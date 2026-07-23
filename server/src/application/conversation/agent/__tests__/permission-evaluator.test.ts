@@ -22,6 +22,7 @@ import {
   buildRememberKey,
   buildRememberKeys,
   mergePolicy,
+  narrowPolicy,
   normalizePolicy,
   getAgentPermissionPolicy,
   getProjectPermissionOverride,
@@ -1457,6 +1458,149 @@ describe('mergePolicy', () => {
     expect(result.enabled).toBe(false);
     expect(result.escalateAlways).toEqual([]);
     expect(result.profile.shellSafe).toBe('block');
+  });
+});
+
+// ============================================
+// narrowPolicy()
+// ============================================
+
+describe('narrowPolicy', () => {
+  const base = makeUnifiedPolicy();
+
+  it('should return parent when override is null/undefined', () => {
+    expect(narrowPolicy(base, null)).toEqual(base);
+    expect(narrowPolicy(base, undefined)).toEqual(base);
+  });
+
+  it('ignores widening of category actions (ask + auto-approve → ask)', () => {
+    const parent = makeUnifiedPolicy({ profile: makeProfile({ shellSafe: 'ask' }) });
+    const result = narrowPolicy(parent, {
+      profile: makeProfile({ shellSafe: 'auto-approve' }),
+    });
+    expect(result.profile.shellSafe).toBe('ask');
+  });
+
+  it('ignores widening from block to a weaker action', () => {
+    const parent = makeUnifiedPolicy({ profile: makeProfile({ destructiveOps: 'block' }) });
+    const result = narrowPolicy(parent, {
+      profile: makeProfile({ destructiveOps: 'ask' }),
+    });
+    expect(result.profile.destructiveOps).toBe('block');
+  });
+
+  it('applies narrowing of category actions (ask + block → block)', () => {
+    const parent = makeUnifiedPolicy({ profile: makeProfile({ shellSafe: 'ask' }) });
+    const result = narrowPolicy(parent, {
+      profile: makeProfile({ shellSafe: 'block' }),
+    });
+    expect(result.profile.shellSafe).toBe('block');
+  });
+
+  it('narrows auto-approve down to ask', () => {
+    const result = narrowPolicy(base, {
+      profile: makeProfile({ fileRead: 'ask' }),
+    });
+    expect(result.profile.fileRead).toBe('ask');
+  });
+
+  it('leaves categories the override does not mention untouched', () => {
+    const parent = makeUnifiedPolicy({ profile: makeProfile({ networkOps: 'ask' }) });
+    const result = narrowPolicy(parent, {
+      profile: { fileWrite: 'block' } as CategoryProfile,
+    });
+    expect(result.profile.networkOps).toBe('ask');
+    expect(result.profile.fileWrite).toBe('block');
+  });
+
+  it('cannot re-enable a disabled parent policy, but can disable an enabled one', () => {
+    const disabledParent = makeUnifiedPolicy({ enabled: false });
+    expect(narrowPolicy(disabledParent, { enabled: true }).enabled).toBe(false);
+    expect(narrowPolicy(base, { enabled: false }).enabled).toBe(false);
+    expect(narrowPolicy(base, { enabled: true }).enabled).toBe(true);
+  });
+
+  it('globalGuards can only be turned on, never off', () => {
+    const parent = makeUnifiedPolicy({
+      globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: false },
+    });
+    const widening = narrowPolicy(parent, {
+      globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: true },
+    });
+    expect(widening.globalGuards.blockSensitiveFiles).toBe(true);
+    expect(widening.globalGuards.blockOutsideWorkspace).toBe(true);
+  });
+
+  it('drops override approve-rules but keeps deny/escalate rules (parent keeps precedence)', () => {
+    const parent = makeUnifiedPolicy({
+      customRules: [{ toolName: 'Bash', action: 'deny' }],
+    });
+    const result = narrowPolicy(parent, {
+      customRules: [
+        { toolName: 'Bash', action: 'approve' },
+        { toolName: 'Write', action: 'deny' },
+        { toolName: 'WebFetch', action: 'escalate' },
+      ],
+    });
+    expect(result.customRules).toEqual([
+      { toolName: 'Bash', action: 'deny' },
+      { toolName: 'Write', action: 'deny' },
+      { toolName: 'WebFetch', action: 'escalate' },
+    ]);
+  });
+
+  it('unions escalateAlways instead of replacing it', () => {
+    const result = narrowPolicy(base, { escalateAlways: ['Bash'] });
+    expect(result.escalateAlways).toContain('AskUserQuestion');
+    expect(result.escalateAlways).toContain('ExitPlanMode');
+    expect(result.escalateAlways).toContain('Bash');
+  });
+
+  it('aiReview can only become stricter', () => {
+    const parent = makeUnifiedPolicy({
+      aiReview: {
+        enabled: true,
+        timeoutBeforeReview: 60,
+        confidenceThreshold: 0.8,
+        maxAutoApprovalsPerMinute: 10,
+      },
+    });
+    const result = narrowPolicy(parent, {
+      aiReview: {
+        enabled: true,
+        timeoutBeforeReview: 5, // would trigger AI review sooner → ignored
+        confidenceThreshold: 0.5, // would auto-approve more → ignored
+        maxAutoApprovalsPerMinute: 50, // would allow more → ignored
+      },
+    });
+    expect(result.aiReview).toEqual(parent.aiReview);
+
+    const stricter = narrowPolicy(parent, {
+      aiReview: {
+        enabled: false,
+        timeoutBeforeReview: 120,
+        confidenceThreshold: 0.95,
+        maxAutoApprovalsPerMinute: 2,
+      },
+    });
+    expect(stricter.aiReview).toEqual({
+      enabled: false,
+      timeoutBeforeReview: 120,
+      confidenceThreshold: 0.95,
+      maxAutoApprovalsPerMinute: 2,
+    });
+  });
+
+  it('integration: narrowed policy keeps parent restrictions under evaluation', () => {
+    const evaluator = new PermissionEvaluator();
+    const parent = makeUnifiedPolicy({ profile: makeProfile({ shellSafe: 'ask' }) });
+    const narrowed = narrowPolicy(parent, {
+      profile: makeProfile({ shellSafe: 'auto-approve' }),
+    });
+    // Widening attempt ignored: ls still escalates instead of auto-approving.
+    expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', narrowed, makeContext())).toBe(
+      'escalate'
+    );
   });
 });
 

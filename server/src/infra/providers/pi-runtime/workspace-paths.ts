@@ -5,9 +5,19 @@ function realpath(filePath: string): string {
   return realpathSync.native?.(filePath) ?? realpathSync(filePath);
 }
 
+/**
+ * True when a path relative to the workspace root escapes it. A bare
+ * `startsWith('..')` would misfire on legitimate in-workspace names like
+ * `..data` or `...config`, so only `..` itself or a `../` (`..\`) prefix
+ * counts as an escape.
+ */
+export function isOutsideWorkspace(relative: string): boolean {
+  return relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative);
+}
+
 function assertInside(realWorkspace: string, candidate: string, rawPath: string): void {
   const relative = path.relative(realWorkspace, candidate);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+  if (isOutsideWorkspace(relative)) {
     throw new Error(`Path is outside workspace: ${rawPath}`);
   }
 }
@@ -18,7 +28,7 @@ export function resolveInsideWorkspace(cwd: string, requestedPath: unknown): str
   const workspace = path.resolve(cwd);
   const resolved = path.resolve(workspace, rawPath);
   const relative = path.relative(workspace, resolved);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+  if (isOutsideWorkspace(relative)) {
     throw new Error(`Path is outside workspace: ${rawPath}`);
   }
   const realWorkspace = realpath(workspace);

@@ -103,6 +103,7 @@ export function buildPiRunToolBundle(input: {
           agentProfile: options.agentProfile,
           permissionOverride: options.permissionOverride,
           permissionCallback,
+          abortSignal: options.abortController?.signal,
         },
       })
     );

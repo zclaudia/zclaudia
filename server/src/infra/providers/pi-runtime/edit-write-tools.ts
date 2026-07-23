@@ -43,7 +43,11 @@ import {
   type MutationStateDescriptor,
 } from './file-state.js';
 import { NOOP_EDIT_HARD_LIMIT, type NoopEditGuard } from './noop-edit-guard.js';
-import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
+import {
+  isOutsideWorkspace,
+  resolveInsideWorkspace,
+  toWorkspaceRelative,
+} from './workspace-paths.js';
 
 type TextBlock = { type: 'text'; text: string };
 type ToolContent = TextBlock[];
@@ -84,6 +88,19 @@ function errorResult(
 function resultDetails(result: FileMutationToolResult): MutationDetails {
   const details = result.details as unknown;
   return details && typeof details === 'object' ? (details as MutationDetails) : {};
+}
+
+// The workspace-relative path of the first failed operation in a patch
+// preflight result, when one is reported (top-level for single-op failures,
+// otherwise the first failing per-file entry).
+function firstPatchFailurePath(details: MutationDetails): string | undefined {
+  if (typeof details.path === 'string') return details.path;
+  if (!Array.isArray(details.perFileResults)) return undefined;
+  for (const entry of details.perFileResults) {
+    const record = entry && typeof entry === 'object' ? (entry as MutationDetails) : undefined;
+    if (record?.ok === false && typeof record.path === 'string') return record.path;
+  }
+  return undefined;
 }
 
 function guardErrorDetails(
@@ -305,8 +322,7 @@ async function resolveWritePath(
   // path compares an absolute argument against the raw, non-canonical cwd.
   const realWorkspace = await realpath(cwd).catch(() => path.resolve(cwd));
   const relToWorkspace = path.relative(realWorkspace, target);
-  const insideWorkspace =
-    relToWorkspace === '' || (!relToWorkspace.startsWith('..') && !path.isAbsolute(relToWorkspace));
+  const insideWorkspace = relToWorkspace === '' || !isOutsideWorkspace(relToWorkspace);
   if (!insideWorkspace) {
     return {
       ok: false,
@@ -733,7 +749,13 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
         patch: {
           type: 'string',
           description:
-            'Optional apply_patch-style multi-file patch. When provided, file_path/old_string/new_string are ignored.',
+            'Optional apply_patch-style multi-file patch. When provided, file_path/old_string/new_string are ignored. Operations apply sequentially and are NOT atomic: a failure partway leaves earlier operations already written to disk (reported as patch_partial_failure). Real runs are preflighted automatically; pass preview_only:true for an explicit dry run before a risky patch.',
+        },
+        preview_only: {
+          type: 'boolean',
+          default: false,
+          description:
+            'When true, validate the edit and compute the diff without writing to disk or updating the snapshot (dry run).',
         },
         hashline_line: {
           type: 'string',
@@ -757,13 +779,41 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
           const perFileResults: MutationDetails[] = [];
           const previewOnly = args.preview_only === true;
           if (!previewOnly) {
-            const editTool = createEditBridgeTool(cwd, options);
-            const preflight = await editTool.execute(`${toolCallId}:preflight`, {
+            // Preflight runs with the noop guard disabled: it is a speculative
+            // dry run, so failures inside it must not count toward
+            // NOOP_EDIT_HARD_LIMIT — only the real run records its own. A
+            // failed preflight short-circuits the real run, so record the
+            // failed patch once here (keyed by patch content, so an adjusted
+            // patch starts fresh) to keep the edit-loop protection intact.
+            const preflightTool = createEditBridgeTool(cwd, { ...options, noopGuard: undefined });
+            const preflight = await preflightTool.execute(`${toolCallId}:preflight`, {
               patch: args.patch,
               preview_only: true,
             });
             const preflightDetails = resultDetails(preflight);
             if (preflightDetails.ok === false) {
+              const failurePath = firstPatchFailurePath(preflightDetails);
+              const attempts = options?.noopGuard
+                ? options.noopGuard.record(
+                    failurePath ? path.resolve(cwd, failurePath) : cwd,
+                    `patch_failed:${hashlineForLine(args.patch)}`
+                  )
+                : 0;
+              if (attempts >= NOOP_EDIT_HARD_LIMIT) {
+                return errorResult(
+                  'edit_loop_detected',
+                  `This patch has failed preflight ${attempts} times` +
+                    (failurePath ? ` (last failure in ${failurePath})` : '') +
+                    '. Read the file again to see its current content before retrying.',
+                  {
+                    ...(failurePath ? { path: failurePath } : {}),
+                    attempts,
+                    ...(preflightDetails.perFileResults
+                      ? { perFileResults: preflightDetails.perFileResults }
+                      : {}),
+                  }
+                );
+              }
               return textResult(
                 buildMutationResultText({
                   action: 'Patch failed preflight',

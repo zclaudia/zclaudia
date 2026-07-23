@@ -55,12 +55,16 @@ function missingReason(toolName: 'Bash' | 'Eval'): SandboxEscalationOutput {
       sandboxed: true,
       privilegeMode: 'sandbox',
       failureClassification: 'not_sandbox_denial',
-      recommendedNextStep: 'Retry with privilege_reason explaining why host execution is necessary.',
+      recommendedNextStep:
+        'Retry with privilege_reason explaining why host execution is necessary.',
     },
   };
 }
 
-function derivedUnsandboxedReason(input: SandboxEscalationInput, details: SandboxExecutionDetails): string {
+function derivedUnsandboxedReason(
+  input: SandboxEscalationInput,
+  details: SandboxExecutionDetails
+): string {
   return (
     input.privilegeReason?.trim() ||
     details.recommendedNextStep ||
@@ -225,7 +229,8 @@ export async function runSandboxedWithEscalation(
       result: {
         ok: false,
         sandboxed: first.sandboxed,
-        outputText: 'Sandbox capability access is required, but no permission channel is available.',
+        outputText:
+          'Sandbox capability access is required, but no permission channel is available.',
         exitCode: first.exitCode,
       },
       details: {
@@ -261,7 +266,12 @@ export async function runSandboxedWithEscalation(
       privilegeMode: 'capability-granted',
       grantsUsed: classified.candidateGrants,
       escalationRequested: true,
+      // On retry failure, keep the classification AND the next step: the model
+      // must learn that the granted capability did not fix it and what would
+      // help instead (another grant, more diagnostics, or unsandboxed mode) —
+      // dropping these left retry failures without any remediation guidance.
       failureClassification: retry.ok ? undefined : classified.classification,
+      recommendedNextStep: retry.ok ? undefined : classified.recommendedNextStep,
       sandboxEvidence: retry.ok ? undefined : classified.evidence,
       ...internalProxyDetails(classified.evidence.internalProxyUrls),
     },

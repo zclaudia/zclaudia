@@ -28,22 +28,6 @@ export function tryGetRegistryModel(provider: string, modelId: string): Registry
 }
 
 /**
- * Cross-provider lookup. Sweeps every pi-ai registered provider for a model
- * whose `id` matches `modelId`, ranks the hits by `contextWindow`
- * (largest first), and returns the winner. Designed for the OpenAI-compat
- * proxy scenario where a user routes (say) `deepseek-v4-flash` through a
- * generic openai endpoint — the same-provider lookup with
- * providerType=`openai` misses, so this fallback finds the entry under the
- * `deepseek` provider key and surfaces the correct context window.
- *
- * Tie-breaker: largest contextWindow wins. The same model id can appear
- * under multiple providers (e.g. `gpt-4o` mirrored across openai +
- * openrouter + vercel-ai-gateway) with subtly different windows; picking the
- * largest is the safest default for compaction triggering (a too-large
- * estimate means we trigger compaction later than ideal, but the user can
- * always override via `models[*].contextWindow`).
- */
-/**
  * All registry providers that declare `modelId`, in registry enumeration
  * order. Used for dialect inheritance, which must consider every provider a
  * model is registered under — not just the contextWindow-ranked winner that
@@ -62,6 +46,22 @@ export function findRegistryProvidersForModel(modelId: string): string[] {
   return providers;
 }
 
+/**
+ * Cross-provider lookup. Sweeps every pi-ai registered provider for a model
+ * whose `id` matches `modelId`, ranks the hits by `contextWindow`
+ * (largest first), and returns the winner. Designed for the OpenAI-compat
+ * proxy scenario where a user routes (say) `deepseek-v4-flash` through a
+ * generic openai endpoint — the same-provider lookup with
+ * providerType=`openai` misses, so this fallback finds the entry under the
+ * `deepseek` provider key and surfaces the correct context window.
+ *
+ * Tie-breaker: largest contextWindow wins. The same model id can appear
+ * under multiple providers (e.g. `gpt-4o` mirrored across openai +
+ * openrouter + vercel-ai-gateway) with subtly different windows; picking the
+ * largest is the safest default for compaction triggering (a too-large
+ * estimate means we trigger compaction later than ideal, but the user can
+ * always override via `models[*].contextWindow`).
+ */
 export function findInRegistryCrossProvider(modelId: string): RegistryHit | undefined {
   const getProvidersFn = getProviders as () => string[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

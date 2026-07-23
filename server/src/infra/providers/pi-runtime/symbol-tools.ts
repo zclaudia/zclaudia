@@ -7,7 +7,7 @@ import type { FileMutationToolOptions } from './edit-write-tools.js';
 import { createEditBridgeTool } from './edit-write-tools.js';
 import type { ReadFileStateStore } from './read-file-state.js';
 import { readTextFileWithMetadata } from './text-io.js';
-import { errorResult, textResult, toolParams } from './tool-common.js';
+import { agentToolParameters, errorResult, textResult, toolParams } from './tool-common.js';
 import { MAX_EDIT_FILE_BYTES } from './write-guards.js';
 import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
 
@@ -36,12 +36,6 @@ interface SymbolMatch {
 
 interface ReadSymbolOptions {
   readFileState?: ReadFileStateStore;
-}
-
-type AgentToolParameters = AgentTool['parameters'];
-
-function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
-  return schema as AgentToolParameters;
 }
 
 function splitLines(content: string): LineInfo[] {

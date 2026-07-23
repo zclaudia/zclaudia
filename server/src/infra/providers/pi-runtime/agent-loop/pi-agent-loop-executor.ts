@@ -27,6 +27,12 @@ export interface AgentLoopExecutorInput {
   sessionId: string;
   cacheRetention?: 'none' | 'short' | 'long';
   streamFn?: StreamFn;
+  /**
+   * Optional caller-owned abort signal. Linked into the executor's internal
+   * abort controller so an external abort cancels the in-flight LLM stream
+   * (not just the turn hooks) instead of waiting out `timeoutMs`.
+   */
+  signal?: AbortSignal;
 }
 
 export interface AgentLoopExecutorResult {
@@ -83,6 +89,19 @@ export const runPiAgentLoop: AgentLoopExecutor = async input => {
   let finalUsage: unknown;
   let terminalError: Error | undefined;
   const abortController = new AbortController();
+  // Link a caller-owned signal into the loop's abort controller so an external
+  // abort cancels the LLM stream immediately; the timeout path below keeps
+  // using the same controller. (AbortSignal.any is avoided to keep the
+  // listener removable and the controller's abort reason internal.)
+  const callerSignal = input.signal;
+  const onCallerAbort = () => abortController.abort();
+  if (callerSignal) {
+    if (callerSignal.aborted) {
+      abortController.abort();
+    } else {
+      callerSignal.addEventListener('abort', onCallerAbort, { once: true });
+    }
+  }
 
   const emit = (event: AgentEvent) => {
     if (event.type !== 'agent_end') return;
@@ -108,7 +127,11 @@ export const runPiAgentLoop: AgentLoopExecutor = async input => {
     ),
     input.timeoutMs,
     () => abortController.abort()
-  );
+  ).finally(() => {
+    // The caller signal may be long-lived (e.g. a workflow-run token shared
+    // across steps); drop the link so each finished run releases its listener.
+    callerSignal?.removeEventListener('abort', onCallerAbort);
+  });
   if (finalMessages.length === 0) {
     finalMessages = returnedMessages;
     finalUsage = extractUsage(finalMessages) ?? extractLastCallUsage(finalMessages);

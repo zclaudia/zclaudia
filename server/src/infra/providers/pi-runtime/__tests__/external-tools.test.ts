@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { existsSync, statSync } from 'node:fs';
+import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
@@ -10,6 +11,7 @@ import { mcpInventoryCache } from '../../../../utils/mcp-inventory-cache.js';
 import {
   buildExternalMetaTools,
   buildExternalProviderCatalog,
+  persistMcpOutput,
   type ExternalToolRuntimeState,
 } from '../external-tools.js';
 
@@ -502,5 +504,60 @@ describe('external progressive tools', () => {
     expect(githubIndex).toBeGreaterThan(alphaIndex);
     expect(catalog).toContain('tools=1, resources=1, prompts=1');
     expect(catalog.length).toBeLessThan(500);
+  });
+});
+
+describe('persistMcpOutput directory hardening (P2)', () => {
+  let dataDir: string;
+  let prevDataDir: string | undefined;
+
+  afterEach(async () => {
+    if (prevDataDir === undefined) delete process.env.ZCLAUDIA_DATA_DIR;
+    else process.env.ZCLAUDIA_DATA_DIR = prevDataDir;
+    delete process.env.ZCLAUDIA_MCP_OUTPUT_DIR;
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  it('defaults to a 0700 directory under the app data dir, files 0600', async () => {
+    dataDir = await mkdtemp(path.join(tmpdir(), 'zclaudia-mcp-home-'));
+    prevDataDir = process.env.ZCLAUDIA_DATA_DIR;
+    process.env.ZCLAUDIA_DATA_DIR = dataDir;
+
+    const saved = await persistMcpOutput('dump', 0, 'payload', 'txt');
+
+    const expectedDir = path.join(dataDir, 'mcp-output');
+    expect(path.dirname(saved)).toBe(expectedDir);
+    expect(statSync(expectedDir).mode & 0o777).toBe(0o700);
+    expect(statSync(saved).mode & 0o777).toBe(0o600);
+    expect(await readFile(saved, 'utf8')).toBe('payload');
+  });
+
+  it('sweeps expired MCP output lazily on each write', async () => {
+    dataDir = await mkdtemp(path.join(tmpdir(), 'zclaudia-mcp-home-'));
+    prevDataDir = process.env.ZCLAUDIA_DATA_DIR;
+    process.env.ZCLAUDIA_DATA_DIR = dataDir;
+    const outputDir = path.join(dataDir, 'mcp-output');
+    await mkdir(outputDir, { recursive: true });
+    const stale = path.join(outputDir, 'stale-1-0.txt');
+    await writeFile(stale, 'stale');
+    const mtime = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    await utimes(stale, mtime, mtime);
+    const fresh = path.join(outputDir, 'fresh-1-0.txt');
+    await writeFile(fresh, 'fresh');
+
+    await persistMcpOutput('new', 0, 'payload', 'txt');
+
+    expect(existsSync(stale)).toBe(false);
+    expect(existsSync(fresh)).toBe(true);
+  });
+
+  it('keeps honoring the ZCLAUDIA_MCP_OUTPUT_DIR override', async () => {
+    dataDir = await mkdtemp(path.join(tmpdir(), 'zclaudia-mcp-override-'));
+    prevDataDir = process.env.ZCLAUDIA_DATA_DIR;
+    process.env.ZCLAUDIA_MCP_OUTPUT_DIR = dataDir;
+
+    const saved = await persistMcpOutput('dump', 0, 'payload', 'txt');
+
+    expect(path.dirname(saved)).toBe(dataDir);
   });
 });

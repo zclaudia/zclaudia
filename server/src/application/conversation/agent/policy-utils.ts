@@ -2,6 +2,7 @@
  * Permission policy utilities — normalization, merging, and database accessors.
  */
 import type {
+  CategoryAction,
   CategoryProfile,
   UnifiedPermissionPolicy,
   EvaluationContext,
@@ -49,6 +50,99 @@ export function mergePolicy(
     merged.escalateAlways = projectOverride.escalateAlways;
 
   return merged;
+}
+
+/**
+ * Category actions ordered by restrictiveness: 'auto-approve' < 'ask' < 'block'.
+ */
+const CATEGORY_ACTION_RANK: Record<CategoryAction, number> = {
+  'auto-approve': 0,
+  ask: 1,
+  block: 2,
+};
+
+function moreRestrictive(a: CategoryAction, b: CategoryAction): CategoryAction {
+  return CATEGORY_ACTION_RANK[a] >= CATEGORY_ACTION_RANK[b] ? a : b;
+}
+
+/**
+ * Intersect a sub-agent-inherited override into the effective policy (P2).
+ *
+ * Unlike {@link mergePolicy} — where the override wins outright — an inherited
+ * override may only NARROW permissions, never widen them: a restriction the
+ * parent effective policy already imposes (global policy + project override)
+ * always survives in the sub-agent. Field semantics:
+ *
+ *   - `enabled`: AND (a disabled parent policy cannot be re-enabled);
+ *   - `profile`: per-category most restrictive action wins
+ *     (parent 'ask' + override 'auto-approve' → stays 'ask';
+ *      parent 'ask' + override 'block' → 'block');
+ *   - `globalGuards`: OR per flag (a guard on in either stays on);
+ *   - `customRules`: parent rules keep precedence; only the override's
+ *     narrowing rules (deny/escalate/continue) are appended — its 'approve'
+ *     rules would widen and are dropped;
+ *   - `escalateAlways`: union (the override can add, never remove);
+ *   - `aiReview`: `enabled` ANDed, `confidenceThreshold`/`timeoutBeforeReview`
+ *     take the max, `maxAutoApprovalsPerMinute` takes the min — so the
+ *     override can only make AI auto-approval harder, never easier.
+ */
+export function narrowPolicy(
+  parentPolicy: UnifiedPermissionPolicy,
+  override?: Partial<UnifiedPermissionPolicy> | null
+): UnifiedPermissionPolicy {
+  if (!override) return parentPolicy;
+
+  const profile: CategoryProfile = { ...parentPolicy.profile };
+  if (override.profile) {
+    for (const [category, action] of Object.entries(override.profile)) {
+      const parentAction = profile[category as keyof CategoryProfile];
+      if (parentAction && action) {
+        profile[category as keyof CategoryProfile] = moreRestrictive(parentAction, action);
+      }
+    }
+  }
+
+  const narrowingRules = (override.customRules ?? []).filter(rule => rule.action !== 'approve');
+
+  return {
+    ...parentPolicy,
+    enabled: parentPolicy.enabled && (override.enabled ?? true),
+    profile,
+    globalGuards: {
+      blockSensitiveFiles:
+        parentPolicy.globalGuards.blockSensitiveFiles ||
+        (override.globalGuards?.blockSensitiveFiles ?? false),
+      blockOutsideWorkspace:
+        parentPolicy.globalGuards.blockOutsideWorkspace ||
+        (override.globalGuards?.blockOutsideWorkspace ?? false),
+    },
+    customRules:
+      override.customRules !== undefined
+        ? [...parentPolicy.customRules, ...narrowingRules]
+        : parentPolicy.customRules,
+    escalateAlways: override.escalateAlways
+      ? [...new Set([...parentPolicy.escalateAlways, ...override.escalateAlways])]
+      : parentPolicy.escalateAlways,
+    aiReview: override.aiReview
+      ? {
+          ...parentPolicy.aiReview,
+          enabled: parentPolicy.aiReview.enabled && (override.aiReview.enabled ?? true),
+          timeoutBeforeReview: Math.max(
+            parentPolicy.aiReview.timeoutBeforeReview,
+            override.aiReview.timeoutBeforeReview ?? parentPolicy.aiReview.timeoutBeforeReview
+          ),
+          confidenceThreshold: Math.max(
+            parentPolicy.aiReview.confidenceThreshold,
+            override.aiReview.confidenceThreshold ?? parentPolicy.aiReview.confidenceThreshold
+          ),
+          maxAutoApprovalsPerMinute: Math.min(
+            parentPolicy.aiReview.maxAutoApprovalsPerMinute,
+            override.aiReview.maxAutoApprovalsPerMinute ??
+              parentPolicy.aiReview.maxAutoApprovalsPerMinute
+          ),
+        }
+      : parentPolicy.aiReview,
+  };
 }
 
 /**

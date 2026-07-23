@@ -1,6 +1,15 @@
+import type { AgentTool } from '@earendil-works/pi-agent-core';
+
 export type TextBlock = { type: 'text'; text: string };
 export type ImageBlock = { type: 'image'; data: string; mimeType: string };
 export type ToolContent = Array<TextBlock | ImageBlock>;
+
+export type AgentToolParameters = AgentTool['parameters'];
+
+/** Shared identity cast for tool parameter schemas (previously copy-pasted per tool module). */
+export function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
+  return schema as AgentToolParameters;
+}
 
 export function textResult<TDetails extends Record<string, unknown> = Record<string, never>>(
   text: string,

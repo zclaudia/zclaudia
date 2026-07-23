@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { execSync } from 'child_process';
 import { mkdtempSync, rmSync, writeFileSync, existsSync, realpathSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
+import { setGatewayClient } from '../../../../infra/gateway/gateway-instance.js';
 import { buildTools } from '../tool-bridge.js';
 
 function git(cwd: string, cmd: string): string {
@@ -35,6 +36,7 @@ describe('EnterWorktree / ExitWorktree tools', () => {
   });
 
   afterEach(() => {
+    setGatewayClient(null);
     rmSync(repo, { recursive: true, force: true });
     db.close();
   });
@@ -121,5 +123,41 @@ describe('EnterWorktree / ExitWorktree tools', () => {
   it('ExitWorktree errors when not currently in a worktree', async () => {
     const res = await tools().ExitWorktree.execute('x1', { action: 'keep' });
     expect(res.details.error).toBe('not_in_worktree');
+  });
+
+  it('normalizes the persisted working directory against the project root (root collapses to NULL)', async () => {
+    // Seed the project row so normalization can compare against root_path.
+    db.prepare(
+      'INSERT INTO projects (id, name, root_path, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('p-test', 'proj', repo, Date.now(), Date.now());
+
+    await tools().EnterWorktree.execute('w1', { name: 'feature-x' });
+    // Entering persists the normalized absolute worktree path (no trailing sep).
+    expect(workingDir()).toBe(
+      path.normalize(path.join(repo, '.worktrees', 'sessions', 'feature-x'))
+    );
+
+    const wtPath = workingDir()!;
+    const built = buildTools(wtPath, { enabled: ['ExitWorktree'], db, sessionId });
+    const res = await (built[0] as any).execute('x1', { action: 'keep' });
+
+    expect(res.details.ok).toBe(true);
+    // Back at the project root, the column collapses to NULL so the session
+    // falls back to projects.root_path — same semantics as run-bootstrap.
+    expect(workingDir()).toBeNull();
+  });
+
+  it('broadcasts a session update after changing the working directory', async () => {
+    const broadcastSessionEvent = vi.fn();
+    setGatewayClient({
+      commands: { backendData: { broadcastSessionEvent } },
+    } as any);
+
+    await tools().EnterWorktree.execute('w1', { name: 'feature-x' });
+
+    expect(broadcastSessionEvent).toHaveBeenCalledWith(
+      'updated',
+      expect.objectContaining({ id: sessionId })
+    );
   });
 });

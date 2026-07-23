@@ -74,4 +74,41 @@ describe('interaction tools', () => {
     expect(result.details).toMatchObject({ ok: true, answered: true });
     expect(result.content[0].text).toContain('Use WebFetch first.');
   });
+
+  it('AskUserQuestion reports answered:false when the user denies or dismisses', async () => {
+    const permissionCallback = vi.fn().mockResolvedValue({ behavior: 'deny' });
+    const ask = createAskUserQuestionTool(permissionCallback as any) as any;
+
+    const result = await ask.execute('question-deny', {
+      questions: [
+        {
+          header: 'Pick one',
+          question: 'Proceed with the risky option?',
+          options: [{ label: 'Yes', description: 'Go ahead' }],
+        },
+      ],
+    });
+
+    // The tool call itself succeeded, but no answer was provided.
+    expect(result.details).toMatchObject({ ok: true, answered: false, behavior: 'deny' });
+    expect(result.content[0].text).toBe('No answer provided.');
+  });
+
+  it('AskUserQuestion reports answered:false when an allow carries no answer text', async () => {
+    const permissionCallback = vi.fn().mockResolvedValue({ behavior: 'allow', message: '  ' });
+    const ask = createAskUserQuestionTool(permissionCallback as any) as any;
+
+    const result = await ask.execute('question-empty', {
+      questions: [
+        {
+          header: 'Pick one',
+          question: 'Any preference?',
+          options: [{ label: 'A', description: 'Option A' }],
+        },
+      ],
+    });
+
+    expect(result.details).toMatchObject({ ok: true, answered: false, behavior: 'allow' });
+    expect(result.content[0].text).toBe('No answer provided.');
+  });
 });

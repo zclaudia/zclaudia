@@ -124,6 +124,12 @@ export class McpClient {
   async connect(): Promise<void> {
     if (this.connected) return;
 
+    // Intentionally NOT env-scrubbed (unlike agent-spawned children via
+    // pi-runtime/env-scrub): MCP servers are user-configured processes that
+    // often legitimately need host credentials from the environment (e.g.
+    // GITHUB_TOKEN for a GitHub MCP server). The user opted the server in;
+    // scrubbing would break configured servers for no threat-model gain,
+    // since the server command itself — not model output — receives the env.
     const mergedEnv = { ...process.env, ...this.env };
     const proc = spawn(this.command, this.args, {
       stdio: ['pipe', 'pipe', 'pipe'],

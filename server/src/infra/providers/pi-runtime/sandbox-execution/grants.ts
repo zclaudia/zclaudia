@@ -42,6 +42,16 @@ export function formatNetworkGrantKey(grant: SandboxNetworkGrant): string {
   return `network:${protocol}://${grant.host}${port}`;
 }
 
+/**
+ * Reduce a structured grant to what the sandbox can actually enforce. The
+ * underlying @anthropic-ai/sandbox-runtime network config accepts host-level
+ * domain patterns only (`allowedDomains: string[]`, matched against the
+ * canonical host — no port or protocol granularity), so approving
+ * `http://host:port` necessarily opens ALL ports and protocols on that host
+ * for the session. This widening is disclosed in the approval text
+ * (buildSandboxCapabilityRequest in permissions.ts); do not "fix" it here by
+ * inventing `host:port` strings — the runtime would reject or misparse them.
+ */
 export function networkGrantToAllowedDomain(grant: SandboxNetworkGrant): string {
   return grant.host;
 }

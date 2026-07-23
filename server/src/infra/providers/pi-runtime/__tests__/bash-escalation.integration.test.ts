@@ -41,7 +41,9 @@ describe('Bash escalate-on-denial (integration, sandbox-gated)', () => {
       asked++;
       expect(req.toolName).toBe('SandboxCapabilityAccess');
       expect(req.toolInput.grants).toEqual(
-        expect.arrayContaining([expect.objectContaining({ type: 'network', host: 'denied.example.com' })])
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'network', host: 'denied.example.com' }),
+        ])
       );
       return { behavior: 'allow' };
     });
@@ -66,7 +68,7 @@ describe('Bash escalate-on-denial (integration, sandbox-gated)', () => {
     });
     const bash = tools.find(t => t.name === 'Bash')!;
     await bash.execute('call1', { command: 'curl -sS https://denied.example.com -o /dev/null' });
-    // The seeded domain is on the allow-list, so detectSandboxDenial filters it out → no escalation prompt.
+    // The seeded domain is on the allow-list, so the sandbox failure classifier filters it out → no escalation prompt.
     expect(asked).toBe(0);
   });
 

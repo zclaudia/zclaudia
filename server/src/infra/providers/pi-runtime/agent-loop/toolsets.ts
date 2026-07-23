@@ -4,12 +4,13 @@ import type {
   AgentLoopPermissionCallback,
   AgentLoopPermissionMode,
 } from '../../../../domains/agent-loop/index.js';
+import { SANDBOX_NETWORK_ACCESS_COMPAT_TOOL } from '../sandbox-execution/index.js';
 import { buildTools } from '../tool-bridge.js';
 import type { PendingArgOverrides } from '../pending-arg-overrides.js';
 
 const SANDBOX_PERMISSION_TOOLS = [
   'CriticalBashCommand',
-  'SandboxNetworkAccess',
+  SANDBOX_NETWORK_ACCESS_COMPAT_TOOL,
   'SandboxCapabilityAccess',
   'SandboxUnsandboxedAccess',
 ] as const;

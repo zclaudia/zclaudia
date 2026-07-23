@@ -6,13 +6,13 @@ import {
   validateTodoItems,
 } from '../../../application/conversation/interactions/todo-normalizer.js';
 import type { PermissionCallback } from '../types.js';
-import { errorResult, jsonResult, textResult, toolParams } from './tool-common.js';
-
-type AgentToolParameters = AgentTool['parameters'];
-
-function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
-  return schema as AgentToolParameters;
-}
+import {
+  agentToolParameters,
+  errorResult,
+  jsonResult,
+  textResult,
+  toolParams,
+} from './tool-common.js';
 
 function extractAskUserQuestionDetail(args: Record<string, unknown>): string {
   const questions = args.questions;
@@ -117,9 +117,12 @@ export function createAskUserQuestionTool(permissionCallback?: PermissionCallbac
         detail: extractAskUserQuestionDetail(args),
         timeoutSeconds: 0,
       });
-      return textResult(decision.message?.trim() || 'No answer provided.', {
+      const answer = decision.message?.trim();
+      return textResult(answer || 'No answer provided.', {
         ok: true,
-        answered: true,
+        // The tool call itself succeeded, but only an allow decision carrying
+        // answer text counts as answered — deny/dismiss yields no answer.
+        answered: decision.behavior === 'allow' && Boolean(answer),
         behavior: decision.behavior,
       });
     },

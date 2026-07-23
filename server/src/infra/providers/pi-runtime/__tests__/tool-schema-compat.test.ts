@@ -127,6 +127,60 @@ describe('Moonshot tool schema compatibility', () => {
     });
   });
 
+  it('merges root anyOf required as the intersection of branch requirements', () => {
+    expect(
+      normalizeMoonshotJsonSchema({
+        anyOf: [
+          {
+            type: 'object',
+            properties: { a: { type: 'string' }, b: { type: 'string' }, c: { type: 'string' } },
+            required: ['a', 'b'],
+          },
+          {
+            type: 'object',
+            properties: { a: { type: 'string' }, b: { type: 'string' }, c: { type: 'string' } },
+            required: ['a', 'c'],
+          },
+        ],
+      })
+    ).toEqual({
+      type: 'object',
+      properties: { a: { type: 'string' }, b: { type: 'string' }, c: { type: 'string' } },
+      required: ['a'],
+    });
+  });
+
+  it('omits required when no key is required by EVERY branch (a union would over-constrain)', () => {
+    // Branch A requires x, branch B requires y — requiring both would reject
+    // valid anyOf inputs. pi re-validates args against the original schema at
+    // execution time, so the dropped guarantee costs model guidance only.
+    const merged = normalizeMoonshotJsonSchema({
+      anyOf: [
+        { type: 'object', properties: { x: { type: 'string' } }, required: ['x'] },
+        { type: 'object', properties: { y: { type: 'string' } }, required: ['y'] },
+      ],
+    }) as Record<string, unknown>;
+    expect(merged.required).toBeUndefined();
+  });
+
+  it('keeps a root-level required alongside the merged intersection', () => {
+    expect(
+      normalizeMoonshotJsonSchema({
+        type: 'object',
+        required: ['base'],
+        properties: { base: { type: 'string' } },
+        anyOf: [
+          { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+          { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] },
+        ],
+      })
+    ).toEqual({
+      type: 'object',
+      properties: { base: { type: 'string' }, a: { type: 'string' } },
+      required: ['base', 'a'],
+    });
+  });
+
   it('wrapStreamFnWithToolSchemaCompat normalizes outbound tools at the stream boundary', async () => {
     const seen: any[] = [];
     const base = ((model: any, context: any, options: any) => {

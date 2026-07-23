@@ -189,6 +189,14 @@ describe('buildTools', () => {
     expect(tools.map(t => t.name).sort()).toEqual(['Bash', 'Read', 'WebFetch']);
   });
 
+  it('dedupes `enabled` names that normalize to the same tool', () => {
+    // 'read' → Read, 'Read' → Read; 'READ' is not a known alias and is skipped.
+    // Pre-fix this produced two same-named tools, which some provider APIs reject.
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const tools = buildTools('/tmp', { enabled: ['read', 'Read', 'READ'] });
+    expect(tools.map(t => t.name)).toEqual(['Read']);
+  });
+
   it('applies `overrides` to replace specific implementations', () => {
     const mockRead = {
       name: 'read',
@@ -879,7 +887,7 @@ describe('buildTools', () => {
     });
     const parsed = JSON.parse(result.content[0].text);
 
-    expect(result.details).toMatchObject({ ok: true, pattern: 'target', total: 3 });
+    expect(result.details).toMatchObject({ ok: true, pattern: 'target', total: 1, returned: 3 });
     expect(parsed.results).toEqual([
       expect.objectContaining({
         file: 'src/feature.ts',

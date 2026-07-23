@@ -7,7 +7,6 @@ import {
   createWriteStream,
   renameSync,
 } from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import type { Readable, Writable } from 'stream';
 import type { TaskRecord, TaskStatus } from '@zclaudia/shared/core/task';
@@ -18,20 +17,31 @@ import {
   networkGrantToAllowedDomain,
   type SandboxGrant,
 } from '../../../infra/providers/pi-runtime/sandbox-execution/index.js';
+import { resolveDataDir, sweepStaleLogs } from '../../../utils/data-dir.js';
 import { type TaskRepository } from '../repository.js';
 import { TaskService } from '../task-service.js';
 import type { TaskExecutor, TaskExecutorUpdate } from './types.js';
 
 const TERMINAL: ReadonlySet<TaskStatus> = new Set(['completed', 'failed', 'stopped']);
 
-export function resolveDataDir(): string {
-  return process.env.ZCLAUDIA_DATA_DIR
-    ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
-    : path.join(os.homedir(), '.zclaudia');
-}
+// resolveDataDir lives in utils/data-dir.ts (single source, shared with
+// bash-runner); re-exported so existing consumers keep working.
+export { resolveDataDir };
 
 export function commandTaskLogPath(taskId: string): string {
   return path.join(resolveDataDir(), 'task-logs', `${taskId}.log`);
+}
+
+/**
+ * task-logs/ previously accumulated forever; mirror the bash-logs policy
+ * (utils/data-dir.ts sweepStaleLogs): 24h TTL, swept opportunistically when a
+ * new task log is created — no background timer. A running task's log keeps a
+ * fresh mtime through appends, so only quiet-for-24h logs are collected.
+ */
+const TASK_LOG_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function sweepStaleTaskLogs(): void {
+  sweepStaleLogs(path.join(resolveDataDir(), 'task-logs'), TASK_LOG_MAX_AGE_MS);
 }
 
 /**
@@ -63,6 +73,34 @@ export function pidAlive(pid: number): boolean {
     return true;
   } catch (err) {
     return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/**
+ * Grace windows for stop(): SIGKILL, confirm death within ~2.5s, one
+ * escalation round, then report if the process still will not die.
+ */
+const STOP_CONFIRM_TIMEOUT_MS = 2500;
+const STOP_ESCALATION_TIMEOUT_MS = 1000;
+const STOP_CONFIRM_POLL_MS = 100;
+
+/** Interval for the reconcile-attached pid exit watcher (poll; cross-platform). */
+const PID_WATCH_INTERVAL_MS = 1000;
+
+/** Task ids with an attached pid exit watcher (dedupes across executor instances). */
+const pidExitWatchTasks = new Set<string>();
+
+/**
+ * Poll until the pid is gone or the timeout expires. Polling with awaits —
+ * rather than one immediate check — lets the event loop reap a zombie child,
+ * whose pid otherwise still answers kill(pid, 0).
+ */
+async function confirmProcessExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (!pidAlive(pid)) return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise(r => setTimeout(r, STOP_CONFIRM_POLL_MS));
   }
 }
 
@@ -133,6 +171,7 @@ export class CommandTaskExecutor implements TaskExecutor {
 
     const logPath = commandTaskLogPath(task.id);
     mkdirSync(path.dirname(logPath), { recursive: true });
+    sweepStaleTaskLogs();
     const fd = openSync(logPath, 'a');
     let child;
     try {
@@ -184,6 +223,7 @@ export class CommandTaskExecutor implements TaskExecutor {
     const command = typeof meta.command === 'string' ? meta.command : '';
     const logPath = commandTaskLogPath(task.id);
     mkdirSync(path.dirname(logPath), { recursive: true });
+    sweepStaleTaskLogs();
 
     // Freeze live output while the pre-handoff capture is moved/copied into
     // the log so entries stay chronological; the pipes buffer in the meantime
@@ -316,6 +356,16 @@ export class CommandTaskExecutor implements TaskExecutor {
     try {
       const current = this.repo.findById(taskId);
       if (!current || TERMINAL.has(current.status)) return;
+      // Structured exit code: TaskOutput reads metadata.exitCode instead of
+      // parsing the result text (text parsing remains as a legacy fallback
+      // for tasks finalized before this field existed).
+      if (typeof exitCode === 'number') {
+        try {
+          this.repo.update(taskId, { metadata: { exitCode } });
+        } catch {
+          // best-effort metadata; the lifecycle transition below must still run
+        }
+      }
       if (errorNote) {
         this.service.failTask(taskId, { error: errorNote });
       } else if (exitCode === 0) {
@@ -335,12 +385,46 @@ export class CommandTaskExecutor implements TaskExecutor {
     const task = this.repo.findById(taskId);
     if (!task) return { status: 'stopped' };
     const pid = task.executorRef?.pid;
-    if (typeof pid === 'number') killProcessTree(pid);
+    // Only signal a live task: a terminal task's pid may have been recycled
+    // by the OS, and killing the recycled process would be wrong (same
+    // PID-reuse caveat as pidAlive).
+    const hasLivePid = typeof pid === 'number' && !TERMINAL.has(task.status);
+    // Settle BEFORE the confirm wait: our own kill fires the child's exit
+    // watch within a tick, and that watch must not win the race and mark a
+    // user-requested stop as 'failed'.
     if (!TERMINAL.has(task.status)) {
       try {
         this.service.stopTask(taskId, reason ? { error: reason } : undefined);
       } catch {
         // already transitioned by the exit watch — fine
+      }
+    }
+    if (hasLivePid) {
+      killProcessTree(pid);
+      if (!(await confirmProcessExit(pid, STOP_CONFIRM_TIMEOUT_MS))) {
+        killProcessTree(pid); // escalation round: re-SIGKILL, one more window
+        if (!(await confirmProcessExit(pid, STOP_ESCALATION_TIMEOUT_MS))) {
+          // Report the unconfirmed kill on the settled result; the task stays
+          // 'stopped' either way — we no longer track the process.
+          try {
+            const stopped = this.repo.findById(taskId);
+            const base = stopped?.result?.error ?? reason;
+            this.repo.update(taskId, {
+              result: {
+                ...stopped?.result,
+                error: [
+                  base,
+                  `process ${pid} could not be confirmed dead after two kill rounds; ` +
+                    'it may still be running (or the pid was reused)',
+                ]
+                  .filter(Boolean)
+                  .join('; '),
+              },
+            });
+          } catch {
+            // best-effort annotation — the stop itself already succeeded
+          }
+        }
       }
     }
     const after = this.repo.findById(taskId);
@@ -361,7 +445,9 @@ export class CommandTaskExecutor implements TaskExecutor {
   /**
    * Startup reconcile: command tasks recorded as queued/running from a previous
    * server life. queued → never actually started → stopped. running + dead pid →
-   * stopped with a note. running + live pid → re-adopted (left as-is).
+   * stopped with a note. running + live pid → left running with an exit watcher
+   * attached, so the task settles when the process exits instead of only when
+   * TaskOutput happens to poll it.
    */
   reconcile(): void {
     for (const task of this.repo.listByTypeAndStatuses('command', ['queued', 'running'])) {
@@ -369,10 +455,44 @@ export class CommandTaskExecutor implements TaskExecutor {
         const pid = task.executorRef?.pid;
         if (task.status === 'queued' || typeof pid !== 'number' || !pidAlive(pid)) {
           this.service.stopTask(task.id, { error: 'process not found after server restart' });
+        } else if (task.status === 'running') {
+          this.watchPidForExit(task.id, pid);
         }
       } catch {
         // best-effort
       }
     }
+  }
+
+  /**
+   * Watch a live orphaned pid from a previous server life (we hold no
+   * ChildProcess handle for it, so exit events are unavailable) and finalize
+   * the task once the process is gone. Same PID-reuse caveat as pidAlive: a
+   * recycled pid keeps the task "running" until the replacement exits —
+   * accepted best-effort, mirroring the TaskOutput liveness settle.
+   */
+  private watchPidForExit(taskId: string, pid: number): void {
+    if (pidExitWatchTasks.has(taskId)) return;
+    pidExitWatchTasks.add(taskId);
+    const timer = setInterval(() => {
+      try {
+        const current = this.repo.findById(taskId);
+        if (!current || TERMINAL.has(current.status)) {
+          clearInterval(timer);
+          pidExitWatchTasks.delete(taskId);
+          return;
+        }
+        if (!pidAlive(pid)) {
+          clearInterval(timer);
+          pidExitWatchTasks.delete(taskId);
+          this.service.completeTask(taskId, {
+            text: 'Process exited (exit code unknown; observed after restart)',
+          });
+        }
+      } catch {
+        // keep watching — a transient repo error must not lose the watcher
+      }
+    }, PID_WATCH_INTERVAL_MS);
+    timer.unref();
   }
 }

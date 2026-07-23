@@ -21,6 +21,7 @@ import {
   isInternalInteractionTool,
   isOutsideWorkspacePathAllowed,
   mergePolicy,
+  narrowPolicy,
   normalizePolicy,
   PermissionEvaluator,
   resolveRememberedDecision,
@@ -438,7 +439,18 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           : DEFAULT_UNIFIED_POLICY;
 
       if (sessionPermissionOverride) {
-        effectivePolicy = mergePolicy(effectivePolicy, sessionPermissionOverride);
+        // P2: distinguish WHERE the override comes from. On an 'agent'-type
+        // session the override is inherited from the parent run (Agent tool →
+        // task metadata → agent-task-runner's run_start), so it is intersected:
+        // it may only NARROW the effective policy, never widen a restriction
+        // the global/project policy already imposes on the sub-agent. On
+        // regular/background sessions the override comes from the trusted host
+        // (UI) for the user's own session and may legitimately widen — keep
+        // merge semantics there.
+        effectivePolicy =
+          sessionType === 'agent'
+            ? narrowPolicy(effectivePolicy, sessionPermissionOverride)
+            : mergePolicy(effectivePolicy, sessionPermissionOverride);
       }
 
       // Union the active provider's policy-declared always-escalate tools

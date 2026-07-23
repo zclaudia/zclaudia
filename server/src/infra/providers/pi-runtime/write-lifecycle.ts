@@ -49,7 +49,23 @@ export type DeferredDiagnosticsResult =
   | { status: 'completed'; diagnostics: WriteLifecycleDiagnostic[] }
   | { status: 'failed'; error: string };
 
-const deferredDiagnostics = new Map<string, DeferredDiagnosticsResult>();
+interface DeferredDiagnosticsEntry {
+  createdAt: number;
+  result: DeferredDiagnosticsResult;
+}
+
+const deferredDiagnostics = new Map<string, DeferredDiagnosticsEntry>();
+
+// Deferred results are polled once by the client and then forgotten; without
+// eviction the map would grow by one entry per write for the process's life.
+const DEFERRED_DIAGNOSTICS_TTL_MS = 10 * 60 * 1000;
+
+// Lazy sweep (no timer): entries older than the TTL are evicted on access.
+function sweepDeferredDiagnostics(now: number): void {
+  for (const [id, entry] of deferredDiagnostics) {
+    if (now - entry.createdAt > DEFERRED_DIAGNOSTICS_TTL_MS) deferredDiagnostics.delete(id);
+  }
+}
 
 const DEFAULT_WRITE_LIFECYCLE_TIMEOUT_MS = 2_000;
 
@@ -128,22 +144,43 @@ export function scheduleDeferredDiagnostics(
   input: WriteLifecycleInput
 ): WriteLifecycleResult | undefined {
   if (!provider) return undefined;
+  sweepDeferredDiagnostics(Date.now());
   const id = randomUUID();
-  deferredDiagnostics.set(id, { status: 'pending' });
+  deferredDiagnostics.set(id, { createdAt: Date.now(), result: { status: 'pending' } });
   Promise.resolve()
     .then(() => provider(input))
     .then(diagnostics => {
-      deferredDiagnostics.set(id, { status: 'completed', diagnostics });
+      const entry = deferredDiagnostics.get(id);
+      // The entry may already be evicted (TTL) — dropping the result is fine,
+      // late diagnostics are best-effort.
+      if (entry) {
+        deferredDiagnostics.set(id, {
+          ...entry,
+          result: { status: 'completed', diagnostics },
+        });
+      }
     })
     .catch(err => {
-      deferredDiagnostics.set(id, {
-        status: 'failed',
-        error: err instanceof Error ? err.message : String(err),
-      });
+      const entry = deferredDiagnostics.get(id);
+      if (entry) {
+        deferredDiagnostics.set(id, {
+          ...entry,
+          result: {
+            status: 'failed',
+            error: err instanceof Error ? err.message : String(err),
+          },
+        });
+      }
     });
   return { deferredDiagnostics: { id, status: 'pending' } };
 }
 
 export function getDeferredDiagnosticsResult(id: string): DeferredDiagnosticsResult | undefined {
-  return deferredDiagnostics.get(id);
+  sweepDeferredDiagnostics(Date.now());
+  const entry = deferredDiagnostics.get(id);
+  if (!entry) return undefined;
+  // Terminal results are single-read: the client stops polling once it has a
+  // completed/failed result, so free the entry instead of holding it to the TTL.
+  if (entry.result.status !== 'pending') deferredDiagnostics.delete(id);
+  return entry.result;
 }

@@ -10,17 +10,33 @@ import {
   worktreeBranch,
 } from '../../../utils/agent-worktrees.js';
 import { listGitWorktrees } from '../../../utils/git-worktrees.js';
-import { errorResult, textResult, toolParams } from './tool-common.js';
+import { normalizeSessionWorkingDirectory } from '../../../utils/server-utils.js';
+import { getGatewayClient } from '../../gateway/gateway-instance.js';
+import { agentToolParameters, errorResult, textResult, toolParams } from './tool-common.js';
 
 export interface WorktreeToolOptions {
   db?: Database.Database;
   sessionId?: string;
 }
 
-type AgentToolParameters = AgentTool['parameters'];
-
-function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
-  return schema as AgentToolParameters;
+/** Same payload shape as server-state's SessionSyncPort.broadcastSessionUpdated. */
+function broadcastSessionUpdated(db: Database.Database, sessionId: string): void {
+  const gatewayClient = getGatewayClient();
+  if (!gatewayClient) return;
+  const updatedSession = db
+    .prepare(
+      `
+      SELECT s.id, s.name, s.updated_at as updatedAt, s.archived_at as archivedAt
+      FROM sessions s
+      WHERE s.id = ?
+    `
+    )
+    .get(sessionId) as
+    | { id: string; name?: string; updatedAt?: number; archivedAt?: number | null }
+    | undefined;
+  if (updatedSession) {
+    gatewayClient.commands.backendData.broadcastSessionEvent('updated', updatedSession);
+  }
 }
 
 function persistWorkingDirectory(
@@ -28,11 +44,27 @@ function persistWorkingDirectory(
   sessionId: string,
   dir: string | null
 ): void {
+  // Mirror run-bootstrap's persist path (which a raw UPDATE bypassed): normalize
+  // against the project root — a directory equal to the root persists NULL so
+  // the session falls back to root_path — then broadcast so connected clients
+  // observe the new working directory.
+  const session = db
+    .prepare(
+      `
+      SELECT p.root_path AS rootPath
+      FROM sessions s
+      LEFT JOIN projects p ON s.project_id = p.id
+      WHERE s.id = ?
+    `
+    )
+    .get(sessionId) as { rootPath?: string | null } | undefined;
+  const normalized = normalizeSessionWorkingDirectory(dir, session?.rootPath ?? null);
   db.prepare('UPDATE sessions SET working_directory = ?, updated_at = ? WHERE id = ?').run(
-    dir,
+    normalized,
     Date.now(),
     sessionId
   );
+  broadcastSessionUpdated(db, sessionId);
 }
 
 function isUnderSessionWorktrees(cwd: string): boolean {

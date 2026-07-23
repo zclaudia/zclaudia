@@ -1,9 +1,19 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { buildTools } from '../tool-bridge.js';
-import { __shutdownAllEvalKernelsForTests } from '../eval-kernel.js';
+import { EvalKernel, __shutdownAllEvalKernelsForTests } from '../eval-kernel.js';
+import { __resetEvalPrivilegeKeyHistoryForTests } from '../eval-tool.js';
 import { __resetSandboxCacheForTests } from '../sandbox.js';
 
 let counter = 0;
@@ -19,6 +29,7 @@ function makeEval(options: Record<string, unknown> = {}): { tool: any; dir: stri
 describe('Eval tool', () => {
   afterEach(async () => {
     await __shutdownAllEvalKernelsForTests();
+    __resetEvalPrivilegeKeyHistoryForTests();
   });
 
   it('evaluates an expression and returns its value', async () => {
@@ -208,5 +219,85 @@ describe('Eval tool', () => {
     expect(fullOutputStat.mode & 0o777).toBe(0o600);
     expect(fullOutput).toContain('x'.repeat(1000));
     expect(fullOutput).toContain('done');
+  });
+
+  it('flags kernelRestarted with grants_changed when a session grant changes the kernel key', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-eval-grants-'));
+    const sessionId = `eval-grants-${process.pid}-${counter++}`;
+    const makeTool = (sandboxAllowedDomains: string[]) =>
+      buildTools(dir, { enabled: ['Eval'], sessionId, sandboxAllowedDomains }).find(
+        (t: any) => t.name === 'Eval'
+      );
+
+    const first = makeTool(['one.example.com']);
+    await first.execute('e1', { code: 'var grantState = "held"' });
+
+    // Simulate a later run after the session persisted an additional network
+    // grant: the privilege key changes, so this cell runs in a fresh kernel.
+    const second = makeTool(['one.example.com', 'two.example.com']);
+    const restarted = await second.execute('e2', { code: 'typeof grantState' });
+
+    expect(restarted.details.ok).toBe(true);
+    expect(restarted.details.kernelRestarted).toBe(true);
+    expect(restarted.details.kernelRestartReason).toBe('grants_changed');
+    // The state really is gone — the flag is honest, not cosmetic.
+    expect(restarted.content[0].text).toContain('undefined');
+
+    // Stable grants → the next cell reuses the new kernel without a flag.
+    const stable = await second.execute('e3', { code: '1' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(stable.details.kernelRestarted).toBeUndefined();
+    expect(stable.details.kernelRestartReason).toBeUndefined();
+  });
+
+  it('deletes the temp kernel script on shutdown and rewrites it on the next exec', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-eval-script-'));
+    const kernel = new EvalKernel({ workspaceRoot: dir });
+    try {
+      const res = await kernel.exec('1 + 1');
+      expect(res.ok).toBe(true);
+      const scriptPath = kernel.scriptFilePath;
+      expect(scriptPath).toBeDefined();
+      expect(scriptPath).toContain('zclaudia-eval-kernel-');
+      expect(existsSync(scriptPath!)).toBe(true);
+
+      kernel.shutdown();
+      expect(existsSync(scriptPath!)).toBe(false);
+      expect(kernel.scriptFilePath).toBeUndefined();
+
+      // The kernel stays usable: a later exec writes a fresh script.
+      const after = await kernel.exec('2 + 2');
+      expect(after.ok).toBe(true);
+      expect(after.output).toContain('4');
+      expect(kernel.scriptFilePath).toBeDefined();
+    } finally {
+      kernel.shutdown();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('sweeps stale eval output logs (24h TTL) when a new cell writes one', async () => {
+    const logsDir = path.join(tmpdir(), 'zclaudia-eval-logs');
+    mkdirSync(logsDir, { recursive: true });
+    const stamp = `${process.pid}-${Date.now()}`;
+    const stalePath = path.join(logsDir, `stale-${stamp}.log`);
+    const freshPath = path.join(logsDir, `fresh-${stamp}.log`);
+    writeFileSync(stalePath, 'old eval output');
+    writeFileSync(freshPath, 'recent eval output');
+    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    utimesSync(stalePath, twoDaysAgo, twoDaysAgo);
+
+    const { tool, dir } = makeEval();
+    // Any cell routes through evalLogPath(), which sweeps before writing.
+    const res = await tool.execute('e-sweep', { code: '1' });
+
+    expect(res.details.ok).toBe(true);
+    const staleExists = existsSync(stalePath);
+    const freshExists = existsSync(freshPath);
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(freshPath, { force: true });
+    rmSync(stalePath, { force: true });
+    expect(staleExists).toBe(false);
+    expect(freshExists).toBe(true);
   });
 });

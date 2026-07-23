@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ToolName } from '@zclaudia/shared/core/tools';
+import { SANDBOX_NETWORK_ACCESS_COMPAT_TOOL } from '../../sandbox-execution/index.js';
 import { buildAgentLoopTools, getAgentLoopToolsetDescriptor } from '../toolsets.js';
 
 const EXPECTED_PERMISSION_TOOLS = [
@@ -44,6 +45,16 @@ describe('agent-loop builtin toolsets', () => {
       permissionMode: 'allow-declared-tools',
       sandboxReadOnly: false,
     });
+  });
+
+  it('declares the sandbox network compat tool through the shared constant (P2 single-source)', () => {
+    // The literal 'SandboxNetworkAccess' used to be repeated here, in
+    // sandbox-denial.ts (now deleted), and in sandbox-execution/permissions.ts.
+    // The toolset must reference the one exported constant.
+    expect(EXPECTED_PERMISSION_TOOLS).toContain(SANDBOX_NETWORK_ACCESS_COMPAT_TOOL);
+    expect(getAgentLoopToolsetDescriptor('workflow-prompt')?.permissionTools).toContain(
+      SANDBOX_NETWORK_ACCESS_COMPAT_TOOL
+    );
   });
 
   it('rejects unknown toolsets', () => {

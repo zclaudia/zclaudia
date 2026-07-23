@@ -926,4 +926,227 @@ describe('progressive skill runtime', () => {
     expect(state.loadedSkills).toEqual([]);
     expect(state.loadedSkillContents).toEqual({});
   });
+
+  it('returns a structured InvokeSkill error when skill content is unavailable', async () => {
+    loadDiscoveredSkillContentMock.mockResolvedValue(null);
+    const state = createSkillRuntimeState([
+      {
+        id: 'coding-guidelines',
+        name: 'coding-guidelines',
+        description: 'Follow project conventions',
+        source: 'workspace',
+        filePath: '/skills/coding-guidelines/SKILL.md',
+        dirPath: '/skills/coding-guidelines',
+      },
+    ]);
+    const invokeSkill = buildSkillMetaTools({ state }).find(tool => tool.name === 'InvokeSkill')!;
+
+    // Plain-text failure bodies used to throw inside JSON.parse and then have
+    // their ok:false masked by a forced ok:true spread; both are gone now.
+    const result = await invokeSkill.execute('invoke-unavailable', {
+      input: '/coding-guidelines',
+    });
+
+    expect(jsonFrom(result)).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'skill_content_unavailable',
+        ref: { source: 'workspace', id: 'coding-guidelines' },
+      })
+    );
+    expect(result.details).toMatchObject({ ok: false, error: 'skill_content_unavailable' });
+    expect(state.loadedSkills).toEqual([]);
+    expect(state.loadedSkillContents).toEqual({});
+  });
+
+  it('returns a structured direct-invocation error when skill content is unavailable', async () => {
+    loadDiscoveredSkillContentMock.mockResolvedValue(null);
+    const state = createSkillRuntimeState([
+      {
+        id: 'coding-guidelines',
+        name: 'coding-guidelines',
+        description: 'Follow project conventions',
+        source: 'workspace',
+        filePath: '/skills/coding-guidelines/SKILL.md',
+        dirPath: '/skills/coding-guidelines',
+      },
+    ]);
+
+    const result = await prepareDirectSkillInvocation(state, '/coding-guidelines');
+
+    expect(result).toEqual({
+      matched: true,
+      ok: false,
+      error: 'skill_content_unavailable',
+      ref: { source: 'workspace', id: 'coding-guidelines' },
+      message: 'Skill content unavailable: workspace/coding-guidelines',
+    });
+    expect(recordSkillUsageMock).not.toHaveBeenCalled();
+    expect(state.loadedSkills).toEqual([]);
+  });
+
+  it('returns a structured timeout error when the forked skill agent hangs', async () => {
+    loadDiscoveredSkillContentMock.mockResolvedValue('# Audit\nReview the target carefully.');
+    const previousTimeout = process.env.ZCLAUDIA_SKILL_FORK_TIMEOUT_MS;
+    process.env.ZCLAUDIA_SKILL_FORK_TIMEOUT_MS = '50';
+    try {
+      const state = createSkillRuntimeState([
+        {
+          id: 'security-audit',
+          name: 'security-audit',
+          description: 'Audit and report',
+          source: 'external',
+          filePath: '/skills/security-audit/SKILL.md',
+          dirPath: '/skills/security-audit',
+        },
+      ]);
+      const runSkill = buildSkillMetaTools({
+        state,
+        execution: {
+          cwd: '/tmp/project',
+          enabledTools: ['Read'],
+          agentFactory: () => ({
+            subscribe: () => () => {},
+            prompt: vi.fn(() => new Promise<void>(() => {})), // never settles
+          }),
+        },
+      } as any).find(tool => tool.name === 'RunSkill')!;
+
+      const result = await runSkill.execute('run-timeout', {
+        ref: { source: 'external', id: 'security-audit' },
+        task: 'Review everything',
+        mode: 'fork',
+      });
+
+      expect(jsonFrom(result)).toEqual(
+        expect.objectContaining({
+          ok: false,
+          error: 'skill_execution_timeout',
+          executionId: expect.any(String),
+        })
+      );
+    } finally {
+      if (previousTimeout === undefined) delete process.env.ZCLAUDIA_SKILL_FORK_TIMEOUT_MS;
+      else process.env.ZCLAUDIA_SKILL_FORK_TIMEOUT_MS = previousTimeout;
+    }
+  });
+
+  it('resolves a hanging fork with an aborted error when the parent abort signal fires', async () => {
+    loadDiscoveredSkillContentMock.mockResolvedValue('# Audit\nReview the target carefully.');
+    const controller = new AbortController();
+    const state = createSkillRuntimeState([
+      {
+        id: 'security-audit',
+        name: 'security-audit',
+        description: 'Audit and report',
+        source: 'external',
+        filePath: '/skills/security-audit/SKILL.md',
+        dirPath: '/skills/security-audit',
+      },
+    ]);
+    const runSkill = buildSkillMetaTools({
+      state,
+      execution: {
+        cwd: '/tmp/project',
+        enabledTools: ['Read'],
+        abortSignal: controller.signal,
+        agentFactory: () => ({
+          subscribe: () => () => {},
+          prompt: vi.fn(() => new Promise<void>(() => {})), // never settles
+        }),
+      },
+    } as any).find(tool => tool.name === 'RunSkill')!;
+
+    const pending = runSkill.execute('run-abort', {
+      ref: { source: 'external', id: 'security-audit' },
+      task: 'Review everything',
+      mode: 'fork',
+    });
+    setTimeout(() => controller.abort(), 20);
+    const result = await pending;
+
+    expect(jsonFrom(result)).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'skill_execution_aborted',
+      })
+    );
+  });
+
+  it('only forbids file modifications in the fork prompt when the policy grants no write tools', async () => {
+    loadDiscoveredSkillContentMock.mockResolvedValue('# Worker\nDo the task.');
+    const systemPrompts: string[] = [];
+    const agentFactory = (opts: any) => {
+      systemPrompts.push(opts.initialState.systemPrompt);
+      let listener: ((event: any) => void) | undefined;
+      return {
+        subscribe: (fn: (event: any) => void) => {
+          listener = fn;
+          return () => {
+            listener = undefined;
+          };
+        },
+        prompt: vi.fn(async () => {
+          listener?.({
+            type: 'agent_end',
+            messages: [{ role: 'assistant', content: [{ type: 'text', text: 'Done.' }] }],
+          });
+        }),
+      };
+    };
+    const state = createSkillRuntimeState([
+      {
+        id: 'editor',
+        name: 'editor',
+        description: 'Edit files',
+        source: 'workspace',
+        filePath: '/skills/editor/SKILL.md',
+        dirPath: '/skills/editor',
+        execution: {
+          allowedModes: ['fork'],
+          defaultMode: 'fork',
+          forkToolPolicy: 'workspace-edit',
+        },
+      },
+      {
+        id: 'reviewer',
+        name: 'reviewer',
+        description: 'Audit and report',
+        source: 'external',
+        filePath: '/skills/reviewer/SKILL.md',
+        dirPath: '/skills/reviewer',
+        execution: {
+          allowedModes: ['fork'],
+          defaultMode: 'fork',
+          forkToolPolicy: 'read-only',
+        },
+      },
+    ]);
+    const runSkill = buildSkillMetaTools({
+      state,
+      execution: {
+        cwd: '/tmp/project',
+        enabledTools: ['Read', 'Grep', 'Write', 'Edit'],
+        agentFactory,
+      },
+    } as any).find(tool => tool.name === 'RunSkill')!;
+
+    await runSkill.execute('run-edit', {
+      ref: { source: 'workspace', id: 'editor' },
+      task: 'Edit the file',
+      mode: 'fork',
+    });
+    await runSkill.execute('run-review', {
+      ref: { source: 'external', id: 'reviewer' },
+      task: 'Review the diff',
+      mode: 'fork',
+    });
+
+    // workspace-edit forks get Write/Edit tools, so the prompt must not tell
+    // the worker it may not modify files; read-only forks keep the guardrail.
+    expect(systemPrompts[0]).not.toContain('Do not modify files');
+    expect(systemPrompts[1]).toContain(
+      'Do not modify files unless a future policy explicitly grants write access.'
+    );
+  });
 });

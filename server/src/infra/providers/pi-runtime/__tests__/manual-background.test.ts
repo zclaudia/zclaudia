@@ -35,7 +35,7 @@ describe('inflight foreground command registry', () => {
       sessionId: 's1',
       toolUseId: 't1',
       command: 'sleep 5',
-      startedAt: 1,
+      startedAt: Date.now(),
       requestBackground: () => {},
     });
     expect(listInflightForegroundCommands('s1')).toHaveLength(1);
@@ -49,14 +49,14 @@ describe('inflight foreground command registry', () => {
       sessionId: 's1',
       toolUseId: 't-new',
       command: 'b',
-      startedAt: 200,
+      startedAt: Date.now() - 1000,
       requestBackground: () => fired.push('t-new'),
     });
     registerInflightForegroundCommand({
       sessionId: 's1',
       toolUseId: 't-old',
       command: 'a',
-      startedAt: 100,
+      startedAt: Date.now() - 2000,
       requestBackground: () => fired.push('t-old'),
     });
     const result = requestBackgroundForCommand('s1');
@@ -70,7 +70,7 @@ describe('inflight foreground command registry', () => {
       sessionId: 's1',
       toolUseId: 't1',
       command: 'a',
-      startedAt: 1,
+      startedAt: Date.now(),
       requestBackground: () => fired.push('t1'),
     });
     const miss = requestBackgroundForCommand('s1', 'nope');

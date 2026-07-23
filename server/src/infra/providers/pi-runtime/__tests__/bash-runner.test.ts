@@ -1,8 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, statSync, utimesSync } from 'fs';
+import {
+  mkdtempSync,
+  rmSync,
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  statSync,
+  utimesSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { runBash, persistBashFullOutput, BASH_SPILL_MAX_BYTES } from '../bash-runner.js';
+import {
+  runBash,
+  persistBashFullOutput,
+  BASH_SPILL_MAX_BYTES,
+  formatShellNotFoundMessage,
+  resolveWindowsShell,
+} from '../bash-runner.js';
 
 const TMP = () => mkdtempSync(join(tmpdir(), 'zc-bash-'));
 
@@ -218,6 +232,56 @@ describe('runBash', () => {
   });
 });
 
+describe('resolveWindowsShell (P2: shell-resolution ENOENT)', () => {
+  it('finds Git bash in ProgramFiles before falling back to PATH', () => {
+    const resolution = resolveWindowsShell({
+      programFiles: 'C:\\Program Files',
+      pathEnv: 'C:\\Windows',
+      exists: candidate => candidate === 'C:\\Program Files\\Git\\bin\\bash.exe',
+    });
+    expect(resolution).toEqual({
+      found: true,
+      shell: 'C:\\Program Files\\Git\\bin\\bash.exe',
+      args: ['-c'],
+    });
+  });
+
+  it('falls back to a PATH bash.exe and spawns it by bare name', () => {
+    const resolution = resolveWindowsShell({
+      programFiles: undefined,
+      programFilesX86: undefined,
+      pathEnv: 'C:\\Windows;D:\\tools',
+      exists: candidate => candidate === 'D:\\tools\\bash.exe',
+    });
+    expect(resolution).toEqual({ found: true, shell: 'bash', args: ['-c'] });
+  });
+
+  it('reports not-found with every probed path when no bash exists', () => {
+    const resolution = resolveWindowsShell({
+      programFiles: 'C:\\Program Files',
+      programFilesX86: 'C:\\Program Files (x86)',
+      pathEnv: 'C:\\Windows',
+      exists: () => false,
+    });
+    expect(resolution.found).toBe(false);
+    if (!resolution.found) {
+      expect(resolution.probedPaths).toEqual([
+        'C:\\Program Files\\Git\\bin\\bash.exe',
+        'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+        'C:\\Windows\\bash.exe',
+      ]);
+    }
+  });
+
+  it('the structured shell_not_found message names the probed paths', () => {
+    const probed = ['C:\\Program Files\\Git\\bin\\bash.exe', 'C:\\Windows\\bash.exe'];
+    const message = formatShellNotFoundMessage(probed);
+    expect(message).toContain('shell_not_found');
+    for (const p of probed) expect(message).toContain(p);
+    expect(message).toContain('Git for Windows');
+  });
+});
+
 describe('runBash env scrubbing (P0-3)', () => {
   it('strips secret-looking env vars from the child environment', async () => {
     const dir = TMP();
@@ -242,7 +306,8 @@ describe('runBash env scrubbing (P0-3)', () => {
     process.env.ZC_TEST_PLAIN_VAR = 'plain-value';
     try {
       const r = await runBash({
-        command: 'echo "path=${#PATH} plain=$ZC_TEST_PLAIN_VAR"; command -v sh >/dev/null && echo sh-found',
+        command:
+          'echo "path=${#PATH} plain=$ZC_TEST_PLAIN_VAR"; command -v sh >/dev/null && echo sh-found',
         cwd: dir,
         timeoutSec: 10,
       });

@@ -8,6 +8,7 @@
 import * as path from 'path';
 import { toolRegistry } from '../../../application/plugins/index.js';
 import { MemoryStore } from '../memory/memory-store.js';
+import { loadSessionSandboxDomains } from '../agent/permission-memory.js';
 import { isBlockedHostname } from './network-guard.js';
 import { readResponseBodyWithBudget } from './stream-read.js';
 import { scrubEnv } from '../../../infra/providers/pi-runtime/env-scrub.js';
@@ -253,7 +254,16 @@ export function registerAgentTools(config: {
         // pi-runtime Bash tool). When sandboxing is available, the wrapped
         // argv replaces the raw `/bin/sh -c`; otherwise fall back to a
         // secret-scrubbed environment.
-        const wrap = await wrapCommand(command, { workspaceRoot: cwd });
+        // P2: thread the session's granted sandbox network domains from
+        // permission_memories (same source the pi-runtime Bash path uses via
+        // run-tools) so hosts the user approved for this session are reachable
+        // from the sandboxed agent_shell too. Fails open to [] on db errors
+        // (loadSessionSandboxDomains degrades defensively).
+        const sessionId = context?.sessionId as string | undefined;
+        const wrap = await wrapCommand(command, {
+          workspaceRoot: cwd,
+          extraAllowedDomains: sessionId ? loadSessionSandboxDomains(db, sessionId) : [],
+        });
         const spawnSpec =
           wrap.sandboxed && wrap.argv && wrap.argv.length > 0
             ? { command: wrap.argv[0], args: wrap.argv.slice(1), env: wrap.env }
@@ -494,7 +504,8 @@ export function registerAgentTools(config: {
       // tripped on the byte cap, so a stalled server hung the tool forever).
       // Env-overridable so tests can exercise the timeout quickly.
       const parsedTimeout = Number(process.env.ZCLAUDIA_AGENT_HTTP_TIMEOUT_MS);
-      const timeoutMs = Number.isFinite(parsedTimeout) && parsedTimeout > 0 ? parsedTimeout : 30_000;
+      const timeoutMs =
+        Number.isFinite(parsedTimeout) && parsedTimeout > 0 ? parsedTimeout : 30_000;
       const controller = new AbortController();
       let timedOut = false;
       const timeout = setTimeout(() => {

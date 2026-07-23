@@ -11,13 +11,7 @@ import {
   truncateMcpTextContent,
 } from './external-tools.js';
 import type { ToolContent } from './tool-common.js';
-import { errorResult, toolParams } from './tool-common.js';
-
-type AgentToolParameters = AgentTool['parameters'];
-
-function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
-  return schema as AgentToolParameters;
-}
+import { agentToolParameters, errorResult, toolParams } from './tool-common.js';
 
 function normalizeMcpToolContent(
   content: Array<{ type: string; text?: string; data?: unknown; mimeType?: unknown }>
@@ -135,10 +129,7 @@ export function createMcpTool(db?: Database.Database): AgentTool {
         );
         // P1-15: same output budget as concrete tools — truncate oversized text
         // and persist the full output to disk instead of flooding model context.
-        const output = await truncateMcpTextContent(
-          normalizeMcpToolContent(result.content),
-          tool
-        );
+        const output = await truncateMcpTextContent(normalizeMcpToolContent(result.content), tool);
         return {
           content: output.content,
           details: {

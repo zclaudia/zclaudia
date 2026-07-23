@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, symlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { buildTools } from '../tool-bridge.js';
-import { substituteMetaVariables } from '../ast-tools.js';
+import { collectAstFiles, substituteMetaVariables } from '../ast-tools.js';
 
 function getTools(dir: string): Record<string, any> {
   const tools = buildTools(dir, { enabled: ['AstGrep', 'AstEdit'] });
@@ -47,6 +47,46 @@ describe('AstGrep', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.ok).toBe(true);
     expect(res.details.matches).toBe(0);
+  });
+});
+
+describe('collectAstFiles', () => {
+  it('terminates on symlink cycles without duplicating files', async () => {
+    const dir = makeWorkspace();
+    // loop -> root, sub/up -> root: both resolve to an already-visited realpath.
+    symlinkSync(dir, path.join(dir, 'loop'), 'dir');
+    symlinkSync(dir, path.join(dir, 'sub', 'up'), 'dir');
+
+    const files = await collectAstFiles(dir);
+    const rel = files.map(f => path.relative(dir, f)).sort();
+    rmSync(dir, { recursive: true, force: true });
+
+    expect(rel).toEqual(['a.ts', 'sub/b.ts']);
+  });
+
+  it('skips vendor and node_modules directories', async () => {
+    const dir = makeWorkspace();
+    mkdirSync(path.join(dir, 'vendor'));
+    writeFileSync(path.join(dir, 'vendor', 'v.ts'), 'console.log("v");\n');
+    mkdirSync(path.join(dir, 'node_modules'));
+    writeFileSync(path.join(dir, 'node_modules', 'n.ts'), 'console.log("n");\n');
+
+    const files = await collectAstFiles(dir);
+    const rel = files.map(f => path.relative(dir, f)).sort();
+    rmSync(dir, { recursive: true, force: true });
+
+    expect(rel).toEqual(['a.ts', 'sub/b.ts']);
+  });
+
+  it('follows symlinks to files', async () => {
+    const dir = makeWorkspace();
+    symlinkSync(path.join(dir, 'a.ts'), path.join(dir, 'linked.ts'));
+
+    const files = await collectAstFiles(dir);
+    const rel = files.map(f => path.relative(dir, f)).sort();
+    rmSync(dir, { recursive: true, force: true });
+
+    expect(rel).toEqual(['a.ts', 'linked.ts', 'sub/b.ts']);
   });
 });
 

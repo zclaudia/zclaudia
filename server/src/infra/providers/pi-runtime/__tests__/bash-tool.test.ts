@@ -283,4 +283,13 @@ describe('Bash bridge tool module', () => {
     expect(logStat.mode & 0o777).toBe(0o600);
     expect(log.length).toBe(200000);
   });
+
+  it('description discloses that shell control syntax skips tool-routing steering (P2)', () => {
+    // Any pipeline/compound command bypasses the LS/Glob/Grep routing guards;
+    // the model must be told, or it cannot predict when steering applies.
+    const bash = createBashBridgeTool('/tmp');
+    expect(bash.description).toContain('shell control syntax');
+    expect(bash.description).toMatch(/pipeline|compound/);
+    expect(bash.description).toContain('skips that steering');
+  });
 });

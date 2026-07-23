@@ -21,6 +21,8 @@ const {
   mcpInventoryCacheMock,
   isBashLikeToolMock,
   isSandboxAvailableMock,
+  mergePolicyMock,
+  narrowPolicyMock,
 } = vi.hoisted(() => ({
   isBashLikeToolMock: vi.fn(() => true),
   isSandboxAvailableMock: vi.fn(() => false),
@@ -28,6 +30,8 @@ const {
   normalizeFromAskUserMock: vi.fn(),
   permissionEvaluatorEvaluateMock: vi.fn(() => 'ask'),
   evaluateMcpToolTrustPolicyMock: vi.fn(() => 'escalate'),
+  mergePolicyMock: vi.fn((globalPolicy: unknown) => globalPolicy),
+  narrowPolicyMock: vi.fn((parentPolicy: unknown) => parentPolicy),
   getAgentPermissionPolicyMock: vi.fn(() => ({
     enabled: false,
     profile: {
@@ -86,7 +90,8 @@ vi.mock('../../agent/permission-evaluator.js', () => ({
   getProjectPermissionOverride: vi.fn(() => undefined),
   isInternalInteractionTool: vi.fn(() => false),
   isOutsideWorkspacePathAllowed: vi.fn(() => false),
-  mergePolicy: vi.fn(globalPolicy => globalPolicy),
+  mergePolicy: mergePolicyMock,
+  narrowPolicy: narrowPolicyMock,
   normalizePolicy: vi.fn(policy => policy),
   evaluateMcpToolTrustPolicy: evaluateMcpToolTrustPolicyMock,
   PermissionEvaluator: class {
@@ -350,6 +355,57 @@ describe('createPermissionCallback workflow routing', () => {
     );
     await Promise.resolve();
     expect(input.permissionBridge.setWorkflowRunId).toHaveBeenCalledWith('req-1', 'wf-run-1');
+  });
+
+  it('intersects (narrow-only) an inherited override on agent sessions (P2)', () => {
+    const input = createInput() as any;
+    input.sessionType = 'agent';
+    input.message = {
+      sessionId: 'session-1',
+      permissionOverride: { profile: { shellSafe: 'auto-approve' } },
+    };
+    const callback = createPermissionCallback(input);
+
+    void callback({
+      requestId: 'req-agent-narrow',
+      toolName: 'Bash',
+      toolInput: { command: 'grep -n "foo" /tmp/outside/file' },
+      detail: 'grep -n "foo" /tmp/outside/file',
+      timeoutSeconds: 0,
+    });
+
+    // Inherited override → narrowPolicy (cannot widen the effective policy).
+    expect(narrowPolicyMock).toHaveBeenCalledTimes(1);
+    expect(narrowPolicyMock).toHaveBeenCalledWith(expect.anything(), {
+      profile: { shellSafe: 'auto-approve' },
+    });
+    // mergePolicy ran only for the global+project merge, not for the override.
+    expect(mergePolicyMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps merge semantics for a trusted-host override on regular sessions (P2)', () => {
+    const input = createInput() as any;
+    input.sessionType = 'regular';
+    input.message = {
+      sessionId: 'session-1',
+      permissionOverride: { profile: { shellSafe: 'auto-approve' } },
+    };
+    const callback = createPermissionCallback(input);
+
+    void callback({
+      requestId: 'req-regular-merge',
+      toolName: 'Bash',
+      toolInput: { command: 'grep -n "foo" /tmp/outside/file' },
+      detail: 'grep -n "foo" /tmp/outside/file',
+      timeoutSeconds: 0,
+    });
+
+    expect(narrowPolicyMock).not.toHaveBeenCalled();
+    // global+project merge, then the session override merge.
+    expect(mergePolicyMock).toHaveBeenCalledTimes(2);
+    expect(mergePolicyMock).toHaveBeenLastCalledWith(expect.anything(), {
+      profile: { shellSafe: 'auto-approve' },
+    });
   });
 
   it('passes effective AI review settings to the permission workflow payload', () => {

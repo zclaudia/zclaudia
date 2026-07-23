@@ -24,6 +24,15 @@ function createDb(projectRoot: string): Database.Database {
       id TEXT PRIMARY KEY,
       root_path TEXT
     );
+
+    CREATE TABLE permission_memories (
+      session_id TEXT NOT NULL,
+      remember_key TEXT NOT NULL,
+      decision TEXT CHECK(decision IN ('allow', 'deny')) NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (session_id, remember_key)
+    );
   `);
   db.prepare(`INSERT INTO projects (id, root_path) VALUES ('project-1', ?)`).run(projectRoot);
   db.prepare(`INSERT INTO sessions (id, project_id) VALUES ('session-1', 'project-1')`).run();
@@ -66,7 +75,9 @@ describe('agent-tools/agent_shell', () => {
   it('scrubs secret-looking environment variables from the child (P1-16)', async () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test-secret';
 
-    const result = await execute({ command: 'echo "key=[$ANTHROPIC_API_KEY] path_set=$([ -n "$PATH" ] && echo yes)"' });
+    const result = await execute({
+      command: 'echo "key=[$ANTHROPIC_API_KEY] path_set=$([ -n "$PATH" ] && echo yes)"',
+    });
     const parsed = JSON.parse(result);
 
     expect(parsed.exitCode).toBe(0);
@@ -94,7 +105,8 @@ describe('agent-tools/agent_shell', () => {
 
   it('truncates runaway output head+tail instead of buffering it all (P1-16)', async () => {
     const result = await execute({
-      command: 'i=0; while [ $i -lt 4000 ]; do echo "line-$i-padding-padding-padding"; i=$((i+1)); done',
+      command:
+        'i=0; while [ $i -lt 4000 ]; do echo "line-$i-padding-padding-padding"; i=$((i+1)); done',
     });
     const parsed = JSON.parse(result);
 
@@ -110,32 +122,34 @@ describe('agent-tools/agent_shell', () => {
   it('passes the scrubbed env and /bin/sh argv through the process supervisor when present', async () => {
     process.env.ANTHROPIC_API_KEY = 'sk-test-secret';
 
-    const trackCommand = vi.fn(async (spec: {
-      command: string;
-      args: string[];
-      cwd?: string;
-      env?: Record<string, string | undefined>;
-    }) => {
-      const child = spawn(spec.command, spec.args, {
-        cwd: spec.cwd,
-        env: spec.env as NodeJS.ProcessEnv,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      return {
-        processId: 'proc-1',
-        pid: child.pid ?? null,
-        pgid: null,
-        handle: {
-          stdout: child.stdout,
-          stderr: child.stderr,
-          stdin: child.stdin,
-          exitPromise: new Promise<{ code: number | null; signal: string | null }>(resolve =>
-            child.once('exit', (code, signal) => resolve({ code, signal }))
-          ),
-          kill: (signal?: NodeJS.Signals) => child.kill(signal),
-        },
-      };
-    });
+    const trackCommand = vi.fn(
+      async (spec: {
+        command: string;
+        args: string[];
+        cwd?: string;
+        env?: Record<string, string | undefined>;
+      }) => {
+        const child = spawn(spec.command, spec.args, {
+          cwd: spec.cwd,
+          env: spec.env as NodeJS.ProcessEnv,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        return {
+          processId: 'proc-1',
+          pid: child.pid ?? null,
+          pgid: null,
+          handle: {
+            stdout: child.stdout,
+            stderr: child.stderr,
+            stdin: child.stdin,
+            exitPromise: new Promise<{ code: number | null; signal: string | null }>(resolve =>
+              child.once('exit', (code, signal) => resolve({ code, signal }))
+            ),
+            kill: (signal?: NodeJS.Signals) => child.kill(signal),
+          },
+        };
+      }
+    );
 
     toolRegistry.clear();
     registerAgentTools({

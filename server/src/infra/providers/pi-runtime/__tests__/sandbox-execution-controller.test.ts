@@ -14,6 +14,52 @@ function failedCurl(): SandboxOperationResult {
 }
 
 describe('runSandboxedWithEscalation', () => {
+  it('carries the recommended next step when the granted-capability retry still fails', async () => {
+    const permissionCallback = vi.fn(async () => ({ behavior: 'allow' as const }));
+    const operation = vi.fn<[], Promise<SandboxOperationResult>>().mockResolvedValue(failedCurl()); // sandboxed attempt AND retry both fail
+
+    const result = await runSandboxedWithEscalation({
+      toolCallId: 'call-retry-fail',
+      toolName: 'Bash',
+      sourceText: 'curl -sS http://api.internal.corp:8000/health',
+      allowedDomains: new Set(),
+      sandboxMode: 'auto',
+      operation,
+      permissionCallback,
+    });
+
+    expect(operation).toHaveBeenCalledTimes(2);
+    expect(result.result.ok).toBe(false);
+    expect(result.details.privilegeMode).toBe('capability-granted');
+    // The model must see that the grant did not fix it and what to try next —
+    // dropping these fields left retry failures without remediation guidance.
+    expect(result.details.failureClassification).toBe('confirmed_sandbox_denial');
+    expect(result.details.recommendedNextStep).toContain('SandboxCapabilityAccess');
+    expect(result.details.recommendedNextStep).toContain('api.internal.corp');
+  });
+
+  it('clears classification guidance once the granted retry succeeds', async () => {
+    const permissionCallback = vi.fn(async () => ({ behavior: 'allow' as const }));
+    const operation = vi
+      .fn<[], Promise<SandboxOperationResult>>()
+      .mockResolvedValueOnce(failedCurl())
+      .mockResolvedValueOnce({ ok: true, sandboxed: true, outputText: 'ok', exitCode: 0 });
+
+    const result = await runSandboxedWithEscalation({
+      toolCallId: 'call-retry-ok',
+      toolName: 'Bash',
+      sourceText: 'curl -sS http://api.internal.corp:8000/health',
+      allowedDomains: new Set(),
+      sandboxMode: 'auto',
+      operation,
+      permissionCallback,
+    });
+
+    expect(result.result.ok).toBe(true);
+    expect(result.details.failureClassification).toBeUndefined();
+    expect(result.details.recommendedNextStep).toBeUndefined();
+  });
+
   it('asks capability permission and reruns with grants on confirmed denial', async () => {
     const permissionCallback = vi.fn(async () => ({ behavior: 'allow' as const }));
     const persistGrant = vi.fn();

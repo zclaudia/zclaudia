@@ -14,6 +14,17 @@ describe('Read bridge tool module', () => {
     expect(read.parameters.properties.hashline).toMatchObject({ type: 'boolean' });
   });
 
+  it('documents the structural-summary trigger and the full:true escape hatch', () => {
+    const read = createReadBridgeTool('/tmp') as any;
+
+    // The default for large files is a folded skeleton, not raw lines — the
+    // model must be told the trigger thresholds and how to opt out.
+    expect(read.description).toContain('structural summary');
+    expect(read.description).toContain('250+ lines');
+    expect(read.description).toContain('30%');
+    expect(read.description).toContain('full:true');
+  });
+
   it('supports line offset and limit with structured details', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-module-'));
     await writeFile(path.join(root, 'sample.ts'), ['one', 'two', 'three', 'four'].join('\n'));

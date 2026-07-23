@@ -1,5 +1,7 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
+import * as path from 'path';
 import type { ToolName } from '@zclaudia/shared/core/tools';
+import { SESSION_WORKTREES_DIR } from '../../../utils/agent-worktrees.js';
 
 export interface ToolExecutionEvent {
   toolName: ToolName;
@@ -21,21 +23,61 @@ export function toolParams(first: unknown, second: unknown): Record<string, unkn
   return candidate && typeof candidate === 'object' ? (candidate as Record<string, unknown>) : {};
 }
 
-export function extractTouchedPaths(toolName: ToolName, params: Record<string, unknown>): string[] {
+// Mirrors slugify() in utils/agent-worktrees.ts (not exported there) — the
+// EnterWorktree `name` argument materializes at .worktrees/sessions/<slug>.
+// Keep the two in sync.
+function worktreeSlug(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40) || 'wt'
+  );
+}
+
+/**
+ * The primary workspace path a tool call touches, derived from the
+ * model-visible args. Single extraction point shared by the execution
+ * observer (skill activation) and tool telemetry so both agree on what "the
+ * file" of a call is; covers every path-carrying built-in tool. Returns
+ * undefined for tools without a path argument — ExitWorktree included: its
+ * target (the main worktree root) is session state, not an args value.
+ */
+export function extractToolPathParam(
+  toolName: ToolName | string,
+  params: Record<string, unknown> | undefined
+): string | undefined {
   const value = (() => {
-    if (
-      toolName === 'Read' ||
-      toolName === 'Write' ||
-      toolName === 'Edit' ||
-      toolName === 'MultiEdit' ||
-      toolName === 'ReadSymbol' ||
-      toolName === 'EditSymbol'
-    )
-      return params.path ?? params.file_path;
-    if (toolName === 'Grep' || toolName === 'Glob' || toolName === 'LS') return params.path;
-    return undefined;
+    switch (toolName) {
+      case 'Read':
+      case 'Write':
+      case 'Edit':
+      case 'MultiEdit':
+      case 'ReadSymbol':
+      case 'EditSymbol':
+      case 'Grep':
+      case 'Glob':
+      case 'LS':
+      case 'AstGrep':
+      case 'AstEdit':
+        return params?.path ?? params?.file_path ?? params?.filePath;
+      case 'EnterWorktree': {
+        const name = params?.name;
+        return typeof name === 'string'
+          ? path.join(SESSION_WORKTREES_DIR, worktreeSlug(name))
+          : undefined;
+      }
+      default:
+        return undefined;
+    }
   })();
-  return typeof value === 'string' && value.trim() ? [value.trim()] : [];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+export function extractTouchedPaths(toolName: ToolName, params: Record<string, unknown>): string[] {
+  const value = extractToolPathParam(toolName, params);
+  return value ? [value] : [];
 }
 
 export function withToolName(tool: AgentTool, name: ToolName, label: string = name): AgentTool {

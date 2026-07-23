@@ -24,8 +24,13 @@ function cloneRecord(record: Record<string, unknown>): Record<string, unknown> {
  * shape `{ type: 'object', anyOf: [...] }`. Nested schemas must move the type
  * into each anyOf branch. Tool roots are stricter still: the OpenAI-compatible
  * envelope requires `type: 'object'`, making a root anyOf impossible. At the
- * root we therefore merge branch properties, drop the combinator for model
- * guidance, and leave exact validation to the original execution-time schema.
+ * root we therefore merge branch properties, keep only the `required` keys
+ * every branch agrees on (intersection — a union would over-constrain the
+ * anyOf), drop the combinator for model guidance, and leave exact validation
+ * to the original execution-time schema: normalizeToolSchemasForModel returns
+ * outbound-only copies and pi re-validates args against the ORIGINAL schema
+ * before execute, so anything the merge cannot express degrades model
+ * guidance, never correctness.
  */
 export function normalizeMoonshotJsonSchema(schema: unknown, isRoot = true): unknown {
   if (Array.isArray(schema)) {
@@ -58,8 +63,28 @@ export function normalizeMoonshotJsonSchema(schema: unknown, isRoot = true): unk
         if (!(name in mergedProperties)) mergedProperties[name] = propertySchema;
       }
     }
+    // `required` merges as the INTERSECTION of branch requirements: a key is
+    // required in the merged root only when EVERY branch requires it. A union
+    // would be wrong for anyOf semantics (branch A requiring x and branch B
+    // requiring y must not force both). Keys the merge cannot prove required
+    // stay optional for the model and are still enforced at execution time
+    // against the original schema (see the module-header note).
+    const branchRequired = branches.map(branch =>
+      isRecord(branch) && Array.isArray(branch.required)
+        ? branch.required.filter((key): key is string => typeof key === 'string')
+        : []
+    );
+    const intersection =
+      branchRequired.length > 0
+        ? branchRequired.reduce((acc, keys) => acc.filter(key => keys.includes(key)))
+        : [];
+    const existingRequired = Array.isArray(next.required)
+      ? next.required.filter((key): key is string => typeof key === 'string')
+      : [];
+    const mergedRequired = [...new Set([...existingRequired, ...intersection])];
     next.type = 'object';
     if (Object.keys(mergedProperties).length > 0) next.properties = mergedProperties;
+    if (mergedRequired.length > 0) next.required = mergedRequired;
     delete next.anyOf;
     return next;
   }
@@ -131,7 +156,11 @@ type AnyStreamFn = (model: any, context: any, options?: any) => any;
 export function wrapStreamFnWithToolSchemaCompat<T extends AnyStreamFn>(base: T): T {
   const wrapped = (model: any, context: any, options?: any) =>
     context?.tools
-      ? base(model, { ...context, tools: normalizeToolSchemasForModel(context.tools, model) }, options)
+      ? base(
+          model,
+          { ...context, tools: normalizeToolSchemasForModel(context.tools, model) },
+          options
+        )
       : base(model, context, options);
   return wrapped as T;
 }

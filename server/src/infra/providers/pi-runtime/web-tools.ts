@@ -8,38 +8,23 @@ import { getWebSearchProviderConfig } from '../../../domains/web-search/config.j
 import { isPrivateOrReservedIp } from '../../../utils/ip-guard.js';
 import { extractPdfText } from './rich-read.js';
 import { htmlToMarkdown, stripHtmlToText, shouldExtractAsHtml } from './web-extract.js';
-import { errorResult, jsonResult, textResult, toolParams, truncateText } from './tool-common.js';
-
-type AgentToolParameters = AgentTool['parameters'];
-
-function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
-  return schema as AgentToolParameters;
-}
+import {
+  agentToolParameters,
+  errorResult,
+  textResult,
+  toolParams,
+  truncateText,
+} from './tool-common.js';
 
 const USER_AGENT = 'ZClaudia-Agent/1.0';
 const REQUEST_TIMEOUT_MS = 30_000;
+/** Overall wall-clock budget for the whole redirect chain (not per hop). */
+const FETCH_TOTAL_TIMEOUT_MS = 90_000;
 const MAX_REDIRECTS = 8;
 const DEFAULT_FETCH_MAX_BYTES = 5 * 1024 * 1024;
 const HARD_FETCH_MAX_BYTES = 25 * 1024 * 1024;
 const DEFAULT_OUTPUT_CHARS = 80_000;
 const HARD_OUTPUT_CHARS = 200_000;
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<\/?(p|div|br|h[1-6]|li|tr|article|section)[^>]*>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
 
 function stringArrayParam(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -200,10 +185,10 @@ function parseDuckDuckGoResults(
     const url = decodeSearchUrl(linkMatch[1] || '');
     return [
       {
-        title: stripHtml(linkMatch[2] || ''),
+        title: stripHtmlToText(linkMatch[2] || ''),
         url,
         domain: urlDomain(url),
-        snippet: stripHtml(
+        snippet: stripHtmlToText(
           /<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/i.exec(block)?.[1] ??
             /<div[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/div>/i.exec(block)?.[1] ??
             ''
@@ -389,10 +374,10 @@ function createSearxngSearchProvider(baseUrl: string): WebSearchProvider {
         if (!result.url) return [];
         return [
           {
-            title: stripHtml(result.title ?? ''),
+            title: stripHtmlToText(result.title ?? ''),
             url: result.url,
             domain: urlDomain(result.url),
-            snippet: stripHtml(result.content ?? result.snippet ?? ''),
+            snippet: stripHtmlToText(result.content ?? result.snippet ?? ''),
             ...(typeof result.score === 'number' ? { score: result.score } : {}),
             ...(result.publishedDate ? { publishedDate: result.publishedDate } : {}),
           },
@@ -435,15 +420,15 @@ function createBraveSearchProvider(apiKey: string): WebSearchProvider {
         if (!result.url) return [];
         return [
           {
-            title: stripHtml(result.title ?? ''),
+            title: stripHtmlToText(result.title ?? ''),
             url: result.url,
             domain: urlDomain(result.url),
-            snippet: stripHtml(result.description ?? ''),
+            snippet: stripHtmlToText(result.description ?? ''),
             ...(result.age || result.page_age ? { pageAge: result.age ?? result.page_age } : {}),
             ...(Array.isArray(result.extra_snippets)
               ? {
                   extraSnippets: result.extra_snippets
-                    .map(snippet => stripHtml(snippet))
+                    .map(snippet => stripHtmlToText(snippet))
                     .filter(Boolean),
                 }
               : {}),
@@ -522,10 +507,7 @@ async function validatePublicHttpUrl(
   } catch {
     return { ok: false, reason: 'dns_lookup_failed' };
   }
-  if (
-    addresses.length === 0 ||
-    addresses.some(({ address }) => isPrivateOrReservedIp(address))
-  ) {
+  if (addresses.length === 0 || addresses.some(({ address }) => isPrivateOrReservedIp(address))) {
     return { ok: false, reason: 'blocked_private_network' };
   }
 
@@ -617,13 +599,14 @@ interface FetchedPublicBody {
   contentLength?: number;
 }
 
-async function fetchPublicHttpBody(
+// Exported for tests (redirect-budget coverage).
+export async function fetchPublicHttpBody(
   rawUrl: string,
   options: {
     maxBytes: number;
     allowedDomains: string[];
     blockedDomains: string[];
-    useCache: boolean;
+    totalTimeoutMs?: number;
   }
 ): Promise<
   | { ok: true; value: FetchedPublicBody }
@@ -631,8 +614,20 @@ async function fetchPublicHttpBody(
 > {
   let currentUrl = rawUrl;
   const redirects: Array<{ from: string; to: string; status: number }> = [];
+  // One wall-clock budget spans the whole redirect chain — otherwise
+  // MAX_REDIRECTS+1 hops times the per-hop timeout could stall for minutes.
+  const deadline = Date.now() + (options.totalTimeoutMs ?? FETCH_TOTAL_TIMEOUT_MS);
 
   for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
+      return {
+        ok: false,
+        code: 'fetch_timeout',
+        message: 'WebFetch exceeded its overall time budget while following redirects',
+        details: { url: currentUrl, redirects },
+      };
+    }
     const validation = await validatePublicHttpUrl(currentUrl);
     if (!validation.ok) {
       return {
@@ -658,16 +653,15 @@ async function fetchPublicHttpBody(
     }
 
     const dispatcher = createPinnedDispatcher(validation.addresses);
-    const requestInit = {
+    const requestInit: RequestInit = {
       redirect: 'manual',
-      cache: options.useCache ? 'default' : 'no-store',
       headers: {
         'User-Agent': USER_AGENT,
         Accept:
           'text/html,application/xhtml+xml,application/json,text/plain,text/markdown,application/pdf,*/*;q=0.8',
       },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    } as RequestInit & { cache?: 'default' | 'no-store' };
+      signal: AbortSignal.timeout(Math.min(REQUEST_TIMEOUT_MS, remainingMs)),
+    };
     // Node's fetch accepts an undici dispatcher; typed separately because the
     // global RequestInit type references a different undici-types version.
     (requestInit as { dispatcher?: unknown }).dispatcher = dispatcher;
@@ -757,7 +751,21 @@ function isTextLikeContentType(contentType: string): boolean {
   );
 }
 
-function decodeBodyText(body: Buffer): string {
+function charsetFromContentType(contentType: string): string | undefined {
+  const match = /charset\s*=\s*"?([^";\s]+)"?/i.exec(contentType);
+  return match?.[1]?.trim().toLowerCase() || undefined;
+}
+
+function decodeBodyText(body: Buffer, contentType?: string): string {
+  const charset = contentType ? charsetFromContentType(contentType) : undefined;
+  if (charset && charset !== 'utf-8' && charset !== 'utf8') {
+    try {
+      // GBK / Shift_JIS / ISO-8859-* etc. decode via their WHATWG label.
+      return new TextDecoder(charset, { fatal: false }).decode(body);
+    } catch {
+      // Unknown label (RangeError) — fall back to UTF-8 below.
+    }
+  }
   return new TextDecoder('utf-8', { fatal: false }).decode(body);
 }
 
@@ -770,7 +778,7 @@ export function createWebFetchTool(): AgentTool {
     name: 'WebFetch',
     label: 'WebFetch',
     description:
-      'Fetch a public URL and return its content. Redirects are followed only after each target is revalidated. HTML pages are extracted to clean Markdown; PDFs are text-extracted; JSON/plain text/markdown are returned as-is. Supports domain filters, cache bypass, and response size limits.',
+      'Fetch a public URL and return its content. Redirects (max 8 hops within a 90s overall budget) are followed only after each target is revalidated. HTML pages are extracted to clean Markdown; PDFs are text-extracted; JSON/plain text/markdown are returned as-is. Supports domain filters and response size limits.',
     parameters: agentToolParameters({
       type: 'object',
       properties: {
@@ -797,11 +805,6 @@ export function createWebFetchTool(): AgentTool {
           default: DEFAULT_OUTPUT_CHARS,
           description: 'Maximum characters returned to the model.',
         },
-        use_cache: {
-          type: 'boolean',
-          default: true,
-          description: 'Set false to bypass HTTP caches when fresh content is required.',
-        },
         pages: { type: 'string', description: 'For PDFs: page range like "1-5" or "2,7".' },
       },
       required: ['url'],
@@ -809,7 +812,7 @@ export function createWebFetchTool(): AgentTool {
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       const url = String(args.url || '');
-      if (!url) return jsonResult({ error: 'url is required' });
+      if (!url) return errorResult('missing_url', 'WebFetch requires a url');
 
       const allowed = domainFiltersParam(args.allowed_domains);
       const blocked = domainFiltersParam(args.blocked_domains);
@@ -844,7 +847,6 @@ export function createWebFetchTool(): AgentTool {
           maxBytes,
           allowedDomains: allowed.filters,
           blockedDomains: blocked.filters,
-          useCache: args.use_cache !== false,
         });
         if (!result.ok) return errorResult(result.code, result.message, result.details);
         fetched = result.value;
@@ -854,8 +856,8 @@ export function createWebFetchTool(): AgentTool {
       }
 
       const response = fetched.response;
-      const bodyText = decodeBodyText(fetched.body);
       const contentType = response.headers?.get?.('content-type') ?? '';
+      const bodyText = decodeBodyText(fetched.body, contentType);
       const finalUrl = fetched.finalUrl;
       const format = args.format === 'raw' || args.format === 'text' ? args.format : 'markdown';
 
@@ -881,11 +883,11 @@ export function createWebFetchTool(): AgentTool {
             }
           );
         }
-      } else if (format === 'raw') {
-        content = bodyText;
-        extractMode = 'raw';
-      } else if (!shouldExtractAsHtml(contentType, bodyText)) {
-        if (!isTextLikeContentType(contentType) || looksBinary(bodyText)) {
+      } else {
+        const extractAsHtml = shouldExtractAsHtml(contentType, bodyText);
+        // The binary sniff runs before the format branches so format:'raw'
+        // cannot return replacement-char garbage for a PNG/zip/etc.
+        if (!extractAsHtml && (!isTextLikeContentType(contentType) || looksBinary(bodyText))) {
           return errorResult(
             'unsupported_binary_content',
             'WebFetch received non-text content that cannot be returned safely',
@@ -898,16 +900,21 @@ export function createWebFetchTool(): AgentTool {
             }
           );
         }
-        content = bodyText;
-        extractMode = 'passthrough';
-      } else if (format === 'text') {
-        content = stripHtmlToText(bodyText);
-        extractMode = 'text';
-      } else {
-        const extracted = await htmlToMarkdown(bodyText, finalUrl);
-        content = extracted.markdown;
-        extractMode = extracted.mode;
-        title = extracted.title;
+        if (format === 'raw') {
+          content = bodyText;
+          extractMode = 'raw';
+        } else if (!extractAsHtml) {
+          content = bodyText;
+          extractMode = 'passthrough';
+        } else if (format === 'text') {
+          content = stripHtmlToText(bodyText);
+          extractMode = 'text';
+        } else {
+          const extracted = await htmlToMarkdown(bodyText, finalUrl);
+          content = extracted.markdown;
+          extractMode = extracted.mode;
+          title = extracted.title;
+        }
       }
 
       const header = [
@@ -978,7 +985,7 @@ export function createWebSearchTool(db?: Database): AgentTool {
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       const query = String(args.query || '').trim();
-      if (!query) return jsonResult({ error: 'query is required' });
+      if (!query) return errorResult('missing_query', 'WebSearch requires a query');
       const maxResults = clampNumberParam(args.max_results, 5, 1, 10);
       const allowed = domainFiltersParam(args.allowed_domains);
       const blocked = domainFiltersParam(args.blocked_domains);
@@ -1009,7 +1016,8 @@ export function createWebSearchTool(db?: Database): AgentTool {
         extraSnippets: booleanParam(args.extra_snippets),
       };
       const fallbacks: Array<Record<string, unknown>> = [];
-      for (const provider of createWebSearchProviders(db)) {
+      const providers = createWebSearchProviders(db);
+      for (const [index, provider] of providers.entries()) {
         try {
           const providerResults = await provider.search(query, searchOptions);
           const results = providerResults
@@ -1023,15 +1031,19 @@ export function createWebSearchTool(db?: Database): AgentTool {
                 blocked.filters.length === 0 || !filterMatchesUrl(result.url, blocked.filters)
             )
             .slice(0, maxResults);
-          if (
-            results.length === 0 &&
-            providerResults.length > 0 &&
-            (allowed.filters.length > 0 || blocked.filters.length > 0)
-          ) {
+          // Zero usable results: with domain filters the filters may be the
+          // cause; without them an empty page is as unhelpful as an error.
+          // Either way, try the next provider — only the last one returns empty.
+          if (results.length === 0 && index < providers.length - 1) {
+            const filteredOut =
+              providerResults.length > 0 &&
+              (allowed.filters.length > 0 || blocked.filters.length > 0);
             fallbacks.push({
               provider: provider.name,
-              message: 'no results matched domain filters',
-              unfilteredTotal: providerResults.length,
+              message: filteredOut
+                ? 'no results matched domain filters'
+                : 'provider returned no results',
+              ...(filteredOut ? { unfilteredTotal: providerResults.length } : {}),
             });
             continue;
           }

@@ -1,19 +1,9 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { randomUUID } from 'crypto';
-import {
-  closeSync,
-  existsSync,
-  mkdirSync,
-  openSync,
-  readdirSync,
-  statSync,
-  unlinkSync,
-  writeFileSync,
-  writeSync,
-} from 'fs';
-import * as os from 'os';
+import { closeSync, existsSync, mkdirSync, openSync, writeFileSync, writeSync } from 'fs';
 import * as path from 'path';
 
+import { resolveDataDir, sweepStaleLogs } from '../../../utils/data-dir.js';
 import { scrubEnv } from './env-scrub.js';
 
 export interface BashRunOptions {
@@ -71,6 +61,13 @@ export interface BashRunResult {
   fullOutputCapped?: boolean;
   /** Present when the run was handed off at autoBackgroundMs; the child is still alive. */
   handoff?: BashHandoff;
+  /**
+   * 'shell_not_found' when no shell executable could be resolved (Windows
+   * without Git bash on the probed paths/PATH): no process was spawned and
+   * `output` carries a formatted shell_not_found message, distinct from a
+   * command that ran and failed.
+   */
+  shellError?: 'shell_not_found';
 }
 
 const DEFAULT_MAX_LINES = 2000;
@@ -90,55 +87,75 @@ const SPILL_CAP_MARKER = `\n[zclaudia: output exceeded the ${
   BASH_SPILL_MAX_BYTES / (1024 * 1024)
 }MB spill cap; output after this point was dropped from this file. The result tail still reflects the command's final output.]\n`;
 
-function resolveDataDir(): string {
-  return process.env.ZCLAUDIA_DATA_DIR
-    ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
-    : path.join(os.homedir(), '.zclaudia');
-}
-
 // Spilled bash logs are kept only long enough for the model to Read them back
 // within the session; without a sweep they accumulate forever (one file per
 // command whose output exceeds maxBytes). 24h TTL, swept opportunistically on
-// each new write — no background timer.
+// each new write — no background timer. The sweep is shared with task-logs
+// (utils/data-dir.ts).
 const BASH_LOG_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-
-function sweepStaleBashLogs(dir: string, maxAgeMs: number): void {
-  let entries: string[];
-  try {
-    entries = readdirSync(dir);
-  } catch {
-    return;
-  }
-  const cutoff = Date.now() - maxAgeMs;
-  for (const name of entries) {
-    if (!name.endsWith('.log')) continue;
-    const filePath = path.join(dir, name);
-    try {
-      if (statSync(filePath).mtimeMs < cutoff) unlinkSync(filePath);
-    } catch {
-      // file vanished or is locked — ignore, this is best-effort
-    }
-  }
-}
 
 export function persistBashFullOutput(content: string): string {
   const dir = path.join(resolveDataDir(), 'bash-logs');
   mkdirSync(dir, { recursive: true });
-  sweepStaleBashLogs(dir, BASH_LOG_MAX_AGE_MS);
+  sweepStaleLogs(dir, BASH_LOG_MAX_AGE_MS);
   const filePath = path.join(dir, `${randomUUID()}.log`);
   writeFileSync(filePath, content, { encoding: 'utf8', mode: 0o600 });
   return filePath;
 }
 
+export type ShellResolution =
+  | { found: true; shell: string; args: string[] }
+  | { found: false; probedPaths: string[] };
+
+/**
+ * Windows shell resolution, with injectable probes so the detection logic is
+ * unit-testable off-Windows. Probes the Git-for-Windows install dirs, then
+ * every PATH entry for bash.exe. `found:false` means a spawn would fail with
+ * ENOENT — callers must surface a structured error instead of spawning and
+ * letting the ENOENT masquerade as command output (the historical bug: the
+ * bare-'bash' fallback made a missing shell indistinguishable from a failed
+ * command, exitCode null with the error appended to the output).
+ */
+export function resolveWindowsShell(overrides?: {
+  programFiles?: string;
+  programFilesX86?: string;
+  pathEnv?: string;
+  exists?: (candidate: string) => boolean;
+}): ShellResolution {
+  const exists = overrides?.exists ?? existsSync;
+  const programFiles = overrides?.programFiles ?? process.env.ProgramFiles;
+  const programFilesX86 = overrides?.programFilesX86 ?? process.env['ProgramFiles(x86)'];
+  const probedPaths: string[] = [];
+  for (const root of [programFiles, programFilesX86]) {
+    if (typeof root !== 'string' || !root) continue;
+    const candidate = `${root}\\Git\\bin\\bash.exe`;
+    probedPaths.push(candidate);
+    if (exists(candidate)) return { found: true, shell: candidate, args: ['-c'] };
+  }
+  const pathEnv = overrides?.pathEnv ?? process.env.PATH ?? '';
+  for (const dir of pathEnv.split(';').filter(Boolean)) {
+    const candidate = `${dir}\\bash.exe`;
+    probedPaths.push(candidate);
+    if (exists(candidate)) return { found: true, shell: 'bash', args: ['-c'] };
+  }
+  return { found: false, probedPaths };
+}
+
+export function formatShellNotFoundMessage(probedPaths: string[]): string {
+  const probed = probedPaths.length ? probedPaths.join('; ') : '(no candidate locations)';
+  return (
+    `shell_not_found: no bash executable is available for bash -c execution on this Windows host. ` +
+    `Probed: ${probed}. Install Git for Windows or add bash.exe to PATH, then retry.`
+  );
+}
+
 export function resolveShell(): { shell: string; args: string[] } {
   if (process.platform === 'win32') {
-    const candidates = [
-      process.env.ProgramFiles ? `${process.env.ProgramFiles}\\Git\\bin\\bash.exe` : undefined,
-      process.env['ProgramFiles(x86)']
-        ? `${process.env['ProgramFiles(x86)']}\\Git\\bin\\bash.exe`
-        : undefined,
-    ].filter((p): p is string => typeof p === 'string');
-    for (const p of candidates) if (existsSync(p)) return { shell: p, args: ['-c'] };
+    const resolution = resolveWindowsShell();
+    if (resolution.found) return { shell: resolution.shell, args: resolution.args };
+    // Legacy fallback for callers with their own spawn-error handling (e.g.
+    // command-executor fails the task via its error watch): let the spawn
+    // surface ENOENT there rather than changing their contract.
     return { shell: 'bash', args: ['-c'] };
   }
   if (existsSync('/bin/bash')) return { shell: '/bin/bash', args: ['-c'] };
@@ -311,14 +328,44 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
         windowsHide: true,
       });
     } else {
-      const { shell, args } = resolveShell();
-      child = spawn(shell, [...args, command], {
-        cwd,
-        env: scrubEnv(process.env, opts.extraEnv),
-        detached: process.platform !== 'win32',
-        stdio: [stdinMode, 'pipe', 'pipe'],
-        windowsHide: true,
-      });
+      // Windows: resolve the shell up front. A missing bash must surface as a
+      // structured shell_not_found result — not as a spawn ENOENT appended to
+      // the output with exitCode null, which is indistinguishable from a
+      // command that ran and failed.
+      if (process.platform === 'win32') {
+        const resolution = resolveWindowsShell();
+        if (!resolution.found) {
+          const message = formatShellNotFoundMessage(resolution.probedPaths);
+          resolve({
+            exitCode: null,
+            output: message,
+            fullOutput: message,
+            truncated: false,
+            timedOut: false,
+            aborted: false,
+            durationMs: Date.now() - startedAt,
+            stderrOutput: message,
+            shellError: 'shell_not_found',
+          });
+          return;
+        }
+        child = spawn(resolution.shell, [...resolution.args, command], {
+          cwd,
+          env: scrubEnv(process.env, opts.extraEnv),
+          detached: false,
+          stdio: [stdinMode, 'pipe', 'pipe'],
+          windowsHide: true,
+        });
+      } else {
+        const { shell, args } = resolveShell();
+        child = spawn(shell, [...args, command], {
+          cwd,
+          env: scrubEnv(process.env, opts.extraEnv),
+          detached: true,
+          stdio: [stdinMode, 'pipe', 'pipe'],
+          windowsHide: true,
+        });
+      }
     }
 
     if (opts.stdin !== undefined && child.stdin) {

@@ -7,7 +7,8 @@
  * lock, backup, read-state update). Languages: JS/TS/TSX/HTML/CSS (the
  * parsers bundled with @ast-grep/napi).
  */
-import { readdirSync, statSync } from 'fs';
+import type { Dirent } from 'fs';
+import { readdir, realpath, stat } from 'fs/promises';
 import * as path from 'path';
 import type { Lang, SgNode } from '@ast-grep/napi';
 
@@ -24,39 +25,77 @@ const LANG_BY_EXT: Record<string, string> = {
   '.css': 'Css',
 };
 
-const SKIPPED_DIRS = new Set(['node_modules', '.git', '.worktrees', 'dist', 'build', 'coverage']);
+const SKIPPED_DIRS = new Set([
+  'node_modules',
+  '.git',
+  '.worktrees',
+  'dist',
+  'build',
+  'coverage',
+  'vendor',
+]);
 const MAX_CANDIDATE_FILES = 500;
 
 export function langForFile(filePath: string): string | undefined {
   return LANG_BY_EXT[path.extname(filePath).toLowerCase()];
 }
 
-/** Collect parseable files under root (file or directory), bounded and ignore-aware. */
-export function collectAstFiles(root: string): string[] {
-  const rootStat = statSync(root);
+/**
+ * Collect parseable files under root (file or directory), bounded and
+ * ignore-aware. Async walk (fs/promises) so large trees never block the event
+ * loop. Symlinked directories are followed (matching the old statSync walk)
+ * but a realpath visited-set kills symlink cycles, which used to spin the
+ * walk until the file cap.
+ */
+export async function collectAstFiles(root: string): Promise<string[]> {
+  const rootStat = await stat(root);
   if (rootStat.isFile()) return langForFile(root) ? [root] : [];
   const results: string[] = [];
+  const visited = new Set<string>();
+  try {
+    visited.add(await realpath(root));
+  } catch {
+    // Root vanished mid-walk; per-directory handling below tolerates it.
+  }
   const queue: string[] = [root];
   while (queue.length > 0 && results.length < MAX_CANDIDATE_FILES) {
     const dir = queue.shift()!;
-    let entries: string[];
+    let entries: Dirent[];
     try {
-      entries = readdirSync(dir);
+      entries = await readdir(dir, { withFileTypes: true });
     } catch {
       continue;
     }
-    for (const entry of entries.sort()) {
+    // Code-unit sort, same ordering as the old string readdirSync walk.
+    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    for (const entry of entries) {
       if (results.length >= MAX_CANDIDATE_FILES) break;
-      const full = path.join(dir, entry);
-      let entryStat;
-      try {
-        entryStat = statSync(full);
-      } catch {
-        continue;
+      const full = path.join(dir, entry.name);
+      let isDirectory = entry.isDirectory();
+      let isFile = entry.isFile();
+      if (entry.isSymbolicLink()) {
+        // Dirent describes the link itself; stat the target to keep the old
+        // follow-symlinks behavior. Dangling links are skipped.
+        try {
+          const target = await stat(full);
+          isDirectory = target.isDirectory();
+          isFile = target.isFile();
+        } catch {
+          continue;
+        }
       }
-      if (entryStat.isDirectory()) {
-        if (!SKIPPED_DIRS.has(entry) && !entry.startsWith('.')) queue.push(full);
-      } else if (entryStat.isFile() && langForFile(full)) {
+      if (isDirectory) {
+        if (SKIPPED_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
+        let real: string;
+        try {
+          real = await realpath(full);
+        } catch {
+          continue;
+        }
+        if (visited.has(real)) continue; // symlink cycle back to an ancestor
+        visited.add(real);
+        queue.push(full);
+      } else if (isFile && langForFile(full)) {
         results.push(full);
       }
     }

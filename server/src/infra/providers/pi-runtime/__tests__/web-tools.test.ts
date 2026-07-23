@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 
-import { createWebFetchTool, createWebSearchTool } from '../web-tools.js';
+import { createWebFetchTool, createWebSearchTool, fetchPublicHttpBody } from '../web-tools.js';
 
 vi.mock('undici', () => {
   class MockAgent {
@@ -385,5 +385,202 @@ describe('web tools', () => {
     } finally {
       db.close();
     }
+  });
+
+  it('WebFetch decodes GBK pages using the content-type charset', async () => {
+    // '中文' in GBK (WHATWG encoding): 中 = D6 D0, 文 = CE C4.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(Buffer.from([0xd6, 0xd0, 0xce, 0xc4]), {
+            status: 200,
+            statusText: 'OK',
+            headers: { 'content-type': 'text/plain; charset=gbk' },
+          })
+      )
+    );
+    const webFetch = createWebFetchTool() as any;
+
+    const result = await webFetch.execute('fetch-gbk', { url: 'https://example.com/gbk.txt' });
+
+    expect(result.details).toMatchObject({ ok: true });
+    expect(result.content[0].text).toContain('中文');
+  });
+
+  it('WebFetch falls back to UTF-8 for an unknown charset label', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('héllo wörld', {
+            status: 200,
+            statusText: 'OK',
+            headers: { 'content-type': 'text/plain; charset=not-a-real-charset' },
+          })
+      )
+    );
+    const webFetch = createWebFetchTool() as any;
+
+    const result = await webFetch.execute('fetch-bogus-charset', {
+      url: 'https://example.com/utf8.txt',
+    });
+
+    expect(result.details).toMatchObject({ ok: true });
+    expect(result.content[0].text).toContain('héllo wörld');
+  });
+
+  it('WebFetch rejects binary content even when format is raw', async () => {
+    const pngBytes = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44,
+      0x52,
+    ]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(pngBytes, {
+            status: 200,
+            statusText: 'OK',
+            headers: { 'content-type': 'image/png' },
+          })
+      )
+    );
+    const webFetch = createWebFetchTool() as any;
+
+    const result = await webFetch.execute('fetch-png', {
+      url: 'https://example.com/image.png',
+      format: 'raw',
+    });
+
+    expect(result.details).toMatchObject({ ok: false, error: 'unsupported_binary_content' });
+  });
+
+  it('WebFetch treats a 304 without Location as a normal response', async () => {
+    const fetchMock = vi.fn(
+      async () => new Response(null, { status: 304, statusText: 'Not Modified' })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const webFetch = createWebFetchTool() as any;
+
+    const result = await webFetch.execute('fetch-304', { url: 'https://example.com/cached' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.details).toMatchObject({ status: 304 });
+    expect(result.content[0].text).toContain('Status: 304 Not Modified');
+  });
+
+  it('WebFetch stops redirecting when the overall time budget is exhausted', async () => {
+    vi.useFakeTimers();
+    try {
+      let now = 1_000_000;
+      vi.setSystemTime(now);
+      const fetchMock = vi.fn(async () => {
+        // Each hop "costs" 10s of wall clock, so a 25s budget allows 3 hops.
+        now += 10_000;
+        vi.setSystemTime(now);
+        return new Response(null, { status: 302, headers: { location: '/next' } });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await fetchPublicHttpBody('https://example.com/start', {
+        maxBytes: 1024,
+        allowedDomains: [],
+        blockedDomains: [],
+        totalTimeoutMs: 25_000,
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe('fetch_timeout');
+        expect(result.details.redirects).toHaveLength(3);
+      }
+      // Budget tripped well before the 8-redirect cap.
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('WebFetch fails fast when the overall time budget is already spent', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchPublicHttpBody('https://example.com/start', {
+      maxBytes: 1024,
+      allowedDomains: [],
+      blockedDomains: [],
+      totalTimeoutMs: 0,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('fetch_timeout');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('WebFetch no longer accepts the dead use_cache parameter', async () => {
+    const webFetch = createWebFetchTool() as any;
+    expect((webFetch.parameters as any).properties.use_cache).toBeUndefined();
+  });
+
+  it('WebFetch reports a missing url as a structured error', async () => {
+    const webFetch = createWebFetchTool() as any;
+
+    const result = await webFetch.execute('fetch-missing', {});
+
+    expect(result.details).toMatchObject({ ok: false, error: 'missing_url' });
+  });
+
+  it('WebSearch reports a missing query as a structured error', async () => {
+    const webSearch = createWebSearchTool() as any;
+
+    const result = await webSearch.execute('search-missing', {});
+
+    expect(result.details).toMatchObject({ ok: false, error: 'missing_query' });
+  });
+
+  it('WebSearch falls back to the next provider when one returns zero results', async () => {
+    vi.stubEnv('ZCLAUDIA_BRAVE_SEARCH_API_KEY', 'test-key');
+    vi.stubEnv('ZCLAUDIA_SEARXNG_BASE_URL', 'https://search.example.test');
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith('https://api.search.brave.com')) {
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          text: async () => JSON.stringify({ web: { results: [] } }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        text: async () =>
+          JSON.stringify({
+            results: [
+              {
+                title: 'SearXNG hit',
+                url: 'https://docs.example.com/page',
+                content: 'from searxng',
+              },
+            ],
+          }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const webSearch = createWebSearchTool() as any;
+
+    const result = await webSearch.execute('search-empty', { query: 'docs' });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.source).toBe('searxng');
+    expect(payload.fallbacks[0]).toMatchObject({
+      provider: 'brave',
+      message: 'provider returned no results',
+    });
+    expect(payload.results).toHaveLength(1);
+    expect(payload.results[0]).toMatchObject({ url: 'https://docs.example.com/page' });
+    // Brave, then SearXNG — DuckDuckGo never runs once a provider produced results.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

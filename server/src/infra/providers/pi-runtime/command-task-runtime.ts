@@ -1,4 +1,4 @@
-import type { TaskRecord, TaskResult } from '@zclaudia/shared/core/task';
+import type { TaskRecord } from '@zclaudia/shared/core/task';
 
 import { type TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
@@ -17,8 +17,16 @@ import { readTaskLogWindow } from './task-output-window.js';
 import type { TaskRuntime } from './task-runtime.js';
 import { toWorkspaceRelative } from './workspace-paths.js';
 
-function commandExitCode(result: TaskResult | undefined, status: string): number | null {
-  if (status === 'completed' && !result?.text?.includes('unknown')) return 0;
+/**
+ * Resolve a command task's exit code. Prefer the structured metadata.exitCode
+ * written by CommandTaskExecutor.finalize; the text parsing below is only a
+ * legacy fallback for tasks finalized before that field existed.
+ */
+export function commandExitCode(task: TaskRecord): number | null {
+  const stored = (task.metadata as Record<string, unknown> | undefined)?.exitCode;
+  if (typeof stored === 'number' && Number.isInteger(stored)) return stored;
+  const result = task.result;
+  if (task.status === 'completed' && !result?.text?.includes('unknown')) return 0;
   const exitCodeMatch = result?.error?.match(/exit code (\d+)/);
   return exitCodeMatch ? Number(exitCodeMatch[1]) : null;
 }
@@ -82,7 +90,7 @@ export class CommandTaskRuntime implements TaskRuntime {
         : typeof current.executorRef?.command === 'string'
           ? current.executorRef.command
           : '<unknown>';
-    const exitCode = commandExitCode(current.result, current.status);
+    const exitCode = commandExitCode(current);
     const insights = extractBashOutputInsights(window.output);
     const text = formatBashResultText(
       {

@@ -424,6 +424,41 @@ describe('buildAgentHooks tool telemetry', () => {
       toolCounts: { Bash: 1 },
     });
   });
+
+  it('outputBytes excludes advisory text appended by this same hook (P2-7)', async () => {
+    const hooks = makeHooks();
+    // 1: plain Read (no advisories).
+    await hooks.afterToolCall!({
+      toolCall: { name: 'Read' },
+      args: { path: 'src/app.ts' },
+      result: { content: [{ type: 'text', text: 'alpha' }], details: { ok: true } },
+    } as any);
+    // 2: failing Edit — remediation appends a [fix] block BEFORE telemetry
+    // records; the [fix] text must not inflate outputBytes.
+    const second = await hooks.afterToolCall!({
+      toolCall: { name: 'Edit' },
+      args: { file_path: 'src/app.ts' },
+      result: {
+        content: [{ type: 'text', text: 'old_string not found in file' }],
+        details: { ok: false, error: 'not_found' },
+      },
+      isError: false,
+    } as any);
+    const secondText = (second?.content ?? []).map((b: any) => b.text ?? '').join('\n');
+    expect(secondText).toContain('[fix]'); // advisory really was appended
+    // 3: second Read of the same path → telemetry advisory → snapshot attached.
+    const third = await hooks.afterToolCall!({
+      toolCall: { name: 'Read' },
+      args: { path: 'src/app.ts' },
+      result: { content: [{ type: 'text', text: 'gamma' }], details: { ok: true } },
+    } as any);
+
+    const expected = ['alpha', 'old_string not found in file', 'gamma'].reduce(
+      (sum, t) => sum + Buffer.byteLength(t, 'utf8'),
+      0
+    );
+    expect(third?.details?.toolTelemetry?.outputBytes).toBe(expected);
+  });
 });
 
 describe('buildAgentHooks.shouldStopAfterTurn', () => {
@@ -604,6 +639,30 @@ describe('user hooks integration', () => {
       { type: 'text', text: '[hook] lint failed on changed file' },
     ]);
   });
+
+  it('PostToolUse hooks receive the tool result as toolResponse on stdin', async () => {
+    const capture = path.join(
+      os.tmpdir(),
+      `zc-hook-res-${process.pid}-${Math.random().toString(36).slice(2)}.json`
+    );
+    const hooks = buildAgentHooks({
+      permissionCallback: allow(),
+      userHooks: [{ event: 'PostToolUse', command: `cat - > "${capture}"` }],
+      cwd: process.cwd(),
+    });
+    await hooks.afterToolCall!({
+      toolCall: { id: 't1', name: 'Bash', arguments: { command: 'git push' } },
+      args: { command: 'git push' },
+      result: { content: [{ type: 'text', text: 'pushed ok' }], details: { ok: true } },
+      isError: false,
+      context: {} as any,
+    } as any);
+    const seen = JSON.parse(fs.readFileSync(capture, 'utf8'));
+    fs.rmSync(capture, { force: true });
+    expect(seen.event).toBe('PostToolUse');
+    expect(seen.toolInput).toEqual({ command: 'git push' });
+    expect(seen.toolResponse.content).toEqual([{ type: 'text', text: 'pushed ok' }]);
+  });
 });
 
 describe('afterToolCall — tool failure loop guard', () => {
@@ -750,9 +809,7 @@ describe('afterToolCall — tool failure loop guard', () => {
     });
 
     const first = await hooks.afterToolCall!(throwingCtx() as any);
-    expect((first?.content ?? []).map((b: any) => b.text ?? '').join('\n')).not.toContain(
-      '[loop]'
-    );
+    expect((first?.content ?? []).map((b: any) => b.text ?? '').join('\n')).not.toContain('[loop]');
     await hooks.afterToolCall!(throwingCtx() as any);
     const third = await hooks.afterToolCall!(throwingCtx() as any);
 

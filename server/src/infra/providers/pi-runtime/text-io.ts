@@ -12,8 +12,26 @@ export interface TextFileMetadata {
   mode?: number;
 }
 
+/**
+ * Picks the line-ending style for writing a file back, majority-wins: a
+ * mixed-ending file keeps the style most of its lines already use, so a small
+ * edit doesn't silently normalize every line on disk (which would also make
+ * the on-disk bytes diverge from the model-visible diff). Ties — and files
+ * with no newline at all — resolve to LF, the ecosystem default. A fully
+ * faithful alternative (preserving each untouched line's own ending) would
+ * need span tracking through every edit path; majority-wins bounds the damage
+ * of any single write to the minority lines.
+ */
 export function lineEndingFor(content: string): LineEndingStyle {
-  return content.includes('\r\n') ? 'CRLF' : 'LF';
+  let crlf = 0;
+  let lf = 0;
+  for (let index = 0; index < content.length; index += 1) {
+    if (content[index] === '\n') {
+      if (content[index - 1] === '\r') crlf += 1;
+      else lf += 1;
+    }
+  }
+  return crlf > lf ? 'CRLF' : 'LF';
 }
 
 export function applyLineEndingStyle(content: string, style: LineEndingStyle): string {

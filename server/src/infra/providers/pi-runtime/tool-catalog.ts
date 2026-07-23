@@ -33,9 +33,9 @@ import type { ToolBridgeOptions } from './tool-options.js';
 export type ToolFactory = (cwd: string, options?: ToolBridgeOptions) => AgentTool<any>;
 
 // Dispatch table: tool name → factory taking (cwd, options?) and returning an AgentTool.
-// Each pi factory accepts an optional per-tool options object; we don't expose those
-// in this MVP (use pi defaults). Future sub-projects can wire ToolBridgeOptions.<name>
-// through to the factory.
+// Factories wire the ToolBridgeOptions slices they need (db, session/run ids,
+// permission callbacks, memoryDir, ...). Construction must stay cheap and free
+// of I/O — __tests__/tool-catalog.test.ts constructs every factory as a smoke test.
 export const BUILTIN_TOOL_FACTORIES: Record<ToolName, ToolFactory> = {
   Read: (cwd, options) => createReadBridgeTool(cwd, options),
   Write: (cwd, options) => createFileWriteBridgeTool(cwd, options),

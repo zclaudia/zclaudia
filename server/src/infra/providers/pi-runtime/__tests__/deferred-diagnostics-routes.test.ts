@@ -2,7 +2,7 @@ import express from 'express';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 import { createDeferredDiagnosticsRoutes } from '../deferred-diagnostics-routes.js';
-import { scheduleDeferredDiagnostics, getDeferredDiagnosticsResult } from '../write-lifecycle.js';
+import { scheduleDeferredDiagnostics } from '../write-lifecycle.js';
 
 describe('deferred diagnostics routes', () => {
   it('returns completed deferred diagnostics by id', async () => {
@@ -30,14 +30,20 @@ describe('deferred diagnostics routes', () => {
     const id = scheduled?.deferredDiagnostics?.id;
     expect(id).toBeTruthy();
 
-    await vi.waitFor(() => {
-      expect(getDeferredDiagnosticsResult(String(id))?.status).toBe('completed');
-    });
-
     const app = express();
     app.use('/api/providers', createDeferredDiagnosticsRoutes());
 
-    const res = await request(app).get(`/api/providers/deferred-diagnostics/${id}`);
+    // Terminal results are single-read, so poll the route itself until the
+    // provider settles — the completed GET is the consuming read. The first
+    // GET may already see the completed result.
+    let res = await request(app).get(`/api/providers/deferred-diagnostics/${id}`);
+    if (res.body.data?.status !== 'completed') {
+      await vi.waitFor(async () => {
+        res = await request(app).get(`/api/providers/deferred-diagnostics/${id}`);
+        expect(res.status).toBe(200);
+        expect(res.body.data?.status).toBe('completed');
+      });
+    }
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
@@ -56,6 +62,10 @@ describe('deferred diagnostics routes', () => {
         ],
       },
     });
+
+    // The completed result was consumed by the read above.
+    const consumed = await request(app).get(`/api/providers/deferred-diagnostics/${id}`);
+    expect(consumed.status).toBe(404);
   });
 
   it('returns 404 for unknown deferred diagnostics ids', async () => {

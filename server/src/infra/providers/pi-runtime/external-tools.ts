@@ -1,7 +1,6 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type {
   ExternalToolProviderRef,
@@ -21,9 +20,11 @@ import { loadMcpServersFromDb } from '../../../utils/mcp-config.js';
 import type { McpServerRuntimeConfig } from '../../../utils/mcp-config.js';
 import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
 import { mcpInventoryCache } from '../../../utils/mcp-inventory-cache.js';
+import { resolveDataDir } from '../../../domains/tasks/executors/command-executor.js';
+import { sweepPersistedStore } from './tool-result-store.js';
+import { agentToolParameters } from './tool-common.js';
 
 type ToolContent = Array<{ type: 'text'; text: string }>;
-type AgentToolParameters = AgentTool['parameters'];
 
 const MCP_AUTHENTICATE_TOOL = 'authenticate';
 
@@ -32,10 +33,6 @@ const EMPTY_OBJECT_SCHEMA: Record<string, unknown> = {
   properties: {},
   additionalProperties: true,
 };
-
-function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
-  return schema as AgentToolParameters;
-}
 
 export interface LoadedExternalToolSchema {
   description: string;
@@ -204,8 +201,15 @@ function maxMcpOutputChars(): number {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : DEFAULT_MCP_MAX_OUTPUT_CHARS;
 }
 
+/**
+ * MCP output (oversized text, binary blobs) spills under the app data dir —
+ * not the shared, world-writable os.tmpdir() — because payloads can carry
+ * private data. The directory is created 0700 and files 0600; retention
+ * matches the tool-result store (TTL + oldest-first size cap, swept lazily on
+ * each write). ZCLAUDIA_MCP_OUTPUT_DIR overrides the location (tests).
+ */
 function mcpOutputDir(): string {
-  return process.env.ZCLAUDIA_MCP_OUTPUT_DIR || path.join(tmpdir(), 'zclaudia-mcp-output');
+  return process.env.ZCLAUDIA_MCP_OUTPUT_DIR || path.join(resolveDataDir(), 'mcp-output');
 }
 
 function sanitizeOutputName(value: string): string {
@@ -234,12 +238,13 @@ export async function persistMcpOutput(
   extension: string
 ): Promise<string> {
   const dir = mcpOutputDir();
-  await mkdir(dir, { recursive: true });
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  sweepPersistedStore(dir);
   const filePath = path.join(
     dir,
     `${sanitizeOutputName(name)}-${Date.now()}-${index}.${extension}`
   );
-  await writeFile(filePath, data);
+  await writeFile(filePath, data, { mode: 0o600 });
   return filePath;
 }
 

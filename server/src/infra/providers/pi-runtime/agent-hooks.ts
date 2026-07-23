@@ -319,7 +319,11 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
           {
             event: 'PostToolUse',
             toolName,
+            // Hooks see the ORIGINAL model-supplied args (permission rewrites
+            // with decrypted credentials never leave the execute wrapper) and a
+            // sanitized copy of the tool result (user-hooks truncates it).
             toolInput: args,
+            toolResult: result,
             detail: buildToolDetail(toolName, args),
             cwd: input.cwd ?? process.cwd(),
             sessionId: input.sessionId,
@@ -405,11 +409,14 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
         toolFailureGuard.recordSuccess(toolName, args as Record<string, unknown> | undefined);
       }
 
+      // Telemetry measures the tool's OWN output (result.content), not the
+      // advisory text ([fix]/[hook]/[loop]) appended above in this same hook —
+      // counting those would inflate outputBytes with our own scaffolding.
       const telemetry = toolTelemetry.record(
         toolName,
         args as Record<string, unknown> | undefined,
         {
-          content,
+          content: result.content,
           details: result.details as Record<string, unknown> | undefined,
         }
       );
@@ -468,6 +475,12 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
               budgetExceeded: true,
               persistedPath: persisted.filePath,
               originalSize: persisted.size,
+              // A result can be BOTH output-limit-truncated and budget-persisted;
+              // keep the truncation facts under their own keys so `originalSize`
+              // stays unambiguous (it measures the persisted full text).
+              ...(truncated.didTruncate
+                ? { truncated: true, truncatedOriginalSize: truncated.originalSize }
+                : {}),
               ...(telemetryUpdated ? { toolTelemetry: telemetry.snapshot } : {}),
             },
           };

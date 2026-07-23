@@ -116,4 +116,27 @@ describe('per-turn tool result budget', () => {
     expect(out.content.some((b: { type: string }) => b.type === 'image')).toBe(true);
     expect(existsSync(out.details.persistedPath)).toBe(true);
   });
+
+  it('a result that is BOTH truncated and persisted keeps both flags distinctly', async () => {
+    const h = buildAgentHooks({
+      permissionCallback: allowAll,
+      outputTruncationLimit: 6_000,
+      toolResultBudgetBytes: 5_000,
+    });
+    // Multi-line so head-truncation keeps a substantial (>4KiB) preview:
+    // pi's truncateHead is line-aware and drops an over-budget single line whole.
+    const text = Array.from({ length: 200 }, () => 'z'.repeat(39)).join('\n'); // 7999 bytes
+
+    const out: any = await h.afterToolCall!(callCtx('Grep', text));
+
+    // Output-limit truncation happened (7999 > 6000) AND the truncated result
+    // still blew the turn budget (6000+ > 5000), so it was persisted.
+    expect(out.details.truncated).toBe(true);
+    expect(out.details.truncatedOriginalSize).toBe(Buffer.byteLength(text, 'utf8'));
+    expect(out.details.budgetExceeded).toBe(true);
+    expect(typeof out.details.persistedPath).toBe('string');
+    // `originalSize` measures the persisted full text — no ambiguity with the
+    // truncation size now that truncatedOriginalSize carries the latter.
+    expect(out.details.originalSize).toBe(Buffer.byteLength(text, 'utf8'));
+  });
 });

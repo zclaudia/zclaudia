@@ -1,8 +1,17 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs';
+import {
+  mkdtempSync,
+  rmSync,
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  utimesSync,
+} from 'fs';
 import * as fs from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { spawn } from 'child_process';
 import { PassThrough, Writable } from 'stream';
 import Database from 'better-sqlite3';
 
@@ -116,6 +125,112 @@ describe('CommandTaskExecutor', () => {
     await wait(300);
     expect(pidAlive(pid)).toBe(false);
     expect(repo.findById(task.id)!.status).toBe('stopped');
+  });
+
+  it('stop resolves only after the process is confirmed dead (P2)', async () => {
+    const repo = new TaskRepository(db);
+    const service = new TaskService(repo);
+    const executor = new CommandTaskExecutor(repo);
+    const task = service.createTask({
+      type: 'command',
+      metadata: { command: 'sleep 30', cwd: dataDir },
+    });
+    const started = await executor.start(task);
+    service.startTask(task.id, { executorRef: started.executorRef });
+    const pid = started.executorRef!.pid!;
+    const update = await executor.stop(task.id);
+    // No post-stop settling wait: the kill must be confirmed by stop() itself.
+    expect(pidAlive(pid)).toBe(false);
+    expect(update.status).toBe('stopped');
+    expect(repo.findById(task.id)!.result?.error ?? '').not.toContain(
+      'could not be confirmed dead'
+    );
+  });
+
+  it('stores the structured exit code in task metadata at finalize (P2)', async () => {
+    const repo = new TaskRepository(db);
+    const service = new TaskService(repo);
+    const executor = new CommandTaskExecutor(repo);
+    const failed = service.createTask({
+      type: 'command',
+      metadata: { command: 'exit 4', cwd: dataDir },
+    });
+    const startedFailed = await executor.start(failed);
+    service.startTask(failed.id, { executorRef: startedFailed.executorRef });
+    const ok = service.createTask({
+      type: 'command',
+      metadata: { command: 'true', cwd: dataDir },
+    });
+    const startedOk = await executor.start(ok);
+    service.startTask(ok.id, { executorRef: startedOk.executorRef });
+    await wait(700);
+
+    expect(repo.findById(failed.id)!.metadata?.exitCode).toBe(4);
+    expect(repo.findById(ok.id)!.metadata?.exitCode).toBe(0);
+  });
+
+  it('sweeps task logs older than 24h when a new task starts, keeping recent ones (P2)', async () => {
+    const repo = new TaskRepository(db);
+    const service = new TaskService(repo);
+    const executor = new CommandTaskExecutor(repo);
+    const logsDir = join(dataDir, 'task-logs');
+    mkdirSync(logsDir, { recursive: true });
+    const stale = join(logsDir, 'stale-task.log');
+    writeFileSync(stale, 'old');
+    const backdated = Date.now() / 1000 - 25 * 60 * 60; // 25h ago, past the TTL
+    utimesSync(stale, backdated, backdated);
+    const fresh = join(logsDir, 'fresh-task.log');
+    writeFileSync(fresh, 'new');
+
+    const task = service.createTask({
+      type: 'command',
+      metadata: { command: 'echo sweep-trigger', cwd: dataDir },
+    });
+    const started = await executor.start(task);
+    service.startTask(task.id, { executorRef: started.executorRef });
+
+    expect(existsSync(stale)).toBe(false); // swept
+    expect(existsSync(fresh)).toBe(true); // recent, kept
+    expect(existsSync(commandTaskLogPath(task.id))).toBe(true); // own log untouched
+    await executor.stop(task.id);
+  });
+
+  it('reconcile attaches an exit watcher that settles a live-pid task when the process exits (P2)', async () => {
+    const repo = new TaskRepository(db);
+    const service = new TaskService(repo);
+    const executor = new CommandTaskExecutor(repo);
+    // Simulate a previous server life's task: a real live process started
+    // OUTSIDE the executor — we hold no ChildProcess handle, so no 'exit'
+    // event can ever reach the executor; only the reconcile-attached pid
+    // watcher can settle the task.
+    const child = spawn('sleep', ['30'], { detached: true, stdio: 'ignore' });
+    child.unref();
+    const pid = child.pid!;
+    try {
+      const task = service.createTask({
+        type: 'command',
+        metadata: { command: 'sleep 30', cwd: dataDir },
+      });
+      service.startTask(task.id, { executorRef: { pid, command: 'sleep 30' } });
+
+      executor.reconcile();
+      expect(repo.findById(task.id)!.status).toBe('running'); // still alive → left running
+
+      process.kill(-pid, 'SIGKILL'); // process exits with nobody watching
+      expect(await waitUntil(() => repo.findById(task.id)?.status === 'completed', 6000)).toBe(
+        true
+      );
+      const settled = repo.findById(task.id)!;
+      expect(settled.result?.text).toContain('exit code unknown');
+      // ...and the settle went through the real lifecycle (settled event emitted)
+      expect(repo.listEvents(task.id).map(e => e.type)).toContain('completed');
+    } finally {
+      try {
+        process.kill(-pid, 'SIGKILL');
+      } catch {
+        /* already dead */
+      }
+    }
   });
 
   it('stop on an already-completed task is a quiet no-op', async () => {

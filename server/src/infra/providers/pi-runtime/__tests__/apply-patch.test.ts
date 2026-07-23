@@ -37,9 +37,7 @@ describe('parseApplyPatch', () => {
   });
 
   it('accepts a patch with a trailing newline after the end marker', () => {
-    const operations = parseApplyPatch(
-      '*** Begin Patch\n*** Delete File: a.ts\n*** End Patch\n'
-    );
+    const operations = parseApplyPatch('*** Begin Patch\n*** Delete File: a.ts\n*** End Patch\n');
     expect(operations).toEqual([{ type: 'delete', path: 'a.ts' }]);
   });
 
@@ -109,9 +107,9 @@ describe('parseApplyPatch', () => {
   });
 
   it('rejects a patch without the begin marker', () => {
-    expect(() =>
-      parseApplyPatch('*** Delete File: a.ts\n*** End Patch')
-    ).toThrow(/Begin Patch.*End Patch/);
+    expect(() => parseApplyPatch('*** Delete File: a.ts\n*** End Patch')).toThrow(
+      /Begin Patch.*End Patch/
+    );
   });
 
   it('rejects an update hunk line without a -/+/space prefix', () => {
@@ -135,6 +133,39 @@ describe('parseApplyPatch', () => {
         ['*** Begin Patch', '*** Add File: a.ts', 'not added', '*** End Patch'].join('\n')
       )
     ).toThrow(/must start with "\+"/);
+  });
+
+  it('treats a bare empty line inside an add hunk as a blank content line', () => {
+    const operations = parseApplyPatch(
+      [
+        '*** Begin Patch',
+        '*** Add File: b.ts',
+        '+line one',
+        '',
+        '+line three',
+        '*** End Patch',
+      ].join('\n')
+    );
+    expect(operations).toEqual([
+      { type: 'add', path: 'b.ts', content: 'line one\n\nline three\n' },
+    ]);
+  });
+
+  it('drops trailing blank separator lines at the end of an add hunk', () => {
+    const operations = parseApplyPatch(
+      [
+        '*** Begin Patch',
+        '*** Add File: b.ts',
+        '+line one',
+        '',
+        '*** Delete File: c.ts',
+        '*** End Patch',
+      ].join('\n')
+    );
+    expect(operations).toEqual([
+      { type: 'add', path: 'b.ts', content: 'line one\n' },
+      { type: 'delete', path: 'c.ts' },
+    ]);
   });
 
   it('rejects a malformed rename operation', () => {
@@ -232,5 +263,24 @@ describe('apply patch integration', () => {
     expect(renamed).toBe('export const x = 1;\n');
     expect(oldExists).toBe(false);
     expect(goneExists).toBe(false);
+  });
+
+  it('adds a file whose hunk contains a blank content line', async () => {
+    const dir = makeWorkspace();
+    const tools = getTools(dir);
+    const res = await tools.Edit.execute('e1', {
+      patch: [
+        '*** Begin Patch',
+        '*** Add File: added.ts',
+        '+export const a = 1;',
+        '',
+        '+export const b = 2;',
+        '*** End Patch',
+      ].join('\n'),
+    });
+    const added = readFileSync(path.join(dir, 'added.ts'), 'utf8');
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(added).toBe('export const a = 1;\n\nexport const b = 2;\n');
   });
 });

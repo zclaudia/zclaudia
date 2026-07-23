@@ -80,9 +80,23 @@ export function parseApplyPatch(input: string): ApplyPatchOperation[] {
       const filePath = line.slice('*** Add File: '.length).trim();
       index += 1;
       const contentLines: string[] = [];
+      // Same buffered-blank tolerance as update hunks: models often emit a
+      // bare empty line for a blank content line. Buffer blanks and only flush
+      // them as content when more hunk lines follow — trailing blanks right
+      // before the next "***" marker are separators, not content.
+      let pendingBlanks = 0;
       while (index < lines.length - 1 && !lines[index].startsWith('*** ')) {
         const patchLine = lines[index];
+        if (patchLine === '') {
+          pendingBlanks += 1;
+          index += 1;
+          continue;
+        }
         if (!patchLine.startsWith('+')) throw new Error('Add File lines must start with "+"');
+        for (let blank = 0; blank < pendingBlanks; blank += 1) {
+          contentLines.push('');
+        }
+        pendingBlanks = 0;
         contentLines.push(patchLine.slice(1));
         index += 1;
       }

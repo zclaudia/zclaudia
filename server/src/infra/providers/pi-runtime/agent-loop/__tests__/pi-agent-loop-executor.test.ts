@@ -60,6 +60,68 @@ describe('runPiAgentLoop', () => {
     expect(testState.lastSignal?.aborted).toBe(true);
   });
 
+  it('cancels the in-flight loop when the caller-owned signal aborts (P2)', async () => {
+    testState.runAgentLoop.mockImplementation((_prompts, _context, _config, _emit, signal) => {
+      testState.lastSignal = signal;
+      return new Promise(() => {});
+    });
+    const caller = new AbortController();
+
+    const runPromise = runPiAgentLoop({
+      systemPrompt: 'system',
+      userInput: 'hello',
+      history: [],
+      modelInfo: { model: { id: 'test-model' } } as never,
+      tools: [],
+      hooks: {},
+      timeoutMs: 50,
+      maxTurns: 2,
+      sessionId: 'session-1',
+      streamFn: vi.fn(),
+      signal: caller.signal,
+    });
+
+    // The loop never settles on its own; time it out so the promise rejects
+    // and no dangling promise is left behind.
+    const rejection = expect(runPromise).rejects.toBeInstanceOf(AgentLoopTimeoutError);
+
+    expect(testState.lastSignal?.aborted).toBe(false);
+    caller.abort();
+    expect(testState.lastSignal?.aborted).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(50);
+    await rejection;
+  });
+
+  it('starts with an aborted loop signal when the caller signal is already aborted (P2)', async () => {
+    testState.runAgentLoop.mockImplementation((_prompts, _context, _config, _emit, signal) => {
+      testState.lastSignal = signal;
+      return new Promise(() => {});
+    });
+    const caller = new AbortController();
+    caller.abort();
+
+    const runPromise = runPiAgentLoop({
+      systemPrompt: 'system',
+      userInput: 'hello',
+      history: [],
+      modelInfo: { model: { id: 'test-model' } } as never,
+      tools: [],
+      hooks: {},
+      timeoutMs: 50,
+      maxTurns: 2,
+      sessionId: 'session-1',
+      streamFn: vi.fn(),
+      signal: caller.signal,
+    });
+    const rejection = expect(runPromise).rejects.toBeInstanceOf(AgentLoopTimeoutError);
+
+    expect(testState.lastSignal?.aborted).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(50);
+    await rejection;
+  });
+
   it('stops at the maxTurns cap when shouldStopAfterTurn reaches the limit', async () => {
     const hookStop = vi.fn().mockResolvedValue(false);
     let stopResults: boolean[] = [];

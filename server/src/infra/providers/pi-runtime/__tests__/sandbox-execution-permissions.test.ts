@@ -28,6 +28,27 @@ describe('sandbox execution permission requests', () => {
     expect(request.detail).toContain('http://127.0.0.1:8000');
   });
 
+  it('discloses the true host-level scope of a network grant (P2 grant widening)', () => {
+    // The sandbox runtime enforces host-level allow-lists: approving
+    // http://api.internal.corp:8000 really opens every port/protocol on that
+    // host. The approval text must say so, not imply URL-level scoping.
+    const request = buildSandboxCapabilityRequest({
+      requestId: 'call-1b:capability:0',
+      commandPreview: 'curl http://api.internal.corp:8000/health',
+      grants: [{ type: 'network', protocol: 'http', host: 'api.internal.corp', port: 8000 }],
+      classification: 'confirmed_sandbox_denial',
+      evidence: {
+        matchedSignals: ['curl error output'],
+        candidateTargets: ['http://api.internal.corp:8000'],
+        missingSignals: [],
+      },
+    });
+
+    expect(request.detail).toContain('http://api.internal.corp:8000');
+    expect(request.detail).toContain('all ports and protocols on api.internal.corp');
+    expect(request.detail).toContain('host-scoped');
+  });
+
   it('builds an unsandboxed request from model reason', () => {
     const request = buildSandboxUnsandboxedRequest({
       requestId: 'call-2:unsandboxed',

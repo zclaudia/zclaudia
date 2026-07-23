@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import * as path from 'path';
 import type { TaskRecord, TaskStatus } from '@zclaudia/shared/core/task';
 
@@ -9,14 +9,10 @@ import type { TaskExecutorUpdate } from '../../../domains/tasks/executors/types.
 import { killProcessTree } from './bash-runner.js';
 import { pidAlive, resolveDataDir } from '../../../domains/tasks/executors/command-executor.js';
 import * as sandbox from './sandbox.js';
-import {
-  networkGrantToAllowedDomain,
-  type SandboxGrant,
-} from './sandbox-execution/index.js';
+import { networkGrantToAllowedDomain, type SandboxGrant } from './sandbox-execution/index.js';
 import { readTaskLogWindow } from './task-output-window.js';
 import { errorResult, textResult, truncateText } from './tool-common.js';
 import type { TaskRuntime } from './task-runtime.js';
-import { toWorkspaceRelative } from './workspace-paths.js';
 
 const TERMINAL: ReadonlySet<TaskStatus> = new Set(['completed', 'failed', 'stopped']);
 
@@ -67,6 +63,21 @@ function evalTaskLogPath(taskId: string): string {
 
 function evalTaskResultPath(taskId: string): string {
   return path.join(resolveDataDir(), 'task-logs', `${taskId}.result.json`);
+}
+
+function evalTaskPayloadPath(taskId: string): string {
+  return path.join(resolveDataDir(), 'task-scripts', `${taskId}.eval.json`);
+}
+
+/** Per-task payload/result files are only needed until the task settles. */
+function removeSettledTaskFiles(taskId: string): void {
+  for (const filePath of [evalTaskPayloadPath(taskId), evalTaskResultPath(taskId)]) {
+    try {
+      unlinkSync(filePath);
+    } catch {
+      // best-effort: already gone or locked
+    }
+  }
 }
 
 function evalTaskScriptPath(): string {
@@ -137,7 +148,7 @@ export class EvalTaskRuntime implements TaskRuntime {
     const resultPath = evalTaskResultPath(task.id);
     mkdirSync(path.dirname(logPath), { recursive: true });
     const scriptPath = evalTaskScriptPath();
-    const payloadPath = path.join(resolveDataDir(), 'task-scripts', `${task.id}.eval.json`);
+    const payloadPath = evalTaskPayloadPath(task.id);
     writeFileSync(payloadPath, JSON.stringify({ code, logPath, resultPath }), {
       encoding: 'utf8',
       mode: 0o600,
@@ -207,6 +218,7 @@ export class EvalTaskRuntime implements TaskRuntime {
       } else {
         this.service.failTask(taskId, { error: `Eval task exited with code ${exitCode}` });
       }
+      removeSettledTaskFiles(taskId);
     } catch {
       // lifecycle race
     }
@@ -221,13 +233,14 @@ export class EvalTaskRuntime implements TaskRuntime {
         ? metadata.resultPath
         : evalTaskResultPath(current.id);
     const result = parseResult(resultPath);
-    if (result?.ok === true) {
-      return this.service.completeTask(current.id, { text: result.text });
-    }
-    if (result?.ok === false) {
-      return this.service.failTask(current.id, { error: result.error });
-    }
-    return this.service.stopTask(current.id, { error: fallbackError });
+    const settled =
+      result?.ok === true
+        ? this.service.completeTask(current.id, { text: result.text })
+        : result?.ok === false
+          ? this.service.failTask(current.id, { error: result.error })
+          : this.service.stopTask(current.id, { error: fallbackError });
+    removeSettledTaskFiles(current.id);
+    return settled;
   }
 
   private taskTimeoutMs(task: TaskRecord): number {
@@ -284,6 +297,7 @@ export class EvalTaskRuntime implements TaskRuntime {
     if (!TERMINAL.has(task.status)) {
       try {
         this.service.stopTask(task.id, reason ? { error: reason } : undefined);
+        removeSettledTaskFiles(task.id);
       } catch {
         // already terminal
       }
@@ -321,7 +335,9 @@ export class EvalTaskRuntime implements TaskRuntime {
     const code = typeof metadata.code === 'string' ? metadata.code : '<unknown>';
     const workspaceRoot =
       typeof metadata.workspaceRoot === 'string' ? metadata.workspaceRoot : undefined;
-    const cwd = workspaceRoot ? toWorkspaceRelative(workspaceRoot, workspaceRoot) || '.' : '.';
+    // The task process runs with cwd = workspaceRoot; show the real root rather
+    // than relativizing it against itself (which always produced 'Cwd: .').
+    const cwd = workspaceRoot ?? '.';
     const terminal = TERMINAL.has(current.status);
     const status = current.status === 'completed' ? 'success' : current.status;
     const text = [

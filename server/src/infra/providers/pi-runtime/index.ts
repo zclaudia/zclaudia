@@ -67,4 +67,19 @@ export {
   type SkillExecutionPolicy,
   type SkillRuntimeState,
 } from './skills.js';
-export * from './agent-loop/index.js';
+// Enumerated explicitly (no `export *`) so a growing agent-loop surface can
+// never silently collide with the named exports above.
+export {
+  BUILTIN_AGENT_LOOP_TOOLSETS,
+  buildAgentLoopTools,
+  getAgentLoopToolsetDescriptor,
+  LightweightAgentRunner,
+  AgentLoopTimeoutError,
+  runPiAgentLoop,
+  type AgentLoopToolsetDescriptor,
+  type ToolsetContext,
+  type LightweightAgentRunnerDeps,
+  type AgentLoopExecutor,
+  type AgentLoopExecutorInput,
+  type AgentLoopExecutorResult,
+} from './agent-loop/index.js';

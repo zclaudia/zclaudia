@@ -28,6 +28,10 @@ describe('task bridge tools', () => {
 
     expect(executorResult.content[0].text).toContain('Agent tool requires a task executor');
     expect(dbResult.content[0].text).toContain('Agent tool requires database context');
+    // Structured failure contract: details.ok === false so the failure-loop
+    // guard and remediation can see these failures.
+    expect(executorResult.details).toMatchObject({ ok: false, error: 'missing_task_executor' });
+    expect(dbResult.details).toMatchObject({ ok: false, error: 'missing_db_context' });
   });
 
   it('TaskOutput and Monitor report missing database context', async () => {

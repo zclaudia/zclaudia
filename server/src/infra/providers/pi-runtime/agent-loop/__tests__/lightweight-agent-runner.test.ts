@@ -670,4 +670,74 @@ describe('LightweightAgentRunner', () => {
     expect(result.error).toContain('Unsupported lightweight agent permission mode: custom');
     expect(execute).not.toHaveBeenCalled();
   });
+
+  it('forwards the caller abort signal to the executor input (P2)', async () => {
+    const execute: AgentLoopExecutor = vi.fn(async () => ({
+      text: '{"result":"done"}',
+      messages: [],
+    }));
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const caller = new AbortController();
+
+    const result = await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'say done',
+      toolset: { id: 'none' },
+      outputContract: {
+        type: 'json',
+        schema: {
+          type: 'object',
+          required: ['result'],
+          properties: { result: { type: 'string' } },
+        },
+      },
+      context: { policy: 'none' },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      permissionMode: 'deny-external',
+      abortSignal: caller.signal,
+    });
+
+    expect(result.status).toBe('completed');
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signal: caller.signal,
+      })
+    );
+  });
+
+  it('omits the executor signal when the request carries no abortSignal', async () => {
+    const execute: AgentLoopExecutor = vi.fn(async () => ({
+      text: '{"result":"done"}',
+      messages: [],
+    }));
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+
+    const result = await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'say done',
+      toolset: { id: 'none' },
+      outputContract: {
+        type: 'json',
+        schema: {
+          type: 'object',
+          required: ['result'],
+          properties: { result: { type: 'string' } },
+        },
+      },
+      context: { policy: 'none' },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      permissionMode: 'deny-external',
+    });
+
+    expect(result.status).toBe('completed');
+    expect((execute as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.signal).toBeUndefined();
+  });
 });

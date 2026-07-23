@@ -26,6 +26,10 @@ export function buildTools(cwd: string, options?: ToolBridgeOptions): AgentTool<
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result: AgentTool<any>[] = [];
+  // Dedupe AFTER normalization: aliases ('read') and canonical names ('Read')
+  // resolve to the same tool, and duplicates would produce two same-named
+  // tools, which some provider APIs reject outright.
+  const seen = new Set<ToolName>();
 
   for (const requestedName of requested) {
     const name = normalizeToolName(requestedName);
@@ -33,6 +37,8 @@ export function buildTools(cwd: string, options?: ToolBridgeOptions): AgentTool<
       console.warn(`[buildTools] Unknown tool name skipped: ${requestedName}`);
       continue;
     }
+    if (seen.has(name)) continue;
+    seen.add(name);
     if (name === 'Memory' && !effectiveOptions.memoryDir) continue;
     const override = overrides.get(name);
     const tool = override
@@ -45,7 +51,9 @@ export function buildTools(cwd: string, options?: ToolBridgeOptions): AgentTool<
     const withOverrides = effectiveOptions.argOverrides
       ? withPendingArgOverrides(tool, effectiveOptions.argOverrides)
       : tool;
-    result.push(withToolExecutionObserver(withOverrides, name, cwd, effectiveOptions.toolExecutionObserver));
+    result.push(
+      withToolExecutionObserver(withOverrides, name, cwd, effectiveOptions.toolExecutionObserver)
+    );
   }
 
   return result;

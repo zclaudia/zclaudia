@@ -36,16 +36,17 @@ import {
   type SandboxOperationResult,
   type SandboxPrivilegeMode,
 } from './sandbox-execution/index.js';
-import { errorResult, textResult, toolParams, truncateText } from './tool-common.js';
+import {
+  agentToolParameters,
+  errorResult,
+  textResult,
+  toolParams,
+  truncateText,
+} from './tool-common.js';
 import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
 
 export type SandboxFsDenial = 'read_only' | 'write_outside_workspace';
-type AgentToolParameters = AgentTool['parameters'];
 type SandboxInvocation = { argv: string[]; env: NodeJS.ProcessEnv };
-
-function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
-  return schema as AgentToolParameters;
-}
 
 function sandboxInvocation(wrap: sandbox.WrapResult): SandboxInvocation | undefined {
   if (!wrap.sandboxed) return undefined;
@@ -109,17 +110,13 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
   const MAX_TIMEOUT_SEC = 600;
   const UPDATE_THROTTLE_MS = 100;
   const DEFAULT_AUTO_BACKGROUND_MS = 60_000;
-  const TERMINAL_TASK_STATUSES: ReadonlySet<string> = new Set([
-    'completed',
-    'failed',
-    'stopped',
-  ]);
+  const TERMINAL_TASK_STATUSES: ReadonlySet<string> = new Set(['completed', 'failed', 'stopped']);
   const grantedDomains = new Set<string>(options?.sandboxAllowedDomains ?? []);
   return {
     name: 'Bash',
     label: 'Bash',
     description:
-      'Execute a shell command (bash -c) in the workspace. Returns merged stdout+stderr and the exit code. Output is truncated to the last 2000 lines / 50KB; full output is written to a temp file when truncated. A command still running after 60s is automatically moved to a background task (returns a taskId to poll with TaskOutput); set an explicit timeout (max 600s) to wait inline and kill at the deadline instead. Set run_in_background:true to background immediately (dev servers, watchers).',
+      'Execute a shell command (bash -c) in the workspace. Returns merged stdout+stderr and the exit code. Output is truncated to the last 2000 lines / 50KB; full output is written to a temp file when truncated. A command still running after 60s is automatically moved to a background task (returns a taskId to poll with TaskOutput); set an explicit timeout (max 600s) to wait inline and kill at the deadline instead. Set run_in_background:true to background immediately (dev servers, watchers). Tool-routing guidance (steering simple ls/find/grep-style commands to LS/Glob/Grep) applies only to standalone commands: any pipeline or compound command containing shell control syntax (| ; & > < ` $(...)) skips that steering and runs as-is.',
     parameters: agentToolParameters({
       type: 'object',
       properties: {
@@ -428,7 +425,10 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         const extraAllowedDomains = [
           ...grantedDomains,
           ...grants
-            .filter((grant): grant is Extract<SandboxGrant, { type: 'network' }> => grant.type === 'network')
+            .filter(
+              (grant): grant is Extract<SandboxGrant, { type: 'network' }> =>
+                grant.type === 'network'
+            )
             .map(networkGrantToAllowedDomain),
         ];
         const wrap = forceUnsandboxed
@@ -524,7 +524,8 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         );
       }
       const result = operationResult.raw;
-      const wrap = operationResult.wrap ?? ({ sandboxed: operationResult.sandboxed } as sandbox.WrapResult);
+      const wrap =
+        operationResult.wrap ?? ({ sandboxed: operationResult.sandboxed } as sandbox.WrapResult);
       if (!result) {
         return textResult(operationResult.outputText || '(no output)', {
           ok: operationResult.ok,

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 
@@ -84,6 +84,63 @@ describe('Eval background runtime', () => {
     });
     expect(output.details.rawOutput).toContain('hello from eval');
     expect(output.details.rawOutput).toContain('42');
+    // The task process runs with cwd = workspaceRoot; the output must show the
+    // real root, not a self-relativized 'Cwd: .'.
+    expect(output.content[0].text).toContain(`Cwd: ${dir}`);
+    expect(output.content[0].text).not.toContain('Cwd: .');
+  });
+
+  it('carries session-granted sandbox domains into the background task privilege plan', async () => {
+    expect(db).toBeDefined();
+    expect(dir).toBeDefined();
+    const evalTool = createEvalBridgeTool(dir!, {
+      sessionId: 's1',
+      runId: 'r1',
+      db: db!,
+      sandboxAllowedDomains: ['granted.example.com', 'other.example.com'],
+    }) as any;
+
+    const start = await evalTool.execute('eval-bg-grants', {
+      code: '1 + 1',
+      run_in_background: true,
+    });
+
+    expect(start.details).toMatchObject({ ok: true, type: 'eval' });
+    const repo = new TaskRepository(db!);
+    const task = repo.findById(start.details.taskId as string);
+    expect(task?.metadata?.privilegePlan).toEqual({
+      mode: 'sandbox',
+      grants: [
+        { type: 'network', host: 'granted.example.com' },
+        { type: 'network', host: 'other.example.com' },
+      ],
+    });
+  });
+
+  it('removes per-task payload and result files once the task settles', async () => {
+    expect(db).toBeDefined();
+    expect(dir).toBeDefined();
+    expect(dataDir).toBeDefined();
+    const evalTool = createEvalBridgeTool(dir!, { sessionId: 's1', runId: 'r1', db: db! }) as any;
+    const start = await evalTool.execute('eval-bg-cleanup', {
+      code: "'cleanup probe'",
+      run_in_background: true,
+    });
+    const taskId = start.details.taskId as string;
+    const payloadPath = path.join(dataDir!, 'task-scripts', `${taskId}.eval.json`);
+    const resultPath = path.join(dataDir!, 'task-logs', `${taskId}.result.json`);
+
+    const repo = new TaskRepository(db!);
+    const completed = await eventually(
+      () => repo.findById(taskId),
+      task => task?.status === 'completed' || task?.status === 'failed'
+    );
+
+    expect(completed?.status).toBe('completed');
+    expect(existsSync(payloadPath)).toBe(false);
+    expect(existsSync(resultPath)).toBe(false);
+    // The user-visible log survives settlement; only payload/result are per-run scratch.
+    expect(existsSync(path.join(dataDir!, 'task-logs', `${taskId}.log`))).toBe(true);
   });
 
   it('reconciles completed and failed tasks from result files after restart', () => {

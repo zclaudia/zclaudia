@@ -15,7 +15,14 @@ import {
   readTextFileWithMetadata,
   writeTextFileAtomic,
 } from './text-io.js';
-import { errorResult, textResult, toolParams } from './tool-common.js';
+import {
+  agentToolParameters,
+  errorResult,
+  textResult,
+  toolParams,
+  truncateText,
+} from './tool-common.js';
+import { validateMutationContent } from './write-guards.js';
 import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
 
 export interface AstBridgeToolOptions {
@@ -23,11 +30,8 @@ export interface AstBridgeToolOptions {
   noopGuard?: NoopEditGuard;
 }
 
-type AgentToolParameters = AgentTool['parameters'];
-
-function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
-  return schema as AgentToolParameters;
-}
+/** Output budget for the concatenated AstEdit diff (matches tool-common's default). */
+const MAX_AST_EDIT_DIFF_CHARS = 80_000;
 
 export function createAstGrepTool(cwd: string): AgentTool {
   return {
@@ -63,7 +67,7 @@ export function createAstGrepTool(cwd: string): AgentTool {
       }
       const maxResults = Math.max(1, Math.min(Number(args.max_results ?? 50) || 50, 200));
       try {
-        const files = collectAstFiles(searchRoot);
+        const files = await collectAstFiles(searchRoot);
         const lines: string[] = [];
         let total = 0;
         let truncated = false;
@@ -147,10 +151,17 @@ export function createAstEditTool(cwd: string, options?: AstBridgeToolOptions): 
       }
       const previewOnly = args.dry_run === true;
       try {
-        const files = collectAstFiles(searchRoot);
+        const files = await collectAstFiles(searchRoot);
         const perFileResults: Array<Record<string, unknown>> = [];
-        const diffs: string[] = [];
+        const diffEntries: Array<{
+          path: string;
+          diff: string;
+          hunks: number;
+          additions: number;
+          deletions: number;
+        }> = [];
         let totalReplaced = 0;
+        let mutatedFiles = 0;
         for (const file of files) {
           let original: Awaited<ReturnType<typeof readTextFileWithMetadata>>;
           try {
@@ -176,20 +187,59 @@ export function createAstEditTool(cwd: string, options?: AstBridgeToolOptions): 
             });
             continue;
           }
+          // Same mutation-content scan Edit/Write/MultiEdit run: the rewritten
+          // content must not introduce secrets or unsafe agent settings.
+          const contentGuard = validateMutationContent(file, result.updated);
+          if (contentGuard) {
+            perFileResults.push({
+              ok: false,
+              error: contentGuard.code,
+              path: relPath,
+              message: contentGuard.message,
+              ...(contentGuard.details ?? {}),
+            });
+            continue;
+          }
           const diff = buildFileDiff(relPath, original.content, result.updated);
-          diffs.push(diff.diff);
+          diffEntries.push({
+            path: relPath,
+            diff: diff.diff,
+            hunks: diff.structuredPatch.length,
+            additions: diff.lineChanges.additions,
+            deletions: diff.lineChanges.deletions,
+          });
           if (!previewOnly) {
+            let written = false;
             await runWithFileWriteLock(file, async () => {
+              // TOCTOU guard: the rewrite was computed from content read before
+              // the lock. Re-read inside the lock and refuse to clobber a
+              // concurrent change (mirrors Edit's assertSafeToWrite flow).
+              const current = await readTextFileWithMetadata(file);
+              if (current.content !== original.content) {
+                perFileResults.push({
+                  ok: false,
+                  error: 'file_changed_during_edit',
+                  path: relPath,
+                  message:
+                    'File changed while AstEdit was running; no changes were written. Retry the edit.',
+                });
+                return;
+              }
               const backup = await recordFileBackup(relPath, original.content, file);
               await writeTextFileAtomic(
                 file,
                 applyLineEndingStyle(result.updated, lineEndingFor(original.content)),
-                original
+                current
               );
               await options?.readFileState?.recordWrite(file, result.updated);
               options?.noopGuard?.clear(file);
+              written = true;
               perFileResults.push({ ok: true, path: relPath, replaced: result.replaced, backup });
             });
+            if (written) {
+              totalReplaced += result.replaced;
+              mutatedFiles += 1;
+            }
           } else {
             perFileResults.push({
               ok: true,
@@ -197,8 +247,9 @@ export function createAstEditTool(cwd: string, options?: AstBridgeToolOptions): 
               path: relPath,
               replaced: result.replaced,
             });
+            totalReplaced += result.replaced;
+            mutatedFiles += 1;
           }
-          totalReplaced += result.replaced;
         }
         const failures = perFileResults.filter(entry => entry.ok === false);
         if (totalReplaced === 0) {
@@ -211,14 +262,31 @@ export function createAstEditTool(cwd: string, options?: AstBridgeToolOptions): 
           return errorResult('no_matches', 'Pattern did not match anything in the target path.');
         }
         const summary =
-          `${previewOnly ? 'Previewed' : 'Applied'} ${totalReplaced} replacement(s) in ${diffs.length} file(s).` +
-          (failures.length > 0 ? ` ${failures.length} file(s) skipped (auto-generated).` : '');
-        return textResult(`${summary}\n\n${diffs.join('\n')}`, {
+          `${previewOnly ? 'Previewed' : 'Applied'} ${totalReplaced} replacement(s) in ${mutatedFiles} file(s).` +
+          (failures.length > 0 ? ` ${failures.length} file(s) skipped.` : '');
+        // Cap the concatenated diff; past the budget, fall back to a per-file
+        // hunk summary so the model still sees what changed where.
+        let diffText = diffEntries.map(entry => entry.diff).join('\n');
+        let diffTruncated = false;
+        if (diffText.length > MAX_AST_EDIT_DIFF_CHARS) {
+          diffTruncated = true;
+          const perFileSummary = diffEntries
+            .map(
+              entry =>
+                `${entry.path}: ${entry.hunks} hunk(s), +${entry.additions}/-${entry.deletions}`
+            )
+            .join('\n');
+          diffText =
+            `${truncateText(diffText, MAX_AST_EDIT_DIFF_CHARS)}\n\n` +
+            `[diff truncated: per-file summary for all ${diffEntries.length} file(s)]\n${perFileSummary}`;
+        }
+        return textResult(`${summary}\n\n${diffText}`, {
           ok: true,
           ...(previewOnly ? { preview: true } : {}),
           replaced: totalReplaced,
           files: perFileResults,
-          diff: diffs.join('\n'),
+          diff: diffText,
+          ...(diffTruncated ? { diffTruncated: true } : {}),
         });
       } catch (err) {
         return errorResult('ast_edit_failed', err instanceof Error ? err.message : String(err));

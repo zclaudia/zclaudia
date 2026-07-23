@@ -1,3 +1,5 @@
+import { extractToolPathParam } from './tool-execution-observer.js';
+
 export interface ToolTelemetrySnapshot {
   totalCalls: number;
   toolCounts: Record<string, number>;
@@ -24,11 +26,6 @@ function textBytes(content: ToolResultLike['content']): number {
     if (block?.type !== 'text' || typeof block.text !== 'string') return sum;
     return sum + Buffer.byteLength(block.text, 'utf8');
   }, 0);
-}
-
-function pathArg(args: Record<string, unknown> | undefined): string | undefined {
-  const value = args?.path ?? args?.file_path ?? args?.filePath;
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 function increment(map: Map<string, number>, key: string): number {
@@ -59,7 +56,7 @@ export class ToolCallTelemetry {
     this.outputBytes += textBytes(result.content);
     increment(this.toolCounts, toolName || '<unknown>');
 
-    const path = pathArg(args);
+    const path = extractToolPathParam(toolName, args);
     if (toolName === 'Read' && path) {
       const count = increment(this.readsByPath, path);
       if (count === 2) {

@@ -107,6 +107,25 @@ describe('buildPiRunPrompt — edit tool guidance', () => {
   });
 });
 
+describe('buildPiRunPrompt — snapshot skill catalog text', () => {
+  it('separates the skill catalog and active skill context with a newline', () => {
+    const bundle = buildPiRunPrompt({
+      ...base,
+      skillCatalog: 'CATALOG-END',
+      activeSkillContext: 'CONTEXT-START',
+    });
+    expect(bundle.snapshotSkillCatalogText).toBe('CATALOG-END\nCONTEXT-START');
+  });
+
+  it('adds no stray separator when either block is empty', () => {
+    expect(buildPiRunPrompt({ ...base, skillCatalog: 'CAT' }).snapshotSkillCatalogText).toBe('CAT');
+    expect(buildPiRunPrompt({ ...base, activeSkillContext: 'CTX' }).snapshotSkillCatalogText).toBe(
+      'CTX'
+    );
+    expect(buildPiRunPrompt(base).snapshotSkillCatalogText).toBe('');
+  });
+});
+
 describe('buildPiRunPrompt — sandbox privilege guidance', () => {
   it('teaches the model to request unsandboxed Bash for host-only workflows', () => {
     const bundle = buildPiRunPrompt({ ...base, systemPrompt: 'Base.' });
@@ -120,7 +139,9 @@ describe('buildPiRunPrompt — sandbox privilege guidance', () => {
     expect(bundle.effectiveSystemPrompt).toContain('aws sso');
     expect(bundle.effectiveSystemPrompt).toContain('http_proxy=http://localhost:<port>');
     expect(bundle.effectiveSystemPrompt).toContain('sandbox-runtime internal network proxy');
-    expect(bundle.effectiveSystemPrompt).toContain('Do not ask the user to run commands in their terminal');
+    expect(bundle.effectiveSystemPrompt).toContain(
+      'Do not ask the user to run commands in their terminal'
+    );
     expect(bundle.snapshotSystemPromptText).toContain('# Sandbox Privilege Selection');
   });
 });

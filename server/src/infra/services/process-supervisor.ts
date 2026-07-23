@@ -13,6 +13,7 @@ import {
   listAllProcesses,
   listDescendantProcesses,
 } from '../../utils/process-tree.js';
+import { scrubEnv } from '../providers/pi-runtime/env-scrub.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -374,8 +375,14 @@ export class ProcessSupervisor {
 
   private buildChildEnv(spec: SpawnSpec, processId: string): NodeJS.ProcessEnv {
     const inherited = spec.env ?? {};
+    // P2: scrub the inherited base the same way the Bash path does (P0-3) —
+    // otherwise a caller that passes only a partial env (or the sandbox's
+    // already-scrubbed env) would still leak host secrets into the child via
+    // the process.env base. Callers that already pass a fully-scrubbed env
+    // (agent_shell) are unaffected; an explicit spec.env value is an
+    // intentional act and always wins over the scrubbed base.
     return {
-      ...process.env,
+      ...scrubEnv(process.env),
       ...inherited,
       _MC_PROCESS_ID: processId,
       _MC_SOURCE: spec.source,

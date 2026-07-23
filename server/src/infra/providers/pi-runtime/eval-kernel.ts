@@ -8,7 +8,7 @@
  * the kernel (state lost) and the next cell starts a fresh one.
  */
 import { spawn, type ChildProcess } from 'child_process';
-import { mkdirSync, writeFileSync } from 'fs';
+import { mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
@@ -129,6 +129,8 @@ export interface EvalExecResult {
   error?: string;
   timedOut?: boolean;
   kernelRestarted?: boolean;
+  /** Why the kernel restarted when kernelRestarted is set (e.g. 'grants_changed'). */
+  kernelRestartReason?: string;
   sandboxed?: boolean;
   outputTruncated?: boolean;
   fullOutputPath?: string;
@@ -141,9 +143,35 @@ export interface EvalKernelOptions {
   unsandboxed?: boolean;
 }
 
+// Eval full-output logs are kept only long enough for the model to Read them
+// back within the session; without a sweep they accumulate forever (one file
+// per cell whose output exceeds the capture budget). 24h TTL, swept
+// opportunistically on each new write — no background timer (mirrors bash-logs).
+const EVAL_LOG_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function sweepStaleEvalLogs(dir: string, maxAgeMs: number): void {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return;
+  }
+  const cutoff = Date.now() - maxAgeMs;
+  for (const name of entries) {
+    if (!name.endsWith('.log')) continue;
+    const filePath = path.join(dir, name);
+    try {
+      if (statSync(filePath).mtimeMs < cutoff) unlinkSync(filePath);
+    } catch {
+      // file vanished or is locked — ignore, this is best-effort
+    }
+  }
+}
+
 function evalLogPath(): string {
   const dir = path.join(os.tmpdir(), 'zclaudia-eval-logs');
   mkdirSync(dir, { recursive: true });
+  sweepStaleEvalLogs(dir, EVAL_LOG_MAX_AGE_MS);
   return path.join(dir, `${randomUUID()}.log`);
 }
 
@@ -165,6 +193,11 @@ export class EvalKernel {
   lastUsedAt = Date.now();
 
   constructor(private readonly options: EvalKernelOptions) {}
+
+  /** Temp script backing this kernel (undefined again after shutdown); exposed for tests. */
+  get scriptFilePath(): string | undefined {
+    return this.scriptPath;
+  }
 
   private alive(): boolean {
     return !!this.child && this.child.exitCode === null && !this.child.killed;
@@ -301,12 +334,25 @@ export class EvalKernel {
   shutdown(): void {
     const child = this.child;
     this.child = undefined;
-    if (!child) return;
-    try {
-      if (child.pid && process.platform !== 'win32') process.kill(-child.pid, 'SIGKILL');
-      else child.kill('SIGKILL');
-    } catch {
-      // already gone
+    if (child) {
+      try {
+        if (child.pid && process.platform !== 'win32') process.kill(-child.pid, 'SIGKILL');
+        else child.kill('SIGKILL');
+      } catch {
+        // already gone
+      }
+    }
+    // The temp kernel script is per-kernel state; leaving it behind would leak
+    // one file per kernel into the shared tmp dir. Deleting after the child is
+    // dead; a later exec re-writes a fresh script via ensureChild().
+    const scriptPath = this.scriptPath;
+    this.scriptPath = undefined;
+    if (scriptPath) {
+      try {
+        unlinkSync(scriptPath);
+      } catch {
+        // best-effort: may be locked (Windows) or already removed
+      }
     }
   }
 }

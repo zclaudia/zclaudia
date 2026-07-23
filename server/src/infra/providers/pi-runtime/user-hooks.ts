@@ -11,6 +11,11 @@ export interface HookInvocation {
   event: UserHookEvent;
   toolName: string;
   toolInput: unknown;
+  /**
+   * PostToolUse only: the raw tool result. Sent to the hook as `toolResponse`
+   * on stdin after sanitizeHookToolResult caps it.
+   */
+  toolResult?: unknown;
   detail: string;
   cwd: string;
   sessionId?: string;
@@ -22,6 +27,38 @@ export interface PreHookOutcome {
 }
 
 const REASON_LIMIT = 1024;
+/** Per-text-block cap for the tool result forwarded to PostToolUse hooks. */
+export const HOOK_TOOL_RESULT_TEXT_LIMIT = 8 * 1024;
+
+/**
+ * Claude Code's `tool_response` equivalent for PostToolUse hooks. A full Bash
+ * spill or Read dump would swamp the hook's stdin payload, so oversized text
+ * blocks are capped (the marker notes the cut) and image/binary blocks degrade
+ * to a placeholder — no base64 megabytes cross the process boundary.
+ */
+export function sanitizeHookToolResult(result: unknown): unknown {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
+  const record = result as { content?: unknown };
+  if (!Array.isArray(record.content)) return result;
+  const content = record.content.map(block => {
+    if (!block || typeof block !== 'object') return block;
+    const b = block as { type?: unknown; text?: unknown };
+    if (b.type === 'text' && typeof b.text === 'string') {
+      if (b.text.length <= HOOK_TOOL_RESULT_TEXT_LIMIT) return block;
+      return {
+        ...b,
+        text:
+          b.text.slice(0, HOOK_TOOL_RESULT_TEXT_LIMIT) +
+          `\n... [truncated ${b.text.length - HOOK_TOOL_RESULT_TEXT_LIMIT} chars for hook payload]`,
+      };
+    }
+    if (b.type === 'image') {
+      return { type: 'text', text: '[image content omitted from hook payload]' };
+    }
+    return block;
+  });
+  return { ...record, content };
+}
 
 function matchingHooks(
   hooks: UserHookDefinition[],
@@ -53,6 +90,9 @@ async function invokeHook(hook: UserHookDefinition, inv: HookInvocation, signal?
       event: inv.event,
       toolName: inv.toolName,
       toolInput: inv.toolInput,
+      // undefined for PreToolUse — JSON.stringify drops the key there.
+      toolResponse:
+        inv.toolResult === undefined ? undefined : sanitizeHookToolResult(inv.toolResult),
       detail: inv.detail,
       cwd: inv.cwd,
       sessionId: inv.sessionId,

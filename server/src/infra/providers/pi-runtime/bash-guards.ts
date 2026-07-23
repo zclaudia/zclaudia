@@ -508,6 +508,11 @@ function findSuggestion(words: string[]): BashToolRoutingSuggestion | undefined 
 export function findBashToolRoutingSuggestion(
   command: string
 ): BashToolRoutingSuggestion | undefined {
+  // Any shell control syntax disables ALL tool-routing steering for the
+  // command: a pipeline/compound command runs exactly as written, even when
+  // one segment is a plain `ls`/`grep`. Deliberate trade-off (statically
+  // splitting compound commands would misparse quoting/subshells), documented
+  // in the Bash tool description so the behavior is visible to the model.
   if (hasShellControlSyntax(command)) return undefined;
   const words = shellWords(command);
   if (words.length === 0) return undefined;

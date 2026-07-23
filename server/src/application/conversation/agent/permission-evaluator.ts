@@ -62,6 +62,7 @@ export {
   resolveProfile,
   normalizePolicy,
   mergePolicy,
+  narrowPolicy,
   getAgentPermissionPolicy,
   getProjectPermissionOverride,
 } from './policy-utils.js';

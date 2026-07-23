@@ -5,15 +5,10 @@ import * as path from 'path';
 import { promisify } from 'util';
 
 import { runRipgrep } from './ripgrep-runner.js';
-import { errorResult, textResult, toolParams } from './tool-common.js';
+import { agentToolParameters, errorResult, textResult, toolParams } from './tool-common.js';
 import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
 
 const execFileAsync = promisify(execFile);
-type AgentToolParameters = AgentTool['parameters'];
-
-function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
-  return schema as AgentToolParameters;
-}
 
 function parseRipgrepLines(
   cwd: string,
@@ -153,7 +148,7 @@ export function createGrepBridgeTool(cwd: string): AgentTool {
     name: 'Grep',
     label: 'Grep',
     description:
-      'Search file contents with ripgrep. output_mode: "content" (default, matching lines with optional context), "files_with_matches" (file paths), or "count" (total match count). Supports case_insensitive and a glob include filter.',
+      'Search file contents with ripgrep. output_mode: "content" (default, matching lines with optional context), "files_with_matches" (file paths), or "count" (total match count). Supports case_insensitive and a glob include filter. In content mode, total counts matching lines only; returned counts all emitted rows including context lines. When truncated, totals cover only the rows collected.',
     parameters: agentToolParameters({
       type: 'object',
       properties: {
@@ -286,13 +281,32 @@ export function createGrepBridgeTool(cwd: string): AgentTool {
           context > 0
             ? parseRipgrepContextLines(cwd, stdout, maxResults)
             : parseRipgrepLines(cwd, stdout, maxResults).map(row => ({ ...row, isMatch: true }));
+        // `total` counts matching lines only; `returned` counts every emitted
+        // row (context lines included) so the two are never conflated.
+        const matchCount = results.reduce((count, row) => count + (row.isMatch ? 1 : 0), 0);
         return textResult(
           JSON.stringify(
-            { pattern, path: relPath, mode, results, total: results.length, truncated },
+            {
+              pattern,
+              path: relPath,
+              mode,
+              results,
+              total: matchCount,
+              returned: results.length,
+              truncated,
+            },
             null,
             2
           ),
-          { ok: true, pattern, path: relPath, total: results.length, truncated, context }
+          {
+            ok: true,
+            pattern,
+            path: relPath,
+            total: matchCount,
+            returned: results.length,
+            truncated,
+            context,
+          }
         );
       } catch (err) {
         return errorResult('grep_failed', err instanceof Error ? err.message : String(err), {
@@ -305,6 +319,7 @@ export function createGrepBridgeTool(cwd: string): AgentTool {
 
 export function createLsBridgeTool(cwd: string): AgentTool {
   const LS_DEFAULT_LIMIT = 500;
+  const LS_STAT_BATCH_SIZE = 32;
   return {
     name: 'LS',
     label: 'LS',
@@ -344,24 +359,32 @@ export function createLsBridgeTool(cwd: string): AgentTool {
             { path: toWorkspaceRelative(cwd, dirPath) || '.' }
           );
         }
-        const entries = (await readdir(dirPath)).sort((a, b) =>
-          a.toLowerCase().localeCompare(b.toLowerCase())
+        const entries = (await readdir(dirPath, { withFileTypes: true })).sort((a, b) =>
+          a.name.toLowerCase().localeCompare(b.name.toLowerCase())
         );
-        const lines: string[] = [];
-        let truncated = false;
-        for (const entry of entries) {
-          if (lines.length >= limit) {
-            truncated = true;
-            break;
-          }
-          let suffix = '';
-          try {
-            if ((await stat(path.join(dirPath, entry))).isDirectory()) suffix = '/';
-          } catch {
-            /* un-stattable entry (e.g. dangling symlink) - list it without a suffix */
-          }
-          lines.push(entry + suffix);
+        const listed = entries.slice(0, limit);
+        const truncated = entries.length > limit;
+        // Dirent answers the directory bit for plain entries; only symlinks
+        // need a real stat (does the TARGET resolve to a directory?). Those
+        // stats run in bounded batches instead of one awaited stat per entry.
+        const isDirectory: boolean[] = [];
+        for (let i = 0; i < listed.length; i += LS_STAT_BATCH_SIZE) {
+          const batch = listed.slice(i, i + LS_STAT_BATCH_SIZE);
+          isDirectory.push(
+            ...(await Promise.all(
+              batch.map(async entry => {
+                if (!entry.isSymbolicLink()) return entry.isDirectory();
+                try {
+                  return (await stat(path.join(dirPath, entry.name))).isDirectory();
+                } catch {
+                  // un-stattable entry (e.g. dangling symlink) - list it without a suffix
+                  return false;
+                }
+              })
+            ))
+          );
         }
+        const lines = listed.map((entry, index) => entry.name + (isDirectory[index] ? '/' : ''));
         const relPath = toWorkspaceRelative(cwd, dirPath) || '.';
         if (lines.length === 0) {
           return textResult('(empty directory)', {
@@ -393,7 +416,7 @@ export function createGlobTool(cwd: string): AgentTool {
     name: 'Glob',
     label: 'Glob',
     description:
-      'Find files by glob pattern under the workspace, returned most-recently-modified first. Respects .gitignore.',
+      'Find files by glob pattern under the workspace, returned most-recently-modified first. Respects .gitignore. total is the number of matching files collected (a lower bound when truncated at the internal stream cap); returned is the number of paths emitted.',
     parameters: agentToolParameters({
       type: 'object',
       properties: {
@@ -542,11 +565,10 @@ export function createLspTool(cwd: string): AgentTool {
         );
       } catch (err) {
         // Same guarded shape as Grep: structured error instead of a raw rejection.
-        return errorResult(
-          'lsp_search_failed',
-          err instanceof Error ? err.message : String(err),
-          { action, query }
-        );
+        return errorResult('lsp_search_failed', err instanceof Error ? err.message : String(err), {
+          action,
+          query,
+        });
       }
     },
   };

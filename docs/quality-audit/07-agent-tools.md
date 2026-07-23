@@ -133,50 +133,62 @@ Scope: 全部 agent 工具实现，覆盖两个位置：
 
 ## P2 — 中低优先改进（按组精选）
 
-**文件工具（A，77 分）**
-- `workspace-paths.ts:10,21`：`..` 边界判断误拒 `..data` 类合法名，改 `=== '..' || startsWith('..' + sep)`
-- `text-io.ts:15-22`：混合换行文件编辑会把全文归一化，diff 与磁盘不一致；按多数派/逐行保留
-- `read-tool.ts:540`：≥250 行且 ≥30% 可折叠时默认返回骨架，描述未告知模型；补描述与 `full:true` 逃生口
-- `file-history.ts`：备份 0600、restore 时重校验工作区包含关系
-- `write-lifecycle.ts:132`：deferred diagnostics 加 TTL/LRU
-- patch 预检双计 noop 失败（edit-write-tools.ts:759）；`Edit` 实际支持 `preview_only` 但 schema 未声明；patch 非原子需在描述中警示
+> **修复状态（2026-07-23）：P2 与遗留项已全部完成并验证（约 40 项）**。验证：server 全量测试 495 文件 / 5539 通过 / 0 失败；`tsc --noEmit` 零错误；ESLint 警告数与基线完全一致（308 = 308，零新增）；prettier 全部改动文件通过。实现要点与行为变化见文末 P2 附录。原始清单保留如下（全部 ✅）：
 
-**Bash/沙箱（B，65 分）**
-- grant  widening：批准 `http://host:port`，会话持久化为整个 host 任意端口/协议（grants.ts:45）
-- 重启后 live-pid 后台任务无退出监听，不轮询永不收敛；`stop()` 不确认 kill 生效（command-executor.ts:204-247）
-- 退出码靠结果文本正则恢复（command-task-runtime.ts:20），应存结构化字段
-- `2>` 重定向逃逸文件写守卫；`2>>` 被意外拦下——行为靠巧合
-- 任何 shell 元字符即关闭全部工具路由引导（bash-guards.ts:220），需在描述中说明
-- adopter 日志管线无背压；task-logs 无 TTL；Windows 仅裸 `bash` fallback 且 ENOENT 与命令失败不可区分
+**文件工具（A，77 分）** ✅
+- `workspace-paths.ts`：`..` 前缀合法名误拒 → 新增 `isOutsideWorkspace` 辅助（`=== '..' || startsWith('..' + sep)`），edit-write-tools 的同类判断一并修复；新建 workspace-paths 测试
+- `text-io.ts`：混合换行采用多数派风格（注释记录取舍）；未编辑行字节不变，补 7 单测 + 2 集成
+- `read-tool.ts:545`：描述已写明结构摘要触发条件（250 行/30% 可折叠）与 `full:true` 逃生口
+- `file-history.ts`：备份与索引 0600；restore 重校验包含关系 + 拒绝符号链接目标；索引互斥串行化；每文件 20 份 + 7 天 TTL 修剪
+- `write-lifecycle.ts`：deferred diagnostics 读取即删（终态）+ 10 分钟 TTL 懒清扫
+- patch 预检不再双计 noop 失败（预检用空 guard，失败按内容指纹计一次）；`Edit` schema 声明 `preview_only`；patch 描述增加非原子警示；`*** Add File` 空行容错与 update hunk 对齐
 
-**搜索/Web（C，66 分）**
-- `web-tools.ts:749`：忽略 charset，GBK/ISO-8859-1 页面乱码
-- `ast-bridge-tools.ts:213`：AstEdit 返回无上限 diff；`ast-tools.ts:35`：同步遍历、无 .gitignore、符号链接环无 visited-set
-- `web-tools.ts:1015`：0 结果短路 fallback 链；`format:'raw'` 绕过二进制守卫（873）；重定向无整体时限（9 跳 × 30s）
-- `ripgrep-runner.ts:60`：stderr 无上限、SIGTERM 后无 SIGKILL 升级
-- `lsp-diagnostics-adapter.ts:50`：file-URI 手工拼接遇 `#%?` 即损坏，改 `pathToFileURL`
-- `total` 语义在 Grep/Glob 间不一致（search-tools.ts:246,397）
+**Bash/沙箱（B，65 分）** ✅
+- grant widening：确认 `@anthropic-ai/sandbox-runtime` 的 allowedDomains 仅支持 host 级（运行时限制，无法端口/协议收窄）→ 批准文案如实披露"将开放该主机全部端口与协议"
+- `stop()` 先 settle 再杀并确认死亡（2.5s 轮询 + 一轮升级，不可确认时注释结果）；reconcile 对 live-pid 任务挂退出监听（1s 轮询 watcher，去重、自动清理）
+- 退出码结构化：`metadata.exitCode` 在 finalize 时落库，`command-task-runtime` 优先读字段、文本正则仅作 legacy 兜底
+- task-logs 24h TTL 清扫（新增共享 `utils/data-dir.ts`：`resolveDataDir` + `sweepStaleLogs`）
+- `sandbox-denial.ts` 死模块及其测试已删除；`SandboxNetworkAccess` 常量单源化（permissions.ts 导出，toolsets.ts 引用）；capability 重试失败携带 `recommendedNextStep`
+- inflight-bash-registry 按 2×600s 龄期懒清扫；Windows shell 缺失返回结构化 `shell_not_found`（列出探测路径）；Bash 描述已注明 shell 控制语法会跳过 LS/Glob/Grep 路由引导
 
-**编排/元工具（D，61 分）**
-- `eval-tool.ts:180`：后台 Eval 丢弃会话已授权域名；`eval-tool.ts:220`：新 grant 改变 kernelKey 导致 kernel 状态静默丢失（无 `kernelRestarted` 信号）
-- `skills.ts:899`：`invokeSkill` 对纯文本失败体 `JSON.parse` 即抛，且 `ok:true` 覆盖错误载荷；fork 执行无超时（633）
-- `worktree-tools.ts:26`：raw SQL 写 `working_directory`，绕过 normalize 与广播
-- `interaction-tools.ts:120`：AskUserQuestion deny/dismiss 也返回 `answered:true`
-- `browser.ts:86`：整body 入内存再截断；改流式读取
+**搜索/Web（C，66 分）** ✅
+- `web-tools.ts`：按 content-type charset 解码（GBK 等不再乱码，未知 label 回退 UTF-8）；`format:'raw'` 不再绕过二进制守卫；90s 整体重定向预算（`fetch_timeout`）；0 结果时继续 fallback 链；删除死参数 `use_cache`；`stripHtml` 去重；`missing_url`/`missing_query` 错误结构化
+- `ast-bridge-tools.ts`：锁内重读比对（`file_changed_during_edit`）；逐文件 `validateMutationContent`；diff 80KB 截断 + 每文件 hunk 摘要
+- `ast-tools.ts`：遍历改 `fs/promises` + realpath visited-set 防符号链接环 + 跳过 vendor
+- `ripgrep-runner.ts`：stderr 8KB 上限（`stderrTruncated`）；所有 kill 路径 SIGTERM→1s→SIGKILL
+- `search-tools.ts`：Grep content 模式 `total` 改为匹配行数（新增 `returned` 全部行数）；LS 用 `withFileTypes` + 32 路并发 stat
+- registry-search JSDoc 归位
 
-**基础设施（E，69 分）**
-- `tool-result-store.ts` / `external-tools.ts:207`：结果与 MCP 输出持久化无淘汰、落共享 tmp；改数据目录 + 0700 + TTL
-- `tool-bridge.ts:29`：enabled 重复名不去重（部分 provider API 拒绝）
-- `tool-schema-compat.ts:51`：anyOf 合并丢弃 `required`（目前靠执行时校验兜底，需注释+测试钉住）
-- `tool-execution-observer.ts:24`：`extractTouchedPaths` 漏 AstEdit/worktree 工具，与 telemetry 的提取逻辑不统一
-- `agent-hooks.ts:439`：persist 路径丢失 `truncated` 标志；telemetry 把 advisory 文本计入 outputBytes
-- `user-hooks.ts:46`：钩子进程继承完整 env（与 P0-3 同源）
+**编排/元工具（D，61 分）** ✅
+- 后台 Eval 继承会话已授权域名（grants 从 `sandboxAllowedDomains` 映射）；grant 变化导致 kernel 重建时返回 `kernelRestarted:'grants_changed'`
+- kernel 脚本 shutdown 删除、eval 日志 24h 清扫、已 settle 任务 payload/result 文件清理
+- `skills.ts`：`loadSkillStructured` 结构化结果替代 `JSON.parse(text)`；fork 超时（`ZCLAUDIA_SKILL_FORK_TIMEOUT_MS` 默认 10 分钟）+ abort 传播（`run-tools.ts` 已接线 `abortSignal`）
+- `worktree-tools.ts`：改走 `normalizeSessionWorkingDirectory` + 网关广播（与 run-bootstrap 同语义）
+- AskUserQuestion deny/空 allow → `answered:false`
+- `agentToolParameters` 全部 13 处单源化到 tool-common（D 组 6 处 + 集成时 7 处）；task-tools 缺失依赖错误改 `errorResult`；Agent/Monitor 参数描述补全；fork 系统提示按策略条件化；eval TaskOutput 显示真实 Cwd
 
-## 建议行动顺序
+**基础设施（E，69 分）** ✅
+- `tool-result-store.ts`：0600 + 7 天 TTL + 256MB 总量上限（最旧先清），模块头写明保留策略
+- MCP 输出默认目录迁到 `<dataDir>/mcp-output`（0700/0600 + 同款清扫），`ZCLAUDIA_MCP_OUTPUT_DIR` 覆盖仍有效
+- `tool-bridge.ts`：enabled 归一化后去重；`tool-catalog.ts` 注释更新 + 30 个工厂运行时冒烟测试
+- `tool-schema-compat.ts`：anyOf `required` 按交集合并（并集会过度约束），注释记录执行时校验兜底
+- `extractTouchedPaths` 与 telemetry 统一为共享 `extractToolPathParam`（覆盖 AstEdit/AstGrep/EnterWorktree）
+- persist+truncated 双标志保留（`truncatedOriginalSize`）；telemetry `outputBytes` 不计 advisory 文本
+- `run-prompt.ts` 拼接加分隔符；`index.ts` wildcard 导出改 12 个具名导出；failure-loop-guard 注释说明取舍
+- PostToolUse 钩子收到 `toolResponse`（8KB 截断、图片占位符；凭证重写的 args 永远不会进钩子）
 
-1. **本周（P0）**：P0-1 ~ P0-8，其中 P0-2/P0-4/P0-5 是小改动高杠杆，P0-1 需上游修复或本地包装层。
-2. **两周内（P1）**：P1-1 ~ P1-16，配合"测试缺口"表逐项补回归测试——每个 bug 的测试用例在审查中已基本给出。
-3. **一个月内（主题治理）**：策略单点化（主题 1）、锁内复核模式统一（主题 2）、资源 TTL 清扫统一框架（主题 3）、删除死代码与假实现（主题 4）、错误契约统一并加约束（主题 5）、重复实现单源化（主题 6）。
+**跨域加固（F）** ✅
+- 子代理权限 override 改交集语义：新增 `narrowPolicy`（仅当 `sessionType === 'agent'` 时启用；常规/后台会话保持 merge——可信宿主的合法放宽不受影响）；子代理永远不超过 global+project 策略
+- `agent_shell` 沙箱接入会话级授权域名（`loadSessionSandboxDomains` 同层复用）
+- `process-supervisor.ts` 子进程 env 经 `scrubEnv`（显式 `spec.env` 仍优先）；terminal-manager（交互式 PTY）与 MCP client 经评估后有意保留完整 env（注释记录理由：PTY 是用户自己的登录 shell；MCP server 由用户配置且常需 env 凭证）
+- lightweight runner 的 `abortSignal` 接入 agent-loop executor 的 LLM 流（链接式中止，可移除监听）
+- `noop-edit-guard.ts` 字面 NUL 字节改为 `\u0000` 转义（文件恢复为合法 UTF-8 文本）
+
+## 建议行动顺序（已全部执行完毕 ✅）
+
+1. ~~本周（P0）~~ — 已于 2026-07-22 完成（commit `ca71614b`）。
+2. ~~两周内（P1）~~ — 已于 2026-07-22 完成（commit `aadb2bd5`）。
+3. ~~一个月内（主题治理/P2）~~ — 已于 2026-07-23 完成；主题 2-6 均已治理，主题 1（策略单点化）经 P0/P2 后仅剩设计层面建议，见 P2 附录遗留项。
 
 ## 分组详细结论（保留各组健康度评价）
 
@@ -218,4 +230,22 @@ Scope: 全部 agent 工具实现，覆盖两个位置：
 13. 新增环境变量（主要用于测试/调优）：`ZCLAUDIA_AGENT_SHELL_TIMEOUT_MS`、`ZCLAUDIA_AGENT_SHELL_KILL_GRACE_MS`、`ZCLAUDIA_AGENT_HTTP_TIMEOUT_MS`。
 14. LSP 诊断适配器（目前仅测试接线、无生产调用方）：重复保存会发送 `didChange`（版本递增），`dispose()` 发送 `didClose`——未来接入真实 server 时会看到此前没有的文档生命周期流量。
 
-**遗留跟进项（P2 或后续）**：`*** Add File` hunk 仍要求每行带 `+`（空行会报错而非容错）；patch 预检双计 noop 失败；task-logs 无 TTL 清扫；重启后 live-pid 后台任务无退出监听；退出码仍靠文本正则恢复；agent_shell 沙箱未接入会话级授权域名；轻量 runner 的 `abortSignal` 仅达 hooks（未接入 LLM 流）；`mcp-client.ts`/`process-supervisor.ts` 等 env 透传未处理；子代理权限 override 合并仍是 replace 而非 intersect。
+**遗留跟进项（P2 或后续）**：~~`*** Add File` 空行容错~~、~~patch 预检双计~~、~~task-logs TTL~~、~~live-pid 退出监听~~、~~退出码结构化~~、~~agent_shell 会话域名~~、~~runner abortSignal 接 LLM 流~~、~~env 透传~~、~~override intersect~~ —— 以上已全部在 P2 批次完成（2026-07-23）。
+
+## 附录：P2 修复引入的行为变化（2026-07-23）
+
+1. WebFetch 删除死参数 `use_cache`；新增 90s 整体重定向预算（`fetch_timeout`）；按 charset 解码非 UTF-8 页面；WebSearch 中间 provider 0 结果会继续 fallback（末位 provider 0 结果返回 `ok:true` 空集而非 `provider_error`）。
+2. Grep content 模式 `total` 语义变为匹配行数（原口径移入新字段 `returned`）——消费 `total` 的调用方需注意。
+3. AstEdit 新增失败码 `file_changed_during_edit`/`secret_detected` 等；`details.diff` 上限 80KB（`diffTruncated`）。
+4. 混合换行文件按多数派风格写回（此前遇任意 `\r\n` 即全文 CRLF）。
+5. 文件备份 0600、每文件 20 份 + 7 天 TTL；restore 拒绝符号链接/越界目标；deferred diagnostics 结果变为单次读取 + 10 分钟过期。
+6. `stop()` 后台任务最长约 3.5s（确认死亡 + 一轮升级），不再对终态任务的 pid 发信号（PID 复用安全）；沙箱网络授权批准文案披露"开放该主机全部端口与协议"。
+7. tool-results 0600 + 7 天/256MB 保留；MCP 输出默认目录迁至 `<dataDir>/mcp-output`（原 `/tmp/zclaudia-mcp-output`）。
+8. PostToolUse 钩子 stdin 新增 `toolResponse` 字段；telemetry `outputBytes` 不再计入 advisory 文本（数值略降）。
+9. `stop()`/reconcile 接入退出监听后，重启前启动的 live-pid 任务会在进程退出时自动 settle（此前需轮询）。
+10. 子代理（agent 类型会话）的权限 override 只能收窄不能放宽；宿主会话级放宽不再传播进子代理。
+11. process-supervisor 派生进程默认过滤密钥类 env（显式 `spec.env` 优先）；terminal PTY 与 MCP server 有意保留完整 env。
+12. 新增环境变量：`ZCLAUDIA_SKILL_FORK_TIMEOUT_MS`（默认 10 分钟）。
+13. `noop-edit-guard.ts` 恢复为合法 UTF-8 文本（git/rg 不再当二进制）。
+
+**P2 已知遗留（设计层面，非缺陷）**：`lastPrivilegeKeyByKernelBase` 随会话数微增（无清扫，量级可忽略）；`removeSettledTaskFiles` 仅清理计算路径（自定义 `metadata.resultPath` 遗留行不清理，有意保守）；Glob 10k 流式上限时的 `total` 为下界（已在描述中钉住）；DNS 解析耗时不计入 WebFetch 90s 预算；`interfaces/http/commands.ts:223` 与 `application/plugins/skill-tools.ts:233` 存在同款 `..` 前缀误拒（agent-tools 范围外，建议后续同款修复）；`check:architecture` 预存失败（`domains/sessions/message-routes.ts` 裸 SQL，HEAD 即存在，与本报告范围无关）。

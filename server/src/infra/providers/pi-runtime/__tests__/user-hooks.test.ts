@@ -120,4 +120,58 @@ describe('runPostToolUseHooks', () => {
     );
     expect(extras).toEqual(['ok']);
   });
+
+  it('receives the tool result as toolResponse on stdin', async () => {
+    const capture = join(cwd, 'cap.json');
+    await runPostToolUseHooks(
+      [{ event: 'PostToolUse', command: `cat - > "${capture}"` }],
+      inv({
+        event: 'PostToolUse',
+        toolResult: { content: [{ type: 'text', text: 'pushed ok' }], details: { ok: true } },
+      })
+    );
+    const seen = JSON.parse(readFileSync(capture, 'utf8'));
+    expect(seen.toolResponse).toEqual({
+      content: [{ type: 'text', text: 'pushed ok' }],
+      details: { ok: true },
+    });
+  });
+
+  it('PreToolUse payload carries no toolResponse key', async () => {
+    const capture = join(cwd, 'cap.json');
+    await runPreToolUseHooks([hook({ command: `cat - > "${capture}"` })], inv());
+    const seen = JSON.parse(readFileSync(capture, 'utf8'));
+    expect('toolResponse' in seen).toBe(false);
+  });
+
+  it('truncates oversized tool result text in the hook payload', async () => {
+    const capture = join(cwd, 'cap.json');
+    await runPostToolUseHooks(
+      [{ event: 'PostToolUse', command: `cat - > "${capture}"` }],
+      inv({
+        event: 'PostToolUse',
+        toolResult: { content: [{ type: 'text', text: 'x'.repeat(20_000) }] },
+      })
+    );
+    const seen = JSON.parse(readFileSync(capture, 'utf8'));
+    const text = seen.toolResponse.content[0].text as string;
+    expect(text.startsWith('x'.repeat(100))).toBe(true);
+    expect(text.length).toBeLessThan(20_000);
+    expect(text).toContain('truncated');
+  });
+
+  it('replaces image blocks with a placeholder instead of base64', async () => {
+    const capture = join(cwd, 'cap.json');
+    await runPostToolUseHooks(
+      [{ event: 'PostToolUse', command: `cat - > "${capture}"` }],
+      inv({
+        event: 'PostToolUse',
+        toolResult: { content: [{ type: 'image', source: { data: 'QUJD'.repeat(1000) } }] },
+      })
+    );
+    const seen = JSON.parse(readFileSync(capture, 'utf8'));
+    expect(seen.toolResponse.content).toEqual([
+      { type: 'text', text: '[image content omitted from hook payload]' },
+    ]);
+  });
 });

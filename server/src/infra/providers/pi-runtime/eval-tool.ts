@@ -63,6 +63,17 @@ function formatEvalResultText(result: EvalExecResult): string {
   return text || '(no output)';
 }
 
+// Per-session history of the privilege key each Eval kernel base last ran with.
+// A new network grant changes the privilege key, so the next cell silently
+// spawns a FRESH kernel and all in-memory state vanishes; tracking the previous
+// key lets the tool surface that restart as kernelRestarted/'grants_changed'
+// instead of dropping state with no signal.
+const lastPrivilegeKeyByKernelBase = new Map<string, string>();
+
+export function __resetEvalPrivilegeKeyHistoryForTests(): void {
+  lastPrivilegeKeyByKernelBase.clear();
+}
+
 export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOptions): AgentTool<any> {
   return {
     name: 'Eval',
@@ -179,7 +190,13 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
             ...(timeout.timeoutMs !== undefined ? { timeoutMs: timeout.timeoutMs } : {}),
             privilegePlan: {
               mode: sandboxMode === 'unsandboxed' ? 'unsandboxed' : 'sandbox',
-              grants: [],
+              // Carry session-granted network domains into the task so the
+              // isolated background eval gets the same allow-list as the
+              // foreground kernel (they were silently dropped before).
+              grants: (options?.sandboxAllowedDomains ?? []).map(host => ({
+                type: 'network' as const,
+                host,
+              })),
             },
           },
         });
@@ -222,9 +239,12 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
           : extraAllowedDomains.length > 0
             ? `sandbox:${extraAllowedDomains.sort().join(',')}`
             : 'sandbox';
-        const kernelKey = `${options?.sessionId ?? `cwd:${cwd}`}:${
-          readOnly ? 'ro' : 'rw'
-        }:${privilegeKey}`;
+        const kernelBaseKey = `${options?.sessionId ?? `cwd:${cwd}`}:${readOnly ? 'ro' : 'rw'}`;
+        const kernelKey = `${kernelBaseKey}:${privilegeKey}`;
+        const previousPrivilegeKey = lastPrivilegeKeyByKernelBase.get(kernelBaseKey);
+        lastPrivilegeKeyByKernelBase.set(kernelBaseKey, privilegeKey);
+        const kernelRestartedByGrants =
+          previousPrivilegeKey !== undefined && previousPrivilegeKey !== privilegeKey;
         const evalOptions = {
           workspaceRoot: cwd,
           readOnly,
@@ -240,6 +260,14 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
                 ...(timeout.timeoutMs !== undefined ? { timeoutMs: timeout.timeoutMs } : {}),
                 reset: args.reset === true,
               });
+        // The privilege key changed since the previous cell, so this cell ran
+        // in a fresh kernel and prior var/function state is gone. An explicit
+        // reset already signals the wipe; a kernel-reported restart (timeout,
+        // exit) carries its own signal — don't mask either.
+        if (kernelRestartedByGrants && args.reset !== true && !result.kernelRestarted) {
+          result.kernelRestarted = true;
+          result.kernelRestartReason = 'grants_changed';
+        }
         return {
           ok: result.ok,
           sandboxed: result.sandboxed !== false,
@@ -284,6 +312,7 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
         ok: result.ok,
         ...(result.timedOut ? { timedOut: true } : {}),
         ...(result.kernelRestarted ? { kernelRestarted: true } : {}),
+        ...(result.kernelRestartReason ? { kernelRestartReason: result.kernelRestartReason } : {}),
         ...(result.sandboxed !== undefined ? { sandboxed: result.sandboxed } : {}),
         ...(result.outputTruncated ? { outputTruncated: true } : {}),
         ...(result.fullOutputPath ? { fullOutputPath: result.fullOutputPath } : {}),

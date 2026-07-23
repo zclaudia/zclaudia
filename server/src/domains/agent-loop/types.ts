@@ -115,8 +115,9 @@ export interface LightweightAgentRunRequest {
   /**
    * Optional caller-owned abort signal for the run. Forwarded to the agent
    * hooks so shouldStopAfterTurn stops the loop after the current turn and
-   * Pre/PostToolUse hook processes are cancelled on abort. (Mid-turn LLM
-   * streaming is governed by the executor's own timeout controller.)
+   * Pre/PostToolUse hook processes are cancelled on abort, and linked into
+   * the executor's abort controller so mid-turn LLM streaming is cancelled
+   * too (the executor's own timeout controller still applies as a backstop).
    */
   abortSignal?: AbortSignal;
   permissionMode: AgentLoopPermissionMode;

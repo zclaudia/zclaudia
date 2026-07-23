@@ -47,6 +47,21 @@ export class ToolFailureLoopGuard {
     return { attempts: next, signature: sig, kind };
   }
 
+  /**
+   * Non-Bash signatures are INPUT-only (generateToolSignature embeds the tool
+   * name plus key args), while Bash failure signatures additionally
+   * fingerprint the failure content (exit code, diagnostics, failed tests).
+   * Two accepted consequences:
+   *  1. Volatile args (timestamps, random tmp paths) defeat the dedup, so the
+   *     same logical failure may never accumulate — a false negative. Missed
+   *     nudges are preferable to wrong ones.
+   *  2. Identical inputs with CHANGING failure modes still count as one loop,
+   *     so the "[loop] failed N times with identical inputs" text is accurate
+   *     about the inputs, not the failure content. The error code is
+   *     deliberately NOT folded into the generic signature: that would split
+   *     the count across changing errors and let a genuine retry loop slip
+   *     under the hard limit.
+   */
   recordSuccess(toolName: string, args: Record<string, unknown> | undefined): void {
     const base = isBash(toolName)
       ? bashInputSignature(args)

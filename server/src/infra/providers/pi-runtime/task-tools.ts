@@ -5,7 +5,14 @@ import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permi
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
-import { errorResult, jsonResult, textResult, toolParams, truncateText } from './tool-common.js';
+import {
+  agentToolParameters,
+  errorResult,
+  jsonResult,
+  textResult,
+  toolParams,
+  truncateText,
+} from './tool-common.js';
 import { CommandTaskRuntime } from './command-task-runtime.js';
 import { EvalTaskRuntime } from './eval-task-runtime.js';
 import {
@@ -14,12 +21,6 @@ import {
   type TaskToolResult,
 } from './task-runtime.js';
 export { parseTaskOutputWindowParams } from './task-output-window.js';
-
-type AgentToolParameters = AgentTool['parameters'];
-
-function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
-  return schema as AgentToolParameters;
-}
 
 function taskTitleFromArgs(args: Record<string, unknown>): string | undefined {
   if (typeof args.description === 'string' && args.description.trim())
@@ -68,9 +69,20 @@ export function createAgentTool(
     parameters: agentToolParameters({
       type: 'object',
       properties: {
-        prompt: { type: 'string' },
-        description: { type: 'string' },
-        wait: { type: 'boolean' },
+        prompt: {
+          type: 'string',
+          description:
+            'Full task instructions for the sub-agent. It runs without your conversation context, so include everything it needs.',
+        },
+        description: {
+          type: 'string',
+          description: 'Short human-readable task title shown in the task list',
+        },
+        wait: {
+          type: 'boolean',
+          description:
+            'Block this tool call until the sub-agent finishes and return its result. Can block for a long time (up to the 30-minute sub-agent safety timeout). Default false: start in the background and poll with TaskOutput({ task_id, wait_ms }) instead — preferred, since it does not stall your run.',
+        },
         isolation: {
           type: 'string',
           enum: ['worktree'],
@@ -84,8 +96,9 @@ export function createAgentTool(
     }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
-      if (!agentTaskExecutor) return jsonResult({ error: 'Agent tool requires a task executor' });
-      if (!db) return jsonResult({ error: 'Agent tool requires database context' });
+      if (!agentTaskExecutor)
+        return errorResult('missing_task_executor', 'Agent tool requires a task executor');
+      if (!db) return errorResult('missing_db_context', 'Agent tool requires database context');
       if (typeof args.prompt !== 'string' || !args.prompt.trim()) {
         return errorResult('missing_prompt', 'Agent requires a prompt');
       }
@@ -247,14 +260,19 @@ export function createMonitorTool(
     parameters: agentToolParameters({
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['start', 'status', 'stop'] },
-        task_id: { type: 'string' },
-        taskId: { type: 'string' },
-        title: { type: 'string' },
-        description: { type: 'string' },
-        target_task_id: { type: 'string' },
-        interval_ms: { type: 'number' },
-        reason: { type: 'string' },
+        action: {
+          type: 'string',
+          enum: ['start', 'status', 'stop'],
+          description:
+            '"start" is rejected (no monitor runtime exists — watch a task via TaskOutput with wait_ms instead); "status" reads a task; "stop" stops it',
+        },
+        task_id: { type: 'string', description: 'Task id (required for status/stop)' },
+        taskId: { type: 'string', description: 'Alias for task_id' },
+        title: { type: 'string', description: 'Unused (start is not supported)' },
+        description: { type: 'string', description: 'Unused (start is not supported)' },
+        target_task_id: { type: 'string', description: 'Unused (start is not supported)' },
+        interval_ms: { type: 'number', description: 'Unused (start is not supported)' },
+        reason: { type: 'string', description: 'Optional stop reason recorded on the task' },
       },
     }),
     execute: async (toolCallId: string, params: unknown) => {

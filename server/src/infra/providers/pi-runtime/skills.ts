@@ -25,14 +25,8 @@ import {
 import type { PermissionCallback } from '../message-types.js';
 import { buildModel } from './build-model.js';
 import { buildTools } from './tool-bridge.js';
+import { agentToolParameters, textResult, type ToolContent } from './tool-common.js';
 import { wrapStreamFnWithToolSchemaCompat } from './tool-schema-compat.js';
-
-type ToolContent = Array<{ type: 'text'; text: string }>;
-type AgentToolParameters = AgentTool['parameters'];
-
-function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
-  return schema as AgentToolParameters;
-}
 
 export type SkillExecutionMode = 'inline' | 'fork';
 
@@ -119,15 +113,12 @@ export interface SkillExecutionDependencies {
   permissionCallback?: PermissionCallback;
   agentFactory?: (opts: AgentOptions) => NestedAgentLike;
   streamFn?: StreamFn;
+  /** Parent run's abort signal: an in-flight fork resolves with an aborted error when it fires. */
+  abortSignal?: AbortSignal;
 }
 
-function textResult(
-  text: string,
-  details: Record<string, unknown> = {}
-): { content: ToolContent; details: Record<string, unknown> } {
-  return { content: [{ type: 'text', text }], details };
-}
-
+// Local variant of tool-common's jsonResult that also passes details through
+// (tool-common's returns empty details); textResult itself is shared.
 function jsonResult(value: Record<string, unknown>, details: Record<string, unknown> = {}) {
   return textResult(JSON.stringify(value, null, 2), details);
 }
@@ -444,43 +435,61 @@ function skillSummary(
   };
 }
 
-async function loadSkill(
+type LoadSkillOutcome =
+  | { ok: true; ref: SkillRef; name: string }
+  | {
+      ok: false;
+      error: string;
+      message: string;
+      ref?: SkillRef;
+      executionPolicy?: SkillExecutionPolicy;
+    };
+
+const SKILL_LOADED_MESSAGE =
+  'Skill loaded for this session. Its full SKILL.md content will be injected as active skill context on the next assistant step.';
+
+/**
+ * Structured core of LoadSkill. Programmatic callers (InvokeSkill, direct chat
+ * invocation) consume this object directly instead of JSON-parsing the
+ * model-facing text result — plain-text failure bodies used to blow up that
+ * parse, and the ok:true spread then masked the error.
+ */
+async function loadSkillStructured(
   state: SkillRuntimeState,
   ref: SkillRef,
   agentProfile?: AgentProfileConfig,
   args?: string
-) {
+): Promise<LoadSkillOutcome> {
   const skill = findSkill(state, ref);
   if (!skill) {
-    return textResult(`Skill not found or not eligible: ${ref.source}/${ref.id}`, {
+    return {
       ok: false,
       error: 'skill_not_found',
+      message: `Skill not found or not eligible: ${ref.source}/${ref.id}`,
       ref,
-    });
+    };
   }
 
   const policy = resolveSkillExecutionPolicy(skill, undefined, agentProfile);
   if (!policy.modes.includes('inline')) {
-    return jsonResult(
-      {
-        ok: false,
-        error: 'policy_denied_inline',
-        ref,
-        executionPolicy: policy,
-        message:
-          'This skill does not allow inline loading. Use RunSkill when fork execution is allowed.',
-      },
-      { ok: false, error: 'policy_denied_inline', ref }
-    );
+    return {
+      ok: false,
+      error: 'policy_denied_inline',
+      message:
+        'This skill does not allow inline loading. Use RunSkill when fork execution is allowed.',
+      ref,
+      executionPolicy: policy,
+    };
   }
 
   const content = await loadDiscoveredSkillContent(ref);
   if (!content) {
-    return textResult(`Skill content unavailable: ${ref.source}/${ref.id}`, {
+    return {
       ok: false,
       error: 'skill_content_unavailable',
+      message: `Skill content unavailable: ${ref.source}/${ref.id}`,
       ref,
-    });
+    };
   }
 
   const key = skillRefKey(ref);
@@ -494,16 +503,46 @@ async function loadSkill(
     state.loadedSkills.sort((a, b) => skillRefKey(a).localeCompare(skillRefKey(b)));
   }
 
+  return { ok: true, ref, name: skill.name };
+}
+
+/** Model-facing LoadSkill result; the text contract is part of the tool API. */
+async function loadSkill(
+  state: SkillRuntimeState,
+  ref: SkillRef,
+  agentProfile?: AgentProfileConfig,
+  args?: string
+) {
+  const outcome = await loadSkillStructured(state, ref, agentProfile, args);
+  if (!outcome.ok) {
+    if (outcome.error === 'policy_denied_inline') {
+      return jsonResult(
+        {
+          ok: false,
+          error: outcome.error,
+          ref: outcome.ref,
+          executionPolicy: outcome.executionPolicy,
+          message: outcome.message,
+        },
+        { ok: false, error: outcome.error, ref: outcome.ref }
+      );
+    }
+    return textResult(outcome.message, {
+      ok: false,
+      error: outcome.error,
+      ...(outcome.ref ? { ref: outcome.ref } : {}),
+    });
+  }
+
   return textResult(
     JSON.stringify(
       {
         loaded: true,
         ref,
-        name: skill.name,
+        name: outcome.name,
         ...(args !== undefined ? { args } : {}),
         availability: 'next_model_request',
-        message:
-          'Skill loaded for this session. Its full SKILL.md content will be injected as active skill context on the next assistant step.',
+        message: SKILL_LOADED_MESSAGE,
       },
       null,
       2
@@ -552,8 +591,12 @@ function extractAssistantText(messages: unknown): string {
   return '';
 }
 
-function buildForkSystemPrompt(ref: SkillRef, content: string): string {
-  return [
+function buildForkSystemPrompt(
+  ref: SkillRef,
+  content: string,
+  policy: SkillExecutionPolicy
+): string {
+  const lines = [
     'You are executing the following skill as an isolated worker for a parent agent.',
     '',
     `<skill source="${ref.source}" id="${ref.id}">`,
@@ -563,8 +606,14 @@ function buildForkSystemPrompt(ref: SkillRef, content: string): string {
     'Complete the user task using this skill.',
     'Return a concise result for the parent agent.',
     'Do not assume your intermediate messages are visible to the parent.',
-    'Do not modify files unless a future policy explicitly grants write access.',
-  ].join('\n');
+  ];
+  // Only forbid writes when the resolved fork policy actually withholds write
+  // tools — a 'workspace-edit' fork grants Write/Edit in the same run, so the
+  // blanket no-modify line would contradict the tool set.
+  if ((policy.forkToolPolicy ?? 'read-only') !== 'workspace-edit') {
+    lines.push('Do not modify files unless a future policy explicitly grants write access.');
+  }
+  return lines.join('\n');
 }
 
 function resolveForkSkillToolNames(
@@ -600,6 +649,24 @@ function buildForkSkillTools(
   });
 }
 
+/**
+ * Safety net for forked skill execution: a hung nested agent must not block
+ * the parent run's tool call forever. Shorter than the 30-minute sub-agent
+ * safety timeout (agent-task-runner) since skills are scoped tasks.
+ */
+const DEFAULT_SKILL_FORK_TIMEOUT_MS = 10 * 60 * 1000;
+
+function skillForkTimeoutMs(): number {
+  const parsed = Number(process.env.ZCLAUDIA_SKILL_FORK_TIMEOUT_MS);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : DEFAULT_SKILL_FORK_TIMEOUT_MS;
+}
+
+type ForkPromptOutcome =
+  | { kind: 'completed' }
+  | { kind: 'failed'; error: unknown }
+  | { kind: 'timeout' }
+  | { kind: 'aborted' };
+
 async function executeForkedSkill(
   ref: SkillRef,
   skillContent: string,
@@ -612,7 +679,7 @@ async function executeForkedSkill(
   const finalMessages: unknown[] = [];
   const agent = agentFactory({
     initialState: {
-      systemPrompt: buildForkSystemPrompt(ref, skillContent),
+      systemPrompt: buildForkSystemPrompt(ref, skillContent, policy),
       model: builtModel.model,
       messages: [],
       tools: buildForkSkillTools(execution, policy),
@@ -630,15 +697,55 @@ async function executeForkedSkill(
       );
     }
   });
+
+  const timeoutMs = skillForkTimeoutMs();
+  const abortSignal = execution.abortSignal;
+  let timer: NodeJS.Timeout | undefined;
+  let onAbort: (() => void) | undefined;
+  // Both race branches settle through handlers, so a late rejection from the
+  // losing side can never surface as an unhandled rejection.
+  const promptOutcome: Promise<ForkPromptOutcome> = agent.prompt(`Task:\n${task}`).then(
+    () => ({ kind: 'completed' }) as ForkPromptOutcome,
+    error => ({ kind: 'failed', error }) as ForkPromptOutcome
+  );
+  const interruption = new Promise<ForkPromptOutcome>(resolve => {
+    timer = setTimeout(() => resolve({ kind: 'timeout' }), timeoutMs);
+    timer.unref?.();
+    if (abortSignal) {
+      if (abortSignal.aborted) {
+        resolve({ kind: 'aborted' });
+      } else {
+        onAbort = () => resolve({ kind: 'aborted' });
+        abortSignal.addEventListener('abort', onAbort, { once: true });
+      }
+    }
+  });
   try {
-    await agent.prompt(`Task:\n${task}`);
-  } catch (err) {
-    return {
-      ok: false,
-      error: 'skill_execution_failed',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    const outcome = await Promise.race([promptOutcome, interruption]);
+    if (outcome.kind === 'timeout') {
+      return {
+        ok: false,
+        error: 'skill_execution_timeout',
+        message: `Forked skill execution exceeded the ${Math.round(timeoutMs / 60_000)}-minute safety timeout and was abandoned. Retry with a narrower task or raise ZCLAUDIA_SKILL_FORK_TIMEOUT_MS.`,
+      };
+    }
+    if (outcome.kind === 'aborted') {
+      return {
+        ok: false,
+        error: 'skill_execution_aborted',
+        message: 'Forked skill execution was aborted together with the parent run.',
+      };
+    }
+    if (outcome.kind === 'failed') {
+      return {
+        ok: false,
+        error: 'skill_execution_failed',
+        message: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
+      };
+    }
   } finally {
+    if (timer) clearTimeout(timer);
+    if (onAbort && abortSignal) abortSignal.removeEventListener('abort', onAbort);
     unsubscribe();
   }
 
@@ -896,14 +1003,31 @@ async function invokeSkill(
       execution
     );
   }
-  const result = await loadSkill(state, ref, execution?.agentProfile, parsed.args);
-  const payload = JSON.parse(textResultText(result));
+  const outcome = await loadSkillStructured(state, ref, execution?.agentProfile, parsed.args);
+  if (!outcome.ok) {
+    return jsonResult(
+      {
+        ok: false,
+        error: outcome.error,
+        ref,
+        mode: 'inline',
+        args: parsed.args,
+        ...(outcome.executionPolicy ? { executionPolicy: outcome.executionPolicy } : {}),
+        message: outcome.message,
+      },
+      { ok: false, error: outcome.error, ref }
+    );
+  }
   return jsonResult(
     {
-      ...payload,
+      loaded: true,
+      ref,
+      name: outcome.name,
       ok: true,
       mode: 'inline',
       args: parsed.args,
+      availability: 'next_model_request',
+      message: SKILL_LOADED_MESSAGE,
     },
     { ok: true, ref, mode: 'inline' }
   );
@@ -950,19 +1074,14 @@ export async function prepareDirectSkillInvocation(
       message: `Skill ${skill.id} requires fork execution and cannot be invoked directly in chat yet.`,
     };
   }
-  const loadResult = await loadSkill(state, ref, options.agentProfile, parsed.args);
-  const payload = JSON.parse(textResultText(loadResult)) as {
-    loaded?: boolean;
-    error?: string;
-    message?: string;
-  };
-  if (!payload.loaded) {
+  const outcome = await loadSkillStructured(state, ref, options.agentProfile, parsed.args);
+  if (!outcome.ok) {
     return {
       matched: true,
       ok: false,
-      error: payload.error ?? 'skill_load_failed',
+      error: outcome.error,
       ref,
-      message: payload.message ?? `Failed to load skill ${skill.id}.`,
+      message: outcome.message,
     };
   }
   recordSkillUsage(ref);
@@ -1018,7 +1137,8 @@ export async function executePreparedDirectSkillInvocation(
 }
 
 function textResultText(result: { content: ToolContent }): string {
-  return result.content[0]?.text ?? '{}';
+  const first = result.content[0];
+  return first && first.type === 'text' ? first.text : '{}';
 }
 
 export function buildSkillMetaTools(options: SkillRuntimeOptions): AgentTool[] {

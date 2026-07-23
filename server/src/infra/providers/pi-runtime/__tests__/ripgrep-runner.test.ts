@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { runRipgrep } from '../ripgrep-runner.js';
+import { runRipgrep, runStreamingProcess } from '../ripgrep-runner.js';
 
 describe('runRipgrep', () => {
   it('streams matching file lines and reports not-truncated under the limit', async () => {
@@ -45,5 +45,33 @@ describe('runRipgrep', () => {
     const { truncated } = await runRipgrep(['--files', dir], { maxLines: 100, timeoutMs: 0 });
     rmSync(dir, { recursive: true, force: true });
     expect(truncated).toBe(true);
+  });
+
+  it('caps accumulated stderr at 8KB and keeps the head', async () => {
+    const result = await runStreamingProcess(
+      process.execPath,
+      ['-e', 'process.stderr.write("x".repeat(64 * 1024))'],
+      { maxLines: 10 }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderrTruncated).toBe(true);
+    expect(result.stderr.length).toBeLessThanOrEqual(8 * 1024);
+    expect(result.stderr.startsWith('xxxx')).toBe(true);
+  });
+
+  it('escalates to SIGKILL when the child ignores SIGTERM', async () => {
+    const start = Date.now();
+    const result = await runStreamingProcess(
+      process.execPath,
+      ['-e', "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"],
+      { maxLines: 10, timeoutMs: 100 }
+    );
+    const elapsed = Date.now() - start;
+
+    expect(result.truncated).toBe(true);
+    // Killed by signal (SIGKILL after the grace period), not by exit code.
+    expect(result.exitCode).toBeNull();
+    expect(elapsed).toBeLessThan(5_000);
   });
 });

@@ -161,6 +161,9 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
           maxTurns: request.limits.maxTurns,
           sessionId: resolvedContext.contextId,
           cacheRetention: llmProfile.cacheRetention,
+          // P2: forward the caller's abort signal into the executor so an
+          // external abort cancels the in-flight LLM stream, not just hooks.
+          signal: request.abortSignal,
         });
 
         latestText = agentResult.text;

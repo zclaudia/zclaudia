@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, mkdir, writeFile } from 'fs/promises';
+import { mkdtemp, mkdir, symlink, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
 
@@ -39,7 +39,14 @@ describe('search and listing tools', () => {
     });
 
     const payload = JSON.parse(result.content[0].text);
-    expect(result.details).toMatchObject({ ok: true, pattern: 'target', total: 3, context: 1 });
+    // total counts match lines only (1); returned counts all rows incl. context (3).
+    expect(result.details).toMatchObject({
+      ok: true,
+      pattern: 'target',
+      total: 1,
+      returned: 3,
+      context: 1,
+    });
     expect(payload.results.map((entry: any) => entry.file)).toEqual(['a.ts', 'a.ts', 'a.ts']);
     expect(payload.results.some((entry: any) => entry.isMatch)).toBe(true);
   });
@@ -187,7 +194,7 @@ describe('search and listing tools', () => {
     });
 
     const payload = JSON.parse(result.content[0].text);
-    expect(result.details).toMatchObject({ ok: true, total: 3 });
+    expect(result.details).toMatchObject({ ok: true, total: 1, returned: 3 });
     expect(payload.results).toEqual([
       { file: 'report-2024-01.ts', line: 1, preview: 'before ctx', isMatch: false },
       { file: 'report-2024-01.ts', line: 2, preview: 'target line', isMatch: true },
@@ -231,9 +238,7 @@ describe('search and listing tools', () => {
 
     const payload = JSON.parse(result.content[0].text);
     expect(result.details).toMatchObject({ ok: true, total: 1 });
-    expect(payload.results).toEqual([
-      expect.objectContaining({ file: 'symbols.ts', line: 1 }),
-    ]);
+    expect(payload.results).toEqual([expect.objectContaining({ file: 'symbols.ts', line: 1 })]);
   });
 
   it('LSPTool reports a missing query with ok:false', async () => {
@@ -252,5 +257,39 @@ describe('search and listing tools', () => {
     const result = await lsp.execute('lsp-fail', { query: 'q', path: 'does-not-exist' });
 
     expect(result.details).toMatchObject({ ok: false, error: 'lsp_search_failed' });
+  });
+
+  it('Grep content mode reports match-line count as total and all rows as returned', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-total-'));
+    await writeFile(path.join(root, 'a.ts'), 'one\ntarget\ntwo\ntarget\nthree\n');
+    const grep = createGrepBridgeTool(root) as any;
+
+    const result = await grep.execute('grep-total', { pattern: 'target', context: 1 });
+
+    const payload = JSON.parse(result.content[0].text);
+    // 2 match lines; 5 emitted rows (context of the two matches overlaps).
+    expect(payload.total).toBe(2);
+    expect(payload.returned).toBe(5);
+    expect(result.details).toMatchObject({ total: 2, returned: 5 });
+    expect(payload.results.filter((entry: any) => entry.isMatch)).toHaveLength(2);
+  });
+
+  it('LS marks symlinked directories with a slash and dangling symlinks without', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-ls-links-'));
+    await mkdir(path.join(root, 'real-dir'));
+    await writeFile(path.join(root, 'plain.txt'), 'x');
+    await symlink(path.join(root, 'real-dir'), path.join(root, 'dir-link'));
+    await symlink(path.join(root, 'no-such-target'), path.join(root, 'broken-link'));
+    const ls = createLsBridgeTool(root) as any;
+
+    const result = await ls.execute('ls-links', {});
+
+    expect(result.content[0].text.split('\n')).toEqual([
+      'broken-link',
+      'dir-link/',
+      'plain.txt',
+      'real-dir/',
+    ]);
+    expect(result.details).toMatchObject({ ok: true, total: 4, returned: 4, truncated: false });
   });
 });

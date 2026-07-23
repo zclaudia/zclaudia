@@ -9,7 +9,7 @@ import {
   exitPlanMode as applyExitPlanMode,
 } from '../../../domains/sessions/plan-mode-toggle.js';
 import { SessionRepository } from '../../../domains/sessions/repository.js';
-import { errorResult, textResult } from './tool-common.js';
+import { agentToolParameters, errorResult, textResult } from './tool-common.js';
 
 const MAX_PLAN_BYTES = 128 * 1024;
 const MAX_ALLOWED_PROMPTS = 50;
@@ -19,12 +19,6 @@ const MAX_ALLOWED_PROMPT_PROMPT_CHARS = 2_000;
 export interface ModeToolOptions {
   db?: Database.Database;
   sessionId?: string;
-}
-
-type AgentToolParameters = AgentTool['parameters'];
-
-function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
-  return schema as AgentToolParameters;
 }
 
 function validatePlan(

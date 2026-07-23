@@ -13,7 +13,7 @@ import {
 } from './hashline.js';
 import { readLineWindowStreaming } from './read-window.js';
 import { compressImageToLimit, extractPdfText, renderNotebook } from './rich-read.js';
-import { errorResult, textResult, toolParams } from './tool-common.js';
+import { agentToolParameters, errorResult, textResult, toolParams } from './tool-common.js';
 import {
   buildPartialReadStateDescriptor,
   buildRangeDescriptor,
@@ -26,13 +26,7 @@ export interface ReadToolOptions {
   readFileState?: ReadFileStateStore;
 }
 
-type AgentToolParameters = AgentTool['parameters'];
 type ReadToolResult = AgentToolResult<unknown>;
-
-function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
-  return schema as AgentToolParameters;
-}
-
 // Read's own size budget is intentionally decoupled from the mutation caps in
 // write-guards.ts (Write content 2MB, Edit file 10MB): reading is non-destructive
 // and the model often needs to inspect generated bundles, lock files, or logs.
@@ -542,7 +536,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
     name: 'Read',
     label: 'Read',
     description:
-      'Read a file. Text files return up to 2000 lines per call (default reads from the start); the output footer reports the total line count and whether more lines remain, so prefer one large read over many small ones and only paginate with offset when a file exceeds 2000 lines. To pull back several scattered sections at once, pass ranges (e.g. "5-16,960-973"). Images return vision blocks (oversized ones are downscaled automatically); .ipynb notebooks render as cells with outputs; PDFs extract text per page (use pages, e.g. "1-5", max 20 pages per call).',
+      'Read a file. Text files return up to 2000 lines per call (default reads from the start); the output footer reports the total line count and whether more lines remain, so prefer one large read over many small ones and only paginate with offset when a file exceeds 2000 lines. A large text file (250+ lines, up to 20,000 lines / 2MB) whose foldable bodies cover at least 30% of its lines returns a structural summary by default — an outline with elided bodies, each marked with the offset/limit that re-reads it; pass full:true to read the whole file verbatim instead. To pull back several scattered sections at once, pass ranges (e.g. "5-16,960-973"). Images return vision blocks (oversized ones are downscaled automatically); .ipynb notebooks render as cells with outputs; PDFs extract text per page (use pages, e.g. "1-5", max 20 pages per call).',
     parameters: agentToolParameters({
       type: 'object',
       properties: {

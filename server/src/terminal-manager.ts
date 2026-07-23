@@ -127,6 +127,13 @@ export class TerminalManager {
         cols,
         rows,
         cwd: spawnCwd,
+        // Deliberately NOT scrubbed (unlike agent-spawned children, which go
+        // through pi-runtime/env-scrub): this PTY is the user's OWN interactive
+        // login shell, driven by the human through the UI — not by model
+        // output. Scrubbing secret-looking vars (AWS/GITHUB_TOKEN/…) would
+        // break the user's own workflows (git push, terraform, CLIs) for no
+        // threat-model gain: the env-scrub layer exists to stop agent command
+        // output from exfiltrating host credentials.
         env: process.env as Record<string, string>,
       });
     } catch (err) {
