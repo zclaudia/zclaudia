@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs';
+import { mkdtempSync, rmSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
@@ -106,16 +106,20 @@ describe('runBash auto-background handoff', () => {
   it('handoff keeps the spill fd sealed: pre-handoff spill stays readable for the adopter', async () => {
     // Output spills (>1KB with the small maxBytes) before the handoff; the
     // adopter path relies on the file being complete and closed at handoff.
+    // Deflake: emit via `head | tr` (near-zero startup, no interpreter) instead
+    // of python3, whose cold start under parallel-suite load could lose the
+    // race against the handoff threshold; 800ms gives process-spawn scheduling
+    // ample headroom while keeping the test fast.
     const dataDir = mkdtempSync(path.join(tmpdir(), 'zc-handoff-spill-'));
     const prev = process.env.ZCLAUDIA_DATA_DIR;
     process.env.ZCLAUDIA_DATA_DIR = dataDir;
     try {
       const res = await runBash({
-        command: 'python3 -c "print(\'x\' * 5000)"; sleep 5',
+        command: "head -c 5000 /dev/zero | tr '\\0' x; sleep 5",
         cwd: tmpdir(),
         timeoutSec: 30,
         maxBytes: 1024,
-        autoBackgroundMs: 300,
+        autoBackgroundMs: 800,
       });
       try {
         expect(res.handoff).toBeDefined();
