@@ -11,6 +11,7 @@ vi.mock('../../services/api', () => ({
   getSessions: vi.fn().mockResolvedValue([]),
   listLlmProfiles: vi.fn().mockResolvedValue([]),
   fetchAndSyncPlugins: vi.fn().mockResolvedValue(undefined),
+  fetchAndSyncRuntimeDescriptors: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../stores/gatewayStore', () => ({

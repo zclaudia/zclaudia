@@ -130,6 +130,9 @@ describe('services/fileDownload', () => {
     consoleWarnSpy.mockRestore();
     consoleErrorSpy.mockRestore();
     removeTauriInternals();
+    // Restore stubbed globals (document/URL/fetch) so they don't leak into
+    // other test files sharing the same worker process.
+    vi.unstubAllGlobals();
   });
 
   describe('isAndroid', () => {
