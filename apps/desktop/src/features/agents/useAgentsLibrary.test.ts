@@ -52,4 +52,24 @@ describe('buildLibraryItems', () => {
     const item = items.find(i => i.kind === 'skill' && i.id === 's1');
     expect(item?.recordStatus).toEqual(draft);
   });
+
+  it('marks skills deletable only when they come from the workspace', () => {
+    const withSources = {
+      ...sources,
+      skills: new Map([
+        [
+          'b1',
+          [
+            { id: 's1', name: 'ws-skill', source: 'workspace' },
+            { id: 's2', name: 'ext-skill', source: 'external' },
+            { id: 's3', name: 'plug-skill', source: 'plugin' },
+          ],
+        ],
+      ]),
+    };
+    const items = buildLibraryItems(withSources, backends, { tab: 'skills', backendFilter: 'all' });
+    expect(items.find(i => i.id === 's1')?.deletable).toBe(true);
+    expect(items.find(i => i.id === 's2')?.deletable).toBe(false);
+    expect(items.find(i => i.id === 's3')?.deletable).toBe(false);
+  });
 });

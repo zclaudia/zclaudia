@@ -32,6 +32,9 @@ export interface LibraryItem {
   recordStatus?: RecordStatus;
   /** Whether an agent profile is the current default. */
   isDefault?: boolean;
+  /** Whether the record can be deleted (false for source-managed skills).
+   *  Undefined means deletable. */
+  deletable?: boolean;
 }
 
 /** A backend in the Agents shell mode (library cards + editor header). */

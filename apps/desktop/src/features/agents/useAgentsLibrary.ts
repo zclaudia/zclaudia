@@ -16,6 +16,9 @@ interface SkillLike {
   id: string;
   name?: string;
   description?: string;
+  /** 'workspace' skills are user-owned (deletable); external/plugin skills are
+   *  managed by their source. */
+  source?: string;
   recordStatus?: RecordStatus;
 }
 interface ServerLike {
@@ -81,6 +84,7 @@ export function buildLibraryItems(
         title: s.name ?? s.id,
         subtitle: s.description,
         recordStatus: s.recordStatus,
+        deletable: (s.source ?? 'workspace') === 'workspace',
       })
     );
   if (wantKind('mcp-server'))

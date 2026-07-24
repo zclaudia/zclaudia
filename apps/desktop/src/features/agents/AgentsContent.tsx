@@ -23,6 +23,8 @@ import {
   createMcpServerForBackend,
   deleteAgentProfileForBackend,
   deleteLlmProfileForBackend,
+  deleteMcpServerForBackend,
+  deleteWorkspaceSkillForBackend,
   listLlmProfilesForBackend,
   saveWorkspaceSkillForBackend,
   setDefaultLlmProfileForBackend,
@@ -416,6 +418,68 @@ export function AgentsContent({
     });
   };
 
+  const handleDeleteSkill = async (item: LibraryItem) => {
+    const ok = await confirm({
+      title: 'Delete skill?',
+      message: `"${item.title}" will be permanently deleted.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await deleteWorkspaceSkillForBackend(item.backendId, item.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      useToastStore.getState().add({
+        title: 'Failed to delete skill',
+        message,
+        type: 'error',
+        icon: 'error',
+      });
+      return;
+    }
+    // Clear the selection if the deleted skill was open, then refresh.
+    if (
+      selection?.kind === 'skill' &&
+      selection.backendId === item.backendId &&
+      selection.id === item.id
+    ) {
+      selectAgentsItem(null);
+    }
+    bumpAgentsRefresh();
+  };
+
+  const handleDeleteMcpServer = async (item: LibraryItem) => {
+    const ok = await confirm({
+      title: 'Delete MCP server?',
+      message: `"${item.title}" will be permanently deleted.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await deleteMcpServerForBackend(item.backendId, item.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      useToastStore.getState().add({
+        title: 'Failed to delete MCP server',
+        message,
+        type: 'error',
+        icon: 'error',
+      });
+      return;
+    }
+    // Clear the selection if the deleted server was open, then refresh.
+    if (
+      selection?.kind === 'mcp-server' &&
+      selection.backendId === item.backendId &&
+      selection.id === item.id
+    ) {
+      selectAgentsItem(null);
+    }
+    bumpAgentsRefresh();
+  };
+
   if (!selection) {
     return (
       <div className="relative h-full">
@@ -431,6 +495,8 @@ export function AgentsContent({
           onDeleteProfile={handleDeleteProfile}
           onSetLlmProfileDefault={handleSetLlmProfileDefault}
           onDeleteLlmProfile={handleDeleteLlmProfile}
+          onDeleteSkill={handleDeleteSkill}
+          onDeleteMcpServer={handleDeleteMcpServer}
         />
         {newProfileBackendId !== null && (
           <NewAgentProfileModal

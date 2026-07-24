@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Search, Plus } from 'lucide-react';
 import type { AgentsBackend, AgentsTab, LibraryItem } from './agents-types';
 import { ItemCard } from './ui/ItemCard';
+import type { ItemCardAction } from './ui/ItemCard';
 import { FilterChips } from './ui/FilterChips';
 
 const TAB_TITLE: Record<AgentsTab, string> = {
@@ -23,6 +24,8 @@ export function BrowseView({
   onDeleteProfile,
   onSetLlmProfileDefault,
   onDeleteLlmProfile,
+  onDeleteSkill,
+  onDeleteMcpServer,
 }: {
   tab: AgentsTab;
   backendFilter: string;
@@ -35,6 +38,8 @@ export function BrowseView({
   onDeleteProfile?: (item: LibraryItem) => void;
   onSetLlmProfileDefault?: (item: LibraryItem) => void;
   onDeleteLlmProfile?: (item: LibraryItem) => void;
+  onDeleteSkill?: (item: LibraryItem) => void;
+  onDeleteMcpServer?: (item: LibraryItem) => void;
 }) {
   const [query, setQuery] = useState('');
   const byName = useMemo(() => new Map(backends.map(b => [b.backendId, b])), [backends]);
@@ -80,6 +85,56 @@ export function BrowseView({
 
   const gridClass = 'grid auto-rows-min grid-cols-2 gap-3 lg:grid-cols-3';
 
+  const actionsFor = (item: LibraryItem): ItemCardAction[] | undefined => {
+    switch (item.kind) {
+      case 'profile':
+        return [
+          {
+            label: 'Set as default agent',
+            onSelect: () => onSetProfileDefault?.(item),
+            disabled: item.isDefault,
+          },
+          {
+            label: 'Delete agent',
+            onSelect: () => onDeleteProfile?.(item),
+            destructive: true,
+          },
+        ];
+      case 'llm-profile':
+        return [
+          {
+            label: 'Set as default provider',
+            onSelect: () => onSetLlmProfileDefault?.(item),
+            disabled: item.isDefault,
+          },
+          {
+            label: 'Delete provider',
+            onSelect: () => onDeleteLlmProfile?.(item),
+            destructive: true,
+          },
+        ];
+      case 'skill':
+        // Source-managed skills (external/plugin) are read-only — no delete.
+        return item.deletable === false
+          ? undefined
+          : [
+              {
+                label: 'Delete skill',
+                onSelect: () => onDeleteSkill?.(item),
+                destructive: true,
+              },
+            ];
+      case 'mcp-server':
+        return [
+          {
+            label: 'Delete server',
+            onSelect: () => onDeleteMcpServer?.(item),
+            destructive: true,
+          },
+        ];
+    }
+  };
+
   const renderCard = (item: LibraryItem) => {
     const b = byName.get(item.backendId);
     return (
@@ -90,35 +145,7 @@ export function BrowseView({
         backendOnline={b?.online ?? false}
         showBackendBadge={!showGroups}
         onOpen={() => onOpen(item)}
-        actions={
-          item.kind === 'profile'
-            ? [
-                {
-                  label: 'Set as default agent',
-                  onSelect: () => onSetProfileDefault?.(item),
-                  disabled: item.isDefault,
-                },
-                {
-                  label: 'Delete agent',
-                  onSelect: () => onDeleteProfile?.(item),
-                  destructive: true,
-                },
-              ]
-            : item.kind === 'llm-profile'
-              ? [
-                  {
-                    label: 'Set as default provider',
-                    onSelect: () => onSetLlmProfileDefault?.(item),
-                    disabled: item.isDefault,
-                  },
-                  {
-                    label: 'Delete provider',
-                    onSelect: () => onDeleteLlmProfile?.(item),
-                    destructive: true,
-                  },
-                ]
-              : undefined
-        }
+        actions={actionsFor(item)}
       />
     );
   };

@@ -79,4 +79,34 @@ describe('BrowseView', () => {
     // The card keeps its own backend badge in flat mode.
     expect(screen.getAllByText('This Device').length).toBeGreaterThan(1);
   });
+
+  it('skill cards get a delete menu that fires onDeleteSkill', () => {
+    const onDeleteSkill = vi.fn();
+    setup({
+      items: [{ kind: 'skill', backendId: 'b1', id: 's1', title: 'web-search' }],
+      onDeleteSkill,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete skill' }));
+    expect(onDeleteSkill).toHaveBeenCalledWith(expect.objectContaining({ id: 's1' }));
+  });
+
+  it('read-only (source-managed) skill cards have no menu', () => {
+    setup({
+      items: [{ kind: 'skill', backendId: 'b1', id: 's1', title: 'plug-skill', deletable: false }],
+    });
+    expect(screen.getByRole('button', { name: /plug-skill/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument();
+  });
+
+  it('mcp server cards get a delete menu that fires onDeleteMcpServer', () => {
+    const onDeleteMcpServer = vi.fn();
+    setup({
+      items: [{ kind: 'mcp-server', backendId: 'b1', id: 'm1', title: 'filesystem' }],
+      onDeleteMcpServer,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete server' }));
+    expect(onDeleteMcpServer).toHaveBeenCalledWith(expect.objectContaining({ id: 'm1' }));
+  });
 });
