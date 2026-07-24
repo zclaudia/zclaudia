@@ -1,55 +1,24 @@
 import { Router, type Request, type Response } from 'express';
-import type { PCPEffectiveProfile } from '@zclaudia/shared/core/pcp';
-import { toolRegistry, type ToolScope } from './tool-registry.js';
-import { shouldExposeInteractionTool } from '../../infra/providers/pcp-capability.js';
 import { sendApiError } from '../../interfaces/http/response.js';
+import {
+  createZClaudiaToolCatalog,
+  resolveAgentToolScope,
+  type ZClaudiaToolCatalogDeps,
+} from './tool-catalog.js';
 
-export interface PluginToolsRoutesDeps {
-  getActiveProfile?: (sessionId: string) => PCPEffectiveProfile | undefined;
-  getSessionType?: (sessionId: string) => string | undefined;
-  resolveActiveSessionId?: () => string | undefined;
-}
-
-/**
- * Map (sessionId, sessionType) to the caller's ToolScope.
- *   - no sessionId            → 'plugin-panel'  (request originates from a plugin iframe)
- *   - sessionType === 'agent' → 'agent-assistant'
- *   - otherwise               → 'main-session'
- */
-function resolveCallerScope(
-  sessionId: string | undefined,
-  sessionType: string | undefined
-): ToolScope {
-  if (!sessionId) return 'plugin-panel';
-  if (sessionType === 'agent') return 'agent-assistant';
-  return 'main-session';
-}
+export type PluginToolsRoutesDeps = ZClaudiaToolCatalogDeps;
 
 export function createPluginToolsRoutes(deps?: PluginToolsRoutesDeps): Router {
   const router = Router();
+  const catalog = createZClaudiaToolCatalog(deps);
 
   router.get('/tools', (req: Request, res: Response) => {
     const sessionId =
       (req.query.sessionId as string | undefined) || deps?.resolveActiveSessionId?.();
-    const profile = sessionId ? deps?.getActiveProfile?.(sessionId) : undefined;
     const sessionType = sessionId ? deps?.getSessionType?.(sessionId) : undefined;
-    const callerScope = resolveCallerScope(sessionId, sessionType);
-    // Allow-list filter via the registry (undefined scope = callable everywhere).
-    const allowedNames = new Set(
-      toolRegistry.getDefinitionsByScope(callerScope).map(d => d.function.name)
-    );
-    const pluginTools = toolRegistry.getBridgeTools();
-    const tools = pluginTools
-      .filter(t => allowedNames.has(t.definition.function.name))
-      .filter(t => shouldExposeInteractionTool(t.definition.function.name, profile))
-      .map(t => ({
-        name: t.definition.function.name,
-        description: t.definition.function.description,
-        inputSchema: t.definition.function.parameters,
-      }));
-    console.log(
-      `[PluginTools] list tools count=${tools.length} scope=${callerScope}${profile ? ` (filtered by PCP profile: ${profile.providerId})` : ''}`
-    );
+    const callerScope = resolveAgentToolScope(sessionId, sessionType);
+    const tools = catalog.listTools({ sessionId });
+    console.log(`[PluginTools] list tools count=${tools.length} scope=${callerScope}`);
     res.json({ tools });
   });
 
@@ -61,26 +30,16 @@ export function createPluginToolsRoutes(deps?: PluginToolsRoutesDeps): Router {
     };
     const sessionTag = context.sessionId || 'none';
     const sessionType = context.sessionId ? deps?.getSessionType?.(context.sessionId) : undefined;
-    const callerScope = resolveCallerScope(context.sessionId, sessionType);
-
-    if (context.sessionId) {
-      const profile = deps?.getActiveProfile?.(context.sessionId);
-      if (profile && !shouldExposeInteractionTool(name, profile)) {
-        console.warn(
-          `[PluginTools] rejected name=${name} session=${sessionTag} — capability not supported by ${profile.providerId}`
-        );
-        res.json({
-          result: JSON.stringify({ error: `Tool "${name}" is not available for this provider` }),
-        });
-        return;
-      }
-    }
+    const callerScope = resolveAgentToolScope(context.sessionId, sessionType);
 
     try {
       console.log(
         `[PluginTools] execute start name=${name} session=${sessionTag} scope=${callerScope} args=${Object.keys(args).join(',') || 'none'}`
       );
-      const result = await toolRegistry.execute(name, args, context, callerScope);
+      const result = await catalog.callTool(name, args, {
+        ...context,
+        signal: AbortSignal.timeout(30_000),
+      });
       console.log(
         `[PluginTools] execute ok name=${name} session=${sessionTag} resultLength=${String(result).length}`
       );

@@ -27,6 +27,7 @@
     "@earendil-works/pi-ai": "^0.79.3",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@mozilla/readability": "^0.6.0",
+    "@zclaudia/agent-tool-bridge": "^0.1.0",
     "@zclaudia/protocol": "^0.2.0",
     "@zclaudia/shared": "workspace:*",
     "async-mutex": "^0.5.0",

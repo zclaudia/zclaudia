@@ -22,6 +22,7 @@ import { GatewayManager } from './infra/gateway/manager.js';
 import { stopFileStoreCleanup } from './infra/storage/fileStore.js';
 import { writeCrashReportSync } from './utils/crash-log.js';
 import { defaultServerHost } from './interfaces/http/trust-boundary.js';
+import { closeAgentToolBridgeHost } from './application/plugins/agent-tool-bridge-host.js';
 
 const sanitizedEnv = sanitizeInheritedProviderEnv();
 if (sanitizedEnv.removedKeys.length > 0) {
@@ -241,6 +242,7 @@ async function main() {
 
       // Deactivate all plugins (cleanup schedulers, event listeners, etc.)
       await pluginLoader.deactivateAll();
+      await closeAgentToolBridgeHost();
       skillWatcher.stop();
 
       // Stop all managed provider sub-processes

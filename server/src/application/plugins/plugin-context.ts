@@ -25,10 +25,7 @@ import type { CommandHandler as ServerCommandHandler } from '../commands/registr
 import { providerRegistry } from '../../infra/providers/registry.js';
 import { runtimeDescriptorRegistry } from '../../infra/providers/runtime-descriptor-registry.js';
 import { wrapExternalAgentAdapter } from '../../infra/providers/external-agent-shim.js';
-import {
-  createAgentPluginToolBridgeMcpEntry,
-  DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME,
-} from '../../infra/providers/external-agents/agent-plugin/tool-bridge.js';
+import { createAgentToolBridgeEntry } from './agent-tool-bridge-host.js';
 
 type PluginDatabase = Database.Database;
 type RuntimePluginContext = PluginContext & Record<string, unknown>;
@@ -395,14 +392,7 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
             broadcast?.({ type: 'agent_runtimes_changed' });
           },
           createToolBridge: async (request: ProviderToolBridgeRequest) => {
-            const entry = await createAgentPluginToolBridgeMcpEntry({
-              serverPort: request.serverPort,
-              zclaudiaSessionId: request.sessionId,
-            });
-            if (!entry) return null;
-            // createAgentPluginToolBridgeMcpEntry returns the MCP server config directly
-            // (not a keyed map), so pair it with the bridge's well-known server name.
-            return { name: DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME, config: entry };
+            return createAgentToolBridgeEntry(request);
           },
         }
       : undefined,

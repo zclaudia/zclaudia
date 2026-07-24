@@ -320,6 +320,28 @@ await esbuild.build({
   }
 }
 
+// The portable bridge's stdio proxy is launched as a separate child process,
+// so esbuild cannot fold it into server.mjs. Copy it beside the existing
+// standalone plugin scripts when the public package is installed.
+try {
+  const bridgePackageRoot = resolvePackage('@zclaudia/agent-tool-bridge');
+  const bridgeProxySource = path.join(bridgePackageRoot, 'dist', 'stdio-bridge.js');
+  const bridgeProxyDestination = path.join(
+    outDir,
+    'application',
+    'plugins',
+    'agent-tool-bridge-stdio.js'
+  );
+  copyFile(bridgeProxySource, bridgeProxyDestination);
+  console.log(`    ${path.relative(outDir, bridgeProxyDestination)}: OK`);
+} catch (error) {
+  const serverManifest = JSON.parse(fs.readFileSync(path.join(serverRoot, 'package.json'), 'utf8'));
+  if (serverManifest.dependencies?.['@zclaudia/agent-tool-bridge']) {
+    throw error;
+  }
+  console.log('    agent-tool-bridge-stdio: SKIP (package not installed)');
+}
+
 // ============================================================================
 // Step 3: Clean-room npm install + selective copy to bundle
 // ============================================================================

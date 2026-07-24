@@ -299,97 +299,100 @@ describe('ws/run-events', () => {
     });
   });
 
-  it('completes result events, emits background completion, and notifies', async () => {
-    const sendRunEventMock = vi.fn();
-    const broadcastHeartbeatMock = vi.fn();
-    const postItemMock = vi.fn();
-    const activeRun = {
-      sessionId: 'session-1',
-      assistantMessageId: 'assistant-1',
-      sessionType: 'background',
-      providerType: 'claude',
-      collectedToolCalls: [],
-      contentBlocks: [],
-      fullContent: '',
-      pendingPermissions: new Map(),
-      recentToolCalls: [],
-      phase: 'running',
-      phaseEmitter: new PhaseEmitter(),
-      runId: 'run-1',
-    } as any;
+  it.each(['result', 'provider_turn_finished'] as const)(
+    'completes %s events, emits background completion, and notifies',
+    async eventType => {
+      const sendRunEventMock = vi.fn();
+      const broadcastHeartbeatMock = vi.fn();
+      const postItemMock = vi.fn();
+      const activeRun = {
+        sessionId: 'session-1',
+        assistantMessageId: 'assistant-1',
+        sessionType: 'background',
+        providerType: 'claude',
+        collectedToolCalls: [],
+        contentBlocks: [],
+        fullContent: '',
+        pendingPermissions: new Map(),
+        recentToolCalls: [],
+        phase: 'running',
+        phaseEmitter: new PhaseEmitter(),
+        runId: 'run-1',
+      } as any;
 
-    const { handleProviderEvent } = await import('../run-events.js');
+      const { handleProviderEvent } = await import('../run-events.js');
 
-    handleProviderEvent({
-      activeRun,
-      activeRuns: new Map(),
-      broadcastHeartbeat: broadcastHeartbeatMock,
-      client: { ws: {} as any } as any,
-      db: {} as any,
-      input: 'hello',
-      modeValue: 'default',
-      msg: {
-        type: 'result',
-        content: 'done',
+      handleProviderEvent({
+        activeRun,
+        activeRuns: new Map(),
+        broadcastHeartbeat: broadcastHeartbeatMock,
+        client: { ws: {} as any } as any,
+        db: {} as any,
+        input: 'hello',
+        modeValue: 'default',
+        msg: {
+          type: eventType,
+          content: 'done',
+          usage: { inputTokens: 1, outputTokens: 2 },
+        } as any,
+        notificationService: { notify: vi.fn() } as any,
+        notificationsService: { postItem: postItemMock } as any,
+        persistSessionWorkingDirectory: vi.fn(),
+        providerType: 'claude',
+        runId: 'run-1',
+        sendRunEvent: sendRunEventMock,
+        sessionId: 'session-1',
+        sessionType: 'background',
+        state: {},
+        toolUseIdToName: new Map(),
+        providerRegistry: mockProviderRegistry as any,
+      });
+
+      expect(activeRun.fullContent).toBe('done');
+      expect(activeRun.phase).toBe('completed');
+      expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun, {
         usage: { inputTokens: 1, outputTokens: 2 },
-      } as any,
-      notificationService: { notify: vi.fn() } as any,
-      notificationsService: { postItem: postItemMock } as any,
-      persistSessionWorkingDirectory: vi.fn(),
-      providerType: 'claude',
-      runId: 'run-1',
-      sendRunEvent: sendRunEventMock,
-      sessionId: 'session-1',
-      sessionType: 'background',
-      state: {},
-      toolUseIdToName: new Map(),
-      providerRegistry: mockProviderRegistry as any,
-    });
-
-    expect(activeRun.fullContent).toBe('done');
-    expect(activeRun.phase).toBe('completed');
-    expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun, {
-      usage: { inputTokens: 1, outputTokens: 2 },
-      indexMetadata: true,
-    });
-    expect(sendRunEventMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'delta',
-        runId: 'run-1',
-        content: 'done',
-      })
-    );
-    expect(sendRunEventMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'run_completed',
-        runId: 'run-1',
+        indexMetadata: true,
+      });
+      expect(sendRunEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'delta',
+          runId: 'run-1',
+          content: 'done',
+        })
+      );
+      expect(sendRunEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'run_completed',
+          runId: 'run-1',
+          sessionId: 'session-1',
+          usage: { inputTokens: 1, outputTokens: 2 },
+        })
+      );
+      expect(pluginEventsEmitMock).toHaveBeenCalledWith(
+        'run.completed',
+        expect.objectContaining({
+          runId: 'run-1',
+          sessionId: 'session-1',
+        })
+      );
+      expect(broadcastHeartbeatMock).toHaveBeenCalled();
+      expect(postItemMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: 'session-1',
+          title: 'Run completed: session-1',
+          summary: 'Session response is ready.',
+          status: 'completed',
+          source: 'manual',
+        })
+      );
+      expect(sendRunEventMock).toHaveBeenCalledWith({
+        type: 'background_task_update',
         sessionId: 'session-1',
-        usage: { inputTokens: 1, outputTokens: 2 },
-      })
-    );
-    expect(pluginEventsEmitMock).toHaveBeenCalledWith(
-      'run.completed',
-      expect.objectContaining({
-        runId: 'run-1',
-        sessionId: 'session-1',
-      })
-    );
-    expect(broadcastHeartbeatMock).toHaveBeenCalled();
-    expect(postItemMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionId: 'session-1',
-        title: 'Run completed: session-1',
-        summary: 'Session response is ready.',
         status: 'completed',
-        source: 'manual',
-      })
-    );
-    expect(sendRunEventMock).toHaveBeenCalledWith({
-      type: 'background_task_update',
-      sessionId: 'session-1',
-      status: 'completed',
-    });
-  });
+      });
+    }
+  );
 
   it('marks heartbeat dirty before broadcasting completion state', async () => {
     const sendRunEventMock = vi.fn();
@@ -555,80 +558,83 @@ describe('ws/run-events', () => {
     );
   });
 
-  it('fails runs on provider error and removes them from activeRuns', async () => {
-    const sendRunEventMock = vi.fn();
-    const broadcastHeartbeatMock = vi.fn();
-    const postItemMock = vi.fn();
-    const activeRun = {
-      sessionId: 'session-1',
-      providerType: 'claude',
-      collectedToolCalls: [],
-      contentBlocks: [],
-      fullContent: 'partial',
-      pendingPermissions: new Map(),
-      recentToolCalls: [],
-      phase: 'running',
-      phaseEmitter: new PhaseEmitter(),
-      runId: 'run-1',
-    } as any;
-    const activeRuns = new Map([['run-1', activeRun]]);
-
-    const { handleProviderEvent } = await import('../run-events.js');
-
-    handleProviderEvent({
-      activeRun,
-      activeRuns,
-      broadcastHeartbeat: broadcastHeartbeatMock,
-      client: { ws: {} as any } as any,
-      db: {} as any,
-      input: 'hello',
-      modeValue: 'default',
-      msg: {
-        type: 'error',
-        error: 'provider exploded',
-      } as any,
-      notificationService: { notify: vi.fn() } as any,
-      notificationsService: { postItem: postItemMock } as any,
-      persistSessionWorkingDirectory: vi.fn(),
-      providerType: 'claude',
-      runId: 'run-1',
-      sendRunEvent: sendRunEventMock,
-      sessionId: 'session-1',
-      sessionType: 'regular',
-      state: {},
-      toolUseIdToName: new Map(),
-      providerRegistry: mockProviderRegistry as any,
-    });
-
-    expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun, { indexMetadata: true });
-    expect(sendRunEventMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'run_failed',
+  it.each(['error', 'provider_error'] as const)(
+    'fails runs on %s and removes them from activeRuns',
+    async eventType => {
+      const sendRunEventMock = vi.fn();
+      const broadcastHeartbeatMock = vi.fn();
+      const postItemMock = vi.fn();
+      const activeRun = {
+        sessionId: 'session-1',
+        providerType: 'claude',
+        collectedToolCalls: [],
+        contentBlocks: [],
+        fullContent: 'partial',
+        pendingPermissions: new Map(),
+        recentToolCalls: [],
+        phase: 'running',
+        phaseEmitter: new PhaseEmitter(),
         runId: 'run-1',
-        sessionId: 'session-1',
-      })
-    );
-    expect(activeRun.phase).toBe('failed');
-    expect(pluginEventsEmitMock).toHaveBeenCalledWith(
-      'run.error',
-      expect.objectContaining({
+      } as any;
+      const activeRuns = new Map([['run-1', activeRun]]);
+
+      const { handleProviderEvent } = await import('../run-events.js');
+
+      handleProviderEvent({
+        activeRun,
+        activeRuns,
+        broadcastHeartbeat: broadcastHeartbeatMock,
+        client: { ws: {} as any } as any,
+        db: {} as any,
+        input: 'hello',
+        modeValue: 'default',
+        msg: {
+          type: eventType,
+          error: 'provider exploded',
+        } as any,
+        notificationService: { notify: vi.fn() } as any,
+        notificationsService: { postItem: postItemMock } as any,
+        persistSessionWorkingDirectory: vi.fn(),
+        providerType: 'claude',
         runId: 'run-1',
+        sendRunEvent: sendRunEventMock,
         sessionId: 'session-1',
-      })
-    );
-    expect(broadcastHeartbeatMock).toHaveBeenCalled();
-    expect(postItemMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionId: 'session-1',
-        title: 'Run failed: session-1',
-        error: 'provider exploded',
-        status: 'failed',
-        source: 'manual',
-      })
-    );
-    expect(cleanupPendingPermissionsMock).toHaveBeenCalled();
-    expect(activeRuns.has('run-1')).toBe(false);
-  });
+        sessionType: 'regular',
+        state: {},
+        toolUseIdToName: new Map(),
+        providerRegistry: mockProviderRegistry as any,
+      });
+
+      expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun, { indexMetadata: true });
+      expect(sendRunEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'run_failed',
+          runId: 'run-1',
+          sessionId: 'session-1',
+        })
+      );
+      expect(activeRun.phase).toBe('failed');
+      expect(pluginEventsEmitMock).toHaveBeenCalledWith(
+        'run.error',
+        expect.objectContaining({
+          runId: 'run-1',
+          sessionId: 'session-1',
+        })
+      );
+      expect(broadcastHeartbeatMock).toHaveBeenCalled();
+      expect(postItemMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: 'session-1',
+          title: 'Run failed: session-1',
+          error: 'provider exploded',
+          status: 'failed',
+          source: 'manual',
+        })
+      );
+      expect(cleanupPendingPermissionsMock).toHaveBeenCalled();
+      expect(activeRuns.has('run-1')).toBe(false);
+    }
+  );
 
   // mode_transition is a provider-agnostic event. The runtime must react to it
   // identically regardless of which provider emitted it — that's the whole

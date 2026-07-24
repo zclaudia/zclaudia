@@ -196,7 +196,8 @@ export function handleProviderEvent({
       break;
     }
 
-    case 'result': {
+    case 'result':
+    case 'provider_turn_finished': {
       completeProviderTurn({
         activeRun,
         broadcastHeartbeat,
@@ -227,7 +228,8 @@ export function handleProviderEvent({
       break;
     }
 
-    case 'error': {
+    case 'error':
+    case 'provider_error': {
       const rawProviderError = (msg.error || 'Provider error') as string;
 
       // Context-window overflow: do NOT fail here. Throw a sentinel so the

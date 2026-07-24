@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3';
 import type { WebSocket } from 'ws';
 import { createPluginRoutes } from './routes.js';
 import { createPluginToolsRoutes } from './tools-routes.js';
+import { configureZClaudiaToolCatalog } from './tool-catalog.js';
 import { pluginLoader } from './loader.js';
 import {
   sendMessage,
@@ -36,35 +37,34 @@ export function registerPluginsDomain(deps: PluginsDomainDeps): void {
     broadcastPluginState,
   } = deps;
 
+  const toolCatalogDeps = {
+    getActiveProfile: (sessionId: string) => {
+      for (const run of activeRuns.values()) {
+        if (run.sessionId === sessionId && !isTerminalPhase(run.phase)) {
+          return run.effectiveProfile;
+        }
+      }
+      return undefined;
+    },
+    getSessionType: (sessionId: string) => {
+      const row = db.prepare('SELECT type FROM sessions WHERE id = ?').get(sessionId) as
+        | { type: string }
+        | undefined;
+      return row?.type;
+    },
+    resolveActiveSessionId: () => {
+      for (const run of activeRuns.values()) {
+        if (!isTerminalPhase(run.phase)) {
+          return run.sessionId;
+        }
+      }
+      return undefined;
+    },
+  };
+  configureZClaudiaToolCatalog(toolCatalogDeps);
+
   app.use('/api/plugins', authMiddleware, createPluginRoutes(localOnlyMiddleware));
-  app.use(
-    '/api/plugins',
-    localOnlyMiddleware,
-    createPluginToolsRoutes({
-      getActiveProfile: sessionId => {
-        for (const run of activeRuns.values()) {
-          if (run.sessionId === sessionId && !isTerminalPhase(run.phase)) {
-            return run.effectiveProfile;
-          }
-        }
-        return undefined;
-      },
-      getSessionType: sessionId => {
-        const row = db.prepare('SELECT type FROM sessions WHERE id = ?').get(sessionId) as
-          | { type: string }
-          | undefined;
-        return row?.type;
-      },
-      resolveActiveSessionId: () => {
-        for (const run of activeRuns.values()) {
-          if (!isTerminalPhase(run.phase)) {
-            return run.sessionId;
-          }
-        }
-        return undefined;
-      },
-    })
-  );
+  app.use('/api/plugins', localOnlyMiddleware, createPluginToolsRoutes(toolCatalogDeps));
 
   pluginLoader.setBroadcast(msg => {
     clients.forEach(client => {

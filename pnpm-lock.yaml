@@ -216,6 +216,9 @@ importers:
       '@mozilla/readability':
         specifier: ^0.6.0
         version: 0.6.0
+      '@zclaudia/agent-tool-bridge':
+        specifier: ^0.1.0
+        version: 0.1.0
       '@zclaudia/protocol':
         specifier: ^0.2.0
         version: 0.2.0
@@ -2308,6 +2311,11 @@ packages:
 
   '@xyflow/system@0.0.77':
     resolution: {integrity: sha512-qCDCMCQAAgUu8yHnhloHG9F5mwPX5E+Wl8McpYIOPSSXfzFJJoZcwOcsDiAjitVKIg2de1WmJbCHfpcvxprsgg==}
+
+  '@zclaudia/agent-tool-bridge@0.1.0':
+    resolution: {integrity: sha512-/MP2qW2t2Rpf7fjbiV1E/ek3Gt4UivCcabfzx2yRVwetbx4WlfjftpavWSQAi62cW5PTAFhKiQ3tDFiRTmeS1g==}
+    engines: {node: '>=22.19.0'}
+    hasBin: true
 
   '@zclaudia/plugin-sdk@0.1.0':
     resolution: {integrity: sha512-Njpk7b02nENaoJhyE3WsgBfoRRUzHPxsL+1Kr5zCOst0HfxM3unkOhJ5HIU5lTpPF1F3fJcEzZvrWliXqWnkig==}
@@ -7234,6 +7242,10 @@ snapshots:
       d3-interpolate: 3.0.1
       d3-selection: 3.0.0
       d3-zoom: 3.0.0
+
+  '@zclaudia/agent-tool-bridge@0.1.0':
+    dependencies:
+      '@zclaudia/plugin-sdk': 0.1.0
 
   '@zclaudia/plugin-sdk@0.1.0': {}
 

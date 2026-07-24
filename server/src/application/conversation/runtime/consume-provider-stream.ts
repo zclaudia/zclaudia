@@ -5,10 +5,9 @@ import type { NotificationService } from '../../../domains/notification-feed/ind
 import { summarizeProviderMessage, type TraceRecorder } from '../../../utils/provider-trace.js';
 import type { ActiveRun, ConnectedClient } from '../transport/types.js';
 import { handleProviderEvent, type ProviderEventState } from './run-events.js';
-import { postRunCompletedNotification } from './run-terminal-notifications.js';
 import { spawnBackgroundFollowUpConsumer } from './background-follow-up.js';
-import { setPhase, isTerminalPhase } from './active-run-phase.js';
-import { persistAssistantTerminalSnapshot } from './run-terminal-snapshot.js';
+import { isTerminalPhase } from './active-run-phase.js';
+import { failProviderTurn } from './run-terminal-coordinator.js';
 
 interface ConsumeProviderStreamInput {
   activeRun: ActiveRun;
@@ -162,34 +161,30 @@ export async function consumeProviderStream(input: ConsumeProviderStreamInput): 
     throw err;
   }
 
-  // If the provider stream ended without emitting a result/error event,
-  // the frontend never receives run_completed/run_failed and gets stuck in
-  // a permanent loading state. Emit a synthetic run_completed so the client
-  // can move on; set phase to 'completed' to keep wire and phase aligned —
-  // we have no positive signal that this was an error, and any server-side
-  // distinguishing of this degraded path can rely on the trace event below.
+  // A provider stream closing is not proof of a successful turn. Require an
+  // explicit terminal event so plugin bugs and crashed provider processes do
+  // not silently persist partial output as a successful answer.
   if (!isTerminalPhase(activeRun.phase)) {
+    const errorMessage = 'Provider stream ended without a terminal event.';
     trace.log(
       'server_norm',
-      'stream_ended_without_result',
+      'stream_ended_without_terminal',
       { runId, providerType },
-      'provider stream ended without result event'
+      errorMessage
     );
-    setPhase(activeRun, 'finalizing');
-    const terminalSnapshot = persistAssistantTerminalSnapshot(activeRun, { indexMetadata: true });
-    sendRunEvent({
-      type: 'run_completed',
-      runId,
-      sessionId,
-      ...terminalSnapshot,
-    });
-    setPhase(activeRun, 'completed');
-    broadcastHeartbeat();
-    postRunCompletedNotification({
+    failProviderTurn({
+      activeRun,
+      activeRuns,
+      broadcastHeartbeat,
+      cleanupReason: errorMessage,
       db,
-      sessionId,
-      notificationSender: notificationService,
+      errorCode: 'STREAM_ENDED',
+      errorMessage,
+      notificationService,
       notificationsService,
+      runId,
+      sendRunEvent,
+      sessionId,
     });
   }
 }
