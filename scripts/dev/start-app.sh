@@ -64,10 +64,21 @@ if [[ -n "${OPENAI_BASE_URL:-}" ]]; then
   ok "  OPENAI_BASE_URL: ${OPENAI_BASE_URL}"
 fi
 
-# Ensure fnm is available and uses the project's .node-version
+# Ensure fnm is available and uses the project's .node-version.
+#
+# Pins the version EXPLICITLY rather than letting `fnm use` discover a
+# .node-version from the cwd: `fnm env` re-points the multishell at the `default`
+# alias, and fnm's default `local` version-file strategy only looks in the
+# current directory. Callers run this from subdirs (server/, apps/desktop/) that
+# have no .node-version, so the discovery would fail silently and leave the shell
+# on whatever `fnm default` is — breaking better-sqlite3 with ERR_DLOPEN_FAILED.
+NODE_VERSION="$(tr -d '[:space:]' < "$PROJECT_ROOT/.node-version" 2>/dev/null || true)"
+
 setup_node() {
-  eval "$(fnm env --use-on-cd)" 2>/dev/null || die "fnm not found. Install fnm first."
-  fnm use --silent-if-unchanged 2>/dev/null || true
+  eval "$(fnm env)" 2>/dev/null || die "fnm not found. Install fnm first."
+  [[ -n "$NODE_VERSION" ]] || return 0
+  fnm use "$NODE_VERSION" --silent-if-unchanged >/dev/null 2>&1 \
+    || die "fnm could not select Node $NODE_VERSION. Run: fnm install $NODE_VERSION"
 }
 
 run_pnpm() {
