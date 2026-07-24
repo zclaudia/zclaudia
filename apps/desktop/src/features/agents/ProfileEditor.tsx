@@ -743,8 +743,6 @@ export function ProfileEditor({
         onNameChange={setFormName}
         onFieldBlur={autosave.flush}
         namePlaceholder={NAME_PLACEHOLDER}
-        description={formDescription}
-        onDescriptionChange={setFormDescription}
         badges={headerBadges}
         saveStatus={!isReadonly ? autosave.status : undefined}
         onRetry={autosave.retry}
@@ -774,6 +772,19 @@ export function ProfileEditor({
             <div className="flex flex-col gap-4">
               <EditorSection title="Runtime & model" flush overflowVisible>
                 <div className="divide-y divide-border/60">
+                  <EditorRow title="Description">
+                    <textarea
+                      value={formDescription}
+                      onChange={e => setFormDescription(e.target.value)}
+                      onBlur={autosave.flush}
+                      placeholder="Add a description"
+                      aria-label="Profile description"
+                      disabled={isReadonly}
+                      rows={2}
+                      className={`${FIELD_CLASS} resize-y`}
+                    />
+                  </EditorRow>
+
                   <EditorRow
                     title="Agent Type"
                     control={

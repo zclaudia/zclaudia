@@ -6,7 +6,7 @@
  * the ForBackend API variants directly — no global store.
  *
  * Matches the agent/LLM profile editor design language: it owns its own
- * full-height chrome (ProfileHeader breadcrumb + inline-editable name/description
+ * full-height chrome (ProfileHeader breadcrumb + inline-editable name
  * + save indicator) and autosaves on change (no explicit Add/Save button),
  * laying fields out as EditorSection cards. Delete lives in the header "⋯"
  * menu; the other connection lifecycle actions (connect/disconnect/refresh/
@@ -550,8 +550,6 @@ export function McpServerEditor({
         onNameChange={setFormName}
         onFieldBlur={autosave.flush}
         namePlaceholder="e.g. filesystem"
-        description={formDescription}
-        onDescriptionChange={setFormDescription}
         badges={headerBadges}
         saveStatus={autosave.status}
         onRetry={autosave.retry}
@@ -565,6 +563,20 @@ export function McpServerEditor({
           {server && renderConnectionSection(server)}
 
           <EditorSection title="Configuration">
+            <FormField label="Description">
+              {f => (
+                <textarea
+                  {...f}
+                  rows={2}
+                  value={formDescription}
+                  onChange={e => setFormDescription(e.target.value)}
+                  onBlur={autosave.flush}
+                  placeholder="Add a description"
+                  className={`${FIELD_CLASS} resize-y`}
+                />
+              )}
+            </FormField>
+
             <div>
               <FieldLabel htmlFor="mcp-transport">Transport</FieldLabel>
               <select

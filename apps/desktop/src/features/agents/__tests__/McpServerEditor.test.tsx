@@ -320,7 +320,8 @@ describe('McpServerEditor', () => {
 
   it('every MCP text field is labeled', () => {
     const stdio = renderEditor(makeServer({ transport: 'stdio' }));
-    // Name + Description are inline-editable in the header (ProfileHeader).
+    // Name is inline-editable in the header (ProfileHeader); Description is a
+    // regular field in the Configuration section.
     ['Name', 'Command', 'Arguments', 'Description'].forEach(name => {
       expect(screen.getByLabelText(new RegExp(name, 'i'))).toBeTruthy();
     });
