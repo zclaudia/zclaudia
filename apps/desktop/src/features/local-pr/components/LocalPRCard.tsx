@@ -15,6 +15,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import { IconButton } from '../../../components/ui/Button';
 import { useLocalPRStore } from '../store';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../../stores/llmProfileMetaStore';
@@ -279,35 +280,38 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
         {!isMobile && (
           <div className="flex items-center gap-1 shrink-0">
             {pr.executionState === 'queued' && (
-              <button
+              <IconButton
+                size="sm"
+                aria-label="Cancel queue"
                 onClick={handleCancelQueue}
                 disabled={loading}
                 title="Cancel queue"
-                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
               >
                 <XCircle className="w-3.5 h-3.5" />
-              </button>
+              </IconButton>
             )}
             {pr.executionState === 'failed' && (
-              <button
+              <IconButton
+                size="sm"
+                aria-label="Retry"
                 onClick={handleRetry}
                 disabled={loading}
                 title="Retry"
-                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-              </button>
+              </IconButton>
             )}
             {canReview && (
               <div className="relative">
-                <button
+                <IconButton
+                  size="sm"
+                  aria-label="AI Review"
                   onClick={() => setReviewPickerOpen(v => !v)}
                   disabled={loading}
                   title="AI Review"
-                  className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
                 >
                   <Eye className="w-3.5 h-3.5" />
-                </button>
+                </IconButton>
                 {reviewPickerOpen && (
                   <>
                     <div
@@ -344,84 +348,92 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
               </div>
             )}
             {pr.status === 'open' && (
-              <button
+              <IconButton
+                size="sm"
+                aria-label="Merge directly (skip review)"
                 onClick={handleMerge}
                 disabled={loading}
                 title="Merge directly (skip review)"
-                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
               >
                 <GitMerge className="w-3.5 h-3.5" />
-              </button>
+              </IconButton>
             )}
             {pr.status === 'approved' && (
-              <button
+              <IconButton
+                size="sm"
+                aria-label="Merge now"
                 onClick={handleMerge}
                 disabled={loading}
                 title="Merge now"
-                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
               >
                 <GitMerge className="w-3.5 h-3.5" />
-              </button>
+              </IconButton>
             )}
             {pr.status === 'conflict' && (
               <>
-                <button
+                <IconButton
+                  size="sm"
+                  aria-label="Retry merge"
                   onClick={handleMerge}
                   disabled={loading}
                   title="Retry merge"
-                  className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
                 >
                   <GitMerge className="w-3.5 h-3.5" />
-                </button>
-                <button
+                </IconButton>
+                <IconButton
+                  size="sm"
+                  aria-label="Resolve with AI"
                   onClick={handleResolveConflictWithAI}
                   disabled={loading}
                   title="Resolve with AI"
-                  className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
                 >
                   <Bot className="w-3.5 h-3.5" />
-                </button>
+                </IconButton>
               </>
             )}
             {pr.status === 'merging' && (
               <>
-                <button
+                <IconButton
+                  size="sm"
+                  aria-label="Cancel merge"
                   onClick={handleCancelMerge}
                   disabled={loading}
                   title="Cancel merge"
-                  className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
                 >
                   <XCircle className="w-3.5 h-3.5" />
-                </button>
-                <button
+                </IconButton>
+                <IconButton
+                  size="sm"
+                  aria-label="Cancel and retry"
                   onClick={handleCancelAndRetryMerge}
                   disabled={loading}
                   title="Cancel and retry"
-                  className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                </button>
+                </IconButton>
               </>
             )}
             {pr.status === 'merged' && (
-              <button
+              <IconButton
+                size="sm"
+                aria-label="Revert merge"
                 onClick={handleRevertMerged}
                 disabled={loading}
                 title="Revert merge"
-                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
               >
                 <Undo2 className="w-3.5 h-3.5" />
-              </button>
+              </IconButton>
             )}
             {pr.status === 'closed' && (
-              <button
+              <IconButton
+                size="sm"
+                aria-label="Reopen PR"
                 onClick={handleReopen}
                 disabled={loading}
                 title="Reopen PR"
-                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-              </button>
+              </IconButton>
             )}
             {!['merged', 'closed'].includes(pr.status) && (
               <button

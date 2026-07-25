@@ -3,6 +3,7 @@ import { ArrowUp, ChevronRight, Folder, Loader2 } from 'lucide-react';
 import type { DirectoryBrowseEntry } from '@zclaudia/shared';
 import { browseDirectories } from '../../services/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 
 interface DirectoryPickerModalProps {
@@ -72,13 +73,9 @@ export function DirectoryPickerModal({
       zClassName="z-[110]"
       footer={
         <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="h-7 rounded-xl px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-          >
-            Cancel
-          </button>
-          <button
+          <Button onClick={onClose}>Cancel</Button>
+          <Button
+            variant="primary"
             onClick={() => {
               if (currentPath) {
                 onSelect(currentPath);
@@ -86,10 +83,9 @@ export function DirectoryPickerModal({
               }
             }}
             disabled={!currentPath || loading}
-            className="h-7 rounded-xl bg-primary px-3 text-[13px] font-medium text-primary-foreground shadow-apple-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Use this folder
-          </button>
+          </Button>
         </div>
       }
     >

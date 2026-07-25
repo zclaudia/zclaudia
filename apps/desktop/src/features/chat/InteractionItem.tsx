@@ -32,6 +32,7 @@ import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { SavePlanAsIssueDialog } from './SavePlanAsIssueDialog';
 import { useChatActionsOptional } from './ChatActionsContext';
+import { Button } from '../../components/ui/Button';
 import { Toggle } from '../../components/ui/Toggle';
 
 const ALLOW_MESSAGE = 'Proceed with the plan above.';
@@ -366,13 +367,10 @@ function PromptRenderer({ interaction }: { interaction: InteractionPromptMessage
             {interaction.cancelLabel || 'Skip'}
           </button>
         )}
-        <button
-          onClick={handleSubmit}
-          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
+        <Button variant="primary" size="sm" onClick={handleSubmit}>
           <Send size={10} />
           {interaction.submitLabel || 'Submit'}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -431,13 +429,10 @@ function ApprovalRenderer({ interaction }: { interaction: ApprovalInteractionMes
           <ThumbsDown size={10} />
           {interaction.rejectLabel || 'Reject'}
         </button>
-        <button
-          onClick={() => handleDecision(true)}
-          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
+        <Button variant="primary" size="sm" onClick={() => handleDecision(true)}>
           <ThumbsUp size={10} />
           {interaction.approveLabel || 'Approve'}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -706,14 +701,10 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
           <ThumbsDown size={10} />
           Deny
         </button>
-        <button
-          onClick={handleApprove}
-          disabled={saving}
-          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
+        <Button variant="primary" size="sm" onClick={handleApprove} disabled={saving}>
           <ThumbsUp size={10} />
           Approve Plan
-        </button>
+        </Button>
       </div>
 
       {dialogOpen && (

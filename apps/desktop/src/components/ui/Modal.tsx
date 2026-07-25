@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { IconButton } from './Button';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { trapTab } from '../../utils/focusTrap';
 
@@ -108,13 +109,9 @@ export function Modal({
         {title && (
           <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
             <span className="truncate text-[13px] font-semibold text-foreground">{title}</span>
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            >
+            <IconButton aria-label="Close" onClick={onClose}>
               <X size={16} strokeWidth={1.75} />
-            </button>
+            </IconButton>
           </div>
         )}
         <div

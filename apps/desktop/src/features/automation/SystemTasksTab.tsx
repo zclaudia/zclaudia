@@ -3,6 +3,7 @@ import { Loader2, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
 import type { SystemTaskInfo } from '@zclaudia/shared';
 import type { AutomationApiType } from './useAutomationApi';
 import { formatInterval, CATEGORY_COLORS } from './automation-types';
+import { IconButton } from '../../components/ui/Button';
 import { LoadingState, EmptyState } from './AutomationSharedComponents';
 
 interface SystemTasksTabProps {
@@ -34,13 +35,9 @@ export function SystemTasksTab({ api }: SystemTasksTabProps) {
         <h2 className="text-sm font-medium text-muted-foreground">
           {tasks.length} system task{tasks.length !== 1 ? 's' : ''}
         </h2>
-        <button
-          onClick={refresh}
-          className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-          title="Refresh"
-        >
+        <IconButton onClick={refresh} title="Refresh" aria-label="Refresh">
           <RefreshCw size={14} />
-        </button>
+        </IconButton>
       </div>
       {tasks.length === 0 ? (
         <EmptyState message="No system tasks running" />

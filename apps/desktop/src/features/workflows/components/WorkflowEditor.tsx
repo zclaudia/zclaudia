@@ -27,8 +27,10 @@ import type { Node, Edge } from '@xyflow/react';
 import { isDesktopTauri } from '../../../utils/platform';
 import { openPopoutWindow } from '../../../utils/popoutWindow';
 import { useOwnershipStore } from '../../../stores/ownershipStore';
+import { IconButton } from '../../../components/ui/Button';
 import { FormField } from '../../../components/ui/FormField';
 import { Input } from '../../../components/ui/Input';
+import { SECTION_LABEL } from '../../../components/ui/typography';
 
 interface WorkflowEditorProps {
   workflow?: Workflow;
@@ -321,13 +323,14 @@ export function WorkflowEditor({
       <div className="border-b border-border">
         {!standalone && (
           <div className="flex items-center gap-2 px-3 py-2">
-            <button
+            <IconButton
+              size="sm"
+              aria-label="Back to Workflows"
               onClick={onBack}
-              className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground shrink-0"
               title="Back to Workflows"
             >
               <ArrowLeft size={14} />
-            </button>
+            </IconButton>
             <span className="text-xs text-muted-foreground">Dashboard</span>
             <span className="text-xs text-muted-foreground/60">/</span>
             <button
@@ -375,13 +378,13 @@ export function WorkflowEditor({
             </span>
           )}
           {!standalone && !readOnly && isDesktopTauri() && (
-            <button
+            <IconButton
+              aria-label="Open in new window"
               onClick={handlePopOut}
-              className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground shrink-0"
               title="Open in new window"
             >
               <ExternalLink size={14} />
-            </button>
+            </IconButton>
           )}
           {!readOnly && (
             <button
@@ -410,14 +413,14 @@ export function WorkflowEditor({
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setLeftPanelMode('toolbox')}
-                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wider transition-colors ${leftPanelMode === 'toolbox' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md transition-colors ${SECTION_LABEL} ${leftPanelMode === 'toolbox' ? 'bg-secondary !text-foreground' : 'hover:text-foreground'}`}
                 >
                   <Wrench size={10} />
                   Toolbox
                 </button>
                 <button
                   onClick={() => setLeftPanelMode('ai')}
-                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wider transition-colors ${leftPanelMode === 'ai' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md transition-colors ${SECTION_LABEL} ${leftPanelMode === 'ai' ? 'bg-secondary !text-foreground' : 'hover:text-foreground'}`}
                 >
                   <Sparkles size={10} />
                   AI
@@ -443,13 +446,14 @@ export function WorkflowEditor({
           </div>
         ) : !readOnly ? (
           <div className="w-8 border-r border-border flex flex-col items-center pt-2 shrink-0">
-            <button
+            <IconButton
+              size="sm"
+              aria-label="Expand panel"
               onClick={() => setLeftPanelOpen(true)}
-              className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
               title="Expand panel"
             >
               <PanelLeftOpen size={14} />
-            </button>
+            </IconButton>
           </div>
         ) : null}
 
@@ -473,9 +477,7 @@ export function WorkflowEditor({
             className={`w-72 border-l border-border overflow-y-auto p-3 bg-card/50 shrink-0 ${readOnly ? '[&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none [&_button:not([data-close])]:hidden' : ''}`}
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                {readOnly ? 'Details' : 'Config'}
-              </span>
+              <span className={SECTION_LABEL}>{readOnly ? 'Details' : 'Config'}</span>
               <button
                 data-close
                 onClick={() => {

@@ -3,6 +3,7 @@ import type { SupervisionTask } from '@zclaudia/shared';
 import * as api from '../../../services/api';
 import { useSupervisionStore } from '../store';
 import { useAndroidBack } from '../../../hooks/useAndroidBack';
+import { IconButton } from '../../../components/ui/Button';
 
 interface CreateTaskDialogProps {
   projectId: string;
@@ -106,10 +107,7 @@ export function CreateTaskDialog({
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
             <h2 className="text-base font-semibold">Create Task</h2>
-            <button
-              onClick={handleClose}
-              className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-            >
+            <IconButton size="sm" aria-label="Close" onClick={handleClose}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
@@ -118,7 +116,7 @@ export function CreateTaskDialog({
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-            </button>
+            </IconButton>
           </div>
 
           {/* Body */}

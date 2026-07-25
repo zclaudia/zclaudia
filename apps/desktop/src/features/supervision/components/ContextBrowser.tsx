@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 import * as api from '../../../services/api';
+import { IconButton } from '../../../components/ui/Button';
 
 interface ContextDocument {
   id: string;
@@ -62,14 +63,15 @@ export function ContextBrowser({ projectId }: ContextBrowserProps) {
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border flex-shrink-0">
         <h3 className="text-xs font-semibold uppercase text-muted-foreground">Context</h3>
-        <button
+        <IconButton
+          size="sm"
+          aria-label="Reload from disk"
           onClick={handleReload}
           disabled={loading}
-          className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground disabled:opacity-50"
           title="Reload from disk"
         >
           <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-        </button>
+        </IconButton>
       </div>
 
       {error && <div className="px-3 py-1 text-xs text-destructive">{error}</div>}

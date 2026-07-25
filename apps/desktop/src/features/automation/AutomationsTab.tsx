@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { EYEBROW } from '../../components/ui/typography';
+import { IconButton } from '../../components/ui/Button';
 import { Plus, RefreshCw, Play, Pause, Trash2, FolderOpen, Globe } from 'lucide-react';
 import type { Automation, Workflow, WorkflowStepTypeMeta } from '@zclaudia/shared';
 import type { AutomationApiType } from './useAutomationApi';
@@ -191,13 +192,9 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
             <Plus size={12} />
             New
           </button>
-          <button
-            onClick={refresh}
-            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-            title="Refresh"
-          >
+          <IconButton onClick={refresh} title="Refresh" aria-label="Refresh">
             <RefreshCw size={14} />
-          </button>
+          </IconButton>
         </div>
       </div>
 
@@ -423,20 +420,16 @@ function AutomationCard({
         </div>
       </div>
       <div className="flex items-center gap-1">
-        <button
-          onClick={onTrigger}
-          className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-          title="Run now"
-        >
+        <IconButton onClick={onTrigger} title="Run now" aria-label="Run now">
           <Play size={12} />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           onClick={onToggle}
-          className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
           title={item.enabled ? 'Disable' : 'Enable'}
+          aria-label={item.enabled ? 'Disable' : 'Enable'}
         >
           {item.enabled ? <Pause size={12} /> : <Play size={12} />}
-        </button>
+        </IconButton>
         <button
           onClick={onDelete}
           className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400"

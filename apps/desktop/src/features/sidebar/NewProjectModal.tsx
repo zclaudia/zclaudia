@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FolderOpen } from 'lucide-react';
+import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
 import { DirectoryPickerModal } from './DirectoryPickerModal';
@@ -57,19 +58,10 @@ export function NewProjectModal({
 
   const footer = (
     <div className="flex justify-end gap-2">
-      <button
-        onClick={onClose}
-        className="h-7 rounded-xl px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-      >
-        Cancel
-      </button>
-      <button
-        onClick={submit}
-        disabled={!canCreate}
-        className="h-7 rounded-xl bg-primary px-3 text-[13px] font-medium text-primary-foreground shadow-apple-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
-      >
+      <Button onClick={onClose}>Cancel</Button>
+      <Button variant="primary" onClick={submit} disabled={!canCreate}>
         {creatingProject ? 'Creating…' : 'Create'}
-      </button>
+      </Button>
     </div>
   );
 

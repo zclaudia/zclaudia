@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Loader2, RefreshCw, ArrowLeft } from 'lucide-react';
 import type { Workflow, WorkflowRun, WorkflowStepRun } from '@zclaudia/shared';
 import { StepRunCard, RunStatusBadge, formatDuration } from '../workflows/components/RunComponents';
+import { IconButton } from '../../components/ui/Button';
 import type { AutomationApiType } from './useAutomationApi';
 
 interface RunsTabProps {
@@ -68,13 +69,9 @@ export function RunsTab({ api, projectId }: RunsTabProps) {
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold">Run History</h2>
         <div className="flex items-center gap-2">
-          <button
-            onClick={refresh}
-            disabled={loading}
-            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-          >
+          <IconButton aria-label="Refresh" onClick={refresh} disabled={loading}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          </button>
+          </IconButton>
         </div>
       </div>
 

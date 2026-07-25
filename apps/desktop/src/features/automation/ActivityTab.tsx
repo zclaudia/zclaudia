@@ -10,6 +10,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, Repeat } from 'lucide-react';
 import type { WorkflowStepTypeMeta } from '@zclaudia/shared';
 import type { AutomationApiType } from './useAutomationApi';
+import { IconButton } from '../../components/ui/Button';
 import { LoadingState, EmptyState } from './AutomationSharedComponents';
 
 interface ActivityTabProps {
@@ -54,14 +55,9 @@ export function ActivityTab({ api }: ActivityTabProps) {
         <h2 className="text-sm font-medium text-muted-foreground">
           {activities.length} activit{activities.length !== 1 ? 'ies' : 'y'}
         </h2>
-        <button
-          onClick={refresh}
-          className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-          title="Refresh"
-          aria-label="Refresh"
-        >
+        <IconButton onClick={refresh} title="Refresh" aria-label="Refresh">
           <RefreshCw size={14} />
-        </button>
+        </IconButton>
       </div>
 
       {activities.length === 0 ? (

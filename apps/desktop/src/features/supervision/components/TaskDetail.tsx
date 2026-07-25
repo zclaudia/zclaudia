@@ -5,6 +5,7 @@ import { useSupervisionStore } from '../store';
 import { useAndroidBack } from '../../../hooks/useAndroidBack';
 import { taskStatusStyle, ACTION_BUTTON } from './statusStyles';
 import { EYEBROW } from '../../../components/ui/typography';
+import { IconButton } from '../../../components/ui/Button';
 
 interface TaskDetailProps {
   task: SupervisionTask;
@@ -38,12 +39,9 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
           </span>
           <h3 className="text-sm font-semibold truncate">{task.title}</h3>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground shrink-0"
-        >
+        <IconButton size="sm" aria-label="Close" onClick={onClose}>
           <X size={16} />
-        </button>
+        </IconButton>
       </div>
 
       {/* Body */}
