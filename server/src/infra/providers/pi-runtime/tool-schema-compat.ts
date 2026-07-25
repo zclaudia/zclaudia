@@ -1,9 +1,16 @@
+import type { LlmModelDialect } from '@zclaudia/shared/core/llm-profile';
+
 interface ToolSchemaModel {
   id?: string;
   provider: string;
   baseUrl: string;
-  /** Stamped by buildModel from LlmProfileModelEntry.dialect / registry inherit. */
-  dialect?: unknown;
+  /**
+   * Stamped by buildModel (typed there as `Model & { dialect?: LlmModelDialect }`)
+   * from LlmProfileModelEntry.dialect / registry inherit. Declaring the same
+   * type on the reader keeps the cross-module contract honest at both ends
+   * instead of passing through `unknown` + a runtime string check.
+   */
+  dialect?: LlmModelDialect;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -110,7 +117,7 @@ export function usesMoonshotToolSchemaFlavor(model: ToolSchemaModel): boolean {
   // An explicit dialect is authoritative in both directions: 'moonshotai'
   // forces normalization on, anything else (incl. 'openai') forces it off —
   // heuristics below only apply when no dialect was resolved.
-  if (typeof model.dialect === 'string' && model.dialect.length > 0) {
+  if (model.dialect) {
     return model.dialect === 'moonshotai';
   }
 
