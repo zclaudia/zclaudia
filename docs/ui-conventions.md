@@ -36,7 +36,8 @@ other chrome icon stay monochrome lucide.
 
 - List rows: `h-7 px-2 text-sm rounded-md`, hover `hover:bg-secondary hover:text-foreground`. Applies to file-tree-style navigation lists; other chrome rows adopt the label/token rules without a mandatory row-height change.
 - Section labels: `text-[11px] font-medium text-muted-foreground`, sentence case —
-  never `uppercase` + `tracking-*`.
+  never `uppercase` + `tracking-*`. Use the `SECTION_LABEL` constant from
+  `src/components/ui/typography.ts` instead of hand-rolling the classes.
 - Muted micro-text uses exactly two opacity steps: `text-muted-foreground` and
   `text-muted-foreground/60`.
 - Nested sub-section labels (a group heading inside a panel that already has its own
@@ -64,3 +65,30 @@ Rules the generator enforces per theme: every neutral sits on the theme's single
 hue axis (light 45°, dark 35°, dark-warm 30°, dark-cool 225°); the surface ladder
 is `sidebar < background < card (= popover)`; WCAG contrast floors (7:1 body text,
 4.5:1 muted text and all solid-fill foreground pairs).
+
+## 7. Use the primitives
+
+New chrome must compose the shared primitives in `src/components/ui/` instead of
+hand-rolling their recipes:
+
+- **Button / IconButton** (`Button.tsx`) — every plain-text or icon-only control.
+  One radius, one disabled treatment, focus-visible ring built in.
+- **DropdownMenu** (`DropdownMenu.tsx`) — action menus. Never hand-roll a
+  document-mousedown or `fixed inset-0` click-shield menu again; the primitive
+  provides Escape, arrow-key roving, focus return, and viewport clamping.
+- **Tooltip** (`Tooltip.tsx`) — hover/focus hints. Native `title=` attributes are
+  slow, unstyled, and invisible to keyboard users; don't add new ones in chrome.
+- **Tone map** (`tone.ts`) — every status color. `TONE_TEXT` / `TONE_BADGE` /
+  `TONE_DOT` keyed by semantic tone; never a raw palette badge map per feature.
+- **Select / Modal / Input (`FIELD_CLASS`) / Toggle / FormField** — as before.
+
+## 8. Desktop chrome details
+
+- Chrome text is not selectable: `<button>` gets `user-select: none` globally;
+  put `select-none` on any non-button clickable chrome.
+- Layering uses the config tokens `z-dropdown` (60) < `z-modal` (100) <
+  `z-nested` (110). Don't invent per-file arbitrary `z-[…]` values.
+- Micro text uses the `text-2xs` (11px) / `text-3xs` (10px) tokens; there is no
+  9px tier and no fractional sizes.
+- The default WebView context menu is suppressed in production builds
+  (see `src/main.tsx`); editable fields and real selections keep it.

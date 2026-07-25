@@ -1,9 +1,11 @@
-import { SquareStack, ChevronsRight, ChevronsLeft } from 'lucide-react';
+import { SquareStack, ChevronsRight, ChevronsLeft, ChevronLeft, Menu, Bell } from 'lucide-react';
 import { emit as emitTauri } from '@tauri-apps/api/event';
 import { NOTCH_EVENT } from '../services/notchBridge';
 import { openWindowManagerWindow } from '../utils/windowManagerWindow';
 import { ServerSelector } from '../features/settings/ServerSelector';
 import { BrandMark } from '../components/BrandMark';
+import { IconButton } from '../components/ui/Button';
+import { Tooltip } from '../components/ui/Tooltip';
 import { PluginWindowButtons } from './PluginDock';
 
 interface AppHeaderProps {
@@ -34,20 +36,14 @@ export function AppHeader({
     >
       {/* Left section: Logo and app name */}
       <div className="flex items-center gap-2 md:gap-3 flex-shrink-0" data-tauri-drag-region>
+        {/* Mobile buttons keep the larger touch target (p-2) instead of IconButton's 28px. */}
         {isMobile && isAgentExpanded ? (
           <button
             onClick={onCloseAgent}
             className="p-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex-shrink-0"
             aria-label="Close agent"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
+            <ChevronLeft size={20} strokeWidth={1.75} />
           </button>
         ) : isMobile ? (
           <button
@@ -55,19 +51,12 @@ export function AppHeader({
             className="p-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex-shrink-0"
             aria-label="Open menu"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
+            <Menu size={20} strokeWidth={1.75} />
           </button>
         ) : null}
 
         <div className="hidden md:flex items-center gap-2" data-tauri-drag-region>
-          <div className="w-7 h-7 rounded-xl border border-border/70 bg-card/80 dark:bg-white/5 dark:border-white/10 shadow-sm backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+          <div className="w-7 h-7 rounded-xl border border-border/70 bg-card/80 shadow-apple-sm backdrop-blur-sm flex items-center justify-center flex-shrink-0">
             <BrandMark className="w-[1.625rem] h-[1.625rem] object-contain pointer-events-none select-none drop-shadow-sm" />
           </div>
           <span
@@ -79,17 +68,19 @@ export function AppHeader({
         </div>
 
         {!isMobile && (
-          <button
-            onClick={onToggleSidebar}
-            className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground ml-2"
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {sidebarCollapsed ? (
-              <ChevronsRight size={16} strokeWidth={2} />
-            ) : (
-              <ChevronsLeft size={16} strokeWidth={2} />
-            )}
-          </button>
+          <Tooltip content={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+            <IconButton
+              onClick={onToggleSidebar}
+              className="ml-2"
+              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {sidebarCollapsed ? (
+                <ChevronsRight size={16} strokeWidth={1.75} />
+              ) : (
+                <ChevronsLeft size={16} strokeWidth={1.75} />
+              )}
+            </IconButton>
+          </Tooltip>
         )}
       </div>
 
@@ -101,40 +92,33 @@ export function AppHeader({
           <>
             <ServerSelector />
             {!disableNotifications && (
-              <div className="relative">
-                <button
+              <Tooltip content="Notifications">
+                <IconButton
                   onClick={() => {
                     void emitTauri(NOTCH_EVENT.toggle, {});
                   }}
-                  className="relative p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-                  title="Notifications"
+                  className="relative"
+                  aria-label="Notifications"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                    />
-                  </svg>
+                  <Bell size={16} strokeWidth={1.75} />
                   {notificationUnreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center bg-muted/60 text-primary-foreground text-[9px] font-medium rounded-full px-0.5">
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center bg-primary text-primary-foreground text-[10px] font-medium rounded-full px-0.5">
                       {notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}
                     </span>
                   )}
-                </button>
-              </div>
+                </IconButton>
+              </Tooltip>
             )}
-            <button
-              onClick={() => {
-                void openWindowManagerWindow();
-              }}
-              className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-              title="Windows"
-              aria-label="Open window manager"
-            >
-              <SquareStack size={16} strokeWidth={1.75} />
-            </button>
+            <Tooltip content="Windows">
+              <IconButton
+                onClick={() => {
+                  void openWindowManagerWindow();
+                }}
+                aria-label="Open window manager"
+              >
+                <SquareStack size={16} strokeWidth={1.75} />
+              </IconButton>
+            </Tooltip>
           </>
         )}
       </div>

@@ -57,7 +57,7 @@ describe('ItemCard', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
-    expect(screen.getByRole('menu')).toHaveClass('top-full', 'right-0', 'mt-1');
+    expect(screen.getByRole('menu')).toHaveClass('fixed');
     fireEvent.click(screen.getByRole('menuitem', { name: 'Set as default agent' }));
 
     expect(onSetDefault).toHaveBeenCalledTimes(1);

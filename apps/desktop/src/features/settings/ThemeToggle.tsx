@@ -1,4 +1,3 @@
-import { useState, useRef, useEffect } from 'react';
 import { useTheme, isDarkTheme, type Theme } from '../../contexts/ThemeContext';
 import {
   Sun,
@@ -11,6 +10,7 @@ import {
   ChevronDown,
   type LucideIcon,
 } from 'lucide-react';
+import { DropdownMenu, type DropdownMenuEntry } from '../../components/ui/DropdownMenu';
 
 const THEME_OPTIONS: { value: Theme; label: string; icon: LucideIcon }[] = [
   { value: 'light', label: 'Light', icon: Sun },
@@ -30,74 +30,48 @@ function getButtonIcon(theme: Theme, resolvedTheme: string): LucideIcon {
 
 export function ThemeToggle() {
   const { theme, resolvedTheme, setTheme } = useTheme();
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const currentOption = THEME_OPTIONS.find(opt => opt.value === theme) || THEME_OPTIONS[5];
   const ButtonIcon = getButtonIcon(theme, resolvedTheme);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [isOpen]);
+  const entries: DropdownMenuEntry[] = THEME_OPTIONS.map(option => {
+    const OptionIcon = option.icon;
+    const active = theme === option.value;
+    return {
+      key: option.value,
+      label: (
+        <span className={`flex items-center gap-2 ${active ? 'text-primary' : ''}`}>
+          <span className="flex-1">{option.label}</span>
+          {active && <Check size={12} className="ml-auto" />}
+        </span>
+      ),
+      icon: <OptionIcon size={14} strokeWidth={1.75} />,
+      onSelect: () => setTheme(option.value),
+    };
+  });
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`
-          flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all
-          ${
-            isOpen
+    <DropdownMenu
+      entries={entries}
+      align="end"
+      ariaLabel="Theme"
+      panelClassName="w-44"
+      trigger={({ ref, props, open }) => (
+        <button
+          ref={ref}
+          {...props}
+          aria-label="Change theme"
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
+            open
               ? 'bg-card text-foreground shadow-apple-sm'
               : 'bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary'
-          }
-        `}
-        title="Change theme"
-      >
-        <ButtonIcon size={14} strokeWidth={1.75} />
-        <span className="hidden sm:inline">{currentOption.label}</span>
-        <ChevronDown size={12} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {/* Dropdown menu */}
-      {isOpen && (
-        <div className="absolute top-full right-0 mt-1 w-44 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl z-50 overflow-hidden animate-apple-fade-in">
-          {THEME_OPTIONS.map(option => {
-            const OptionIcon = option.icon;
-            return (
-              <button
-                key={option.value}
-                onClick={() => {
-                  setTheme(option.value);
-                  setIsOpen(false);
-                }}
-                className={`
-                  w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors
-                  ${
-                    theme === option.value
-                      ? 'bg-muted/60 text-primary'
-                      : 'text-popover-foreground hover:bg-muted'
-                  }
-                `}
-              >
-                <OptionIcon size={14} strokeWidth={1.75} />
-                <span>{option.label}</span>
-                {theme === option.value && <Check size={12} className="ml-auto" />}
-              </button>
-            );
-          })}
-        </div>
+          }`}
+        >
+          <ButtonIcon size={14} strokeWidth={1.75} />
+          <span className="hidden sm:inline">{currentOption.label}</span>
+          <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
       )}
-    </div>
+    />
   );
 }

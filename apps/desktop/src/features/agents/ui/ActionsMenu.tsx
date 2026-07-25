@@ -1,5 +1,6 @@
-import { useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
+import { IconButton } from '../../../components/ui/Button';
+import { DropdownMenu } from '../../../components/ui/DropdownMenu';
 
 export interface ActionsMenuAction {
   label: string;
@@ -8,8 +9,9 @@ export interface ActionsMenuAction {
   disabled?: boolean;
 }
 
-/** The "⋯" dropdown used on library cards and editor headers. The parent
- *  controls positioning — this renders as an inline relative container. */
+/** The "⋯" dropdown used on library cards and editor headers. Built on the
+ *  DropdownMenu primitive, which supplies Escape/arrow-key handling, focus
+ *  return, and viewport clamping. */
 export function ActionsMenu({
   actions,
   ariaLabel = 'More actions',
@@ -17,48 +19,22 @@ export function ActionsMenu({
   actions: ActionsMenuAction[];
   ariaLabel?: string;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <div className="relative">
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen(open => !open)}
-        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
-      >
-        <MoreHorizontal size={16} strokeWidth={1.75} />
-      </button>
-      {menuOpen && (
-        <>
-          <div className="fixed inset-0 z-[70]" onClick={() => setMenuOpen(false)} />
-          <div
-            role="menu"
-            className="absolute right-0 top-full z-[80] mt-1 min-w-48 overflow-hidden rounded-md border border-border bg-popover py-1 shadow-md"
-          >
-            {actions.map(action => (
-              <button
-                key={action.label}
-                role="menuitem"
-                type="button"
-                disabled={action.disabled}
-                onClick={() => {
-                  setMenuOpen(false);
-                  action.onSelect();
-                }}
-                className={`flex w-full px-3 py-1.5 text-left text-xs hover:bg-secondary disabled:pointer-events-none disabled:opacity-50 ${
-                  action.destructive
-                    ? 'text-destructive hover:bg-destructive/10'
-                    : 'text-foreground'
-                }`}
-              >
-                {action.label}
-              </button>
-            ))}
-          </div>
-        </>
+    <DropdownMenu
+      align="end"
+      ariaLabel={ariaLabel}
+      entries={actions.map(action => ({
+        key: action.label,
+        label: action.label,
+        onSelect: action.onSelect,
+        disabled: action.disabled,
+        destructive: action.destructive,
+      }))}
+      trigger={({ ref, props }) => (
+        <IconButton ref={ref} {...props} aria-label={ariaLabel}>
+          <MoreHorizontal size={16} strokeWidth={1.75} />
+        </IconButton>
       )}
-    </div>
+    />
   );
 }
