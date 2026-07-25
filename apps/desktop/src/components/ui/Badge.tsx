@@ -2,7 +2,7 @@ type BadgeTone = 'accent' | 'neutral' | 'success';
 
 const TONE: Record<BadgeTone, string> = {
   accent: 'bg-primary/10 text-primary',
-  neutral: 'bg-secondary text-muted-foreground border border-border/60',
+  neutral: 'bg-secondary text-muted-foreground',
   success: 'bg-success/15 text-success',
 };
 
@@ -17,7 +17,7 @@ export function Badge({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${TONE[tone]}`}
+      className={`inline-flex h-5 items-center gap-1 rounded-full px-2 text-2xs ${TONE[tone]}`}
     >
       {online !== undefined && (
         <span

@@ -1576,7 +1576,7 @@ function ProviderTypeSelector({
         <div
           role="listbox"
           aria-label="Provider Type"
-          className="absolute left-0 right-0 top-full mt-1 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden"
+          className="absolute right-0 top-full mt-1 min-w-full w-max max-w-[19rem] bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden"
         >
           {PROVIDER_TYPE_OPTIONS.map((opt, index) => (
             <button
@@ -1590,7 +1590,7 @@ function ProviderTypeSelector({
               tabIndex={-1}
               onClick={() => selectOption(index)}
               onKeyDown={e => handleOptionKeyDown(e, index)}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left whitespace-nowrap transition-colors ${
                 opt.value === value
                   ? 'text-primary font-medium bg-muted/40'
                   : 'text-foreground hover:bg-secondary/80'

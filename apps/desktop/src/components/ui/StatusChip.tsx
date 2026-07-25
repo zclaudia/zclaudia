@@ -45,7 +45,7 @@ export function StatusChip({
   return (
     <span
       title={label}
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] ${CHIP_CLASS[chip]} ${className}`.trim()}
+      className={`inline-flex h-5 items-center rounded-full px-2 text-2xs ${CHIP_CLASS[chip]} ${className}`.trim()}
     >
       {label}
     </span>

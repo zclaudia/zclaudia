@@ -12,9 +12,9 @@ export function SaveStateIndicator({
     return (
       <span
         data-testid="save-state"
-        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+        className="inline-flex h-5 items-center gap-1 text-2xs text-muted-foreground"
       >
-        <Loader2 size={13} strokeWidth={1.75} className="animate-spin" />
+        <Loader2 size={12} strokeWidth={1.75} className="animate-spin" />
         Saving…
       </span>
     );
@@ -24,9 +24,9 @@ export function SaveStateIndicator({
       <span
         data-testid="save-state"
         title="Complete the required fields to save"
-        className="inline-flex items-center gap-1.5 text-xs text-warning"
+        className="inline-flex h-5 items-center gap-1 text-2xs text-warning"
       >
-        <Circle size={13} strokeWidth={1.75} />
+        <Circle size={12} strokeWidth={1.75} />
         Not saved
       </span>
     );
@@ -35,9 +35,9 @@ export function SaveStateIndicator({
     return (
       <span
         data-testid="save-state"
-        className="inline-flex items-center gap-1.5 text-xs text-destructive"
+        className="inline-flex h-5 items-center gap-1 text-2xs text-destructive"
       >
-        <AlertCircle size={13} strokeWidth={1.75} />
+        <AlertCircle size={12} strokeWidth={1.75} />
         Save failed
         <button
           type="button"
@@ -52,9 +52,9 @@ export function SaveStateIndicator({
   return (
     <span
       data-testid="save-state"
-      className="inline-flex items-center gap-1.5 text-xs text-success"
+      className="inline-flex h-5 items-center gap-1 text-2xs text-success"
     >
-      <Check size={13} strokeWidth={1.75} />
+      <Check size={12} strokeWidth={1.75} />
       Saved
     </span>
   );
