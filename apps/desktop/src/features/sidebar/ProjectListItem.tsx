@@ -4,10 +4,12 @@ import {
   FolderOpen,
   ChevronDown,
   ChevronRight,
+  MoreVertical,
   Plus,
   Settings,
   Trash2,
 } from 'lucide-react';
+import { SECTION_LABEL } from '../../components/ui/typography';
 import { isDesktopTauri } from '../../utils/platform';
 import { SessionItem } from './SessionItem';
 import { WorktreeGroupItem } from './WorktreeGroupItem';
@@ -274,19 +276,7 @@ export function ProjectListItem({
           className={menuButtonClass}
           aria-label="Project menu"
         >
-          <svg
-            className="w-3.5 h-3.5 text-muted-foreground"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-            />
-          </svg>
+          <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.75} />
         </button>
         {/* New session — placed last */}
         <button
@@ -366,25 +356,14 @@ export function ProjectListItem({
                 onClick={onToggleRegularSessions}
                 className="w-full flex items-center gap-1.5 px-2 py-1 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
               >
-                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-                  Sessions
-                </span>
+                <span className={SECTION_LABEL}>Sessions</span>
                 <span className="text-[10px] text-muted-foreground/50">
                   {regularSessions.length}
                 </span>
-                <svg
+                <ChevronRight
                   className={`ml-auto w-2.5 h-2.5 opacity-40 transition-transform duration-200 ${!regularSessionsCollapsed ? 'rotate-90' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
+                  strokeWidth={1.75}
+                />
               </button>
               {!regularSessionsCollapsed && <div className="mt-0.5">{renderRegularSessions()}</div>}
             </div>

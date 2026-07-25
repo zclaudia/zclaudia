@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Clock, Lock, TriangleAlert } from 'lucide-react';
 import { parseToolRule, suggestRuleForRequest } from '@zclaudia/shared';
 import { PermissionDetailView } from './PermissionDetailView';
 
@@ -147,33 +148,9 @@ export function PermissionModal({ request, queueSize = 0, onDecision }: Permissi
                 }`}
               >
                 {request.requiresCredential ? (
-                  <svg
-                    className="w-5 h-5 text-amber-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
-                  </svg>
+                  <Lock className="w-5 h-5 text-warning" strokeWidth={1.75} />
                 ) : (
-                  <svg
-                    className="w-5 h-5 text-warning"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
-                  </svg>
+                  <TriangleAlert className="w-5 h-5 text-warning" strokeWidth={1.75} />
                 )}
               </div>
               <div className="flex-1">
@@ -245,19 +222,7 @@ export function PermissionModal({ request, queueSize = 0, onDecision }: Permissi
 
             {/* Timeout warning - show different message based on timeout setting */}
             <div className="mt-3 flex items-center gap-2 text-sm">
-              <svg
-                className="w-4 h-4 text-warning"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+              <Clock className="w-4 h-4 text-warning" strokeWidth={1.75} />
               {hasTimeout ? (
                 <span className="text-muted-foreground">
                   {request.aiInitiated ? 'Auto-approve in' : 'Auto-deny in'}{' '}

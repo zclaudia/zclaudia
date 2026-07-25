@@ -85,10 +85,10 @@ function ThinkingBlock({ content }: { content: string }) {
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1.5 w-full px-3 py-1.5 text-thinking hover:text-foreground transition-colors"
       >
-        <Brain size={14} strokeWidth={1.5} className="flex-shrink-0" />
+        <Brain size={14} strokeWidth={1.75} className="flex-shrink-0" />
         <ChevronRight
           size={12}
-          strokeWidth={2}
+          strokeWidth={1.75}
           className={`transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`}
         />
         <span className="font-medium">Thinking</span>
@@ -135,10 +135,10 @@ function ThinkingBlocksCard({ blocks }: { blocks: ThinkingBlockMeta[] }) {
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1.5 w-full px-3 py-1.5 text-thinking hover:text-foreground transition-colors"
       >
-        <Brain size={14} strokeWidth={1.5} className="flex-shrink-0" />
+        <Brain size={14} strokeWidth={1.75} className="flex-shrink-0" />
         <ChevronRight
           size={12}
-          strokeWidth={2}
+          strokeWidth={1.75}
           className={`transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`}
         />
         <span className="font-medium">Thinking</span>
@@ -611,7 +611,7 @@ const CodeBlock = memo(function CodeBlock({
           >
             {copied ? (
               <>
-                <Check size={16} strokeWidth={2} />
+                <Check size={16} strokeWidth={1.75} />
                 Copied!
               </>
             ) : (
@@ -698,7 +698,7 @@ function AttachmentDisplay({ attachment }: { attachment: MessageAttachment }) {
       >
         <div className="flex items-center justify-center h-24 text-muted-foreground">
           <div className="text-center">
-            <Image size={32} strokeWidth={1.5} className="mx-auto mb-1 opacity-50" />
+            <Image size={32} strokeWidth={1.75} className="mx-auto mb-1 opacity-50" />
             <div className="text-xs">
               {error ? 'Load failed — click to retry' : 'Click to load image'}
             </div>
@@ -734,7 +734,7 @@ function CollapsedTextBlock({ content }: { content: string }) {
       >
         <ChevronRight
           size={12}
-          strokeWidth={2}
+          strokeWidth={1.75}
           className={`transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`}
         />
         <span className="truncate text-left">{preview || '...'}</span>
@@ -905,7 +905,7 @@ function MessageActionsMenu({
         title="Message actions"
         aria-label="Message actions"
       >
-        <MoreHorizontal size={14} strokeWidth={1.5} />
+        <MoreHorizontal size={14} strokeWidth={1.75} />
       </button>
 
       {open && (
@@ -920,7 +920,7 @@ function MessageActionsMenu({
               onFork(treeEntryId);
             }}
           >
-            <GitFork size={14} strokeWidth={1.5} className="flex-shrink-0 text-muted-foreground" />
+            <GitFork size={14} strokeWidth={1.75} className="flex-shrink-0 text-muted-foreground" />
             <span>Fork into new session</span>
           </button>
           <button
@@ -938,7 +938,7 @@ function MessageActionsMenu({
           >
             <GitBranch
               size={14}
-              strokeWidth={1.5}
+              strokeWidth={1.75}
               className="flex-shrink-0 text-muted-foreground"
             />
             <span>Branch from here (rewind)</span>

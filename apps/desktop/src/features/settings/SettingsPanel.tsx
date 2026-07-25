@@ -6,6 +6,8 @@ import {
   type MouseEvent as ReactMouseEvent,
   type TouchEvent as ReactTouchEvent,
 } from 'react';
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { IconButton } from '../../components/ui/Button';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useConnection } from '../../contexts/ConnectionContext';
@@ -148,14 +150,7 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
     >
       <span className="text-muted-foreground">{tab.icon}</span>
       <span className="flex-1 text-sm text-left">{tab.label}</span>
-      <svg
-        className="w-4 h-4 text-muted-foreground"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-      </svg>
+      <ChevronRight className="w-4 h-4 text-muted-foreground" strokeWidth={1.75} />
     </button>
   );
 
@@ -170,7 +165,7 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
       {isMobile && (
         <div className="flex items-center justify-between px-3 py-3 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-2">
-            <button
+            <IconButton
               onClick={() => {
                 if (mobileShowContent) {
                   setMobileShowContent(false);
@@ -178,17 +173,10 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                   onClose();
                 }
               }}
-              className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+              aria-label="Back"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-            </button>
+              <ChevronLeft className="w-5 h-5" strokeWidth={1.75} />
+            </IconButton>
             <h2 className="text-lg font-semibold">
               {mobileShowContent
                 ? tabs.find(t => t.id === activeTab)?.label || 'Settings'
@@ -228,30 +216,14 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                   onClick={onClose}
                   className="flex items-center gap-1.5 mt-1 mb-2 px-3 py-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
+                  <ChevronLeft className="w-4 h-4" strokeWidth={1.75} />
                   <span className="text-sm">Back to app</span>
                 </button>
                 <div className="relative mb-2">
-                  <svg
+                  <Search
                     className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"
-                    />
-                  </svg>
+                    strokeWidth={1.75}
+                  />
                   <input
                     type="text"
                     value={navQuery}
