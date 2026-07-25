@@ -27,12 +27,14 @@ zclaudia/
 | Gateway  | 3200         | `GATEWAY_PORT`                   |                                                                                                  |
 | Vite dev | 1420         | -                                | hardcoded, `strictPort: true`                                                                    |
 
-| Env Var             | Used By         | Purpose                                           |
-| ------------------- | --------------- | ------------------------------------------------- |
-| `ZCLAUDIA_DATA_DIR` | server, gateway | Override data directory (default: `~/.zclaudia/`) |
-| `GATEWAY_URL`       | server          | WebSocket URL to connect to gateway               |
-| `GATEWAY_SECRET`    | server, gateway | Shared secret for gateway auth                    |
-| `GATEWAY_NAME`      | server          | Backend display name on gateway                   |
+| Env Var                               | Used By         | Purpose                                                           |
+| ------------------------------------- | --------------- | ----------------------------------------------------------------- |
+| `ZCLAUDIA_DATA_DIR`                   | server, gateway | Override data directory (default: `~/.zclaudia/`)                 |
+| `GATEWAY_URL`                         | server          | WebSocket URL to connect to gateway                               |
+| `GATEWAY_SECRET`                      | server, gateway | Shared secret for gateway auth                                    |
+| `GATEWAY_NAME`                        | server          | Backend display name on gateway                                   |
+| `ZCLAUDIA_TRUSTED_RUNTIME_PUBLISHERS` | server          | Comma-separated publishers trusted for managed CLI auto-install   |
+| `ZCLAUDIA_RUNTIME_MIRROR_ORIGINS`     | server          | Exact enterprise mirror origins allowed for managed CLI downloads |
 
 ## Server (`server/`)
 
@@ -43,6 +45,8 @@ zclaudia/
   - Upgrading across schema migration 003 (LLM profile models): `rm ~/.zclaudia/data.db` once before next start — the `agent_profiles.context_window` column is dropped and the override moves to `llm_profile.models[*].contextWindow`.
   - Upgrading across migration 030 (orchestration model): `rm ~/.zclaudia/data.db` once before next start — the run tables are rebuilt and triggers move from workflows into the new `automations` table.
 - File storage: `~/.zclaudia/files/`
+- Managed Agent CLI store and plugin references: `~/.zclaudia/runtime-store/` and
+  `~/.zclaudia/runtime-refs/`; see `docs/managed-runtimes.md`
 - Gateway client (`server/src/gateway-client.ts`): connects to gateway, registers as backend, infinite reconnect with exponential backoff (5s base, 60s cap)
 - `PORT=0` support: outputs `SERVER_READY:<port>` to stdout for parent process discovery
 

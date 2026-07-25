@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PluginInstance, PluginManifest } from '@zclaudia/shared/plugin-types';
 import type { PluginLoader } from '../loader.js';
 import { PluginPackageError, PluginPackageService } from '../package-service.js';
@@ -59,15 +59,18 @@ describe('PluginPackageService', () => {
   let loader: FakeLoader;
   let service: PluginPackageService;
   let now: Date;
+  let releasePluginReference: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     dataDir = await mkdtemp(path.join(os.tmpdir(), 'zclaudia-package-service-'));
     loader = new FakeLoader(dataDir);
     now = new Date('2026-07-21T00:00:00.000Z');
+    releasePluginReference = vi.fn(async () => {});
     service = new PluginPackageService({
       dataDir,
       loader: loader as unknown as PluginLoader,
       now: () => now,
+      managedRuntimeReferences: { releasePluginReference },
     });
   });
 
@@ -80,7 +83,10 @@ describe('PluginPackageService', () => {
     main = 'export const version = 1;',
     extras: ZipEntrySpec[] = []
   ) {
-    const archive = path.join(dataDir, `plugin-${version}-${Math.random().toString(36).slice(2)}.zplugin`);
+    const archive = path.join(
+      dataDir,
+      `plugin-${version}-${Math.random().toString(36).slice(2)}.zplugin`
+    );
     const built = buildZip([
       { name: 'plugin.json', data: JSON.stringify(manifest(version)) },
       { name: 'dist/main.js', data: main },
@@ -130,6 +136,9 @@ describe('PluginPackageService', () => {
     expect(await readActiveVersion()).toBe('1.0.0');
 
     await service.uninstallPlugin('com.test.package');
+    expect(releasePluginReference).toHaveBeenCalledTimes(2);
+    expect(releasePluginReference).toHaveBeenCalledWith('com.test.package', '1.0.0');
+    expect(releasePluginReference).toHaveBeenCalledWith('com.test.package', '2.0.0');
     expect(loader.getPlugin('com.test.package')).toBeUndefined();
     await expect(
       readFile(path.join(dataDir, 'plugins', 'com.test.package', 'plugin.json'))

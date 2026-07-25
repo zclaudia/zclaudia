@@ -1,4 +1,5 @@
 export * from './permissions.js';
+export * from './managed-runtimes.js';
 export * from './capabilities.js';
 export * from './tools.js';
 export * from './contributions.js';

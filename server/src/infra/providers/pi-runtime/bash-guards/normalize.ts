@@ -212,7 +212,10 @@ export function optionValue(words: string[], names: string[]): string | undefine
   return undefined;
 }
 
-export function nonOptionOperands(words: string[], skipOptionArgs: Set<string> = new Set()): string[] {
+export function nonOptionOperands(
+  words: string[],
+  skipOptionArgs: Set<string> = new Set()
+): string[] {
   const operands: string[] = [];
   for (let i = 1; i < words.length; i++) {
     const word = words[i];

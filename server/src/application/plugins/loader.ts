@@ -56,6 +56,7 @@ import {
 } from './agent-runtime-contributions.js';
 import { providerRegistry } from '../../infra/providers/registry.js';
 import { AgentProfileRepository } from '../../domains/agent-profiles/repository.js';
+import { managedRuntimeService } from '../managed-runtimes/service.js';
 
 // ============================================
 // Types
@@ -471,8 +472,15 @@ export class PluginLoader {
         }
       }
 
-      // Load and register contributions
-      await this.registerContributions(instance);
+      // Load and register contributions as one activation unit. This also
+      // prevents a failed plugin from leaving managed runtime metadata trusted
+      // or selectable after the rest of activation has rolled back.
+      try {
+        await this.registerContributions(instance);
+      } catch (contributionError) {
+        this.unregisterContributions(pluginId);
+        throw contributionError;
+      }
 
       // Load main module if specified
       try {
@@ -796,6 +804,13 @@ export class PluginLoader {
     // ships both, the runtime descriptor must exist before its bundled profile
     // installs and validates its runtimeType (see runtime-type-guard.ts).
     if (contributes.agentRuntimes) {
+      await managedRuntimeService.registerPlugin({
+        pluginId: manifest.id,
+        pluginVersion: manifest.version,
+        pluginPath: instance.path,
+        publisher: manifest.author?.name,
+        runtimes: contributes.agentRuntimes.map(runtime => runtime.type),
+      });
       const n = registerAgentRuntimeContributions(manifest.id, contributes.agentRuntimes);
       if (n > 0) this.broadcastFn?.({ type: 'agent_runtimes_changed' });
     }
@@ -899,6 +914,7 @@ export class PluginLoader {
     this.broadcastFn?.({ type: 'plugin_panel_unregistered', pluginId });
 
     // Clear agentRuntimes descriptors + any registered adapters for this plugin.
+    managedRuntimeService.unregisterPlugin(pluginId);
     unregisterAgentRuntimeContributions(pluginId);
     providerRegistry.removePluginAdapters(pluginId);
     this.broadcastFn?.({ type: 'agent_runtimes_changed' });

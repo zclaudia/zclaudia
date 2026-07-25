@@ -8,10 +8,7 @@
 
 import * as os from 'os';
 import { CRITICAL_BASH_PATTERNS } from './patterns.js';
-import {
-  isObfuscatedSensitiveHomePath,
-  isSensitiveHomePath,
-} from './sensitive-home.js';
+import { isObfuscatedSensitiveHomePath, isSensitiveHomePath } from './sensitive-home.js';
 import { normalizeBashCommandForMatch, normalizeHomePath, shellWords } from './normalize.js';
 
 /** Permission-callback tool name for critical-command escalation. */

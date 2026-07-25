@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PCPEffectiveProfile } from '@zclaudia/shared/core/pcp';
-import {
-  createZClaudiaToolCatalog,
-  resolveAgentToolScope,
-} from '../tool-catalog.js';
+import { createZClaudiaToolCatalog, resolveAgentToolScope } from '../tool-catalog.js';
 import { ToolRegistry, type ToolMeta } from '../tool-registry.js';
 
 function makeTool(overrides: Partial<ToolMeta> & { id: string }): ToolMeta {
@@ -22,7 +19,10 @@ function makeTool(overrides: Partial<ToolMeta> & { id: string }): ToolMeta {
   } as ToolMeta;
 }
 
-function makeCatalog(registry: ToolRegistry, deps: Parameters<typeof createZClaudiaToolCatalog>[0] = {}) {
+function makeCatalog(
+  registry: ToolRegistry,
+  deps: Parameters<typeof createZClaudiaToolCatalog>[0] = {}
+) {
   return createZClaudiaToolCatalog({ registry, ...deps });
 }
 
@@ -75,10 +75,14 @@ describe('createZClaudiaToolCatalog', () => {
     );
     const catalog = makeCatalog(registry);
 
-    const result = await catalog.callTool('builtin_tool', {}, {
-      sessionId: 's1',
-      signal: new AbortController().signal,
-    });
+    const result = await catalog.callTool(
+      'builtin_tool',
+      {},
+      {
+        sessionId: 's1',
+        signal: new AbortController().signal,
+      }
+    );
     expect(JSON.parse(result)).toEqual({ error: 'Unknown tool: builtin_tool' });
     expect(called).toBe(false);
   });
@@ -88,10 +92,14 @@ describe('createZClaudiaToolCatalog', () => {
     registry.register(makeTool({ id: 'scoped_out', source: 'plugin', scope: ['command-palette'] }));
     const catalog = makeCatalog(registry);
 
-    const result = await catalog.callTool('scoped_out', {}, {
-      sessionId: 's1',
-      signal: new AbortController().signal,
-    });
+    const result = await catalog.callTool(
+      'scoped_out',
+      {},
+      {
+        sessionId: 's1',
+        signal: new AbortController().signal,
+      }
+    );
     expect(JSON.parse(result).error).toContain('not available in scope');
   });
 
@@ -112,10 +120,14 @@ describe('createZClaudiaToolCatalog', () => {
     const controller = new AbortController();
     controller.abort();
 
-    const result = await catalog.callTool('plugin_tool', {}, {
-      sessionId: 's1',
-      signal: controller.signal,
-    });
+    const result = await catalog.callTool(
+      'plugin_tool',
+      {},
+      {
+        sessionId: 's1',
+        signal: controller.signal,
+      }
+    );
     expect(JSON.parse(result).error).toContain('aborted');
     expect(called).toBe(false);
   });
@@ -130,10 +142,14 @@ describe('createZClaudiaToolCatalog', () => {
     });
 
     expect(catalog.listTools({ sessionId: 's1' })).toEqual([]);
-    const result = await catalog.callTool('ask_user_form', {}, {
-      sessionId: 's1',
-      signal: new AbortController().signal,
-    });
+    const result = await catalog.callTool(
+      'ask_user_form',
+      {},
+      {
+        sessionId: 's1',
+        signal: new AbortController().signal,
+      }
+    );
     expect(JSON.parse(result).error).toContain('not available for this provider');
   });
 });

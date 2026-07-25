@@ -25,6 +25,26 @@ describe('plugin-tools routes', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Callable tools must also be present in the bridge-exposable catalog.
+    // Keep the route tests aligned with the production list/call parity guard.
+    vi.mocked(toolRegistry.getBridgeTools).mockReturnValue([
+      {
+        source: 'plugin',
+        definition: {
+          function: { name: 'my_tool', description: 'fixture', parameters: { type: 'object' } },
+        },
+      },
+      {
+        source: 'interaction',
+        definition: {
+          function: {
+            name: 'ask_user_form',
+            description: 'fixture interaction',
+            parameters: { type: 'object' },
+          },
+        },
+      },
+    ] as any);
     app = express();
     app.use(express.json());
     app.use('/api/plugins', createPluginToolsRoutes());

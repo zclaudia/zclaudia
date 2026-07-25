@@ -16,6 +16,7 @@ import { createPluginContext } from '../plugin-context.js';
 import { permissionManager } from '../permissions.js';
 import { providerRegistry } from '../../../infra/providers/registry.js';
 import { runtimeDescriptorRegistry } from '../../../infra/providers/runtime-descriptor-registry.js';
+import { managedRuntimeService } from '../../managed-runtimes/service.js';
 import type { AgentRuntimeDescriptor, ExternalAgentAdapter } from '@zclaudia/shared/providers';
 
 vi.mock('../permissions.js', () => ({
@@ -86,6 +87,7 @@ describe('context.agentRuntimes', () => {
     const ctx = makeContext();
 
     expect(ctx.agentRuntimes).toBeUndefined();
+    expect(ctx.managedRuntimes).toBeUndefined();
   });
 
   it('registers the adapter into providerRegistry when permission granted and descriptor present', () => {
@@ -175,5 +177,37 @@ describe('context.agentRuntimes', () => {
     const result = await ctx.agentRuntimes.createToolBridge({});
 
     expect(result).toBeNull();
+  });
+
+  it('binds managed runtime resolution to the calling plugin', async () => {
+    vi.mocked(permissionManager.hasPermission).mockImplementation(
+      (_pluginId: string, permission: string) => permission === 'provider.register'
+    );
+    const resolution = {
+      status: 'resolved' as const,
+      runtime: 'test-ctx-rt',
+      executablePath: '/managed/test-ctx-rt',
+      source: 'managed' as const,
+      compatibilityState: 'compatible' as const,
+      authState: 'unknown' as const,
+      verification: { checksumVerified: true },
+    };
+    const resolve = vi
+      .spyOn(managedRuntimeService, 'resolveForPlugin')
+      .mockResolvedValue(resolution);
+
+    const ctx = makeContext();
+    await expect(
+      ctx.managedRuntimes.resolve({
+        runtime: 'test-ctx-rt',
+        explicitPath: '/configured/test-ctx-rt',
+        headless: false,
+      })
+    ).resolves.toBe(resolution);
+    expect(resolve).toHaveBeenCalledWith(PLUGIN, 'test-ctx-rt', {
+      explicitPath: '/configured/test-ctx-rt',
+      headless: false,
+      allowAutoInstall: true,
+    });
   });
 });

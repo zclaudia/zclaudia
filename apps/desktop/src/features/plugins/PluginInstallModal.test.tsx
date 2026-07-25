@@ -83,7 +83,10 @@ describe('PluginInstallModal', () => {
     setup();
     inspectMock.mockResolvedValue(makePreview());
     installMock.mockRejectedValue(
-      new ApiError('Plugin package preview expired; choose the file again', 'PACKAGE_PREVIEW_EXPIRED')
+      new ApiError(
+        'Plugin package preview expired; choose the file again',
+        'PACKAGE_PREVIEW_EXPIRED'
+      )
     );
 
     chooseFile();
@@ -110,7 +113,9 @@ describe('PluginInstallModal', () => {
 
   it('shows the inspection error and returns to select on an invalid package', async () => {
     setup();
-    inspectMock.mockRejectedValue(new ApiError('plugin.json failed validation', 'INVALID_MANIFEST'));
+    inspectMock.mockRejectedValue(
+      new ApiError('plugin.json failed validation', 'INVALID_MANIFEST')
+    );
 
     chooseFile();
     expect(await screen.findByRole('alert')).toHaveTextContent('plugin.json failed validation');

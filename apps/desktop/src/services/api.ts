@@ -26,6 +26,7 @@ export * from './api/debug';
 export * from './api/plugins';
 export * from './api/plugin-packages';
 export * from './api/runtime-descriptors';
+export * from './api/managed-runtimes';
 export * from './api/provider-diagnostics';
 export * from './api/context-usage';
 export * from './api/web-search';

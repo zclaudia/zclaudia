@@ -19,6 +19,7 @@ import type {
   McpAPI,
   PluginSchedulerAPI,
 } from './runtime-apis.js';
+import type { ManagedRuntimesAPI } from './managed-runtimes.js';
 
 export type CommandHandler = (
   args: string[],
@@ -60,6 +61,9 @@ export interface PluginContext {
 
   // External-agent runtime registration (requires provider.register permission)
   agentRuntimes?: AgentRuntimesAPI;
+
+  // Host-owned Agent CLI resolution. Plugins never download or execute installers.
+  managedRuntimes?: ManagedRuntimesAPI;
 
   // MCP API（按 network.fetch 权限提供）
   mcp?: McpAPI;

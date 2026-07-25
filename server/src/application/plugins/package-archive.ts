@@ -43,7 +43,12 @@ export function crc32(buffer: Buffer): number {
  */
 type OccupiedRanges = Array<[number, number]>;
 
-function assertRangeUnclaimed(ranges: OccupiedRanges, start: number, end: number, name: string): void {
+function assertRangeUnclaimed(
+  ranges: OccupiedRanges,
+  start: number,
+  end: number,
+  name: string
+): void {
   let lo = 0;
   let hi = ranges.length;
   while (lo < hi) {

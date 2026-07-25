@@ -26,6 +26,7 @@ import { providerRegistry } from '../../infra/providers/registry.js';
 import { runtimeDescriptorRegistry } from '../../infra/providers/runtime-descriptor-registry.js';
 import { wrapExternalAgentAdapter } from '../../infra/providers/external-agent-shim.js';
 import { createAgentToolBridgeEntry } from './agent-tool-bridge-host.js';
+import { managedRuntimeService } from '../managed-runtimes/service.js';
 
 type PluginDatabase = Database.Database;
 type RuntimePluginContext = PluginContext & Record<string, unknown>;
@@ -393,6 +394,24 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
           },
           createToolBridge: async (request: ProviderToolBridgeRequest) => {
             return createAgentToolBridgeEntry(request);
+          },
+        }
+      : undefined,
+
+    // Host-owned managed runtime API. The calling plugin can select only its
+    // own statically registered descriptor; it cannot supply a URL or hash.
+    managedRuntimes: permissionManager.hasPermission(pluginId, 'provider.register')
+      ? {
+          resolve: async (request: {
+            runtime: string;
+            explicitPath?: string;
+            headless?: boolean;
+          }) => {
+            return await managedRuntimeService.resolveForPlugin(pluginId, request.runtime, {
+              explicitPath: request.explicitPath,
+              headless: request.headless ?? true,
+              allowAutoInstall: true,
+            });
           },
         }
       : undefined,

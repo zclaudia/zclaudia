@@ -9,6 +9,7 @@ A cross-platform desktop and gateway shell for a zclaudia-owned coding agent, bu
 - **Project Management**: Organize conversations by project
 - **Supervision**: AI-powered project orchestration and task management
 - **Local-First**: All data stored locally with SQLite
+- **Managed Agent CLIs**: Installs verified, plugin-scoped CLIs without modifying system CLIs
 
 ## Getting Started
 
@@ -96,6 +97,7 @@ Additional architecture notes:
 
 - [Runtime Event Model](docs/runtime-events.md)
 - [Plugin Package Installation](docs/plugin-packages.md)
+- [Managed Agent CLI Runtimes](docs/managed-runtimes.md)
 
 ## License
 

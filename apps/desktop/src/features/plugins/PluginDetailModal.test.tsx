@@ -81,9 +81,7 @@ describe('PluginDetailModal', () => {
     fireEvent.change(screen.getByLabelText('Rollback version'), { target: { value: '1.0.0' } });
     fireEvent.click(screen.getByRole('button', { name: /Roll back/ }));
 
-    await waitFor(() =>
-      expect(rollbackMock).toHaveBeenCalledWith('com.test.plugin', '1.0.0')
-    );
+    await waitFor(() => expect(rollbackMock).toHaveBeenCalledWith('com.test.plugin', '1.0.0'));
     expect(onChanged).toHaveBeenCalled();
   });
 

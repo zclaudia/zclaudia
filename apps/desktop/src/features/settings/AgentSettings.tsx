@@ -7,6 +7,7 @@ import { isDesktopTauri } from '../../utils/platform';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useLocalBackendId } from '../../hooks/useLocalBackendId';
 import { Select } from '../../components/ui/Select';
+import { ManagedRuntimeSettings } from './ManagedRuntimeSettings';
 
 interface AgentCapabilities {
   tools: Array<{ id: string; name: string; description: string; scope: string[] }>;
@@ -144,6 +145,11 @@ export function AgentSettings() {
           <ShortcutSettings disabled={!config?.enabled} />
         </div>
       )}
+
+      <div>
+        <h3 className="text-sm font-medium mb-3">Managed Agent CLIs</h3>
+        <ManagedRuntimeSettings />
+      </div>
 
       {/* Capabilities */}
       {capabilities && (

@@ -176,7 +176,8 @@ export type BuiltModel = {
  * pi-ai `Model` plus the dialect stamp read by tool-schema-compat. Naming the
  * stamp channel keeps it typed at both ends instead of passing through `any`.
  */
-type DialectStampedModel = Model & { dialect?: LlmModelDialect };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DialectStampedModel = Model<any> & { dialect?: LlmModelDialect };
 
 /**
  * Resolve the effective dialect for a model. Explicit entry dialect wins.

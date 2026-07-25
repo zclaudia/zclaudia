@@ -210,7 +210,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     createLlmProfileOauthRouter(llmProfileRepo, codexOauthSessions)
   );
 
-  registerAgentProfilesDomain({ app, authMiddleware, db });
+  registerAgentProfilesDomain({ app, authMiddleware, localOnlyMiddleware, db });
   registerRuntimeRoutes({ app, authMiddleware, db, toolRegistry });
 
   const { notificationService: notificationsService } = registerNotificationDomain({

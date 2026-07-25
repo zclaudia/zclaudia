@@ -3,6 +3,11 @@ import type {
   ProviderToolBridgeEntry,
   ProviderToolBridgeRequest,
 } from '../providers/index.js';
+export type {
+  ManagedRuntimeResolveRequest,
+  ManagedRuntimeResolution,
+  ManagedRuntimesAPI,
+} from './managed-runtimes.js';
 
 export type EventHandler = (data: unknown) => void | Promise<void>;
 

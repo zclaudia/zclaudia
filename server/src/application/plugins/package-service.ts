@@ -5,6 +5,7 @@ import { cp, mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { Mutex } from 'async-mutex';
+import { ManagedRuntimeService, managedRuntimeService } from '../managed-runtimes/service.js';
 import {
   validatePluginManifest,
   type Permission,
@@ -128,6 +129,7 @@ export interface PluginPackageServiceOptions {
   loader?: PluginLoader;
   now?: () => Date;
   stagedPackageTtlMs?: number;
+  managedRuntimeReferences?: Pick<ManagedRuntimeService, 'releasePluginReference'>;
 }
 
 export function resolvePluginDataDir(): string {
@@ -391,6 +393,7 @@ export class PluginPackageService {
   private readonly stagedPackages = new Map<string, StagedPackage>();
   private readonly mutationMutex = new Mutex();
   private readonly stagingReady: Promise<void>;
+  private readonly managedRuntimeReferences: Pick<ManagedRuntimeService, 'releasePluginReference'>;
 
   constructor(options: PluginPackageServiceOptions = {}) {
     this.dataDir = options.dataDir ? path.resolve(options.dataDir) : resolvePluginDataDir();
@@ -398,6 +401,11 @@ export class PluginPackageService {
     this.storeDir = path.join(this.dataDir, 'plugin-store');
     this.stagingDir = path.join(this.dataDir, 'plugin-staging');
     this.loader = options.loader ?? pluginLoader;
+    this.managedRuntimeReferences =
+      options.managedRuntimeReferences ??
+      (options.dataDir
+        ? new ManagedRuntimeService({ dataDir: this.dataDir })
+        : managedRuntimeService);
     this.now = options.now ?? (() => new Date());
     this.stagedPackageTtlMs = options.stagedPackageTtlMs ?? STAGED_PACKAGE_TTL_MS;
     // Preview tokens are process-local. A restart invalidates every token, so
@@ -652,10 +660,13 @@ export class PluginPackageService {
 
   async uninstallPlugin(id: string): Promise<PluginPackageMutationResult> {
     return await this.mutationMutex.runExclusive(async () => {
-      this.requireState(id);
+      const state = this.requireState(id);
       await this.loader.remove(id);
       await rm(this.activePluginDir(id), { force: true, recursive: true });
       await rm(path.join(this.storeDir, id), { force: true, recursive: true });
+      for (const version of state.versions) {
+        await this.managedRuntimeReferences.releasePluginReference(id, version.version);
+      }
       return { id, inactive: true };
     });
   }

@@ -37,6 +37,7 @@ import {
 import { projectRunDomainEventToWireMessages } from './wire-projector.js';
 import { registerPluginDomainEventListener } from './plugin-domain-event-listener.js';
 import { resolveMultimodalFallbackForRun } from './multimodal-fallback.js';
+import { resolveAgentProfileRuntime } from './run-managed-runtime.js';
 
 registerPluginDomainEventListener();
 
@@ -119,7 +120,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
           images,
         })
       : baseMultimodalFallback;
-  const effectiveAgentProfile = multimodalFallback.agentProfile;
+  let effectiveAgentProfile = multimodalFallback.agentProfile;
   const effectiveProviderConfig = multimodalFallback.llmProfile;
   const effectiveLlmProfileId = multimodalFallback.llmProfileId;
   const effectiveProviderType = providerType;
@@ -136,6 +137,32 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
         model: effectiveAgentProfile.model,
       },
       `multimodal fallback model=${effectiveAgentProfile.model}`
+    );
+  }
+
+  // CLI-backed plugin runtimes are resolved by the trusted host immediately
+  // before launch. Legacy plugins without runtime-compatibility.json keep the
+  // previous behavior and receive their original optional cliPath unchanged.
+  const managedRuntime = await resolveAgentProfileRuntime(
+    effectiveProviderType,
+    effectiveAgentProfile
+  );
+  const runtimeResolution = managedRuntime.resolution;
+  if (runtimeResolution) {
+    effectiveAgentProfile = managedRuntime.agentProfile;
+    activeRun.agentProfile = effectiveAgentProfile;
+    trace.log(
+      'server_norm',
+      'managed_runtime_resolved',
+      {
+        runtime: effectiveProviderType,
+        source: runtimeResolution.source,
+        version: runtimeResolution.version,
+        compatibilityState: runtimeResolution.compatibilityState,
+        authState: runtimeResolution.authState,
+        executablePath: runtimeResolution.executablePath,
+      },
+      runtimeResolution.warning ?? `CLI resolved from ${runtimeResolution.source}`
     );
   }
 
