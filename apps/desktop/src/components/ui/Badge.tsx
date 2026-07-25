@@ -3,7 +3,7 @@ type BadgeTone = 'accent' | 'neutral' | 'success';
 const TONE: Record<BadgeTone, string> = {
   accent: 'bg-primary/10 text-primary',
   neutral: 'bg-secondary text-muted-foreground border border-border/60',
-  success: 'bg-secondary text-muted-foreground border border-border/60',
+  success: 'bg-success/15 text-success',
 };
 
 export function Badge({
@@ -22,7 +22,7 @@ export function Badge({
       {online !== undefined && (
         <span
           data-testid="badge-dot"
-          className={`h-1.5 w-1.5 rounded-full ${online ? 'bg-emerald-500' : 'bg-muted-foreground/50'}`}
+          className={`h-1.5 w-1.5 rounded-full ${online ? 'bg-success' : 'bg-muted-foreground/50'}`}
         />
       )}
       {label}

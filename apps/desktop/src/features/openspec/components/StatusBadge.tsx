@@ -1,33 +1,33 @@
 // apps/desktop/src/features/openspec/components/StatusBadge.tsx
 //
 // Small reusable badge for issue + executor + spec-change statuses. Colors
-// follow the saturated /10 + /15 pattern (matches Meta Workflow E2b
-// convention).
+// come from the shared semantic tone map (ui-conventions rule 1).
 
 import React from 'react';
 import type { LocalIssue, LocalIssueStatus } from '@zclaudia/shared/features/local-issue';
 import type { ExecutorStatus } from '@zclaudia/shared/features/executor';
 import type { SpecChangeStatus } from '@zclaudia/shared/features/spec-change';
+import { TONE_BADGE, type Tone } from '../../../components/ui/tone.js';
 import { useOpenSpecStore } from '../store.js';
 
-const STATUS_COLORS: Record<string, string> = {
+const STATUS_TONES: Record<string, Tone> = {
   // LocalIssue (4 lifecycle states)
-  open: 'bg-secondary text-muted-foreground',
-  tracked: 'bg-blue-500/10 text-blue-500',
-  closed: 'bg-green-500/10 text-green-600',
-  cancelled: 'bg-red-500/10 text-red-500',
+  open: 'neutral',
+  tracked: 'info',
+  closed: 'success',
+  cancelled: 'destructive',
   // SpecChange (full workflow — projected via IssueStatusBadge)
-  drafting: 'bg-secondary text-muted-foreground',
-  proposing: 'bg-blue-500/10 text-blue-500',
-  designing: 'bg-blue-500/15 text-blue-600',
-  tasks_ready: 'bg-blue-500/15 text-blue-600',
-  archived: 'bg-green-500/10 text-green-600',
+  drafting: 'neutral',
+  proposing: 'info',
+  designing: 'info',
+  tasks_ready: 'info',
+  archived: 'success',
   // Executor
-  pending: 'bg-secondary text-muted-foreground',
-  executing: 'bg-yellow-500/10 text-yellow-600',
-  paused: 'bg-yellow-500/10 text-yellow-600',
-  completed: 'bg-green-500/10 text-green-600',
-  failed: 'bg-red-500/10 text-red-500',
+  pending: 'neutral',
+  executing: 'success',
+  paused: 'warning',
+  completed: 'success',
+  failed: 'destructive',
 };
 
 export function StatusBadge({
@@ -35,7 +35,7 @@ export function StatusBadge({
 }: {
   status: LocalIssueStatus | ExecutorStatus | SpecChangeStatus;
 }): React.ReactElement {
-  const cls = STATUS_COLORS[status] ?? 'bg-secondary text-muted-foreground';
+  const cls = TONE_BADGE[STATUS_TONES[status] ?? 'neutral'];
   return <span className={`px-2 py-0.5 rounded-md text-xs font-mono ${cls}`}>{status}</span>;
 }
 

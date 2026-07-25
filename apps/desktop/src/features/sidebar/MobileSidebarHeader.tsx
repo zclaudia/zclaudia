@@ -96,10 +96,10 @@ export function MobileSidebarHeader({
                 <span
                   className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
                     hasClaudiaPermissionPending
-                      ? 'bg-orange-500'
+                      ? 'bg-warning'
                       : hasClaudiaUnread
                         ? 'bg-primary animate-pulse'
-                        : 'bg-amber-500 animate-pulse'
+                        : 'bg-warning animate-pulse'
                   }`}
                 />
               )}

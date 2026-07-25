@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ExternalLink, Trash2, GitBranch, MoreHorizontal } from 'lucide-react';
+import { ExternalLink, Trash2, GitBranch, Lock, MoreHorizontal } from 'lucide-react';
 import type { Session } from '@zclaudia/shared';
+import { TONE_BADGE, TONE_TEXT, type Tone } from '../../components/ui/tone';
 
 interface SessionItemProps {
   session: Session;
@@ -21,10 +22,10 @@ interface SessionItemProps {
   deleteWorktreeTitle?: string;
 }
 
-const ROLE_BADGES: Record<string, { label: string; className: string }> = {
-  main: { label: 'main', className: 'bg-blue-500/20 text-blue-400' },
-  review: { label: 'review', className: 'bg-purple-500/20 text-purple-400' },
-  checkpoint: { label: 'check', className: 'bg-orange-500/20 text-orange-400' },
+const ROLE_BADGES: Record<string, { label: string; tone: Tone }> = {
+  main: { label: 'main', tone: 'info' },
+  review: { label: 'review', tone: 'thinking' },
+  checkpoint: { label: 'check', tone: 'neutral' },
 };
 
 /** Resolve status label based on session state. Returns null for idle sessions. */
@@ -32,13 +33,12 @@ function getStatusLabel(
   session: Session,
   isActive?: boolean,
   hasPending?: boolean
-): { text: string; className: string; pulse?: boolean } | null {
-  if (hasPending) return { text: 'waiting', className: 'text-amber-500', pulse: true };
-  if (session.lastRunStatus === 'interrupted')
-    return { text: 'interrupted', className: 'text-red-400' };
-  if (session.planStatus === 'planning') return { text: 'planning', className: 'text-blue-400' };
-  if (session.planStatus === 'planned') return { text: 'planned', className: 'text-yellow-500' };
-  if (isActive) return { text: 'running', className: 'text-success', pulse: true };
+): { text: string; tone: Tone; pulse?: boolean } | null {
+  if (hasPending) return { text: 'waiting', tone: 'warning', pulse: true };
+  if (session.lastRunStatus === 'interrupted') return { text: 'interrupted', tone: 'destructive' };
+  if (session.planStatus === 'planning') return { text: 'planning', tone: 'info' };
+  if (session.planStatus === 'planned') return { text: 'planned', tone: 'info' };
+  if (isActive) return { text: 'running', tone: 'success', pulse: true };
   return null;
 }
 
@@ -93,7 +93,7 @@ export function SessionItem({
     <div className="relative group" data-testid="session-item">
       <button
         onClick={() => onSelect(session.id)}
-        className={`-ml-5 w-[calc(100%+1.25rem)] text-left pl-7 rounded-lg truncate flex items-center gap-1 transition-colors text-xs ${
+        className={`-ml-5 w-[calc(100%+1.25rem)] text-left pl-7 rounded-md truncate flex items-center gap-1 transition-colors text-xs ${
           isMobile ? 'min-h-[44px]' : 'h-7'
         } ${actionPadding} ${isSelected ? selectedClass : unselectedClass}`}
       >
@@ -107,7 +107,7 @@ export function SessionItem({
         {/* Project role badge */}
         {roleBadge && (
           <span
-            className={`text-[9px] px-1 rounded-md font-medium shrink-0 ${roleBadge.className}`}
+            className={`text-[10px] px-1 rounded-md font-medium shrink-0 ${TONE_BADGE[roleBadge.tone]}`}
           >
             {roleBadge.label}
           </span>
@@ -115,7 +115,7 @@ export function SessionItem({
         {/* Provider name tag (for regular sessions, only when idle) */}
         {!session.projectRole && providerName && !statusLabel && (
           <span
-            className={`text-[9px] px-1 rounded-md shrink-0 ${
+            className={`text-[10px] px-1 rounded-md shrink-0 ${
               isSelected
                 ? 'bg-foreground/10 text-muted-foreground'
                 : 'bg-muted-foreground/10 text-muted-foreground/60'
@@ -126,16 +126,7 @@ export function SessionItem({
         )}
         {/* Read-only lock icon */}
         {session.isReadOnly && (
-          <svg
-            className="w-3 h-3 shrink-0 text-muted-foreground"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-          >
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
+          <Lock size={12} strokeWidth={1.75} className="shrink-0 text-muted-foreground" />
         )}
         {/* Worktree branch indicator — right-aligned with a branch glyph */}
         {!session.projectRole && worktreeBranch && !hideWorktreeBranch && (
@@ -145,14 +136,14 @@ export function SessionItem({
             }`}
             title={worktreeBranch}
           >
-            <GitBranch size={9} strokeWidth={2} className="shrink-0" />
+            <GitBranch size={9} strokeWidth={1.75} className="shrink-0" />
             <span className="truncate">{worktreeBranch}</span>
           </span>
         )}
         {/* Status label (right side) */}
         {statusLabel && (
           <span
-            className={`ml-auto flex items-center gap-1 shrink-0 text-[9px] font-medium ${statusLabel.className}`}
+            className={`ml-auto flex items-center gap-1 shrink-0 text-[9px] font-medium ${TONE_TEXT[statusLabel.tone]}`}
           >
             {statusLabel.pulse && (
               <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />

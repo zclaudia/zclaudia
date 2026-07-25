@@ -162,21 +162,21 @@ describe('SkillEditor', () => {
     expect(await screen.findByText('load boom')).toBeInTheDocument();
   });
 
-  it('eligible badge uses the green pair', async () => {
+  it('eligible badge uses the success tone', async () => {
     renderEditor(makeSkill({ eligible: true }));
 
     const badge = screen.getByText('Eligible');
-    expect(badge.className).toContain('bg-green-500/20');
-    expect(badge.className).toContain('text-green-400');
+    expect(badge.className).toContain('bg-success/15');
+    expect(badge.className).toContain('text-success');
   });
 
-  it('blocked badge uses destructive tokens, not green', async () => {
+  it('blocked badge uses destructive tokens, not success', async () => {
     renderEditor(makeSkill({ eligible: false }));
 
     const badge = screen.getByText('Blocked');
-    expect(badge.className).toContain('bg-destructive/20');
+    expect(badge.className).toContain('bg-destructive/15');
     expect(badge.className).toContain('text-destructive');
-    expect(badge.className).not.toContain('green');
+    expect(badge.className).not.toContain('success');
   });
 
   it('surfaces a failed save via the save-state indicator and an inline error', async () => {

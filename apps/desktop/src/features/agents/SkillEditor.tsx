@@ -7,6 +7,7 @@ import type { DetailBadge } from './ui/DetailHeader';
 import type { ActionsMenuAction } from './ui/ActionsMenu';
 import { useProfileAutosave } from './useProfileAutosave';
 import { FIELD_CLASS } from '../../components/ui/Input';
+import { TONE_BADGE } from '../../components/ui/tone';
 import { confirm } from '../../stores/confirmDialogStore';
 
 /**
@@ -235,14 +236,14 @@ function SkillInfoCard({ skill }: { skill: WorkspaceSkillInfo }) {
         <span className="font-medium text-sm truncate">{displayName}</span>
         <span
           className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium ${
-            isEligible ? 'bg-green-500/20 text-green-400' : 'bg-destructive/20 text-destructive'
+            isEligible ? TONE_BADGE.success : TONE_BADGE.destructive
           }`}
         >
           {isEligible ? 'Eligible' : 'Blocked'}
         </span>
         <span
           className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium ${
-            isWorkspace ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'
+            isWorkspace ? TONE_BADGE.info : TONE_BADGE.thinking
           }`}
         >
           {source[0].toUpperCase() + source.slice(1)}
@@ -309,7 +310,7 @@ function SkillInfoCard({ skill }: { skill: WorkspaceSkillInfo }) {
           {skill.metadata?.hookTriggers?.tools?.map(tool => (
             <span
               key={`hook-tool:${tool}`}
-              className="px-1.5 py-0.5 rounded bg-purple-500/10 text-[10px] text-purple-300"
+              className={`px-1.5 py-0.5 rounded text-[10px] ${TONE_BADGE.thinking}`}
             >
               hook tool {tool}
             </span>
@@ -317,13 +318,13 @@ function SkillInfoCard({ skill }: { skill: WorkspaceSkillInfo }) {
           {skill.metadata?.hookTriggers?.paths?.map(skillPath => (
             <span
               key={`hook-path:${skillPath}`}
-              className="px-1.5 py-0.5 rounded bg-purple-500/10 text-[10px] text-purple-300 font-mono"
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${TONE_BADGE.thinking}`}
             >
               hook path {skillPath}
             </span>
           ))}
           {requirementSummary && (
-            <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-[10px] text-amber-300">
+            <span className={`px-1.5 py-0.5 rounded text-[10px] ${TONE_BADGE.warning}`}>
               requires {requirementSummary}
             </span>
           )}

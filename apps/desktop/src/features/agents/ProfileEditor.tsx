@@ -1169,11 +1169,11 @@ export function ProfileEditor({
                                     <span
                                       className={`shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] ${
                                         state === 'connected'
-                                          ? 'text-green-400'
+                                          ? 'text-success'
                                           : state === 'failed'
-                                            ? 'text-red-400'
+                                            ? 'text-destructive'
                                             : state === 'needs-auth'
-                                              ? 'text-orange-300'
+                                              ? 'text-warning'
                                               : 'text-muted-foreground'
                                       }`}
                                     >
@@ -1565,7 +1565,7 @@ function MultimodalFallbackSection({
       </div>
 
       {profileId && hasDeclaredModels && visionModels.length === 0 && (
-        <p className="mx-4 mb-4 text-xs text-amber-600">
+        <p className="mx-4 mb-4 text-xs text-warning">
           No Vision-capable models declared on this LLM profile.
         </p>
       )}
@@ -1594,7 +1594,7 @@ function ModelDeclarationWarning({
   const known = models.some(m => m.modelId === trimmed);
   if (known) return null;
   return (
-    <p className="text-xs text-amber-600 mt-1">
+    <p className="text-xs text-warning mt-1">
       This model is not declared on the selected LLM profile. The agent will work but will fall back
       to pi-ai registry defaults for context window / max tokens.
     </p>

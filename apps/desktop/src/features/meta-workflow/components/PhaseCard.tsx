@@ -1,6 +1,7 @@
 // apps/desktop/src/features/meta-workflow/components/PhaseCard.tsx
 import React from 'react';
 import type { MetaWorkflowPhase } from '@zclaudia/shared/features/meta-workflow';
+import { TONE_BADGE, type Tone } from '../../../components/ui/tone.js';
 import {
   sendRunPhase,
   sendRerunPhase,
@@ -16,20 +17,20 @@ interface Props {
   onClick: () => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-secondary text-muted-foreground',
-  searching_reuse: 'bg-blue-500/10 text-blue-500',
-  generating: 'bg-blue-500/15 text-blue-600',
-  ready_to_run: 'bg-yellow-500/10 text-yellow-600',
-  running: 'bg-yellow-500/15 text-yellow-600',
-  verifying_gates: 'bg-orange-500/10 text-orange-500',
-  done: 'bg-green-500/10 text-green-600',
-  failed: 'bg-red-500/10 text-red-500',
-  stale: 'bg-purple-500/10 text-purple-500',
+const STATUS_TONES: Record<string, Tone> = {
+  pending: 'neutral',
+  searching_reuse: 'info',
+  generating: 'info',
+  ready_to_run: 'warning',
+  running: 'success',
+  verifying_gates: 'warning',
+  done: 'success',
+  failed: 'destructive',
+  stale: 'warning',
 };
 
 export function PhaseCard({ runId, phase, socket, onClick }: Props): React.ReactElement {
-  const colorClass = STATUS_COLORS[phase.status] ?? 'bg-secondary text-muted-foreground';
+  const colorClass = TONE_BADGE[STATUS_TONES[phase.status] ?? 'neutral'];
   const canRun = phase.status === 'pending';
   const canRerun = phase.status === 'done' || phase.status === 'failed' || phase.status === 'stale';
   const isStale = phase.status === 'stale';

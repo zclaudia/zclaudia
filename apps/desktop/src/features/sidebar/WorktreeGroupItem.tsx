@@ -70,7 +70,7 @@ export function WorktreeGroupItem({
               e.stopPropagation();
               onDelete();
             }}
-            className={`rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors ${
+            className={`rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors ${
               isMobile
                 ? 'min-h-[36px] min-w-[36px] opacity-100'
                 : 'h-7 w-7 opacity-0 group-hover:opacity-100'

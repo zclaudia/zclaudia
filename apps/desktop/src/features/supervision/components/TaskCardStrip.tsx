@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Pencil, Eye, RotateCw, Play, X, Clock } from 'lucide-react';
 import type { SupervisionTask, TaskStatus } from '@zclaudia/shared';
+import { TONE_BADGE, TONE_DOT, type Tone } from '../../../components/ui/tone';
 import { useSupervisionStore } from '../store';
 import { useProjectStore } from '../../../stores/projectStore';
 import * as api from '../../../services/api';
@@ -9,21 +10,21 @@ interface TaskCardStripProps {
   projectId: string;
 }
 
-const STATUS_BADGE: Record<TaskStatus, { label: string; className: string }> = {
-  proposed: { label: 'Proposed', className: 'bg-purple-500/15 text-purple-500' },
-  pending: { label: 'Pending', className: 'bg-blue-500/15 text-blue-500' },
-  queued: { label: 'Queued', className: 'bg-cyan-500/15 text-cyan-500' },
-  planning: { label: 'Planning', className: 'bg-blue-500/15 text-blue-500' },
-  running: { label: 'Running', className: 'bg-green-500/15 text-green-500' },
-  completed: { label: 'Done', className: 'bg-emerald-600/15 text-emerald-600' },
-  reviewing: { label: 'Review', className: 'bg-yellow-500/15 text-yellow-500' },
-  approved: { label: 'Approved', className: 'bg-green-600/15 text-green-600' },
-  integrated: { label: 'Done', className: 'bg-emerald-600/15 text-emerald-600' },
-  rejected: { label: 'Rejected', className: 'bg-red-500/15 text-red-500' },
-  merge_conflict: { label: 'Conflict', className: 'bg-orange-500/15 text-orange-500' },
-  blocked: { label: 'Blocked', className: 'bg-gray-500/15 text-gray-400' },
-  failed: { label: 'Failed', className: 'bg-red-600/15 text-red-600' },
-  cancelled: { label: 'Cancelled', className: 'bg-gray-500/15 text-gray-500' },
+const STATUS_BADGE: Record<TaskStatus, { label: string; tone: Tone }> = {
+  proposed: { label: 'Proposed', tone: 'thinking' },
+  pending: { label: 'Pending', tone: 'neutral' },
+  queued: { label: 'Queued', tone: 'neutral' },
+  planning: { label: 'Planning', tone: 'thinking' },
+  running: { label: 'Running', tone: 'success' },
+  completed: { label: 'Done', tone: 'success' },
+  reviewing: { label: 'Review', tone: 'thinking' },
+  approved: { label: 'Approved', tone: 'success' },
+  integrated: { label: 'Done', tone: 'success' },
+  rejected: { label: 'Rejected', tone: 'destructive' },
+  merge_conflict: { label: 'Conflict', tone: 'warning' },
+  blocked: { label: 'Blocked', tone: 'warning' },
+  failed: { label: 'Failed', tone: 'destructive' },
+  cancelled: { label: 'Cancelled', tone: 'neutral' },
 };
 
 const STORAGE_KEY = 'task-card-strip-collapsed';
@@ -125,7 +126,7 @@ function TaskMiniCard({ task }: { task: SupervisionTask }) {
   const upsertTask = useSupervisionStore(s => s.upsertTask);
   const badge = STATUS_BADGE[task.status] ?? {
     label: task.status,
-    className: 'bg-gray-500/15 text-gray-400',
+    tone: 'neutral' as Tone,
   };
   const hasSession = !!task.sessionId;
   const isActive = ['running', 'reviewing'].includes(task.status);
@@ -175,14 +176,14 @@ function TaskMiniCard({ task }: { task: SupervisionTask }) {
     <div className="flex-shrink-0 w-[160px] p-2 bg-background border border-border rounded-lg hover:border-border/80 transition-colors">
       {/* Status + indicators */}
       <div className="flex items-center gap-1.5 mb-1">
-        <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${badge.className}`}>
+        <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${TONE_BADGE[badge.tone]}`}>
           {badge.label}
         </span>
         {task.status === 'running' && (
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${TONE_DOT.success}`} />
         )}
         {task.status === 'planning' && (
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+          <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${TONE_DOT.thinking}`} />
         )}
         {task.scheduleCron && (
           <span title={`Cron: ${task.scheduleCron}`}>
