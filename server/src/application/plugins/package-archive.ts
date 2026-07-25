@@ -27,10 +27,39 @@ for (let index = 0; index < CRC_TABLE.length; index += 1) {
   CRC_TABLE[index] = value >>> 0;
 }
 
-function crc32(buffer: Buffer): number {
+export function crc32(buffer: Buffer): number {
   let value = 0xffffffff;
   for (const byte of buffer) value = CRC_TABLE[(value ^ byte) & 0xff] ^ (value >>> 8);
   return (value ^ 0xffffffff) >>> 0;
+}
+
+/**
+ * Start-offset-sorted list of already-claimed data ranges. Entries arrive in
+ * central-directory order (not offset order), so each insert binary-searches
+ * its position and checks only the predecessor/successor — for disjoint
+ * ranges sorted by start, those are the only possible overlap partners.
+ * O(log n) per entry instead of a full O(n) scan (matters at the 20k-entry
+ * limit, where a scan-per-entry costs ~200M comparisons).
+ */
+type OccupiedRanges = Array<[number, number]>;
+
+function assertRangeUnclaimed(ranges: OccupiedRanges, start: number, end: number, name: string): void {
+  let lo = 0;
+  let hi = ranges.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (ranges[mid][0] < start) lo = mid + 1;
+    else hi = mid;
+  }
+  const predecessor = ranges[lo - 1];
+  if (predecessor && start < predecessor[1]) {
+    throw new Error(`Overlapping ZIP entry data found for ${name}`);
+  }
+  const successor = ranges[lo];
+  if (successor && end > successor[0]) {
+    throw new Error(`Overlapping ZIP entry data found for ${name}`);
+  }
+  ranges.splice(lo, 0, [start, end]);
 }
 
 export function assertSafeArchivePath(name: string): string {
@@ -52,7 +81,14 @@ export function resolveSafeLinkTarget(entryName: string, target: string): string
     throw new Error(`Unsafe symlink ${entryName} -> ${JSON.stringify(target)}`);
   }
 
-  const stack = path.posix.dirname(entryName).split('/').filter(Boolean);
+  // dirname of a root-level entry is '.', which must not count as a directory
+  // level — otherwise resolved targets gain a bogus './' prefix (failing the
+  // archive's target-exists check) and '../' escapes look one level shallower
+  // than they are.
+  const stack = path.posix
+    .dirname(entryName)
+    .split('/')
+    .filter(component => component !== '' && component !== '.');
   for (const component of target.split('/')) {
     if (!component || component === '.') continue;
     if (component === '..') {
@@ -116,7 +152,7 @@ export async function readPluginArchive(
 
   const entries: PluginArchiveEntry[] = [];
   const names = new Set<string>();
-  const occupiedRanges: Array<[number, number]> = [];
+  const occupiedRanges: OccupiedRanges = [];
   let cursor = centralOffset;
   let unpackedSize = 0;
 
@@ -181,10 +217,7 @@ export async function readPluginArchive(
     ) {
       throw new Error(`Local and central ZIP headers disagree for ${name}`);
     }
-    if (occupiedRanges.some(([start, end]) => localOffset < end && dataEnd > start)) {
-      throw new Error(`Overlapping ZIP entry data found for ${name}`);
-    }
-    occupiedRanges.push([localOffset, dataEnd]);
+    assertRangeUnclaimed(occupiedRanges, localOffset, dataEnd, name);
 
     const compressed = archive.subarray(dataStart, dataEnd);
     const data =

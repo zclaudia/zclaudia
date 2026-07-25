@@ -93,6 +93,17 @@ export function createZClaudiaToolCatalog(deps: ZClaudiaToolCatalogDeps = {}): A
 
     async callTool(name, args, context) {
       const { profile, scope, sessionId } = resolveContext(context.sessionId);
+      // Keep the callable set identical to the listed set: listTools only
+      // surfaces bridge-exposable tools (plugin/interaction/skill sources), so
+      // callTool must reject anything outside that set instead of letting a
+      // caller invoke a never-listed tool by name. The error mirrors the
+      // registry's unknown-tool response to avoid leaking what exists.
+      const bridgeToolNames = new Set(
+        registry.getBridgeTools().map(tool => tool.definition.function.name)
+      );
+      if (!bridgeToolNames.has(name)) {
+        return JSON.stringify({ error: `Unknown tool: ${name}` });
+      }
       if (profile && !shouldExposeInteractionTool(name, profile)) {
         return JSON.stringify({ error: `Tool "${name}" is not available for this provider` });
       }

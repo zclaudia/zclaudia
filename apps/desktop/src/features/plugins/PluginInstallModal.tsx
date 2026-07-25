@@ -6,6 +6,7 @@ import {
   installPluginPackage,
   type PluginPackagePreview,
 } from '../../services/api/plugin-packages';
+import { ApiError } from '../../services/api/unwrap';
 import { PluginPermissionsPreview } from './ui/PluginPermissionsPreview';
 import { PluginRequirementStatus } from './ui/PluginRequirementStatus';
 
@@ -88,7 +89,15 @@ export function PluginInstallModal({
       setPhase('complete');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not install plugin');
-      setPhase('review');
+      // An expired preview token can never succeed on retry — drop the dead
+      // preview and return to file selection instead of leaving the user on a
+      // Review screen whose Install button fails every time.
+      if (cause instanceof ApiError && cause.code === 'PACKAGE_PREVIEW_EXPIRED') {
+        setPreview(null);
+        setPhase('select');
+      } else {
+        setPhase('review');
+      }
     }
   };
 

@@ -463,7 +463,20 @@ export class PluginPackageService {
     const token = randomUUID();
     const directory = path.join(this.stagingDir, token);
     await mkdir(this.stagingDir, { recursive: true });
-    await extractPluginArchive(entries, directory);
+    try {
+      await extractPluginArchive(entries, directory);
+    } catch (error) {
+      // A failed extraction (e.g. an entry nested below a symlink) can leave a
+      // partial tree on disk. The token is never registered, so TTL cleanup
+      // would never collect it — remove it now instead of waiting for the
+      // next process start, and report the archive problem as a client error.
+      await rm(directory, { force: true, recursive: true }).catch(() => {});
+      throw new PluginPackageError(
+        400,
+        'INVALID_PACKAGE',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
     const digest = await sha256(archivePath);
     const expiresAt = this.now().getTime() + this.stagedPackageTtlMs;
     const currentVersion = existing?.manifest.version;

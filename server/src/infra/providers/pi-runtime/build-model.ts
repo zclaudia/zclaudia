@@ -173,6 +173,12 @@ export type BuiltModel = {
  * `model.contextWindow` sees the user-declared value.
  */
 /**
+ * pi-ai `Model` plus the dialect stamp read by tool-schema-compat. Naming the
+ * stamp channel keeps it typed at both ends instead of passing through `any`.
+ */
+type DialectStampedModel = Model & { dialect?: LlmModelDialect };
+
+/**
  * Resolve the effective dialect for a model. Explicit entry dialect wins.
  * In Auto mode, a registry hit whose id is registered under a known dialect
  * provider is inherited (e.g. `deepseek-v4-flash` behind a generic proxy) —
@@ -299,8 +305,7 @@ export function buildModel(
   // providers use `provider` for OAuth/key/header logic and stay untouched.
   const dialect = resolveDialect(modelEntry, registryHit, modelId, providerType);
   if (dialect) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (model as any).dialect = dialect;
+    (model as DialectStampedModel).dialect = dialect;
     if (model.api === 'openai-completions') {
       model.provider = dialect;
     }

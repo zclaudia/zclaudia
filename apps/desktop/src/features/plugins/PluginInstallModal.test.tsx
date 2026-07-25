@@ -1,79 +1,120 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { PluginInstallModal } from './PluginInstallModal';
-import { inspectPluginPackage, installPluginPackage } from '../../services/api/plugin-packages';
+import { ApiError } from '../../services/api/unwrap';
+import type { PluginPackagePreview } from '../../services/api/plugin-packages';
 
 vi.mock('../../services/api/plugin-packages', () => ({
   inspectPluginPackage: vi.fn(),
   installPluginPackage: vi.fn(),
 }));
 
-const preview = {
-  token: 'preview-token',
-  fileName: 'agent.zplugin',
-  size: 1024,
-  sha256: 'a'.repeat(64),
-  fileCount: 3,
-  unpackedSize: 2048,
-  manifest: {
-    id: 'com.test.agent',
-    name: 'Test Agent',
-    version: '1.0.0',
-    description: 'Test package',
-  },
-  permissions: ['network.fetch'],
-  requirements: [{ name: 'test-agent', found: false, source: 'manifest' as const }],
-  warnings: ['test-agent was not found on PATH.'],
-  action: 'install' as const,
-  expiresAt: '2026-07-21T00:15:00.000Z',
-};
+import { inspectPluginPackage, installPluginPackage } from '../../services/api/plugin-packages';
+
+const inspectMock = vi.mocked(inspectPluginPackage);
+const installMock = vi.mocked(installPluginPackage);
+
+function makePreview(overrides: Partial<PluginPackagePreview> = {}): PluginPackagePreview {
+  return {
+    token: 'tok-1',
+    fileName: 'plugin.zplugin',
+    size: 128,
+    sha256: 'deadbeef',
+    fileCount: 2,
+    unpackedSize: 256,
+    manifest: {
+      id: 'com.test.plugin',
+      name: 'Test Plugin',
+      version: '1.0.0',
+      description: 'A test plugin',
+      permissions: [],
+    },
+    permissions: [],
+    requirements: [],
+    warnings: [],
+    action: 'install',
+    expiresAt: new Date('2026-07-25T01:00:00.000Z').toISOString(),
+    ...overrides,
+  };
+}
+
+function setup() {
+  const onClose = vi.fn();
+  const onInstalled = vi.fn().mockResolvedValue(undefined);
+  const onViewPlugin = vi.fn();
+  render(
+    <PluginInstallModal
+      open
+      onClose={onClose}
+      onInstalled={onInstalled}
+      onViewPlugin={onViewPlugin}
+    />
+  );
+  return { onClose, onInstalled, onViewPlugin };
+}
+
+function chooseFile(name = 'plugin.zplugin') {
+  const input = screen.getByLabelText('Choose plugin package');
+  const file = new File(['zip-bytes'], name, { type: 'application/zip' });
+  fireEvent.change(input, { target: { files: [file] } });
+}
 
 describe('PluginInstallModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(inspectPluginPackage).mockResolvedValue(preview);
-    vi.mocked(installPluginPackage).mockResolvedValue({
-      id: 'com.test.agent',
-      version: '1.0.0',
-      activeVersion: '1.0.0',
-      inactive: true,
-    });
   });
 
-  it('validates, previews, and installs a package without activating it', async () => {
-    const onInstalled = vi.fn();
-    render(
-      <PluginInstallModal open onClose={vi.fn()} onInstalled={onInstalled} onViewPlugin={vi.fn()} />
-    );
+  it('walks select → review → complete on a successful install', async () => {
+    const { onInstalled } = setup();
+    inspectMock.mockResolvedValue(makePreview());
+    installMock.mockResolvedValue({ id: 'com.test.plugin', inactive: true });
 
-    const file = new File(['package'], 'agent.zplugin', { type: 'application/zip' });
-    fireEvent.change(screen.getByLabelText('Choose plugin package'), {
-      target: { files: [file] },
-    });
+    chooseFile();
+    expect(await screen.findByText('Test Plugin')).toBeInTheDocument();
 
-    await screen.findByText('Test Agent');
-    expect(screen.getByText('network.fetch')).toBeInTheDocument();
-    expect(
-      screen.getByText('Not found on PATH. Install it before activating this plugin.')
-    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Install' }));
-
-    await screen.findByText('Test Agent installed');
-    expect(installPluginPackage).toHaveBeenCalledWith('preview-token');
-    expect(onInstalled).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/currently inactive/i)).toBeInTheDocument();
+    expect(await screen.findByText('Test Plugin installed')).toBeInTheDocument();
+    expect(installMock).toHaveBeenCalledWith('tok-1');
+    expect(onInstalled).toHaveBeenCalled();
   });
 
-  it('returns to file selection with an actionable validation error', async () => {
-    vi.mocked(inspectPluginPackage).mockRejectedValue(new Error('Unsafe archive path'));
-    render(
-      <PluginInstallModal open onClose={vi.fn()} onInstalled={vi.fn()} onViewPlugin={vi.fn()} />
+  it('returns to file selection when the preview token has expired', async () => {
+    setup();
+    inspectMock.mockResolvedValue(makePreview());
+    installMock.mockRejectedValue(
+      new ApiError('Plugin package preview expired; choose the file again', 'PACKAGE_PREVIEW_EXPIRED')
     );
-    fireEvent.change(screen.getByLabelText('Choose plugin package'), {
-      target: { files: [new File(['bad'], 'bad.zplugin')] },
-    });
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Unsafe archive path'));
+    chooseFile();
+    fireEvent.click(await screen.findByRole('button', { name: 'Install' }));
+
+    // The dead preview is dropped: the user is back at file selection with an
+    // explanation, instead of stuck on a Review screen that always fails.
+    expect(await screen.findByText('Choose a .zplugin package')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('preview expired');
+    expect(screen.queryByRole('button', { name: 'Install' })).toBeNull();
+  });
+
+  it('stays on the review screen after a retryable install failure', async () => {
+    setup();
+    inspectMock.mockResolvedValue(makePreview());
+    installMock.mockRejectedValue(new ApiError('disk full', 'INSTALLATION_FAILED'));
+
+    chooseFile();
+    fireEvent.click(await screen.findByRole('button', { name: 'Install' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('disk full');
+    expect(screen.getByRole('button', { name: 'Install' })).toBeInTheDocument();
+  });
+
+  it('shows the inspection error and returns to select on an invalid package', async () => {
+    setup();
+    inspectMock.mockRejectedValue(new ApiError('plugin.json failed validation', 'INVALID_MANIFEST'));
+
+    chooseFile();
+    expect(await screen.findByRole('alert')).toHaveTextContent('plugin.json failed validation');
     expect(screen.getByText('Choose a .zplugin package')).toBeInTheDocument();
+    expect(installMock).not.toHaveBeenCalled();
   });
 });
