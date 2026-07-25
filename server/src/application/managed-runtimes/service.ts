@@ -307,25 +307,114 @@ async function runCompatibilityProbe(
       timeoutMs: probe.timeoutMs ?? 10_000,
     });
   }
-  const request = `${JSON.stringify({
-    id: 1,
-    method: 'initialize',
-    params: { clientInfo: { name: 'zclaudia-managed-runtime', version: '1' } },
-  })}\n`;
-  const result = await runProcess(executable, probe.args, {
-    env,
-    timeoutMs: probe.timeoutMs ?? 10_000,
-    stdin: request,
-  });
-  if (result.code !== 0 && !/"id"\s*:\s*1/.test(result.stdout)) return result;
-  if (!/"id"\s*:\s*1/.test(result.stdout) || !/"result"\s*:/.test(result.stdout)) {
-    return {
-      ...result,
-      code: result.code ?? 1,
-      error: 'JSON-RPC initialize did not return a result.',
+  return await new Promise(resolve => {
+    let stdout = '';
+    let stderr = '';
+    let remainder = '';
+    let settled = false;
+    // Assigned after spawn and listener setup so all completion paths share
+    // the same cleanup function.
+    // eslint-disable-next-line prefer-const
+    let timer: NodeJS.Timeout | undefined;
+    let child: ReturnType<typeof spawn>;
+    const finish = (result: Omit<ProcessResult, 'stdout' | 'stderr'>) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      if (child && !child.killed) child.kill('SIGTERM');
+      resolve({ ...result, stdout, stderr });
     };
-  }
-  return { ...result, code: 0, error: undefined };
+    try {
+      child = spawn(executable, probe.args, {
+        env: { ...env },
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
+    } catch (error) {
+      resolve({
+        code: null,
+        signal: null,
+        stdout,
+        stderr,
+        error: error instanceof Error ? error.message : String(error),
+        timedOut: false,
+      });
+      return;
+    }
+    child.stdout?.on('data', chunk => {
+      stdout = boundedAppend(stdout, chunk);
+      remainder = boundedAppend(remainder, chunk);
+      const lines = remainder.split(/\r?\n/);
+      remainder = lines.pop() ?? '';
+      for (const line of lines) {
+        try {
+          const message = JSON.parse(line) as {
+            id?: unknown;
+            result?: unknown;
+            error?: { message?: string };
+          };
+          if (message.id !== 1) continue;
+          if (Object.prototype.hasOwnProperty.call(message, 'result')) {
+            finish({ code: 0, signal: 'SIGTERM', timedOut: false });
+            return;
+          }
+          if (message.error) {
+            finish({
+              code: 1,
+              signal: 'SIGTERM',
+              error: `JSON-RPC initialize failed: ${message.error.message ?? 'unknown error'}.`,
+              timedOut: false,
+            });
+            return;
+          }
+        } catch {
+          // Runtime diagnostics may share stdout; ignore non-JSON lines.
+        }
+      }
+    });
+    child.stderr?.on('data', chunk => {
+      stderr = boundedAppend(stderr, chunk);
+    });
+    child.once('error', error => {
+      finish({
+        code: null,
+        signal: null,
+        error: error.message,
+        timedOut: false,
+      });
+    });
+    child.once('close', (code, signal) => {
+      finish({
+        code,
+        signal,
+        error: 'Process exited before JSON-RPC initialize returned a result.',
+        timedOut: false,
+      });
+    });
+    const request = `${JSON.stringify({
+      id: 1,
+      method: 'initialize',
+      params: { clientInfo: { name: 'zclaudia-managed-runtime', version: '1' } },
+    })}\n`;
+    child.stdin?.write(request, error => {
+      if (!error) return;
+      finish({
+        code: null,
+        signal: null,
+        error: error.message,
+        timedOut: false,
+      });
+    });
+    timer = setTimeout(() => {
+      finish({
+        code: null,
+        signal: 'SIGTERM',
+        error: `JSON-RPC initialize timed out after ${probe.timeoutMs ?? 10_000}ms.`,
+        timedOut: true,
+      });
+    }, probe.timeoutMs ?? 10_000);
+    timer.unref?.();
+  });
 }
 
 function parseVersion(

@@ -6,7 +6,7 @@ function writeTarField(header: Buffer, offset: number, length: number, value: st
   header.write(value, offset, Math.min(length, Buffer.byteLength(value)), 'ascii');
 }
 
-function tarEntry(name: string, type: '0' | '2' = '0', data = Buffer.alloc(0)): Buffer {
+function tarEntry(name: string, type: '0' | '2' | 'x' = '0', data = Buffer.alloc(0)): Buffer {
   const header = Buffer.alloc(512);
   writeTarField(header, 0, 100, name);
   writeTarField(header, 100, 8, '0000755\0');
@@ -22,19 +22,38 @@ function tarEntry(name: string, type: '0' | '2' = '0', data = Buffer.alloc(0)): 
   for (const byte of header) checksum += byte;
   writeTarField(header, 148, 8, `${checksum.toString(8).padStart(6, '0')}\0 `);
   const padding = Buffer.alloc(Math.ceil(data.length / 512) * 512 - data.length);
-  return Buffer.concat([header, data, padding, Buffer.alloc(1024)]);
+  return Buffer.concat([header, data, padding]);
+}
+
+function tarArchive(...entries: Buffer[]): Buffer {
+  return Buffer.concat([...entries, Buffer.alloc(1024)]);
 }
 
 describe('managed runtime TAR archive validation', () => {
   it('rejects path traversal entries', () => {
     expect(() =>
-      readTarGzArchive(gzipSync(tarEntry('../escape', '0', Buffer.from('bad'))))
+      readTarGzArchive(gzipSync(tarArchive(tarEntry('../escape', '0', Buffer.from('bad')))))
     ).toThrow(/unsafe/i);
   });
 
   it('rejects symbolic links before extraction', () => {
-    expect(() => readTarGzArchive(gzipSync(tarEntry('bin/fixture', '2')))).toThrow(
+    expect(() => readTarGzArchive(gzipSync(tarArchive(tarEntry('bin/fixture', '2'))))).toThrow(
       /may not contain links/i
     );
+  });
+
+  it('ignores PAX metadata without applying its path override', () => {
+    const entries = readTarGzArchive(
+      gzipSync(
+        tarArchive(
+          tarEntry('././@PaxHeader', 'x', Buffer.from('20 path=../escape\n')),
+          tarEntry('bin/fixture', '0', Buffer.from('ok'))
+        )
+      )
+    );
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.name).toBe('bin/fixture');
+    expect(entries[0]?.data.toString('utf8')).toBe('ok');
   });
 });

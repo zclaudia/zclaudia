@@ -47,6 +47,7 @@
     "test:services": "bash scripts/with-project-node.sh node scripts/dev/test-file-by-file.mjs \"apps/desktop/src/services\"",
     "test:components": "bash scripts/with-project-node.sh node scripts/dev/test-file-by-file.mjs \"apps/desktop/src/components\"",
     "test:utils": "bash scripts/with-project-node.sh node scripts/dev/test-file-by-file.mjs \"apps/desktop/src/utils\"",
+    "canary:managed-runtime": "bash scripts/with-project-node.sh pnpm --filter @zclaudia/shared build && bash scripts/with-project-node.sh pnpm --filter @zclaudia/server build && bash scripts/with-project-node.sh node scripts/dev/canary-managed-runtime.mjs",
     "preinstall": "node scripts/hooks/ensure-node-version.mjs",
     "postinstall": "bash scripts/with-project-node.sh node scripts/hooks/check-native-modules.mjs && node scripts/hooks/install-git-hooks.mjs"
   },

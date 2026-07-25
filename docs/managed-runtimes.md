@@ -170,6 +170,23 @@ The host binds the call to the current plugin ID. The plugin cannot pass downloa
 approve its own download. The Agent adapter continues to receive only the final resolved `cliPath`
 and never downloads an executable itself.
 
+## Release canary
+
+Run a real download, checksum, extraction, compatibility, authentication, pin, and second-resolution
+canary without calling a model:
+
+```bash
+pnpm canary:managed-runtime -- \
+  --plugin-package /absolute/path/to/zclaudia-agent-codex-0.1.0-any.zplugin
+```
+
+This form first installs the packaged plugin into the isolated data directory, then validates its
+managed runtime. During development, `--plugin-dir /absolute/plugin/directory` can be used instead.
+The command removes the temporary plugin and runtime stores when it finishes and deliberately hides
+the system CLI from resolution. It still inherits the normal home directory, keychain, and provider
+environment so the authentication probe verifies reuse of the existing login. Pass `--keep-data`
+only when the retained store is needed for diagnosis.
+
 Managed store metadata is protected against untrusted paths and digest collisions, but it is not a
 privilege boundary against another process running as the same OS user. Operate only one ZClaudia
 server per data directory and protect that account and directory permissions. A verified detached

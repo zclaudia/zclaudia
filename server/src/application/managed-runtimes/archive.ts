@@ -61,6 +61,7 @@ export function readTarGzArchive(archive: Buffer, limits = MANAGED_RUNTIME_LIMIT
   const entries: TarEntry[] = [];
   const names = new Set<string>();
   let totalSize = 0;
+  let headerCount = 0;
   let offset = 0;
   let foundEnd = false;
 
@@ -70,20 +71,16 @@ export function readTarGzArchive(archive: Buffer, limits = MANAGED_RUNTIME_LIMIT
       foundEnd = true;
       break;
     }
-    if (entries.length >= limits.fileCount) {
+    if (headerCount >= limits.fileCount) {
       throw new Error(`Archive exceeds the ${limits.fileCount}-entry limit`);
     }
+    headerCount += 1;
     const expectedChecksum = parseTarOctal(header, 148, 8, 'checksum');
     if (tarChecksum(header) !== expectedChecksum) throw new Error('TAR checksum mismatch');
 
     const namePart = parseTarString(header, 0, 100);
     const prefix = parseTarString(header, 345, 155);
     const name = prefix ? `${prefix}/${namePart}` : namePart;
-    assertSafeRuntimeRelativePath(name.replace(/\/$/, ''), 'TAR entry path');
-    const normalizedName = name.replace(/\/$/, '');
-    if (names.has(normalizedName)) throw new Error(`Duplicate TAR entry: ${normalizedName}`);
-    names.add(normalizedName);
-
     const size = parseTarOctal(header, 124, 12, 'entry size');
     if (size > limits.fileSize) {
       throw new Error(`TAR entry exceeds the ${limits.fileSize}-byte limit`);
@@ -93,15 +90,29 @@ export function readTarGzArchive(archive: Buffer, limits = MANAGED_RUNTIME_LIMIT
       throw new Error(`Archive exceeds the ${limits.unpackedSize}-byte unpacked-size limit`);
     }
     const typeFlag = String.fromCharCode(header[156] || 0x30);
+    const dataStart = offset + 512;
+    const dataEnd = dataStart + size;
+    if (dataEnd > unpacked.length) throw new Error(`Truncated TAR entry: ${name}`);
+
+    // PAX extended/global headers only describe later entries. This parser
+    // deliberately does not apply their path or link overrides, so they can
+    // be skipped without allowing metadata to redirect extraction.
+    if (typeFlag === 'x' || typeFlag === 'g') {
+      offset = dataStart + Math.ceil(size / 512) * 512;
+      continue;
+    }
+
+    assertSafeRuntimeRelativePath(name.replace(/\/$/, ''), 'TAR entry path');
+    const normalizedName = name.replace(/\/$/, '');
+    if (names.has(normalizedName)) throw new Error(`Duplicate TAR entry: ${normalizedName}`);
+    names.add(normalizedName);
+
     if (typeFlag === '1' || typeFlag === '2') {
       throw new Error(`Runtime archives may not contain links: ${normalizedName}`);
     }
     if (typeFlag !== '\0' && typeFlag !== '0' && typeFlag !== '5') {
       throw new Error(`Unsupported TAR entry type ${JSON.stringify(typeFlag)}: ${normalizedName}`);
     }
-    const dataStart = offset + 512;
-    const dataEnd = dataStart + size;
-    if (dataEnd > unpacked.length) throw new Error(`Truncated TAR entry: ${normalizedName}`);
     entries.push({
       name: normalizedName,
       // Retain a view into the bounded decompression buffer. Copying every

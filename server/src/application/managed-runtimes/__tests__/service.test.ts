@@ -45,6 +45,20 @@ if (args.includes('--version')) {
   console.log('fixture ${version}');
 } else if (args.includes('--probe')) {
   console.log('PROBE_OK');
+} else if (args.includes('--json-rpc-probe')) {
+  let input = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', chunk => {
+    input += chunk;
+    const lines = input.split(/\\r?\\n/);
+    input = lines.pop() ?? '';
+    for (const line of lines) {
+      const message = JSON.parse(line);
+      if (message.method === 'initialize') {
+        console.log(JSON.stringify({ id: message.id, result: { ready: true } }));
+      }
+    }
+  });
 } else if (args[0] === 'auth' && args[1] === 'status') {
   if (process.env.OFFICIAL_FAKE_TOKEN === 'preserved' && process.env.HOME === '/host/home') {
     console.log('AUTH_OK');
@@ -232,6 +246,25 @@ function registerCatalog(
 }
 
 describe('ManagedRuntimeService resolution', () => {
+  it('keeps JSON-RPC stdin open until initialize returns', async () => {
+    const root = await temporaryDirectory();
+    const systemDir = path.join(root, 'system');
+    const systemPath = await executable(systemDir, 'fixture', '1.2.3');
+    const runtimeService = await service({ path: systemDir });
+    const config = descriptor();
+    config.probe = { kind: 'json-rpc', args: ['--json-rpc-probe'] };
+    registerCatalog(runtimeService, config);
+
+    await expect(
+      runtimeService.resolveForPlugin('com.example.fixture', 'fixture', { headless: true })
+    ).resolves.toMatchObject({
+      status: 'resolved',
+      source: 'system',
+      executablePath: systemPath,
+      compatibilityState: 'compatible',
+    });
+  });
+
   it('uses explicit, pinned managed, system, then installed managed in order', async () => {
     const root = await temporaryDirectory();
     const systemDir = path.join(root, 'system');
