@@ -68,6 +68,18 @@ export default {
         sans: ['var(--font-sans)'],
         mono: ['var(--font-mono)'],
       },
+      fontSize: {
+        // Micro-text tiers below text-xs; replaces ad-hoc text-[11px]/text-[10px].
+        '2xs': ['11px', '1.35'],
+        '3xs': ['10px', '1.3'],
+      },
+      zIndex: {
+        // Layer ladder: in-flow chrome (0-50) < dropdown < modal < nested
+        // (dropdowns/dialogs opened above an already-open modal).
+        dropdown: '60',
+        modal: '100',
+        nested: '110',
+      },
     },
   },
   plugins: [],

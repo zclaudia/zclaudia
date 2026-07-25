@@ -156,12 +156,13 @@ export function BrowseView({
         <div className="flex items-center gap-2">
           <h1 className="text-sm font-medium">{TAB_TITLE[tab]}</h1>
           <div className="ml-auto flex items-center gap-2">
-            <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-secondary/30 px-3 py-1.5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-secondary/30 px-3 py-1.5 text-xs text-muted-foreground focus-within:ring-1 focus-within:ring-ring">
               <Search className="h-3.5 w-3.5" strokeWidth={1.75} />
               <input
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Search…"
+                aria-label="Search"
                 className="w-28 bg-transparent outline-none placeholder:text-muted-foreground"
               />
             </div>

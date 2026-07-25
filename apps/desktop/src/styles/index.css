@@ -382,6 +382,15 @@ body {
   min-height: 100vh;
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+  /* No trackpad rubber-band on the app shell; inner scrollers still bounce. */
+  overscroll-behavior: none;
+}
+
+/* Desktop chrome discipline: control labels are not selectable text. Content
+   surfaces (prose, inputs, code) are unaffected. */
+button {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 html.claudia-chat-window,
@@ -531,9 +540,11 @@ body.notch-window {
    box-shadow is intentionally excluded: it is not GPU-composited, so
    transitioning it on every node causes main-thread repaints. Components
    that need a shadow transition opt in locally (e.g. `transition-shadow`). */
+/* 120ms keeps theme switches smooth while hover feedback stays near-instant —
+   200ms read as laggy on desktop pointer interactions. */
 * {
   transition-property: background-color, border-color, color, opacity;
-  transition-duration: 200ms;
+  transition-duration: 120ms;
   transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 

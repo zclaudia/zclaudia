@@ -109,7 +109,7 @@ export function FileContentSearchInput({
 
   return (
     <div className="border-b border-border bg-background/95 flex-shrink-0">
-      <div className="flex items-center gap-2 px-3 py-2">
+      <div className="flex items-center gap-2 px-3 py-2 focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring">
         <Search className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" aria-hidden="true" />
         <input
           ref={inputRef}
