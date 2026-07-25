@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import * as api from '../../../services/api';
 import type { ManagedProcessRecord } from '../../../services/api/debug';
 import { SettingsRow } from '../ui/SettingsGroup';
+import { SECTION_LABEL } from '../../../components/ui/typography';
 
 interface ManagedProcessesSectionProps {
   embeddedServerStatus: string;
@@ -103,9 +104,7 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
                   <div className="text-xs font-medium break-all">
                     {process.command} {process.args.join(' ')}
                   </div>
-                  <div className="text-[11px] text-muted-foreground uppercase">
-                    {process.status}
-                  </div>
+                  <div className={SECTION_LABEL}>{process.status}</div>
                 </div>
                 <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
                   <span>{process.source}</span>

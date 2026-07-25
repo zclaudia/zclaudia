@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Archive, ChevronRight } from 'lucide-react';
 import type { CompactionMarker } from '@zclaudia/shared';
-import { EYEBROW } from '../../components/ui/typography';
+import { SECTION_LABEL } from '../../components/ui/typography';
 
 interface CompactionMarkerCardProps {
   marker: CompactionMarker;
@@ -46,7 +46,7 @@ export function CompactionMarkerCard({ marker }: CompactionMarkerCardProps) {
           strokeWidth={2}
           className={`transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`}
         />
-        <span className="font-medium tracking-wide uppercase text-[10px]">{sourceLabel}</span>
+        <span className={SECTION_LABEL}>{sourceLabel}</span>
         <span className="text-muted-foreground/70">— {tokenLabel}</span>
       </button>
 
@@ -57,7 +57,7 @@ export function CompactionMarkerCard({ marker }: CompactionMarkerCardProps) {
         >
           {hasInstructions && (
             <div>
-              <div className={`${EYEBROW} mb-1`}>Custom instructions</div>
+              <div className={`${SECTION_LABEL} mb-1`}>Custom instructions</div>
               <div className="px-2 py-1.5 rounded bg-background/60 italic text-foreground/90 whitespace-pre-wrap">
                 {marker.customInstructions}
               </div>
@@ -65,7 +65,7 @@ export function CompactionMarkerCard({ marker }: CompactionMarkerCardProps) {
           )}
 
           <div>
-            <div className={`${EYEBROW} mb-1`}>Summary</div>
+            <div className={`${SECTION_LABEL} mb-1`}>Summary</div>
             <pre className="px-2 py-1.5 rounded bg-background/60 whitespace-pre-wrap break-words text-foreground/90 font-sans leading-relaxed">
               {marker.summary}
             </pre>
@@ -80,7 +80,7 @@ export function CompactionMarkerCard({ marker }: CompactionMarkerCardProps) {
               <div className="mt-2 space-y-2">
                 {hasReadFiles && (
                   <div>
-                    <div className={`${EYEBROW} mb-0.5`}>Read</div>
+                    <div className={`${SECTION_LABEL} mb-0.5`}>Read</div>
                     <ul className="list-disc list-inside text-foreground/80">
                       {marker.readFiles.map(path => (
                         <li key={`r-${path}`} className="font-mono break-all">
@@ -92,7 +92,7 @@ export function CompactionMarkerCard({ marker }: CompactionMarkerCardProps) {
                 )}
                 {hasModifiedFiles && (
                   <div>
-                    <div className={`${EYEBROW} mb-0.5`}>Modified</div>
+                    <div className={`${SECTION_LABEL} mb-0.5`}>Modified</div>
                     <ul className="list-disc list-inside text-foreground/80">
                       {marker.modifiedFiles.map(path => (
                         <li key={`m-${path}`} className="font-mono break-all">

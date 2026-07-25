@@ -7,6 +7,7 @@ import { useConnection } from '../../contexts/ConnectionContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import type { BackendSnapshot } from '@zclaudia/shared';
 import type { BackendRecoveryViewState } from '../../stores/recoveryStore';
+import { SECTION_LABEL } from '../../components/ui/typography';
 import {
   getMobileBackendViewState,
   isMobileGatewayConnected,
@@ -181,7 +182,9 @@ export function ServerSelector({ placement = 'down' }: { placement?: 'down' | 'u
 
               {/* Gateway Section */}
               <div>
-                <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider bg-secondary/50 flex items-center justify-between">
+                <div
+                  className={`px-3 py-1.5 ${SECTION_LABEL} bg-secondary/50 flex items-center justify-between`}
+                >
                   <span>{isMobile ? 'Servers' : 'Gateway'}</span>
                   {isGatewayConfigured && (
                     <div className="flex items-center gap-1">
@@ -190,7 +193,7 @@ export function ServerSelector({ placement = 'down' }: { placement?: 'down' | 'u
                           isGatewayReady ? 'bg-success' : 'bg-destructive'
                         }`}
                       />
-                      <span className="text-[10px] normal-case font-normal">
+                      <span className="text-[10px] font-normal">
                         {isGatewayReady ? 'Connected' : 'Disconnected'}
                       </span>
                     </div>
@@ -221,15 +224,11 @@ export function ServerSelector({ placement = 'down' }: { placement?: 'down' | 'u
                       return (
                         <>
                           {showGroups && sameDevice.length > 0 && (
-                            <div className="px-3 py-1 text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider">
-                              This Device
-                            </div>
+                            <div className={`px-3 py-1 ${SECTION_LABEL}`}>This device</div>
                           )}
                           {sameDevice.map(renderItem)}
                           {showGroups && remote.length > 0 && (
-                            <div className="px-3 py-1 text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider">
-                              Remote
-                            </div>
+                            <div className={`px-3 py-1 ${SECTION_LABEL}`}>Remote</div>
                           )}
                           {remote.map(renderItem)}
                         </>

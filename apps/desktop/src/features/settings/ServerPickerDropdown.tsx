@@ -1,6 +1,7 @@
 import type { BackendConnectionState, BackendSnapshot, GatewayBackendInfo } from '@zclaudia/shared';
 import { getMobileBackendViewState } from '../../services/mobileConnectionState';
 import type { MobileBackendViewState } from '../../services/mobileConnectionState';
+import { SECTION_LABEL } from '../../components/ui/typography';
 
 export function getViewStateLabel(viewState: MobileBackendViewState): string | null {
   switch (viewState) {
@@ -42,8 +43,8 @@ export function ServerPickerDropdown({
       <div className="absolute left-1 right-1 top-full bg-card border border-border rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
         {isGatewayConnected && visibleGatewayBackends.length > 0 && (
           <>
-            <div className="px-3 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider bg-secondary/50 border-t border-border">
-              Via Gateway
+            <div className={`px-3 py-1 ${SECTION_LABEL} bg-secondary/50 border-t border-border`}>
+              Via gateway
             </div>
             {visibleGatewayBackends.map(backend => {
               const gwId = backend.backendId;

@@ -1,6 +1,7 @@
 import { Gauge } from 'lucide-react';
 import type { ContextUsagePayload } from '@zclaudia/shared';
 import { formatTokens } from '../../utils/formatTokens';
+import { SECTION_LABEL } from '../../components/ui/typography';
 
 interface ContextUsageCardProps {
   usage: ContextUsagePayload;
@@ -93,9 +94,7 @@ export function ContextUsageCard({ usage, bare = false }: ContextUsageCardProps)
     >
       <div className="flex items-center gap-2">
         <Gauge size={14} strokeWidth={1.5} className="flex-shrink-0 text-muted-foreground" />
-        <span className="font-medium tracking-wide uppercase text-[10px] text-muted-foreground">
-          Context window
-        </span>
+        <span className={SECTION_LABEL}>Context window</span>
         <span className="ml-auto text-muted-foreground">
           {`${formatTokenCount(usedTokens)} / ${formatTokenCount(contextWindow)} (${usedPercent.toFixed(1)}%)`}
         </span>

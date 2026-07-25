@@ -11,6 +11,7 @@ import {
 } from '../../../services/api';
 import { LocalPRCard } from './LocalPRCard';
 import { CreateLocalPRDialog } from './CreateLocalPRDialog';
+import { SECTION_LABEL } from '../../../components/ui/typography';
 
 const STATUS_ORDER: LocalPRStatus[] = [
   'conflict',
@@ -26,8 +27,8 @@ const STATUS_ORDER: LocalPRStatus[] = [
 const GROUP_LABELS: Partial<Record<LocalPRStatus, string>> = {
   open: 'Open',
   reviewing: 'Reviewing',
-  review_failed: 'Review Failed',
-  approved: 'Approved — Ready to Merge',
+  review_failed: 'Review failed',
+  approved: 'Approved — ready to merge',
   merging: 'Merging',
   conflict: 'Conflict',
   merged: 'Merged',
@@ -228,9 +229,7 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
         {/* Worktree Configs */}
         {!loading && allNonMainWorktrees.length > 0 && (
           <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              Worktrees
-            </h3>
+            <h3 className={`${SECTION_LABEL} mb-2`}>Worktrees</h3>
             <div className="space-y-1.5">
               {allNonMainWorktrees.map(wt => {
                 const config = wtConfigs[wt.path];
@@ -323,9 +322,7 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
         {(Object.entries(grouped) as [LocalPRStatus, typeof projectPRs][]).map(
           ([status, items]) => (
             <div key={status}>
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                {GROUP_LABELS[status] ?? status}
-              </h3>
+              <h3 className={`${SECTION_LABEL} mb-2`}>{GROUP_LABELS[status] ?? status}</h3>
               <div className="space-y-2">
                 {items.map(pr => (
                   <LocalPRCard key={pr.id} pr={pr} projectId={projectId} />

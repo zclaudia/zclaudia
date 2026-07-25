@@ -51,7 +51,7 @@ describe('PermissionSelector', () => {
 
     fireEvent.click(screen.getByRole('button'));
 
-    expect(screen.getByText('Session Permission Override')).toBeInTheDocument();
+    expect(screen.getByText('Session permission override')).toBeInTheDocument();
     // v3 presets: Read Only, Standard, Power User, Full Auto
     expect(screen.getAllByText(/Read Only/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Standard/).length).toBeGreaterThanOrEqual(1);
@@ -63,12 +63,12 @@ describe('PermissionSelector', () => {
     render(<PermissionSelector value={null} onChange={() => {}} />);
 
     fireEvent.click(screen.getByRole('button'));
-    expect(screen.getByText('Session Permission Override')).toBeInTheDocument();
+    expect(screen.getByText('Session permission override')).toBeInTheDocument();
 
     // Click outside
     fireEvent.mouseDown(document.body);
 
-    expect(screen.queryByText('Session Permission Override')).not.toBeInTheDocument();
+    expect(screen.queryByText('Session permission override')).not.toBeInTheDocument();
   });
 
   it('should call onChange with selected preset', () => {
@@ -183,7 +183,7 @@ describe('PermissionSelector', () => {
 
     fireEvent.click(screen.getByRole('button'));
 
-    expect(screen.queryByText('Session Permission Override')).not.toBeInTheDocument();
+    expect(screen.queryByText('Session permission override')).not.toBeInTheDocument();
   });
 
   it('should show temporary override info in footer', () => {

@@ -3,7 +3,7 @@ import { Pencil, RotateCcw, Trash2, X, Paperclip, Zap } from 'lucide-react';
 import type { LocalIssue } from '@zclaudia/shared';
 import { ACTIONABLE_LABEL } from '@zclaudia/shared';
 import { useLocalIssueStore } from '../store';
-import { EYEBROW } from '../../../components/ui/typography';
+import { SECTION_LABEL } from '../../../components/ui/typography';
 import { AttachmentList, useAttachments, useAttachmentCount } from '../../attachments';
 import { CreateIssueDialog } from './CreateIssueDialog';
 import { IssueMarkdown } from './IssueMarkdown';
@@ -155,7 +155,7 @@ export function LocalIssueDetailView({ issue, projectId, onDeleted }: LocalIssue
 
         {/* Description */}
         <section className="space-y-1.5">
-          <div className={EYEBROW}>Description</div>
+          <div className={SECTION_LABEL}>Description</div>
           <div className="border border-border rounded-md bg-card px-3 py-2">
             {issue.description?.trim() ? (
               <IssueMarkdown content={issue.description} />
@@ -168,7 +168,7 @@ export function LocalIssueDetailView({ issue, projectId, onDeleted }: LocalIssue
         {/* Attachments */}
         {attachmentCount > 0 && (
           <section className="space-y-1.5">
-            <div className={EYEBROW}>Attachments</div>
+            <div className={SECTION_LABEL}>Attachments</div>
             <AttachmentList
               items={attachments.items}
               onRemove={id => void attachments.remove(id)}

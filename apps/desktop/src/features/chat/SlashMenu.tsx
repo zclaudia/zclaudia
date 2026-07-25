@@ -1,6 +1,7 @@
 import { forwardRef, useMemo } from 'react';
 import { Pin, PinOff, Sparkles, Terminal, Bookmark } from 'lucide-react';
 import type { SkillRef } from '@zclaudia/shared';
+import { SECTION_LABEL } from '../../components/ui/typography';
 
 /**
  * Cursor-style slash/skill command menu.
@@ -138,7 +139,7 @@ export const SlashMenu = forwardRef<HTMLDivElement, SlashMenuProps>(function Sla
     >
       {groups.map(group => (
         <div key={group.key} className="py-1">
-          <div className="flex items-center gap-1.5 px-3 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className={`flex items-center gap-1.5 px-3 pt-1.5 pb-1 ${SECTION_LABEL}`}>
             <group.icon size={11} strokeWidth={2} />
             {group.label}
           </div>

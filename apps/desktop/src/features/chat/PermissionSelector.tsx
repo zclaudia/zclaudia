@@ -10,6 +10,7 @@ import {
   SlidersHorizontal,
   AlertTriangle,
 } from 'lucide-react';
+import { SECTION_LABEL } from '../../components/ui/typography';
 import type { LucideIcon } from 'lucide-react';
 import type {
   UnifiedPermissionPolicy,
@@ -214,8 +215,8 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
       {isOpen && (
         <div className="absolute bottom-full left-0 mb-1 z-50 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl py-1 min-w-[260px] max-h-[400px] overflow-y-auto animate-apple-fade-in">
           {/* Header */}
-          <div className="px-3 py-1.5 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider border-b border-border">
-            Session Permission Override
+          <div className={`px-3 py-1.5 ${SECTION_LABEL} border-b border-border`}>
+            Session permission override
           </div>
 
           {/* Project Default option */}

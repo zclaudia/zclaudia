@@ -7,6 +7,7 @@ import {
   extractDocSummary,
   getEditableDocType,
 } from './supervisor-utils';
+import { SECTION_LABEL } from '../../../components/ui/typography';
 
 interface WorkspaceDocsPanelProps {
   docs: ContextDocumentPreview[];
@@ -60,7 +61,7 @@ export function WorkspaceDocsPanel({
     <div className="flex min-w-0 flex-col overflow-hidden">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div>
-          <h3 className="text-xs font-semibold uppercase text-muted-foreground">Workspace Docs</h3>
+          <h3 className={SECTION_LABEL}>Workspace docs</h3>
           <p className="text-[11px] text-muted-foreground">
             {previewChange ? (
               <>Viewing `.supervision/changes/{previewChange.id}`</>
@@ -168,9 +169,7 @@ export function WorkspaceDocsPanel({
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
                     {previewAcceptanceDoc && (
                       <div className="rounded-md border border-border bg-background px-2.5 py-2">
-                        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                          Acceptance
-                        </div>
+                        <div className={SECTION_LABEL}>Acceptance</div>
                         <div className="mt-1 text-[11px] text-foreground">
                           {extractDocSummary(
                             previewAcceptanceDoc.content,
@@ -181,9 +180,7 @@ export function WorkspaceDocsPanel({
                     )}
                     {previewSyncDoc && (
                       <div className="rounded-md border border-border bg-background px-2.5 py-2">
-                        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                          Sync
-                        </div>
+                        <div className={SECTION_LABEL}>Sync</div>
                         <div className="mt-1 text-[11px] text-foreground">
                           {extractDocSummary(
                             previewSyncDoc.content,

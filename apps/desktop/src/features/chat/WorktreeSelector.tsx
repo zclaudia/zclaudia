@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import type { GitWorktree } from '@zclaudia/shared';
 import * as api from '../../services/api';
 import { SelectorTrigger } from './SelectorTrigger';
+import { SECTION_LABEL } from '../../components/ui/typography';
 
 function pathBasename(p: string): string {
   return p.replace(/\\/g, '/').split('/').filter(Boolean).pop() || p;
@@ -219,9 +220,7 @@ export function WorktreeSelector({
 
       {isOpen && (
         <div className="absolute bottom-full left-0 mb-1 z-50 bg-popover border border-border rounded-xl shadow-lg py-1 w-[min(92vw,320px)] max-h-[320px] overflow-y-auto">
-          <div className="px-3 py-1.5 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider border-b border-border">
-            Worktree
-          </div>
+          <div className={`px-3 py-1.5 ${SECTION_LABEL} border-b border-border`}>Worktree</div>
 
           {/* Root (default) */}
           <button
