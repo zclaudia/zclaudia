@@ -110,14 +110,14 @@ export async function handleClientMessage(
   termMgr?: TerminalManager
 ): Promise<void> {
   if (ctx.browserManager && message.type.startsWith('browser_')) {
-    handleBrowserMessage(
+    const handled = handleBrowserMessage(
       client,
       message,
       ctx.browserManager,
       ctx.broadcastBrowserEngineStatus ?? (() => {}),
       ctx.installBrowserEngine
     );
-    return;
+    if (handled) return;
   }
 
   switch (message.type) {

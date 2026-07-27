@@ -11,7 +11,7 @@ import type { BrowserInputEvent } from '@zclaudia/shared';
 const RESIZE_DEBOUNCE_MS = 200;
 
 export function BrowserPanel(_props: { projectId?: string; projectRoot?: string; workingDirectory?: string; panelId?: string }) {
-  const { sendMessage } = useConnection();
+  const { sendMessage, isConnected } = useConnection();
   const sessionId = useSelectionStore((s) => s.selectedSessionId);
   const engine = useBrowserStore((s) => s.engine);
   const view = useBrowserStore((s) => (sessionId ? s.sessions[sessionId] : undefined));
@@ -28,17 +28,49 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
     };
   }, []);
 
+  // Open + attach for the current session. Idempotent server-side, so it's safe
+  // to call again on reconnect / engine-ready without tearing anything down first.
+  const openAndAttach = useCallback(
+    (targetSessionId: string) => {
+      sendMessage({ type: 'browser_open', sessionId: targetSessionId });
+      const vp = measure() ?? { width: 1024, height: 768, dpr: 1 };
+      setViewport({ width: vp.width, height: vp.height });
+      sendMessage({ type: 'browser_attach', sessionId: targetSessionId, viewport: vp });
+    },
+    [sendMessage, measure]
+  );
+
   // Open + attach on mount / session change; detach on unmount.
   useEffect(() => {
     if (!sessionId) return;
-    sendMessage({ type: 'browser_open', sessionId });
-    const vp = measure() ?? { width: 1024, height: 768, dpr: 1 };
-    setViewport({ width: vp.width, height: vp.height });
-    sendMessage({ type: 'browser_attach', sessionId, viewport: vp });
+    openAndAttach(sessionId);
     return () => {
       sendMessage({ type: 'browser_detach', sessionId });
     };
-  }, [sessionId, sendMessage, measure]);
+  }, [sessionId, sendMessage, openAndAttach]);
+
+  // Re-open + attach once the engine transitions into 'ready' (e.g. after the
+  // download flow completes) — the initial mount-time open no-ops server-side
+  // while the engine is missing, so we need to retry once it becomes available.
+  const prevEngineStatusRef = useRef(engine.status);
+  useEffect(() => {
+    const prevStatus = prevEngineStatusRef.current;
+    prevEngineStatusRef.current = engine.status;
+    if (prevStatus !== 'ready' && engine.status === 'ready' && sessionId) {
+      openAndAttach(sessionId);
+    }
+  }, [engine.status, sessionId, openAndAttach]);
+
+  // Re-open + attach after a WS reconnect: the server-side session/attachment
+  // state is gone from this client's perspective once the socket drops.
+  const prevConnectedRef = useRef(isConnected);
+  useEffect(() => {
+    const prevConnected = prevConnectedRef.current;
+    prevConnectedRef.current = isConnected;
+    if (!prevConnected && isConnected && sessionId) {
+      openAndAttach(sessionId);
+    }
+  }, [isConnected, sessionId, openAndAttach]);
 
   // Debounced resize → browser_resize.
   useEffect(() => {
@@ -111,11 +143,7 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
             <div className="text-sm text-muted-foreground">Browser page crashed</div>
             <button
               className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90"
-              onClick={() => {
-                sendMessage({ type: 'browser_open', sessionId });
-                const vp = measure();
-                if (vp) sendMessage({ type: 'browser_attach', sessionId, viewport: vp });
-              }}
+              onClick={() => openAndAttach(sessionId)}
             >
               Reopen
             </button>

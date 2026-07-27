@@ -45,13 +45,13 @@ describe('handleBrowserMessage', () => {
     expect(mgr.open).toHaveBeenCalledWith('c1', 's1', undefined);
   });
 
-  it('routes attach/detach/close', () => {
+  it('routes attach/detach/close with the client id (ownership checks)', () => {
     handleBrowserMessage(client, { type: 'browser_attach', sessionId: 's1', viewport }, mgr as never, () => {});
     handleBrowserMessage(client, { type: 'browser_detach', sessionId: 's1' }, mgr as never, () => {});
     handleBrowserMessage(client, { type: 'browser_close', sessionId: 's1' }, mgr as never, () => {});
     expect(mgr.attach).toHaveBeenCalledWith('c1', 's1', viewport);
-    expect(mgr.detach).toHaveBeenCalledWith('s1');
-    expect(mgr.close).toHaveBeenCalledWith('s1', 'user');
+    expect(mgr.detach).toHaveBeenCalledWith('c1', 's1');
+    expect(mgr.close).toHaveBeenCalledWith('c1', 's1', 'user');
   });
 
   it('normalizes navigate URLs (adds https://, passes localhost through as http)', () => {

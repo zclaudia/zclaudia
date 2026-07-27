@@ -17,6 +17,8 @@ interface ManagedBrowserSession {
  */
 export class BrowserManager {
   private sessions = new Map<string, ManagedBrowserSession>();
+  /** In-flight open() calls per sessionId, so concurrent opens/attaches don't race the engine launch. */
+  private opening = new Map<string, Promise<void>>();
 
   constructor(
     private engine: BrowserEngine,
@@ -27,33 +29,30 @@ export class BrowserManager {
     if (managed.attachedClientId) this.sendToClient(managed.attachedClientId, msg);
   }
 
+  /** Await any in-flight open() for this sessionId before touching `this.sessions`. */
+  private async ready(sessionId: string): Promise<void> {
+    const inFlight = this.opening.get(sessionId);
+    if (inFlight) await inFlight;
+  }
+
   async open(clientId: string, sessionId: string, url?: string): Promise<void> {
-    let managed = this.sessions.get(sessionId);
-    if (!managed) {
-      const status = await this.engine.engineStatus();
-      if (status.status !== 'ready') {
-        this.sendToClient(clientId, { type: 'browser_engine_status', status: 'missing' });
-        return;
-      }
-      // Create entry object before passing to engine callbacks so they can capture and reference it.
-      const entry: ManagedBrowserSession = {
-        session: null as unknown as EngineSession,
-        attachedClientId: null,
-        streaming: false,
-      };
-      entry.session = await this.engine.createSession({
-        onFrame: (data, metadata) => {
-          if (entry.streaming) this.send(entry, { type: 'browser_frame', sessionId, data, metadata });
-        },
-        onState: (state) => this.send(entry, { type: 'browser_state', sessionId, state }),
-        onCrashed: () => {
-          this.send(entry, { type: 'browser_closed', sessionId, reason: 'crash' });
-          this.sessions.delete(sessionId);
-        },
+    // Dedup concurrent open() calls for the same sessionId onto a single engine
+    // session creation (fixes the React StrictMode double-mount Page leak): the
+    // first caller creates the shared promise, later callers just await it.
+    let create = this.opening.get(sessionId);
+    if (!create && !this.sessions.has(sessionId)) {
+      create = this.createSession(sessionId, url);
+      this.opening.set(sessionId, create);
+      void create.finally(() => {
+        if (this.opening.get(sessionId) === create) this.opening.delete(sessionId);
       });
-      this.sessions.set(sessionId, entry);
-      managed = entry;
-      if (url) await managed.session.navigate(url);
+    }
+    if (create) await create;
+
+    const managed = this.sessions.get(sessionId);
+    if (!managed) {
+      this.sendToClient(clientId, { type: 'browser_engine_status', status: 'missing' });
+      return;
     }
     this.sendToClient(clientId, {
       type: 'browser_opened',
@@ -62,7 +61,34 @@ export class BrowserManager {
     });
   }
 
+  /** Launches the engine session for sessionId exactly once; only called while holding `opening`. */
+  private async createSession(sessionId: string, url: string | undefined): Promise<void> {
+    const status = await this.engine.engineStatus();
+    if (status.status !== 'ready') {
+      return;
+    }
+    // Create entry object before passing to engine callbacks so they can capture and reference it.
+    const entry: ManagedBrowserSession = {
+      session: null as unknown as EngineSession,
+      attachedClientId: null,
+      streaming: false,
+    };
+    entry.session = await this.engine.createSession({
+      onFrame: (data, metadata) => {
+        if (entry.streaming) this.send(entry, { type: 'browser_frame', sessionId, data, metadata });
+      },
+      onState: (state) => this.send(entry, { type: 'browser_state', sessionId, state }),
+      onCrashed: () => {
+        this.send(entry, { type: 'browser_closed', sessionId, reason: 'crash' });
+        this.sessions.delete(sessionId);
+      },
+    });
+    this.sessions.set(sessionId, entry);
+    if (url) await entry.session.navigate(url);
+  }
+
   async attach(clientId: string, sessionId: string, viewport: BrowserViewport): Promise<void> {
+    await this.ready(sessionId);
     const managed = this.sessions.get(sessionId);
     if (!managed) return;
     managed.attachedClientId = clientId;
@@ -72,43 +98,64 @@ export class BrowserManager {
     this.send(managed, { type: 'browser_state', sessionId, state: managed.session.getState() });
   }
 
-  async detach(sessionId: string): Promise<void> {
+  async detach(clientId: string, sessionId: string): Promise<void> {
+    await this.ready(sessionId);
     const managed = this.sessions.get(sessionId);
     if (!managed) return;
+    if (managed.attachedClientId !== clientId) return;
     managed.streaming = false;
     managed.attachedClientId = null;
     await managed.session.stopScreencast();
   }
 
-  async close(sessionId: string, reason: 'user' | 'idle' | 'shutdown'): Promise<void> {
+  async close(clientId: string, sessionId: string, reason: 'user' | 'idle' | 'shutdown'): Promise<void> {
+    await this.ready(sessionId);
     const managed = this.sessions.get(sessionId);
     if (!managed) return;
+    if (reason === 'user' && managed.attachedClientId !== null && managed.attachedClientId !== clientId) {
+      return; // Refused: another client owns the attach.
+    }
+    await this.closeInternal(sessionId, managed, reason);
+  }
+
+  /** Closes unconditionally, regardless of ownership. Used by dispose()/crash paths. */
+  private async closeInternal(
+    sessionId: string,
+    managed: ManagedBrowserSession,
+    reason: 'user' | 'idle' | 'shutdown'
+  ): Promise<void> {
     this.send(managed, { type: 'browser_closed', sessionId, reason });
     this.sessions.delete(sessionId);
     await managed.session.close();
   }
 
   async navigate(sessionId: string, url: string): Promise<void> {
+    await this.ready(sessionId);
     await this.sessions.get(sessionId)?.session.navigate(url);
   }
 
   async history(sessionId: string, direction: 'back' | 'forward'): Promise<void> {
+    await this.ready(sessionId);
     await this.sessions.get(sessionId)?.session.history(direction);
   }
 
   async reload(sessionId: string): Promise<void> {
+    await this.ready(sessionId);
     await this.sessions.get(sessionId)?.session.reload();
   }
 
   async stop(sessionId: string): Promise<void> {
+    await this.ready(sessionId);
     await this.sessions.get(sessionId)?.session.stop();
   }
 
   async input(sessionId: string, event: BrowserInputEvent): Promise<void> {
+    await this.ready(sessionId);
     await this.sessions.get(sessionId)?.session.dispatchInput(event);
   }
 
   async resize(sessionId: string, viewport: BrowserViewport): Promise<void> {
+    await this.ready(sessionId);
     await this.sessions.get(sessionId)?.session.setViewport(viewport);
   }
 
@@ -124,8 +171,8 @@ export class BrowserManager {
   }
 
   async dispose(): Promise<void> {
-    for (const [sessionId] of this.sessions) {
-      await this.close(sessionId, 'shutdown');
+    for (const [sessionId, managed] of [...this.sessions]) {
+      await this.closeInternal(sessionId, managed, 'shutdown');
     }
     await this.engine.dispose();
   }

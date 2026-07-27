@@ -69,10 +69,10 @@ export function handleBrowserMessage(
       run(msg.sessionId, browserMgr.attach(client.id, msg.sessionId, msg.viewport));
       break;
     case 'browser_detach':
-      run(msg.sessionId, browserMgr.detach(msg.sessionId));
+      run(msg.sessionId, browserMgr.detach(client.id, msg.sessionId));
       break;
     case 'browser_close':
-      run(msg.sessionId, browserMgr.close(msg.sessionId, 'user'));
+      run(msg.sessionId, browserMgr.close(client.id, msg.sessionId, 'user'));
       break;
     case 'browser_navigate':
       run(msg.sessionId, browserMgr.navigate(msg.sessionId, normalizeUrl(msg.url)));

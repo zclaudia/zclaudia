@@ -33,6 +33,7 @@ zclaudia/
 | `GATEWAY_URL`                         | server          | WebSocket URL to connect to gateway                               |
 | `GATEWAY_SECRET`                      | server, gateway | Shared secret for gateway auth                                    |
 | `GATEWAY_NAME`                        | server          | Backend display name on gateway                                   |
+| `ZCLAUDIA_CHROME_PATH`                | server          | Explicit Chromium executable path for the browser panel engine (skips auto-discovery) |
 | `ZCLAUDIA_TRUSTED_RUNTIME_PUBLISHERS` | server          | Comma-separated publishers trusted for managed CLI auto-install   |
 | `ZCLAUDIA_RUNTIME_MIRROR_ORIGINS`     | server          | Exact enterprise mirror origins allowed for managed CLI downloads |
 

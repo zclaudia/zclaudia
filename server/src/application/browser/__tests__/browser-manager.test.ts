@@ -120,11 +120,21 @@ describe('BrowserManager', () => {
   it('detach stops the screencast and drops frames', async () => {
     await manager.open('c1', 's1');
     await manager.attach('c1', 's1', { width: 800, height: 600, dpr: 1 });
-    await manager.detach('s1');
+    await manager.detach('c1', 's1');
     const s = engine.sessions[0];
     expect(s.screencasting).toBe(false);
     s.callbacks.onFrame('AAAA', { deviceWidth: 800, deviceHeight: 600 });
     expect(of('browser_frame')).toHaveLength(0);
+  });
+
+  it('detach is a no-op for a client that does not own the attach (stale/duplicate detach)', async () => {
+    await manager.open('c1', 's1');
+    await manager.attach('c1', 's1', { width: 800, height: 600, dpr: 1 });
+    await manager.detach('c2', 's1');
+    const s = engine.sessions[0];
+    expect(s.screencasting).toBe(true);
+    s.callbacks.onFrame('AAAA', { deviceWidth: 800, deviceHeight: 600 });
+    expect(of('browser_frame')).toHaveLength(1);
   });
 
   it('state changes broadcast browser_state to the attached client', async () => {
@@ -149,11 +159,26 @@ describe('BrowserManager', () => {
   it('close destroys the session and notifies with reason', async () => {
     await manager.open('c1', 's1');
     await manager.attach('c1', 's1', { width: 800, height: 600, dpr: 1 });
-    await manager.close('s1', 'user');
+    await manager.close('c1', 's1', 'user');
     expect(engine.sessions[0].closed).toBe(true);
     const closed = of('browser_closed');
     expect(closed).toHaveLength(1);
     expect((closed[0].msg as { reason: string }).reason).toBe('user');
+  });
+
+  it('close(user) is refused for a non-owner while another client is attached', async () => {
+    await manager.open('c1', 's1');
+    await manager.attach('c1', 's1', { width: 800, height: 600, dpr: 1 });
+    await manager.close('c2', 's1', 'user');
+    expect(engine.sessions[0].closed).toBe(false);
+    expect(of('browser_closed')).toHaveLength(0);
+  });
+
+  it('close(user) is allowed when nobody is attached yet', async () => {
+    await manager.open('c1', 's1');
+    await manager.close('c2', 's1', 'user');
+    // No client is attached to receive browser_closed, but the session itself must be torn down.
+    expect(engine.sessions[0].closed).toBe(true);
   });
 
   it('crash callback notifies browser_closed(crash) and forgets the session', async () => {
@@ -209,5 +234,77 @@ describe('BrowserManager', () => {
     await manager.resize('s1', { width: 1024, height: 768, dpr: 1.5 });
     expect(engine.sessions[0].resizes).toHaveLength(2); // 1 from attach, 1 from resize
     expect(engine.sessions[0].resizes[1]).toEqual({ width: 1024, height: 768, dpr: 1.5 });
+  });
+});
+
+/** FakeEngine whose createSession() only resolves once the test explicitly releases it. */
+class GatedFakeEngine extends FakeEngine {
+  private gateResolve: (() => void) | null = null;
+  private gate: Promise<void> = Promise.resolve();
+  createSessionCalls = 0;
+
+  /** Blocks subsequent createSession() calls until release() is invoked. */
+  hold(): void {
+    this.gate = new Promise((resolve) => {
+      this.gateResolve = resolve;
+    });
+  }
+
+  release(): void {
+    this.gateResolve?.();
+    this.gateResolve = null;
+  }
+
+  async createSession(callbacks: EngineSessionCallbacks) {
+    this.createSessionCalls++;
+    await this.gate;
+    return super.createSession(callbacks);
+  }
+}
+
+describe('BrowserManager open() race conditions', () => {
+  it('attach arriving while open() is still launching Chrome waits, then replays state (no silent no-op)', async () => {
+    const engine = new GatedFakeEngine();
+    const sent: Array<{ clientId: string; msg: ServerMessage }> = [];
+    const manager = new BrowserManager(engine, (clientId, msg) => sent.push({ clientId, msg }));
+    const of = (type: string) => sent.filter((s) => s.msg.type === type);
+
+    engine.hold();
+    const openPromise = manager.open('c1', 's1'); // Not awaited: Chrome launch is "in flight".
+    const attachPromise = manager.attach('c1', 's1', { width: 800, height: 600, dpr: 1 });
+
+    // Give both async calls a chance to run up to the gate.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(engine.createSessionCalls).toBe(1);
+    expect(of('browser_opened')).toHaveLength(0); // Still waiting on the gate.
+
+    engine.release();
+    await openPromise;
+    await attachPromise;
+
+    const s = engine.sessions[0];
+    expect(s.screencasting).toBe(true);
+    expect(s.viewport).toEqual({ width: 800, height: 600, dpr: 1 });
+    expect(of('browser_opened')).toHaveLength(1);
+    expect(of('browser_state').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('two concurrent open() calls for the same sessionId create exactly one engine session; both callers get browser_opened', async () => {
+    const engine = new GatedFakeEngine();
+    const sent: Array<{ clientId: string; msg: ServerMessage }> = [];
+    const manager = new BrowserManager(engine, (clientId, msg) => sent.push({ clientId, msg }));
+    const of = (type: string) => sent.filter((s) => s.msg.type === type);
+
+    engine.hold();
+    const open1 = manager.open('c1', 's1');
+    const open2 = manager.open('c2', 's1');
+    engine.release();
+    await Promise.all([open1, open2]);
+
+    expect(engine.createSessionCalls).toBe(1);
+    expect(engine.sessions).toHaveLength(1);
+    const opened = of('browser_opened');
+    expect(opened).toHaveLength(2);
+    expect(opened.map((o) => o.clientId).sort()).toEqual(['c1', 'c2']);
   });
 });
