@@ -8,6 +8,7 @@ import type {
   TodoUpdateInteractionMessage,
 } from '../../interaction/forms.js';
 import type { ClientMessage, ServerMessage } from './index.js';
+import type { BrowserClientMessage, BrowserServerMessage } from './browser.js';
 import type { ClaudiaClientMessage, ClaudiaServerMessage } from './claudia.js';
 import type { CoreClientMessage, CoreServerMessage } from './core.js';
 import type { CrudClientMessage, CrudServerMessage } from './crud.js';
@@ -52,7 +53,8 @@ type EnumeratedClientMessage =
   | PluginsClientMessage
   | MetaWorkflowClientMessage
   | OpenSpecClientMessage
-  | GoalClientMessage;
+  | GoalClientMessage
+  | BrowserClientMessage;
 
 type EnumeratedServerMessage =
   | CoreServerMessage
@@ -72,7 +74,8 @@ type EnumeratedServerMessage =
   | TodoUpdateInteractionMessage
   | ApprovalInteractionMessage
   | PlanReviewInteractionMessage
-  | InteractionResolvedMessage;
+  | InteractionResolvedMessage
+  | BrowserServerMessage;
 
 describe('wire message union coverage', () => {
   it('includes every module-level client message union', () => {
@@ -90,6 +93,7 @@ describe('wire message union coverage', () => {
     assertAssignable<AssertAssignable<MetaWorkflowClientMessage, ClientMessage>>();
     assertAssignable<AssertAssignable<OpenSpecClientMessage, ClientMessage>>();
     assertAssignable<AssertAssignable<GoalClientMessage, ClientMessage>>();
+    assertAssignable<AssertAssignable<BrowserClientMessage, ClientMessage>>();
 
     expect(true).toBe(true);
   });
@@ -113,6 +117,7 @@ describe('wire message union coverage', () => {
     assertAssignable<AssertAssignable<ApprovalInteractionMessage, ServerMessage>>();
     assertAssignable<AssertAssignable<PlanReviewInteractionMessage, ServerMessage>>();
     assertAssignable<AssertAssignable<InteractionResolvedMessage, ServerMessage>>();
+    assertAssignable<AssertAssignable<BrowserServerMessage, ServerMessage>>();
 
     expect(true).toBe(true);
   });

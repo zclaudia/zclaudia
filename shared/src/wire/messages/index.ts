@@ -14,6 +14,7 @@ export * from './plugins.js';
 export * from './meta-workflow.js';
 export * from './openspec.js';
 export * from './goal.js';
+export * from './browser.js';
 
 import type {
   ApprovalInteractionMessage,
@@ -23,6 +24,7 @@ import type {
   PlanReviewInteractionMessage,
   TodoUpdateInteractionMessage,
 } from '../../interaction/forms.js';
+import type { BrowserClientMessage, BrowserServerMessage } from './browser.js';
 import type { ClaudiaClientMessage, ClaudiaServerMessage } from './claudia.js';
 import type { CoreClientMessage, CoreServerMessage } from './core.js';
 import type { CrudClientMessage, CrudServerMessage } from './crud.js';
@@ -60,7 +62,8 @@ export type ClientMessage =
   | PluginsClientMessage
   | MetaWorkflowClientMessage
   | OpenSpecClientMessage
-  | GoalClientMessage;
+  | GoalClientMessage
+  | BrowserClientMessage;
 
 // ============================================
 // Server -> Client messages (union type)
@@ -84,4 +87,5 @@ export type ServerMessage =
   | TodoUpdateInteractionMessage
   | ApprovalInteractionMessage
   | PlanReviewInteractionMessage
-  | InteractionResolvedMessage;
+  | InteractionResolvedMessage
+  | BrowserServerMessage;
