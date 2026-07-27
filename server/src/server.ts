@@ -21,6 +21,11 @@ import { generateKeyPair, getPublicKeyPem } from './utils/crypto.js';
 import { GatewayNotificationSender } from './infra/push/notification-sender.js';
 import { ClaudiaBranchService } from './application/orchestration/claudia-branch-service.js';
 import { getGatewayClient } from './infra/gateway/gateway-instance.js';
+import { BrowserManager } from './application/browser/browser-manager.js';
+import { PuppeteerEngine } from './application/browser/puppeteer-engine.js';
+import { installEngine, defaultEngineInstallDeps } from './application/browser/engine-install.js';
+import { resolveDataDir } from './utils/data-dir.js';
+import path from 'node:path';
 
 // WebSocket message-router architecture.
 import { createRouter } from './interfaces/websocket/index.js';
@@ -74,6 +79,7 @@ export interface ServerContext {
   server: Server;
   db: ReturnType<typeof initDatabase>;
   terminalManager: TerminalManager;
+  browserManager: BrowserManager;
   handleMessage: (client: ConnectedClient, message: ClientMessage) => Promise<void>;
   getGatewayStatus: () => GatewayStatus;
   getStateHeartbeat: () => StateHeartbeatMessage;
@@ -128,6 +134,21 @@ export async function createServer(): Promise<ServerContext> {
     const client = clients.get(clientId);
     if (client) sendMessage(client.ws, msg);
   });
+
+  // Browser manager for the browser panel (Chromium screencast + input forwarding).
+  // Mirrors TerminalManager's DI shape: engine + per-client send callback.
+  const dataDir = resolveDataDir();
+  const browserEngine = new PuppeteerEngine({
+    profileDir: path.join(dataDir, 'browser-profile'),
+    cacheDir: path.join(dataDir, 'browsers'),
+  });
+  const browserManager = new BrowserManager(browserEngine, (clientId, msg) => {
+    const client = clients.get(clientId);
+    if (client) sendMessage(client.ws, msg);
+  });
+  serverState.browserManager = browserManager;
+  serverState.installBrowserEngineFn = notify =>
+    installEngine(defaultEngineInstallDeps(path.join(dataDir, 'browsers')), notify);
 
   // Create notification sender — always gateway-aware.
   serverState.notificationSender = new GatewayNotificationSender(() => getGatewayClient());
@@ -354,6 +375,7 @@ export async function createServer(): Promise<ServerContext> {
       console.log(`Client disconnected: ${clientId}`);
       clients.delete(clientId);
       terminalManager.detachClient(clientId);
+      browserManager.detachClient(clientId);
 
       const orphanedRuns: string[] = [];
       activeRuns.forEach((run, runId) => {
@@ -383,6 +405,7 @@ export async function createServer(): Promise<ServerContext> {
     server,
     db,
     terminalManager,
+    browserManager,
     getStateHeartbeat: () => serverState.buildStateHeartbeat(),
     handleMessage: async (client: ConnectedClient, message: ClientMessage) => {
       if (!clients.has(client.id)) {

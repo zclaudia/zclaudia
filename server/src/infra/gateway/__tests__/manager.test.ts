@@ -111,6 +111,7 @@ describe('GatewayManager', () => {
     const connectedClients = new Map<string, unknown>();
     const virtualClient = { id: 'vc-1' };
     const terminalManager = { detachClient: vi.fn() };
+    const browserManager = { detachClient: vi.fn() };
     const serverContext = {
       db: { prepare: vi.fn() },
       handleMessage: vi.fn(),
@@ -126,6 +127,7 @@ describe('GatewayManager', () => {
       updateGatewayBackendId: vi.fn(),
       updateDiscoveredBackends: vi.fn(),
       terminalManager,
+      browserManager,
     } as any;
 
     const manager = new GatewayManager({
@@ -139,7 +141,7 @@ describe('GatewayManager', () => {
 
     manager.setPort(3100);
 
-    return { manager, connectedClients, terminalManager, serverContext };
+    return { manager, connectedClients, terminalManager, browserManager, serverContext };
   }
 
   it('clears virtual clients when gateway disconnects unexpectedly', async () => {

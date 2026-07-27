@@ -253,6 +253,9 @@ async function main() {
       // Destroy all terminal sessions
       serverContext.terminalManager.destroyAll();
 
+      // Close all browser sessions (Chromium pages + engine)
+      await serverContext.browserManager.dispose().catch(() => {});
+
       server.close(() => {
         console.log('✅ Server closed');
         process.exit(0);

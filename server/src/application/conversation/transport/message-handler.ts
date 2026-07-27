@@ -2,7 +2,12 @@
  * WebSocket message dispatcher.
  * Routes ClientMessage to domain-specific handlers under ../handlers/.
  */
-import type { ClientMessage, PongMessage, ErrorMessage } from '@zclaudia/shared/wire/messages';
+import type {
+  ClientMessage,
+  PongMessage,
+  ErrorMessage,
+  BrowserEngineStatusMessage,
+} from '@zclaudia/shared/wire/messages';
 import type { TerminalManager } from '../../../terminal-manager.js';
 import type { ProcessMonitor } from '../../../utils/process-monitor.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
@@ -61,6 +66,8 @@ import {
   handleEvaluateMetaWorkflowPhaseImpact,
   handleCascadeRerunMetaWorkflowPhase,
 } from '../handlers/meta-workflow.js';
+import { handleBrowserMessage } from '../handlers/browser.js';
+import type { BrowserManager } from '../../browser/browser-manager.js';
 
 /** Context object bundling module-level dependencies for handleClientMessage. */
 export interface MessageHandlerContext {
@@ -89,6 +96,9 @@ export interface MessageHandlerContext {
   permissionBridge?: import('../agent/permission-bridge.js').PermissionBridge;
   cancelWorkflowRun?: (runId: string) => void;
   metaWorkflowService?: import('../../../domains/meta-workflow/service.js').MetaWorkflowService;
+  browserManager?: BrowserManager;
+  installBrowserEngine?: (notify: (msg: BrowserEngineStatusMessage) => void) => Promise<void>;
+  broadcastBrowserEngineStatus?: (msg: BrowserEngineStatusMessage) => void;
 }
 
 export async function handleClientMessage(
@@ -99,6 +109,17 @@ export async function handleClientMessage(
   ctx: MessageHandlerContext,
   termMgr?: TerminalManager
 ): Promise<void> {
+  if (ctx.browserManager && message.type.startsWith('browser_')) {
+    handleBrowserMessage(
+      client,
+      message,
+      ctx.browserManager,
+      ctx.broadcastBrowserEngineStatus ?? (() => {}),
+      ctx.installBrowserEngine
+    );
+    return;
+  }
+
   switch (message.type) {
     // ── Core ──
     case 'auth':

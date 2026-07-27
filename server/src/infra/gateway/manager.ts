@@ -100,6 +100,7 @@ export class GatewayManager {
     for (const channelId of this.virtualClients.keys()) {
       this.connectedClients.delete(channelId);
       this.serverContext.terminalManager.detachClient(channelId);
+      this.serverContext.browserManager.detachClient(channelId);
     }
     this.virtualClients.clear();
     // The facade-local virtual client is created lazily by createLocalBackendHandler() and
@@ -108,6 +109,7 @@ export class GatewayManager {
     if (this.connectedClients.has('facade-local')) {
       this.connectedClients.delete('facade-local');
       this.serverContext.terminalManager.detachClient('facade-local');
+      this.serverContext.browserManager.detachClient('facade-local');
     }
   }
 
@@ -266,6 +268,7 @@ export class GatewayManager {
       this.virtualClients.delete(channelId);
       this.connectedClients.delete(channelId);
       serverContext.terminalManager.detachClient(channelId);
+      serverContext.browserManager.detachClient(channelId);
     });
 
     // Set up catch-up handler for content recovery

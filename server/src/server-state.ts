@@ -9,6 +9,7 @@
 
 import type {
   BranchAction,
+  BrowserEngineStatusMessage,
   ClaudiaTaskSnapshotMessage,
   ClaudiaTaskStatus,
   ClaudiaTaskUpdateMessage,
@@ -31,6 +32,7 @@ import type { TaskExecutor } from './domains/tasks/executors/types.js';
 import type { MessageHandlerContext } from './application/conversation/transport/message-handler.js';
 import type { RunHandlerContext } from './application/conversation/runtime/run-handler.js';
 import type { ConnectedClient, ActiveRun } from './application/conversation/transport/types.js';
+import type { BrowserManager } from './application/browser/browser-manager.js';
 import { ClaudiaBranchService } from './application/orchestration/claudia-branch-service.js';
 import { getGatewayClient } from './infra/gateway/gateway-instance.js';
 import { providerRegistry } from './infra/providers/registry.js';
@@ -66,6 +68,10 @@ export class ServerState {
   agentTaskExecutor: TaskExecutor | undefined;
   goalCoordinator: GoalCoordinator | undefined;
   goalService: GoalService | undefined;
+  browserManager: BrowserManager | undefined;
+  installBrowserEngineFn:
+    | ((notify: (msg: BrowserEngineStatusMessage) => void) => Promise<void>)
+    | undefined;
 
   // --- Broadcast wrappers ---
 
@@ -75,6 +81,12 @@ export class ServerState {
 
   broadcastPluginState(): void {
     _broadcastPluginState(this.connectedClients);
+  }
+
+  broadcastBrowserEngineStatus(msg: BrowserEngineStatusMessage): void {
+    for (const client of this.connectedClients.values()) {
+      if (client.authenticated) sendMessage(client.ws, msg);
+    }
   }
 
   buildStateHeartbeat(): StateHeartbeatMessage {
@@ -301,6 +313,9 @@ export class ServerState {
       permissionBridge: this.permissionBridge,
       cancelWorkflowRun: this.cancelWorkflowRun,
       metaWorkflowService: this.metaWorkflowService,
+      browserManager: this.browserManager,
+      installBrowserEngine: this.installBrowserEngineFn,
+      broadcastBrowserEngineStatus: msg => this.broadcastBrowserEngineStatus(msg),
       pauseActiveGoalForSession: (sessionId: string) => {
         const goalService = this.goalService;
         if (!goalService) return;
