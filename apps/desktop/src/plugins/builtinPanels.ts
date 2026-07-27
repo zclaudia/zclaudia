@@ -17,6 +17,7 @@ import { ChangesPanel } from '../features/changes/ChangesPanel';
 import { MemoryPanel } from '../features/memory/MemoryPanel';
 import { LineageActions, LineagePanel } from '../features/lineage/LineagePanel';
 import { GitSidebarPanel } from '../features/git/components/GitSidebarPanel';
+import { BrowserPanel } from '../features/browser/BrowserPanel';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useFileViewerStore } from '../stores/fileViewerStore';
 import { useDraftEditorStore } from '../stores/draftEditorStore';
@@ -202,6 +203,25 @@ export function initBuiltinPanels() {
     visible: false,
     onClose: () => {
       usePluginStore.getState().updatePanelVisibility('git', false);
+    },
+  });
+
+  registerPanel({
+    id: 'browser',
+    pluginId: 'com.zclaudia.browser',
+    builtin: true,
+    type: 'panel',
+    label: 'Browser',
+    icon: 'Globe',
+    component: BrowserPanel,
+    order: 8,
+    platforms: ['desktop'],
+    defaultPlacement: 'right',
+    openMode: 'dedicated',
+    alwaysMount: false,
+    visible: false,
+    onClose: () => {
+      usePluginStore.getState().updatePanelVisibility('browser', false);
     },
   });
 

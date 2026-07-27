@@ -33,6 +33,9 @@ vi.mock('../../features/lineage/LineagePanel', () => ({
 vi.mock('../../features/git/components/GitSidebarPanel', () => ({
   GitSidebarPanel: () => null,
 }));
+vi.mock('../../features/browser/BrowserPanel', () => ({
+  BrowserPanel: () => null,
+}));
 vi.mock('../../stores/terminalStore', () => ({
   useTerminalStore: { getState: () => ({ drawerOpen: {}, setDrawerOpen: vi.fn() }) },
 }));
@@ -50,7 +53,7 @@ describe('initBuiltinPanels', () => {
     } as any);
   });
 
-  it('registers terminal, file-viewer, draft, session-changes, memory, notifications, lineage, and git panels', async () => {
+  it('registers terminal, file-viewer, draft, session-changes, memory, notifications, lineage, git, and browser panels', async () => {
     const registerSpy = vi.fn();
     usePluginStore.setState({ registerPanel: registerSpy } as any);
 
@@ -58,7 +61,7 @@ describe('initBuiltinPanels', () => {
     const { initBuiltinPanels } = await import('../builtinPanels');
     initBuiltinPanels();
 
-    expect(registerSpy).toHaveBeenCalledTimes(8);
+    expect(registerSpy).toHaveBeenCalledTimes(9);
     expect(registerSpy).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'terminal', pluginId: 'com.claudia.terminal' })
     );
@@ -79,6 +82,9 @@ describe('initBuiltinPanels', () => {
     );
     expect(registerSpy).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'git', pluginId: 'com.zclaudia.git' })
+    );
+    expect(registerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'browser', pluginId: 'com.zclaudia.browser' })
     );
   });
 
@@ -143,12 +149,13 @@ describe('builtinPanels openMode', () => {
     initBuiltinPanels();
   });
 
-  it('marks terminal / notifications / lineage as dedicated', () => {
+  it('marks terminal / notifications / lineage / browser as dedicated', () => {
     const panels = usePluginStore.getState().panels;
     const byId = (id: string) => panels.find(p => p.id === id);
     expect(byId('terminal')?.openMode).toBe('dedicated');
     expect(byId('notifications')?.openMode).toBe('dedicated');
     expect(byId('lineage')?.openMode).toBe('dedicated');
+    expect(byId('browser')?.openMode).toBe('dedicated');
   });
 
   it('marks file-viewer / draft / session-changes / memory / git as shared', () => {

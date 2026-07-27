@@ -6,6 +6,7 @@ import {
   GitFork,
   Brain,
   GitBranch,
+  Globe,
   PanelTop,
   type LucideIcon,
 } from 'lucide-react';
@@ -20,6 +21,7 @@ export const TOOL_ICONS: Record<string, LucideIcon> = {
   lineage: GitFork,
   memory: Brain,
   git: GitBranch,
+  browser: Globe,
 };
 
 /** Panel id → iconKey (kept in sync with RightSidebarEmptyState's PANEL_ICON_MAP). */
@@ -31,6 +33,7 @@ const PANEL_ICON_KEY: Record<string, keyof typeof TOOL_ICONS> = {
   lineage: 'lineage',
   memory: 'memory',
   git: 'git',
+  browser: 'browser',
 };
 
 /** Resolve a Lucide icon for a panel id, with a neutral fallback. */
