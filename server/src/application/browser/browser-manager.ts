@@ -35,6 +35,7 @@ export class BrowserManager {
         this.sendToClient(clientId, { type: 'browser_engine_status', status: 'missing' });
         return;
       }
+      // Create entry object before passing to engine callbacks so they can capture and reference it.
       const entry: ManagedBrowserSession = {
         session: null as unknown as EngineSession,
         attachedClientId: null,
@@ -68,6 +69,7 @@ export class BrowserManager {
     managed.streaming = true;
     await managed.session.setViewport(viewport);
     await managed.session.startScreencast();
+    this.send(managed, { type: 'browser_state', sessionId, state: managed.session.getState() });
   }
 
   async detach(sessionId: string): Promise<void> {

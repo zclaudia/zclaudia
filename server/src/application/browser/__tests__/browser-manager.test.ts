@@ -17,15 +17,26 @@ class FakeSession implements EngineSession {
   closed = false;
   inputs: unknown[] = [];
   viewport: unknown = null;
+  historyCalls: Array<'back' | 'forward'> = [];
+  reloadCalls = 0;
+  stopCalls = 0;
+  resizes: unknown[] = [];
   constructor(public callbacks: EngineSessionCallbacks) {}
   async navigate(url: string) {
     this.navigated.push(url);
   }
-  async history() {}
-  async reload() {}
-  async stop() {}
+  async history(direction: 'back' | 'forward') {
+    this.historyCalls.push(direction);
+  }
+  async reload() {
+    this.reloadCalls++;
+  }
+  async stop() {
+    this.stopCalls++;
+  }
   async setViewport(v: unknown) {
     this.viewport = v;
+    this.resizes.push(v);
   }
   async startScreencast() {
     this.screencasting = true;
@@ -120,7 +131,10 @@ describe('BrowserManager', () => {
     await manager.open('c1', 's1');
     await manager.attach('c1', 's1', { width: 800, height: 600, dpr: 1 });
     engine.sessions[0].callbacks.onState({ ...BLANK, url: 'http://x/', title: 'X' });
-    expect(of('browser_state')).toHaveLength(1);
+    const states = of('browser_state');
+    expect(states).toHaveLength(2); // 1 from attach (replay), 1 from onState change
+    expect((states[1].msg as { state: BrowserPageState }).state.url).toBe('http://x/');
+    expect((states[1].msg as { state: BrowserPageState }).state.title).toBe('X');
   });
 
   it('input and navigate delegate to the session', async () => {
@@ -168,5 +182,32 @@ describe('BrowserManager', () => {
     await manager.dispose();
     expect(engine.sessions[0].closed).toBe(true);
     expect((of('browser_closed')[0].msg as { reason: string }).reason).toBe('shutdown');
+  });
+
+  it('history delegates back/forward to the session', async () => {
+    await manager.open('c1', 's1');
+    await manager.history('s1', 'back');
+    await manager.history('s1', 'forward');
+    expect(engine.sessions[0].historyCalls).toEqual(['back', 'forward']);
+  });
+
+  it('reload delegates to the session', async () => {
+    await manager.open('c1', 's1');
+    await manager.reload('s1');
+    expect(engine.sessions[0].reloadCalls).toBe(1);
+  });
+
+  it('stop delegates to the session', async () => {
+    await manager.open('c1', 's1');
+    await manager.stop('s1');
+    expect(engine.sessions[0].stopCalls).toBe(1);
+  });
+
+  it('resize delegates setViewport to the session', async () => {
+    await manager.open('c1', 's1');
+    await manager.attach('c1', 's1', { width: 800, height: 600, dpr: 1 });
+    await manager.resize('s1', { width: 1024, height: 768, dpr: 1.5 });
+    expect(engine.sessions[0].resizes).toHaveLength(2); // 1 from attach, 1 from resize
+    expect(engine.sessions[0].resizes[1]).toEqual({ width: 1024, height: 768, dpr: 1.5 });
   });
 });
