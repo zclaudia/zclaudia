@@ -35,6 +35,16 @@ describe('handleBrowserMessage', () => {
     expect(mgr.open).toHaveBeenCalledWith('c1', 's1', 'http://x/');
   });
 
+  it('normalizes open URLs the same as navigate (bare host gains https://)', () => {
+    handleBrowserMessage(client, { type: 'browser_open', sessionId: 's1', url: 'example.com' }, mgr as never, () => {});
+    expect(mgr.open).toHaveBeenCalledWith('c1', 's1', 'https://example.com');
+  });
+
+  it('passes open through with no url when none is given', () => {
+    handleBrowserMessage(client, { type: 'browser_open', sessionId: 's1' }, mgr as never, () => {});
+    expect(mgr.open).toHaveBeenCalledWith('c1', 's1', undefined);
+  });
+
   it('routes attach/detach/close', () => {
     handleBrowserMessage(client, { type: 'browser_attach', sessionId: 's1', viewport }, mgr as never, () => {});
     handleBrowserMessage(client, { type: 'browser_detach', sessionId: 's1' }, mgr as never, () => {});

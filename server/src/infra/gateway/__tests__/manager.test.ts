@@ -145,7 +145,7 @@ describe('GatewayManager', () => {
   }
 
   it('clears virtual clients when gateway disconnects unexpectedly', async () => {
-    const { manager, connectedClients, terminalManager } = createManager();
+    const { manager, connectedClients, terminalManager, browserManager } = createManager();
 
     await manager.connect({
       id: 1,
@@ -170,10 +170,11 @@ describe('GatewayManager', () => {
     expect((manager as any).virtualClients.size).toBe(0);
     expect(connectedClients.has('ch-1')).toBe(false);
     expect(terminalManager.detachClient).toHaveBeenCalledWith('ch-1');
+    expect(browserManager.detachClient).toHaveBeenCalledWith('ch-1');
   });
 
   it('shutdown clears sync interval and virtual clients', () => {
-    const { manager, connectedClients, terminalManager } = createManager();
+    const { manager, connectedClients, terminalManager, browserManager } = createManager();
     const disconnect = vi.fn();
     const fakeInterval = setInterval(() => {}, 1);
     clearInterval(fakeInterval);
@@ -193,6 +194,7 @@ describe('GatewayManager', () => {
     expect((manager as any).virtualClients.size).toBe(0);
     expect(connectedClients.has('ch-1')).toBe(false);
     expect(terminalManager.detachClient).toHaveBeenCalledWith('ch-1');
+    expect(browserManager.detachClient).toHaveBeenCalledWith('ch-1');
   });
 
   it('local backend catch-up rethrows DB errors instead of returning empty patches', async () => {

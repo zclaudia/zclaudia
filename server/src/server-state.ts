@@ -72,6 +72,14 @@ export class ServerState {
   installBrowserEngineFn:
     | ((notify: (msg: BrowserEngineStatusMessage) => void) => Promise<void>)
     | undefined;
+  /**
+   * Last broadcast engine status, cached so a client that authenticates
+   * *after* the status changed (e.g. mid-download, or after install
+   * completes) still learns the current state instead of waiting for the
+   * next transition. Replayed to newly authenticated clients in server.ts's
+   * auth-success path, alongside the heartbeat/plugin_state snapshots.
+   */
+  lastBrowserEngineStatus: BrowserEngineStatusMessage | undefined;
 
   // --- Broadcast wrappers ---
 
@@ -84,6 +92,10 @@ export class ServerState {
   }
 
   broadcastBrowserEngineStatus(msg: BrowserEngineStatusMessage): void {
+    this.lastBrowserEngineStatus = msg;
+    // Authenticated clients only: a 'ready'/'downloading' status carries
+    // executablePath, a server filesystem path, which shouldn't reach a
+    // socket that hasn't authenticated yet.
     for (const client of this.connectedClients.values()) {
       if (client.authenticated) sendMessage(client.ws, msg);
     }

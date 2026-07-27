@@ -333,6 +333,13 @@ export async function createServer(): Promise<ServerContext> {
 
             // Always send plugin_state so the client can clear stale cached plugins
             sendMessage(ws, buildPluginStateMessage());
+
+            // Replay the last browser engine status so a client that authenticates
+            // after a transition (mid-download, or after install completes) still
+            // learns the current state instead of waiting for the next broadcast.
+            if (serverState.lastBrowserEngineStatus) {
+              sendMessage(ws, serverState.lastBrowserEngineStatus);
+            }
             return;
           }
 

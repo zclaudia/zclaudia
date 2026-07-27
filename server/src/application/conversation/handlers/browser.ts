@@ -60,7 +60,10 @@ export function handleBrowserMessage(
 
   switch (msg.type) {
     case 'browser_open':
-      run(msg.sessionId, browserMgr.open(client.id, msg.sessionId, msg.url));
+      run(
+        msg.sessionId,
+        browserMgr.open(client.id, msg.sessionId, msg.url ? normalizeUrl(msg.url) : msg.url)
+      );
       break;
     case 'browser_attach':
       run(msg.sessionId, browserMgr.attach(client.id, msg.sessionId, msg.viewport));
