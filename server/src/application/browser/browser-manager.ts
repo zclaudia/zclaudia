@@ -43,9 +43,12 @@ export class BrowserManager {
     if (!create && !this.sessions.has(sessionId)) {
       create = this.createSession(sessionId, url);
       this.opening.set(sessionId, create);
-      void create.finally(() => {
+      const cleanup = () => {
         if (this.opening.get(sessionId) === create) this.opening.delete(sessionId);
-      });
+      };
+      // .then(cb, cb) instead of .finally: the derived promise must not adopt
+      // create's rejection, or a failed launch triggers unhandledRejection.
+      void create.then(cleanup, cleanup);
     }
     if (create) await create;
 
