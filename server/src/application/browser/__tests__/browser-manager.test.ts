@@ -21,6 +21,9 @@ class FakeSession implements EngineSession {
   reloadCalls = 0;
   stopCalls = 0;
   resizes: unknown[] = [];
+  screenshots = 0;
+  clicked: string[] = [];
+  typed: Array<{ text: string; submit: boolean }> = [];
   constructor(public callbacks: EngineSessionCallbacks) {}
   async navigate(url: string) {
     this.navigated.push(url);
@@ -52,6 +55,20 @@ class FakeSession implements EngineSession {
   }
   async close() {
     this.closed = true;
+  }
+  async screenshot() {
+    this.screenshots += 1;
+    return { data: 'AAAA', width: 800, height: 600 };
+  }
+  async extractText() {
+    return { url: 'http://x/', title: 'X', text: 'hello world' };
+  }
+  async clickSelector(selector: string) {
+    this.clicked.push(selector);
+    return selector !== '#missing';
+  }
+  async typeText(text: string, submit: boolean) {
+    this.typed.push({ text, submit });
   }
 }
 
@@ -234,6 +251,48 @@ describe('BrowserManager', () => {
     await manager.resize('s1', { width: 1024, height: 768, dpr: 1.5 });
     expect(engine.sessions[0].resizes).toHaveLength(2); // 1 from attach, 1 from resize
     expect(engine.sessions[0].resizes[1]).toEqual({ width: 1024, height: 768, dpr: 1.5 });
+  });
+
+  describe('agent methods', () => {
+    it('ensureSession creates a session without any client reply', async () => {
+      const res = await manager.ensureSession('s1');
+      expect(res).toEqual({ ok: true });
+      expect(engine.sessions).toHaveLength(1);
+      expect(sent).toHaveLength(0); // no browser_opened, no engine_status
+    });
+
+    it('ensureSession is idempotent and reports engine_missing', async () => {
+      await manager.ensureSession('s1');
+      await manager.ensureSession('s1');
+      expect(engine.sessions).toHaveLength(1);
+      engine.available = false;
+      const res = await manager.ensureSession('s2');
+      expect(res).toEqual({ ok: false, reason: 'engine_missing' });
+      expect(engine.sessions).toHaveLength(1);
+    });
+
+    it('screenshot/extractText/clickSelector/typeText delegate to the session', async () => {
+      await manager.ensureSession('s1');
+      expect(await manager.screenshot('s1')).toEqual({ data: 'AAAA', width: 800, height: 600 });
+      expect(await manager.extractText('s1')).toEqual({ url: 'http://x/', title: 'X', text: 'hello world' });
+      expect(await manager.clickSelector('s1', '#btn')).toBe(true);
+      expect(await manager.clickSelector('s1', '#missing')).toBe(false);
+      expect(await manager.typeText('s1', 'hi', true)).toBe(true);
+      expect(engine.sessions[0].typed).toEqual([{ text: 'hi', submit: true }]);
+    });
+
+    it('agent methods return null/false when no session exists', async () => {
+      expect(await manager.screenshot('nope')).toBeNull();
+      expect(await manager.extractText('nope')).toBeNull();
+      expect(await manager.clickSelector('nope', '#x')).toBeNull();
+      expect(await manager.typeText('nope', 'hi', false)).toBe(false);
+      expect(manager.getState('nope')).toBeNull();
+    });
+
+    it('getState returns the live session state', async () => {
+      await manager.ensureSession('s1');
+      expect(manager.getState('s1')).toEqual(BLANK);
+    });
   });
 });
 

@@ -18,6 +18,14 @@ export interface EngineSession {
   dispatchInput(event: BrowserInputEvent): Promise<void>;
   getState(): BrowserPageState;
   close(): Promise<void>;
+  /** Base64 JPEG of the current view. */
+  screenshot(): Promise<{ data: string; width: number; height: number }>;
+  /** Visible text of the current page (agent read_page). */
+  extractText(): Promise<{ url: string; title: string; text: string }>;
+  /** Click the first element matching a CSS selector. False when not found. */
+  clickSelector(selector: string): Promise<boolean>;
+  /** Type into the focused element; optionally press Enter after. */
+  typeText(text: string, submit: boolean): Promise<void>;
 }
 
 export interface EngineStatus {

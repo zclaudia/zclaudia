@@ -1,5 +1,6 @@
 import type {
   BrowserInputEvent,
+  BrowserPageState,
   BrowserViewport,
   ServerMessage,
 } from '@zclaudia/shared';
@@ -35,10 +36,11 @@ export class BrowserManager {
     if (inFlight) await inFlight;
   }
 
-  async open(clientId: string, sessionId: string, url?: string): Promise<void> {
-    // Dedup concurrent open() calls for the same sessionId onto a single engine
-    // session creation (fixes the React StrictMode double-mount Page leak): the
-    // first caller creates the shared promise, later callers just await it.
+  /**
+   * Ensure a session exists for sessionId, deduping concurrent creates.
+   * Returns null when the engine is unavailable. Sends nothing to clients.
+   */
+  private async ensure(sessionId: string, url?: string): Promise<ManagedBrowserSession | null> {
     let create = this.opening.get(sessionId);
     if (!create && !this.sessions.has(sessionId)) {
       create = this.createSession(sessionId, url);
@@ -46,13 +48,14 @@ export class BrowserManager {
       const cleanup = () => {
         if (this.opening.get(sessionId) === create) this.opening.delete(sessionId);
       };
-      // .then(cb, cb) instead of .finally: the derived promise must not adopt
-      // create's rejection, or a failed launch triggers unhandledRejection.
       void create.then(cleanup, cleanup);
     }
     if (create) await create;
+    return this.sessions.get(sessionId) ?? null;
+  }
 
-    const managed = this.sessions.get(sessionId);
+  async open(clientId: string, sessionId: string, url?: string): Promise<void> {
+    const managed = await this.ensure(sessionId, url);
     if (!managed) {
       this.sendToClient(clientId, { type: 'browser_engine_status', status: 'missing' });
       return;
@@ -62,6 +65,41 @@ export class BrowserManager {
       sessionId,
       state: managed.session.getState(),
     });
+  }
+
+  async ensureSession(sessionId: string): Promise<{ ok: true } | { ok: false; reason: 'engine_missing' }> {
+    const managed = await this.ensure(sessionId);
+    return managed ? { ok: true } : { ok: false, reason: 'engine_missing' };
+  }
+
+  async screenshot(sessionId: string): Promise<{ data: string; width: number; height: number } | null> {
+    await this.ready(sessionId);
+    const managed = this.sessions.get(sessionId);
+    return managed ? managed.session.screenshot() : null;
+  }
+
+  async extractText(sessionId: string): Promise<{ url: string; title: string; text: string } | null> {
+    await this.ready(sessionId);
+    const managed = this.sessions.get(sessionId);
+    return managed ? managed.session.extractText() : null;
+  }
+
+  async clickSelector(sessionId: string, selector: string): Promise<boolean | null> {
+    await this.ready(sessionId);
+    const managed = this.sessions.get(sessionId);
+    return managed ? managed.session.clickSelector(selector) : null;
+  }
+
+  async typeText(sessionId: string, text: string, submit: boolean): Promise<boolean> {
+    await this.ready(sessionId);
+    const managed = this.sessions.get(sessionId);
+    if (!managed) return false;
+    await managed.session.typeText(text, submit);
+    return true;
+  }
+
+  getState(sessionId: string): BrowserPageState | null {
+    return this.sessions.get(sessionId)?.session.getState() ?? null;
   }
 
   /** Launches the engine session for sessionId exactly once; only called while holding `opening`. */
