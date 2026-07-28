@@ -1,23 +1,140 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { toolRegistry } from '../../../../application/plugins/index.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { toolRegistry } from '../../../plugins/tool-registry.js';
 import { isBlockedHostname } from '../network-guard.js';
+import { registerBrowserTool } from '../browser.js';
 
 vi.mock('../network-guard.js', () => ({
   isBlockedHostname: vi.fn(),
 }));
 
-describe('agent-tools/browser', () => {
-  beforeEach(() => {
-    toolRegistry.clear();
-    vi.clearAllMocks();
+const shotDir = mkdtempSync(join(tmpdir(), 'agent-shots-'));
+
+const manager = {
+  ensureSession: vi.fn(async () => ({ ok: true as const })),
+  navigate: vi.fn(async () => {}),
+  extractText: vi.fn(async () => ({ url: 'http://x/', title: 'X', text: 'body text' })),
+  screenshot: vi.fn(async () => ({
+    data: Buffer.from('jpegbytes').toString('base64'),
+    width: 800,
+    height: 600,
+  })),
+  clickSelector: vi.fn(async () => true),
+  typeText: vi.fn(async () => true),
+  input: vi.fn(async () => {}),
+  getState: vi.fn(() => ({
+    url: 'http://x/',
+    title: 'X',
+    loading: false,
+    canGoBack: false,
+    canGoForward: false,
+  })),
+};
+const activity: Array<{ sessionId: string; active: boolean }> = [];
+
+const ctx = { sessionId: 's1' };
+const run = (args: Record<string, unknown>) =>
+  toolRegistry.execute('agent_browser', args, ctx as never, 'agent-assistant');
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  activity.length = 0;
+  // Registration overwrites the previous entry for 'agent_browser' (ToolRegistry.register()
+  // is idempotent-by-overwrite already, see tool-registry.ts) so re-registering per test keeps
+  // this file isolated from whatever else in the process may have (re)registered the tool.
+  registerBrowserTool({
+    getBrowserManager: () => manager as never,
+    broadcastAgentActivity: (sessionId, active) => activity.push({ sessionId, active }),
+    getScreenshotDir: () => shotDir,
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('agent_browser actions', () => {
+  it('navigate ensures the session, navigates, returns state + text summary', async () => {
+    const out = JSON.parse(await run({ action: 'navigate', url: 'localhost:5173' }));
+    expect(manager.ensureSession).toHaveBeenCalledWith('s1');
+    expect(manager.navigate).toHaveBeenCalledWith('s1', 'http://localhost:5173');
+    expect(out.url).toBe('http://x/');
+    expect(out.title).toBe('X');
+    expect(out.text).toContain('body text');
   });
 
+  it('wraps browser actions in activity broadcasts (true then false, even on error)', async () => {
+    await run({ action: 'read_page' });
+    expect(activity).toEqual([
+      { sessionId: 's1', active: true },
+      { sessionId: 's1', active: false },
+    ]);
+    activity.length = 0;
+    manager.extractText.mockRejectedValueOnce(new Error('boom'));
+    const out = JSON.parse(await run({ action: 'read_page' }));
+    expect(out.error).toBeTruthy();
+    expect(activity.map(a => a.active)).toEqual([true, false]);
+  });
+
+  it('screenshot writes a jpg under the screenshot dir and returns its path', async () => {
+    const out = JSON.parse(await run({ action: 'screenshot' }));
+    expect(out.file).toContain(shotDir);
+    expect(out.width).toBe(800);
+    expect(existsSync(out.file)).toBe(true);
+    expect(readFileSync(out.file).toString()).toBe('jpegbytes');
+  });
+
+  it('click by selector and by coordinates', async () => {
+    await run({ action: 'click', selector: '#btn' });
+    expect(manager.clickSelector).toHaveBeenCalledWith('s1', '#btn');
+    await run({ action: 'click', x: 10, y: 20 });
+    expect(manager.input).toHaveBeenCalledTimes(2); // down + up
+    const [down, up] = manager.input.mock.calls.map(c => c[1]);
+    expect(down).toMatchObject({ kind: 'mouse', type: 'down', x: 10, y: 20, button: 'left' });
+    expect(up).toMatchObject({ kind: 'mouse', type: 'up', x: 10, y: 20 });
+  });
+
+  it('type and scroll delegate', async () => {
+    await run({ action: 'type', text: 'hi', submit: true });
+    expect(manager.typeText).toHaveBeenCalledWith('s1', 'hi', true);
+    await run({ action: 'scroll', direction: 'down' });
+    expect(manager.input).toHaveBeenCalledWith('s1', expect.objectContaining({ kind: 'wheel' }));
+  });
+
+  it('engine missing yields a helpful error and no activity trailing state leak', async () => {
+    manager.ensureSession.mockResolvedValueOnce({ ok: false, reason: 'engine_missing' } as never);
+    const out = JSON.parse(await run({ action: 'navigate', url: 'http://x/' }));
+    expect(out.error).toMatch(/engine/i);
+    expect(activity.map(a => a.active)).toEqual([true, false]);
+  });
+
+  it('action omitted defaults to legacy fetch behavior (no browser calls)', async () => {
+    // fetch hits the network; use an invalid URL to exercise the error path only
+    const out = JSON.parse(await run({ url: 'http://127.0.0.1:1/nope' }));
+    expect(out.error).toBeTruthy();
+    expect(manager.ensureSession).not.toHaveBeenCalled();
+    expect(activity).toHaveLength(0);
+  });
+
+  it('missing sessionId rejects browser actions', async () => {
+    const out = JSON.parse(
+      await toolRegistry.execute(
+        'agent_browser',
+        { action: 'read_page' },
+        {} as never,
+        'agent-assistant'
+      )
+    );
+    expect(out.error).toMatch(/session/i);
+  });
+});
+
+describe('agent_browser legacy fetch action', () => {
   it('registers the browser tool and blocks private destinations before fetching', async () => {
     vi.stubGlobal('fetch', vi.fn());
     vi.mocked(isBlockedHostname).mockResolvedValue(true);
-
-    const { registerBrowserTool } = await import('../browser.js');
-    registerBrowserTool();
 
     const tool = toolRegistry.get('agent_browser');
     expect(tool).toBeDefined();
@@ -42,9 +159,6 @@ describe('agent-tools/browser', () => {
           .mockResolvedValue('<h1>Hello</h1><script>bad()</script><p>World &amp; Friends</p>'),
       })
     );
-
-    const { registerBrowserTool } = await import('../browser.js');
-    registerBrowserTool();
 
     const tool = toolRegistry.get('agent_browser');
     const result = await tool!.handler({ url: 'https://example.com/docs' });
@@ -74,9 +188,6 @@ describe('agent-tools/browser', () => {
       })
     );
 
-    const { registerBrowserTool } = await import('../browser.js');
-    registerBrowserTool();
-
     const tool = toolRegistry.get('agent_browser');
     const result = await tool!.handler({ url: 'https://api.example.com/status', format: 'raw' });
 
@@ -94,9 +205,6 @@ describe('agent-tools/browser', () => {
         text: vi.fn(),
       })
     );
-
-    const { registerBrowserTool } = await import('../browser.js');
-    registerBrowserTool();
 
     const tool = toolRegistry.get('agent_browser');
     const result = await tool!.handler({ url: 'https://example.com/rate-limited' });
@@ -123,9 +231,6 @@ describe('agent-tools/browser', () => {
         }),
       })
     );
-
-    const { registerBrowserTool } = await import('../browser.js');
-    registerBrowserTool();
 
     const tool = toolRegistry.get('agent_browser');
     const result = await tool!.handler({ url: 'https://example.com/huge' });

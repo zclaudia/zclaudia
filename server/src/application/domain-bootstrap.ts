@@ -7,8 +7,11 @@ import type { Express } from 'express';
 import type { RequestHandler } from 'express';
 import type Database from 'better-sqlite3';
 import type { WebSocket } from 'ws';
+import { join } from 'node:path';
 import type { SessionType } from '@zclaudia/shared/core/session';
 import type { initDatabase } from '../infra/storage/db.js';
+import { serverState } from '../server-state.js';
+import { resolveDataDir } from '../utils/data-dir.js';
 import type { RunStartMessage } from './conversation/runtime/run-bootstrap.js';
 import type { RunStartHandler } from '../server-setup.js';
 import { createFilesRoutes } from '../interfaces/http/files.js';
@@ -256,7 +259,14 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     getProcessSupervisor: () => processSupervisor,
   });
 
-  import('../application/conversation/agent-tools/browser.js').then(m => m.registerBrowserTool());
+  import('../application/conversation/agent-tools/browser.js').then(m =>
+    m.registerBrowserTool({
+      getBrowserManager: () => serverState.browserManager,
+      broadcastAgentActivity: (sessionId, active) =>
+        serverState.broadcastBrowserAgentActivity(sessionId, active),
+      getScreenshotDir: () => join(resolveDataDir(), 'files', 'browser-screenshots'),
+    })
+  );
 
   const agentTaskExecutor = new AgentTaskExecutor(
     createAgentTaskRunner({

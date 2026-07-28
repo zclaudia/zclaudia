@@ -9,6 +9,7 @@
 
 import type {
   BranchAction,
+  BrowserAgentActivityMessage,
   BrowserEngineStatusMessage,
   ClaudiaTaskSnapshotMessage,
   ClaudiaTaskStatus,
@@ -96,6 +97,15 @@ export class ServerState {
     // Authenticated clients only: a 'ready'/'downloading' status carries
     // executablePath, a server filesystem path, which shouldn't reach a
     // socket that hasn't authenticated yet.
+    for (const client of this.connectedClients.values()) {
+      if (client.authenticated) sendMessage(client.ws, msg);
+    }
+  }
+
+  /** Agent is driving a session's browser. Authenticated clients only (consistency
+   *  with engine-status; clients filter by sessionId). Not cached — transient. */
+  broadcastBrowserAgentActivity(sessionId: string, active: boolean): void {
+    const msg: BrowserAgentActivityMessage = { type: 'browser_agent_activity', sessionId, active };
     for (const client of this.connectedClients.values()) {
       if (client.authenticated) sendMessage(client.ws, msg);
     }
