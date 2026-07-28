@@ -1,12 +1,29 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { handleBrowserMessage } from '../handlers';
 import { useBrowserStore } from '../browserStore';
+import { useSelectionStore } from '../../../stores/selectionStore';
+import { useRightWorkspaceStore, newPane } from '../../../stores/rightWorkspaceStore';
+
+const uiMocks = vi.hoisted(() => ({
+  openToolInWorkspace: vi.fn(),
+  isPanelAvailable: vi.fn(() => true),
+}));
+vi.mock('../../../utils/workspaceActions', () => ({
+  openToolInWorkspace: uiMocks.openToolInWorkspace,
+}));
+vi.mock('../../../utils/openPanel', () => ({
+  isPanelAvailable: uiMocks.isPanelAvailable,
+}));
 
 const state = { url: 'http://x/', title: 'X', loading: false, canGoBack: false, canGoForward: false };
 
 describe('handleBrowserMessage', () => {
   beforeEach(() => {
     useBrowserStore.getState().reset();
+    useRightWorkspaceStore.setState({ bySession: {}, order: [] });
+    useSelectionStore.setState({ selectedSessionId: null });
+    uiMocks.openToolInWorkspace.mockClear();
+    uiMocks.isPanelAvailable.mockReturnValue(true);
   });
 
   it('ignores non-browser messages', () => {
@@ -48,5 +65,41 @@ describe('handleBrowserMessage', () => {
   it('browser_agent_activity toggles agentActive', () => {
     handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: true } as never);
     expect(useBrowserStore.getState().sessions['s1'].agentActive).toBe(true);
+  });
+
+  it('agent activity active=true auto-opens the browser panel when its session is selected and the workspace is empty', () => {
+    useSelectionStore.getState().setSelectedSessionId('s1');
+    handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: true } as never);
+    expect(uiMocks.openToolInWorkspace).toHaveBeenCalledWith('s1', 'browser');
+  });
+
+  it('agent activity active=false does not open the panel', () => {
+    useSelectionStore.getState().setSelectedSessionId('s1');
+    handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: false } as never);
+    expect(uiMocks.openToolInWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('no auto-open when the panel is unavailable on this platform', () => {
+    useSelectionStore.getState().setSelectedSessionId('s1');
+    uiMocks.isPanelAvailable.mockReturnValueOnce(false);
+    handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: true } as never);
+    expect(uiMocks.openToolInWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('no auto-open when the browser tool is already open in the session workspace', () => {
+    useSelectionStore.getState().setSelectedSessionId('s1');
+    const pane = newPane('browser');
+    useRightWorkspaceStore.setState({
+      bySession: { s1: { root: pane, primaryPaneId: pane.id, focusedPaneId: pane.id } },
+      order: ['s1'],
+    });
+    handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: true } as never);
+    expect(uiMocks.openToolInWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('no auto-open when the activity is for a non-selected session', () => {
+    useSelectionStore.getState().setSelectedSessionId('other-session');
+    handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: true } as never);
+    expect(uiMocks.openToolInWorkspace).not.toHaveBeenCalled();
   });
 });
