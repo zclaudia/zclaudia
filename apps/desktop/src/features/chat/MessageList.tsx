@@ -1179,7 +1179,7 @@ const MessageItem = memo(function MessageItem({
  * streaming string that changes on every websocket token re-parses ~60×/s at
  * most (not hundreds). Always converges to the final value.
  */
-function useAnimationFrameThrottle<T>(value: T): T {
+export function useAnimationFrameThrottle<T>(value: T): T {
   const [throttled, setThrottled] = useState(value);
   const latestRef = useRef(value);
   const frameRef = useRef<number | null>(null);
@@ -1195,7 +1195,15 @@ function useAnimationFrameThrottle<T>(value: T): T {
 
   useEffect(
     () => () => {
-      if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
+      if (frameRef.current != null) {
+        cancelAnimationFrame(frameRef.current);
+        // Reset the handle so the scheduling guard (`if (frameRef.current != null)`)
+        // isn't left pointing at a cancelled frame. Without this, StrictMode's
+        // mount→cleanup→mount cycle cancels the pending frame but leaves the ref
+        // non-null, permanently blocking all future frames and freezing `throttled`
+        // at its initial value (blank body for a message that mounted mid-<think>).
+        frameRef.current = null;
+      }
     },
     []
   );
