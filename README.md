@@ -54,6 +54,21 @@ pnpm browser:service logs
 pnpm browser:service uninstall
 ```
 
+### Agent Plugin Playground
+
+Run an agent plugin against a lightweight Dev Host and standalone UI, without starting the full
+desktop application:
+
+```bash
+pnpm agent:playground \
+  --plugin ../zclaudia-plugins/agents/codex \
+  --runtime codex \
+  --cwd ../zclaudia-plugins
+```
+
+See [Agent Playground](docs/agent-playground.md) for supported events, hot reload, security, and
+debugging options.
+
 ### Build
 
 ```bash

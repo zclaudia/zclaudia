@@ -13,6 +13,7 @@
     "server:dev:isolated": "bash scripts/with-project-node.sh env PORT=0 ZCLAUDIA_DATA_DIR=$HOME/.zclaudia-dev pnpm --filter @zclaudia/server run dev",
     "gateway:dev": "pnpm --dir ../zclaudia-gateway run dev",
     "desktop:dev": "bash scripts/with-project-node.sh pnpm --filter @zclaudia/desktop run dev",
+    "agent:playground": "bash scripts/with-project-node.sh node scripts/dev/agent-playground.mjs",
     "browser:build": "bash scripts/with-project-node.sh pnpm --filter @zclaudia/shared run build && bash scripts/with-project-node.sh pnpm --filter @zclaudia/server run build && bash scripts/with-project-node.sh pnpm --filter @zclaudia/desktop run build",
     "browser:start": "bash scripts/with-project-node.sh pnpm --filter @zclaudia/server run start",
     "browser:service": "bash scripts/deploy/browser-service.sh",
