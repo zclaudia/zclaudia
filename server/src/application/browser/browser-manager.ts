@@ -41,6 +41,9 @@ export class BrowserManager {
    * Returns null when the engine is unavailable. Sends nothing to clients.
    */
   private async ensure(sessionId: string, url?: string): Promise<ManagedBrowserSession | null> {
+    // Dedup concurrent open() calls for the same sessionId onto a single engine
+    // session creation (fixes the React StrictMode double-mount Page leak): the
+    // first caller creates the shared promise, later callers just await it.
     let create = this.opening.get(sessionId);
     if (!create && !this.sessions.has(sessionId)) {
       create = this.createSession(sessionId, url);
@@ -48,6 +51,8 @@ export class BrowserManager {
       const cleanup = () => {
         if (this.opening.get(sessionId) === create) this.opening.delete(sessionId);
       };
+      // .then(cb, cb) instead of .finally: the derived promise must not adopt
+      // create's rejection, or a failed launch triggers unhandledRejection.
       void create.then(cleanup, cleanup);
     }
     if (create) await create;
@@ -98,6 +103,7 @@ export class BrowserManager {
     return true;
   }
 
+  /** Synchronous by contract (returns BrowserPageState | null); callers racing a cold open should use ensureSession() first. */
   getState(sessionId: string): BrowserPageState | null {
     return this.sessions.get(sessionId)?.session.getState() ?? null;
   }

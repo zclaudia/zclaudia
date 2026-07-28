@@ -4,6 +4,14 @@ import type { BrowserEngine, EngineSession, EngineSessionCallbacks, EngineStatus
 import { defaultChromeDiscoveryDeps, resolveChromePath } from './chrome-discovery.js';
 import { toCdpInput } from './input-mapping.js';
 
+// Server's tsconfig has no "DOM" lib (Node-only), but page.evaluate() callbacks below
+// are serialized and run inside the browser tab. This shape is file-scoped (not global)
+// and covers only what extractText() touches.
+declare const document: {
+  title: string;
+  body: { innerText: string } | null;
+};
+
 const SCREENCAST_QUALITY = 60;
 
 export class PuppeteerEngine implements BrowserEngine {
@@ -179,6 +187,36 @@ class PuppeteerSession implements EngineSession {
     for (const call of toCdpInput(event)) {
       await this.cdp.send(call.method as 'Input.dispatchMouseEvent', call.params as never).catch(() => {});
     }
+  }
+
+  async screenshot(): Promise<{ data: string; width: number; height: number }> {
+    const data = await this.page.screenshot({
+      type: 'jpeg',
+      quality: 70,
+      encoding: 'base64',
+    });
+    return { data, width: this.viewport.width, height: this.viewport.height };
+  }
+
+  async extractText(): Promise<{ url: string; title: string; text: string }> {
+    const { title, text } = await this.page.evaluate(() => ({
+      title: document.title,
+      text: document.body?.innerText ?? '',
+    }));
+    return { url: this.page.url(), title, text };
+  }
+
+  async clickSelector(selector: string): Promise<boolean> {
+    const el = await this.page.$(selector);
+    if (!el) return false;
+    await el.click().catch(() => {});
+    await el.dispose().catch(() => {});
+    return true;
+  }
+
+  async typeText(text: string, submit: boolean): Promise<void> {
+    await this.page.keyboard.type(text);
+    if (submit) await this.page.keyboard.press('Enter');
   }
 
   getState(): BrowserPageState {

@@ -32,4 +32,28 @@ describe.skipIf(!chromePath)('PuppeteerEngine (integration, requires Chrome)', (
     expect(states.some((s) => s.title === 'hello')).toBe(true);
     await session.close();
   }, 30_000);
+
+  it('agent capabilities: extractText, screenshot, typeText, clickSelector', async () => {
+    const session = await engine.createSession({
+      onFrame: () => {},
+      onState: () => {},
+      onCrashed: () => {},
+    });
+    await session.setViewport({ width: 640, height: 480, dpr: 1 });
+    await session.navigate(
+      'data:text/html,<title>t3</title><input id="i"><button id="b" onclick="document.title=\'clicked\'">go</button>'
+    );
+    const text = await session.extractText();
+    expect(text.title).toBe('t3');
+    const shot = await session.screenshot();
+    expect(shot.data.length).toBeGreaterThan(100);
+    expect(shot.width).toBe(640);
+    expect(await session.clickSelector('#missing')).toBe(false);
+    await session.clickSelector('#i');
+    await session.typeText('hello', false);
+    expect(await session.clickSelector('#b')).toBe(true);
+    await new Promise((r) => setTimeout(r, 300));
+    expect((await session.extractText()).title).toBe('clicked');
+    await session.close();
+  }, 30_000);
 });
