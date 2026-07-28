@@ -25,7 +25,7 @@ import { useSendMessage } from '../../hooks/chat/useSendMessage';
 import { useSendQueueConsumer } from '../../hooks/chat/useSendQueueConsumer';
 import { useSendQueueStore, type QueueItem } from '../../stores/sendQueueStore';
 import { useCommandHandler } from '../../hooks/chat/useCommandHandler';
-import { useMessagePagination, restoreToolCalls } from '../../hooks/chat/useMessagePagination';
+import { useMessagePagination } from '../../hooks/chat/useMessagePagination';
 import { useSessionActions } from '../../hooks/chat/useSessionActions';
 import { usePlanStatus } from '../../hooks/chat/usePlanStatus';
 import { useKeyboardShortcuts } from '../../hooks/chat/useKeyboardShortcuts';
@@ -323,8 +323,7 @@ export function ChatInterface({
         await branchSession(sessionId, treeEntryId);
         // Reload messages for this session (full replace) — mirrors the initial-load path in useMessagePagination
         const result = await api.getSessionMessages(sessionId, { limit: 50 });
-        const restoredMessages = restoreToolCalls(result.messages);
-        useChatMessageStore.getState().setMessages(sessionId, restoredMessages, result.pagination);
+        useChatMessageStore.getState().setMessages(sessionId, result.messages, result.pagination);
         useToastStore.getState().add({
           title: 'Session rewound',
           message: 'The conversation has been branched from this point.',

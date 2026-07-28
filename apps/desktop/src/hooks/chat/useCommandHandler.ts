@@ -9,6 +9,7 @@ import { activatePanel } from '../../utils/openPanel';
 import * as api from '../../services/api';
 import { activateGoal } from '../../services/goalActions';
 import { pauseGoal, resumeGoal, clearGoal } from '../../services/api/goals';
+import { finalizeRunLifecycle } from '../../services/message-handlers/run-finalization';
 import type {
   CommandExecuteResponse,
   SlashCommand,
@@ -282,7 +283,7 @@ export function useCommandHandler({
       // Clear any stale frontend run state so the session is no longer stuck in loading
       const staleRunId = useRunStore.getState().getSessionRunId(sessionId);
       if (staleRunId) {
-        useRunStore.getState().endRun(staleRunId);
+        finalizeRunLifecycle(staleRunId);
       }
       useProjectStore.getState().setSessionActive(sessionId, false);
       addMessage(sessionId, {

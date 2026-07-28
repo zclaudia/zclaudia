@@ -7,6 +7,7 @@ import { usePermissionStore } from './permissionStore';
 import { useProjectStore } from './projectStore';
 import { usePromptRequestStore } from './promptRequestStore';
 import { useSessionsStore } from './sessionsStore';
+import { finalizeRunLifecycle } from '../services/message-handlers/run-finalization';
 
 export type SessionRunPhase = 'idle' | 'running' | 'waiting' | 'interrupted';
 
@@ -59,6 +60,7 @@ interface SessionRunState {
     backendId?: string | null;
     activeRuns: ActiveRunInput[];
     source: SessionRunStateSource;
+    cleanupChatRuns?: boolean;
   }) => void;
   reconcileBackendSessionStatuses: (input: {
     backendId?: string | null;
@@ -151,16 +153,13 @@ function cleanupForegroundChatRunsForSession(
   const chatStore = useRunStore.getState() as ReturnType<typeof useRunStore.getState> & {
     activeRuns?: Record<string, string>;
     backgroundRunIds?: Set<string>;
-    finalizeRunToMessage?: (runId: string) => void;
-    endRun?: (runId: string) => void;
   };
 
   for (const [runId, runSessionId] of Object.entries(chatStore.activeRuns ?? {})) {
     if (runSessionId !== sessionId) continue;
     if (chatStore.backgroundRunIds?.has(runId)) continue;
     if (allowedRunIds.has(runId)) continue;
-    chatStore.finalizeRunToMessage?.(runId);
-    chatStore.endRun?.(runId);
+    finalizeRunLifecycle(runId);
   }
 }
 
@@ -172,8 +171,6 @@ function cleanupForegroundChatRunsForBackend(
   const chatStore = useRunStore.getState() as ReturnType<typeof useRunStore.getState> & {
     activeRuns?: Record<string, string>;
     backgroundRunIds?: Set<string>;
-    finalizeRunToMessage?: (runId: string) => void;
-    endRun?: (runId: string) => void;
   };
   const ownershipStore = useOwnershipStore.getState() as ReturnType<
     typeof useOwnershipStore.getState
@@ -190,8 +187,7 @@ function cleanupForegroundChatRunsForBackend(
       ownershipStore.getSessionBackendId?.(sessionId);
     const belongsToBackend = ownerBackendId === backendId || knownSessionIds.has(sessionId);
     if (!belongsToBackend) continue;
-    chatStore.finalizeRunToMessage?.(runId);
-    chatStore.endRun?.(runId);
+    finalizeRunLifecycle(runId);
     clearSessionBlockingState(sessionId);
   }
 }
@@ -313,7 +309,7 @@ export const useSessionRunStateStore = create<SessionRunState>((set, get) => ({
     setLegacySessionActive(normalizedBackendId, sessionId, true);
   },
 
-  reconcileBackendActiveRuns: ({ backendId, activeRuns, source }) => {
+  reconcileBackendActiveRuns: ({ backendId, activeRuns, source, cleanupChatRuns = true }) => {
     const normalizedBackendId = normalizeBackendId(backendId);
     const foregroundRuns = activeRuns.filter(run => isForegroundRun(run.sessionType));
     const activeRunIds = new Set(foregroundRuns.map(run => run.runId));
@@ -357,7 +353,9 @@ export const useSessionRunStateStore = create<SessionRunState>((set, get) => ({
       return { records };
     });
 
-    cleanupForegroundChatRunsForBackend(normalizedBackendId, activeRunIds, knownSessionIds);
+    if (cleanupChatRuns) {
+      cleanupForegroundChatRunsForBackend(normalizedBackendId, activeRunIds, knownSessionIds);
+    }
 
     for (const sessionId of staleSessionIds) {
       setLegacySessionActive(normalizedBackendId, sessionId, false);

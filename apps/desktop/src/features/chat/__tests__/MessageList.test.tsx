@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
 import type { MessageWithToolCalls } from '../../../stores/chatMessageStore';
 import type { ToolCallState } from '../../../stores/runStore';
 import type { ContentBlock } from '@zclaudia/shared';
+import { StrictModeTestWrapper } from '../../../test/StrictModeTestWrapper';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 
@@ -687,6 +688,60 @@ describe('MessageList', () => {
     expect(screen.getByText('Thinking')).toBeInTheDocument();
     // The main answer content renders via markdown mock
     expect(screen.getByText('Here is my answer.')).toBeInTheDocument();
+  });
+
+  it('reveals a think-first answer live under StrictMode without requiring a reload', () => {
+    const frames = new Map<number, FrameRequestCallback>();
+    let nextFrameId = 0;
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      const id = ++nextFrameId;
+      frames.set(id, callback);
+      return id;
+    });
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+      frames.delete(id);
+    });
+    const flushFrames = () => {
+      const pending = [...frames.values()];
+      frames.clear();
+      for (const callback of pending) callback(0);
+    };
+
+    const initial = [
+      makeMessage({
+        id: 'msg-think-first',
+        role: 'assistant',
+        content: '<think>Still reasoning</think>',
+      }),
+    ];
+    const view = render(
+      <StrictModeTestWrapper>
+        <MessageList messages={initial} />
+      </StrictModeTestWrapper>
+    );
+
+    try {
+      act(flushFrames);
+      view.rerender(
+        <StrictModeTestWrapper>
+          <MessageList
+            messages={[
+              makeMessage({
+                id: 'msg-think-first',
+                role: 'assistant',
+                content: '<think>Still reasoning</think>Final answer arrived',
+              }),
+            ]}
+          />
+        </StrictModeTestWrapper>
+      );
+      act(flushFrames);
+
+      expect(screen.getByText('Final answer arrived')).toBeInTheDocument();
+    } finally {
+      view.unmount();
+      vi.unstubAllGlobals();
+    }
   });
 
   it('thinking block shows line count', () => {

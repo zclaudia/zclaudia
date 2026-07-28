@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Message, ContentBlock } from '@zclaudia/shared';
 import type { ToolCallState } from './runStore';
+import { hydrateMessagesForDisplay } from '../services/message-hydration';
 
 export interface PaginationInfo {
   total: number;
@@ -75,7 +76,10 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
 
   setMessages: (sessionId, messages, pagination) =>
     set(state => ({
-      messages: { ...state.messages, [sessionId]: messages },
+      messages: {
+        ...state.messages,
+        [sessionId]: hydrateMessagesForDisplay(messages),
+      },
       pagination: pagination
         ? {
             ...state.pagination,
@@ -91,8 +95,9 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
   prependMessages: (sessionId, newMessages, pagination) =>
     set(state => {
       const existingMessages = state.messages[sessionId] || [];
+      const hydratedNewMessages = hydrateMessagesForDisplay(newMessages);
       // Prepend new messages (older) to the beginning
-      const combined = [...newMessages, ...existingMessages];
+      const combined = [...hydratedNewMessages, ...existingMessages];
 
       return {
         messages: { ...state.messages, [sessionId]: combined },
@@ -112,9 +117,10 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
   appendMessages: (sessionId, newMessages, pagination) =>
     set(state => {
       const existingMessages = state.messages[sessionId] || [];
+      const hydratedNewMessages = hydrateMessagesForDisplay(newMessages);
       // Deduplicate by message ID
       const existingIds = new Set(existingMessages.map(m => m.id));
-      const deduped = newMessages.filter(m => !existingIds.has(m.id));
+      const deduped = hydratedNewMessages.filter(m => !existingIds.has(m.id));
       const existingPagination = state.pagination[sessionId] || DEFAULT_PAGINATION;
       const nextMessageVersion =
         pagination?.messageVersion != null
@@ -151,10 +157,11 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
   mergeMessages: (sessionId, incomingMessages, pagination) =>
     set(state => {
       const existingMessages = state.messages[sessionId] || [];
+      const hydratedIncomingMessages = hydrateMessagesForDisplay(incomingMessages);
       const byId = new Map(existingMessages.map(message => [message.id, message]));
       let changed = false;
 
-      for (const incoming of incomingMessages) {
+      for (const incoming of hydratedIncomingMessages) {
         const existing = byId.get(incoming.id);
         if (!existing) {
           byId.set(incoming.id, incoming);
@@ -199,14 +206,15 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
   addMessage: (sessionId, message) =>
     set(state => {
       const existingMessages = state.messages[sessionId] || [];
+      const hydratedMessage = hydrateMessagesForDisplay([message])[0];
       // Dual dedup: check both server ID and client-generated message ID
       if (
         existingMessages.some(
           m =>
-            m.id === message.id ||
-            (message.clientMessageId &&
+            m.id === hydratedMessage.id ||
+            (hydratedMessage.clientMessageId &&
               m.clientMessageId &&
-              m.clientMessageId === message.clientMessageId)
+              m.clientMessageId === hydratedMessage.clientMessageId)
         )
       ) {
         return state;
@@ -216,14 +224,14 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
       return {
         messages: {
           ...state.messages,
-          [sessionId]: [...existingMessages, message],
+          [sessionId]: [...existingMessages, hydratedMessage],
         },
         pagination: {
           ...state.pagination,
           [sessionId]: {
             ...existingPagination,
             total: existingPagination.total + 1,
-            newestTimestamp: message.createdAt,
+            newestTimestamp: hydratedMessage.createdAt,
           },
         },
       };

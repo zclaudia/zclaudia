@@ -12,6 +12,8 @@ import type { ContextUsagePayload } from '@zclaudia/shared';
 import { getSessionContextUsage } from '../../services/api';
 import { ContextUsageCard } from './ContextUsageCard';
 import { formatTokens } from '../../utils/formatTokens';
+import { useIsMounted } from '../../hooks/useIsMounted';
+import { useLatestRef } from '../../hooks/useLatestRef';
 
 interface Props {
   sessionId: string;
@@ -44,12 +46,11 @@ export function ContextUsagePopover({ sessionId, children, latestCacheRead }: Pr
   const [state, setState] = useState<FetchState | null>(null);
   // Per-session stale-while-revalidate cache so re-hovering doesn't white-flash.
   const cacheRef = useRef<Map<string, ContextUsagePayload>>(new Map());
-  const mountedRef = useRef(true);
+  const isMounted = useIsMounted();
   // Always holds the latest sessionId so an in-flight fetch can detect that the
   // component was re-pointed at a different session (it updates in place rather
   // than remounting) and drop its now-stale result.
-  const sessionIdRef = useRef(sessionId);
-  sessionIdRef.current = sessionId;
+  const sessionIdRef = useLatestRef(sessionId);
   const openTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -60,7 +61,7 @@ export function ContextUsagePopover({ sessionId, children, latestCacheRead }: Pr
     try {
       const res = await getSessionContextUsage(sid);
       // Drop the result if we unmounted or switched sessions mid-flight.
-      if (!mountedRef.current || sid !== sessionIdRef.current) return;
+      if (!isMounted() || sid !== sessionIdRef.current) return;
       if (!res.available) {
         setState({ status: 'unavailable' });
         return;
@@ -69,10 +70,10 @@ export function ContextUsagePopover({ sessionId, children, latestCacheRead }: Pr
       cacheRef.current.set(sid, usage);
       setState({ status: 'available', usage });
     } catch {
-      if (!mountedRef.current || sid !== sessionIdRef.current) return;
+      if (!isMounted() || sid !== sessionIdRef.current) return;
       setState({ status: 'error' });
     }
-  }, [sessionId]);
+  }, [isMounted, sessionId, sessionIdRef]);
 
   const scheduleOpen = useCallback(() => {
     clearTimeout(closeTimer.current);
@@ -91,17 +92,13 @@ export function ContextUsagePopover({ sessionId, children, latestCacheRead }: Pr
     closeTimer.current = setTimeout(() => setOpen(false), CLOSE_DELAY);
   }, []);
 
-  useEffect(() => {
-    // Re-arm on (re)mount. StrictMode runs this effect twice with a cleanup in
-    // between; without setting this back to true the ref stays false and every
-    // fetch result is dropped, stranding the popover on "Loading…".
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
+  useEffect(
+    () => () => {
       clearTimeout(openTimer.current);
       clearTimeout(closeTimer.current);
-    };
-  }, []);
+    },
+    []
+  );
 
   return (
     <span

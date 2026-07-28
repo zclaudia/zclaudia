@@ -1,7 +1,7 @@
-import { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { ContextUsagePayload } from '@zclaudia/shared';
+import { StrictModeTestWrapper } from '../../../test/StrictModeTestWrapper';
 import { ContextUsagePopover } from '../ContextUsagePopover';
 
 // The component imports the named fetch from the api index; mock just that.
@@ -66,11 +66,11 @@ describe('ContextUsagePopover', () => {
     // "Loading…". The real app wraps the tree in StrictMode; tests must too.
     mockFetch.mockResolvedValue({ available: true, ...payload() });
     const { container } = render(
-      <StrictMode>
+      <StrictModeTestWrapper>
         <ContextUsagePopover sessionId="s1">
           <span>indicator</span>
         </ContextUsagePopover>
-      </StrictMode>
+      </StrictModeTestWrapper>
     );
     fireEvent.mouseEnter(container.firstChild as HTMLElement);
     await screen.findByTestId('context-usage-card');

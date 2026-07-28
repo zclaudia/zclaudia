@@ -35,6 +35,7 @@ import { useProfileAutosave } from './useProfileAutosave';
 import { ProfileHeader } from './ui/ProfileHeader';
 import type { DetailBadge } from './ui/DetailHeader';
 import type { ActionsMenuAction } from './ui/ActionsMenu';
+import { useIsMounted } from '../../hooks/useIsMounted';
 
 /**
  * Parent must remount this component per identity — key it by
@@ -230,13 +231,7 @@ export function ProfileEditor({
   // pre-hydration form is never seen as a dirty edit.
   const [hydrated, setHydrated] = useState(false);
 
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+  const isMounted = useIsMounted();
 
   // Captured once per mount (the editor is keyed by profile id, so this is stable
   // per identity). Used to decide null (clear existing) vs undefined (omit) for the
@@ -636,9 +631,9 @@ export function ProfileEditor({
 
   const performAutosave = useCallback(async () => {
     const saved = await api.updateAgentProfileForBackend(backendId, profile.id, buildPayload());
-    if (!mountedRef.current) return;
+    if (!isMounted()) return;
     onSaved(saved);
-  }, [profile, backendId, buildPayload, onSaved]);
+  }, [profile, backendId, buildPayload, isMounted, onSaved]);
 
   const autosave = useProfileAutosave({
     enabled: hydrated && profile.status !== 'readonly',

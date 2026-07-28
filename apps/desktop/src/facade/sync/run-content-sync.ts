@@ -1,12 +1,11 @@
 import type { BackendFacadeEvent } from '@zclaudia/shared';
 import type { SessionMessage } from '@zclaudia/protocol/zclaudia';
-import { useChatMessageStore, type MessageWithToolCalls } from '../../stores/chatMessageStore';
+import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useToastStore } from '../../stores/toastStore';
 import { handleServerMessage } from '../../services/messageHandler';
 import { getFacadeServerRuns } from './state';
-import { restoreToolCalls } from '../../services/message-hydration';
 import type { MessageMetadata } from '@zclaudia/shared';
 
 export function forwardRunEvent(event: Extract<BackendFacadeEvent, { type: 'run_event' }>): void {
@@ -26,23 +25,21 @@ export function syncContentPatch(
   event: Extract<BackendFacadeEvent, { type: 'content_patch' }>
 ): void {
   const { sessionId, messages, latestOffset } = event;
-  const restoredMessages: MessageWithToolCalls[] = restoreToolCalls(
-    messages.map((msg: SessionMessage) => {
-      const extended = msg as SessionMessage & { metadata?: MessageMetadata };
-      return {
-        id: msg.messageId,
-        sessionId: msg.sessionId,
-        role: msg.role === 'tool' ? 'assistant' : msg.role,
-        createdAt: msg.createdAt,
-        offset: msg.offset,
-        content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-        metadata: extended.metadata,
-      };
-    })
-  );
+  const incomingMessages = messages.map((msg: SessionMessage) => {
+    const extended = msg as SessionMessage & { metadata?: MessageMetadata };
+    return {
+      id: msg.messageId,
+      sessionId: msg.sessionId,
+      role: msg.role === 'tool' ? ('assistant' as const) : msg.role,
+      createdAt: msg.createdAt,
+      offset: msg.offset,
+      content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+      metadata: extended.metadata,
+    };
+  });
   useChatMessageStore
     .getState()
-    .mergeMessages(sessionId, restoredMessages, { maxOffset: latestOffset });
+    .mergeMessages(sessionId, incomingMessages, { maxOffset: latestOffset });
   useRecoveryStore.getState().noteActiveSessionMessage();
 }
 

@@ -61,6 +61,42 @@ describe('chatMessageStore', () => {
     expect(useChatMessageStore.getState().messages.s1.map(m => m.id)).toEqual(['a', 'b']);
   });
 
+  it('hydrates persisted display metadata at every message-ingestion boundary', () => {
+    const persisted = {
+      id: 'hydrated',
+      sessionId: 's1',
+      role: 'assistant' as const,
+      content: 'full text',
+      createdAt: 1,
+      metadata: {
+        contentBlocks: [{ type: 'text' as const, content: 'full text' }],
+        toolCalls: [{ toolUseId: 't1', name: 'Read', input: { path: 'a' }, output: 'ok' }],
+      },
+    };
+    const operations = [
+      () => useChatMessageStore.getState().setMessages('s1', [persisted]),
+      () => useChatMessageStore.getState().prependMessages('s1', [persisted]),
+      () => useChatMessageStore.getState().appendMessages('s1', [persisted]),
+      () => useChatMessageStore.getState().mergeMessages('s1', [persisted]),
+      () => useChatMessageStore.getState().addMessage('s1', persisted),
+    ];
+
+    for (const ingest of operations) {
+      reset();
+      ingest();
+      const hydrated = useChatMessageStore.getState().messages.s1[0];
+      expect(hydrated.contentBlocks).toEqual([{ type: 'text', content: 'full text' }]);
+      expect(hydrated.toolCalls).toEqual([
+        expect.objectContaining({
+          id: 't1',
+          toolName: 'Read',
+          status: 'completed',
+          result: 'ok',
+        }),
+      ]);
+    }
+  });
+
   it('clearMessages resets list and pagination', () => {
     useChatMessageStore
       .getState()

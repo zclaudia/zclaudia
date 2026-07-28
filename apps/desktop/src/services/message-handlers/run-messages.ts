@@ -12,7 +12,8 @@ import { useServerStore } from '../../stores/serverStore';
 import { useToastStore } from '../../stores/toastStore';
 import { eagerSyncCurrentSession, recoverCurrentSessionTail } from '../sessionSync';
 import { getSessionCompaction } from '../api/sessions';
-import { scheduleDelta, flushDeltaForRun } from './delta-buffer';
+import { scheduleDelta } from './delta-buffer';
+import { finalizeRunLifecycle } from './run-finalization';
 
 /**
  * Translate a Codex OAuth error code into a user-facing message.
@@ -117,8 +118,13 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       if (ctx.isRunEventGap(msg.runId, msg.seq))
         ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
-      flushDeltaForRun(msg.runId);
-      const completedSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
+      const { sessionId: completedSession } = finalizeRunLifecycle(msg.runId, {
+        sessionId: msg.sessionId,
+        assistantMessageId: msg.assistantMessageId,
+        messageVersion: msg.messageVersion,
+        content: msg.content,
+        contentBlocks: msg.contentBlocks,
+      });
       console.log(
         `[${logTag}] run_completed runId=${msg.runId} sessionId=${completedSession ?? 'unknown'} seq=${msg.seq ?? 'none'}`
       );
@@ -126,17 +132,6 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         usePromptRequestStore.getState().clearRequestsForSession(completedSession);
         usePermissionStore.getState().clearRequestsForSession(completedSession);
         useInteractionStore.getState().clearSession(completedSession);
-        // Server-authoritative final content repairs any delta frames lost in
-        // transit; without it the message stays truncated until a full reload.
-        // sessionId lets it apply even if a racing heartbeat already endRun()'d
-        // the client-side tracking.
-        useRunStore.getState().finalizeRunToMessage(msg.runId, {
-          sessionId: completedSession,
-          assistantMessageId: msg.assistantMessageId,
-          messageVersion: msg.messageVersion,
-          content: msg.content,
-          contentBlocks: msg.contentBlocks,
-        });
         if (msg.usage) {
           useSessionConfigStore.getState().addSessionUsage(completedSession, msg.usage);
         }
@@ -152,7 +147,6 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       }
       ctx.recordTerminalRun(msg.runId, msg.seq);
       ctx.clearRunActivity(msg.runId);
-      useRunStore.getState().endRun(msg.runId);
       serverRunsRef.get(serverId)?.delete(msg.runId);
       ctx.clearRunSeq(msg.runId);
       return true;
@@ -162,8 +156,14 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       if (ctx.isRunEventGap(msg.runId, msg.seq))
         ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
-      flushDeltaForRun(msg.runId);
-      const failedSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
+      const { sessionId: failedSession } = finalizeRunLifecycle(msg.runId, {
+        sessionId: msg.sessionId,
+        assistantMessageId: msg.assistantMessageId,
+        messageVersion: msg.messageVersion,
+        content: msg.content,
+        contentBlocks: msg.contentBlocks,
+        error: msg.error,
+      });
       console.log(
         `[${logTag}] run_failed runId=${msg.runId} sessionId=${failedSession ?? 'unknown'} seq=${msg.seq ?? 'none'}`
       );
@@ -184,14 +184,6 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
             });
           }
         }
-        useRunStore.getState().finalizeRunToMessage(msg.runId, {
-          sessionId: failedSession,
-          assistantMessageId: msg.assistantMessageId,
-          messageVersion: msg.messageVersion,
-          content: msg.content,
-          contentBlocks: msg.contentBlocks,
-          error: msg.error,
-        });
         useSessionRunStateStore.getState().markRunEnded({
           backendId,
           runId: msg.runId,
@@ -209,7 +201,6 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       }
       ctx.recordTerminalRun(msg.runId, msg.seq);
       ctx.clearRunActivity(msg.runId);
-      useRunStore.getState().endRun(msg.runId);
       serverRunsRef.get(serverId)?.delete(msg.runId);
       ctx.clearRunSeq(msg.runId);
       console.error(`[${logTag}] Run failed:`, msg.error);

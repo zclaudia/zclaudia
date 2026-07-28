@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useIsMounted } from '../../hooks/useIsMounted';
+import { useLatestRef } from '../../hooks/useLatestRef';
 
 export type SaveStatus = 'saved' | 'saving' | 'pending' | 'failed';
 
@@ -31,22 +33,16 @@ export function useProfileAutosave({
 }: UseProfileAutosaveParams): UseProfileAutosaveResult {
   const [status, setStatus] = useState<SaveStatus>('saved');
   const lastSaved = useRef(signature); // signature known to be persisted
-  const sigRef = useRef(signature);
-  const saveRef = useRef(save);
-  const enabledRef = useRef(enabled);
-  const validRef = useRef(valid);
+  const sigRef = useLatestRef(signature);
+  const saveRef = useLatestRef(save);
+  const enabledRef = useLatestRef(enabled);
+  const validRef = useLatestRef(valid);
   const savingRef = useRef(false);
   const prevEnabledRef = useRef(enabled);
-  const mountedRef = useRef(true);
+  const isMounted = useIsMounted();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  sigRef.current = signature;
-  saveRef.current = save;
-  enabledRef.current = enabled;
-  validRef.current = valid;
-
   useEffect(
     () => () => {
-      mountedRef.current = false;
       if (timer.current) clearTimeout(timer.current);
     },
     []
@@ -61,37 +57,40 @@ export function useProfileAutosave({
 
   // Stable: reads live values from refs so the debounce effect need not depend
   // on the (often inline) `save` closure.
-  const runSave = useCallback(async () => {
-    if (savingRef.current) return;
-    if (sigRef.current === lastSaved.current) {
-      // Nothing new to persist and no save in flight. Never leave a stale
-      // "saving" spinner up: this fires when a scheduled/trailing run finds the
-      // current signature already saved (e.g. the signature blipped and settled
-      // back to the persisted value while a save was completing).
-      if (mountedRef.current) setStatus(s => (s === 'saving' ? 'saved' : s));
-      return;
-    }
-    const saving = sigRef.current;
-    savingRef.current = true;
-    if (mountedRef.current) setStatus('saving');
-    try {
-      await saveRef.current();
-      lastSaved.current = saving;
-      if (!mountedRef.current) return;
+  const runSave = useCallback(
+    async function runSaveNow() {
+      if (savingRef.current) return;
       if (sigRef.current === lastSaved.current) {
-        setStatus('saved');
-      } else {
-        // Edits arrived during the save — persist the trailing change.
-        setStatus('saving');
-        clearTimer();
-        timer.current = setTimeout(() => void runSave(), 0);
+        // Nothing new to persist and no save in flight. Never leave a stale
+        // "saving" spinner up: this fires when a scheduled/trailing run finds the
+        // current signature already saved (e.g. the signature blipped and settled
+        // back to the persisted value while a save was completing).
+        if (isMounted()) setStatus(s => (s === 'saving' ? 'saved' : s));
+        return;
       }
-    } catch {
-      if (mountedRef.current) setStatus('failed');
-    } finally {
-      savingRef.current = false;
-    }
-  }, []);
+      const saving = sigRef.current;
+      savingRef.current = true;
+      if (isMounted()) setStatus('saving');
+      try {
+        await saveRef.current();
+        lastSaved.current = saving;
+        if (!isMounted()) return;
+        if (sigRef.current === lastSaved.current) {
+          setStatus('saved');
+        } else {
+          // Edits arrived during the save — persist the trailing change.
+          setStatus('saving');
+          clearTimer();
+          timer.current = setTimeout(() => void runSaveNow(), 0);
+        }
+      } catch {
+        if (isMounted()) setStatus('failed');
+      } finally {
+        savingRef.current = false;
+      }
+    },
+    [isMounted, saveRef, sigRef]
+  );
 
   // Safety net: the spinner must never outlive the work. If a render settles
   // with no save in flight and the current signature already persisted, the
@@ -102,7 +101,7 @@ export function useProfileAutosave({
     if (status === 'saving' && !savingRef.current && sigRef.current === lastSaved.current) {
       setStatus('saved');
     }
-  });
+  }, [status, sigRef]);
 
   useEffect(() => {
     const justEnabled = enabled && !prevEnabledRef.current;
@@ -137,13 +136,13 @@ export function useProfileAutosave({
     if (!enabledRef.current || !validRef.current) return;
     clearTimer();
     void runSave();
-  }, [runSave]);
+  }, [enabledRef, runSave, validRef]);
 
   const retry = useCallback(() => {
     if (!enabledRef.current || !validRef.current) return;
     clearTimer();
     void runSave();
-  }, [runSave]);
+  }, [enabledRef, runSave, validRef]);
 
   return { status, flush, retry };
 }

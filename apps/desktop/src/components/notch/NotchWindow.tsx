@@ -338,7 +338,10 @@ export function NotchWindow() {
     const from = progressRef.current;
     if (from === target) return;
 
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
 
     if (isOpen) {
       // Expanding — stop polling, ensure pass-through is off.
@@ -382,7 +385,10 @@ export function NotchWindow() {
 
     rafRef.current = requestAnimationFrame(tick);
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
   }, [isOpen]);
 

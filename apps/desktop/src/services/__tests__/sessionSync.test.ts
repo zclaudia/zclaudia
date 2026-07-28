@@ -332,7 +332,7 @@ describe('services/sessionSync', () => {
       });
     });
 
-    it('hydrates contentBlocks and toolCalls from metadata before appending', async () => {
+    it('preserves contentBlocks and toolCalls metadata for store-boundary hydration', async () => {
       selectionState.selectedSessionId = 'session-1';
       chatState.pagination = { 'session-1': { maxOffset: 5 } };
       mockGetSessionMessages.mockResolvedValue({
@@ -359,13 +359,13 @@ describe('services/sessionSync', () => {
         [
           expect.objectContaining({
             id: 'message-6',
-            contentBlocks: [
-              { type: 'tool_use', toolUseId: 't1' },
-              { type: 'text', content: 'full text' },
-            ],
-            toolCalls: [
-              expect.objectContaining({ id: 't1', toolName: 'Read', status: 'completed' }),
-            ],
+            metadata: {
+              contentBlocks: [
+                { type: 'tool_use', toolUseId: 't1' },
+                { type: 'text', content: 'full text' },
+              ],
+              toolCalls: [{ toolUseId: 't1', name: 'Read', input: { p: 1 }, output: 'ok' }],
+            },
           }),
         ],
         { maxOffset: 6 }
@@ -402,7 +402,7 @@ describe('services/sessionSync', () => {
       });
     });
 
-    it('hydrates contentBlocks from metadata so recovery can repair the rendered blocks', async () => {
+    it('preserves contentBlocks metadata so store hydration can repair rendered blocks', async () => {
       // The segmented (tool-call) message view renders from top-level
       // contentBlocks; recovery must rebuild them from metadata or the repair
       // is invisible until a full reload.
@@ -433,10 +433,12 @@ describe('services/sessionSync', () => {
           expect.objectContaining({
             id: 'message-10',
             content: 'full text',
-            contentBlocks: [
-              { type: 'tool_use', toolUseId: 't1' },
-              { type: 'text', content: 'full text' },
-            ],
+            metadata: {
+              contentBlocks: [
+                { type: 'tool_use', toolUseId: 't1' },
+                { type: 'text', content: 'full text' },
+              ],
+            },
           }),
         ],
         { maxOffset: 10 }

@@ -7,13 +7,11 @@ import type { MessageWithToolCalls } from '../stores/chatMessageStore';
  *
  * Server wire messages carry blocks/tool calls only under `metadata`; the
  * top-level `contentBlocks`/`toolCalls` fields the segmented message view
- * renders from are client-side and must be rebuilt here. Every path that
- * feeds server-fetched messages into the chat store (initial load, pagination,
- * gap fill, tail recovery) must hydrate through this function — otherwise a
- * recovery merge repairs `content` invisibly while the rendered blocks stay
- * stale.
+ * renders from are client-side and must be rebuilt here. The chat message
+ * store invokes this at every ingestion method, so initial load, pagination,
+ * gap fill, tail recovery, and live facade patches cannot bypass hydration.
  */
-export function restoreToolCalls(messages: Message[]): MessageWithToolCalls[] {
+export function hydrateMessagesForDisplay(messages: Message[]): MessageWithToolCalls[] {
   return messages.map(msg => {
     const result: MessageWithToolCalls = { ...msg };
     if (msg.metadata?.toolCalls && msg.metadata.toolCalls.length > 0) {

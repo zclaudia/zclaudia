@@ -4,10 +4,6 @@ import { useChatMessageStore, type MessageWithToolCalls } from '../../stores/cha
 import { useFilePushStore } from '../../stores/filePushStore';
 import { useUIStore } from '../../stores/uiStore';
 import * as api from '../../services/api';
-import { restoreToolCalls } from '../../services/message-hydration';
-
-// Re-export for existing importers (e.g. ChatInterface).
-export { restoreToolCalls };
 
 const MESSAGES_PER_PAGE = 50;
 const BOTTOM_REFRESH_LIMIT = 12;
@@ -28,7 +24,7 @@ export function useMessagePagination({
   const pagination = useChatMessageStore(s => s.pagination);
   const setMessages = useChatMessageStore(s => s.setMessages);
   const prependMessages = useChatMessageStore(s => s.prependMessages);
-  const appendMessages = useChatMessageStore(s => s.appendMessages);
+  const mergeMessages = useChatMessageStore(s => s.mergeMessages);
   const setLoadingMore = useChatMessageStore(s => s.setLoadingMore);
   const sessionMessages = useChatMessageStore(s => s.messages[sessionId]);
 
@@ -147,9 +143,8 @@ export function useMessagePagination({
             signal,
           });
 
-          const restoredOlder = restoreToolCalls(result.messages);
-          prependMessages(sessionId, restoredOlder, result.pagination);
-          syncFilePushMessages(restoredOlder);
+          prependMessages(sessionId, result.messages, result.pagination);
+          syncFilePushMessages(result.messages);
         } else {
           // Initial load via HTTP
           setLoadError(null);
@@ -160,9 +155,8 @@ export function useMessagePagination({
               : { limit: MESSAGES_PER_PAGE, signal }
           );
 
-          const restoredMessages = restoreToolCalls(result.messages);
-          setMessages(sessionId, restoredMessages, result.pagination);
-          syncFilePushMessages(restoredMessages);
+          setMessages(sessionId, result.messages, result.pagination);
+          syncFilePushMessages(result.messages);
 
           // Restore active run state (fixes loading state lost after page refresh)
           if (result.activeRun) {
@@ -340,15 +334,16 @@ export function useMessagePagination({
     state.lastAt = now;
     try {
       const result = await api.getSessionMessages(sessionId, { limit: BOTTOM_REFRESH_LIMIT });
-      const restored = restoreToolCalls(result.messages);
-      appendMessages(sessionId, restored, result.pagination);
-      syncFilePushMessages(restored);
+      // This is a latest-tail snapshot, not an insert-only page. Merge by id so
+      // an updated final assistant row repairs the live view as well.
+      mergeMessages(sessionId, result.messages, result.pagination);
+      syncFilePushMessages(result.messages);
     } catch (error) {
       console.debug('[ChatInterface] bottom refresh failed:', error);
     } finally {
       state.inFlight = false;
     }
-  }, [appendMessages, initialLoadDone, isConnected, sessionId, syncFilePushMessages]);
+  }, [initialLoadDone, isConnected, mergeMessages, sessionId, syncFilePushMessages]);
 
   const handleMessageWheel = useCallback(
     (deltaY: number) => {

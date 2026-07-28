@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useProfileAutosave } from './useProfileAutosave';
+import { StrictModeTestWrapper } from '../../test/StrictModeTestWrapper';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -181,6 +182,70 @@ describe('useProfileAutosave', () => {
     });
     expect(save).toHaveBeenCalledTimes(2); // trailing save for v2
     expect(view.result.current.status).toBe('saved');
+  });
+
+  it('persists a trailing edit and settles under StrictMode even when its debounce fires in-flight', async () => {
+    let resolveFirst!: () => void;
+    const save = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>(resolve => {
+            resolveFirst = resolve;
+          })
+      )
+      .mockResolvedValueOnce(undefined);
+    const view = renderHook(p => useProfileAutosave(p), {
+      initialProps: {
+        enabled: true,
+        valid: true,
+        signature: 'v0',
+        save,
+        debounceMs: 600,
+      },
+      wrapper: StrictModeTestWrapper,
+    });
+
+    view.rerender({ enabled: true, valid: true, signature: 'v1', save, debounceMs: 600 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(save).toHaveBeenCalledTimes(1);
+
+    view.rerender({ enabled: true, valid: true, signature: 'v2', save, debounceMs: 600 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(save).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveFirst();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(view.result.current.status).toBe('saved');
+  });
+
+  it('surfaces a save failure under StrictMode', async () => {
+    const save = vi.fn().mockRejectedValue(new Error('boom'));
+    const view = renderHook(p => useProfileAutosave(p), {
+      initialProps: {
+        enabled: true,
+        valid: true,
+        signature: 'v0',
+        save,
+        debounceMs: 600,
+      },
+      wrapper: StrictModeTestWrapper,
+    });
+
+    view.rerender({ enabled: true, valid: true, signature: 'v1', save, debounceMs: 600 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+
+    expect(view.result.current.status).toBe('failed');
   });
 
   it('never strands on "saving": a redundant run for an already-saved signature resolves to saved', async () => {

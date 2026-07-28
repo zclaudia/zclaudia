@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Command, type Child } from '@tauri-apps/plugin-shell';
 import { appDataDir, resolveResource } from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/core';
+import { useIsMounted } from './useIsMounted';
 
 export type EmbeddedServerStatus =
   | 'idle'
@@ -86,7 +87,7 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
   }));
 
   const childRef = useRef<Child | null>(null);
-  const mountedRef = useRef(true);
+  const isMounted = useIsMounted();
   const [restartNonce, setRestartNonce] = useState(0);
 
   const registerManualEndpointProbe = useCallback(() => {
@@ -209,7 +210,7 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
       command.stdout.on('data', (line: string) => {
         const trimmed = line.trim();
         const match = trimmed.match(/^SERVER_READY:(\d+)$/);
-        if (match && mountedRef.current) {
+        if (match && isMounted()) {
           const port = parseInt(match[1], 10);
           console.log(`[EmbeddedServer] Ready on port ${port}`);
           setState({ port, status: 'ready', error: null });
@@ -225,14 +226,14 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
 
       command.on('error', (error: string) => {
         console.error('[EmbeddedServer] Process error:', error);
-        if (mountedRef.current) {
+        if (isMounted()) {
           setState(prev => ({ ...prev, status: 'error', error }));
         }
       });
 
       command.on('close', (data: { code: number | null; signal: number | null }) => {
         console.log(`[EmbeddedServer] Process exited (code=${data.code}, signal=${data.signal})`);
-        if (!mountedRef.current) return;
+        if (!isMounted()) return;
         // Before marking as error, check if server is still reachable
         // (handles React StrictMode double-mount: old process dies but new one is running)
         setState(prev => {
@@ -250,12 +251,12 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
           }
           fetch(`http://127.0.0.1:${recoveryPort}/health`)
             .then(resp => {
-              if (resp.ok && mountedRef.current) {
+              if (resp.ok && isMounted()) {
                 console.log(
                   `[EmbeddedServer] Process exited but server still reachable on port ${recoveryPort}, recovering`
                 );
                 setState({ port: recoveryPort, status: 'ready', error: null });
-              } else if (mountedRef.current) {
+              } else if (isMounted()) {
                 setState(p => {
                   if (p.status === 'ready')
                     return { ...p, status: 'error', error: 'Server process exited unexpectedly' };
@@ -270,7 +271,7 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
               }
             })
             .catch(() => {
-              if (mountedRef.current) {
+              if (isMounted()) {
                 setState(p => {
                   if (p.status === 'ready')
                     return { ...p, status: 'error', error: 'Server process exited unexpectedly' };
@@ -308,7 +309,7 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
       }
     } catch (err) {
       console.error('[EmbeddedServer] Failed to start:', err);
-      if (mountedRef.current) {
+      if (isMounted()) {
         setState({
           port: null,
           status: 'error',
@@ -316,7 +317,7 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
         });
       }
     }
-  }, [registerManualEndpointProbe, runOpencodeEndpointProbe]);
+  }, [isMounted, registerManualEndpointProbe, runOpencodeEndpointProbe]);
 
   const startServerProd = useCallback(async () => {
     try {
@@ -334,13 +335,13 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
         dataDir,
       });
 
-      if (mountedRef.current) {
+      if (isMounted()) {
         console.log(`[EmbeddedServer] Ready on port ${result.port}`);
         setState({ port: result.port, status: 'ready', error: null });
       }
     } catch (err) {
       console.error('[EmbeddedServer] Failed to start:', err);
-      if (mountedRef.current) {
+      if (isMounted()) {
         setState({
           port: null,
           status: 'error',
@@ -348,7 +349,7 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
         });
       }
     }
-  }, [registerManualEndpointProbe, runOpencodeEndpointProbe]);
+  }, [isMounted, registerManualEndpointProbe, runOpencodeEndpointProbe]);
 
   const restart = useCallback(async () => {
     if (disabled || !isDesktopTauriNonWindows()) return;
@@ -374,8 +375,6 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
   }, [disabled]);
 
   useEffect(() => {
-    mountedRef.current = true;
-
     if (disabled || !isDesktopTauriNonWindows()) return;
 
     if (import.meta.env.DEV) {
@@ -385,7 +384,6 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
     }
 
     return () => {
-      mountedRef.current = false;
       if (import.meta.env.DEV) {
         // Dev mode: do NOT kill the server process on cleanup.
         // React StrictMode unmount+remount causes a race condition:
@@ -398,7 +396,7 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
         invoke('stop_server').catch(() => {});
       }
     };
-  }, [restartNonce, startServerDev, startServerProd]);
+  }, [disabled, restartNonce, startServerDev, startServerProd]);
 
   return useMemo(
     () => ({

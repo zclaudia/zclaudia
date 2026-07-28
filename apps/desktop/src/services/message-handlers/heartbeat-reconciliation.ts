@@ -10,7 +10,7 @@ import { useInteractionStore } from '../../stores/interactionStore';
 import { useSessionsStore, getSessionBucketKeyForBackend } from '../../stores/sessionsStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { eagerSyncCurrentSession, recoverCurrentSessionTail } from '../sessionSync';
-import { flushDeltaForRun } from './delta-buffer';
+import { finalizeRunLifecycle } from './run-finalization';
 import { getProjectsForBackend } from '../api/projects';
 import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../utils/controlPlane';
 import { parseBackendId } from '../../stores/gatewayStore';
@@ -209,10 +209,7 @@ export function handleHeartbeat(
         }
         state.heartbeatMissesByRun.delete(runId);
         console.log(`[${logTag}] Cleaning up stale run ${runId} (not in server heartbeat)`);
-        const sessionId = chatState.activeRuns[runId];
-        flushDeltaForRun(runId);
-        chatState.finalizeRunToMessage(runId);
-        chatState.endRun(runId);
+        const { sessionId } = finalizeRunLifecycle(runId);
         if (sessionId) {
           usePermissionStore.getState().clearRequestsForSession(sessionId);
           usePromptRequestStore.getState().clearRequestsForSession(sessionId);
@@ -311,6 +308,9 @@ export function handleHeartbeat(
         .map(g => ({ runId: g.runId, sessionId: g.sessionId, sessionType: undefined })),
     ],
     source: 'heartbeat',
+    // The heartbeat handler above owns the grace window and terminal content
+    // transition. This layer only reconciles the derived session activity.
+    cleanupChatRuns: false,
   });
 
   if (backendId) {

@@ -1,8 +1,9 @@
 /// <reference types="vite/client" />
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { resolveResource } from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/core';
 import { isWindows as isWindowsTauri } from '../utils/platform';
+import { useIsMounted } from './useIsMounted';
 
 export type WslServerStatus = 'idle' | 'checking' | 'deploying' | 'starting' | 'ready' | 'error';
 
@@ -80,15 +81,18 @@ export function useWslServer(): WslServerState & {
     outputLines: [],
   });
 
-  const mountedRef = useRef(true);
+  const isMounted = useIsMounted();
 
-  const appendOutput = useCallback((line: string) => {
-    if (!mountedRef.current) return;
-    setState(prev => ({
-      ...prev,
-      outputLines: [...prev.outputLines.slice(-200), line], // Keep last 200 lines
-    }));
-  }, []);
+  const appendOutput = useCallback(
+    (line: string) => {
+      if (!isMounted()) return;
+      setState(prev => ({
+        ...prev,
+        outputLines: [...prev.outputLines.slice(-200), line], // Keep last 200 lines
+      }));
+    },
+    [isMounted]
+  );
 
   /**
    * Check deployed server version in WSL.
@@ -163,7 +167,7 @@ export function useWslServer(): WslServerState & {
       if (result.code !== 0) {
         const errMsg = result.stderr.trim() || 'Deploy failed';
         appendOutput(`[Deploy] ERROR: ${errMsg}`);
-        if (mountedRef.current) {
+        if (isMounted()) {
           setState(prev => ({ ...prev, status: 'error', error: errMsg }));
         }
         return false;
@@ -175,12 +179,12 @@ export function useWslServer(): WslServerState & {
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       appendOutput(`[Deploy] ERROR: ${errMsg}`);
-      if (mountedRef.current) {
+      if (isMounted()) {
         setState(prev => ({ ...prev, status: 'error', error: errMsg }));
       }
       return false;
     }
-  }, [appendOutput]);
+  }, [appendOutput, isMounted]);
 
   /**
    * Start the server in WSL via the Rust-side `wsl_start_server` Tauri
@@ -196,18 +200,18 @@ export function useWslServer(): WslServerState & {
     try {
       const { port } = await invoke<{ port: number }>('wsl_start_server');
       appendOutput(`[Server] Ready on port ${port}`);
-      if (mountedRef.current) {
+      if (isMounted()) {
         setState(prev => ({ ...prev, port, status: 'ready', error: null }));
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error('[WslServer] Failed to start:', err);
       appendOutput(`[Server] Failed: ${errMsg}`);
-      if (mountedRef.current) {
+      if (isMounted()) {
         setState(prev => ({ ...prev, status: 'error', error: errMsg }));
       }
     }
-  }, [appendOutput]);
+  }, [appendOutput, isMounted]);
 
   /**
    * Full flow: check health → deploy if needed → start.
@@ -221,7 +225,7 @@ export function useWslServer(): WslServerState & {
     // 1. Quick health check — maybe server is already running
     if (await checkHealth()) {
       appendOutput('[Check] Server already running');
-      if (mountedRef.current) {
+      if (isMounted()) {
         setState(prev => ({ ...prev, port: DEFAULT_PORT, status: 'ready', error: null }));
       }
       return;
@@ -235,7 +239,7 @@ export function useWslServer(): WslServerState & {
       if (probe.code !== 0 || !probe.stdout.includes('ok')) {
         const detail = probe.stderr.trim() || `exit code ${probe.code}`;
         appendOutput(`[Check] WSL probe failed: ${detail}`);
-        if (mountedRef.current) {
+        if (isMounted()) {
           setState(prev => ({
             ...prev,
             status: 'error',
@@ -248,7 +252,7 @@ export function useWslServer(): WslServerState & {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       appendOutput(`[Check] WSL not available: ${msg}`);
-      if (mountedRef.current) {
+      if (isMounted()) {
         setState(prev => ({
           ...prev,
           status: 'error',
@@ -279,17 +283,7 @@ export function useWslServer(): WslServerState & {
 
     // 3. Start
     await startServer();
-  }, [appendOutput, deploy, getDeployedVersion, startServer]);
-
-  // Track mount state. The server process is owned by Rust and intentionally
-  // outlives this hook — WindowsSetup unmounts when the app transitions to
-  // the main UI, and we want the WSL server to keep running.
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+  }, [appendOutput, deploy, getDeployedVersion, isMounted, startServer]);
 
   return { ...state, start };
 }

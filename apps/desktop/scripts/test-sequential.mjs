@@ -47,6 +47,8 @@ const CONFIGS = [
       'src/hooks/__tests__/useProviderManager.test.ts',
       'src/hooks/__tests__/useSessionManager.test.ts',
       'src/hooks/__tests__/useAgentForSession.test.ts',
+      'src/hooks/__tests__/useIsMounted.test.tsx',
+      'src/hooks/__tests__/useLatestRef.test.tsx',
       'src/hooks/chat/__tests__/useProviderCapabilities.test.ts',
     ],
     exclude: ['**/node_modules/**', '**/src-tauri/**'],

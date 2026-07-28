@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { Command } from '@tauri-apps/plugin-shell';
 import { isWindows as isWindowsTauri } from '../utils/platform';
+import { useIsMounted } from './useIsMounted';
 
 export interface WslDistro {
   name: string;
@@ -34,14 +35,7 @@ export function useWslDiscovery() {
     error: null,
   });
 
-  const mountedRef = useRef(true);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+  const isMounted = useIsMounted();
 
   /**
    * Check if WSL is installed and get available distros
@@ -57,7 +51,7 @@ export function useWslDiscovery() {
       const command = Command.create('wsl-check', ['--list', '--verbose']);
       const output = await command.execute();
 
-      if (!mountedRef.current) return false;
+      if (!isMounted()) return false;
 
       if (output.code !== 0) {
         // WSL not installed or not available
@@ -82,7 +76,7 @@ export function useWslDiscovery() {
       }));
       return true;
     } catch (err) {
-      if (!mountedRef.current) return false;
+      if (!isMounted()) return false;
 
       setState(prev => ({
         ...prev,
@@ -92,7 +86,7 @@ export function useWslDiscovery() {
       }));
       return false;
     }
-  }, []);
+  }, [isMounted]);
 
   /**
    * Check if server is running at the specified address
@@ -148,14 +142,14 @@ export function useWslDiscovery() {
     // Then check WSL availability
     await checkWslAvailable();
 
-    if (!mountedRef.current) return;
+    if (!isMounted()) return;
 
     setState(prev => ({
       ...prev,
       isChecking: false,
       serverRunning: serverOk,
     }));
-  }, [checkServerHealth, checkWslAvailable]);
+  }, [checkServerHealth, checkWslAvailable, isMounted]);
 
   /**
    * Reset discovery state

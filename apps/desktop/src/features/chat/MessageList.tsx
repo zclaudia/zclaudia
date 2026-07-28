@@ -56,6 +56,7 @@ import {
 import { FileLineReference, INLINE_FILE_REF_REGEX } from './FileLineReference';
 import { activatePanel } from '../../utils/openPanel';
 import { formatMessageTimestamp } from './messageTimestamp';
+import { useAnimationFrameThrottle } from '../../hooks/useAnimationFrameThrottle';
 
 interface FileRefContextValue {
   projectRoot?: string;
@@ -1173,43 +1174,6 @@ const MessageItem = memo(function MessageItem({
     </div>
   );
 });
-
-/**
- * Coalesce rapid value changes to at most one commit per animation frame, so a
- * streaming string that changes on every websocket token re-parses ~60×/s at
- * most (not hundreds). Always converges to the final value.
- */
-export function useAnimationFrameThrottle<T>(value: T): T {
-  const [throttled, setThrottled] = useState(value);
-  const latestRef = useRef(value);
-  const frameRef = useRef<number | null>(null);
-  latestRef.current = value;
-
-  useEffect(() => {
-    if (frameRef.current != null) return; // a frame is already pending
-    frameRef.current = requestAnimationFrame(() => {
-      frameRef.current = null;
-      setThrottled(latestRef.current);
-    });
-  }, [value]);
-
-  useEffect(
-    () => () => {
-      if (frameRef.current != null) {
-        cancelAnimationFrame(frameRef.current);
-        // Reset the handle so the scheduling guard (`if (frameRef.current != null)`)
-        // isn't left pointing at a cancelled frame. Without this, StrictMode's
-        // mount→cleanup→mount cycle cancels the pending frame but leaves the ref
-        // non-null, permanently blocking all future frames and freezing `throttled`
-        // at its initial value (blank body for a message that mounted mid-<think>).
-        frameRef.current = null;
-      }
-    },
-    []
-  );
-
-  return throttled;
-}
 
 /** Renders assistant message markdown (thinking blocks already extracted at MessageItem level) */
 const AssistantContent = memo(function AssistantContent({ content }: { content: string }) {

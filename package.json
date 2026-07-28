@@ -22,7 +22,7 @@
     "release:macos": "bash scripts/release/macos.sh",
     "clean": "pnpm -r run clean && rm -rf node_modules",
     "check:architecture": "bash scripts/with-project-node.sh node scripts/dev/check-architecture-boundaries.mjs",
-    "lint": "eslint .",
+    "lint": "eslint . && pnpm --filter @zclaudia/desktop run check:lifecycle",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}\"",
