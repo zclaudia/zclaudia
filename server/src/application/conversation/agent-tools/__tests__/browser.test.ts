@@ -65,6 +65,18 @@ describe('agent_browser actions', () => {
     expect(out.text).toContain('body text');
   });
 
+  it('navigate rejects non-http(s) schemes like file:// (the visible-panel allowlist)', async () => {
+    const out = JSON.parse(await run({ action: 'navigate', url: 'file:///etc/passwd' }));
+    expect(out.error).toMatch(/http\(s\)/i);
+    expect(manager.navigate).not.toHaveBeenCalled();
+  });
+
+  it('navigate still allows localhost/private addresses (dev-preview use case)', async () => {
+    const out = JSON.parse(await run({ action: 'navigate', url: 'localhost:5173' }));
+    expect(manager.navigate).toHaveBeenCalledWith('s1', 'http://localhost:5173');
+    expect(out.error).toBeUndefined();
+  });
+
   it('wraps browser actions in activity broadcasts (true then false, even on error)', async () => {
     await run({ action: 'read_page' });
     expect(activity).toEqual([
@@ -86,6 +98,29 @@ describe('agent_browser actions', () => {
     expect(readFileSync(out.file).toString()).toBe('jpegbytes');
   });
 
+  it('sanitizes a path-traversal sessionId so the screenshot stays inside the screenshot dir', async () => {
+    const out = JSON.parse(
+      await toolRegistry.execute(
+        'agent_browser',
+        { action: 'screenshot' },
+        { sessionId: '../../evil' } as never,
+        'agent-assistant'
+      )
+    );
+    expect(out.file.startsWith(shotDir)).toBe(true);
+    expect(out.file).not.toContain('..');
+    expect(existsSync(out.file)).toBe(true);
+  });
+
+  it('adds a monotonic counter suffix so same-millisecond screenshots do not collide', async () => {
+    const [a, b] = await Promise.all([run({ action: 'screenshot' }), run({ action: 'screenshot' })]);
+    const fileA = JSON.parse(a).file;
+    const fileB = JSON.parse(b).file;
+    expect(fileA).not.toBe(fileB);
+    expect(existsSync(fileA)).toBe(true);
+    expect(existsSync(fileB)).toBe(true);
+  });
+
   it('click by selector and by coordinates', async () => {
     await run({ action: 'click', selector: '#btn' });
     expect(manager.clickSelector).toHaveBeenCalledWith('s1', '#btn');
@@ -96,11 +131,32 @@ describe('agent_browser actions', () => {
     expect(up).toMatchObject({ kind: 'mouse', type: 'up', x: 10, y: 20 });
   });
 
+  it('click survives a navigation race: extractText rejecting falls back to a getState()-only summary', async () => {
+    manager.extractText.mockRejectedValueOnce(new Error('Execution context was destroyed'));
+    const out = JSON.parse(await run({ action: 'click', selector: '#btn' }));
+    expect(out.error).toBeUndefined();
+    expect(out.url).toBe('http://x/');
+    expect(out.title).toBe('X');
+    expect(out.text).toBe('');
+  });
+
   it('type and scroll delegate', async () => {
     await run({ action: 'type', text: 'hi', submit: true });
     expect(manager.typeText).toHaveBeenCalledWith('s1', 'hi', true);
     await run({ action: 'scroll', direction: 'down' });
     expect(manager.input).toHaveBeenCalledWith('s1', expect.objectContaining({ kind: 'wheel' }));
+  });
+
+  it('type allows empty text when submit is true (just press Enter)', async () => {
+    const out = JSON.parse(await run({ action: 'type', submit: true }));
+    expect(out.ok).toBe(true);
+    expect(manager.typeText).toHaveBeenCalledWith('s1', '', true);
+  });
+
+  it('type rejects when there is neither text nor submit', async () => {
+    const out = JSON.parse(await run({ action: 'type' }));
+    expect(out.error).toMatch(/text or submit/i);
+    expect(manager.typeText).not.toHaveBeenCalled();
   });
 
   it('engine missing yields a helpful error and no activity trailing state leak', async () => {

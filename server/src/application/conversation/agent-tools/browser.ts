@@ -19,6 +19,11 @@ import type { BrowserManager } from '../../browser/browser-manager.js';
 
 const TEXT_BUDGET = 20_000;
 
+// Monotonic tie-breaker for screenshot filenames: sessionId + Date.now() can
+// collide when the agent takes two screenshots inside the same millisecond,
+// which would silently overwrite the first file.
+let screenshotCounter = 0;
+
 /** Simple HTML to text conversion (strip tags, decode entities) */
 function htmlToText(html: string): string {
   return (
@@ -193,7 +198,21 @@ async function runBrowserAction(
     case 'navigate': {
       const url = args.url as string | undefined;
       if (!url) return JSON.stringify({ error: 'navigate requires url' });
-      await manager.navigate(sessionId, normalizeUrl(url));
+      const normalized = normalizeUrl(url);
+      // Deliberate asymmetry vs. `fetch` below: navigate drives the VISIBLE
+      // shared browser panel — activity indicator, auto-open, and live frames
+      // all give the user real-time oversight of where the agent goes, which
+      // is exactly the dev-preview use case (pointing the agent at a
+      // localhost/private dev server). So private/localhost addresses are
+      // allowed by design here; only the URL *scheme* is restricted, to keep
+      // the agent from driving the browser to `file://`, `chrome://`, etc.
+      // `fetch` is headless and invisible to the user, so it keeps the full
+      // `isBlockedHostname` SSRF guard instead.
+      const scheme = new URL(normalized).protocol;
+      if (scheme !== 'http:' && scheme !== 'https:') {
+        return JSON.stringify({ error: 'agent navigation is limited to http(s) URLs' });
+      }
+      await manager.navigate(sessionId, normalized);
       return stateWithText(manager, sessionId);
     }
     case 'read_page': {
@@ -210,7 +229,12 @@ async function runBrowserAction(
       if (!shot) return JSON.stringify({ error: 'no page' });
       const dir = deps.getScreenshotDir();
       mkdirSync(dir, { recursive: true });
-      const file = join(dir, `${sessionId}-${Date.now()}.jpg`);
+      // sessionId can arrive from the local HTTP route unvalidated; strip
+      // anything but safe filename characters so it can't escape `dir` via
+      // path traversal (e.g. "../../evil"), and add a monotonic counter so
+      // two screenshots in the same millisecond don't overwrite each other.
+      const safe = sessionId.replace(/[^A-Za-z0-9_-]/g, '_');
+      const file = join(dir, `${safe}-${Date.now()}-${screenshotCounter++}.jpg`);
       writeFileSync(file, Buffer.from(shot.data, 'base64'));
       return JSON.stringify({
         file,
@@ -235,9 +259,13 @@ async function runBrowserAction(
       return stateWithText(manager, sessionId);
     }
     case 'type': {
-      const text = args.text as string | undefined;
-      if (!text) return JSON.stringify({ error: 'type requires text' });
-      await manager.typeText(sessionId, text, args.submit === true);
+      const text = (args.text as string | undefined) ?? '';
+      const submit = args.submit === true;
+      // Empty text with submit:true is valid — "just press Enter" on the
+      // focused element. Only reject when there's neither text to type nor
+      // an Enter to send.
+      if (!text && !submit) return JSON.stringify({ error: 'type requires text or submit' });
+      await manager.typeText(sessionId, text, submit);
       return JSON.stringify({ ok: true });
     }
     case 'scroll': {
@@ -252,7 +280,12 @@ async function runBrowserAction(
 }
 
 async function stateWithText(manager: BrowserManager, sessionId: string): Promise<string> {
-  const page = await manager.extractText(sessionId);
+  // A click (or navigate) can trigger a page navigation while extractText's
+  // evaluate() is still running, tearing down the execution context mid-call
+  // ("Execution context was destroyed"). That's a benign race, not a real
+  // failure — the outer handler's catch would otherwise turn a successful
+  // click into a reported error. Fall back to a getState()-only summary.
+  const page = await manager.extractText(sessionId).catch(() => null);
   const state = manager.getState(sessionId);
   return JSON.stringify({
     url: state?.url ?? page?.url,

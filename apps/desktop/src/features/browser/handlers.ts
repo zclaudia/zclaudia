@@ -2,6 +2,8 @@ import type { ServerMessage } from '@zclaudia/shared';
 import { useBrowserStore } from './browserStore';
 import { openToolInWorkspace } from '../../utils/workspaceActions';
 import { isPanelAvailable } from '../../utils/openPanel';
+import { useSelectionStore } from '../../stores/selectionStore';
+import { useRightWorkspaceStore, findPaneWithTool } from '../../stores/rightWorkspaceStore';
 
 export function handleBrowserMessage(msg: ServerMessage): boolean {
   const store = useBrowserStore.getState();
@@ -26,12 +28,23 @@ export function handleBrowserMessage(msg: ServerMessage): boolean {
     case 'browser_engine_status':
       store.setEngine({ status: msg.status, progress: msg.progress, message: msg.message });
       return true;
-    case 'browser_agent_activity':
+    case 'browser_agent_activity': {
       store.patchSession(msg.sessionId, { agentActive: msg.active });
-      if (msg.active && isPanelAvailable('browser')) {
-        openToolInWorkspace(msg.sessionId, 'browser');
+      // Auto-open only for the session the user is currently looking at, and
+      // only if the browser tool isn't already open there — otherwise a
+      // background agent's activity would steal focus/expand the sidebar for
+      // an unrelated session, or re-focus a tab the user just switched away
+      // from mid-task.
+      const isSelectedSession = useSelectionStore.getState().selectedSessionId === msg.sessionId;
+      if (msg.active && isPanelAvailable('browser') && isSelectedSession) {
+        const root = useRightWorkspaceStore.getState().bySession[msg.sessionId]?.root ?? null;
+        const alreadyOpen = findPaneWithTool(root, 'browser', undefined, true) !== null;
+        if (!alreadyOpen) {
+          openToolInWorkspace(msg.sessionId, 'browser');
+        }
       }
       return true;
+    }
     default:
       return false;
   }
