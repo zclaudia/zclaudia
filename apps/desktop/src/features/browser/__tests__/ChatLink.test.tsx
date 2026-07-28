@@ -5,10 +5,12 @@ const mocks = vi.hoisted(() => ({
   sendMessage: vi.fn(),
   openToolInWorkspace: vi.fn(),
   selectedSessionId: 's1' as string | null,
+  isConnected: true,
+  isPanelAvailable: vi.fn(),
 }));
 
 vi.mock('../../../contexts/ConnectionContext', () => ({
-  useConnection: () => ({ sendMessage: mocks.sendMessage }),
+  useConnection: () => ({ sendMessage: mocks.sendMessage, isConnected: mocks.isConnected }),
 }));
 vi.mock('../../../stores/selectionStore', () => ({
   useSelectionStore: (sel: (s: { selectedSessionId: string | null }) => unknown) =>
@@ -16,6 +18,9 @@ vi.mock('../../../stores/selectionStore', () => ({
 }));
 vi.mock('../../../utils/workspaceActions', () => ({
   openToolInWorkspace: mocks.openToolInWorkspace,
+}));
+vi.mock('../../../utils/openPanel', () => ({
+  isPanelAvailable: mocks.isPanelAvailable,
 }));
 
 import { ChatLink } from '../ChatLink';
@@ -25,6 +30,9 @@ describe('ChatLink', () => {
     mocks.sendMessage.mockClear();
     mocks.openToolInWorkspace.mockClear();
     mocks.selectedSessionId = 's1';
+    mocks.isConnected = true;
+    mocks.isPanelAvailable.mockReset();
+    mocks.isPanelAvailable.mockReturnValue(true);
   });
 
   it('plain left-click on an http(s) link opens it in the browser panel', () => {
@@ -60,6 +68,24 @@ describe('ChatLink', () => {
     const { getByText } = render(<ChatLink href="https://example.com">x</ChatLink>);
     fireEvent.click(getByText('x'));
     expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('falls through to default anchor behavior when the browser panel is unavailable (e.g. mobile)', () => {
+    mocks.isPanelAvailable.mockReturnValue(false);
+    const { getByText } = render(<ChatLink href="https://example.com">x</ChatLink>);
+    const ev = fireEvent.click(getByText('x'));
+    expect(ev).toBe(true); // preventDefault not called
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+    expect(mocks.openToolInWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('falls through to default anchor behavior when disconnected', () => {
+    mocks.isConnected = false;
+    const { getByText } = render(<ChatLink href="https://example.com">x</ChatLink>);
+    const ev = fireEvent.click(getByText('x'));
+    expect(ev).toBe(true); // preventDefault not called
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+    expect(mocks.openToolInWorkspace).not.toHaveBeenCalled();
   });
 
   it('renders the existing anchor visuals and attributes', () => {
