@@ -30,6 +30,7 @@ import { FilePushCard } from './FilePushNotification';
 import { FilePreviewModal } from './FilePreviewModal';
 import { CompactionMarkerCard } from './CompactionMarkerCard';
 import { ContextUsageCard } from './ContextUsageCard';
+import { ChatLink } from '../browser/ChatLink';
 import type { MessageWithToolCalls } from '../../stores/chatMessageStore';
 import type { ToolCallState } from '../../stores/runStore';
 import type { ContentBlock, ThinkingBlock as ThinkingBlockMeta } from '@zclaudia/shared';
@@ -1262,16 +1263,7 @@ const AssistantContent = memo(function AssistantContent({ content }: { content: 
               return <>{children}</>;
             },
             a({ href, children }) {
-              return (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:text-primary/80 underline"
-                >
-                  {children}
-                </a>
-              );
+              return <ChatLink href={href}>{children}</ChatLink>;
             },
             table({ children }) {
               return (

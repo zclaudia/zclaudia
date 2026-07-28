@@ -56,10 +56,14 @@ export function activatePanel(panelId: string): void {
 }
 
 /**
- * Non-reactive check for event handlers and stores that need the same
- * placement-aware active-tab semantics as usePanelIsActive().
+ * Non-reactive check: is this panel registered and usable on the current
+ * platform/surface (desktop vs. mobile) and not disabled? This does NOT
+ * reflect whether the panel is currently shown — use isPanelActive() for
+ * that. Intended for event handlers that need to decide whether opening a
+ * panel is even possible before doing so (e.g. ChatLink deciding whether to
+ * intercept a click before the browser panel exists on this platform).
  */
-export function isPanelActive(panelId: string): boolean {
+export function isPanelAvailable(panelId: string): boolean {
   const pluginState = usePluginStore.getState();
   const panel = pluginState.panels.find(p => p.id === panelId);
   if (!panel) return false;
@@ -67,7 +71,18 @@ export function isPanelActive(panelId: string): boolean {
   const platform = isMobileViewport() ? 'mobile' : 'desktop';
   if (!(panel.platforms ?? ['desktop']).includes(platform)) return false;
   if (pluginState.disabledBuiltinPanels.includes(panelId)) return false;
-  if (panel.visible === false) return false;
+  return true;
+}
+
+/**
+ * Non-reactive check for event handlers and stores that need the same
+ * placement-aware active-tab semantics as usePanelIsActive().
+ */
+export function isPanelActive(panelId: string): boolean {
+  if (!isPanelAvailable(panelId)) return false;
+  const pluginState = usePluginStore.getState();
+  const panel = pluginState.panels.find(p => p.id === panelId);
+  if (!panel || panel.visible === false) return false;
 
   const placement = viewportPlacement(panelId);
   if (placement === 'right') {
