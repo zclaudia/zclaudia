@@ -1,12 +1,25 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { handleBrowserMessage } from '../handlers';
 import { useBrowserStore } from '../browserStore';
+
+const uiMocks = vi.hoisted(() => ({
+  openToolInWorkspace: vi.fn(),
+  isPanelAvailable: vi.fn(() => true),
+}));
+vi.mock('../../../utils/workspaceActions', () => ({
+  openToolInWorkspace: uiMocks.openToolInWorkspace,
+}));
+vi.mock('../../../utils/openPanel', () => ({
+  isPanelAvailable: uiMocks.isPanelAvailable,
+}));
 
 const state = { url: 'http://x/', title: 'X', loading: false, canGoBack: false, canGoForward: false };
 
 describe('handleBrowserMessage', () => {
   beforeEach(() => {
     useBrowserStore.getState().reset();
+    uiMocks.openToolInWorkspace.mockClear();
+    uiMocks.isPanelAvailable.mockReturnValue(true);
   });
 
   it('ignores non-browser messages', () => {
@@ -48,5 +61,21 @@ describe('handleBrowserMessage', () => {
   it('browser_agent_activity toggles agentActive', () => {
     handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: true } as never);
     expect(useBrowserStore.getState().sessions['s1'].agentActive).toBe(true);
+  });
+
+  it('agent activity active=true auto-opens the browser panel', () => {
+    handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: true } as never);
+    expect(uiMocks.openToolInWorkspace).toHaveBeenCalledWith('s1', 'browser');
+  });
+
+  it('agent activity active=false does not open the panel', () => {
+    handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: false } as never);
+    expect(uiMocks.openToolInWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('no auto-open when the panel is unavailable on this platform', () => {
+    uiMocks.isPanelAvailable.mockReturnValueOnce(false);
+    handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: true } as never);
+    expect(uiMocks.openToolInWorkspace).not.toHaveBeenCalled();
   });
 });

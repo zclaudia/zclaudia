@@ -1,5 +1,7 @@
 import type { ServerMessage } from '@zclaudia/shared';
 import { useBrowserStore } from './browserStore';
+import { openToolInWorkspace } from '../../utils/workspaceActions';
+import { isPanelAvailable } from '../../utils/openPanel';
 
 export function handleBrowserMessage(msg: ServerMessage): boolean {
   const store = useBrowserStore.getState();
@@ -26,6 +28,9 @@ export function handleBrowserMessage(msg: ServerMessage): boolean {
       return true;
     case 'browser_agent_activity':
       store.patchSession(msg.sessionId, { agentActive: msg.active });
+      if (msg.active && isPanelAvailable('browser')) {
+        openToolInWorkspace(msg.sessionId, 'browser');
+      }
       return true;
     default:
       return false;
