@@ -39,6 +39,15 @@ describe('toCdpInput', () => {
     expect(call.params).not.toHaveProperty('text');
   });
 
+  it('adds virtual key codes for editing/navigation keys (Chromium ignores them otherwise)', () => {
+    const [backspace] = toCdpInput({ kind: 'key', type: 'down', key: 'Backspace', code: 'Backspace' });
+    expect(backspace.params).toMatchObject({ windowsVirtualKeyCode: 8, nativeVirtualKeyCode: 8 });
+    const [up] = toCdpInput({ kind: 'key', type: 'up', key: 'ArrowLeft', code: 'ArrowLeft' });
+    expect(up.params).toMatchObject({ type: 'keyUp', windowsVirtualKeyCode: 37 });
+    const [plain] = toCdpInput({ kind: 'key', type: 'down', key: 'a', code: 'KeyA', text: 'a' });
+    expect(plain.params).not.toHaveProperty('windowsVirtualKeyCode');
+  });
+
   it('maps keyup and passes modifiers through', () => {
     const [call] = toCdpInput({ kind: 'key', type: 'up', key: 'a', code: 'KeyA', modifiers: 2 });
     expect(call.params).toMatchObject({ type: 'keyUp', modifiers: 2 });

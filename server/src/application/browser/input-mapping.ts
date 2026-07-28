@@ -11,6 +11,29 @@ const MOUSE_TYPE: Record<'move' | 'down' | 'up', string> = {
   up: 'mouseReleased',
 };
 
+// Chromium ignores editing/navigation keys dispatched without a virtual key
+// code (verified live: rawKeyDown Backspace/Arrow without it is inert; with
+// windowsVirtualKeyCode it works). Map the common non-printables.
+const VIRTUAL_KEYS: Record<string, number> = {
+  Backspace: 8,
+  Tab: 9,
+  Enter: 13,
+  Shift: 16,
+  Control: 17,
+  Alt: 18,
+  Escape: 27,
+  ' ': 32,
+  PageUp: 33,
+  PageDown: 34,
+  End: 35,
+  Home: 36,
+  ArrowLeft: 37,
+  ArrowUp: 38,
+  ArrowRight: 39,
+  ArrowDown: 40,
+  Delete: 46,
+};
+
 export function toCdpInput(event: BrowserInputEvent): CdpInputCall[] {
   switch (event.kind) {
     case 'mouse':
@@ -44,6 +67,7 @@ export function toCdpInput(event: BrowserInputEvent): CdpInputCall[] {
       ];
     case 'key': {
       const hasText = event.type === 'down' && !!event.text;
+      const virtualKey = VIRTUAL_KEYS[event.key];
       return [
         {
           method: 'Input.dispatchKeyEvent',
@@ -52,6 +76,9 @@ export function toCdpInput(event: BrowserInputEvent): CdpInputCall[] {
             key: event.key,
             code: event.code,
             ...(hasText ? { text: event.text } : {}),
+            ...(virtualKey !== undefined
+              ? { windowsVirtualKeyCode: virtualKey, nativeVirtualKeyCode: virtualKey }
+              : {}),
             modifiers: event.modifiers ?? 0,
           },
         },
