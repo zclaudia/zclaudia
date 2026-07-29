@@ -70,6 +70,35 @@ interface ChatMessageState {
   getPagination: (sessionId: string) => PaginationInfo | undefined;
 }
 
+/**
+ * Prevent a reconcile/patch merge from regressing an assistant message that is
+ * still streaming. Server tail/gap/patch snapshots lag the live delta stream by
+ * up to one periodic-save interval, so an incoming row can carry a stale prefix
+ * of `content` (and fewer blocks/tool calls). A merge may only grow these, never
+ * shrink them — mirroring finalizeRunToMessage's richness guard. The
+ * authoritative terminal content is applied through finalizeRunToMessage, not
+ * mergeMessages, so refusing to shrink here is always safe.
+ */
+function withoutContentRegression(
+  existing: MessageWithToolCalls,
+  merged: MessageWithToolCalls
+): MessageWithToolCalls {
+  if (
+    typeof existing.content === 'string' &&
+    typeof merged.content === 'string' &&
+    merged.content.length < existing.content.length
+  ) {
+    merged.content = existing.content;
+  }
+  if ((existing.contentBlocks?.length ?? 0) > (merged.contentBlocks?.length ?? 0)) {
+    merged.contentBlocks = existing.contentBlocks;
+  }
+  if ((existing.toolCalls?.length ?? 0) > (merged.toolCalls?.length ?? 0)) {
+    merged.toolCalls = existing.toolCalls;
+  }
+  return merged;
+}
+
 export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
   messages: {},
   pagination: {},
@@ -169,7 +198,7 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
           continue;
         }
 
-        const merged = { ...existing, ...incoming };
+        const merged = withoutContentRegression(existing, { ...existing, ...incoming });
         if (JSON.stringify(existing) !== JSON.stringify(merged)) {
           byId.set(incoming.id, merged);
           changed = true;

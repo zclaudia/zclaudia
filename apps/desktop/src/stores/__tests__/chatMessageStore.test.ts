@@ -61,6 +61,36 @@ describe('chatMessageStore', () => {
     expect(useChatMessageStore.getState().messages.s1.map(m => m.id)).toEqual(['a', 'b']);
   });
 
+  it('mergeMessages never shrinks a streaming assistant message with a stale tail snapshot', () => {
+    // Live row is ahead of the last server periodic save; a bottom-refresh tail
+    // snapshot carries only the earlier prefix. Merging must not truncate it.
+    useChatMessageStore
+      .getState()
+      .setMessages('s1', [msg('a1', 'assistant', 1, 'Hello world, this is the full streamed reply')]);
+
+    useChatMessageStore.getState().mergeMessages('s1', [msg('a1', 'assistant', 1, 'Hello world')]);
+
+    expect(useChatMessageStore.getState().messages.s1[0].content).toBe(
+      'Hello world, this is the full streamed reply'
+    );
+  });
+
+  it('mergeMessages still grows content when the incoming snapshot is more complete', () => {
+    // The lost-delta repair path: the client fell behind and the server tail is
+    // longer. Merge must adopt the longer content.
+    useChatMessageStore
+      .getState()
+      .setMessages('s1', [msg('a1', 'assistant', 1, 'Hello world')]);
+
+    useChatMessageStore
+      .getState()
+      .mergeMessages('s1', [msg('a1', 'assistant', 1, 'Hello world, now the complete reply')]);
+
+    expect(useChatMessageStore.getState().messages.s1[0].content).toBe(
+      'Hello world, now the complete reply'
+    );
+  });
+
   it('hydrates persisted display metadata at every message-ingestion boundary', () => {
     const persisted = {
       id: 'hydrated',
