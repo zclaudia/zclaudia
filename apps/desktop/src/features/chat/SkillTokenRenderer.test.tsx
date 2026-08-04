@@ -1,6 +1,23 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import { splitSegments, renderSkillTokens, deleteTokenAt } from './SkillTokenRenderer';
+
+/** Stub matchMedia so `(hover: none)` matches — i.e. a touch device. */
+function stubTouchDevice() {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(hover: none)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+  );
+}
 
 const skills = new Set(['commit', 'brainstorming']);
 const commands = new Set(['/clear', '/commit-commands:commit']);
@@ -237,6 +254,66 @@ describe('renderSkillTokens', () => {
     };
     const { container } = render(
       <div>{renderSkillTokens('see @cli.py', skills, commands, interaction)}</div>
+    );
+    const slot = container.querySelector('[data-token-start="4"] [data-token-delete]')!;
+    fireEvent.click(slot);
+    expect(interaction.onDeleteToken).toHaveBeenCalledWith(4);
+  });
+});
+
+describe('renderSkillTokens on touch devices (no hover)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('does not delete on click and reports no hover', () => {
+    stubTouchDevice();
+    const interaction = {
+      hoveredTokenStart: null,
+      onTokenHover: vi.fn(),
+      onDeleteZoneHover: vi.fn(),
+      onDeleteToken: vi.fn(),
+    };
+    const { container } = render(
+      <div>{renderSkillTokens('run /commit go', skills, commands, interaction)}</div>
+    );
+    const token = container.querySelector('[data-token-start="4"]')!;
+    const slot = token.querySelector('[data-token-delete]')!;
+    // A tap synthesizes mouseover + click — neither may hover-swap or delete.
+    fireEvent.mouseOver(slot);
+    fireEvent.click(slot);
+    fireEvent.mouseOver(token);
+    fireEvent.mouseOut(token);
+    expect(interaction.onDeleteToken).not.toHaveBeenCalled();
+    expect(interaction.onTokenHover).not.toHaveBeenCalled();
+    expect(interaction.onDeleteZoneHover).not.toHaveBeenCalled();
+  });
+
+  it('never swaps to the X icon even with a hovered token offset', () => {
+    stubTouchDevice();
+    const interaction = {
+      hoveredTokenStart: 4,
+      onTokenHover: vi.fn(),
+      onDeleteZoneHover: vi.fn(),
+      onDeleteToken: vi.fn(),
+    };
+    const { container } = render(
+      <div>{renderSkillTokens('run /commit go', skills, commands, interaction)}</div>
+    );
+    expect(container.querySelector('svg.lucide-x')).toBeNull();
+    expect(container.querySelector('svg.lucide-sparkles')).not.toBeNull();
+  });
+
+  it('defaults to hover-capable (click deletes) when matchMedia is absent', () => {
+    vi.stubGlobal('matchMedia', undefined);
+    const interaction = {
+      hoveredTokenStart: null,
+      onTokenHover: vi.fn(),
+      onDeleteZoneHover: vi.fn(),
+      onDeleteToken: vi.fn(),
+    };
+    const { container } = render(
+      <div>{renderSkillTokens('run /commit go', skills, commands, interaction)}</div>
     );
     const slot = container.querySelector('[data-token-start="4"] [data-token-delete]')!;
     fireEvent.click(slot);

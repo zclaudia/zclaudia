@@ -20,6 +20,11 @@ import { FileSymbol } from '../../components/filesymbols';
  * events to whichever backdrop node sits under the cursor and synthesizes
  * mouseover/mouseout — so plain React handlers on these spans fire at
  * runtime even though the textarea itself is what receives the events.
+ * On devices without hover (see `isHoverCapable`) these handlers are not
+ * attached at all: mobile browsers synthesize mouseover+click on tap, which
+ * would silently delete a token when tapping near its sigil to place the
+ * caret — with no visible X affordance. There, tapping only places the
+ * caret and tokens are deleted via backspace.
  *
  * Token matching: a candidate token starts with `/` or `@` and runs to the
  * next whitespace. A `/` token is a **command** if it exactly matches a
@@ -111,6 +116,18 @@ export function deleteTokenAt(
   return { next: value.slice(0, tokenStart) + value.slice(end), caret: tokenStart };
 }
 
+/**
+ * Non-reactive check for hover capability (kept local so tests that mock
+ * shared hook modules are unaffected). Detects the *absence* of hover via
+ * `(hover: none)` so environments where matchMedia is missing or mocked to
+ * always-false (jsdom, SSR) default to hover-capable, preserving desktop
+ * behavior. Exported for tests.
+ */
+export function isHoverCapable(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true;
+  return !window.matchMedia('(hover: none)').matches;
+}
+
 /** Callbacks wired by MessageInput; all offsets are token `start` values. */
 export interface TokenInteraction {
   hoveredTokenStart: number | null;
@@ -170,6 +187,11 @@ export function renderSkillTokens(
   commandSet: Set<string>,
   interaction?: TokenInteraction
 ): ReactNode {
+  // On touch devices (no hover) the X swap never shows, yet browsers
+  // synthesize mouseover+click on tap — so a tap near the sigil to place the
+  // caret would silently delete the token. Disable hover/click-delete there;
+  // tapping just places the caret and deletion happens via backspace.
+  const hoverInteraction = isHoverCapable() ? interaction : undefined;
   return splitSegments(value, commandSet, skillIds).map((seg, i) => {
     if (seg.kind === 'plain') {
       return (
@@ -178,7 +200,7 @@ export function renderSkillTokens(
         </span>
       );
     }
-    const hovered = interaction?.hoveredTokenStart === seg.start;
+    const hovered = hoverInteraction?.hoveredTokenStart === seg.start;
     const name = seg.text.slice(1);
     let icon: ReactNode;
     if (hovered) {
@@ -198,25 +220,31 @@ export function renderSkillTokens(
       <span
         key={i}
         data-token-start={seg.start}
-        onMouseOver={() => interaction?.onTokenHover(seg.start)}
-        onMouseOut={() => interaction?.onTokenHover(null)}
+        onMouseOver={hoverInteraction && (() => hoverInteraction.onTokenHover(seg.start))}
+        onMouseOut={hoverInteraction && (() => hoverInteraction.onTokenHover(null))}
         style={
           hovered ? { backgroundColor: 'hsl(var(--secondary))', borderRadius: '4px' } : undefined
         }
       >
         <span
           data-token-delete
-          onMouseOver={e => {
-            e.stopPropagation();
-            interaction?.onTokenHover(seg.start);
-            interaction?.onDeleteZoneHover(true);
-          }}
-          onMouseOut={e => {
-            e.stopPropagation();
-            interaction?.onTokenHover(null);
-            interaction?.onDeleteZoneHover(false);
-          }}
-          onClick={() => interaction?.onDeleteToken(seg.start)}
+          onMouseOver={
+            hoverInteraction &&
+            (e => {
+              e.stopPropagation();
+              hoverInteraction.onTokenHover(seg.start);
+              hoverInteraction.onDeleteZoneHover(true);
+            })
+          }
+          onMouseOut={
+            hoverInteraction &&
+            (e => {
+              e.stopPropagation();
+              hoverInteraction.onTokenHover(null);
+              hoverInteraction.onDeleteZoneHover(false);
+            })
+          }
+          onClick={hoverInteraction && (() => hoverInteraction.onDeleteToken(seg.start))}
           style={{
             position: 'relative',
             color: 'transparent',
