@@ -43,7 +43,9 @@ export function PluginsBrowseView({
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
-        <h1 className="min-w-0 truncate text-sm font-medium">{title}</h1>
+        <h1 className="min-w-0 truncate text-sm font-medium" title={title}>
+          {title}
+        </h1>
         <span className="text-[11px] text-muted-foreground">{models.length}</span>
         <div className="ml-auto flex items-center gap-2">
           <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-secondary/30 px-3 py-1.5 text-xs text-muted-foreground focus-within:ring-1 focus-within:ring-ring">

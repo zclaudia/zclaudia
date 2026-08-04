@@ -154,7 +154,9 @@ export function BrowseView({
     <div className="flex h-full flex-col bg-background text-foreground">
       <div className="flex flex-col gap-3 border-b border-border px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="min-w-0 truncate text-sm font-medium">{TAB_TITLE[tab]}</h1>
+          <h1 className="min-w-0 truncate text-sm font-medium" title={TAB_TITLE[tab]}>
+            {TAB_TITLE[tab]}
+          </h1>
           <div className="ml-auto flex items-center gap-2">
             <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-secondary/30 px-3 py-1.5 text-xs text-muted-foreground focus-within:ring-1 focus-within:ring-ring">
               <Search className="h-3.5 w-3.5" strokeWidth={1.75} />
