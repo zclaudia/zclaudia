@@ -261,7 +261,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
               />
             )}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <span className="text-[10px] text-muted-foreground">Action:</span>
             <Select
               value={newActionType}

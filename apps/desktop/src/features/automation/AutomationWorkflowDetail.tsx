@@ -99,7 +99,7 @@ function EmptyStatePanel({
       {templates.length > 0 && !selectedIsGlobal && (
         <div className="w-full max-w-lg">
           <h3 className={`${SECTION_LABEL} mb-2`}>Quick Start Templates</h3>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {templates.map(t => (
               <div
                 key={t.id}

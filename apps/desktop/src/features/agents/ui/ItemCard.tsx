@@ -54,7 +54,7 @@ export function ItemCard({
         <div className="truncate text-xs text-muted-foreground">{item.subtitle}</div>
       )}
       {(showBackendBadge || item.status || item.recordStatus) && (
-        <div className="mt-0.5 flex items-center gap-1.5">
+        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5">
           {showBackendBadge && <Badge label={backendName} online={backendOnline} />}
           {item.status && <Badge label={item.status} tone="accent" />}
           {item.recordStatus && <StatusChip status={item.recordStatus} />}

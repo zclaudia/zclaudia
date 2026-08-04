@@ -83,7 +83,7 @@ export function BrowseView({
     ...backends.map(b => ({ key: b.backendId, label: b.name, online: b.online })),
   ];
 
-  const gridClass = 'grid auto-rows-min grid-cols-2 gap-3 lg:grid-cols-3';
+  const gridClass = 'grid auto-rows-min grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3';
 
   const actionsFor = (item: LibraryItem): ItemCardAction[] | undefined => {
     switch (item.kind) {
@@ -153,8 +153,8 @@ export function BrowseView({
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
       <div className="flex flex-col gap-3 border-b border-border px-4 py-3">
-        <div className="flex items-center gap-2">
-          <h1 className="text-sm font-medium">{TAB_TITLE[tab]}</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="min-w-0 truncate text-sm font-medium">{TAB_TITLE[tab]}</h1>
           <div className="ml-auto flex items-center gap-2">
             <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-secondary/30 px-3 py-1.5 text-xs text-muted-foreground focus-within:ring-1 focus-within:ring-ring">
               <Search className="h-3.5 w-3.5" strokeWidth={1.75} />

@@ -22,11 +22,11 @@ export function PluginCard({
           : 'Disabled';
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-border/60 bg-secondary/30 p-3 text-left">
-      <div className="flex items-center justify-between">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+      <div className="flex flex-wrap items-center justify-between gap-1">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="h-4 w-4" strokeWidth={1.75} />
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
           {model.source && (
             <Badge label={model.source === 'managed' ? 'Managed' : 'Development'} tone="neutral" />
           )}
