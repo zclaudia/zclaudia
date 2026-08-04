@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getBaseUrl, fetchAndSyncPlugins } from '../../services/api';
+import {
+  fetchAndSyncPlugins,
+  fetchPluginDirs,
+  savePluginDirs as savePluginDirsApi,
+} from '../../services/api';
 
 // Plugin directory manager
 export function PluginDirsManager({ embedded = false }: { embedded?: boolean } = {}) {
@@ -12,13 +16,9 @@ export function PluginDirsManager({ embedded = false }: { embedded?: boolean } =
 
   const fetchDirs = useCallback(async () => {
     try {
-      const baseUrl = getBaseUrl();
-      const res = await fetch(`${baseUrl}/api/plugins/dirs`);
-      const data = await res.json();
-      if (data.success) {
-        setAllDirs(data.data.dirs);
-        setExtraDirs(data.data.extraDirs);
-      }
+      const data = await fetchPluginDirs();
+      setAllDirs(data.dirs);
+      setExtraDirs(data.extraDirs);
     } catch {
       // Silently fail on load
     } finally {
@@ -33,22 +33,12 @@ export function PluginDirsManager({ embedded = false }: { embedded?: boolean } =
   const saveDirs = async (dirs: string[]) => {
     setError(null);
     try {
-      const baseUrl = getBaseUrl();
-      const res = await fetch(`${baseUrl}/api/plugins/dirs`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dirs }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setAllDirs(data.data.dirs);
-        setExtraDirs(dirs);
-        // Refresh plugin list after directory change.
-        // Server discovers and activates plugins asynchronously, so delay slightly.
-        setTimeout(() => fetchAndSyncPlugins().catch(() => {}), 500);
-      } else {
-        setError(data.error?.message || 'Failed to save');
-      }
+      const data = await savePluginDirsApi(dirs);
+      setAllDirs(data.dirs);
+      setExtraDirs(dirs);
+      // Refresh plugin list after directory change.
+      // Server discovers and activates plugins asynchronously, so delay slightly.
+      setTimeout(() => fetchAndSyncPlugins().catch(() => {}), 500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
     }

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 import { usePluginStore, selectPluginPanels } from '../../stores/pluginStore';
-import { getBaseUrl, fetchAndSyncPlugins } from '../../services/api';
+import { fetchAndSyncPlugins, setPluginActive } from '../../services/api';
 import { Modal } from '../../components/ui/Modal';
 import { WebSearchSettings } from '../settings/WebSearchSettings';
 import { PluginDirsManager } from './PluginDirsManager';
@@ -114,18 +114,10 @@ export function PluginsContent() {
       if (!plugin) return;
       const action = plugin.status === 'active' ? 'deactivate' : 'activate';
       try {
-        const res = await fetch(
-          `${getBaseUrl()}/api/plugins/${encodeURIComponent(pluginId)}/${action}`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' } }
-        );
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setError(data.error?.message || `Failed to ${action} plugin`);
-        } else {
-          await fetchAndSyncPlugins();
-        }
+        await setPluginActive(pluginId, action);
+        await fetchAndSyncPlugins();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to toggle plugin');
+        setError(err instanceof Error ? err.message : `Failed to ${action} plugin`);
       }
     },
     [plugins, setError]

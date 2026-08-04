@@ -3,6 +3,11 @@ import { apiCall } from './unwrap';
 import { usePluginStore } from '../../stores/pluginStore';
 import type { InstalledPlugin } from '../../stores/pluginStore';
 
+export interface PluginDirsData {
+  dirs: string[];
+  extraDirs: string[];
+}
+
 interface PluginData {
   id: string;
   name: string;
@@ -91,4 +96,25 @@ export async function fetchAndSyncPlugins(options?: RequestInit): Promise<void> 
       }
     }
   }
+}
+
+/** Activate or deactivate an installed plugin. */
+export async function setPluginActive(
+  pluginId: string,
+  action: 'activate' | 'deactivate'
+): Promise<void> {
+  await apiCall(`/api/plugins/${encodeURIComponent(pluginId)}/${action}`, { method: 'POST' });
+}
+
+/** Fetch the configured plugin directories (defaults + extras). */
+export async function fetchPluginDirs(): Promise<PluginDirsData> {
+  return apiCall<PluginDirsData>('/api/plugins/dirs');
+}
+
+/** Persist the extra plugin directories; returns the full resolved dir list. */
+export async function savePluginDirs(dirs: string[]): Promise<{ dirs: string[] }> {
+  return apiCall<{ dirs: string[] }>('/api/plugins/dirs', {
+    method: 'PUT',
+    body: JSON.stringify({ dirs }),
+  });
 }
