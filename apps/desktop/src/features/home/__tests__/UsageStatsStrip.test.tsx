@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { UsageStatsStrip } from '../UsageStatsStrip';
+import { useGatewayStore } from '../../../stores/gatewayStore';
+import { useServerStore } from '../../../stores/serverStore';
 
 const getUsageStats = vi.fn();
 const getModelStats = vi.fn(() =>
@@ -28,6 +30,11 @@ const payload = {
 describe('UsageStatsStrip', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    useGatewayStore.setState({ directGatewayUrl: null, directGatewaySecret: null });
+    useServerStore.setState({ activeServerId: null });
   });
 
   it('renders the numbers, heatmap, and fun line', async () => {
@@ -128,13 +135,47 @@ describe('UsageStatsStrip', () => {
     expect(screen.getByText(/more tokens than/)).toBeTruthy(); // allTimeTokens still 39.9M
   });
 
-  it('renders nothing on fetch failure', async () => {
+  it('shows a compact unavailable notice on fetch failure instead of vanishing', async () => {
     getUsageStats.mockRejectedValue(new Error('nope'));
-    const { container } = render(<UsageStatsStrip />);
+    render(<UsageStatsStrip />);
     await waitFor(() => {
-      expect(getUsageStats).toHaveBeenCalled();
+      expect(screen.getByText(/Usage stats are unavailable/)).toBeTruthy();
     });
-    expect(container.innerHTML).toBe('');
+    expect(screen.queryByText('Sessions')).toBeNull();
+  });
+
+  it('recovers from the unavailable state once a backend becomes reachable', async () => {
+    // Mobile cold start: gateway-direct with no active backend yet, then a
+    // backend connects — the resolver flips and the panel loads.
+    useGatewayStore.setState({ directGatewayUrl: 'wss://gw.example', directGatewaySecret: 's' });
+    getUsageStats.mockResolvedValue(payload);
+    render(<UsageStatsStrip />);
+    await waitFor(() => expect(screen.getByText(/Usage stats are unavailable/)).toBeTruthy());
+    expect(getUsageStats).not.toHaveBeenCalled();
+    act(() => {
+      useServerStore.setState({ activeServerId: 'remote-be-9' });
+    });
+    await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
+    expect(getUsageStats).toHaveBeenCalledWith('remote-be-9', 'all');
+    expect(screen.queryByText(/Usage stats are unavailable/)).toBeNull();
+  });
+
+  it('targets the active backend in gateway-direct mode (no local backend)', async () => {
+    useGatewayStore.setState({ directGatewayUrl: 'wss://gw.example', directGatewaySecret: 's' });
+    useServerStore.setState({ activeServerId: 'remote-be-9' });
+    getUsageStats.mockResolvedValue(payload);
+    render(<UsageStatsStrip />);
+    await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
+    expect(getUsageStats).toHaveBeenCalledWith('remote-be-9', 'all');
+  });
+
+  it('shows the unavailable notice without fetching when no backend exists at all', async () => {
+    useGatewayStore.setState({ directGatewayUrl: 'wss://gw.example', directGatewaySecret: 's' });
+    render(<UsageStatsStrip />);
+    await waitFor(() => {
+      expect(screen.getByText(/Usage stats are unavailable/)).toBeTruthy();
+    });
+    expect(getUsageStats).not.toHaveBeenCalled();
   });
 
   it('renders zeros and an empty heatmap before the first message', async () => {

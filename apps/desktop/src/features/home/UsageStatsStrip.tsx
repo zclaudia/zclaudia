@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { UsageStatsPayload, UsageStatsRange } from '@zclaudia/shared';
 import { getUsageStats } from '../../services/api';
-import { useFacadeStore } from '../../stores/facadeStore';
-import { LOCAL_BACKEND_KEY, resolveSessionBucketBackendId } from '../../stores/sessionsStore';
+import { useStatsBackendId } from './statsBackend';
 import { formatTokens } from '../../utils/formatTokens';
 import {
   buildHeatmapWeeks,
@@ -34,35 +33,58 @@ function localToday(): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-/** Card-based all-time/windowed usage stats for the local backend. Renders
+/** Card-based all-time/windowed usage stats. Targets the local backend when
+ *  one exists, otherwise the active backend (mobile / gateway-direct). Renders
  *  nothing until the first load; keeps stale numbers during range refetches. */
 export function UsageStatsStrip() {
-  const localBackendId = useFacadeStore(s => s.localBackendId);
+  const backendId = useStatsBackendId();
   const [range, setRange] = useState<UsageStatsRange>('all');
   const [tab, setTab] = useState<'overview' | 'models'>('overview');
   const [stats, setStats] = useState<UsageStatsPayload | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const backendId = resolveSessionBucketBackendId(LOCAL_BACKEND_KEY, localBackendId);
+    if (backendId === null) {
+      // No backend to ask (e.g. mobile before any backend connects).
+      setUnavailable(true);
+      return;
+    }
     getUsageStats(backendId, range)
       .then(next => {
-        if (!cancelled) setStats(next);
+        if (cancelled) return;
+        setStats(next);
+        setUnavailable(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setUnavailable(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [localBackendId, range]);
+  }, [backendId, range]);
 
   const weeks = useMemo(
     () => (stats ? buildHeatmapWeeks(stats.activeDays, localToday(), HEATMAP_WEEKS) : []),
     [stats]
   );
 
-  // Only a failed first fetch keeps the panel hidden; range switches keep
-  // showing the previous payload until the new one lands.
-  if (!stats) return null;
+  // With no payload to show, a failed (or impossible) fetch surfaces a compact
+  // notice instead of vanishing; once any payload has loaded, stale numbers
+  // stay up during range refetches and transient failures.
+  if (!stats) {
+    if (unavailable) {
+      return (
+        <div className="mt-10 border-t border-border pt-5 px-2">
+          <p className="text-xs text-muted-foreground/60">
+            Usage stats are unavailable — no backend is reachable right now.
+          </p>
+        </div>
+      );
+    }
+    // First fetch still in flight: stay blank rather than flashing a loader.
+    return null;
+  }
 
   // Guards double as version-skew protection: an older server (stale local
   // build or a remote backend behind on updates) omits the newer fields, and

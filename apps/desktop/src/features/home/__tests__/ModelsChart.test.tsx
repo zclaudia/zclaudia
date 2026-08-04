@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ModelsChart } from '../ModelsChart';
+import { useGatewayStore } from '../../../stores/gatewayStore';
+import { useServerStore } from '../../../stores/serverStore';
 
 const getModelStats = vi.fn();
 vi.mock('../../../services/api', () => ({
@@ -23,6 +25,11 @@ const payload = {
 describe('ModelsChart', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    useGatewayStore.setState({ directGatewayUrl: null, directGatewaySecret: null });
+    useServerStore.setState({ activeServerId: null });
   });
 
   it('renders the chart, legend rows with pretty names and shares, and the footnote', async () => {
@@ -67,5 +74,23 @@ describe('ModelsChart', () => {
     rerender(<ModelsChart range="7d" />);
     await waitFor(() => expect(getModelStats).toHaveBeenCalledTimes(2));
     expect(getModelStats).toHaveBeenLastCalledWith(expect.anything(), '7d');
+  });
+
+  it('shows a compact unavailable notice on fetch failure instead of vanishing', async () => {
+    getModelStats.mockRejectedValue(new Error('nope'));
+    render(<ModelsChart range="all" />);
+    await waitFor(() => {
+      expect(screen.getByText(/Model stats are unavailable/)).toBeTruthy();
+    });
+    expect(document.querySelector('[data-testid="models-chart-svg"]')).toBeNull();
+  });
+
+  it('targets the active backend in gateway-direct mode (no local backend)', async () => {
+    useGatewayStore.setState({ directGatewayUrl: 'wss://gw.example', directGatewaySecret: 's' });
+    useServerStore.setState({ activeServerId: 'remote-be-9' });
+    getModelStats.mockResolvedValue(payload);
+    render(<ModelsChart range="all" />);
+    await waitFor(() => expect(screen.getByText('Fable 5')).toBeTruthy());
+    expect(getModelStats).toHaveBeenCalledWith('remote-be-9', 'all');
   });
 });

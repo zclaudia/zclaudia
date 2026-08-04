@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ModelUsagePayload, UsageStatsRange } from '@zclaudia/shared';
 import { getModelStats } from '../../services/api';
-import { useFacadeStore } from '../../stores/facadeStore';
-import { LOCAL_BACKEND_KEY, resolveSessionBucketBackendId } from '../../stores/sessionsStore';
+import { useStatsBackendId } from './statsBackend';
 import { formatTokens } from '../../utils/formatTokens';
 import { buildModelChart, prettyModelName } from './modelStats';
 
@@ -20,24 +19,33 @@ function formatDay(date: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-/** Per-model stacked daily usage for the local backend. Same fetch semantics
- *  as the cards: silent failure, stale data kept during range refetches. */
+/** Per-model stacked daily usage. Same backend targeting and fetch semantics
+ *  as the cards: shared stats backend, visible failure notice, stale data kept
+ *  during range refetches. */
 export function ModelsChart({ range }: { range: UsageStatsRange }) {
-  const localBackendId = useFacadeStore(s => s.localBackendId);
+  const backendId = useStatsBackendId();
   const [stats, setStats] = useState<ModelUsagePayload | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const backendId = resolveSessionBucketBackendId(LOCAL_BACKEND_KEY, localBackendId);
+    if (backendId === null) {
+      setUnavailable(true);
+      return;
+    }
     getModelStats(backendId, range)
       .then(next => {
-        if (!cancelled) setStats(next);
+        if (cancelled) return;
+        setStats(next);
+        setUnavailable(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setUnavailable(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [localBackendId, range]);
+  }, [backendId, range]);
 
   const [expanded, setExpanded] = useState(false);
   const chart = useMemo(
@@ -51,7 +59,16 @@ export function ModelsChart({ range }: { range: UsageStatsRange }) {
     [stats]
   );
 
-  if (!stats || !chart) return null;
+  if (!stats || !chart) {
+    if (unavailable) {
+      return (
+        <p className="py-6 text-xs text-muted-foreground/60">
+          Model stats are unavailable — no backend is reachable right now.
+        </p>
+      );
+    }
+    return null;
+  }
 
   if (stats.models.length === 0) {
     return (
