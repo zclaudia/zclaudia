@@ -178,6 +178,7 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
     set({
       filePath: null,
       content: null,
+      loading: false,
       knownMtimeMs: null,
       error: null,
       targetLine: null,

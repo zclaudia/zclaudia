@@ -234,6 +234,21 @@ describe('fileViewerStore', () => {
       expect(state.isOpen).toBe(true);
     });
 
+    it('clears loading so an in-flight fetch cancelled by navigating away does not leave a permanent spinner', () => {
+      // openFile with no cache leaves loading: true while the fetch is in flight.
+      useFileViewerStore.getState().openFile('/project', 'src/index.ts');
+      expect(useFileViewerStore.getState().loading).toBe(true);
+
+      useFileViewerStore.getState().backToTree();
+
+      const state = useFileViewerStore.getState();
+      expect(state.loading).toBe(false);
+      // isBrowseMode in FileViewerPanel is `!filePath && !loading && !error`;
+      // all three preconditions must hold for browse mode to render.
+      expect(state.filePath).toBeNull();
+      expect(state.error).toBeNull();
+    });
+
     it('clears content, error, and pending in-file search state', () => {
       useFileViewerStore.getState().openFile('/project', 'src/index.ts');
       useFileViewerStore.getState().setContent('const x = 1;', 1000);
