@@ -28,6 +28,13 @@ interface ModalProps {
   /** On mobile, expand the card to a full-screen sheet (inset-0, no radius). */
   mobileFullscreen?: boolean;
   isMobile?: boolean;
+  /** Close when the backdrop is clicked (default true). Disable for dialogs
+   *  where an accidental dismissal has side effects (e.g. cancelling an
+   *  in-flight OAuth session). */
+  dismissOnBackdrop?: boolean;
+  /** Close on the Escape key (default true). See dismissOnBackdrop. Android
+   *  back always closes regardless — on phones back must remain an exit. */
+  dismissOnEscape?: boolean;
   /** Stacking context; override for nested dialogs. Defaults to z-[100]. */
   zClassName?: string;
 }
@@ -57,6 +64,8 @@ export function Modal({
   placement = 'top',
   mobileFullscreen = false,
   isMobile = false,
+  dismissOnBackdrop = true,
+  dismissOnEscape = true,
   zClassName = 'z-[100]',
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -66,13 +75,15 @@ export function Modal({
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
+        if (dismissOnEscape) {
+          e.preventDefault();
+          onClose();
+        }
         return;
       }
       trapTab(e, dialogRef.current);
     },
-    [onClose]
+    [onClose, dismissOnEscape]
   );
 
   useEffect(() => {
@@ -94,7 +105,7 @@ export function Modal({
     >
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-[apple-fade-in_120ms_ease-out]"
-        onClick={onClose}
+        onClick={dismissOnBackdrop ? onClose : undefined}
         aria-hidden
         data-testid="modal-backdrop"
       />

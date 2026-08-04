@@ -75,6 +75,46 @@ describe('Modal', () => {
     expect(screen.getByTestId('modal-body')).not.toHaveClass('overflow-y-auto');
   });
 
+  it('does not close on Escape when dismissOnEscape is false', () => {
+    const onClose = vi.fn();
+    render(
+      <Modal open onClose={onClose} ariaLabel="Test" dismissOnEscape={false}>
+        <p>Body</p>
+      </Modal>
+    );
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('does not close on backdrop click when dismissOnBackdrop is false', () => {
+    const onClose = vi.fn();
+    render(
+      <Modal open onClose={onClose} ariaLabel="Test" dismissOnBackdrop={false}>
+        <p>Body</p>
+      </Modal>
+    );
+    fireEvent.click(screen.getByTestId('modal-backdrop'));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('still closes from the header close button when dismissal props are false', () => {
+    const onClose = vi.fn();
+    render(
+      <Modal
+        open
+        onClose={onClose}
+        ariaLabel="Test"
+        title="Hello"
+        dismissOnBackdrop={false}
+        dismissOnEscape={false}
+      >
+        <p>Body</p>
+      </Modal>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('expands to a full-screen sheet with safe-area padding on mobile', () => {
     render(
       <Modal open onClose={vi.fn()} ariaLabel="Test" mobileFullscreen isMobile>

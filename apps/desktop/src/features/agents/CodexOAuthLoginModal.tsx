@@ -145,6 +145,8 @@ export function CodexOAuthLoginModal({
       zClassName="z-[80]"
       mobileFullscreen
       isMobile={isMobile}
+      dismissOnBackdrop={false}
+      dismissOnEscape={false}
       footer={
         <div className="flex justify-end gap-2">
           <button

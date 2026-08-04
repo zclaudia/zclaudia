@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, act } from '@testing-library/react';
+import { render, act, screen, fireEvent } from '@testing-library/react';
 
 const { mockStart, mockPoll, mockCancel } = vi.hoisted(() => ({
   mockStart: vi.fn(),
@@ -101,5 +101,41 @@ describe('CodexOAuthLoginModal polling', () => {
     });
 
     expect(onSuccess).not.toHaveBeenCalled();
+  });
+
+  it('does not cancel the in-flight session on backdrop click or Escape', async () => {
+    mockPoll.mockResolvedValue({ state: 'pending' });
+    const { onClose } = renderModal();
+
+    // Let the start call resolve so a session exists and polling is active.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByTestId('modal-backdrop'));
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Sign in with ChatGPT' }), {
+      key: 'Escape',
+    });
+
+    expect(mockCancel).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('cancels the session from the explicit Cancel button', async () => {
+    mockPoll.mockResolvedValue({ state: 'pending' });
+    mockCancel.mockResolvedValue(undefined);
+    const { onClose } = renderModal();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      await Promise.resolve();
+    });
+
+    expect(mockCancel).toHaveBeenCalledWith('b1', 'p1', 's1');
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
