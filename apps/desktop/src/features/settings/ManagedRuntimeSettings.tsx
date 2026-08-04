@@ -15,7 +15,8 @@ import {
   testManagedRuntime,
   type ManagedRuntimeStatus,
 } from '../../services/api';
-import { useLocalBackendId } from '../../hooks/useLocalBackendId';
+import { useSettingsTargetBackend } from '../../hooks/useSettingsTargetBackend';
+import { TargetBackendBanner, NoTargetBackendNotice } from './ui/TargetBackendNotice';
 import { Select } from '../../components/ui/Select';
 
 function formatBytes(value: number | undefined): string {
@@ -52,8 +53,17 @@ function statusTone(resolution: ManagedRuntimeResolution): string {
   return 'text-destructive';
 }
 
-export function ManagedRuntimeSettings() {
-  const backendId = useLocalBackendId();
+export function ManagedRuntimeSettings({
+  hideTargetBanner = false,
+}: {
+  /** Set when a parent page already renders its own target-backend banner. */
+  hideTargetBanner?: boolean;
+}) {
+  // Downloads/installs land on this backend: the device's local backend when
+  // one exists, otherwise the connected active backend (mobile). The banner
+  // below names a non-local target so installs are never silently remote.
+  const targetBackend = useSettingsTargetBackend();
+  const backendId = targetBackend.targetBackendId;
   const [statuses, setStatuses] = useState<ManagedRuntimeStatus[]>([]);
   const [policy, setPolicy] = useState<ManagedRuntimePolicy>('managed-ask');
   const [loading, setLoading] = useState(true);
@@ -63,6 +73,10 @@ export function ManagedRuntimeSettings() {
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
+    if (!backendId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -107,6 +121,10 @@ export function ManagedRuntimeSettings() {
     [reload]
   );
 
+  if (!backendId) {
+    return <NoTargetBackendNotice />;
+  }
+
   if (loading) {
     return (
       <div
@@ -120,6 +138,7 @@ export function ManagedRuntimeSettings() {
 
   return (
     <div data-testid="managed-runtime-settings" className="space-y-3">
+      {!hideTargetBanner && <TargetBackendBanner target={targetBackend} />}
       <div className="flex items-center justify-between gap-3">
         <div>
           <span className="text-sm">CLI resolution policy</span>

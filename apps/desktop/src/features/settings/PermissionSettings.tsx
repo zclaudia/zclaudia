@@ -5,7 +5,8 @@ import { listAllWorkflowsForBackend } from '../../features/workflows/api';
 import * as providersApi from '../../services/api/llm-profiles';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
-import { useLocalBackendId } from '../../hooks/useLocalBackendId';
+import { useSettingsTargetBackend } from '../../hooks/useSettingsTargetBackend';
+import { TargetBackendBanner, NoTargetBackendNotice } from './ui/TargetBackendNotice';
 import { isMacOS } from '../../utils/platform';
 import { Select } from '../../components/ui/Select';
 import type {
@@ -87,16 +88,15 @@ function AIReviewProviderSelector({
   value,
   onChange,
   disabled,
+  backendId,
 }: {
   value?: string;
   onChange: (id: string | undefined) => void;
   disabled: boolean;
+  /** Backend this page is configuring (see useSettingsTargetBackend). */
+  backendId: string | null;
 }) {
-  // Settings always edit this device's local backend, even when a remote
-  // backend is active for chat — so provider metadata is keyed by (and
-  // fetched from) the local backend id, not the active server id.
-  const localBackendId = useLocalBackendId();
-  const storeProviders = useLlmProfileMetaStore(s => s.getProviders(localBackendId));
+  const storeProviders = useLlmProfileMetaStore(s => s.getProviders(backendId));
   const [providers, setProviders] = useState<LlmProfileConfig[]>(storeProviders);
   const [eligibleProviderIds, setEligibleProviderIds] = useState<Record<string, boolean>>({});
 
@@ -108,18 +108,18 @@ function AIReviewProviderSelector({
 
     let cancelled = false;
     void providersApi
-      .listLlmProfilesForBackend(localBackendId)
+      .listLlmProfilesForBackend(backendId)
       .then(loadedProviders => {
         if (cancelled) return;
         setProviders(loadedProviders);
-        useLlmProfileMetaStore.getState().setProviders(loadedProviders, localBackendId);
+        useLlmProfileMetaStore.getState().setProviders(loadedProviders, backendId);
       })
       .catch(() => {});
 
     return () => {
       cancelled = true;
     };
-  }, [localBackendId, storeProviders]);
+  }, [backendId, storeProviders]);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,7 +131,7 @@ function AIReviewProviderSelector({
             const capabilities = await providersApi.getProviderCapabilities(
               provider.id,
               undefined,
-              localBackendId
+              backendId
             );
             return [provider.id, capabilities.supportsAIReview === true] as const;
           } catch {
@@ -149,7 +149,7 @@ function AIReviewProviderSelector({
     return () => {
       cancelled = true;
     };
-  }, [providers, localBackendId]);
+  }, [providers, backendId]);
 
   const eligibleProviders = providers.filter(provider => eligibleProviderIds[provider.id] === true);
   const selectedProvider = value ? providers.find(provider => provider.id === value) : undefined;
@@ -205,9 +205,12 @@ export function PermissionSettings() {
   const [error, setError] = useState<string | null>(null);
   const [hookList, setHookList] = useState<UserHookDefinition[]>([]);
 
-  // Pin all data in this page to this device's local backend (see
-  // AIReviewProviderSelector for the rationale).
-  const localBackendId = useLocalBackendId();
+  // Resolve which backend this page edits: this device's local backend when
+  // one exists (desktop), otherwise the active backend (mobile has no local
+  // backend and this page is its only way to manage these settings). A banner
+  // below makes a non-local target explicit to the user.
+  const targetBackend = useSettingsTargetBackend();
+  const { targetBackendId } = targetBackend;
 
   // macOS system permission checks (moved from General settings)
   const [fdaGranted, setFdaGranted] = useState<boolean | null>(null);
@@ -223,12 +226,16 @@ export function PermissionSettings() {
   }, []);
 
   const loadPolicy = useCallback(async () => {
+    if (!targetBackendId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const [config, workflows] = await Promise.all([
-        getAgentConfig(),
-        listAllWorkflowsForBackend(localBackendId),
+        getAgentConfig(targetBackendId),
+        listAllWorkflowsForBackend(targetBackendId),
       ]);
 
       setSelectedWorkflowId(config.permissionWorkflowOverrideId ?? '');
@@ -267,38 +274,47 @@ export function PermissionSettings() {
     } finally {
       setLoading(false);
     }
-  }, [localBackendId]);
+  }, [targetBackendId]);
 
   useEffect(() => {
     loadPolicy();
   }, [loadPolicy]);
 
-  const savePolicy = useCallback(async (updated: UnifiedPermissionPolicy) => {
-    setSaving(true);
-    try {
-      await updateAgentConfig({ permissionPolicy: JSON.stringify(updated) });
-      setPolicy(updated);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save');
-    } finally {
-      setSaving(false);
-    }
-  }, []);
+  const savePolicy = useCallback(
+    async (updated: UnifiedPermissionPolicy) => {
+      setSaving(true);
+      try {
+        await updateAgentConfig({ permissionPolicy: JSON.stringify(updated) }, targetBackendId);
+        setPolicy(updated);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to save');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [targetBackendId]
+  );
 
-  const updatePermissionWorkflowOverride = useCallback(async (workflowId: string) => {
-    setSaving(true);
-    setError(null);
-    try {
-      const config = await updateAgentConfig({
-        permissionWorkflowOverrideId: workflowId || null,
-      });
-      setSelectedWorkflowId(config.permissionWorkflowOverrideId ?? '');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save');
-    } finally {
-      setSaving(false);
-    }
-  }, []);
+  const updatePermissionWorkflowOverride = useCallback(
+    async (workflowId: string) => {
+      setSaving(true);
+      setError(null);
+      try {
+        const config = await updateAgentConfig(
+          {
+            permissionWorkflowOverrideId: workflowId || null,
+          },
+          targetBackendId
+        );
+        setSelectedWorkflowId(config.permissionWorkflowOverrideId ?? '');
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to save');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [targetBackendId]
+  );
 
   const updateCategory = useCallback(
     (category: PermissionCategory, action: CategoryAction) => {
@@ -342,17 +358,23 @@ export function PermissionSettings() {
     savePolicy(DEFAULT_UNIFIED_POLICY);
   }, [savePolicy]);
 
-  const saveHooks = useCallback(async (next: UserHookDefinition[]) => {
-    setSaving(true);
-    try {
-      await updateAgentConfig({ hooks: next.length > 0 ? JSON.stringify(next) : null });
-      setHookList(next);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save hooks');
-    } finally {
-      setSaving(false);
-    }
-  }, []);
+  const saveHooks = useCallback(
+    async (next: UserHookDefinition[]) => {
+      setSaving(true);
+      try {
+        await updateAgentConfig(
+          { hooks: next.length > 0 ? JSON.stringify(next) : null },
+          targetBackendId
+        );
+        setHookList(next);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to save hooks');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [targetBackendId]
+  );
 
   // macOS system permissions (full disk access + folder access), shown above
   // the agent tool permission settings regardless of load state.
@@ -415,10 +437,20 @@ export function PermissionSettings() {
       </SettingsGroup>
     ) : null;
 
+  if (!targetBackendId) {
+    return (
+      <div className="space-y-6">
+        {systemPermissionsGroup}
+        <NoTargetBackendNotice />
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
         {systemPermissionsGroup}
+        <TargetBackendBanner target={targetBackend} />
         <div className="p-3 bg-secondary/50 rounded-lg text-sm text-muted-foreground">
           Loading...
         </div>
@@ -429,6 +461,7 @@ export function PermissionSettings() {
   return (
     <div className="space-y-6">
       {systemPermissionsGroup}
+      <TargetBackendBanner target={targetBackend} />
 
       {/* Master toggle (standalone, label-less card) */}
       <SettingsGroup>
@@ -584,6 +617,7 @@ export function PermissionSettings() {
                 value={policy.aiReview.analysisLlmProfileId}
                 onChange={id => updateAIReview({ analysisLlmProfileId: id })}
                 disabled={saving}
+                backendId={targetBackendId}
               />
             </>
           )}

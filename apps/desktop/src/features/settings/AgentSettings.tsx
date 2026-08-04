@@ -5,7 +5,8 @@ import type { LlmProfileConfig } from '@zclaudia/shared';
 import { ShortcutSettings } from './ShortcutSettings';
 import { isDesktopTauri } from '../../utils/platform';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
-import { useLocalBackendId } from '../../hooks/useLocalBackendId';
+import { useSettingsTargetBackend } from '../../hooks/useSettingsTargetBackend';
+import { TargetBackendBanner, NoTargetBackendNotice } from './ui/TargetBackendNotice';
 import { Select } from '../../components/ui/Select';
 import { ManagedRuntimeSettings } from './ManagedRuntimeSettings';
 
@@ -28,18 +29,25 @@ export function AgentSettings() {
   const [metaLoading, setMetaLoading] = useState(true);
   const [metaError, setMetaError] = useState<string | null>(null);
 
-  // Settings always edit this device's local backend, even when a remote
-  // backend is active for chat.
-  const localBackendId = useLocalBackendId();
+  // Resolve which backend this page edits: this device's local backend when
+  // one exists (desktop), otherwise the active backend (mobile has no local
+  // backend and this page is its only way to manage these settings). The
+  // banner below makes a non-local target explicit to the user.
+  const targetBackend = useSettingsTargetBackend();
+  const { targetBackendId } = targetBackend;
 
   const loadData = useCallback(async () => {
+    if (!targetBackendId) {
+      setMetaLoading(false);
+      return;
+    }
     setMetaLoading(true);
     setMetaError(null);
     try {
-      await loadConfig();
+      await loadConfig(targetBackendId);
       const [capsRes, providerList] = await Promise.all([
-        fetchApiForBackend<AgentCapabilities>('/api/agent/capabilities', localBackendId),
-        listLlmProfilesForBackend(localBackendId).catch(() => [] as LlmProfileConfig[]),
+        fetchApiForBackend<AgentCapabilities>('/api/agent/capabilities', targetBackendId),
+        listLlmProfilesForBackend(targetBackendId).catch(() => [] as LlmProfileConfig[]),
       ]);
       if (capsRes.success && capsRes.data) setCapabilities(capsRes.data);
       setProviders(providerList);
@@ -48,7 +56,7 @@ export function AgentSettings() {
     } finally {
       setMetaLoading(false);
     }
-  }, [loadConfig, localBackendId]);
+  }, [loadConfig, targetBackendId]);
 
   useEffect(() => {
     loadData();
@@ -56,10 +64,18 @@ export function AgentSettings() {
 
   const saveConfig = useCallback(
     async (updates: { enabled?: boolean; llmProfileId?: string | null }) => {
-      await updateConfig(updates);
+      await updateConfig(updates, targetBackendId);
     },
-    [updateConfig]
+    [updateConfig, targetBackendId]
   );
+
+  if (!targetBackendId) {
+    return (
+      <div className="space-y-6">
+        <NoTargetBackendNotice />
+      </div>
+    );
+  }
 
   if (loading || metaLoading) {
     return (
@@ -84,6 +100,8 @@ export function AgentSettings() {
 
   return (
     <div className="space-y-6">
+      <TargetBackendBanner target={targetBackend} />
+
       {/* General */}
       <div>
         <h3 className="text-sm font-medium mb-3">General</h3>
@@ -148,7 +166,8 @@ export function AgentSettings() {
 
       <div>
         <h3 className="text-sm font-medium mb-3">Managed Agent CLIs</h3>
-        <ManagedRuntimeSettings />
+        {/* This page already shows the target-backend banner at the top. */}
+        <ManagedRuntimeSettings hideTargetBanner />
       </div>
 
       {/* Capabilities */}

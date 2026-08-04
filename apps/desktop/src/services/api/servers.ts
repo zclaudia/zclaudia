@@ -91,25 +91,37 @@ export interface AgentConfig {
   hooks?: string | null;
 }
 
-export async function getAgentConfig(): Promise<AgentConfig> {
-  const result = await fetchLocalApi<AgentConfig>('/api/agent/config');
+export async function getAgentConfig(backendId?: string | null): Promise<AgentConfig> {
+  // Explicit backend id targets that backend; otherwise fall back to the
+  // primary control-plane resolution (local-first) in fetchLocalApi.
+  const result =
+    backendId != null
+      ? await fetchApiForBackend<AgentConfig>('/api/agent/config', backendId)
+      : await fetchLocalApi<AgentConfig>('/api/agent/config');
   if (!result.success || !result.data) {
     throw new Error(result.error?.message || 'Failed to get agent config');
   }
   return result.data;
 }
 
-export async function updateAgentConfig(config: {
-  enabled?: boolean;
-  llmProfileId?: string | null;
-  permissionWorkflowOverrideId?: string | null;
-  permissionPolicy?: string | null;
-  hooks?: string | null;
-}): Promise<AgentConfig> {
-  const result = await fetchLocalApi<AgentConfig>('/api/agent/config', {
+export async function updateAgentConfig(
+  config: {
+    enabled?: boolean;
+    llmProfileId?: string | null;
+    permissionWorkflowOverrideId?: string | null;
+    permissionPolicy?: string | null;
+    hooks?: string | null;
+  },
+  backendId?: string | null
+): Promise<AgentConfig> {
+  const options: RequestInit = {
     method: 'PUT',
     body: JSON.stringify(config),
-  });
+  };
+  const result =
+    backendId != null
+      ? await fetchApiForBackend<AgentConfig>('/api/agent/config', backendId, options)
+      : await fetchLocalApi<AgentConfig>('/api/agent/config', options);
   if (!result.success || !result.data) {
     throw new Error(result.error?.message || 'Failed to update agent config');
   }

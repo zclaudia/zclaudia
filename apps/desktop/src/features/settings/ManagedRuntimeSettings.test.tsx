@@ -3,8 +3,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ManagedRuntimeSettings } from './ManagedRuntimeSettings';
 
-vi.mock('../../hooks/useLocalBackendId', () => ({
-  useLocalBackendId: () => 'local',
+const mockTarget: {
+  targetBackendId: string | null;
+  isLocalTarget: boolean;
+  targetBackendName: string | null;
+} = { targetBackendId: 'local', isLocalTarget: true, targetBackendName: 'Local' };
+
+vi.mock('../../hooks/useSettingsTargetBackend', () => ({
+  useSettingsTargetBackend: () => mockTarget,
 }));
 
 vi.mock('../../services/api', () => ({
@@ -43,6 +49,9 @@ const artifact = {
 describe('ManagedRuntimeSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockTarget.targetBackendId = 'local';
+    mockTarget.isLocalTarget = true;
+    mockTarget.targetBackendName = 'Local';
     vi.mocked(getManagedRuntimeSettings).mockResolvedValue({
       policy: 'managed-ask',
       trustedPublishers: [],
@@ -96,5 +105,53 @@ describe('ManagedRuntimeSettings', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Confirm download' }));
     await waitFor(() => expect(installManagedRuntime).toHaveBeenCalledWith('local', artifact));
+  });
+
+  it('does not show the target-backend banner when the target is local', async () => {
+    render(<ManagedRuntimeSettings />);
+
+    await screen.findByTestId('managed-runtime-settings');
+    expect(screen.queryByTestId('settings-target-backend-banner')).toBeNull();
+  });
+
+  it('shows the target-backend banner and targets the remote backend when no local backend exists', async () => {
+    mockTarget.targetBackendId = 'remote-1';
+    mockTarget.isLocalTarget = false;
+    mockTarget.targetBackendName = 'Work Laptop';
+
+    render(<ManagedRuntimeSettings />);
+
+    const banner = await screen.findByTestId('settings-target-backend-banner');
+    expect(banner).toHaveTextContent('These settings apply to the connected backend:');
+    expect(banner).toHaveTextContent('Work Laptop');
+
+    await waitFor(() => {
+      expect(listManagedRuntimes).toHaveBeenCalledWith('remote-1');
+      expect(getManagedRuntimeSettings).toHaveBeenCalledWith('remote-1');
+    });
+  });
+
+  it('hides the banner when a parent page already renders one', async () => {
+    mockTarget.targetBackendId = 'remote-1';
+    mockTarget.isLocalTarget = false;
+    mockTarget.targetBackendName = 'Work Laptop';
+
+    render(<ManagedRuntimeSettings hideTargetBanner />);
+
+    await screen.findByTestId('managed-runtime-settings');
+    expect(screen.queryByTestId('settings-target-backend-banner')).toBeNull();
+  });
+
+  it('renders a disabled notice and makes no requests when no backend exists at all', async () => {
+    mockTarget.targetBackendId = null;
+    mockTarget.isLocalTarget = false;
+    mockTarget.targetBackendName = null;
+
+    render(<ManagedRuntimeSettings />);
+
+    expect(await screen.findByTestId('settings-no-backend-notice')).toBeInTheDocument();
+    expect(screen.queryByTestId('managed-runtime-settings')).toBeNull();
+    expect(listManagedRuntimes).not.toHaveBeenCalled();
+    expect(getManagedRuntimeSettings).not.toHaveBeenCalled();
   });
 });

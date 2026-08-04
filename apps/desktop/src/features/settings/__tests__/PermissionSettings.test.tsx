@@ -186,7 +186,75 @@ describe('PermissionSettings', () => {
         'local'
       );
       expect(mockListAllWorkflowsForBackend).toHaveBeenCalledWith('local');
+      expect(mockGetAgentConfig).toHaveBeenCalledWith('local');
     });
+
+    // Target is the local backend, so no target-backend banner is shown.
+    expect(screen.queryByTestId('settings-target-backend-banner')).toBeNull();
+  });
+
+  it('targets the active backend and shows a banner when no local backend exists', async () => {
+    useServerStore.setState({ activeServerId: 'remote-1' } as any);
+    useFacadeStore.setState({
+      localBackendId: null,
+      backends: [{ backendId: 'remote-1', name: 'Work Laptop', isThisInstance: false }],
+    } as any);
+    useLlmProfileMetaStore.setState({
+      providersByBackend: { 'remote-1': LOCAL_PROVIDERS },
+    } as any);
+
+    render(<PermissionSettings />);
+
+    await screen.findByText('Review provider');
+
+    const banner = screen.getByTestId('settings-target-backend-banner');
+    expect(banner).toHaveTextContent('These settings apply to the connected backend:');
+    expect(banner).toHaveTextContent('Work Laptop');
+
+    await waitFor(() => {
+      expect(mockGetAgentConfig).toHaveBeenCalledWith('remote-1');
+      expect(mockListAllWorkflowsForBackend).toHaveBeenCalledWith('remote-1');
+      expect(mockGetProviderCapabilities).toHaveBeenCalledWith(
+        'prov-supported',
+        undefined,
+        'remote-1'
+      );
+    });
+  });
+
+  it('saves policy updates to the resolved target backend', async () => {
+    useServerStore.setState({ activeServerId: 'remote-1' } as any);
+    useFacadeStore.setState({
+      localBackendId: null,
+      backends: [{ backendId: 'remote-1', name: 'Work Laptop', isThisInstance: false }],
+    } as any);
+    useLlmProfileMetaStore.setState({
+      providersByBackend: { 'remote-1': LOCAL_PROVIDERS },
+    } as any);
+
+    render(<PermissionSettings />);
+
+    const toggle = await screen.findByRole('switch', { name: 'Auto-approve tools' });
+    fireEvent.click(toggle);
+
+    await waitFor(() => {
+      expect(mockUpdateAgentConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ permissionPolicy: expect.any(String) }),
+        'remote-1'
+      );
+    });
+  });
+
+  it('renders a disabled notice and makes no requests when no backend exists at all', async () => {
+    useServerStore.setState({ activeServerId: null } as any);
+    useFacadeStore.setState({ localBackendId: null, backends: [] } as any);
+
+    render(<PermissionSettings />);
+
+    expect(await screen.findByTestId('settings-no-backend-notice')).toBeInTheDocument();
+    expect(screen.queryByText('Auto-approve tools')).toBeNull();
+    expect(mockGetAgentConfig).not.toHaveBeenCalled();
+    expect(mockListAllWorkflowsForBackend).not.toHaveBeenCalled();
   });
 
   it('falls back to the backends list when localBackendId is not synced yet', async () => {

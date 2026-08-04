@@ -9,9 +9,10 @@ import { useFacadeStore } from '../stores/facadeStore';
  * mirrors the imperative `resolveLocalBackendId()` in `utils/controlPlane`,
  * but subscribes to the store so components re-render once the id arrives.
  *
- * Use this (instead of `serverStore.activeServerId`) for settings surfaces
- * that must always edit the local machine, even when a remote backend is
- * active for chat.
+ * Returns null when this device has no local backend (e.g. mobile). Settings
+ * surfaces that prefer the local backend but must stay usable without one
+ * should use `useSettingsTargetBackend` instead — passing a raw null into the
+ * api layer silently falls back to the active (possibly remote) backend.
  */
 export function useLocalBackendId(): string | null {
   const localBackendId = useFacadeStore(s => s.localBackendId);

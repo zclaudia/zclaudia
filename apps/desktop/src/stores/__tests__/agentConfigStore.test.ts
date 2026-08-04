@@ -71,11 +71,14 @@ describe('agentConfigStore', () => {
     });
 
     expect(result).toBe(true);
-    expect(updateAgentConfig).toHaveBeenCalledWith({
-      enabled: false,
-      llmProfileId: null,
-      permissionWorkflowOverrideId: 'wf-1',
-    });
+    expect(updateAgentConfig).toHaveBeenCalledWith(
+      {
+        enabled: false,
+        llmProfileId: null,
+        permissionWorkflowOverrideId: 'wf-1',
+      },
+      undefined
+    );
     expect(useAgentConfigStore.getState()).toMatchObject({
       config: updatedConfig,
       isSaving: false,

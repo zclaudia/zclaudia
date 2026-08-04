@@ -7,13 +7,16 @@ interface AgentConfigState {
   isSaving: boolean;
   hasLoaded: boolean;
   error: string | null;
-  loadConfig: () => Promise<void>;
-  updateConfig: (updates: {
-    enabled?: boolean;
-    llmProfileId?: string | null;
-    permissionWorkflowOverrideId?: string | null;
-    permissionPolicy?: string | null;
-  }) => Promise<boolean>;
+  loadConfig: (backendId?: string | null) => Promise<void>;
+  updateConfig: (
+    updates: {
+      enabled?: boolean;
+      llmProfileId?: string | null;
+      permissionWorkflowOverrideId?: string | null;
+      permissionPolicy?: string | null;
+    },
+    backendId?: string | null
+  ) => Promise<boolean>;
 }
 
 export const useAgentConfigStore = create<AgentConfigState>(set => ({
@@ -23,10 +26,10 @@ export const useAgentConfigStore = create<AgentConfigState>(set => ({
   hasLoaded: false,
   error: null,
 
-  loadConfig: async () => {
+  loadConfig: async (backendId?: string | null) => {
     set({ isLoading: true, error: null });
     try {
-      const config = await getAgentConfig();
+      const config = await getAgentConfig(backendId);
       set({
         config,
         isLoading: false,
@@ -42,10 +45,10 @@ export const useAgentConfigStore = create<AgentConfigState>(set => ({
     }
   },
 
-  updateConfig: async updates => {
+  updateConfig: async (updates, backendId) => {
     set({ isSaving: true, error: null });
     try {
-      const config = await updateAgentConfig(updates);
+      const config = await updateAgentConfig(updates, backendId);
       set({
         config,
         isSaving: false,
