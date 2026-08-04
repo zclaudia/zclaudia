@@ -33,6 +33,34 @@ describe('SettingsGroup / SettingsRow', () => {
     expect(screen.getByText('Version')).toBeTruthy();
   });
 
+  it('stacks label and control vertically below md and restores the row layout at md', () => {
+    const { container } = render(
+      <SettingsGroup>
+        <SettingsRow title="Theme" control={<button>Light</button>} />
+      </SettingsGroup>
+    );
+    const row = container.querySelector('.flex.flex-col');
+    expect(row).not.toBeNull();
+    expect(row!.className).toContain('md:flex-row');
+    expect(row!.className).toContain('md:items-center');
+    expect(row!.className).toContain('md:justify-between');
+    // Control wrapper only pins its width from md up so it can stretch when stacked.
+    const controlWrap = screen.getByRole('button', { name: 'Light' }).parentElement!;
+    expect(controlWrap.className).toContain('md:flex-shrink-0');
+    expect(controlWrap.className).not.toMatch(/(^| )flex-shrink-0/);
+  });
+
+  it('uses items-start alignment at md when align="start"', () => {
+    const { container } = render(
+      <SettingsGroup>
+        <SettingsRow title="Row" align="start" control={<span>c</span>} />
+      </SettingsGroup>
+    );
+    const row = container.querySelector('.flex.flex-col');
+    expect(row!.className).toContain('md:items-start');
+    expect(row!.className).not.toContain('md:items-center');
+  });
+
   it('omits the label heading when no label is given', () => {
     const { container } = render(
       <SettingsGroup>

@@ -783,7 +783,7 @@ export function ProfileEditor({
                   <EditorRow
                     title="Agent Type"
                     control={
-                      <div className="w-56">
+                      <div className="w-full md:w-56">
                         <RuntimeSelector
                           aria-label="Agent Type"
                           value={formRuntimeType}
@@ -800,7 +800,7 @@ export function ProfileEditor({
                         title="LLM Profile"
                         description="Required"
                         control={
-                          <div className="w-56">
+                          <div className="w-full md:w-56">
                             <LlmProfileSelector
                               hideLabel
                               aria-label="LLM Profile"
@@ -826,7 +826,7 @@ export function ProfileEditor({
                         title="Model"
                         description="Required"
                         control={
-                          <div className="w-56">
+                          <div className="w-full md:w-56">
                             <ModelSelector
                               hideLabel
                               aria-label="Model"
@@ -857,7 +857,7 @@ export function ProfileEditor({
                           onChange={e => setFormModel(e.target.value)}
                           onBlur={autosave.flush}
                           placeholder="Auto (default)"
-                          className={`${FIELD_CLASS} w-56`}
+                          className={`${FIELD_CLASS} md:w-56`}
                         />
                       }
                     />
@@ -879,7 +879,7 @@ export function ProfileEditor({
                       title={<label htmlFor="agent-profile-cli-path">CLI Path</label>}
                       description={`Optional — custom ${activeDescriptor.label} CLI binary`}
                       control={
-                        <div className="w-56">
+                        <div className="w-full md:w-56">
                           <input
                             id="agent-profile-cli-path"
                             type="text"
@@ -899,7 +899,7 @@ export function ProfileEditor({
                     <EditorRow
                       title="Thinking Level"
                       control={
-                        <div className="w-56">
+                        <div className="w-full md:w-56">
                           <ThinkingLevelSelector
                             hideLabel
                             aria-label="Thinking Level"
@@ -1260,7 +1260,7 @@ export function ProfileEditor({
                         <span>{pinnedSkillCount} pinned inline</span>
                         <span>{skillPolicyOverrideCount} policy overrides</span>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         {(['workspace', 'external', 'plugin'] as SkillSource[]).map(source => (
                           <label
                             key={source}
@@ -1484,7 +1484,7 @@ function MultimodalFallbackSection({
               value={profileId}
               onChange={event => onProfileChange(event.target.value)}
               onBlur={onFlush}
-              className={`${FIELD_CLASS} w-56`}
+              className={`${FIELD_CLASS} md:w-56`}
             >
               <option value="">None</option>
               {llmProfiles.map(profile => (
@@ -1507,7 +1507,7 @@ function MultimodalFallbackSection({
                 onChange={event => onModelChange(event.target.value)}
                 onBlur={onFlush}
                 disabled={visionModels.length === 0}
-                className={`${FIELD_CLASS} w-56 disabled:opacity-50`}
+                className={`${FIELD_CLASS} md:w-56 disabled:opacity-50`}
               >
                 <option value="">Select a Vision-capable model</option>
                 {visionModels.map(entry => {
@@ -1535,7 +1535,7 @@ function MultimodalFallbackSection({
                 onChange={event => onModelChange(event.target.value)}
                 onBlur={onFlush}
                 placeholder="model id"
-                className={`${MONO_FIELD_CLASS} w-56`}
+                className={`${MONO_FIELD_CLASS} md:w-56`}
               />
             }
           />

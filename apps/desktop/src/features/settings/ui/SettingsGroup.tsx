@@ -34,7 +34,7 @@ export function SettingsRow({
   return (
     <div className="p-4">
       <div
-        className={`flex ${align === 'start' ? 'items-start' : 'items-center'} justify-between gap-3`}
+        className={`flex flex-col gap-3 md:flex-row ${align === 'start' ? 'md:items-start' : 'md:items-center'} md:justify-between`}
       >
         <div className="flex min-w-0 items-center gap-3">
           {icon && <span className="flex-shrink-0 text-muted-foreground">{icon}</span>}
@@ -45,7 +45,7 @@ export function SettingsRow({
             )}
           </div>
         </div>
-        {control && <div className="flex flex-shrink-0 items-center gap-2">{control}</div>}
+        {control && <div className="flex items-center gap-2 md:flex-shrink-0">{control}</div>}
       </div>
       {children && <div className="mt-3">{children}</div>}
     </div>

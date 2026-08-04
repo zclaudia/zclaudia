@@ -77,7 +77,8 @@ function CategoryRow({
           options={ACTION_OPTIONS}
           disabled={disabled || isLocked}
           title={isLocked ? 'User questions always require approval' : undefined}
-          triggerClassName="min-w-[120px]"
+          className="w-full md:w-auto"
+          triggerClassName="md:min-w-[120px]"
         />
       }
     />
@@ -163,12 +164,13 @@ function AIReviewProviderSelector({
       title="Review provider"
       description="Only providers that support AI review are shown here"
       control={
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-col items-stretch gap-1 md:items-end">
           <Select
             value={value || ''}
             onChange={next => onChange(next || undefined)}
             disabled={disabled}
-            triggerClassName="max-w-[220px] min-w-[180px]"
+            className="w-full md:w-auto"
+            triggerClassName="md:max-w-[220px] md:min-w-[180px]"
             options={[
               { value: '', label: 'Session default' },
               ...(selectedProvider && !selectedProviderSupported
@@ -637,7 +639,8 @@ export function PermissionSettings() {
               }}
               disabled={saving || loading}
               size="md"
-              triggerClassName="min-w-[220px]"
+              className="w-full md:w-auto"
+              triggerClassName="md:min-w-[220px]"
               options={[
                 { value: '', label: 'System fallback only' },
                 ...workflowOptions.map(workflow => ({

@@ -900,7 +900,7 @@ export function McpServerEditor({
             title="Trust Policy"
             description="Controls how self-declared MCP read-only hints and risk levels affect permission prompts."
           >
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>
                 <FieldLabel htmlFor="mcp-trust-level">Trust Level</FieldLabel>
                 <select
@@ -941,7 +941,7 @@ export function McpServerEditor({
               />
               Trust read-only hints
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
               {(['low', 'medium', 'high'] as const).map(level => (
                 <div key={level}>
                   <FieldLabel htmlFor={`mcp-${level}-risk-action`}>

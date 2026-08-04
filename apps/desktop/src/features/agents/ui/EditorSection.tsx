@@ -60,13 +60,13 @@ export function EditorRow({
   return (
     <div className="px-4 py-3">
       <div
-        className={`flex ${align === 'start' ? 'items-start' : 'items-center'} justify-between gap-3`}
+        className={`flex flex-col gap-3 md:flex-row ${align === 'start' ? 'md:items-start' : 'md:items-center'} md:justify-between`}
       >
         <div className="min-w-0">
           <div className="text-sm text-foreground">{title}</div>
           {description && <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>}
         </div>
-        {control && <div className="flex flex-shrink-0 items-center gap-2">{control}</div>}
+        {control && <div className="flex items-center gap-2 md:flex-shrink-0">{control}</div>}
       </div>
       {children && <div className="mt-3">{children}</div>}
     </div>
