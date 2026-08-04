@@ -489,10 +489,6 @@ function AppContent() {
         <AppHeader
           isMobile={isMobile}
           isAgentExpanded={isAgentExpanded}
-          sidebarCollapsed={sidebarCollapsed}
-          notificationUnreadCount={notificationUnreadCount}
-          disableNotifications={disabledBuiltinPanels.includes('notifications')}
-          onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
           onOpenSidebar={() => setSidebarOpen(true)}
           onCloseAgent={() => setAgentExpanded(false)}
         />

@@ -1,11 +1,8 @@
 import { getBaseUrl, getAuthHeaders } from './api';
 import { useFilePushStore } from '../stores/filePushStore';
-import { isTauri } from '../utils/platform';
+import { isTauri, isAndroid } from '../utils/platform';
 
-/** Check if running on Android (Tauri mobile) */
-export function isAndroid(): boolean {
-  return isTauri() && navigator.userAgent.includes('Android');
-}
+export { isAndroid };
 
 /**
  * Save a blob to the Downloads folder using Tauri fs plugin.

@@ -1,20 +1,14 @@
-import { SquareStack, ChevronsRight, ChevronsLeft, ChevronLeft, Menu, Bell } from 'lucide-react';
-import { emit as emitTauri } from '@tauri-apps/api/event';
-import { NOTCH_EVENT } from '../services/notchBridge';
-import { openWindowManagerWindow } from '../utils/windowManagerWindow';
-import { ServerSelector } from '../features/settings/ServerSelector';
+import { ChevronLeft, Menu } from 'lucide-react';
 import { BrandMark } from '../components/BrandMark';
-import { IconButton } from '../components/ui/Button';
-import { Tooltip } from '../components/ui/Tooltip';
 import { PluginWindowButtons } from './PluginDock';
 
+// This header only mounts on mobile (see App.tsx) — desktop relocates its
+// controls (sidebar toggle, notifications, window manager) into the
+// sidebar's own header instead. Keep this component free of desktop-only
+// code paths so it doesn't pull in unconditional Tauri-only imports.
 interface AppHeaderProps {
   isMobile: boolean;
   isAgentExpanded: boolean;
-  sidebarCollapsed: boolean;
-  notificationUnreadCount: number;
-  disableNotifications: boolean;
-  onToggleSidebar: () => void;
   onOpenSidebar: () => void;
   onCloseAgent: () => void;
 }
@@ -22,10 +16,6 @@ interface AppHeaderProps {
 export function AppHeader({
   isMobile,
   isAgentExpanded,
-  sidebarCollapsed,
-  notificationUnreadCount,
-  disableNotifications,
-  onToggleSidebar,
   onOpenSidebar,
   onCloseAgent,
 }: AppHeaderProps) {
@@ -66,60 +56,12 @@ export function AppHeader({
             ZClaudia
           </span>
         </div>
-
-        {!isMobile && (
-          <Tooltip content={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-            <IconButton
-              onClick={onToggleSidebar}
-              className="ml-2"
-              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              {sidebarCollapsed ? (
-                <ChevronsRight size={16} strokeWidth={1.75} />
-              ) : (
-                <ChevronsLeft size={16} strokeWidth={1.75} />
-              )}
-            </IconButton>
-          </Tooltip>
-        )}
       </div>
 
-      {/* Center section: Server selector + Feed */}
+      {/* Center section: agent title (mobile only) */}
       <div className="flex-1 flex items-center justify-start ml-2 md:ml-4 min-w-0 gap-2">
-        {isMobile && isAgentExpanded ? (
+        {isMobile && isAgentExpanded && (
           <span className="font-semibold text-sm text-foreground">Claudia</span>
-        ) : isMobile ? null : (
-          <>
-            <ServerSelector />
-            {!disableNotifications && (
-              <Tooltip content="Notifications">
-                <IconButton
-                  onClick={() => {
-                    void emitTauri(NOTCH_EVENT.toggle, {});
-                  }}
-                  className="relative"
-                  aria-label="Notifications"
-                >
-                  <Bell size={16} strokeWidth={1.75} />
-                  {notificationUnreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center bg-primary text-primary-foreground text-[10px] font-medium rounded-full px-0.5">
-                      {notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}
-                    </span>
-                  )}
-                </IconButton>
-              </Tooltip>
-            )}
-            <Tooltip content="Windows">
-              <IconButton
-                onClick={() => {
-                  void openWindowManagerWindow();
-                }}
-                aria-label="Open window manager"
-              >
-                <SquareStack size={16} strokeWidth={1.75} />
-              </IconButton>
-            </Tooltip>
-          </>
         )}
       </div>
 
