@@ -12,10 +12,11 @@ interface TokenUsageDisplayProps {
 }
 
 /**
- * Compact context-window gauge shown at the bottom-right of the composer: a
+ * Compact context-window gauge shown at the right edge of the composer: a
  * donut ring plus the used percentage. Detail (token counts, prompt-cache hits,
- * context-window source) lives in the hover popover, not here. Desktop only —
- * it is mounted in the `!isMobile` composer footer.
+ * context-window source) lives in the ContextUsagePopover, not here. Mounted
+ * in the desktop composer footer and, on mobile, at the right end of the
+ * selector-trio row above the textarea.
  */
 export function TokenUsageDisplay({
   latestInputTokens,

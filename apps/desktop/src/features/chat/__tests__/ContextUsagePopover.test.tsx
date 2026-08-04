@@ -119,6 +119,45 @@ describe('ContextUsagePopover', () => {
     );
   });
 
+  it('opens immediately on tap/click (no hover delay) and closes on a second tap', async () => {
+    mockFetch.mockResolvedValue({ available: true, ...payload() });
+    const { container } = renderPopover();
+    const anchor = container.firstChild as HTMLElement;
+
+    fireEvent.click(anchor);
+    // Click opens synchronously — the popover shell is present before the fetch resolves.
+    expect(screen.queryByTestId('context-usage-popover')).not.toBeNull();
+    await screen.findByTestId('context-usage-card');
+    expect(mockFetch).toHaveBeenCalledWith('s1');
+
+    fireEvent.click(anchor);
+    expect(screen.queryByTestId('context-usage-popover')).toBeNull();
+  });
+
+  it('closes on tap outside the anchor and panel', async () => {
+    mockFetch.mockResolvedValue({ available: true, ...payload() });
+    const { container } = renderPopover();
+    fireEvent.click(container.firstChild as HTMLElement);
+    await screen.findByTestId('context-usage-card');
+
+    // Pointerdown inside the panel must not dismiss it.
+    fireEvent.pointerDown(screen.getByTestId('context-usage-popover'));
+    expect(screen.queryByTestId('context-usage-popover')).not.toBeNull();
+
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByTestId('context-usage-popover')).toBeNull();
+  });
+
+  it('closes on Escape', async () => {
+    mockFetch.mockResolvedValue({ available: true, ...payload() });
+    const { container } = renderPopover();
+    fireEvent.click(container.firstChild as HTMLElement);
+    await screen.findByTestId('context-usage-card');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByTestId('context-usage-popover')).toBeNull();
+  });
+
   it('omits the prompt-cache line when latestCacheRead is 0 or absent', async () => {
     mockFetch.mockResolvedValue({ available: true, ...payload() });
     const { container } = render(

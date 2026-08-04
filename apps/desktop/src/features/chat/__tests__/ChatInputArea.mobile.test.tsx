@@ -33,6 +33,12 @@ vi.mock('../TokenUsageDisplay', () => ({
   TokenUsageDisplay: () => <div data-testid="token-usage" />,
 }));
 
+vi.mock('../ContextUsagePopover', () => ({
+  ContextUsagePopover: ({ children }: { children?: ReactNode }) => (
+    <div data-testid="context-usage-popover-wrapper">{children}</div>
+  ),
+}));
+
 vi.mock('../../../services/api', () => ({
   unlockSession: vi.fn(),
 }));
@@ -292,6 +298,17 @@ describe('ChatInputArea mobile selectors', () => {
     render(<ChatInputArea {...baseProps} />);
 
     expect(screen.queryByTitle('More tools')).toBeNull();
+  });
+
+  it('mounts the context gauge (ring + popover) in the mobile selector row', () => {
+    serverStoreState.activeServerSupports.mockReturnValue(false);
+
+    render(<ChatInputArea {...baseProps} />);
+
+    const wrapper = screen.getByTestId('context-usage-popover-wrapper');
+    expect(wrapper).toBeTruthy();
+    // The ring lives inside the tap-to-open popover wrapper.
+    expect(wrapper.querySelector('[data-testid="token-usage"]')).toBeTruthy();
   });
 
   it('hides mode selector entirely when capabilities is null', () => {

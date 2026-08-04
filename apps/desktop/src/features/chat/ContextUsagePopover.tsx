@@ -34,14 +34,15 @@ type FetchState =
   | { status: 'error' };
 
 /**
- * Desktop hover-card that reveals the full /context breakdown panel from the
- * compact input-box indicator. Wraps the trigger (`children`), fetches the
- * server snapshot on open, and renders the shared ContextUsageCard in a
- * portaled overlay. Mounted only inside the desktop composer footer, so it is
- * implicitly desktop-only.
+ * Popover that reveals the full /context breakdown panel from the compact
+ * input-box indicator. Wraps the trigger (`children`), fetches the server
+ * snapshot on open, and renders the shared ContextUsageCard in a portaled
+ * overlay. Opens on hover (desktop) and on tap/click (mobile); tapping
+ * outside or pressing Escape closes it.
  */
 export function ContextUsagePopover({ sessionId, children, latestCacheRead }: Props) {
   const anchorRef = useRef<HTMLSpanElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<FetchState | null>(null);
   // Per-session stale-while-revalidate cache so re-hovering doesn't white-flash.
@@ -92,6 +93,45 @@ export function ContextUsagePopover({ sessionId, children, latestCacheRead }: Pr
     closeTimer.current = setTimeout(() => setOpen(false), CLOSE_DELAY);
   }, []);
 
+  // Tap/click toggles immediately (no hover delay) — the touch path on mobile,
+  // and a deliberate open/close affordance on desktop alongside hover.
+  const toggleOnClick = useCallback(() => {
+    clearTimeout(openTimer.current);
+    clearTimeout(closeTimer.current);
+    if (open) {
+      setOpen(false);
+    } else {
+      setOpen(true);
+      void doFetch();
+    }
+  }, [open, doFetch]);
+
+  // While open, dismiss on tap/click outside the anchor and panel, or Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: Event) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (anchorRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      clearTimeout(openTimer.current);
+      clearTimeout(closeTimer.current);
+      setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        clearTimeout(openTimer.current);
+        clearTimeout(closeTimer.current);
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
   useEffect(
     () => () => {
       clearTimeout(openTimer.current);
@@ -106,11 +146,13 @@ export function ContextUsagePopover({ sessionId, children, latestCacheRead }: Pr
       className="inline-flex"
       onMouseEnter={scheduleOpen}
       onMouseLeave={scheduleClose}
+      onClick={toggleOnClick}
     >
       {children}
       {open && (
         <PopoverBody
           anchorRef={anchorRef}
+          panelRef={panelRef}
           state={state}
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
@@ -123,18 +165,20 @@ export function ContextUsagePopover({ sessionId, children, latestCacheRead }: Pr
 
 function PopoverBody({
   anchorRef,
+  panelRef,
   state,
   onMouseEnter,
   onMouseLeave,
   latestCacheRead,
 }: {
   anchorRef: RefObject<HTMLElement | null>;
+  panelRef: RefObject<HTMLDivElement | null>;
   state: FetchState | null;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   latestCacheRead?: number;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = panelRef;
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
   // Anchor above the indicator (it sits at the bottom-right of the composer),
@@ -175,7 +219,8 @@ function PopoverBody({
         visibility: pos ? 'visible' : 'hidden',
       }}
       // Opaque floating surface so chat content behind it can't bleed through.
-      className="z-50 w-80 max-w-[90vw] overflow-hidden rounded-lg border border-border bg-popover shadow-lg"
+      // Width is clamped to the viewport so it fits small phone screens (375px).
+      className="z-50 w-[min(92vw,20rem)] overflow-hidden rounded-lg border border-border bg-popover shadow-lg"
     >
       {state?.status === 'available' && (
         <>

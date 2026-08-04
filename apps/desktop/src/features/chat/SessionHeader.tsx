@@ -21,6 +21,8 @@ import {
   Users,
   PanelRight,
   MessageSquare,
+  Info,
+  X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Session, Project, SystemInfo } from '@zclaudia/shared';
@@ -95,6 +97,7 @@ export function SessionHeader({
   systemInfo = null,
 }: SessionHeaderProps) {
   const [showInfo, setShowInfo] = useState(false);
+  const [showMobileInfo, setShowMobileInfo] = useState(false);
   const activeServerId = useServerStore(s => s.activeServerId);
   const connectionQuality = useServerStore(s =>
     activeServerId ? s.connections[activeServerId]?.connectionQuality : undefined
@@ -200,9 +203,11 @@ export function SessionHeader({
         </span>
       )}
       <div className="hidden min-w-6 flex-1 self-stretch sm:block" data-tauri-drag-region />
-      {/* Session info chip — agent/model + context%, opens a details popover */}
+      {/* Session info chip — agent/model + context%, opens a details popover.
+          md: (not sm:) so the CSS gate matches useIsMobile's 768px breakpoint;
+          below that, session info lives in the mobile "…" menu instead. */}
       {currentSession.type !== 'background' && (
-        <div className="relative hidden shrink-0 sm:block">
+        <div className="relative hidden shrink-0 md:block">
           <button
             onClick={() => setShowInfo(v => !v)}
             className={`inline-flex max-w-[260px] items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] leading-none transition-colors ${showInfo ? 'border-border bg-secondary text-foreground' : 'border-border/70 bg-muted/40 text-muted-foreground hover:text-foreground'}`}
@@ -241,35 +246,13 @@ export function SessionHeader({
                 >
                   {currentSession.name || 'Untitled Session'}
                 </div>
-                <div className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto px-3 pb-3 text-xs">
-                  <InfoRow icon={Bot} label="Agent" value={agent?.name ?? DEFAULT_AGENT_LABEL} />
-                  {modelValue && <InfoRow icon={Cpu} label="Model" value={modelValue} />}
-                  {systemInfo?.claudeCodeVersion && (
-                    <InfoRow icon={Package} label="Version" value={systemInfo.claudeCodeVersion} />
-                  )}
-                  {systemInfo?.permissionMode && (
-                    <InfoRow icon={Shield} label="Perms" value={systemInfo.permissionMode} />
-                  )}
-                  {systemInfo?.apiKeySource && (
-                    <InfoRow icon={Key} label="API key" value={systemInfo.apiKeySource} />
-                  )}
-                  {pathValue && <InfoRow icon={FolderOpen} label="Path" value={pathValue} mono />}
-                  {contextPercent != null && (
-                    <InfoRow icon={PieChart} label="Context" value={`${contextPercent}%`} />
-                  )}
-                  {systemInfo?.tools && systemInfo.tools.length > 0 && (
-                    <InfoChips icon={Wrench} label="Tools" items={systemInfo.tools} />
-                  )}
-                  {systemInfo?.mcpServers && systemInfo.mcpServers.length > 0 && (
-                    <InfoChips icon={Monitor} label="MCP Servers" items={systemInfo.mcpServers} />
-                  )}
-                  {systemInfo?.slashCommands && systemInfo.slashCommands.length > 0 && (
-                    <InfoChips icon={Terminal} label="Commands" items={systemInfo.slashCommands} />
-                  )}
-                  {systemInfo?.agents && systemInfo.agents.length > 0 && (
-                    <InfoChips icon={Users} label="Agents" items={systemInfo.agents} />
-                  )}
-                </div>
+                <SessionInfoRows
+                  agentName={agent?.name ?? DEFAULT_AGENT_LABEL}
+                  modelValue={modelValue}
+                  systemInfo={systemInfo}
+                  pathValue={pathValue}
+                  contextPercent={contextPercent}
+                />
               </div>
             </>
           )}
@@ -367,56 +350,109 @@ export function SessionHeader({
           )}
           {/* Mobile: collapse actions into "..." dropdown */}
           {isMobile && (
-            <div className="relative shrink-0">
-              <button
-                onClick={onToggleSessionMenu}
-                className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                title="Session actions"
-                aria-label="Session actions"
-              >
-                <MoreHorizontal size={16} strokeWidth={1.75} />
-              </button>
-              {showSessionMenu && (
+            <>
+              <div className="relative shrink-0">
+                <button
+                  onClick={onToggleSessionMenu}
+                  className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  title="Session actions"
+                  aria-label="Session actions"
+                >
+                  <MoreHorizontal size={16} strokeWidth={1.75} />
+                </button>
+                {showSessionMenu && (
+                  <>
+                    <div className="fixed inset-0 z-[70]" onClick={onToggleSessionMenu} />
+                    <div className="fixed right-3 top-[calc(env(safe-area-inset-top,0px)+42px)] z-[80] min-w-[180px] overflow-hidden rounded-lg border border-border bg-popover py-1 shadow-md">
+                      <button
+                        onClick={() => {
+                          setShowMobileInfo(true);
+                          onToggleSessionMenu();
+                        }}
+                        className="w-full text-left px-3 py-2 min-h-[44px] text-sm flex items-center gap-2 text-foreground hover:bg-muted"
+                      >
+                        <Info size={14} />
+                        Session info
+                      </button>
+                      <div className="my-1 h-px bg-border" />
+                      <button
+                        onClick={() => {
+                          onResetProviderSession();
+                          onToggleSessionMenu();
+                        }}
+                        disabled={isLoading}
+                        className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted disabled:opacity-50"
+                      >
+                        <RotateCcw size={14} />
+                        Reset Session
+                      </button>
+                      <button
+                        onClick={() => {
+                          onExport();
+                          onToggleSessionMenu();
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted"
+                      >
+                        <Download size={14} />
+                        Export Markdown
+                      </button>
+                      <button
+                        onClick={() => {
+                          onArchive();
+                          onToggleSessionMenu();
+                        }}
+                        disabled={archiveDisabled}
+                        title={archiveDisabled ? 'Stop the run before archiving' : undefined}
+                        className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-destructive hover:bg-destructive/8 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                      >
+                        <Archive size={14} />
+                        Archive
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* Mobile session-info overlay — same content as the desktop info
+                  popover, sized for phones and dismissed by backdrop tap or the
+                  close button. */}
+              {showMobileInfo && (
                 <>
-                  <div className="fixed inset-0 z-[70]" onClick={onToggleSessionMenu} />
-                  <div className="fixed right-3 top-[calc(env(safe-area-inset-top,0px)+42px)] z-[80] min-w-[180px] overflow-hidden rounded-lg border border-border bg-popover py-1 shadow-md">
-                    <button
-                      onClick={() => {
-                        onResetProviderSession();
-                        onToggleSessionMenu();
-                      }}
-                      disabled={isLoading}
-                      className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted disabled:opacity-50"
-                    >
-                      <RotateCcw size={14} />
-                      Reset Session
-                    </button>
-                    <button
-                      onClick={() => {
-                        onExport();
-                        onToggleSessionMenu();
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted"
-                    >
-                      <Download size={14} />
-                      Export Markdown
-                    </button>
-                    <button
-                      onClick={() => {
-                        onArchive();
-                        onToggleSessionMenu();
-                      }}
-                      disabled={archiveDisabled}
-                      title={archiveDisabled ? 'Stop the run before archiving' : undefined}
-                      className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-destructive hover:bg-destructive/8 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                    >
-                      <Archive size={14} />
-                      Archive
-                    </button>
+                  <div
+                    className="fixed inset-0 z-[90] bg-black/40"
+                    onClick={() => setShowMobileInfo(false)}
+                  />
+                  <div
+                    role="dialog"
+                    aria-label="Session info"
+                    data-testid="session-info-overlay"
+                    className="fixed inset-x-3 top-[calc(env(safe-area-inset-top,0px)+56px)] z-[95] overflow-hidden rounded-xl border border-border/80 bg-card shadow-xl"
+                  >
+                    <div className="flex min-h-[44px] items-center gap-2 pl-3 pr-1">
+                      <div
+                        className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground"
+                        title={currentSession.name || 'Untitled Session'}
+                      >
+                        {currentSession.name || 'Untitled Session'}
+                      </div>
+                      <button
+                        onClick={() => setShowMobileInfo(false)}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        aria-label="Close session info"
+                      >
+                        <X size={16} strokeWidth={1.75} />
+                      </button>
+                    </div>
+                    <SessionInfoRows
+                      agentName={agent?.name ?? DEFAULT_AGENT_LABEL}
+                      modelValue={modelValue}
+                      systemInfo={systemInfo}
+                      pathValue={pathValue}
+                      contextPercent={contextPercent}
+                    />
                   </div>
                 </>
               )}
-            </div>
+            </>
           )}
         </>
       )}
@@ -434,6 +470,56 @@ export function SessionHeader({
             <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
           )}
         </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Shared body of the session-info surfaces: the desktop header popover and the
+ * mobile "Session info" overlay render the same rows from here.
+ */
+function SessionInfoRows({
+  agentName,
+  modelValue,
+  systemInfo,
+  pathValue,
+  contextPercent,
+}: {
+  agentName: string;
+  modelValue: string | null;
+  systemInfo: SystemInfo | null;
+  pathValue: string | null;
+  contextPercent: number | null;
+}) {
+  return (
+    <div className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto px-3 pb-3 text-xs">
+      <InfoRow icon={Bot} label="Agent" value={agentName} />
+      {modelValue && <InfoRow icon={Cpu} label="Model" value={modelValue} />}
+      {systemInfo?.claudeCodeVersion && (
+        <InfoRow icon={Package} label="Version" value={systemInfo.claudeCodeVersion} />
+      )}
+      {systemInfo?.permissionMode && (
+        <InfoRow icon={Shield} label="Perms" value={systemInfo.permissionMode} />
+      )}
+      {systemInfo?.apiKeySource && (
+        <InfoRow icon={Key} label="API key" value={systemInfo.apiKeySource} />
+      )}
+      {pathValue && <InfoRow icon={FolderOpen} label="Path" value={pathValue} mono />}
+      {contextPercent != null && (
+        <InfoRow icon={PieChart} label="Context" value={`${contextPercent}%`} />
+      )}
+      {systemInfo?.tools && systemInfo.tools.length > 0 && (
+        <InfoChips icon={Wrench} label="Tools" items={systemInfo.tools} />
+      )}
+      {systemInfo?.mcpServers && systemInfo.mcpServers.length > 0 && (
+        <InfoChips icon={Monitor} label="MCP Servers" items={systemInfo.mcpServers} />
+      )}
+      {systemInfo?.slashCommands && systemInfo.slashCommands.length > 0 && (
+        <InfoChips icon={Terminal} label="Commands" items={systemInfo.slashCommands} />
+      )}
+      {systemInfo?.agents && systemInfo.agents.length > 0 && (
+        <InfoChips icon={Users} label="Agents" items={systemInfo.agents} />
       )}
     </div>
   );

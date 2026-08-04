@@ -404,8 +404,30 @@ export function ChatInputArea({
             onSteer={onSteerQueueItem}
           />
         )}
-        {/* Mobile-only toolbar: three selectors, JS-gated to mobile only */}
-        {isMobile && <div className="mb-1.5 flex items-center gap-1">{selectorTrio}</div>}
+        {/* Mobile-only toolbar: three selectors + context gauge, JS-gated to mobile only */}
+        {isMobile && (
+          <div className="mb-1.5 flex items-center gap-1">
+            {selectorTrio}
+            <div className="ml-auto shrink-0">
+              <ContextUsagePopover
+                sessionId={sessionId}
+                latestCacheRead={currentUsage.latestCacheReadTokens}
+              >
+                {/* Negative margins keep the row compact while the padded span
+                    provides a ~44px effective touch target for the tap-to-open
+                    popover. */}
+                <span className="-my-2.5 flex min-h-[44px] items-center px-2">
+                  <TokenUsageDisplay
+                    latestInputTokens={currentUsage.latestInputTokens}
+                    inputTokens={currentUsage.inputTokens}
+                    contextUsedTokens={currentUsage.contextUsedTokens}
+                    contextWindow={currentUsage.contextWindow}
+                  />
+                </span>
+              </ContextUsagePopover>
+            </div>
+          </div>
+        )}
         <MessageInput
           key={sessionId}
           sessionId={sessionId}

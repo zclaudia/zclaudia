@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { useChatMessageStore } from '../../../stores/chatMessageStore';
 import { useServerStore } from '../../../stores/serverStore';
 import { useRightSidebarStore } from '../../../stores/rightSidebarStore';
@@ -195,6 +195,45 @@ describe('SessionHeader', () => {
     render(<SessionHeader {...baseProps} />);
     expect(screen.getByText(/Fix my bug/)).toBeTruthy();
     expect(screen.queryByText(/Hello!/)).toBeNull(); // The assistant greeting should not be in chip
+  });
+
+  describe('info chip breakpoint gate', () => {
+    it('hides the info chip below md so it matches the useIsMobile (768px) breakpoint', () => {
+      render(<SessionHeader {...baseProps} />);
+      const chipContainer = screen.getByTitle('Session info').parentElement as HTMLElement;
+      expect(chipContainer.className).toContain('md:block');
+      expect(chipContainer.className).not.toContain('sm:block');
+    });
+  });
+
+  describe('mobile session info', () => {
+    it('offers a Session info item in the mobile "…" menu', () => {
+      render(<SessionHeader {...baseProps} isMobile showSessionMenu />);
+      expect(screen.getByText('Session info')).toBeTruthy();
+    });
+
+    it('opens the info overlay (with context %) from the mobile menu and closes it again', () => {
+      const onToggleSessionMenu = vi.fn();
+      render(
+        <SessionHeader
+          {...baseProps}
+          isMobile
+          showSessionMenu
+          contextPercent={42}
+          onToggleSessionMenu={onToggleSessionMenu}
+        />
+      );
+
+      fireEvent.click(screen.getByText('Session info'));
+      // The menu is asked to close and the overlay opens.
+      expect(onToggleSessionMenu).toHaveBeenCalled();
+      const overlay = screen.getByTestId('session-info-overlay');
+      expect(overlay.textContent).toContain('Agent');
+      expect(overlay.textContent).toContain('42%');
+
+      fireEvent.click(screen.getByLabelText('Close session info'));
+      expect(screen.queryByTestId('session-info-overlay')).toBeNull();
+    });
   });
 
   describe('context usage in the pill', () => {
