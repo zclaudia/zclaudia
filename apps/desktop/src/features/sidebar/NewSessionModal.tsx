@@ -67,6 +67,7 @@ export function NewSessionModal({
       title="New session"
       footer={footer}
       size="md"
+      mobileFullscreen
       isMobile={isMobile}
     >
       <div className="flex flex-col gap-4 px-4 py-4">

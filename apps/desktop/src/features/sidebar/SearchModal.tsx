@@ -10,6 +10,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { SearchFilters } from '../../components/SearchFilters';
 import { timeAgo } from '../../utils/timeAgo';
 import type { SearchModalProps } from './types';
@@ -33,6 +34,7 @@ function resultIcon(resultType?: string) {
  * arrow keys move the highlight, Enter opens, Esc / backdrop / × close.
  */
 export function SearchModal({ open, onClose, search, sessions, onResultSelect }: SearchModalProps) {
+  const isMobile = useIsMobile();
   const {
     searchQuery,
     setSearchQuery,
@@ -128,7 +130,14 @@ export function SearchModal({ open, onClose, search, sessions, onResultSelect }:
   if (!open) return null;
 
   return (
-    <Modal open={open} onClose={onClose} ariaLabel="Search" size="2xl">
+    <Modal
+      open={open}
+      onClose={onClose}
+      ariaLabel="Search"
+      size="2xl"
+      mobileFullscreen
+      isMobile={isMobile}
+    >
       <div onKeyDown={handleKeyDown}>
         {/* Header / input row */}
         <div className="flex items-center gap-2.5 px-4 py-3">

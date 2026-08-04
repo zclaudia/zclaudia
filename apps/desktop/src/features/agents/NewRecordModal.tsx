@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 export interface NewRecordModalProps {
   open: boolean;
@@ -28,6 +29,7 @@ export function NewRecordModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (open) {
@@ -71,6 +73,8 @@ export function NewRecordModal({
       footer={footer}
       size="md"
       bodyScrollable={false}
+      mobileFullscreen
+      isMobile={isMobile}
     >
       <div className="flex flex-col gap-4 px-4 py-4">
         <label className="flex flex-col gap-1.5">

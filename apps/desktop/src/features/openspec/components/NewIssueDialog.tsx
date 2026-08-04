@@ -14,6 +14,7 @@ import type { LocalIssueType } from '@zclaudia/shared/features/local-issue';
 import { useOpenSpecStore } from '../store.js';
 import * as api from '../api.js';
 import { Modal } from '../../../components/ui/Modal';
+import { useIsMobile } from '../../../hooks/useMediaQuery';
 
 interface Props {
   projectId: string;
@@ -43,6 +44,7 @@ export function NewIssueDialog({ projectId, parentEpicId, onClose }: Props): Rea
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   const onSubmit = async (): Promise<void> => {
     if (!title.trim()) return;
@@ -78,6 +80,8 @@ export function NewIssueDialog({ projectId, parentEpicId, onClose }: Props): Rea
       ariaLabel="New Issue"
       title="New Issue"
       placement="center"
+      mobileFullscreen
+      isMobile={isMobile}
       footer={
         <div className="flex items-center justify-end gap-2">
           <button

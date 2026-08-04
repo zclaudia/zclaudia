@@ -74,4 +74,28 @@ describe('Modal', () => {
 
     expect(screen.getByTestId('modal-body')).not.toHaveClass('overflow-y-auto');
   });
+
+  it('expands to a full-screen sheet with safe-area padding on mobile', () => {
+    render(
+      <Modal open onClose={vi.fn()} ariaLabel="Test" mobileFullscreen isMobile>
+        <p>Body</p>
+      </Modal>
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Test' });
+    expect(dialog).toHaveClass('inset-0', 'rounded-none', 'safe-top-pad', 'safe-bottom-pad');
+    expect(dialog).not.toHaveClass('max-w-md');
+  });
+
+  it('keeps the floating card when mobileFullscreen is set but the viewport is not mobile', () => {
+    render(
+      <Modal open onClose={vi.fn()} ariaLabel="Test" mobileFullscreen>
+        <p>Body</p>
+      </Modal>
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Test' });
+    expect(dialog).toHaveClass('max-w-md', 'rounded-2xl');
+    expect(dialog).not.toHaveClass('safe-top-pad');
+  });
 });

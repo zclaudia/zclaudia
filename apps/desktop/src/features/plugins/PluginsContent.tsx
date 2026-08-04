@@ -16,6 +16,7 @@ import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 import { usePluginStore, selectPluginPanels } from '../../stores/pluginStore';
 import { fetchAndSyncPlugins, setPluginActive } from '../../services/api';
 import { Modal } from '../../components/ui/Modal';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { WebSearchSettings } from '../settings/WebSearchSettings';
 import { PluginDirsManager } from './PluginDirsManager';
 import { PluginsBrowseView } from './PluginsBrowseView';
@@ -49,6 +50,7 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
 
 export function PluginsContent() {
   const view = useTopLevelViewStore(s => s.view);
+  const isMobile = useIsMobile();
 
   const plugins = usePluginStore(s => s.plugins);
   const setError = usePluginStore(s => s.setError);
@@ -165,6 +167,8 @@ export function PluginsContent() {
         ariaLabel="Plugin directories"
         title="Plugin directories"
         size="lg"
+        mobileFullscreen
+        isMobile={isMobile}
       >
         <div className="p-4">
           <PluginDirsManager embedded />

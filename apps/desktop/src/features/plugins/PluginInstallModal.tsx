@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { CheckCircle2, FileArchive, Loader2, PackageCheck, Upload } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import {
   inspectPluginPackage,
   installPluginPackage,
@@ -53,6 +54,7 @@ export function PluginInstallModal({
   onViewPlugin: (pluginId: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
   const [phase, setPhase] = useState<InstallPhase>('select');
   const [preview, setPreview] = useState<PluginPackagePreview | null>(null);
   const [installedId, setInstalledId] = useState<string | null>(null);
@@ -178,6 +180,8 @@ export function PluginInstallModal({
       title="Install plugin"
       size="lg"
       footer={footer}
+      mobileFullscreen
+      isMobile={isMobile}
     >
       <div className="space-y-4 p-4">
         <PhaseSteps phase={phase} />

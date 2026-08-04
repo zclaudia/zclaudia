@@ -74,6 +74,7 @@ export function NewProjectModal({
         title="New project"
         footer={footer}
         size="md"
+        mobileFullscreen
         isMobile={isMobile}
       >
         <div className="flex flex-col gap-4 px-4 py-4">

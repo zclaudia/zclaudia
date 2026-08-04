@@ -4,11 +4,13 @@
  * Copy-adapted from the settings Providers tab's modal: gains a `backendId`
  * prop and talks to the ForBackend API variants so the OAuth flow runs against
  * the backend that owns the profile instead of the active server. Polling
- * constants, Tauri browser-open behavior and portal rendering are unchanged.
+ * constants and Tauri browser-open behavior are unchanged; the shell is the
+ * shared Modal (safe-area, Android back, full-screen sheet on mobile).
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { Modal } from '../../components/ui/Modal';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import {
   startCodexOAuthForBackend,
   pollCodexOAuthStatusForBackend,
@@ -39,6 +41,7 @@ export function CodexOAuthLoginModal({
   const [session, setSession] = useState<CodexOAuthStartResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
+  const isMobile = useIsMobile();
   // Held in a ref (mirroring InlinePermissionRequest's onDecisionRef) so an
   // unstable parent callback doesn't restart the polling effect — a restart
   // would reset `count` and defeat the MAX_POLLS timeout.
@@ -131,11 +134,30 @@ export function CodexOAuthLoginModal({
     onClose();
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/80 backdrop-blur">
-      <div className="w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-lg">
-        <h2 className="mb-3 text-lg font-medium">Sign in with ChatGPT</h2>
-
+  return (
+    <Modal
+      open
+      onClose={() => void handleCancel()}
+      ariaLabel="Sign in with ChatGPT"
+      title="Sign in with ChatGPT"
+      placement="center"
+      size="md"
+      zClassName="z-[80]"
+      mobileFullscreen
+      isMobile={isMobile}
+      footer={
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => void handleCancel()}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-secondary"
+          >
+            Cancel
+          </button>
+        </div>
+      }
+    >
+      <div className="px-4 py-4">
         {!session && !error && (
           <div className="text-sm text-muted-foreground">Starting the OAuth flow…</div>
         )}
@@ -223,18 +245,7 @@ export function CodexOAuthLoginModal({
             {error}
           </div>
         )}
-
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-secondary"
-          >
-            Cancel
-          </button>
-        </div>
       </div>
-    </div>,
-    document.body
+    </Modal>
   );
 }

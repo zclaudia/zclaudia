@@ -3,10 +3,13 @@
  *
  * Moved from the old settings MCP Servers tab's component. The caller starts the
  * OAuth session (startMcpOAuthForBackend) and passes it in; this modal polls
- * for completion and cancels the session on close.
+ * for completion and cancels the session on close. The shell is the shared
+ * Modal (safe-area, Android back, full-screen sheet on mobile).
  */
 
 import { useState, useEffect } from 'react';
+import { Modal } from '../../components/ui/Modal';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { cancelMcpOAuthForBackend, pollMcpOAuthStatusForBackend } from '../../services/api';
 import type { McpOAuthStartResult } from '../../services/api';
 
@@ -26,6 +29,7 @@ export function McpOAuthLoginModal({
   onSuccess,
 }: McpOAuthLoginModalProps) {
   const [error, setError] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     let stopped = false;
@@ -68,10 +72,30 @@ export function McpOAuthLoginModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur">
-      <div className="w-full max-w-md rounded-lg border border-border bg-background p-5 shadow-lg">
-        <h2 className="text-lg font-medium text-foreground">MCP OAuth Login</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+    <Modal
+      open
+      onClose={() => void handleClose()}
+      ariaLabel="MCP OAuth Login"
+      title="MCP OAuth Login"
+      placement="center"
+      size="md"
+      zClassName="z-50"
+      mobileFullscreen
+      isMobile={isMobile}
+      footer={
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => void handleClose()}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-secondary"
+          >
+            Close
+          </button>
+        </div>
+      }
+    >
+      <div className="px-4 py-4">
+        <p className="text-sm text-muted-foreground">
           Authenticate {serverName} and return here when the browser flow is complete.
         </p>
         {session.method === 'browser' && (
@@ -102,16 +126,7 @@ export function McpOAuthLoginModal({
             {error}
           </div>
         )}
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={handleClose}
-            className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-secondary"
-          >
-            Close
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

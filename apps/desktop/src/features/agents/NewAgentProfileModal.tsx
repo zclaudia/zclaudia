@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentProfileConfig, LlmProfileConfig } from '@zclaudia/shared';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { Select } from '../../components/ui/Select';
 import { useRuntimeDescriptorStore } from '../../stores/runtimeDescriptorStore';
 import * as api from '../../services/api';
@@ -29,6 +30,7 @@ export function NewAgentProfileModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   const selectedRuntime = runtimeType || enabled[0]?.runtime || 'zclaudia';
   const descriptor = enabled.find(d => d.runtime === selectedRuntime);
@@ -103,6 +105,8 @@ export function NewAgentProfileModal({
       size="md"
       bodyScrollable={false}
       maxHeightClassName="max-h-[calc(100vh-2rem)]"
+      mobileFullscreen
+      isMobile={isMobile}
     >
       <div className="flex flex-col gap-4 px-4 py-4">
         <label className="flex flex-col gap-1.5">

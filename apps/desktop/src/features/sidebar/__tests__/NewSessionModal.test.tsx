@@ -92,4 +92,17 @@ describe('NewSessionModal', () => {
     );
     expect(screen.getByText('/repo/gateway')).toBeTruthy();
   });
+
+  it('renders as a full-screen sheet on mobile', () => {
+    setup({ isMobile: true });
+    const dialog = screen.getByRole('dialog', { name: 'New session' });
+    expect(dialog).toHaveClass('inset-0', 'rounded-none', 'safe-top-pad', 'safe-bottom-pad');
+  });
+
+  it('keeps the floating card on desktop', () => {
+    setup();
+    const dialog = screen.getByRole('dialog', { name: 'New session' });
+    expect(dialog).toHaveClass('max-w-md', 'rounded-2xl');
+    expect(dialog).not.toHaveClass('safe-top-pad');
+  });
 });

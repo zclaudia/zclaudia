@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FolderCog, PackagePlus, RotateCcw, Trash2 } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import type { InstalledPlugin } from '../../stores/pluginStore';
 import { confirm } from '../../stores/confirmDialogStore';
 import { rollbackPluginPackage, uninstallPluginPackage } from '../../services/api/plugin-packages';
@@ -30,6 +31,7 @@ export function PluginDetailModal({
   const [rollbackVersion, setRollbackVersion] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   if (!plugin) return null;
 
@@ -94,6 +96,8 @@ export function PluginDetailModal({
       ariaLabel={`Plugin details: ${plugin.manifest.name}`}
       title={plugin.manifest.name}
       size="lg"
+      mobileFullscreen
+      isMobile={isMobile}
     >
       <div className="space-y-5 p-4">
         <div>
