@@ -30,6 +30,7 @@ import { useServerStore } from '../../stores/serverStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
 import { useAgentForSession } from '../../hooks/useAgentForSession';
+import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { resolveTopicChip } from './sessionTopicChip';
 
@@ -98,6 +99,9 @@ export function SessionHeader({
 }: SessionHeaderProps) {
   const [showInfo, setShowInfo] = useState(false);
   const [showMobileInfo, setShowMobileInfo] = useState(false);
+  // Hardware back closes the session-info overlay before any lower-priority
+  // surface (sidebar drawer 10, agent overlay 20 — see useAndroidBack's guide).
+  useAndroidBack(() => setShowMobileInfo(false), isMobile && showMobileInfo, 30);
   const activeServerId = useServerStore(s => s.activeServerId);
   const connectionQuality = useServerStore(s =>
     activeServerId ? s.connections[activeServerId]?.connectionQuality : undefined

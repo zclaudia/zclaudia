@@ -134,6 +134,30 @@ describe('ContextUsagePopover', () => {
     expect(screen.queryByTestId('context-usage-popover')).toBeNull();
   });
 
+  it('stays open when clicking inside the panel (portal clicks bubble to the anchor)', async () => {
+    mockFetch.mockResolvedValue({ available: true, ...payload() });
+    const { container } = renderPopover();
+    fireEvent.click(container.firstChild as HTMLElement);
+    const card = await screen.findByTestId('context-usage-card');
+
+    // The panel is portaled but remains a React-tree child of the anchor, so
+    // this click reaches the anchor's onClick — it must not toggle closed.
+    fireEvent.click(card);
+    expect(screen.queryByTestId('context-usage-popover')).not.toBeNull();
+  });
+
+  it('closes on anchor click after opening via hover (hover/click interleaving)', async () => {
+    mockFetch.mockResolvedValue({ available: true, ...payload() });
+    const { container } = renderPopover();
+    const anchor = container.firstChild as HTMLElement;
+
+    fireEvent.mouseEnter(anchor);
+    await screen.findByTestId('context-usage-card');
+
+    fireEvent.click(anchor);
+    expect(screen.queryByTestId('context-usage-popover')).toBeNull();
+  });
+
   it('closes on tap outside the anchor and panel', async () => {
     mockFetch.mockResolvedValue({ available: true, ...payload() });
     const { container } = renderPopover();

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useChatMessageStore } from '../../../stores/chatMessageStore';
 import { useServerStore } from '../../../stores/serverStore';
 import { useRightSidebarStore } from '../../../stores/rightSidebarStore';
@@ -232,6 +232,17 @@ describe('SessionHeader', () => {
       expect(overlay.textContent).toContain('42%');
 
       fireEvent.click(screen.getByLabelText('Close session info'));
+      expect(screen.queryByTestId('session-info-overlay')).toBeNull();
+    });
+
+    it('closes the info overlay on the Android back gesture', () => {
+      render(<SessionHeader {...baseProps} isMobile showSessionMenu />);
+      fireEvent.click(screen.getByText('Session info'));
+      expect(screen.getByTestId('session-info-overlay')).toBeTruthy();
+
+      act(() => {
+        window.dispatchEvent(new Event('android-back'));
+      });
       expect(screen.queryByTestId('session-info-overlay')).toBeNull();
     });
   });

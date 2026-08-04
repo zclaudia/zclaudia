@@ -4,6 +4,7 @@ import {
   useEffect,
   useLayoutEffect,
   useCallback,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   type RefObject,
 } from 'react';
@@ -95,16 +96,23 @@ export function ContextUsagePopover({ sessionId, children, latestCacheRead }: Pr
 
   // Tap/click toggles immediately (no hover delay) — the touch path on mobile,
   // and a deliberate open/close affordance on desktop alongside hover.
-  const toggleOnClick = useCallback(() => {
-    clearTimeout(openTimer.current);
-    clearTimeout(closeTimer.current);
-    if (open) {
-      setOpen(false);
-    } else {
-      setOpen(true);
-      void doFetch();
-    }
-  }, [open, doFetch]);
+  const toggleOnClick = useCallback(
+    (e: ReactMouseEvent<HTMLSpanElement>) => {
+      // The portaled panel is still a React-tree child of the anchor, so
+      // synthetic clicks inside it bubble here. Interacting with the panel
+      // (tapping to read, finishing a text selection) must not dismiss it.
+      if (panelRef.current?.contains(e.target as Node)) return;
+      clearTimeout(openTimer.current);
+      clearTimeout(closeTimer.current);
+      if (open) {
+        setOpen(false);
+      } else {
+        setOpen(true);
+        void doFetch();
+      }
+    },
+    [open, doFetch]
+  );
 
   // While open, dismiss on tap/click outside the anchor and panel, or Escape.
   useEffect(() => {
