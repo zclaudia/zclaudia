@@ -11,6 +11,7 @@ import { ToastContainer } from './components/ToastContainer';
 import { UpdateBanner } from './components/UpdateBanner';
 import { WindowRouter } from './app/WindowRouter';
 import { AppHeader } from './app/AppHeader';
+import { MobileModeHeader } from './app/MobileModeHeader';
 import { MobileOverlays } from './app/MobileOverlays';
 import { useConnection } from './contexts/ConnectionContext';
 import { useDataLoader } from './hooks/useDataLoader';
@@ -160,6 +161,18 @@ function AppContent() {
     ? projects.find(p => p.id === dashboardProjectId) || null
     : null;
   const isAppTopLevelView = topLevelView.kind === 'app';
+  // Shell modes replace the app content but keep the sidebar shell. On mobile
+  // they get a dedicated header (back to app + drawer) and an Android-back
+  // escape hatch; the title doubles as the mode discriminator.
+  const shellModeTitle =
+    topLevelView.kind === 'automations'
+      ? 'Automations'
+      : topLevelView.kind === 'agents'
+        ? 'Agents'
+        : topLevelView.kind === 'plugins'
+          ? 'Extensions'
+          : null;
+  const isShellTopLevelView = shellModeTitle !== null;
   const mobileToastContainer = isMobile ? (
     <ToastContainer className={MOBILE_TOAST_CONTAINER_CLASS} />
   ) : null;
@@ -317,14 +330,26 @@ function AppContent() {
   );
   useAndroidBack(
     () => setAgentExpanded(false),
-    isAppTopLevelView && isMobile && isAgentExpanded,
+    (isAppTopLevelView || isShellTopLevelView) && isMobile && isAgentExpanded,
     20
   );
-  useAndroidBack(() => setSidebarOpen(false), isAppTopLevelView && isMobile && sidebarOpen, 10);
+  useAndroidBack(
+    () => setSidebarOpen(false),
+    (isAppTopLevelView || isShellTopLevelView) && isMobile && sidebarOpen,
+    10
+  );
   useAndroidBack(
     () => setSidebarOpen(true),
     isAppTopLevelView && isMobile && !sidebarOpen && !isAgentExpanded && !fileViewerFullscreen,
     5
+  );
+  // Shell modes (automations/agents/plugins): back returns to the app mode —
+  // same "close overlay" tier as SettingsPanel's own registration. The drawer
+  // and the expanded agent overlay close first (registrations above).
+  useAndroidBack(
+    closeTopLevelView,
+    isShellTopLevelView && isMobile && !sidebarOpen && !isAgentExpanded,
+    20
   );
 
   // --- Mobile swipe gestures ---
@@ -437,7 +462,7 @@ function AppContent() {
           inline in the sidebar header (cleared via left padding) instead. */}
       {isMobile && (
         <div
-          className={`safe-top-spacer bg-card flex-shrink-0 ${selectedSessionId && !isAgentExpanded ? 'hidden' : ''}`}
+          className={`safe-top-spacer bg-card flex-shrink-0 ${selectedSessionId && !isAgentExpanded && !isShellTopLevelView ? 'hidden' : ''}`}
           data-tauri-drag-region
         />
       )}
@@ -530,6 +555,16 @@ function AppContent() {
                   : 'h-2'
               }`}
               data-tauri-drag-region
+            />
+          )}
+          {/* Mobile shell modes: AppHeader hides itself on mobile and the drawer
+              is closed by default, so this bar is the only visible way back to
+              the app (and into the drawer's mode tabs). */}
+          {isMobile && shellModeTitle && !isAgentExpanded && (
+            <MobileModeHeader
+              title={shellModeTitle}
+              onBack={closeTopLevelView}
+              onOpenSidebar={() => setSidebarOpen(true)}
             />
           )}
           <div className="flex-1 overflow-hidden relative">

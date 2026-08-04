@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, fireEvent, waitFor } from '@testing-library/react';
+import { render, fireEvent, waitFor, act } from '@testing-library/react';
 
 const { mockUseIsMobile, mockUseAndroidBack } = vi.hoisted(() => ({
   mockUseIsMobile: vi.fn(() => false),
@@ -11,11 +11,27 @@ vi.mock('../WindowRouter', () => ({
 }));
 
 vi.mock('../../features/sidebar/Sidebar', () => ({
-  Sidebar: ({ onOpenSettings }: { onOpenSettings?: (tab?: 'permissions') => void }) => (
-    <aside data-testid="app-sidebar">
+  Sidebar: ({
+    onOpenSettings,
+    isOpen,
+  }: {
+    onOpenSettings?: (tab?: 'permissions') => void;
+    isOpen?: boolean;
+  }) => (
+    <aside data-testid="app-sidebar" data-open={isOpen ? 'true' : 'false'}>
       <button onClick={() => onOpenSettings?.('permissions')}>Open Settings</button>
     </aside>
   ),
+}));
+
+vi.mock('../../features/automation/AutomationContent', () => ({
+  AutomationContent: () => <div data-testid="automations-view">Automations content</div>,
+}));
+vi.mock('../../features/agents/AgentsContent', () => ({
+  AgentsContent: () => <div data-testid="agents-view">Agents content</div>,
+}));
+vi.mock('../../features/plugins/PluginsContent', () => ({
+  PluginsContent: () => <div data-testid="plugins-view">Plugins content</div>,
 }));
 
 vi.mock('../../features/settings/SettingsPanel', () => ({
@@ -214,5 +230,91 @@ describe('App top-level view routing', () => {
     expect(toastContainer.className).toBe(
       'fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2'
     );
+  });
+});
+
+describe('App shell modes on mobile', () => {
+  beforeEach(() => {
+    resetStores();
+    vi.clearAllMocks();
+    mockUseIsMobile.mockReturnValue(true);
+  });
+
+  it('renders the mobile mode header and its back button returns to the app', async () => {
+    const { findByTestId, getByText, getByRole, queryByText } = render(<App />);
+
+    act(() => {
+      useTopLevelViewStore.getState().openAutomations();
+    });
+    await findByTestId('automations-view');
+    expect(getByText('Automations')).toBeTruthy();
+
+    fireEvent.click(getByRole('button', { name: 'Back to app' }));
+
+    await waitFor(() => {
+      expect(useTopLevelViewStore.getState().view.kind).toBe('app');
+    });
+    expect(queryByText('Automations')).toBeNull();
+  });
+
+  it('mode header hamburger opens the sidebar drawer', async () => {
+    const { findByTestId, getByRole, getByTestId } = render(<App />);
+
+    act(() => {
+      useTopLevelViewStore.getState().openPlugins();
+    });
+    await findByTestId('plugins-view');
+    expect(getByTestId('app-sidebar').getAttribute('data-open')).toBe('false');
+
+    fireEvent.click(getByRole('button', { name: 'Open menu' }));
+
+    expect(getByTestId('app-sidebar').getAttribute('data-open')).toBe('true');
+  });
+
+  it('registers an Android back handler that escapes shell modes', async () => {
+    const { findByTestId } = render(<App />);
+
+    act(() => {
+      useTopLevelViewStore.getState().openAgents();
+    });
+    await findByTestId('agents-view');
+
+    // Priority-20 registrations: agent-overlay collapse (disabled — agent not
+    // expanded) and the shell-mode escape. Only the escape is enabled here.
+    const escapeCalls = mockUseAndroidBack.mock.calls.filter(
+      ([, enabled, priority]) => priority === 20 && enabled === true
+    );
+    expect(escapeCalls.length).toBeGreaterThan(0);
+
+    act(() => {
+      escapeCalls.at(-1)![0]();
+    });
+    expect(useTopLevelViewStore.getState().view.kind).toBe('app');
+  });
+
+  it('Android back closes an open drawer before escaping the mode', async () => {
+    const { findByTestId, getByRole, getByTestId } = render(<App />);
+
+    act(() => {
+      useTopLevelViewStore.getState().openAgents();
+    });
+    await findByTestId('agents-view');
+    fireEvent.click(getByRole('button', { name: 'Open menu' }));
+
+    // Latest render: drawer-close (priority 10) is enabled, mode escape is not.
+    const drawerCloseCall = mockUseAndroidBack.mock.calls
+      .filter(([, , priority]) => priority === 10)
+      .at(-1)!;
+    expect(drawerCloseCall[1]).toBe(true);
+    const escapeCall = mockUseAndroidBack.mock.calls
+      .filter(([, , priority]) => priority === 20)
+      .at(-1)!;
+    expect(escapeCall[1]).toBe(false);
+
+    act(() => {
+      drawerCloseCall[0]();
+    });
+    expect(getByTestId('app-sidebar').getAttribute('data-open')).toBe('false');
+    expect(useTopLevelViewStore.getState().view.kind).toBe('agents');
   });
 });

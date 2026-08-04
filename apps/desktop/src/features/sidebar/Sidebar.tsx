@@ -773,6 +773,8 @@ export function Sidebar({
             onResultSelect={actions.handleSearchResultSelect}
           />
 
+          {/* Every navigation callback closes the 256px drawer after it fires
+              (same pattern as onHome) so the destination is actually visible. */}
           <SidebarNav
             onHome={() => {
               onHome();
@@ -780,12 +782,34 @@ export function Sidebar({
             }}
             isHomeActive={isHomeActive}
             isMobile
+            onOpenAutomations={
+              onOpenAutomations
+                ? () => {
+                    onOpenAutomations();
+                    onClose?.();
+                  }
+                : undefined
+            }
             automationMode={
               automationMode
                 ? {
                     tab: automationMode.tab,
-                    onSelectTab: automationMode.onSelectTab,
-                    onBack: automationMode.onBack,
+                    onSelectTab: tab => {
+                      automationMode.onSelectTab(tab);
+                      onClose?.();
+                    },
+                    onBack: () => {
+                      automationMode.onBack();
+                      onClose?.();
+                    },
+                  }
+                : undefined
+            }
+            onOpenAgents={
+              onOpenAgents
+                ? () => {
+                    onOpenAgents();
+                    onClose?.();
                   }
                 : undefined
             }
@@ -793,12 +817,40 @@ export function Sidebar({
               agentsMode
                 ? {
                     tab: agentsMode.tab,
-                    onSelectTab: agentsMode.onSelectTab,
-                    onBack: agentsMode.onBack,
+                    onSelectTab: tab => {
+                      agentsMode.onSelectTab(tab);
+                      onClose?.();
+                    },
+                    onBack: () => {
+                      agentsMode.onBack();
+                      onClose?.();
+                    },
                   }
                 : undefined
             }
-            pluginsMode={pluginsMode}
+            onOpenPlugins={
+              onOpenPlugins
+                ? () => {
+                    onOpenPlugins();
+                    onClose?.();
+                  }
+                : undefined
+            }
+            pluginsMode={
+              pluginsMode
+                ? {
+                    tab: pluginsMode.tab,
+                    onSelectTab: tab => {
+                      pluginsMode.onSelectTab(tab);
+                      onClose?.();
+                    },
+                    onBack: () => {
+                      pluginsMode.onBack();
+                      onClose?.();
+                    },
+                  }
+                : undefined
+            }
           />
 
           <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
@@ -812,7 +864,10 @@ export function Sidebar({
                 getProjectsForBackend={getProjectsForBackend}
                 expandedBackendIds={expandedBackendIds}
                 onToggleBackend={toggleBackend}
-                onSelectScope={automationMode.onSelectScope}
+                onSelectScope={(backendId, projectId) => {
+                  automationMode.onSelectScope(backendId, projectId);
+                  onClose?.();
+                }}
               />
             ) : agentsMode || pluginsMode ? null : (
               renderProjectList()

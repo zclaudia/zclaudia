@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, fireEvent, screen } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 
 const selectionMocks = {
   selectProject: vi.fn(),
@@ -49,7 +50,11 @@ vi.mock('../../../hooks/useSwipeBack', () => ({
   useSwipeBack: vi.fn().mockReturnValue({ current: null }),
 }));
 vi.mock('../../automation/AutomationTree', () => ({
-  AutomationTree: ({ tab }: any) => <div data-testid="automation-tree" data-tab={tab} />,
+  AutomationTree: ({ tab, onSelectScope }: any) => (
+    <div data-testid="automation-tree" data-tab={tab}>
+      <button onClick={() => onSelectScope('backend-1', 'proj-1')}>select-scope</button>
+    </div>
+  ),
 }));
 vi.mock('../../../hooks/useSelectionCoordinator', () => ({
   useSelectionCoordinator: () => ({
@@ -214,10 +219,12 @@ function setupStores() {
   } as any);
 }
 
-function renderSidebarMobileOpen(overrides: { onClose?: () => void } = {}) {
-  const onClose = overrides.onClose ?? vi.fn();
+function renderSidebarMobileOpen(
+  overrides: { onClose?: () => void } & Partial<ComponentProps<typeof Sidebar>> = {}
+) {
+  const { onClose = vi.fn(), ...rest } = overrides;
   const utils = render(
-    <Sidebar collapsed={false} onToggle={vi.fn()} isMobile isOpen onClose={onClose} />
+    <Sidebar collapsed={false} onToggle={vi.fn()} isMobile isOpen onClose={onClose} {...rest} />
   );
   return { onClose, ...utils };
 }
@@ -286,5 +293,99 @@ describe('Sidebar mobile drawer — modal dialog semantics', () => {
   it('close drawer button is reachable by accessible name', () => {
     renderSidebarMobileOpen();
     expect(screen.getByRole('button', { name: /close menu/i })).toBeTruthy();
+  });
+});
+
+describe('Sidebar mobile drawer — top-level mode entries', () => {
+  beforeEach(() => {
+    setupStores();
+    useSidebarExpansionStore.setState({ expandedBackendIds: [] });
+    vi.clearAllMocks();
+    (api.getSearchHistory as ReturnType<typeof vi.fn>).mockImplementation(() => neverSettles);
+    (api.getProjectWorktrees as ReturnType<typeof vi.fn>).mockImplementation(() => neverSettles);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('shows the Agents / Extensions / Automations entries and closes the drawer on tap', () => {
+    const onOpenAgents = vi.fn();
+    const onOpenPlugins = vi.fn();
+    const onOpenAutomations = vi.fn();
+    const { onClose } = renderSidebarMobileOpen({
+      onOpenAgents,
+      onOpenPlugins,
+      onOpenAutomations,
+    });
+
+    const entries: [string, ReturnType<typeof vi.fn>][] = [
+      ['Agents', onOpenAgents],
+      ['Extensions', onOpenPlugins],
+      ['Automations', onOpenAutomations],
+    ];
+    for (const [name, callback] of entries) {
+      fireEvent.click(screen.getByRole('button', { name }));
+      expect(callback).toHaveBeenCalledTimes(1);
+    }
+    expect(onClose).toHaveBeenCalledTimes(entries.length);
+  });
+
+  it('automation mode: tab select, back, and scope select all close the drawer', () => {
+    const onSelectTab = vi.fn();
+    const onBack = vi.fn();
+    const onSelectScope = vi.fn();
+    const { onClose } = renderSidebarMobileOpen({
+      automationMode: {
+        tab: 'activity',
+        activeBackendId: LOCAL_BACKEND_ID,
+        onSelectTab,
+        onBack,
+        onSelectScope,
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Workflows' }));
+    expect(onSelectTab).toHaveBeenCalledWith('workflows');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to app' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'select-scope' }));
+    expect(onSelectScope).toHaveBeenCalledWith('backend-1', 'proj-1');
+
+    expect(onClose).toHaveBeenCalledTimes(3);
+  });
+
+  it('agents mode: tab select and back close the drawer', () => {
+    const onSelectTab = vi.fn();
+    const onBack = vi.fn();
+    const { onClose } = renderSidebarMobileOpen({
+      agentsMode: { tab: 'profiles', onSelectTab, onBack },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skills' }));
+    expect(onSelectTab).toHaveBeenCalledWith('skills');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to app' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('plugins mode: tab select and back close the drawer', () => {
+    const onSelectTab = vi.fn();
+    const onBack = vi.fn();
+    const { onClose } = renderSidebarMobileOpen({
+      pluginsMode: { tab: 'built-in', onSelectTab, onBack },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Web Search' }));
+    expect(onSelectTab).toHaveBeenCalledWith('web-search');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to app' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 });

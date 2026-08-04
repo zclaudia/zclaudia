@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react';
  *
  * Priority guide (higher = runs first):
  *   30 — Settings content (back to tab list)
- *   20 — Settings / Agent panel (close overlay)
+ *   20 — Settings / Agent panel (close overlay) / shell-mode escape (back to app)
  *   10 — Sidebar drawer (close drawer)
  */
 
