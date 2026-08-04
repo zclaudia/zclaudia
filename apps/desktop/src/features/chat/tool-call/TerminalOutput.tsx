@@ -39,7 +39,7 @@ function RunInTerminalButton({ command }: { command: string }) {
           sendMessage({ type: 'terminal_input', terminalId, data: command });
         }
       }}
-      className="absolute top-1 right-1 p-1 rounded-md opacity-0 group-hover/cmd:opacity-100 hover:bg-accent text-muted-foreground hover:text-foreground transition-opacity"
+      className="absolute top-1 right-1 p-1 rounded-md opacity-100 md:opacity-0 md:group-hover/cmd:opacity-100 hover:bg-accent text-muted-foreground hover:text-foreground transition-opacity"
       title="Paste to terminal"
     >
       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

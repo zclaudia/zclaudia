@@ -4,6 +4,7 @@ import * as api from '../../../services/api';
 import { FileViewerPanel, FileViewerActions } from '../FileViewerPanel';
 
 const scrollToRowMock = vi.hoisted(() => vi.fn());
+const mockIsMobile = vi.hoisted(() => ({ value: false }));
 
 vi.mock('../../../contexts/ThemeContext', () => ({
   useTheme: () => ({ resolvedTheme: 'dark' }),
@@ -11,7 +12,7 @@ vi.mock('../../../contexts/ThemeContext', () => ({
 }));
 
 vi.mock('../../../hooks/useMediaQuery', () => ({
-  useIsMobile: () => false,
+  useIsMobile: () => mockIsMobile.value,
 }));
 
 vi.mock('../../../services/api', () => ({
@@ -91,6 +92,7 @@ const mockFileViewerState = {
   setFullscreen: vi.fn(),
   toggleTree: vi.fn(),
   setShowTree: vi.fn(),
+  backToTree: vi.fn(),
   treeWidthPx: 256,
   setTreeWidthPx: vi.fn(),
   isOpen: false,
@@ -124,6 +126,7 @@ vi.mock('../FileContentSearchInput', () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   scrollToRowMock.mockClear();
+  mockIsMobile.value = false;
   mockFileViewerState.filePath = null;
   mockFileViewerState.content = null;
   mockFileViewerState.loading = false;
@@ -368,6 +371,34 @@ describe('FileViewerPanel', () => {
     );
 
     expect(document.querySelectorAll('mark')).toHaveLength(3);
+  });
+
+  it('does not render a back-to-tree button on desktop even with a file open', () => {
+    mockFileViewerState.filePath = 'src/current.ts';
+    mockFileViewerState.content = 'const x = 1;';
+    render(<FileViewerPanel projectRoot="/project" />);
+
+    expect(screen.queryByLabelText('Back to file tree')).not.toBeInTheDocument();
+  });
+
+  it('does not render a back-to-tree button on mobile in browse mode (no file open)', () => {
+    mockIsMobile.value = true;
+    render(<FileViewerPanel projectRoot="/project" />);
+
+    expect(screen.queryByLabelText('Back to file tree')).not.toBeInTheDocument();
+  });
+
+  it('shows a back-to-tree button on mobile when a file is open, and it returns to browse mode', () => {
+    mockIsMobile.value = true;
+    mockFileViewerState.filePath = 'src/current.ts';
+    mockFileViewerState.content = 'const x = 1;';
+    render(<FileViewerPanel projectRoot="/project" />);
+
+    const backButton = screen.getByLabelText('Back to file tree');
+    expect(backButton).toBeInTheDocument();
+
+    fireEvent.click(backButton);
+    expect(mockFileViewerState.backToTree).toHaveBeenCalledTimes(1);
   });
 });
 

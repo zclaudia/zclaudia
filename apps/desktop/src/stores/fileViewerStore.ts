@@ -54,6 +54,12 @@ interface FileViewerState {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   close: () => void;
+  /**
+   * Mobile-only back navigation: returns to the browse (file tree) view
+   * without closing the panel. Desktop never calls this — `showTree` already
+   * keeps the tree visible alongside the open file there.
+   */
+  backToTree: () => void;
   togglePanel: () => void;
   setShowTree: (show: boolean) => void;
   toggleTree: () => void;
@@ -166,6 +172,19 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
     });
     // Hide file viewer panel in bottom panel
     usePluginStore.getState().updatePanelVisibility('file-viewer', false);
+  },
+
+  backToTree: () => {
+    set({
+      filePath: null,
+      content: null,
+      knownMtimeMs: null,
+      error: null,
+      targetLine: null,
+      targetEndLine: null,
+      inFileSearchOpen: false,
+      inFileSearchQuery: '',
+    });
   },
 
   togglePanel: () => {

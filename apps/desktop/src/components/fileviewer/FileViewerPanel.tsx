@@ -18,6 +18,7 @@ import {
 import { List, useListRef, type RowComponentProps, type ListImperativeAPI } from 'react-window';
 import {
   Check,
+  ChevronLeft,
   Copy,
   ExternalLink,
   FileText,
@@ -29,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useTheme, isDarkTheme } from '../../contexts/ThemeContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import { IconButton } from '../ui/Button';
 import * as api from '../../services/api';
 import { FileSearchInput } from './FileSearchInput';
 import { FileContentSearchInput } from './FileContentSearchInput';
@@ -527,6 +529,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
     showTree,
     treeWidthPx,
     setTreeWidthPx,
+    backToTree,
   } = store;
   const treeResizeCleanupRef = useRef<(() => void) | null>(null);
   // Guards an in-flight stat/content poll so overlapping setInterval ticks do
@@ -783,6 +786,16 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
         <>
           {/* Read: breadcrumb toolbar */}
           <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-background/95 flex-shrink-0 min-w-0">
+            {isMobile && filePath && (
+              <IconButton
+                size="sm"
+                onClick={backToTree}
+                aria-label="Back to file tree"
+                className="-ml-1"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" strokeWidth={1.75} />
+              </IconButton>
+            )}
             {headerIcon}
             {filePath &&
               (() => {

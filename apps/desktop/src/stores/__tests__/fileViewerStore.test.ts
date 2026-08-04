@@ -224,6 +224,54 @@ describe('fileViewerStore', () => {
     });
   });
 
+  describe('backToTree', () => {
+    it('clears the open file without closing the panel', () => {
+      useFileViewerStore.getState().openFile('/project', 'src/index.ts');
+      useFileViewerStore.getState().backToTree();
+
+      const state = useFileViewerStore.getState();
+      expect(state.filePath).toBeNull();
+      expect(state.isOpen).toBe(true);
+    });
+
+    it('clears content, error, and pending in-file search state', () => {
+      useFileViewerStore.getState().openFile('/project', 'src/index.ts');
+      useFileViewerStore.getState().setContent('const x = 1;', 1000);
+      useFileViewerStore.getState().setError('boom');
+      useFileViewerStore.getState().setInFileSearchOpen(true);
+      useFileViewerStore.getState().setInFileSearchQuery('x');
+
+      useFileViewerStore.getState().backToTree();
+
+      const state = useFileViewerStore.getState();
+      expect(state.content).toBeNull();
+      expect(state.knownMtimeMs).toBeNull();
+      expect(state.error).toBeNull();
+      expect(state.inFileSearchOpen).toBe(false);
+      expect(state.inFileSearchQuery).toBe('');
+    });
+
+    it('clears any pending line target', () => {
+      useFileViewerStore.getState().openFile('/project', 'src/index.ts', 5, 10);
+      useFileViewerStore.getState().backToTree();
+
+      const state = useFileViewerStore.getState();
+      expect(state.targetLine).toBeNull();
+      expect(state.targetEndLine).toBeNull();
+    });
+
+    it('preserves the project root and cached content so reopening the file is instant', () => {
+      useFileViewerStore.getState().openFile('/project', 'src/index.ts');
+      useFileViewerStore.getState().setContent('const x = 1;', 1000);
+      useFileViewerStore.getState().backToTree();
+
+      expect(useFileViewerStore.getState().projectRoot).toBe('/project');
+      expect(useFileViewerStore.getState().getCached('/project', 'src/index.ts')).toBe(
+        'const x = 1;'
+      );
+    });
+  });
+
   describe('togglePanel', () => {
     it('toggles the panel open and closed', () => {
       expect(useFileViewerStore.getState().isOpen).toBe(false);
