@@ -78,11 +78,20 @@ vi.mock('../../../stores/terminalStore', () => ({
 
 const bottomPanelState = {
   activeTab: '',
-  setActiveTab: vi.fn(),
+  setActiveTab: vi.fn((panelId: string) => {
+    bottomPanelState.activeTab = panelId;
+  }),
 };
 
 vi.mock('../../../stores/bottomPanelStore', () => ({
-  useBottomPanelStore: vi.fn(() => bottomPanelState),
+  useBottomPanelStore: Object.assign(
+    vi.fn((selector?: (state: typeof bottomPanelState) => unknown) =>
+      selector ? selector(bottomPanelState) : bottomPanelState
+    ),
+    {
+      getState: () => bottomPanelState,
+    }
+  ),
 }));
 
 const fileViewerState = {
@@ -101,11 +110,70 @@ vi.mock('../../../stores/fileViewerStore', () => ({
   ),
 }));
 
+interface MockPanel {
+  id: string;
+  label: string;
+  order?: number;
+  visible?: boolean;
+  platforms?: Array<'desktop' | 'mobile'>;
+  requiresFeature?: string;
+  hideFromLauncher?: boolean;
+  defaultPlacement?: 'bottom' | 'right';
+  onOpen?: (ctx: unknown) => void;
+  onClose?: () => void;
+}
+
+/** Mirrors the builtin panel registry (see plugins/builtinPanels.ts). */
+function builtinPanelFixtures(): MockPanel[] {
+  return [
+    {
+      id: 'terminal',
+      label: 'Terminal',
+      order: 0,
+      platforms: ['desktop', 'mobile'],
+      requiresFeature: 'remoteTerminal',
+      visible: false,
+    },
+    {
+      id: 'file-viewer',
+      label: 'File',
+      order: 1,
+      platforms: ['desktop', 'mobile'],
+      visible: false,
+    },
+    { id: 'draft', label: 'Draft', order: 2, platforms: ['desktop', 'mobile'], visible: false },
+    {
+      id: 'session-changes',
+      label: 'Changes',
+      order: 3,
+      platforms: ['desktop', 'mobile'],
+      visible: false,
+    },
+    { id: 'memory', label: 'Memory', order: 4, platforms: ['desktop', 'mobile'], visible: false },
+    {
+      id: 'notifications',
+      label: 'Notifications',
+      order: 5,
+      platforms: ['desktop', 'mobile'],
+      hideFromLauncher: true,
+      visible: false,
+    },
+    { id: 'lineage', label: 'Lineage', order: 6, platforms: ['desktop', 'mobile'], visible: false },
+    { id: 'git', label: 'Git', order: 7, platforms: ['desktop'], visible: false },
+    { id: 'browser', label: 'Browser', order: 8, platforms: ['desktop'], visible: false },
+  ];
+}
+
 const pluginStoreState = {
   disabledBuiltinPanels: [] as string[],
-  panels: [] as Array<{ id: string; visible?: boolean; defaultPlacement?: 'bottom' | 'right' }>,
+  panels: [] as MockPanel[],
   panelPlacements: {} as Record<string, 'bottom' | 'right'>,
   setPanelPlacement: vi.fn(),
+  updatePanelVisibility: vi.fn((id: string, visible: boolean) => {
+    pluginStoreState.panels = pluginStoreState.panels.map(p =>
+      p.id === id ? { ...p, visible } : p
+    );
+  }),
 };
 
 vi.mock('../../../stores/pluginStore', () => ({
@@ -257,6 +325,7 @@ describe('ChatInputArea mobile selectors', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     pluginStoreState.disabledBuiltinPanels = [];
+    pluginStoreState.panels = builtinPanelFixtures();
     terminalStoreState.drawerOpen = {};
     terminalStoreState.terminals = {};
     bottomPanelState.activeTab = '';
@@ -293,11 +362,74 @@ describe('ChatInputArea mobile selectors', () => {
 
   it('hides terminal tool button when remote terminal is unavailable and other panels are disabled', () => {
     serverStoreState.activeServerSupports.mockReturnValue(false);
-    pluginStoreState.disabledBuiltinPanels = ['draft', 'file-viewer', 'session-changes'];
+    pluginStoreState.disabledBuiltinPanels = [
+      'draft',
+      'file-viewer',
+      'session-changes',
+      'memory',
+      'lineage',
+    ];
 
     render(<ChatInputArea {...baseProps} />);
 
     expect(screen.queryByTitle('More tools')).toBeNull();
+  });
+
+  it('derives the tools menu from the panel registry: memory and lineage are reachable on mobile', () => {
+    serverStoreState.activeServerSupports.mockReturnValue(false);
+
+    render(<ChatInputArea {...baseProps} />);
+    fireEvent.click(screen.getByTitle('More tools'));
+
+    // Legacy four keep their labels and lead the menu…
+    expect(screen.getByText('Draft Editor')).toBeTruthy();
+    expect(screen.getByText('File Viewer')).toBeTruthy();
+    expect(screen.getByText('Session Changes')).toBeTruthy();
+    // …registry-declared mobile panels follow.
+    expect(screen.getByText('Memory')).toBeTruthy();
+    expect(screen.getByText('Lineage')).toBeTruthy();
+    // Desktop-only and launcher-hidden panels stay out.
+    expect(screen.queryByText('Git')).toBeNull();
+    expect(screen.queryByText('Browser')).toBeNull();
+    expect(screen.queryByText('Notifications')).toBeNull();
+    // Terminal is capability-gated via requiresFeature (unsupported here).
+    expect(screen.queryByText('Terminal')).toBeNull();
+  });
+
+  it('keeps the terminal capability-gated through the registry requiresFeature flag', () => {
+    serverStoreState.activeServerSupports.mockImplementation(
+      (feature: string) => feature === 'remoteTerminal'
+    );
+
+    render(<ChatInputArea {...baseProps} />);
+    fireEvent.click(screen.getByTitle('More tools'));
+
+    expect(screen.getByText('Terminal')).toBeTruthy();
+  });
+
+  it('opens a generic registry panel (memory) by making it visible and activating its tab', () => {
+    serverStoreState.activeServerSupports.mockReturnValue(false);
+
+    render(<ChatInputArea {...baseProps} />);
+    fireEvent.click(screen.getByTitle('More tools'));
+    fireEvent.click(screen.getByText('Memory'));
+
+    expect(pluginStoreState.updatePanelVisibility).toHaveBeenCalledWith('memory', true);
+    expect(bottomPanelState.setActiveTab).toHaveBeenCalledWith('memory');
+  });
+
+  it('closes an active generic registry panel via its visibility flag', () => {
+    serverStoreState.activeServerSupports.mockReturnValue(false);
+    pluginStoreState.panels = builtinPanelFixtures().map(p =>
+      p.id === 'memory' ? { ...p, visible: true } : p
+    );
+    bottomPanelState.activeTab = 'memory';
+
+    render(<ChatInputArea {...baseProps} />);
+    fireEvent.click(screen.getByTitle('More tools'));
+    fireEvent.click(screen.getByText('Hide Memory'));
+
+    expect(pluginStoreState.updatePanelVisibility).toHaveBeenCalledWith('memory', false);
   });
 
   it('mounts the context gauge (ring + popover) in the mobile selector row', () => {

@@ -1,7 +1,7 @@
 import { useState, useRef, useLayoutEffect, useEffect, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { usePluginStore, selectPluginPanels } from '../../stores/pluginStore';
 import { openToolInWorkspace } from '../../utils/workspaceActions';
+import { useLauncherPanels } from '../../utils/openPanel';
 import { useServerStore } from '../../stores/serverStore';
 import { iconForPanel } from '../rightSidebarToolIcons';
 
@@ -17,15 +17,8 @@ const GAP = 4;
 const MARGIN = 8;
 
 export function ToolLauncherMenu({ sessionId, projectId, anchorRef, onPick }: Props) {
-  const panels = usePluginStore(selectPluginPanels);
-  const disabled = usePluginStore(s => s.disabledBuiltinPanels);
   const backendId = useServerStore(s => s.activeServerId);
-  const tools = panels.filter(
-    p =>
-      (p.platforms ?? ['desktop']).includes('desktop') &&
-      !disabled.includes(p.id) &&
-      !p.hideFromLauncher
-  );
+  const tools = useLauncherPanels('desktop');
 
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);

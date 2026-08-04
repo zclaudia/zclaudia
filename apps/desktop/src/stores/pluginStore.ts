@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { PluginManifest } from '@zclaudia/shared';
+import type { PluginManifest, ServerFeature } from '@zclaudia/shared';
 
 const BUILTIN_PANEL_ID_ALIASES: Record<string, string> = {
   'agent-feed': 'notifications',
@@ -97,6 +97,11 @@ export interface UIExtension {
    *  have their own dedicated entry point elsewhere (e.g. Notifications opens via
    *  the sidebar bell modal). Still registered so it can render when opened. */
   hideFromLauncher?: boolean;
+  /** Server feature the active backend must advertise for this panel to be
+   *  usable (e.g. the terminal needs `remoteTerminal`). Declared here so
+   *  capability gating lives with the panel definition instead of being
+   *  hand-rolled per launcher surface. */
+  requiresFeature?: ServerFeature;
   /** Marks a first-party built-in panel (registered by initBuiltinPanels), as
    *  opposed to a server/third-party plugin panel. This is the single source of
    *  truth for the Settings → Plugins "Built-in" management list, which derives

@@ -1,14 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  Lock,
-  Unlock,
-  X,
-  FileText,
-  FileEdit,
-  FileDiff,
-  Terminal as TerminalIcon,
-  Plus,
-} from 'lucide-react';
+import { Lock, Unlock, X, Plus } from 'lucide-react';
 import { useGoalStore } from '../../stores/goalStore';
 import { GoalPinnedBar } from '../../components/GoalPinnedBar';
 import { GoalDialog } from '../../components/GoalDialog';
@@ -27,16 +18,34 @@ import type { QueueItem } from '../../stores/sendQueueStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
-import { usePluginStore } from '../../stores/pluginStore';
+import { usePluginStore, type UIExtension } from '../../stores/pluginStore';
+import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useDraftEditorStore } from '../../stores/draftEditorStore';
 import { useComposerStore } from '../../stores/composerStore';
-import { activatePanel, usePanelIsActive } from '../../utils/openPanel';
+import { activatePanel, usePanelIsActive, useLauncherPanels } from '../../utils/openPanel';
+import { iconForPanel } from '../../components/rightSidebarToolIcons';
 import * as api from '../../services/api';
 import { useAgentForSession } from '../../hooks/useAgentForSession';
 import type { UnifiedPermissionPolicy, SlashCommand, Session, Project } from '@zclaudia/shared';
 import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
 import type { SessionDraft } from '../../stores/composerStore';
+
+/**
+ * Legacy mobile tools-menu order for the original four tools. Panels not
+ * listed here (memory, lineage, future mobile-capable panels) follow after,
+ * in registry order.
+ */
+const MOBILE_MENU_RANK: Record<string, number> = {
+  draft: 0,
+  'file-viewer': 1,
+  'session-changes': 2,
+  terminal: 3,
+};
+
+function mobileMenuRank(panel: UIExtension): number {
+  return MOBILE_MENU_RANK[panel.id] ?? 100 + (panel.order ?? 0);
+}
 
 interface ChatInputAreaProps {
   sessionId: string;
@@ -115,10 +124,16 @@ export function ChatInputArea({
 }: ChatInputAreaProps) {
   const setDrawerOpen = useTerminalStore(s => s.setDrawerOpen);
   const isDrawerOpen = useTerminalStore(s => s.isDrawerOpen);
-  const disabledBuiltinPanels = usePluginStore(s => s.disabledBuiltinPanels);
   const fileViewerOpen = useFileViewerStore(s => s.isOpen);
   const openDraftEditor = useDraftEditorStore(s => s.openEditor);
   const setSendCallback = useDraftEditorStore(s => s.setSendCallback);
+  // Registry-driven mobile tools menu: every panel declared mobile-capable
+  // (and not disabled/hidden/feature-gated) is offered, so new panels never
+  // silently default to unreachable on phones.
+  const mobileLauncherPanels = useLauncherPanels('mobile');
+  // On mobile every panel renders through the BottomPanel overlay, so a
+  // generic panel is "active" when it is visible and owns the bottom tab.
+  const bottomActiveTab = useBottomPanelStore(s => s.activeTab);
   // Reactive active-tab checks (work for both bottom and right placement)
   const draftPanelActive = usePanelIsActive('draft');
   const fileViewerPanelActive = usePanelIsActive('file-viewer');
@@ -453,98 +468,142 @@ export function ChatInputArea({
                     onClick: () => void;
                   }> = [];
 
-                  if (!disabledBuiltinPanels.includes('draft')) {
-                    const isActive = draftPanelActive;
-                    toolItems.push({
-                      key: 'draft',
-                      icon: <FileEdit size={18} strokeWidth={1.75} />,
-                      label: isActive ? 'Close Draft' : 'Draft Editor',
-                      isActive,
-                      hasBadge: draftExists && !isActive,
-                      onClick: () => {
-                        if (isActive) {
-                          useDraftEditorStore.getState().closeEditor();
-                        } else {
-                          setSendCallback((content: string) => onSendMessage(content));
-                          openDraftEditor(sessionId);
-                        }
-                        closeMobileTools();
-                      },
-                    });
-                  }
+                  const sortedPanels = [...mobileLauncherPanels].sort(
+                    (a, b) => mobileMenuRank(a) - mobileMenuRank(b)
+                  );
 
-                  if (currentProject?.rootPath && !disabledBuiltinPanels.includes('file-viewer')) {
-                    const isActive = fileViewerPanelActive;
-                    toolItems.push({
-                      key: 'file-viewer',
-                      icon: <FileText size={18} strokeWidth={1.75} />,
-                      label: isActive ? 'Close Files' : 'File Viewer',
-                      isActive,
-                      onClick: () => {
-                        if (isActive) {
-                          useFileViewerStore.getState().close();
-                        } else if (fileViewerOpen) {
-                          activatePanel('file-viewer');
-                        } else {
-                          const store = useFileViewerStore.getState();
-                          store.togglePanel();
-                          store.setSearchOpen(true);
-                          activatePanel('file-viewer');
-                        }
-                        closeMobileTools();
-                      },
-                    });
-                  }
+                  for (const panel of sortedPanels) {
+                    const Icon = iconForPanel(panel.id);
+                    const icon = <Icon size={18} strokeWidth={1.75} />;
 
-                  if (!disabledBuiltinPanels.includes('session-changes') && currentSession) {
-                    const isActive = changesPanelActive;
-                    toolItems.push({
-                      key: 'session-changes',
-                      icon: <FileDiff size={18} strokeWidth={1.75} />,
-                      label: isActive ? 'Hide Changes' : 'Session Changes',
-                      isActive,
-                      onClick: () => {
-                        const store = usePluginStore.getState();
-                        if (isActive) {
-                          store.updatePanelVisibility('session-changes', false);
-                        } else {
-                          store.updatePanelVisibility('session-changes', true);
-                          activatePanel('session-changes');
-                        }
-                        closeMobileTools();
-                      },
-                    });
-                  }
+                    switch (panel.id) {
+                      case 'draft': {
+                        const isActive = draftPanelActive;
+                        toolItems.push({
+                          key: 'draft',
+                          icon,
+                          label: isActive ? 'Close Draft' : 'Draft Editor',
+                          isActive,
+                          hasBadge: draftExists && !isActive,
+                          onClick: () => {
+                            if (isActive) {
+                              useDraftEditorStore.getState().closeEditor();
+                            } else {
+                              setSendCallback((content: string) => onSendMessage(content));
+                              openDraftEditor(sessionId);
+                            }
+                            closeMobileTools();
+                          },
+                        });
+                        break;
+                      }
 
-                  if (
-                    !disabledBuiltinPanels.includes('terminal') &&
-                    useServerStore.getState().activeServerSupports('remoteTerminal') &&
-                    currentSession?.projectId
-                  ) {
-                    const pid = currentSession.projectId;
-                    const isOpen = isDrawerOpen(pid);
-                    const isActive = isOpen && terminalPanelActive;
-                    toolItems.push({
-                      key: 'terminal',
-                      icon: <TerminalIcon size={18} strokeWidth={1.75} />,
-                      label: isActive ? 'Hide Terminal' : 'Terminal',
-                      isActive,
-                      onClick: () => {
-                        if (isActive) {
-                          setDrawerOpen(pid, false);
-                        } else if (isOpen) {
-                          activatePanel('terminal');
-                        } else {
-                          const store = useTerminalStore.getState();
-                          if (!store.getTerminalId(pid)) {
-                            store.openTerminal(pid);
-                          }
-                          setDrawerOpen(pid, true);
-                          activatePanel('terminal');
-                        }
-                        closeMobileTools();
-                      },
-                    });
+                      case 'file-viewer': {
+                        if (!currentProject?.rootPath) break;
+                        const isActive = fileViewerPanelActive;
+                        toolItems.push({
+                          key: 'file-viewer',
+                          icon,
+                          label: isActive ? 'Close Files' : 'File Viewer',
+                          isActive,
+                          onClick: () => {
+                            if (isActive) {
+                              useFileViewerStore.getState().close();
+                            } else if (fileViewerOpen) {
+                              activatePanel('file-viewer');
+                            } else {
+                              const store = useFileViewerStore.getState();
+                              store.togglePanel();
+                              store.setSearchOpen(true);
+                              activatePanel('file-viewer');
+                            }
+                            closeMobileTools();
+                          },
+                        });
+                        break;
+                      }
+
+                      case 'session-changes': {
+                        if (!currentSession) break;
+                        const isActive = changesPanelActive;
+                        toolItems.push({
+                          key: 'session-changes',
+                          icon,
+                          label: isActive ? 'Hide Changes' : 'Session Changes',
+                          isActive,
+                          onClick: () => {
+                            const store = usePluginStore.getState();
+                            if (isActive) {
+                              store.updatePanelVisibility('session-changes', false);
+                            } else {
+                              store.updatePanelVisibility('session-changes', true);
+                              activatePanel('session-changes');
+                            }
+                            closeMobileTools();
+                          },
+                        });
+                        break;
+                      }
+
+                      case 'terminal': {
+                        // remoteTerminal capability gating is declared on the
+                        // panel registration (requiresFeature) and enforced by
+                        // useLauncherPanels; only the project scope is local.
+                        if (!currentSession?.projectId) break;
+                        const pid = currentSession.projectId;
+                        const isOpen = isDrawerOpen(pid);
+                        const isActive = isOpen && terminalPanelActive;
+                        toolItems.push({
+                          key: 'terminal',
+                          icon,
+                          label: isActive ? 'Hide Terminal' : 'Terminal',
+                          isActive,
+                          onClick: () => {
+                            if (isActive) {
+                              setDrawerOpen(pid, false);
+                            } else if (isOpen) {
+                              activatePanel('terminal');
+                            } else {
+                              const store = useTerminalStore.getState();
+                              if (!store.getTerminalId(pid)) {
+                                store.openTerminal(pid);
+                              }
+                              setDrawerOpen(pid, true);
+                              activatePanel('terminal');
+                            }
+                            closeMobileTools();
+                          },
+                        });
+                        break;
+                      }
+
+                      default: {
+                        // Generic registry panel (memory, lineage, future
+                        // mobile-capable panels): visibility flag + bottom tab.
+                        const isActive = panel.visible !== false && bottomActiveTab === panel.id;
+                        toolItems.push({
+                          key: panel.id,
+                          icon,
+                          label: isActive ? `Hide ${panel.label}` : panel.label,
+                          isActive,
+                          onClick: () => {
+                            if (isActive) {
+                              if (panel.onClose) panel.onClose();
+                              else usePluginStore.getState().updatePanelVisibility(panel.id, false);
+                            } else {
+                              usePluginStore.getState().updatePanelVisibility(panel.id, true);
+                              panel.onOpen?.({
+                                sessionId,
+                                projectId: currentSession?.projectId,
+                                backendId: useServerStore.getState().activeServerId,
+                              });
+                              activatePanel(panel.id);
+                            }
+                            closeMobileTools();
+                          },
+                        });
+                      }
+                    }
                   }
 
                   if (toolItems.length === 0) return undefined;

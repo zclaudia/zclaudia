@@ -5,7 +5,7 @@ import type { ServerMessage } from '@zclaudia/shared';
 import { usePluginStore } from '../../stores/pluginStore';
 import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../utils/controlPlane';
 import { parseBackendId } from '../../stores/gatewayStore';
-import { activatePanel } from '../../utils/openPanel';
+import { activatePanel, isPanelAvailable } from '../../utils/openPanel';
 
 function resolveOwnerBackendId(backendId: string | null, serverId: string): string {
   const rawBackendId = backendId || parseBackendId(serverId) || serverId;
@@ -135,6 +135,11 @@ export function handlePluginMessage(
     }
 
     case 'plugin_show_panel':
+      // Respect platform availability: a panel that isn't usable here (e.g. a
+      // desktop-only plugin panel while on mobile) must not become visible or
+      // steal the active tab — it would render as an empty open tab in the
+      // mobile bottom overlay.
+      if (!isPanelAvailable(msg.panelId)) return true;
       usePluginStore.getState().updatePanelVisibility(msg.panelId, true);
       activatePanel(msg.panelId);
       return true;

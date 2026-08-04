@@ -1,4 +1,4 @@
-import { usePluginStore, getEffectivePlacement } from '../stores/pluginStore';
+import { usePluginStore, getEffectivePlacement, type UIExtension } from '../stores/pluginStore';
 import { useBottomPanelStore } from '../stores/bottomPanelStore';
 import { useIsMobile, isMobileViewport } from '../hooks/useMediaQuery';
 import { useProjectStore } from '../stores/projectStore';
@@ -71,7 +71,38 @@ export function isPanelAvailable(panelId: string): boolean {
   const platform = isMobileViewport() ? 'mobile' : 'desktop';
   if (!(panel.platforms ?? ['desktop']).includes(platform)) return false;
   if (pluginState.disabledBuiltinPanels.includes(panelId)) return false;
+  if (
+    panel.requiresFeature &&
+    !useServerStore.getState().activeServerSupports(panel.requiresFeature)
+  )
+    return false;
   return true;
+}
+
+/**
+ * Reactive list of panels a tool launcher should offer on the given platform
+ * surface, in registry order. Shared by the desktop workspace "+" menu and the
+ * mobile composer tools menu so the availability rules — platform flags,
+ * disabled builtins, `hideFromLauncher`, backend feature requirements
+ * (`requiresFeature`, e.g. terminal ⇢ remoteTerminal) — live in one place
+ * instead of being hand-rolled per surface.
+ */
+export function useLauncherPanels(platform: 'desktop' | 'mobile'): UIExtension[] {
+  const panels = usePluginStore(s => s.panels);
+  const disabled = usePluginStore(s => s.disabledBuiltinPanels);
+  // Subscribe to the active server's feature set so capability-gated panels
+  // appear/disappear when the backend (or its advertised features) changes.
+  useServerStore(s => (s.activeServerId ? s.connections[s.activeServerId]?.features : undefined));
+  const supports = useServerStore.getState().activeServerSupports;
+  return panels
+    .filter(
+      p =>
+        (p.platforms ?? ['desktop']).includes(platform) &&
+        !disabled.includes(p.id) &&
+        !p.hideFromLauncher &&
+        (!p.requiresFeature || supports(p.requiresFeature))
+    )
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
 }
 
 /**

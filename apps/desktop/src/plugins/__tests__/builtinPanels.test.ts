@@ -120,7 +120,7 @@ describe('initBuiltinPanels', () => {
     }
   });
 
-  it('registers the lineage panel for desktop', async () => {
+  it('registers the lineage panel for desktop and mobile', async () => {
     const registerSpy = vi.fn();
     usePluginStore.setState({ registerPanel: registerSpy } as any);
 
@@ -131,11 +131,43 @@ describe('initBuiltinPanels', () => {
       expect.objectContaining({
         id: 'lineage',
         pluginId: 'com.claudia.lineage',
-        platforms: ['desktop'],
+        platforms: ['desktop', 'mobile'],
         component: expect.any(Function),
         actions: expect.any(Function),
       })
     );
+  });
+
+  it('keeps git and browser desktop-only', async () => {
+    const registerSpy = vi.fn();
+    usePluginStore.setState({ registerPanel: registerSpy } as any);
+
+    const { initBuiltinPanels } = await import('../builtinPanels');
+    initBuiltinPanels();
+
+    for (const id of ['git', 'browser']) {
+      expect(registerSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ id, platforms: ['desktop'] })
+      );
+    }
+  });
+
+  it('declares the terminal remoteTerminal capability requirement on the registration', async () => {
+    const registerSpy = vi.fn();
+    usePluginStore.setState({ registerPanel: registerSpy } as any);
+
+    const { initBuiltinPanels } = await import('../builtinPanels');
+    initBuiltinPanels();
+
+    expect(registerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'terminal', requiresFeature: 'remoteTerminal' })
+    );
+    // Only the terminal is feature-gated today; others must not accidentally gain a gate.
+    const gated = registerSpy.mock.calls
+      .map(([panel]) => panel)
+      .filter(panel => panel.requiresFeature !== undefined)
+      .map(panel => panel.id);
+    expect(gated).toEqual(['terminal']);
   });
 });
 

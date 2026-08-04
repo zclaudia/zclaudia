@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { usePluginStore } from '../../../stores/pluginStore';
+import { useServerStore } from '../../../stores/serverStore';
 import { ToolLauncherMenu } from '../ToolLauncherMenu';
 
 beforeEach(() => {
@@ -12,6 +13,7 @@ beforeEach(() => {
     ] as any,
     disabledBuiltinPanels: [],
   });
+  useServerStore.setState({ activeServerId: null, connections: {} } as any);
 });
 
 describe('ToolLauncherMenu', () => {
@@ -46,5 +48,49 @@ describe('ToolLauncherMenu', () => {
 
     expect(screen.getByRole('menuitem', { name: /Terminal/ })).toBeTruthy();
     expect(screen.queryByRole('menuitem', { name: /Notifications/ })).toBeNull();
+  });
+
+  it('omits panels whose requiresFeature the active server does not advertise', () => {
+    usePluginStore.setState({
+      panels: [
+        {
+          id: 'terminal',
+          pluginId: 'x',
+          type: 'panel',
+          label: 'Terminal',
+          requiresFeature: 'remoteTerminal',
+        },
+        { id: 'draft', pluginId: 'x', type: 'panel', label: 'Draft' },
+      ] as any,
+      disabledBuiltinPanels: [],
+    });
+    const anchorRef = { current: document.createElement('div') };
+    render(<ToolLauncherMenu sessionId="A" anchorRef={anchorRef} onPick={() => {}} />);
+
+    expect(screen.queryByRole('menuitem', { name: /Terminal/ })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: /Draft/ })).toBeTruthy();
+  });
+
+  it('shows feature-gated panels when the active server advertises the feature', () => {
+    usePluginStore.setState({
+      panels: [
+        {
+          id: 'terminal',
+          pluginId: 'x',
+          type: 'panel',
+          label: 'Terminal',
+          requiresFeature: 'remoteTerminal',
+        },
+      ] as any,
+      disabledBuiltinPanels: [],
+    });
+    useServerStore.setState({
+      activeServerId: 's1',
+      connections: { s1: { features: ['remoteTerminal'] } },
+    } as any);
+    const anchorRef = { current: document.createElement('div') };
+    render(<ToolLauncherMenu sessionId="A" anchorRef={anchorRef} onPick={() => {}} />);
+
+    expect(screen.getByRole('menuitem', { name: /Terminal/ })).toBeTruthy();
   });
 });

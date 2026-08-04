@@ -131,7 +131,8 @@ const mockPluginStore = {
   registerPanel: vi.fn(),
   clearPluginExtensions: vi.fn(),
   updatePanelVisibility: vi.fn(),
-  panels: [] as Array<{ id: string; openMode?: string }>,
+  disabledBuiltinPanels: [] as string[],
+  panels: [] as Array<{ id: string; openMode?: string; platforms?: string[] }>,
   pendingPermissionRequest: null as {
     pluginId: string;
     pluginName: string;
@@ -269,6 +270,7 @@ describe('handleServerMessage', () => {
     mockProjectStore.sessions = [];
     mockSelectionStore.selectedSessionId = 'current-session';
     mockPluginStore.panels = [];
+    mockPluginStore.disabledBuiltinPanels = [];
     mockServerStore.activeServerId = 'server-1';
     mockPermissionStore.aiReviewResults = {};
     mockRightSidebarStore.activeTab = null;
@@ -1961,8 +1963,44 @@ describe('handleServerMessage', () => {
     });
 
     it('handles plugin_show_panel on desktop', () => {
+      mockPluginStore.panels = [{ id: 'pan1' }];
       handleServerMessage({ type: 'plugin_show_panel', panelId: 'pan1' }, makeCtx());
+      expect(mockPluginStore.updatePanelVisibility).toHaveBeenCalledWith('pan1', true);
       expect(mockBottomPanelStore.setActiveTab).toHaveBeenCalledWith('pan1');
+    });
+
+    it('ignores plugin_show_panel for panels that are not registered', () => {
+      handleServerMessage({ type: 'plugin_show_panel', panelId: 'ghost' }, makeCtx());
+      expect(mockPluginStore.updatePanelVisibility).not.toHaveBeenCalled();
+      expect(mockBottomPanelStore.setActiveTab).not.toHaveBeenCalled();
+    });
+
+    it('ignores plugin_show_panel on mobile for desktop-only panels (no empty open tab)', () => {
+      // Plugin panels default to ['desktop']; on a mobile viewport they must
+      // not become visible or claim the bottom tab.
+      const originalMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as any;
+      try {
+        mockPluginStore.panels = [{ id: 'pan1' }];
+        handleServerMessage({ type: 'plugin_show_panel', panelId: 'pan1' }, makeCtx());
+        expect(mockPluginStore.updatePanelVisibility).not.toHaveBeenCalled();
+        expect(mockBottomPanelStore.setActiveTab).not.toHaveBeenCalled();
+      } finally {
+        window.matchMedia = originalMatchMedia;
+      }
+    });
+
+    it('handles plugin_show_panel on mobile for mobile-capable panels', () => {
+      const originalMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as any;
+      try {
+        mockPluginStore.panels = [{ id: 'pan1', platforms: ['desktop', 'mobile'] }];
+        handleServerMessage({ type: 'plugin_show_panel', panelId: 'pan1' }, makeCtx());
+        expect(mockPluginStore.updatePanelVisibility).toHaveBeenCalledWith('pan1', true);
+        expect(mockBottomPanelStore.setActiveTab).toHaveBeenCalledWith('pan1');
+      } finally {
+        window.matchMedia = originalMatchMedia;
+      }
     });
 
     it('routes plugin_show_panel to the right sidebar when placed right', () => {

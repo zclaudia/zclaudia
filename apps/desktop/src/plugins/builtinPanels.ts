@@ -39,6 +39,9 @@ export function initBuiltinPanels() {
     actions: TerminalActions,
     order: 0,
     platforms: ['desktop', 'mobile'],
+    // The terminal needs a backend PTY; hide it from launchers when the
+    // active server doesn't advertise the capability.
+    requiresFeature: 'remoteTerminal',
     defaultPlacement: 'right',
     openMode: 'dedicated',
     alwaysMount: true,
@@ -177,7 +180,7 @@ export function initBuiltinPanels() {
     component: LineagePanel,
     actions: LineageActions,
     order: 6,
-    platforms: ['desktop'],
+    platforms: ['desktop', 'mobile'],
     defaultPlacement: 'right',
     openMode: 'dedicated',
     alwaysMount: false,
