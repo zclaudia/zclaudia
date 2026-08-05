@@ -620,7 +620,7 @@ export function LlmProfileEditor({
         <EditorRow
           title="Provider Type"
           control={
-            <div className="w-56">
+            <div className="w-full md:w-56">
               <ProviderTypeSelector
                 hideLabel
                 value={formProviderType}
@@ -641,7 +641,7 @@ export function LlmProfileEditor({
                   setFormCacheRetention(e.target.value as 'default' | 'none' | 'short' | 'long')
                 }
                 aria-label="Prompt cache retention"
-                className={`${FIELD_CLASS} w-56`}
+                className={`${FIELD_CLASS} md:w-56`}
               >
                 <option value="default">Default (short, 5 min TTL)</option>
                 <option value="long">Long (1 hour TTL, higher write cost)</option>
