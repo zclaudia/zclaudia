@@ -4,12 +4,16 @@ import { getModelStats } from '../../services/api';
 import { useStatsBackendId } from './statsBackend';
 import { formatTokens } from '../../utils/formatTokens';
 import { buildModelChart, prettyModelName } from './modelStats';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 const LEGEND_LIMIT = 5;
 /** Share-rank fill opacities; ranks past the ladder reuse the last step. */
 const RANK_OPACITY = [1, 0.8, 0.6, 0.45, 0.3, 0.2];
 
 const CHART_W = 560;
+/** Narrower viewBox below md: — the SVG still fills the container, so the
+ *  9px-in-viewBox-units labels render near actual size instead of ~5px. */
+const CHART_W_MOBILE = 320;
 const CHART_H = 150;
 const AXIS_W = 36;
 const LABEL_H = 16;
@@ -24,6 +28,7 @@ function formatDay(date: string): string {
  *  during range refetches. */
 export function ModelsChart({ range }: { range: UsageStatsRange }) {
   const backendId = useStatsBackendId();
+  const isMobile = useIsMobile();
   const [stats, setStats] = useState<ModelUsagePayload | null>(null);
   const [unavailable, setUnavailable] = useState(false);
 
@@ -82,7 +87,8 @@ export function ModelsChart({ range }: { range: UsageStatsRange }) {
   const opacityFor = (model: string) =>
     RANK_OPACITY[Math.min(rankOf.get(model) ?? RANK_OPACITY.length - 1, RANK_OPACITY.length - 1)];
 
-  const plotW = CHART_W - AXIS_W;
+  const chartW = isMobile ? CHART_W_MOBILE : CHART_W;
+  const plotW = chartW - AXIS_W;
   const plotH = CHART_H - LABEL_H;
   const slot = plotW / chart.bars.length;
   const barW = Math.max(2, Math.min(14, slot * 0.7));
@@ -99,7 +105,7 @@ export function ModelsChart({ range }: { range: UsageStatsRange }) {
     <div>
       <svg
         data-testid="models-chart-svg"
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+        viewBox={`0 0 ${chartW} ${CHART_H}`}
         className="w-full h-auto text-primary"
       >
         {chart.ticks.map(tick => (
@@ -115,7 +121,7 @@ export function ModelsChart({ range }: { range: UsageStatsRange }) {
             <line
               x1={AXIS_W}
               y1={yFor(tick)}
-              x2={CHART_W}
+              x2={chartW}
               y2={yFor(tick)}
               className="stroke-border"
               strokeWidth="0.5"
@@ -167,10 +173,13 @@ export function ModelsChart({ range }: { range: UsageStatsRange }) {
               className="h-2.5 w-2.5 rounded-[3px] bg-primary shrink-0"
               style={{ opacity: opacityFor(m.model) }}
             />
-            <span className="text-foreground truncate" title={m.model}>
+            {/* Name grows into the free space but never below 40% of the row;
+                past that point the in/out span shrinks and truncates instead,
+                so narrow rows keep the model name readable. */}
+            <span className="flex-1 min-w-[40%] text-foreground truncate" title={m.model}>
               {prettyModelName(m.model)}
             </span>
-            <span className="ml-auto shrink-0 text-xs text-muted-foreground/60">
+            <span className="min-w-0 truncate text-right text-xs text-muted-foreground/60">
               {formatTokens(m.inTokens)} in · {formatTokens(m.outTokens)} out
             </span>
             <span className="w-14 shrink-0 text-right text-xs text-muted-foreground">

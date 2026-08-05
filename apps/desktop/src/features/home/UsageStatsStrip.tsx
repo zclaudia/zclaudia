@@ -9,11 +9,15 @@ import {
   flattenRowMajor,
   formatHour,
   funLine,
+  type HeatmapCell,
 } from './usageStats';
 import { prettyModelName } from './modelStats';
 import { ModelsChart } from './ModelsChart';
 
 const HEATMAP_WEEKS = 26;
+/** Columns kept visible below md: — the older half hides so the remaining
+ *  cells stay legible (and tappable) at phone widths. */
+const HEATMAP_WEEKS_MOBILE = 13;
 const RANGES: UsageStatsRange[] = ['all', '30d', '7d'];
 const RANGE_LABEL: Record<UsageStatsRange, string> = { all: 'All', '30d': '30d', '7d': '7d' };
 
@@ -33,6 +37,15 @@ function localToday(): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
+/** 'YYYY-MM-DD' -> 'Jul 3, 2026' for the tapped-day caption. */
+function formatDayLabel(date: string): string {
+  return new Date(`${date}T12:00:00`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 /** Card-based all-time/windowed usage stats. Targets the local backend when
  *  one exists, otherwise the active backend (mobile / gateway-direct). Renders
  *  nothing until the first load; keeps stale numbers during range refetches. */
@@ -42,6 +55,13 @@ export function UsageStatsStrip() {
   const [tab, setTab] = useState<'overview' | 'models'>('overview');
   const [stats, setStats] = useState<UsageStatsPayload | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  // Tapped heatmap day, surfaced as an inline caption below the grid — the
+  // touch-reachable counterpart to the desktop hover title.
+  const [selectedDay, setSelectedDay] = useState<HeatmapCell | null>(null);
+
+  useEffect(() => {
+    setSelectedDay(null);
+  }, [backendId, range]);
 
   useEffect(() => {
     let cancelled = false;
@@ -165,23 +185,44 @@ export function UsageStatsStrip() {
             ))}
           </div>
           {/* Row-major grid with one fr column per week so the heatmap spans the
-              exact same width as the cards above (26 = HEATMAP_WEEKS). */}
+              exact same width as the cards above (26 = HEATMAP_WEEKS from md: up;
+              below md: the older half of the columns hides, 13 = HEATMAP_WEEKS_MOBILE). */}
           <div
             data-testid="usage-heatmap"
-            className="mt-4 grid grid-cols-[repeat(26,minmax(0,1fr))] gap-1"
+            className="mt-4 grid grid-cols-[repeat(13,minmax(0,1fr))] md:grid-cols-[repeat(26,minmax(0,1fr))] gap-1"
           >
-            {flattenRowMajor(weeks).map((cell, i) =>
-              cell ? (
-                <span
+            {flattenRowMajor(weeks).map((cell, i) => {
+              // Week index within the row (row-major flatten). Cells in the older
+              // half only exist from md: up, matching the responsive column count.
+              const olderHalf = i % HEATMAP_WEEKS < HEATMAP_WEEKS - HEATMAP_WEEKS_MOBILE;
+              const responsive = olderHalf ? ' hidden md:block' : '';
+              if (!cell) {
+                return <span key={`pad-${i}`} className={`aspect-square w-full${responsive}`} />;
+              }
+              const label = `${cell.date}: ${cell.count} ${cell.count === 1 ? 'message' : 'messages'}`;
+              return (
+                <button
                   key={cell.date}
-                  title={`${cell.date}: ${cell.count} ${cell.count === 1 ? 'message' : 'messages'}`}
-                  className={`aspect-square w-full rounded-[4px] ${LEVEL_CLASS[cell.level]}`}
+                  type="button"
+                  title={label}
+                  aria-label={label}
+                  onClick={() =>
+                    setSelectedDay(prev => (prev?.date === cell.date ? null : cell))
+                  }
+                  className={`aspect-square w-full rounded-[4px] ${LEVEL_CLASS[cell.level]}${responsive}`}
                 />
-              ) : (
-                <span key={`pad-${i}`} className="aspect-square w-full" />
-              )
-            )}
+              );
+            })}
           </div>
+          {selectedDay && (
+            <div
+              data-testid="heatmap-day-caption"
+              className="mt-2 text-xs text-muted-foreground md:hidden"
+            >
+              {formatDayLabel(selectedDay.date)} · {selectedDay.count}{' '}
+              {selectedDay.count === 1 ? 'message' : 'messages'}
+            </div>
+          )}
           {line && <div className="mt-3 text-xs text-muted-foreground/60">{line}</div>}
         </>
       ) : (

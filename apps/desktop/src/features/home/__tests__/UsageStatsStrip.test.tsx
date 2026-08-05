@@ -202,6 +202,48 @@ describe('UsageStatsStrip', () => {
     expect(screen.queryByText(/more tokens than/)).toBeNull();
   });
 
+  it('shows 13 heatmap columns below md: and 26 from md: up', async () => {
+    getUsageStats.mockResolvedValue(payload);
+    render(<UsageStatsStrip />);
+    await waitFor(() => expect(screen.getByText('241')).toBeTruthy());
+    const heatmap = document.querySelector('[data-testid="usage-heatmap"]')!;
+    expect(heatmap.className).toContain('grid-cols-[repeat(13,minmax(0,1fr))]');
+    expect(heatmap.className).toContain('md:grid-cols-[repeat(26,minmax(0,1fr))]');
+    // Row-major cells: within each 26-cell row, exactly the older 13 weeks
+    // are hidden below md: so the mobile grid stays 13 columns wide.
+    const cells = Array.from(heatmap.children);
+    expect(cells).toHaveLength(26 * 7);
+    cells.forEach((cell, i) => {
+      expect(cell.className.includes('hidden md:block')).toBe(i % 26 < 13);
+    });
+  });
+
+  it('surfaces a tapped heatmap day as an inline caption and toggles it off', async () => {
+    getUsageStats.mockResolvedValue(payload);
+    render(<UsageStatsStrip />);
+    await waitFor(() => expect(screen.getByText('241')).toBeTruthy());
+    expect(screen.queryByTestId('heatmap-day-caption')).toBeNull();
+    const cell = screen.getByTitle('2026-07-03: 5 messages');
+    fireEvent.click(cell);
+    const caption = screen.getByTestId('heatmap-day-caption');
+    expect(caption.textContent).toContain('Jul 3, 2026');
+    expect(caption.textContent).toContain('5 messages');
+    // Desktop keeps the hover title; the caption is mobile-only chrome.
+    expect(caption.className).toContain('md:hidden');
+    fireEvent.click(cell);
+    expect(screen.queryByTestId('heatmap-day-caption')).toBeNull();
+  });
+
+  it('clears the tapped-day caption when the range changes', async () => {
+    getUsageStats.mockResolvedValue(payload);
+    render(<UsageStatsStrip />);
+    await waitFor(() => expect(screen.getByText('241')).toBeTruthy());
+    fireEvent.click(screen.getByTitle('2026-07-03: 5 messages'));
+    expect(screen.getByTestId('heatmap-day-caption')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '7d' }));
+    await waitFor(() => expect(screen.queryByTestId('heatmap-day-caption')).toBeNull());
+  });
+
   it('switches to the Models tab and back', async () => {
     getUsageStats.mockResolvedValue(payload);
     render(<UsageStatsStrip />);

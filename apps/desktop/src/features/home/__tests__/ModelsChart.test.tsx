@@ -9,6 +9,11 @@ vi.mock('../../../services/api', () => ({
   getModelStats: (...args: unknown[]) => getModelStats(...args),
 }));
 
+const mediaState = vi.hoisted(() => ({ isMobile: false }));
+vi.mock('../../../hooks/useMediaQuery', () => ({
+  useIsMobile: () => mediaState.isMobile,
+}));
+
 const payload = {
   days: [
     { date: '2026-07-03', models: { 'claude-fable-5': 600, 'deepseek-v4-flash': 400 } },
@@ -25,6 +30,7 @@ const payload = {
 describe('ModelsChart', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mediaState.isMobile = false;
   });
 
   afterEach(() => {
@@ -83,6 +89,36 @@ describe('ModelsChart', () => {
       expect(screen.getByText(/Model stats are unavailable/)).toBeTruthy();
     });
     expect(document.querySelector('[data-testid="models-chart-svg"]')).toBeNull();
+  });
+
+  it('keeps the 560-wide desktop viewBox by default', async () => {
+    getModelStats.mockResolvedValue(payload);
+    render(<ModelsChart range="all" />);
+    await waitFor(() => expect(screen.getByText('Fable 5')).toBeTruthy());
+    const svg = document.querySelector('[data-testid="models-chart-svg"]')!;
+    expect(svg.getAttribute('viewBox')).toBe('0 0 560 150');
+  });
+
+  it('uses a narrower viewBox on mobile so axis and day labels stay legible', async () => {
+    mediaState.isMobile = true;
+    getModelStats.mockResolvedValue(payload);
+    render(<ModelsChart range="all" />);
+    await waitFor(() => expect(screen.getByText('Fable 5')).toBeTruthy());
+    const svg = document.querySelector('[data-testid="models-chart-svg"]')!;
+    expect(svg.getAttribute('viewBox')).toBe('0 0 320 150');
+  });
+
+  it('lets the in/out span shrink so the model name keeps most of the row', async () => {
+    getModelStats.mockResolvedValue(payload);
+    render(<ModelsChart range="all" />);
+    await waitFor(() => expect(screen.getByText('Fable 5')).toBeTruthy());
+    const name = screen.getByText('Fable 5');
+    expect(name.className).toContain('flex-1');
+    expect(name.className).toContain('min-w-[40%]');
+    const inOut = screen.getByText(/1\.7k in · 900 out/);
+    expect(inOut.className).toContain('truncate');
+    expect(inOut.className).toContain('min-w-0');
+    expect(inOut.className).not.toContain('shrink-0');
   });
 
   it('targets the active backend in gateway-direct mode (no local backend)', async () => {
