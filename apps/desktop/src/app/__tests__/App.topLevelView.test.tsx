@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 
-const { mockUseIsMobile, mockUseAndroidBack } = vi.hoisted(() => ({
-  mockUseIsMobile: vi.fn(() => false),
-  mockUseAndroidBack: vi.fn(),
-}));
+const { mockUseIsMobile, mockUseAndroidBack, mockIsAndroid, mockShouldShowDirectGatewaySetup } =
+  vi.hoisted(() => ({
+    mockUseIsMobile: vi.fn(() => false),
+    mockUseAndroidBack: vi.fn(),
+    mockIsAndroid: vi.fn(() => false),
+    mockShouldShowDirectGatewaySetup: vi.fn(() => false),
+  }));
 
 vi.mock('../WindowRouter', () => ({
   WindowRouter: ({ children }: { children: any }) => <>{children}</>,
@@ -97,9 +100,14 @@ vi.mock('../../hooks/useDeepLinkNavigation', () => ({ useDeepLinkNavigation: () 
 vi.mock('../../hooks/useMobileInit', () => ({ useMobileInit: () => undefined }));
 vi.mock('../../hooks/useTauriWindowEvents', () => ({ useTauriWindowEvents: () => undefined }));
 
-vi.mock('../../utils/platform', () => ({ isDesktopTauri: () => false }));
+vi.mock('../../utils/platform', () => ({
+  isDesktopTauri: () => false,
+  isAndroid: mockIsAndroid,
+}));
 vi.mock('../../plugins/builtinPanels', () => ({ initBuiltinPanels: vi.fn() }));
-vi.mock('../../utils/directGatewaySetup', () => ({ shouldShowDirectGatewaySetup: () => false }));
+vi.mock('../../utils/directGatewaySetup', () => ({
+  shouldShowDirectGatewaySetup: mockShouldShowDirectGatewaySetup,
+}));
 vi.mock('../../services/mobileConnectionState', () => ({
   getMobileControlPlaneState: () => 'ready',
   isMobileBackendUsable: () => true,
@@ -316,5 +324,46 @@ describe('App shell modes on mobile', () => {
     });
     expect(getByTestId('app-sidebar').getAttribute('data-open')).toBe('false');
     expect(useTopLevelViewStore.getState().view.kind).toBe('agents');
+  });
+});
+
+describe('Android tablet control plane (desktop viewport, no embedded server)', () => {
+  beforeEach(() => {
+    resetStores();
+    vi.clearAllMocks();
+    mockUseIsMobile.mockReturnValue(false);
+    mockIsAndroid.mockReturnValue(false);
+    mockShouldShowDirectGatewaySetup.mockReturnValue(false);
+  });
+
+  it('shows the gateway setup screen instead of the desktop shell when unconfigured', () => {
+    mockIsAndroid.mockReturnValue(true);
+    mockShouldShowDirectGatewaySetup.mockReturnValue(true);
+
+    const { getByText, queryByTestId } = render(<App />);
+
+    expect(getByText('Mobile setup')).toBeTruthy();
+    expect(queryByTestId('app-sidebar')).toBeNull();
+  });
+
+  it('skips the embedded-server Connecting splash and renders the shell', () => {
+    mockIsAndroid.mockReturnValue(true);
+    // The desktop transport never connects on Android (no embedded server);
+    // pre-fix this combination pinned the app on the Connecting splash.
+    useRecoveryStore.setState({ transport: { status: 'connecting' } } as any);
+
+    const { getByTestId, queryByText } = render(<App />);
+
+    expect(queryByText('Connecting...')).toBeNull();
+    expect(getByTestId('app-sidebar')).toBeTruthy();
+  });
+
+  it('keeps the desktop Connecting splash on non-Android desktop', () => {
+    useRecoveryStore.setState({ transport: { status: 'connecting' } } as any);
+
+    const { getByText, queryByTestId } = render(<App />);
+
+    expect(getByText('Connecting...')).toBeTruthy();
+    expect(queryByTestId('app-sidebar')).toBeNull();
   });
 });

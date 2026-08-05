@@ -48,7 +48,7 @@ import { useNotificationsModalStore } from './stores/notificationsModalStore';
 import { useGatewayStore } from './stores/gatewayStore';
 import { useShortcutStore } from './stores/shortcutStore';
 import { useHomeQuickActionsStore } from './stores/homeQuickActionsStore';
-import { isDesktopTauri } from './utils/platform';
+import { isAndroid, isDesktopTauri } from './utils/platform';
 import { initBuiltinPanels } from './plugins/builtinPanels';
 import { shouldShowDirectGatewaySetup } from './utils/directGatewaySetup';
 import { getMobileControlPlaneState } from './services/mobileConnectionState';
@@ -85,6 +85,12 @@ const LazyFallback = () => (
 function AppContent() {
   const { embeddedServerStatus, embeddedServerError } = useConnection();
   const isMobile = useIsMobile();
+  // Control-plane concerns (gateway setup, readiness, localhost guards) are
+  // platform-bound, not viewport-bound: an Android tablet (or landscape phone
+  // ≥768px) renders the desktop layout but still has no embedded server, so it
+  // must use the gateway-direct control plane like phones do. Without this it
+  // would land on the embedded-server "Connecting..." splash forever.
+  const usesMobileControlPlane = isMobile || isAndroid();
 
   // --- Store selectors ---
   const activeServerId = useServerStore(s => s.activeServerId);
@@ -142,7 +148,7 @@ function AppContent() {
   const hasConnected = useRef(false);
 
   // --- Derived state ---
-  const controlPlaneState = isMobile
+  const controlPlaneState = usesMobileControlPlane
     ? getMobileControlPlaneState(facadeConnectionState, facadeSnapshotVersion)
     : transportStatus === 'connected'
       ? 'ready'
@@ -283,7 +289,7 @@ function AppContent() {
   });
 
   useDeepLinkNavigation(controlPlaneState);
-  useMobileInit(isMobile);
+  useMobileInit(usesMobileControlPlane);
   useTauriWindowEvents();
   useMainWindowGeometry();
   useNotchBridgeHost({ enabled: !isMobile });
@@ -384,7 +390,7 @@ function AppContent() {
     availableBackendIds: facadeBackends.map(b => b.backendId),
   });
 
-  if (isMobile && requiresDirectGatewaySetup) {
+  if (usesMobileControlPlane && requiresDirectGatewaySetup) {
     return <MobileSetup />;
   }
 
@@ -399,7 +405,7 @@ function AppContent() {
     return <WindowsSetup />;
   }
 
-  if (!isMobile && !hasConnected.current && controlPlaneState !== 'ready') {
+  if (!usesMobileControlPlane && !hasConnected.current && controlPlaneState !== 'ready') {
     const statusText =
       embeddedServerStatus === 'error'
         ? embeddedServerError || 'Server failed to start'
