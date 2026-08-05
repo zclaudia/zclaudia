@@ -379,7 +379,10 @@ export class GatewayClient {
     return this.streamDemandActive;
   }
   getGatewayUrl(): string {
-    return this.config.gatewayUrl;
+    // Consumers use this as an HTTP base (gateway /api/proxy and gateway-direct
+    // REST). GATEWAY_URL is commonly configured as ws(s):// for the socket, so
+    // normalize the scheme here instead of failing with ERR_INVALID_PROTOCOL.
+    return this.config.gatewayUrl.replace(/^ws:/, 'http:').replace(/^wss:/, 'https:');
   }
   getGatewaySecret(): string {
     return this.config.gatewaySecret;

@@ -213,6 +213,17 @@ describe('GatewayClient', () => {
       expect(client.getBackendId()).toBe('test-backend-123');
     });
 
+    it('getGatewayUrl normalizes ws(s) schemes to http(s) for HTTP consumers', () => {
+      (client as any).config.gatewayUrl = 'ws://127.0.0.1:3200';
+      expect(client.getGatewayUrl()).toBe('http://127.0.0.1:3200');
+
+      (client as any).config.gatewayUrl = 'wss://gateway.example.com';
+      expect(client.getGatewayUrl()).toBe('https://gateway.example.com');
+
+      (client as any).config.gatewayUrl = 'https://gateway.example.com';
+      expect(client.getGatewayUrl()).toBe('https://gateway.example.com');
+    });
+
     it('getDiscoveredBackends returns visible backends from registry', () => {
       (client as any).registryItems.set('backend-1', {
         backendId: 'backend-1',
