@@ -604,7 +604,7 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
         </div>
         <button
           onClick={() => setExpanded(!expanded)}
-          className="p-0.5 rounded-md hover:bg-muted transition-colors text-muted-foreground"
+          className="p-0.5 rounded-md hover:bg-muted transition-colors text-muted-foreground relative before:absolute before:-inset-2 before:content-[''] md:before:content-none"
           title={expanded ? 'Collapse' : 'Expand'}
         >
           {expanded ? <Minimize2 size={12} /> : <Maximize2 size={12} />}

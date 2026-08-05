@@ -143,7 +143,7 @@ export function UsageStatsStrip() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
+              className={`text-xs px-2.5 py-2 md:py-1 rounded-md transition-colors ${
                 t === tab
                   ? 'bg-secondary text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
@@ -158,7 +158,7 @@ export function UsageStatsStrip() {
             <button
               key={r}
               onClick={() => setRange(r)}
-              className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
+              className={`text-xs px-2.5 py-2 md:py-1 rounded-md transition-colors ${
                 r === range
                   ? 'bg-secondary text-foreground'
                   : 'text-muted-foreground hover:text-foreground'

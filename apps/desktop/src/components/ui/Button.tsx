@@ -72,7 +72,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
     <button
       ref={ref}
       type={type}
-      className={`${BASE} ${VARIANT.ghost} ${dim} shrink-0 ${className}`.trim()}
+      className={`${BASE} ${VARIANT.ghost} ${dim} shrink-0 relative before:absolute before:-inset-1.5 before:content-[''] md:before:content-none ${className}`.trim()}
       {...rest}
     />
   );

@@ -93,7 +93,7 @@ export function PinnedSkillChips({
             aria-label={`Unpin ${chip.label}`}
             onClick={() => onUnpin(chip.ref)}
             onMouseDown={e => e.stopPropagation()}
-            className="rounded-full p-0.5 text-current opacity-50 hover:opacity-100 hover:bg-foreground/10 transition-opacity cursor-pointer"
+            className="rounded-full p-0.5 text-current opacity-50 hover:opacity-100 hover:bg-foreground/10 transition-opacity cursor-pointer relative before:absolute before:-inset-1 before:content-[''] md:before:content-none"
           >
             <X size={11} strokeWidth={2.5} />
           </button>
