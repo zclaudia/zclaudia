@@ -57,3 +57,25 @@ export function hasAnyActiveRunForSession(
   }
   return false;
 }
+
+/** Gateway wire status for one session. */
+export type GatewaySessionRunStatus = 'idle' | 'running' | 'waiting' | 'failed';
+
+/**
+ * What the gateway should report for a session.
+ *
+ * A live foreground run wins, but it alone can only ever say "running" — the
+ * states clients actually need to act on (blocked on the user, or ended badly)
+ * live in `sessions.last_run_status`, which outlives the in-memory run. Without
+ * folding that in, remote clients can never see `waiting` or `failed`.
+ */
+export function resolveSessionRunStatus(
+  activeRuns: Map<string, RunLike>,
+  sessionId: string,
+  persisted: string | null | undefined
+): GatewaySessionRunStatus {
+  if (persisted === 'waiting') return 'waiting';
+  if (hasForegroundActiveRunForSession(activeRuns, sessionId)) return 'running';
+  if (persisted === 'failed') return 'failed';
+  return 'idle';
+}

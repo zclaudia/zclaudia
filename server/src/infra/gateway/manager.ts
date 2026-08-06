@@ -12,7 +12,7 @@ import type { FacadeWsHub } from './ws-hub.js';
 import type Database from 'better-sqlite3';
 import type { GatewayConfig } from '../../interfaces/http/gateway.js';
 import type { ServerContext } from '../../server.js';
-import { hasForegroundActiveRunForSession } from '../../utils/run-state.js';
+import { resolveSessionRunStatus } from '../../utils/run-state.js';
 import {
   parsePersistedMessageContent,
   parsePersistedMessageMetadata,
@@ -435,7 +435,7 @@ export class GatewayManager {
               `
             SELECT s.id, s.name, s.project_id as projectId,
                    s.created_at as createdAt, s.updated_at as updatedAt,
-                   s.archived_at as archivedAt
+                   s.archived_at as archivedAt, s.last_run_status as lastRunStatus
             FROM sessions s
             LEFT JOIN projects p ON s.project_id = p.id
             WHERE s.archived_at IS NULL
@@ -452,9 +452,11 @@ export class GatewayManager {
               createdAt: s.createdAt as number,
               updatedAt: s.updatedAt as number,
               lastMessageAt: s.updatedAt as number,
-              runStatus: hasForegroundActiveRunForSession(activeRuns, s.id as string)
-                ? 'running'
-                : 'idle',
+              runStatus: resolveSessionRunStatus(
+                activeRuns,
+                s.id as string,
+                (s.lastRunStatus as string | null) ?? null
+              ),
             })
           );
         } catch {

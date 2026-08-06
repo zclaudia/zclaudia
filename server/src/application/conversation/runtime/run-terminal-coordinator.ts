@@ -33,6 +33,7 @@ import {
 import { projectRunDomainEventToWireMessages } from './wire-projector.js';
 import { broadcastRunMessage } from '../transport/broadcast.js';
 import { maybeGenerateSessionTitle } from '../title/session-title-service.js';
+import { setSessionRunStatus } from './session-run-status.js';
 
 export interface TerminalProviderEventState {
   systemInfo?: SystemInfo;
@@ -144,6 +145,9 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
       type: 'run.completed',
     });
     setPhase(activeRun, 'completed');
+    // Settle the persisted status: nothing else clears it, so a completed run
+    // used to leave 'running' behind for state recovery to call "interrupted".
+    setSessionRunStatus(db, sessionId, null);
     broadcastHeartbeat();
     postRunCompletedNotification({
       db,
@@ -274,6 +278,7 @@ export function failProviderTurn(input: FailProviderTurnInput): void {
       type: 'run.failed',
     });
     setPhase(activeRun, 'failed');
+    setSessionRunStatus(db, sessionId, 'failed');
     broadcastHeartbeat();
     postRunFailedNotification({
       db,

@@ -5,7 +5,7 @@ import type {
 import type { ProjectItem, SessionItem } from '@zclaudia/protocol/zclaudia';
 import type { Database as BetterDatabase } from 'better-sqlite3';
 import type { ActiveRun } from '../../application/conversation/transport/types.js';
-import { hasForegroundActiveRunForSession } from '../../utils/run-state.js';
+import { resolveSessionRunStatus } from '../../utils/run-state.js';
 
 type ActiveRunsMap = Map<string, ActiveRun>;
 type BackendDataMessage = BackendResourceSnapshotMessage | BackendResourceEventMessage;
@@ -29,6 +29,14 @@ export interface GatewaySessionRecord {
   updated_at?: number;
   archivedAt?: number | null;
   archived_at?: number | null;
+  lastRunStatus?: string | null;
+  last_run_status?: string | null;
+}
+
+/** Column comes back camelCase from the publisher's own query, snake_case from
+ *  callers that hand over a raw row. */
+function persistedRunStatus(session: GatewaySessionRecord): string | null {
+  return session.lastRunStatus ?? session.last_run_status ?? null;
 }
 
 export interface GatewayProjectRecord {
@@ -155,7 +163,7 @@ export class GatewayBackendDataPublisher {
         `
         SELECT s.id, s.name, s.project_id as projectId,
                s.created_at as createdAt, s.updated_at as updatedAt,
-               s.archived_at as archivedAt
+               s.archived_at as archivedAt, s.last_run_status as lastRunStatus
         FROM sessions s
         LEFT JOIN projects p ON s.project_id = p.id
         WHERE s.archived_at IS NULL
@@ -215,7 +223,7 @@ export class GatewayBackendDataPublisher {
       createdAt: session.createdAt ?? session.created_at ?? Date.now(),
       updatedAt,
       lastMessageAt: updatedAt,
-      runStatus: hasForegroundActiveRunForSession(this.activeRuns, session.id) ? 'running' : 'idle',
+      runStatus: resolveSessionRunStatus(this.activeRuns, session.id, persistedRunStatus(session)),
     };
   }
 

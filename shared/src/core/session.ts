@@ -31,7 +31,10 @@ export interface Session {
   taskId?: string;
   planStatus?: 'planning' | 'planned' | 'executing' | null;
   isReadOnly?: boolean;
-  lastRunStatus?: 'running' | 'waiting' | 'interrupted' | null;
+  /** Live states (`running`, `waiting`) plus how the last run settled.
+   *  `failed` persists until the next run starts; `interrupted` is written by
+   *  state recovery for runs that were in flight when the server stopped. */
+  lastRunStatus?: 'running' | 'waiting' | 'failed' | 'interrupted' | null;
   /** Cross-session fork lineage: the session this was forked from (SP-A). NULL once the source is deleted. */
   forkedFromSessionId?: string;
   /** The source tree entry id this session was forked at (SP-A). */

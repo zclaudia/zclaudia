@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PhaseEmitter, recomputePhase, computeBlockers } from '../active-run-phase.js';
 
+/** Minimal db stub: the run lifecycle persists last_run_status on terminal events. */
+const stubDb = () =>
+  ({ prepare: () => ({ run: () => {}, get: () => undefined, all: () => [] }) }) as any;
 const findProcessPidsByTaskCommandMock = vi.fn();
 const cleanupPendingPermissionsMock = vi.fn();
 const upsertAssistantMessageMock = vi.fn();
@@ -77,7 +80,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: { type: 'assistant_delta', content: 'hello' } as any,
@@ -128,7 +131,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: {
@@ -188,7 +191,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: {
@@ -327,7 +330,7 @@ describe('ws/run-events', () => {
         activeRuns: new Map(),
         broadcastHeartbeat: broadcastHeartbeatMock,
         client: { ws: {} as any } as any,
-        db: {} as any,
+        db: stubDb(),
         input: 'hello',
         modeValue: 'default',
         msg: {
@@ -417,7 +420,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map([['run-1', activeRun]]),
       broadcastHeartbeat: broadcastHeartbeatMock,
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: {
@@ -469,7 +472,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map([['run-1', activeRun]]),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: {
@@ -527,7 +530,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map([['run-1', activeRun]]),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: {
@@ -585,7 +588,7 @@ describe('ws/run-events', () => {
         activeRuns,
         broadcastHeartbeat: broadcastHeartbeatMock,
         client: { ws: {} as any } as any,
-        db: {} as any,
+        db: stubDb(),
         input: 'hello',
         modeValue: 'default',
         msg: {
@@ -664,7 +667,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: {
@@ -719,7 +722,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'plan',
       msg: {
@@ -767,7 +770,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: {
@@ -828,7 +831,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: {
@@ -886,7 +889,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: {
@@ -940,7 +943,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       notificationService: {} as any,
@@ -999,7 +1002,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: {
@@ -1052,7 +1055,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: { type: 'tool_activity', content: 'sub-agent text' } as any,
@@ -1097,7 +1100,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       notificationService: {} as any,
@@ -1148,7 +1151,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: { type: 'thinking_delta', thinkingSignature: 'sig-1' } as any,
@@ -1187,7 +1190,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: { type: 'thinking_delta', thinkingRedacted: true } as any,
@@ -1226,7 +1229,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: { type: 'thinking_delta', thinkingContent: 'hello' } as any,
@@ -1268,7 +1271,7 @@ describe('ws/run-events', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       msg: {
@@ -1329,7 +1332,7 @@ describe('ws/run-events', () => {
         activeRuns: new Map([['run-1', activeRun]]),
         broadcastHeartbeat: vi.fn(),
         client: { ws: {} as any } as any,
-        db: {} as any,
+        db: stubDb(),
         input: 'hello',
         modeValue: 'default',
         msg,
@@ -1511,7 +1514,7 @@ describe('run-events agent_end -> maybeCompact', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: { fake: true } as any,
+      db: stubDb(),
       input: 'hi',
       modeValue: 'default',
       msg: {
@@ -1589,7 +1592,7 @@ describe('run-events agent_end -> maybeCompact', () => {
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
       client: { ws: {} as any } as any,
-      db: { fake: true } as any,
+      db: stubDb(),
       input: 'hi',
       modeValue: 'default',
       msg: {

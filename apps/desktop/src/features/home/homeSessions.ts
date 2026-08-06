@@ -16,6 +16,8 @@ export interface HomeSessionRow {
    * subscribed backend — not just the one whose REST catalog is loaded.
    */
   needsAttention: boolean;
+  /** The last run ended badly (failed, or was cut off by a server restart). */
+  hasFailed: boolean;
   /** Message count when known (RemoteSession.lastMessageOffset). */
   messageCount?: number;
 }
@@ -58,6 +60,7 @@ function toRow(
   projectNames: Map<string, string>
 ): HomeSessionRow {
   const needsAttention = session.lastRunStatus === 'waiting';
+  const hasFailed = session.lastRunStatus === 'failed' || session.lastRunStatus === 'interrupted';
   return {
     id: session.id,
     // Explicit user name wins over the AI auto-title so a rename is never
@@ -71,6 +74,7 @@ function toRow(
     // stuck on the user, so it belongs in its own group, not in Running.
     isRunning: isRunning && !needsAttention,
     needsAttention,
+    hasFailed,
     messageCount: (session as { lastMessageOffset?: number }).lastMessageOffset,
   };
 }

@@ -37,6 +37,7 @@ vi.mock('../../../utils/uuid.js', () => ({
 // Mock run-state utility
 vi.mock('../../../utils/run-state.js', () => ({
   hasForegroundActiveRunForSession: vi.fn().mockReturnValue(false),
+  resolveSessionRunStatus: vi.fn().mockReturnValue('idle'),
 }));
 
 describe('GatewayClient', () => {

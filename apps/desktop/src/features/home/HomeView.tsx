@@ -248,6 +248,9 @@ function SessionGroup({
                   <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse shrink-0" />
                 ) : row.isRunning ? (
                   <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shrink-0" />
+                ) : row.hasFailed ? (
+                  // Settled, so no pulse — it is a result to review, not activity.
+                  <span className="w-1.5 h-1.5 rounded-full bg-destructive shrink-0" />
                 ) : null}
                 <span className="truncate text-sm text-foreground">{row.title}</span>
                 <span className="ml-auto shrink-0 pl-4 text-[11px] text-muted-foreground">
@@ -255,11 +258,12 @@ function SessionGroup({
                 </span>
               </span>
               <span
-                className={`block mt-px truncate text-xs text-muted-foreground ${
-                  row.isRunning || row.needsAttention ? 'pl-[14px]' : ''
-                }`}
+                className={`block mt-px truncate text-xs ${
+                  row.hasFailed ? 'text-destructive/80' : 'text-muted-foreground'
+                } ${row.isRunning || row.needsAttention || row.hasFailed ? 'pl-[14px]' : ''}`}
               >
                 {[
+                  row.hasFailed ? 'Failed' : null,
                   row.messageCount
                     ? `${row.messageCount} ${row.messageCount === 1 ? 'message' : 'messages'}`
                     : null,

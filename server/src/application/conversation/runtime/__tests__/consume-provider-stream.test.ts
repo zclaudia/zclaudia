@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PhaseEmitter } from '../active-run-phase.js';
 
+/** Minimal db stub: terminal run events persist last_run_status. */
+const stubDb = () =>
+  ({ prepare: () => ({ run: () => {}, get: () => undefined, all: () => [] }) }) as any;
 const handleProviderEventMock = vi.fn();
 const failProviderTurnMock = vi.fn();
 
@@ -53,7 +56,7 @@ describe('consumeProviderStream', () => {
         broadcastHeartbeat: vi.fn(),
         client: {} as any,
         cwd: '/tmp',
-        db: {} as any,
+        db: stubDb(),
         input: 'hello',
         modeValue: 'default',
         notificationService: {} as any,
@@ -105,7 +108,7 @@ describe('consumeProviderStream', () => {
       broadcastHeartbeat: vi.fn(),
       client: {} as any,
       cwd: '/tmp',
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       modeValue: 'default',
       notificationService: {} as any,

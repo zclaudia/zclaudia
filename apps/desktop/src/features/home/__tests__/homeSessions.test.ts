@@ -202,4 +202,29 @@ describe('selectHomeSessions', () => {
     expect(result.recent.map(r => r.id)).toEqual(['done']);
     expect(result.recent[0].needsAttention).toBe(false);
   });
+
+  it('marks a settled failure without pulling it out of Recent', () => {
+    const result = selectHomeSessions(
+      input({
+        localSessions: [
+          session('failed', { updatedAt: 200, lastRunStatus: 'failed' }),
+          session('ok', { updatedAt: 100, lastRunStatus: null }),
+        ],
+      })
+    );
+    // Failures stay in the time-ordered list; the row carries the flag so the
+    // UI can mark them rather than fragmenting Home into another group.
+    expect(result.recent.map(r => [r.id, r.hasFailed])).toEqual([
+      ['failed', true],
+      ['ok', false],
+    ]);
+    expect(result.needsAttention).toEqual([]);
+  });
+
+  it('treats a run interrupted by a server restart as failed', () => {
+    const result = selectHomeSessions(
+      input({ localSessions: [session('cut-off', { lastRunStatus: 'interrupted' })] })
+    );
+    expect(result.recent[0].hasFailed).toBe(true);
+  });
 });

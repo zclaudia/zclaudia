@@ -1,6 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { StoredFile } from '../../../../infra/storage/fileStore.js';
 
+/** Minimal db stub: terminal run events persist last_run_status. */
+const stubDb = () =>
+  ({ prepare: () => ({ run: () => {}, get: () => undefined, all: () => [] }) }) as any;
 // Mock the fileStore module so getFileStore() returns a controllable stub.
 const mockGetFile = vi.fn<[string], StoredFile | null>();
 
@@ -25,13 +28,13 @@ function makeInput(messageInput: string) {
     activeRun: {
       sessionId: 'session-1',
       pendingPermissions: new Map(),
-      db: {} as any,
+      db: stubDb(),
     } as any,
     client: { ws: {} as any } as any,
     broadcastToOtherAuthenticatedClients: vi.fn(),
     connectedClients: new Map(),
     cwd: '/tmp/proj',
-    db: {} as any,
+    db: stubDb(),
     message: {
       type: 'run_start' as const,
       clientRequestId: 'req-1',

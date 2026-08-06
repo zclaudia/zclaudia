@@ -4,6 +4,7 @@ import {
   hasForegroundActiveRunForSession,
   findForegroundActiveRunIdForSession,
   hasAnyActiveRunForSession,
+  resolveSessionRunStatus,
 } from '../run-state.js';
 
 describe('run-state helpers', () => {
@@ -54,5 +55,34 @@ describe('run-state helpers', () => {
 
   it('hasAnyActiveRunForSession returns false for empty map', () => {
     expect(hasAnyActiveRunForSession(new Map(), 's1')).toBe(false);
+  });
+
+  describe('resolveSessionRunStatus', () => {
+    const live = new Map<string, any>([
+      ['r1', { sessionId: 'live', phase: 'running', sessionType: 'regular' }],
+    ]);
+
+    it('reports a live foreground run as running', () => {
+      expect(resolveSessionRunStatus(live, 'live', null)).toBe('running');
+    });
+
+    it('lets a persisted waiting status win over the live run', () => {
+      // The run is still in memory while blocked on a permission prompt, but
+      // clients need to see that it is stuck on the user, not working.
+      expect(resolveSessionRunStatus(live, 'live', 'waiting')).toBe('waiting');
+    });
+
+    it('reports a persisted failure once the run has left memory', () => {
+      expect(resolveSessionRunStatus(new Map(), 's1', 'failed')).toBe('failed');
+    });
+
+    it('ignores a stale failure while a new run is in flight', () => {
+      expect(resolveSessionRunStatus(live, 'live', 'failed')).toBe('running');
+    });
+
+    it('falls back to idle', () => {
+      expect(resolveSessionRunStatus(new Map(), 's1', null)).toBe('idle');
+      expect(resolveSessionRunStatus(new Map(), 's1', 'interrupted')).toBe('idle');
+    });
   });
 });

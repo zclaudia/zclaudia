@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PhaseEmitter } from '../active-run-phase.js';
 import { RunDomainEventListenerRegistry } from '../run-domain-event-listeners.js';
 
+/** Minimal db stub: terminal run events persist last_run_status. */
+const stubDb = () =>
+  ({ prepare: () => ({ run: () => {}, get: () => undefined, all: () => [] }) }) as any;
 const upsertAssistantMessageMock = vi.fn();
 const cleanupPendingPermissionsMock = vi.fn();
 const clearSessionMock = vi.fn();
@@ -87,7 +90,7 @@ describe('run terminal coordinator', () => {
     completeProviderTurn({
       activeRun,
       broadcastHeartbeat,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       msg: { type: 'result', content: 'done', usage } as any,
       notificationService: { notify: vi.fn() } as any,
@@ -158,7 +161,7 @@ describe('run terminal coordinator', () => {
     completeProviderTurn({
       activeRun,
       broadcastHeartbeat: vi.fn(),
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       msg: { type: 'result' } as any,
       notificationService: { notify: vi.fn() } as any,
@@ -215,7 +218,7 @@ describe('run terminal coordinator', () => {
     completeProviderTurn({
       activeRun,
       broadcastHeartbeat,
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       msg: { type: 'result', usage } as any,
       notificationService: { notify: vi.fn() } as any,
@@ -272,7 +275,7 @@ describe('run terminal coordinator', () => {
     completeProviderTurn({
       activeRun,
       broadcastHeartbeat: vi.fn(),
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       msg: { type: 'result', content: 'done', usage } as any,
       notificationService: { notify: vi.fn() } as any,
@@ -341,7 +344,7 @@ describe('run terminal coordinator', () => {
     completeProviderTurn({
       activeRun,
       broadcastHeartbeat: vi.fn(),
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       msg: { type: 'result', content: 'done', usage } as any,
       notificationService: { notify: vi.fn() } as any,
@@ -394,7 +397,7 @@ describe('run terminal coordinator', () => {
       activeRuns,
       broadcastHeartbeat,
       cleanupReason: 'formatted provider error',
-      db: {} as any,
+      db: stubDb(),
       errorCode: 'BAD_MODEL',
       errorMessage: 'formatted provider error',
       notificationService: { notify: vi.fn() } as any,
@@ -459,7 +462,7 @@ describe('run terminal coordinator', () => {
     completeProviderTurn({
       activeRun,
       broadcastHeartbeat: vi.fn(),
-      db: {} as any,
+      db: stubDb(),
       input: 'hello',
       msg: { type: 'result', content: 'done', usage } as any,
       notificationService: { notify: vi.fn() } as any,

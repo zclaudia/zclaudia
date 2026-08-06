@@ -17,11 +17,13 @@ export function syncBackendDataSnapshot(
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
     isActive: item.runStatus === 'running' || item.runStatus === 'waiting',
-    // Keep running/waiting apart: `waiting` means the run is blocked on the
-    // user (a permission request sets it), which Home surfaces separately from
-    // "still working". Collapsing both into isActive loses that.
+    // Keep the states apart: `waiting` means blocked on the user, `failed`
+    // means the run ended badly — both are things Home acts on, and both are
+    // lost if everything collapses into isActive.
     lastRunStatus:
-      item.runStatus === 'running' || item.runStatus === 'waiting' ? item.runStatus : null,
+      item.runStatus === 'running' || item.runStatus === 'waiting' || item.runStatus === 'failed'
+        ? item.runStatus
+        : null,
     type: 'regular' as const,
   }));
 

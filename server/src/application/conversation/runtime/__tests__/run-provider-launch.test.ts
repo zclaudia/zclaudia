@@ -4,6 +4,9 @@ import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { LlmProfileRepository } from '../../../../domains/llm-profiles/repository.js';
 import { RunDomainEventListenerRegistry } from '../run-domain-event-listeners.js';
 
+/** Minimal db stub: terminal run events persist last_run_status. */
+const stubDb = () =>
+  ({ prepare: () => ({ run: () => {}, get: () => undefined, all: () => [] }) }) as any;
 const buildRunContextMock = vi.fn();
 const negotiateProfileMock = vi.fn();
 const upsertAssistantMessageMock = vi.fn();
@@ -124,7 +127,7 @@ describe('ws/run-provider-launch', () => {
       broadcastSessionCatalogUpdate: broadcastSessionCatalogUpdateMock,
       client: { ws: {} as any } as any,
       cwd: '/tmp/project',
-      db: {} as any,
+      db: stubDb(),
       enabledTools: [],
       forcedPlanBySession: false,
       images: [],
@@ -312,7 +315,7 @@ describe('ws/run-provider-launch', () => {
       broadcastSessionCatalogUpdate: vi.fn(),
       client: { ws: {} as any } as any,
       cwd: '/tmp/project',
-      db: {} as any,
+      db: stubDb(),
       enabledTools: [],
       forcedPlanBySession: false,
       images: [],

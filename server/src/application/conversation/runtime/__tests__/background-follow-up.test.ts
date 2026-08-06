@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RunDomainEventListenerRegistry } from '../run-domain-event-listeners.js';
 
+/** Minimal db stub: terminal run events persist last_run_status. */
+const stubDb = () =>
+  ({ prepare: () => ({ run: () => {}, get: () => undefined, all: () => [] }) }) as any;
 const sendMessageMock = vi.fn();
 const broadcastToOtherAuthenticatedClientsMock = vi.fn();
 const upsertAssistantMessageMock = vi.fn();
@@ -51,7 +54,7 @@ describe('background follow-up consumer', () => {
       broadcastHeartbeat: vi.fn(),
       client: { id: 'client-1', ws: {} } as any,
       connectedClients: new Map(),
-      db: {} as any,
+      db: stubDb(),
       sessionId: 'session-1',
       projectId: 'project-1',
       providerType: 'zclaudia',
