@@ -23,6 +23,15 @@ import { BackendRow } from './BackendRow';
 import { useProjectStore } from '../../stores/projectStore';
 import { useOnlineBackends } from './onlineBackends';
 import { useBackendConnectionLifecycle } from './useBackendConnectionLifecycle';
+import { useFacadeStore } from '../../stores/facadeStore';
+import { useServerStore } from '../../stores/serverStore';
+import { useGatewayStore } from '../../stores/gatewayStore';
+import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
+import { resolveCanonicalBackendId } from '../../utils/controlPlane';
+import {
+  getMobileBackendViewState,
+  isMobileGatewayConnected,
+} from '../../services/mobileConnectionState';
 import { useSidebarExpansionStore } from '../../stores/sidebarExpansionStore';
 import { NewProjectModal } from './NewProjectModal';
 import { SidebarFooter } from './SidebarFooter';
@@ -155,6 +164,14 @@ export function Sidebar({
   } = data;
 
   const onlineBackends = useOnlineBackends();
+  // The tree is the app's only backend surface, so it owns switching and shows
+  // the full connection state (there is no separate backend picker).
+  const backendActiveId = resolveCanonicalBackendId(data.activeServerId, data.localBackendId);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const facadeBackends = useFacadeStore(s => s.backends);
+  const serverConnections = useServerStore(s => s.connections);
+  const directGatewayUrl = useGatewayStore(s => s.directGatewayUrl);
+  const selectionCoordinator = useSelectionCoordinator();
   const expandedBackendIds = useSidebarExpansionStore(s => s.expandedBackendIds);
   const toggleBackend = useSidebarExpansionStore(s => s.toggleBackend);
   const expandBackend = useSidebarExpansionStore(s => s.expandBackend);
@@ -609,20 +626,40 @@ export function Sidebar({
     </SortableList>
   );
 
+  const noBackendsMessage = (() => {
+    if (isMobile && !directGatewayUrl) return 'Gateway not configured';
+    if (isMobile && !isMobileGatewayConnected(facadeConnectionState))
+      return 'Connecting to gateway...';
+    return 'No backends online';
+  })();
+
   const renderProjectList = () => (
     <>
       {onlineBackends.length === 0 ? (
-        <p className="text-sm text-muted-foreground px-2">No backends online</p>
+        <p className="text-sm text-muted-foreground px-2">{noBackendsMessage}</p>
       ) : (
         <div className="space-y-2">
           {onlineBackends.map(backend => {
             const backendProjects = getProjectsForBackend(backend.backendId);
             const expanded = expandedBackendIds.includes(backend.backendId);
+            // Treat "no active backend yet" as active so the tree never shows a
+            // switch prompt in place of projects during startup.
+            const isActive =
+              !backendActiveId ||
+              resolveCanonicalBackendId(backend.backendId, data.localBackendId) === backendActiveId;
             return (
               <div key={backend.backendId} className="space-y-1">
                 <BackendRow
                   name={backend.name}
                   online={backend.online}
+                  viewState={getMobileBackendViewState(
+                    backend.backendId,
+                    facadeConnectionState,
+                    facadeBackends
+                  )}
+                  latencyMs={serverConnections[backend.backendId]?.latencyMs}
+                  isActive={isActive}
+                  onActivate={() => selectionCoordinator.selectBackend(backend.backendId)}
                   expanded={expanded}
                   onToggle={() => toggleBackend(backend.backendId)}
                   onNewProject={() =>

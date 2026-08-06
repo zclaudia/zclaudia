@@ -41,7 +41,7 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
   const pluginSettingsTabs = usePluginStore(selectPluginSettingsTabs);
 
   // Settings always show/edit this device's local backend; backend switching
-  // lives in the app header's ServerSelector, not in this panel.
+  // lives in the sidebar's backend tree, not in this panel.
   const activeServerId = useServerStore(s => s.activeServerId);
   const { sendMessage, embeddedServerStatus } = useConnection();
 

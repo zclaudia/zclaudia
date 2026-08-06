@@ -1,5 +1,6 @@
-import { ChevronRight, Plus } from 'lucide-react';
+import { ChevronRight, Plus, ArrowLeftRight } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { backendStatusColor, backendStatusLabel, type BackendViewState } from './backendStatus';
 
 interface BackendRowProps {
   name: string;
@@ -9,12 +10,23 @@ interface BackendRowProps {
   children: ReactNode;
   onNewProject?: () => void;
   newProjectDisabled?: boolean;
+  /** Full connection state; falls back to the online flag when not supplied. */
+  viewState?: BackendViewState;
+  latencyMs?: number | null;
+  /**
+   * Whether this backend is the active one. Only the active backend's projects
+   * and sessions are loaded, so a non-active row offers to switch instead of
+   * showing an empty (and misleading) project list.
+   */
+  isActive?: boolean;
+  onActivate?: () => void;
 }
 
 /**
- * Top-level sidebar row for one backend. Header shows an online dot, the backend
- * name, and an expand chevron; expanded content (the project subtree) is supplied
- * by the parent. Presentational only — no data or connection logic (Phase 3).
+ * Top-level sidebar row for one backend: status, name, expand chevron, and the
+ * project subtree supplied by the parent. This is the app's only backend
+ * surface — switching happens here (or implicitly when opening a project), so
+ * the row carries the connection state rather than a plain online dot.
  */
 export function BackendRow({
   name,
@@ -24,7 +36,15 @@ export function BackendRow({
   children,
   onNewProject,
   newProjectDisabled,
+  viewState,
+  latencyMs,
+  isActive = true,
+  onActivate,
 }: BackendRowProps) {
+  const effectiveState: BackendViewState = viewState ?? (online ? 'ready' : 'offline');
+  const statusLabel = backendStatusLabel(effectiveState);
+  const showSwitch = !isActive && !!onActivate;
+
   return (
     <div className="space-y-1">
       <div className="group flex items-center rounded-md hover:bg-secondary transition-colors">
@@ -40,11 +60,20 @@ export function BackendRow({
           {/* Status dot leads (like the project row's folder icon); the expand
               chevron trails at the right end, matching ProjectListItem. */}
           <span
-            className={`h-2 w-2 flex-shrink-0 rounded-full ${online ? 'bg-success' : 'bg-muted-foreground'}`}
+            className={`h-2 w-2 flex-shrink-0 rounded-full ${backendStatusColor(effectiveState)}`}
+            title={statusLabel ?? 'Ready'}
           />
           <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
             {name}
           </span>
+          {statusLabel && (
+            <span className="flex-shrink-0 text-[10px] text-muted-foreground">{statusLabel}</span>
+          )}
+          {!statusLabel && typeof latencyMs === 'number' && (
+            <span className="flex-shrink-0 text-[10px] text-muted-foreground/70">
+              {latencyMs}ms
+            </span>
+          )}
           <ChevronRight
             size={14}
             strokeWidth={2}
@@ -52,11 +81,12 @@ export function BackendRow({
           />
         </button>
         {onNewProject && (
+          // Visible on touch; hover-revealed only from md: up.
           <button
             type="button"
             onClick={onNewProject}
             disabled={newProjectDisabled}
-            className="mr-1 hidden h-6 w-6 flex-shrink-0 items-center justify-center rounded-md hover:bg-accent group-hover:flex disabled:cursor-not-allowed"
+            className="mr-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md hover:bg-accent disabled:cursor-not-allowed md:hidden md:group-hover:flex"
             title="New project"
             aria-label="New project"
           >
@@ -64,7 +94,22 @@ export function BackendRow({
           </button>
         )}
       </div>
-      {expanded && <div className="pl-3">{children}</div>}
+      {expanded && (
+        <div className="pl-3">
+          {showSwitch ? (
+            <button
+              type="button"
+              onClick={onActivate}
+              className="flex w-full items-center gap-1.5 rounded-md px-2 py-2 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <ArrowLeftRight size={12} strokeWidth={1.75} className="flex-shrink-0" />
+              Switch to this backend
+            </button>
+          ) : (
+            children
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -206,7 +206,7 @@ vi.mock('@/contexts/ThemeContext', () => ({
   isDarkTheme: vi.fn(() => true),
 }));
 
-// Mock ConnectionContext — needed by components using useConnection (e.g. ServerSelector → Sidebar)
+// Mock ConnectionContext — needed by components using useConnection (e.g. Sidebar)
 vi.mock('@/contexts/ConnectionContext', () => ({
   useConnection: vi.fn(() => ({
     isConnected: true,
