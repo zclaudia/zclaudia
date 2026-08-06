@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ModelUsagePayload, UsageStatsRange } from '@zclaudia/shared';
 import { getModelStats } from '../../services/api';
-import { useStatsBackendId } from './statsBackend';
+import { useStatsBackendTargets } from './statsBackend';
+import { aggregateModelStats } from './aggregateUsageStats';
 import { formatTokens } from '../../utils/formatTokens';
 import { buildModelChart, prettyModelName } from './modelStats';
 import { useIsMobile } from '../../hooks/useMediaQuery';
@@ -27,22 +28,27 @@ function formatDay(date: string): string {
  *  as the cards: shared stats backend, visible failure notice, stale data kept
  *  during range refetches. */
 export function ModelsChart({ range }: { range: UsageStatsRange }) {
-  const backendId = useStatsBackendId();
+  const targets = useStatsBackendTargets();
+  const targetKey = targets.map(t => t.backendId).join(',');
   const isMobile = useIsMobile();
   const [stats, setStats] = useState<ModelUsagePayload | null>(null);
   const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    if (backendId === null) {
+    if (targets.length === 0) {
       setUnavailable(true);
       return;
     }
-    getModelStats(backendId, range)
-      .then(next => {
+    // Totalled across backends, matching the cards above; a backend that fails
+    // drops out instead of failing the chart.
+    Promise.all(targets.map(target => getModelStats(target.backendId, range).catch(() => null)))
+      .then(results => {
         if (cancelled) return;
-        setStats(next);
-        setUnavailable(false);
+        const usable = results.filter((r): r is ModelUsagePayload => r !== null);
+        setUnavailable(usable.length === 0);
+        const merged = aggregateModelStats(usable);
+        if (merged) setStats(merged);
       })
       .catch(() => {
         if (!cancelled) setUnavailable(true);
@@ -50,7 +56,8 @@ export function ModelsChart({ range }: { range: UsageStatsRange }) {
     return () => {
       cancelled = true;
     };
-  }, [backendId, range]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetKey, range]);
 
   const [expanded, setExpanded] = useState(false);
   const chart = useMemo(

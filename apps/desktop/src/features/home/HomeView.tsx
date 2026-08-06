@@ -74,7 +74,7 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
     [activeBackendSessions, projectOwnerIds, sessionOwnerIds, localBackendId, localAliasBackendIds]
   );
 
-  const { running, recent } = useMemo(
+  const { needsAttention, running, recent } = useMemo(
     () =>
       selectHomeSessions({
         localSessions,
@@ -123,7 +123,7 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
   const titleRequestedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const requested = titleRequestedRef.current;
-    for (const row of [...running, ...recent]) {
+    for (const row of [...needsAttention, ...running, ...recent]) {
       if (row.title !== 'Untitled' || requested.has(row.id)) continue;
       const backendId =
         row.backendKey === LOCAL_BACKEND_KEY
@@ -133,9 +133,9 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
       requested.add(row.id);
       void generateSessionTitle(backendId, row.id).catch(() => {});
     }
-  }, [running, recent, localBackendId]);
+  }, [needsAttention, running, recent, localBackendId]);
 
-  const isEmpty = running.length === 0 && recent.length === 0;
+  const isEmpty = needsAttention.length === 0 && running.length === 0 && recent.length === 0;
 
   // Before the initial REST load finishes the stores are empty regardless of
   // real data — rendering the empty state then would flash onboarding on every
@@ -186,6 +186,16 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
             <div
               className={`[&>*+*]:mt-8 ${isMobile ? '[&>*:first-child]:mt-8' : '[&>*:first-child]:mt-9'}`}
             >
+              {/* Blocked-on-you first: on a phone this is the whole reason to
+                  open the app, and it spans every subscribed backend. */}
+              {needsAttention.length > 0 && (
+                <SessionGroup
+                  label="Needs you"
+                  rows={needsAttention}
+                  backendName={backendName}
+                  onOpen={openSession}
+                />
+              )}
               {running.length > 0 && (
                 <SessionGroup
                   label="Running"
@@ -234,9 +244,11 @@ function SessionGroup({
               className="w-full px-2 py-1.5 rounded-md text-left hover:bg-secondary transition-colors group"
             >
               <span className="flex items-center gap-2">
-                {row.isRunning && (
+                {row.needsAttention ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse shrink-0" />
+                ) : row.isRunning ? (
                   <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shrink-0" />
-                )}
+                ) : null}
                 <span className="truncate text-sm text-foreground">{row.title}</span>
                 <span className="ml-auto shrink-0 pl-4 text-[11px] text-muted-foreground">
                   {timeAgo(row.updatedAt)}
@@ -244,7 +256,7 @@ function SessionGroup({
               </span>
               <span
                 className={`block mt-px truncate text-xs text-muted-foreground ${
-                  row.isRunning ? 'pl-[14px]' : ''
+                  row.isRunning || row.needsAttention ? 'pl-[14px]' : ''
                 }`}
               >
                 {[

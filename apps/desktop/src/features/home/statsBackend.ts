@@ -35,3 +35,31 @@ export function useStatsBackendId(): string | null {
   const hasLocalControlPlane = useGatewayStore(s => !(s.directGatewayUrl && s.directGatewaySecret));
   return resolveStatsBackendId({ hasLocalControlPlane, localBackendId, activeBackendId });
 }
+
+export interface StatsBackendTarget {
+  backendId: string;
+  name: string;
+}
+
+/**
+ * Every backend the stats panel should query. Subscriptions are additive — a
+ * backend keeps streaming once opened — so "active" is not a meaningful scope
+ * for usage: report all online backends and let the panel total them.
+ *
+ * The fallback target (from useStatsBackendId) is always included even when the
+ * registry is empty, which is the single-backend embedded-local case.
+ */
+export function useStatsBackendTargets(): StatsBackendTarget[] {
+  const fallbackId = useStatsBackendId();
+  const backends = useFacadeStore(s => s.backends);
+  const localBackendId = useFacadeStore(s => s.localBackendId);
+
+  const online = backends.filter(b => b.online);
+  if (online.length === 0) {
+    return fallbackId ? [{ backendId: fallbackId, name: 'This device' }] : [];
+  }
+  return online.map(b => ({
+    backendId: b.backendId,
+    name: b.backendId === localBackendId ? (b.name ?? 'This device') : (b.name ?? b.backendId),
+  }));
+}

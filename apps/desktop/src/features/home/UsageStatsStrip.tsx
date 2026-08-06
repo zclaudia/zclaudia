@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { UsageStatsPayload, UsageStatsRange } from '@zclaudia/shared';
+import type { UsageStatsRange } from '@zclaudia/shared';
 import { getUsageStats } from '../../services/api';
-import { useStatsBackendId } from './statsBackend';
+import { useStatsBackendTargets } from './statsBackend';
+import { aggregateUsageStats, type BackendUsage } from './aggregateUsageStats';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { formatTokens } from '../../utils/formatTokens';
 import {
   buildHeatmapWeeks,
@@ -46,35 +48,48 @@ function formatDayLabel(date: string): string {
   });
 }
 
-/** Card-based all-time/windowed usage stats. Targets the local backend when
- *  one exists, otherwise the active backend (mobile / gateway-direct). Renders
- *  nothing until the first load; keeps stale numbers during range refetches. */
+/** Card-based all-time/windowed usage stats, totalled across every online
+ *  backend (subscriptions are additive, so usage is not an "active backend"
+ *  concept). Renders nothing until the first load; keeps stale numbers during
+ *  range refetches. On phones it collapses to a one-line summary. */
 export function UsageStatsStrip() {
-  const backendId = useStatsBackendId();
+  const isMobile = useIsMobile();
+  const targets = useStatsBackendTargets();
+  const targetKey = targets.map(t => t.backendId).join(',');
   const [range, setRange] = useState<UsageStatsRange>('all');
   const [tab, setTab] = useState<'overview' | 'models'>('overview');
-  const [stats, setStats] = useState<UsageStatsPayload | null>(null);
+  const [perBackend, setPerBackend] = useState<BackendUsage[]>([]);
   const [unavailable, setUnavailable] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   // Tapped heatmap day, surfaced as an inline caption below the grid — the
   // touch-reachable counterpart to the desktop hover title.
   const [selectedDay, setSelectedDay] = useState<HeatmapCell | null>(null);
 
   useEffect(() => {
     setSelectedDay(null);
-  }, [backendId, range]);
+  }, [targetKey, range]);
 
   useEffect(() => {
     let cancelled = false;
-    if (backendId === null) {
+    if (targets.length === 0) {
       // No backend to ask (e.g. mobile before any backend connects).
       setUnavailable(true);
       return;
     }
-    getUsageStats(backendId, range)
-      .then(next => {
+    // One request per backend; a backend that fails drops out of the total
+    // rather than failing the whole panel.
+    Promise.all(
+      targets.map(target =>
+        getUsageStats(target.backendId, range)
+          .then(stats => ({ ...target, stats }))
+          .catch(() => null)
+      )
+    )
+      .then(results => {
         if (cancelled) return;
-        setStats(next);
-        setUnavailable(false);
+        const usable = results.filter((r): r is BackendUsage => r !== null);
+        setUnavailable(usable.length === 0);
+        if (usable.length > 0) setPerBackend(usable);
       })
       .catch(() => {
         if (!cancelled) setUnavailable(true);
@@ -82,7 +97,14 @@ export function UsageStatsStrip() {
     return () => {
       cancelled = true;
     };
-  }, [backendId, range]);
+    // targetKey stands in for the target list identity (array is rebuilt each render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetKey, range]);
+
+  const stats = useMemo(
+    () => aggregateUsageStats(perBackend, localToday(), range),
+    [perBackend, range]
+  );
 
   const weeks = useMemo(
     () => (stats ? buildHeatmapWeeks(stats.activeDays, localToday(), HEATMAP_WEEKS) : []),
@@ -134,6 +156,32 @@ export function UsageStatsStrip() {
         ]
       : []),
   ];
+
+  // Phones lead with a single summary line: the full card grid, heatmap and
+  // models chart are retrospective analytics that would otherwise push the
+  // actionable session lists off the first screen.
+  if (isMobile && !expanded) {
+    return (
+      <div className="mt-10 border-t border-border pt-5 px-2">
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="flex w-full items-center gap-2 rounded-md py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        >
+          <span className="min-w-0 truncate">
+            {[
+              `${stats.sessions.toLocaleString('en-US')} sessions`,
+              `${formatTokens(stats.totalTokens)} tokens`,
+              perBackend.length > 1 ? `${perBackend.length} backends` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+          <span className="ml-auto shrink-0 text-muted-foreground/70">View stats</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-10 border-t border-border pt-5 px-2">
@@ -206,9 +254,7 @@ export function UsageStatsStrip() {
                   type="button"
                   title={label}
                   aria-label={label}
-                  onClick={() =>
-                    setSelectedDay(prev => (prev?.date === cell.date ? null : cell))
-                  }
+                  onClick={() => setSelectedDay(prev => (prev?.date === cell.date ? null : cell))}
                   className={`aspect-square w-full rounded-[4px] ${LEVEL_CLASS[cell.level]}${responsive}`}
                 />
               );
@@ -222,6 +268,21 @@ export function UsageStatsStrip() {
               {formatDayLabel(selectedDay.date)} · {selectedDay.count}{' '}
               {selectedDay.count === 1 ? 'message' : 'messages'}
             </div>
+          )}
+          {/* The cards above are a cross-backend total; break it down so a
+              multi-machine setup can see where the usage came from. */}
+          {perBackend.length > 1 && (
+            <ul className="mt-3 space-y-1">
+              {perBackend.map(entry => (
+                <li key={entry.backendId} className="flex items-baseline gap-2 text-xs">
+                  <span className="min-w-0 truncate text-muted-foreground">{entry.name}</span>
+                  <span className="ml-auto shrink-0 text-muted-foreground/70">
+                    {entry.stats.sessions.toLocaleString('en-US')} ·{' '}
+                    {formatTokens(entry.stats.totalTokens)}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
           {line && <div className="mt-3 text-xs text-muted-foreground/60">{line}</div>}
         </>

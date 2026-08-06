@@ -17,6 +17,11 @@ export function syncBackendDataSnapshot(
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
     isActive: item.runStatus === 'running' || item.runStatus === 'waiting',
+    // Keep running/waiting apart: `waiting` means the run is blocked on the
+    // user (a permission request sets it), which Home surfaces separately from
+    // "still working". Collapsing both into isActive loses that.
+    lastRunStatus:
+      item.runStatus === 'running' || item.runStatus === 'waiting' ? item.runStatus : null,
     type: 'regular' as const,
   }));
 
@@ -28,7 +33,8 @@ export function syncBackendDataSnapshot(
       (s, i) =>
         s.id !== mappedSessions[i].id ||
         s.updatedAt !== mappedSessions[i].updatedAt ||
-        s.isActive !== mappedSessions[i].isActive
+        s.isActive !== mappedSessions[i].isActive ||
+        s.lastRunStatus !== mappedSessions[i].lastRunStatus
     );
 
   const ownershipVersion = useRecoveryStore.getState().noteDataSyncSucceeded(backendId);

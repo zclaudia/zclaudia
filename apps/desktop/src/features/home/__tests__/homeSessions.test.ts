@@ -165,4 +165,41 @@ describe('selectHomeSessions', () => {
     );
     expect(multi.multiBackend).toBe(true);
   });
+
+  it('splits blocked runs out of Running into Needs you, across backends', () => {
+    const result = selectHomeSessions(
+      input({
+        localSessions: [session('local-waiting', { updatedAt: 300, lastRunStatus: 'waiting' })],
+        remoteSessions: new Map([
+          [
+            'b1',
+            [
+              session('remote-waiting', { updatedAt: 200, lastRunStatus: 'waiting' }),
+              session('remote-running', { updatedAt: 100, lastRunStatus: 'running' }),
+            ],
+          ],
+        ]),
+        // Upstream marks both running and waiting runs "active"; only the
+        // running one should stay in Running.
+        activeSessionIdsByBackend: new Map([
+          [LOCAL_BACKEND_KEY, new Set(['local-waiting'])],
+          ['b1', new Set(['remote-waiting', 'remote-running'])],
+        ]),
+      })
+    );
+
+    expect(result.needsAttention.map(r => r.id)).toEqual(['local-waiting', 'remote-waiting']);
+    expect(result.running.map(r => r.id)).toEqual(['remote-running']);
+    expect(result.recent).toEqual([]);
+    expect(result.needsAttention[0].isRunning).toBe(false);
+  });
+
+  it('leaves settled sessions in Recent', () => {
+    const result = selectHomeSessions(
+      input({ localSessions: [session('done', { updatedAt: 100, lastRunStatus: null })] })
+    );
+    expect(result.needsAttention).toEqual([]);
+    expect(result.recent.map(r => r.id)).toEqual(['done']);
+    expect(result.recent[0].needsAttention).toBe(false);
+  });
 });

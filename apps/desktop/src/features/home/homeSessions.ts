@@ -10,6 +10,12 @@ export interface HomeSessionRow {
   backendKey: string;
   updatedAt: number;
   isRunning: boolean;
+  /**
+   * The run is blocked on the user (a permission request or another prompt).
+   * Carried per backend in the gateway snapshot, so this works for every
+   * subscribed backend — not just the one whose REST catalog is loaded.
+   */
+  needsAttention: boolean;
   /** Message count when known (RemoteSession.lastMessageOffset). */
   messageCount?: number;
 }
@@ -29,6 +35,8 @@ export interface HomeSessionsInput {
 }
 
 export interface HomeSessions {
+  /** Blocked on the user — the reason to pick up the phone. Listed first. */
+  needsAttention: HomeSessionRow[];
   running: HomeSessionRow[];
   recent: HomeSessionRow[];
   /** True when the rows span more than one backend (show backend badges). */
@@ -49,6 +57,7 @@ function toRow(
   isRunning: boolean,
   projectNames: Map<string, string>
 ): HomeSessionRow {
+  const needsAttention = session.lastRunStatus === 'waiting';
   return {
     id: session.id,
     // Explicit user name wins over the AI auto-title so a rename is never
@@ -58,7 +67,10 @@ function toRow(
     projectName: projectNames.get(session.projectId) ?? '',
     backendKey,
     updatedAt: session.updatedAt,
-    isRunning,
+    // A waiting run is still "active" upstream, but it is not working — it is
+    // stuck on the user, so it belongs in its own group, not in Running.
+    isRunning: isRunning && !needsAttention,
+    needsAttention,
     messageCount: (session as { lastMessageOffset?: number }).lastMessageOffset,
   };
 }
@@ -115,9 +127,10 @@ export function selectHomeSessions(input: HomeSessionsInput): HomeSessions {
   }
 
   rows.sort((a, b) => b.updatedAt - a.updatedAt);
+  const needsAttention = rows.filter(r => r.needsAttention);
   const running = rows.filter(r => r.isRunning);
-  const recent = rows.filter(r => !r.isRunning).slice(0, RECENT_CAP);
+  const recent = rows.filter(r => !r.isRunning && !r.needsAttention).slice(0, RECENT_CAP);
   const multiBackend = new Set(rows.map(r => r.backendKey)).size > 1;
 
-  return { running, recent, multiBackend };
+  return { needsAttention, running, recent, multiBackend };
 }
