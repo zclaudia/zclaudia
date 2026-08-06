@@ -1,5 +1,10 @@
 # Mobile UI findings — hands-on walkthrough (2026-08-06)
 
+> **Status: all findings below are fixed** in `d504947b`, re-verified in the
+> same 375×812 setup. Kept as the record of what was wrong and how it was
+> measured. Two items were reclassified during the fix pass and deliberately
+> left alone — see "Not changed" at the end.
+
 Recorded by driving the real app in a 375×812 viewport against a live
 gateway-direct stack (gateway :3200 → server :3100 → Vite :1420), walking the
 normal flows: Home → new session → chat → composer tools → session menu →
@@ -163,6 +168,18 @@ Other polish items:
   but silent.
 
 ---
+
+## Not changed (reclassified while fixing)
+
+- **Backend dropdown width / dismissal.** The 12px overhang past the drawer is
+  a consequence of the menu being portaled and viewport-anchored (it stays
+  inside the 375px viewport), and outside-tap dismissal already works — the
+  original observation came from synthetic events dispatched straight at the
+  target, which bypass the backdrop. Only the contradictory copy was a real
+  defect.
+- **Drawer backend pill truncating to "Dev Mac…".** Measured again: the pill
+  gets 136px of a 256px drawer that also carries the notifications and Claudia
+  buttons, so there is no spare room to reclaim without dropping a control.
 
 ## What already works well
 
