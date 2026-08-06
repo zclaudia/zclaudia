@@ -237,7 +237,9 @@ export function ServerSelector({ placement = 'down' }: { placement?: 'down' | 'u
                   </div>
                 ) : isGatewayReady ? (
                   <div className="px-3 py-2 text-xs text-muted-foreground text-center">
-                    No backends available
+                    {/* The list hides this instance's own backend, so saying
+                        "no backends" while connected to it reads as a bug. */}
+                    {backends.length > 0 ? 'No other backends available' : 'No backends available'}
                   </div>
                 ) : (
                   <div className="px-3 py-2 text-xs text-muted-foreground text-center">

@@ -155,12 +155,13 @@ export function SessionItem({
       {hasRowMenu && (
         <div
           className={`absolute right-1 top-1/2 -translate-y-1/2 transition-opacity ${
-            menuPos ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            // Visible by default on touch; hover-revealed only from md: up.
+            menuPos ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'
           }`}
         >
           <button
             onClick={openMenu}
-            className={`p-0.5 rounded-md transition-colors ${
+            className={`relative p-0.5 rounded-md transition-colors before:absolute before:-inset-2 before:content-[''] md:before:content-none ${
               menuPos
                 ? 'bg-muted text-foreground'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted'

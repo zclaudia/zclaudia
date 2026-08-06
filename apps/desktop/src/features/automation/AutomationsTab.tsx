@@ -187,7 +187,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowCreate(!showCreate)}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors"
+            className="flex items-center gap-1 px-2.5 py-2 md:py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors"
           >
             <Plus size={12} />
             New
@@ -393,19 +393,22 @@ function AutomationCard({
                 : 'bg-muted-foreground'
         }`}
       />
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium truncate">{item.name}</span>
         </div>
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-          <span className="flex items-center gap-1">
+        {/* Wraps as whole chunks at narrow widths; without this each span
+            shrinks and its text re-wraps internally, spilling under the action
+            cluster so taps landed on Run/Disable. */}
+        <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground mt-0.5">
+          <span className="flex min-w-0 items-center gap-1">
             {item.projectId ? <FolderOpen size={10} /> : <Globe size={10} />}
-            {projectName(item.projectId)}
+            <span className="truncate">{projectName(item.projectId)}</span>
           </span>
           <span>·</span>
-          <span>{item.triggerSummary}</span>
+          <span className="min-w-0 truncate">{item.triggerSummary}</span>
           <span>·</span>
-          <span>{item.actionSummary}</span>
+          <span className="min-w-0 truncate">{item.actionSummary}</span>
           {item.runCount > 0 && (
             <>
               <span>·</span>
@@ -419,7 +422,7 @@ function AutomationCard({
           )}
         </div>
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex flex-shrink-0 items-center gap-1">
         <IconButton onClick={onTrigger} title="Run now" aria-label="Run now">
           <Play size={12} />
         </IconButton>
@@ -432,8 +435,9 @@ function AutomationCard({
         </IconButton>
         <button
           onClick={onDelete}
-          className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400"
+          className="relative p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400 before:absolute before:-inset-1.5 before:content-[''] md:before:content-none"
           title="Delete"
+          aria-label="Delete"
         >
           <Trash2 size={12} />
         </button>

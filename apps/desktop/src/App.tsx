@@ -490,15 +490,19 @@ function AppContent() {
       )}
 
       {/* Desktop relocates these controls into the sidebar's own header, so the
-          full-width AppHeader band only renders on mobile (hamburger / agent). */}
-      {isMobile && !(selectedSessionId && !isAgentExpanded) && (
-        <AppHeader
-          isMobile={isMobile}
-          isAgentExpanded={isAgentExpanded}
-          onOpenSidebar={() => setSidebarOpen(true)}
-          onCloseAgent={() => setAgentExpanded(false)}
-        />
-      )}
+          full-width AppHeader band only renders on mobile (hamburger / agent).
+          Shell modes get MobileModeHeader instead, so skip this one there
+          unless the Claudia overlay is up (which this bar titles). */}
+      {isMobile &&
+        !(selectedSessionId && !isAgentExpanded) &&
+        (isAgentExpanded || !isShellTopLevelView) && (
+          <AppHeader
+            isMobile={isMobile}
+            isAgentExpanded={isAgentExpanded}
+            onOpenSidebar={() => setSidebarOpen(true)}
+            onCloseAgent={() => setAgentExpanded(false)}
+          />
+        )}
 
       {!isMobile && <UpdateBanner />}
 
@@ -559,9 +563,9 @@ function AppContent() {
               data-tauri-drag-region
             />
           )}
-          {/* Mobile shell modes: AppHeader hides itself on mobile and the drawer
-              is closed by default, so this bar is the only visible way back to
-              the app (and into the drawer's mode tabs). */}
+          {/* Mobile shell modes: AppHeader is skipped here, so this bar is the
+              only visible way back to the app (and into the drawer's mode
+              tabs). */}
           {isMobile && shellModeTitle && !isAgentExpanded && (
             <MobileModeHeader
               title={shellModeTitle}

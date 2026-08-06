@@ -142,7 +142,7 @@ export function SessionHeader({
       {isMobile && onOpenSidebar && (
         <button
           onClick={onOpenSidebar}
-          className="flex h-8 w-8 -ml-1 items-center justify-center rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex-shrink-0"
+          className="relative flex h-8 w-8 -ml-1 items-center justify-center rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex-shrink-0 before:absolute before:-inset-1.5 before:content-[''] md:before:content-none"
           aria-label="Open menu"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -358,7 +358,7 @@ export function SessionHeader({
               <div className="relative shrink-0">
                 <button
                   onClick={onToggleSessionMenu}
-                  className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  className="relative flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors before:absolute before:-inset-1.5 before:content-[''] md:before:content-none"
                   title="Session actions"
                   aria-label="Session actions"
                 >

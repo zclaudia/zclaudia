@@ -21,7 +21,7 @@ export function AppHeader({
 }: AppHeaderProps) {
   return (
     <header
-      className={`h-12 md:h-14 border-b border-border flex items-center px-2 md:px-4 bg-card flex-shrink-0 ${isMobile && !isAgentExpanded ? 'hidden' : ''}`}
+      className="h-12 md:h-14 border-b border-border flex items-center px-2 md:px-4 bg-card flex-shrink-0"
       data-tauri-drag-region
     >
       {/* Left section: Logo and app name */}
@@ -58,10 +58,12 @@ export function AppHeader({
         </div>
       </div>
 
-      {/* Center section: agent title (mobile only) */}
+      {/* Center section: title (mobile only) */}
       <div className="flex-1 flex items-center justify-start ml-2 md:ml-4 min-w-0 gap-2">
-        {isMobile && isAgentExpanded && (
-          <span className="font-semibold text-sm text-foreground">Claudia</span>
+        {isMobile && (
+          <span className="font-semibold text-sm text-foreground">
+            {isAgentExpanded ? 'Claudia' : 'ZClaudia'}
+          </span>
         )}
       </div>
 

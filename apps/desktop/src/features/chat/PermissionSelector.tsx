@@ -203,12 +203,14 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled}
         title={triggerLabel}
+        ariaLabel={`Permission mode: ${triggerLabel}`}
         ariaHasPopup="menu"
         ariaExpanded={isOpen}
         className={triggerStateClass}
       >
         <Shield size={14} strokeWidth={1.75} />
-        <span className="hidden md:inline truncate max-w-[80px] lg:max-w-none">{triggerLabel}</span>
+        {/* Kept on phones too: a bare shield gives no clue what it controls. */}
+        <span className="truncate max-w-[80px] lg:max-w-none">{triggerLabel}</span>
         <ChevronDown size={12} className={isElevated ? '' : 'text-muted-foreground'} />
       </SelectorTrigger>
 

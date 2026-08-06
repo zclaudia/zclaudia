@@ -98,8 +98,10 @@ export function ProjectListItem({
   onPopOutSession,
 }: ProjectListItemProps) {
   const menuWidthClass = isMobile ? 'w-44' : 'w-36';
+  // Touch has no hover, so the mobile row actions stay visible; only the
+  // desktop variant is hover-revealed.
   const menuButtonClass = isMobile
-    ? 'w-8 h-8 rounded-md hover:bg-secondary active:bg-secondary flex-shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100'
+    ? 'w-8 h-8 rounded-md hover:bg-secondary active:bg-secondary flex-shrink-0 flex items-center justify-center'
     : 'w-6 h-6 rounded-md hidden group-hover:flex hover:bg-secondary flex-shrink-0 items-center justify-center';
   const projectButtonClass = isMobile
     ? 'flex-1 min-w-0 min-h-[36px] text-left px-1 text-xs flex items-center gap-1.5 text-foreground'

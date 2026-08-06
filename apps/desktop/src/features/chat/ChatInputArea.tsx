@@ -377,9 +377,15 @@ export function ChatInputArea({
   return (
     <div
       className={
+        // pb keeps a 0.75rem floor under the safe-area inset — the plain
+        // .safe-bottom-pad utility *replaces* pb-3, so on devices reporting a
+        // 0 inset the composer sat flush against the screen edge.
         centered
-          ? 'p-2 pb-3 md:px-4 md:pb-3 md:pt-2 overflow-visible flex-1 flex flex-col justify-center min-h-0'
-          : 'p-2 pb-3 md:px-4 md:pb-3 md:pt-2 safe-bottom-pad overflow-visible flex-shrink-0'
+          ? // Phones anchor the composer to the bottom (messaging convention,
+            // and it stops the input from jumping when the keyboard opens);
+            // desktop keeps the centered empty state.
+            'p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-4 md:pt-2 overflow-visible flex-1 flex flex-col justify-end md:justify-center min-h-0'
+          : 'p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-4 md:pt-2 overflow-visible flex-shrink-0'
       }
     >
       {/* Centered column matching the message reading column (ChatMessagePane) so
@@ -619,6 +625,9 @@ export function ChatInputArea({
                             onClick={() => setMobileToolsOpen(v => !v)}
                             className={`h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full transition-colors relative ${hasActiveItem ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                             title="More tools"
+                            aria-label="More tools"
+                            aria-haspopup="menu"
+                            aria-expanded={mobileToolsOpen}
                           >
                             <Plus
                               size={20}
@@ -630,7 +639,10 @@ export function ChatInputArea({
                             )}
                           </button>
                           {mobileToolsOpen && (
-                            <div className="absolute bottom-full left-0 mb-2 py-1 bg-popover border border-border rounded-xl shadow-lg min-w-[160px] z-50">
+                            // Wide enough that the longest label ("Session
+                            // Changes") stays on one line at 375px; capped to
+                            // the viewport so it never overflows.
+                            <div className="absolute bottom-full left-0 mb-2 py-1 bg-popover border border-border rounded-xl shadow-lg w-[min(15rem,80vw)] z-50">
                               {toolItems.map(item => (
                                 <button
                                   key={item.key}
@@ -643,7 +655,9 @@ export function ChatInputArea({
                                       <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
                                     )}
                                   </span>
-                                  {item.label}
+                                  <span className="min-w-0 flex-1 truncate text-left">
+                                    {item.label}
+                                  </span>
                                 </button>
                               ))}
                             </div>

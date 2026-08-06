@@ -48,7 +48,10 @@ export function ProfileHeader({
 }: ProfileHeaderProps) {
   return (
     <div className="border-b border-border px-4 py-3">
-      <div className="flex items-center gap-2">
+      {/* Wraps at narrow widths: the badge/actions cluster drops to a second
+          line instead of being pushed past the viewport edge (the actions menu
+          used to end up clipped and unreachable on phones). */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <button
           type="button"
           onClick={onBack}
@@ -69,7 +72,7 @@ export function ProfileHeader({
           className="w-auto min-w-[3rem] max-w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-foreground [field-sizing:content] hover:border-border focus:border-border focus:bg-background/60 focus:outline-none disabled:cursor-default disabled:opacity-70"
         />
         {(badges.length > 0 || saveStatus || recordStatus || (actions && actions.length > 0)) && (
-          <div className="ml-auto flex flex-shrink-0 items-center gap-2 pl-2">
+          <div className="ml-auto flex min-w-0 flex-shrink-0 flex-wrap items-center justify-end gap-2 pl-2">
             {badges.map(b => (
               <Badge key={b.label} label={b.label} tone={b.tone} online={b.online} />
             ))}

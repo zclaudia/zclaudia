@@ -28,7 +28,9 @@ export function AgentRequiredDialog({
       <div
         className={`fixed z-50 bg-card flex flex-col ${
           isMobile
-            ? 'inset-0 safe-top-pad safe-bottom-pad'
+            ? // Bottom sheet sized to its content: this dialog is a title plus
+              // two lines, so a full-screen sheet left most of the phone empty.
+              'inset-x-0 bottom-0 max-h-[80vh] rounded-t-2xl shadow-2xl safe-bottom-pad'
             : 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] max-h-[80vh] rounded-lg shadow-2xl'
         }`}
         role="dialog"
@@ -41,13 +43,13 @@ export function AgentRequiredDialog({
         <div className="flex gap-2 px-5 pb-5 mt-auto">
           <button
             onClick={() => onConfigure(g.destination)}
-            className="flex-1 px-3 py-2 bg-accent text-foreground font-medium shadow-apple-sm hover:bg-accent/80 rounded-lg text-sm"
+            className="flex-1 px-3 py-3 md:py-2 bg-accent text-foreground font-medium shadow-apple-sm hover:bg-accent/80 rounded-lg text-sm"
           >
             Configure →
           </button>
           <button
             onClick={onClose}
-            className="flex-1 px-3 py-2 bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg text-sm"
+            className="flex-1 px-3 py-3 md:py-2 bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg text-sm"
           >
             Cancel
           </button>

@@ -9,6 +9,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Zap, Blocks, Workflow, History, Server } from 'lucide-react';
 import { useAutomationApi } from './useAutomationApi';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import type { ProjectInfo, AutomationTab } from './automation-types';
 import { isInternalProject } from './automation-types';
 import { AutomationsTab } from './AutomationsTab';
@@ -33,6 +34,7 @@ const TAB_META: Record<AutomationTab, { label: string; Icon: typeof Zap }> = {
 
 export function AutomationContent({ tab, projectId, backendId }: AutomationContentProps) {
   const api = useAutomationApi(backendId, '', '');
+  const isMobile = useIsMobile();
 
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
 
@@ -59,13 +61,20 @@ export function AutomationContent({ tab, projectId, backendId }: AutomationConte
   const meta = TAB_META[tab];
   const scopeKey = backendId || 'fallback';
   const MetaIcon = meta.Icon;
+  const hasProjectScope = !!projectId && projects.length > 0;
+  // On mobile MobileModeHeader already titles the mode, so this bar would just
+  // repeat "Automations". Keep it only when it adds something (another tab, or
+  // a project scope).
+  const showTabBar = !isMobile || tab !== 'automations' || hasProjectScope;
 
   return (
     <div className="flex flex-col h-full bg-background text-foreground">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+      <div
+        className={`items-center gap-2 px-4 py-3 border-b border-border ${showTabBar ? 'flex' : 'hidden'}`}
+      >
         <MetaIcon size={17} className="text-primary" />
         <h1 className="text-sm font-semibold">{meta.label}</h1>
-        {projectId && projects.length > 0 && (
+        {hasProjectScope && (
           <span className="text-xs text-muted-foreground">· {projectName(projectId)}</span>
         )}
       </div>

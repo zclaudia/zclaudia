@@ -285,8 +285,9 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
           {/* Close button */}
           <button
             onClick={handleClose}
-            className="p-1 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground flex-shrink-0"
+            className="relative p-1 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground flex-shrink-0 before:absolute before:-inset-2 before:content-[''] md:before:content-none"
             title="Hide panel"
+            aria-label="Hide panel"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

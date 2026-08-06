@@ -11,6 +11,7 @@ import { useFacadeStore } from '../../stores/facadeStore';
 import { useGatewayStore, shouldShowNonCurrentInstanceBackend } from '../../stores/gatewayStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { isMobileBackendUsable } from '../../services/mobileConnectionState';
 import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../../utils/controlPlane';
 import { timeAgo } from '../../utils/timeAgo';
@@ -26,6 +27,7 @@ interface HomeViewProps {
 
 /** Top-level home view (no project/session selected): cross-backend resume hub. */
 export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
+  const isMobile = useIsMobile();
   const activeBackendSessions = useProjectStore(s => s.sessions);
   const projects = useProjectStore(s => s.projects);
   // Set by useDataLoader once the initial REST load for the active backend
@@ -163,10 +165,11 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-2xl px-6 pt-12 pb-10">
-        {/* Home always leads with the greeting. When there's activity, the
-            sidebar already covers creating sessions/projects (per-project "New
-            session", per-backend "New project"), so the header buttons would be
-            redundant; when empty they're the only onboarding entry point. */}
+        {/* Home always leads with the greeting. On desktop the sidebar is
+            always on screen and already covers creating sessions/projects, so
+            the header buttons would be redundant once there's activity. On
+            mobile the sidebar is a drawer, so these stay the primary entry
+            point at all times. */}
         <h1 className="text-xl font-semibold">{greeting(new Date().getHours())}</h1>
 
         {isEmpty ? (
@@ -177,25 +180,30 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
             <div className="mt-4">{quickActions}</div>
           </div>
         ) : (
-          // First group opens with more air after the header; siblings tighten.
-          <div className="[&>*:first-child]:mt-9 [&>*+*]:mt-8">
-            {running.length > 0 && (
-              <SessionGroup
-                label="Running"
-                rows={running}
-                backendName={backendName}
-                onOpen={openSession}
-              />
-            )}
-            {recent.length > 0 && (
-              <SessionGroup
-                label="Recent"
-                rows={recent}
-                backendName={backendName}
-                onOpen={openSession}
-              />
-            )}
-          </div>
+          <>
+            {isMobile && <div className="mt-4">{quickActions}</div>}
+            {/* First group opens with more air after the header; siblings tighten. */}
+            <div
+              className={`[&>*+*]:mt-8 ${isMobile ? '[&>*:first-child]:mt-8' : '[&>*:first-child]:mt-9'}`}
+            >
+              {running.length > 0 && (
+                <SessionGroup
+                  label="Running"
+                  rows={running}
+                  backendName={backendName}
+                  onOpen={openSession}
+                />
+              )}
+              {recent.length > 0 && (
+                <SessionGroup
+                  label="Recent"
+                  rows={recent}
+                  backendName={backendName}
+                  onOpen={openSession}
+                />
+              )}
+            </div>
+          </>
         )}
 
         <UsageStatsStrip />

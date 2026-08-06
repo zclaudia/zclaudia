@@ -43,7 +43,9 @@ export function SelectorTrigger({
       aria-haspopup={ariaHasPopup}
       aria-expanded={ariaExpanded}
       className={[
-        'flex min-w-0 items-center gap-1 px-1.5 py-1 rounded-md text-[11px] font-medium transition-colors h-7',
+        // Taller on touch so the composer selectors clear a finger; desktop
+        // keeps the compact 28px row.
+        'flex min-w-0 items-center gap-1 px-1.5 py-1 rounded-md text-[11px] font-medium transition-colors h-9 md:h-7',
         stateClass,
         className,
       ].join(' ')}
