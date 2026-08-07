@@ -231,7 +231,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
                   value={newIntervalMinutes}
                   onChange={e => setNewIntervalMinutes(e.target.value)}
                   placeholder="60"
-                  className="w-16 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground"
+                  className="w-16 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground max-md:py-2"
                 />
                 <span className="text-[10px] text-muted-foreground">min</span>
               </div>
@@ -241,7 +241,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
                 value={newCron}
                 onChange={e => setNewCron(e.target.value)}
                 placeholder="0 9 * * *"
-                className="flex-1 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground font-mono"
+                className="flex-1 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground max-md:py-2 font-mono"
               />
             )}
             {newTriggerType === 'once' && (
@@ -249,7 +249,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
                 type="datetime-local"
                 value={newOnceAt}
                 onChange={e => setNewOnceAt(e.target.value)}
-                className="px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground"
+                className="px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground max-md:py-2"
               />
             )}
             {newTriggerType === 'event' && (
@@ -257,7 +257,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
                 value={newEvent}
                 onChange={e => setNewEvent(e.target.value)}
                 placeholder="plugin.event.name"
-                className="flex-1 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground"
+                className="flex-1 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground max-md:py-2"
               />
             )}
           </div>
@@ -297,14 +297,14 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
                 setShowCreate(false);
                 setCreateError(null);
               }}
-              className="px-2 py-1 text-xs rounded-md border border-border hover:bg-secondary"
+              className="px-2 py-1 text-xs rounded-md border border-border hover:bg-secondary max-md:flex-1 max-md:py-2"
             >
               Cancel
             </button>
             <button
               onClick={handleCreate}
               disabled={!newName.trim() || (newActionType === 'workflow' && !workflowRef)}
-              className="px-2 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50"
+              className="px-2 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50 max-md:flex-1 max-md:py-2"
             >
               Create
             </button>
@@ -395,7 +395,12 @@ function AutomationCard({
       />
       <div className="flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate">{item.name}</span>
+          {/* Wraps rather than truncating below md: with the action cluster on
+              the right the name only gets ~197px, and it is the one thing that
+              tells two automations apart. */}
+          <span className="text-sm font-medium truncate max-md:line-clamp-2 max-md:whitespace-normal">
+            {item.name}
+          </span>
         </div>
         {/* Wraps as whole chunks at narrow widths; without this each span
             shrinks and its text re-wraps internally, spilling under the action

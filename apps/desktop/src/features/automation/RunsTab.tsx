@@ -5,6 +5,20 @@ import { StepRunCard, RunStatusBadge, formatDuration } from '../workflows/compon
 import { IconButton } from '../../components/ui/Button';
 import type { AutomationApiType } from './useAutomationApi';
 
+/**
+ * What to call a run in a list. Prefers the workflow's name, then the action it
+ * ran, and only then a shortened id — a bare UUID is indistinguishable from
+ * every other run at phone width.
+ */
+function runLabel(run: WorkflowRun, names: Map<string, string>): string {
+  if (run.workflowId) {
+    const name = names.get(run.workflowId);
+    if (name) return name;
+  }
+  if (run.actionRef && !run.workflowId) return run.actionRef;
+  return run.workflowId ? `Workflow ${run.workflowId.slice(0, 8)}` : 'Activity';
+}
+
 interface RunsTabProps {
   api: AutomationApiType;
   projectId?: string;
@@ -30,12 +44,18 @@ export function RunsTab({ api, projectId }: RunsTabProps) {
       const query = effectiveProjectId
         ? `?projectId=${encodeURIComponent(effectiveProjectId)}`
         : '';
-      const [runsData, workflowsData] = await Promise.all([
+      // Runs are project-scoped, but the workflows they reference often are not
+      // (the built-in ones carry no projectId). Scoping the name lookup the same
+      // way returned an empty list, so every row fell back to a raw UUID slice.
+      const [runsData, scopedWorkflows, globalWorkflows] = await Promise.all([
         api.get(`/api/workflow-runs${query}`).catch(() => []),
-        api.get(`/api/workflows${query}`).catch(() => []),
+        query ? api.get(`/api/workflows${query}`).catch(() => []) : Promise.resolve([]),
+        api.get('/api/workflows').catch(() => []),
       ]);
       setRuns(runsData);
-      setWorkflows(workflowsData);
+      const byId = new Map<string, Workflow>();
+      for (const w of [...globalWorkflows, ...scopedWorkflows]) byId.set(w.id, w);
+      setWorkflows([...byId.values()]);
     } catch {
       /* ignore */
     }
@@ -54,9 +74,7 @@ export function RunsTab({ api, projectId }: RunsTabProps) {
         workflowName={(() => {
           const run = runs.find(r => r.id === selectedRunId);
           if (!run) return '';
-          return run.workflowId
-            ? (workflowNameMap.get(run.workflowId) ?? run.workflowId.slice(0, 12))
-            : (run.actionRef ?? 'Activity');
+          return runLabel(run, workflowNameMap);
         })()}
         onBack={() => setSelectedRunId(null)}
       />
@@ -89,19 +107,24 @@ export function RunsTab({ api, projectId }: RunsTabProps) {
               onClick={() => setSelectedRunId(run.id)}
               className="w-full text-left border border-border rounded-lg p-3 hover:bg-secondary/30 transition-colors"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-2 min-w-0">
                   <RunStatusBadge status={run.status} />
                   <span className="text-sm font-medium truncate">
-                    {run.workflowId
-                      ? (workflowNameMap.get(run.workflowId) ?? run.workflowId.slice(0, 12))
-                      : (run.actionRef ?? 'Activity')}
+                    {runLabel(run, workflowNameMap)}
                   </span>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground md:shrink-0">
                   <span className="px-1.5 py-0.5 rounded-md bg-muted">{run.triggerSource}</span>
                   <span>{formatDuration(run.startedAt, run.completedAt)}</span>
-                  <span>{new Date(run.startedAt).toLocaleString()}</span>
+                  <span className="truncate">
+                    {new Date(run.startedAt).toLocaleString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </span>
                 </div>
               </div>
               {run.error && (

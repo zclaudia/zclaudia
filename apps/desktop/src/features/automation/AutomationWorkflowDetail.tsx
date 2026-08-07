@@ -125,7 +125,7 @@ function EmptyStatePanel({
                 {effectiveProjectId && (
                   <button
                     onClick={() => handleEnableTemplate(t.id, effectiveProjectId)}
-                    className="self-start text-[10px] px-2 py-0.5 rounded-md transition-colors bg-muted/60 text-primary hover:bg-muted"
+                    className="self-start text-[10px] px-2 py-0.5 rounded-md transition-colors bg-muted/60 text-primary hover:bg-muted max-md:px-3 max-md:py-2 max-md:text-xs"
                   >
                     Enable
                   </button>
