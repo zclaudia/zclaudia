@@ -72,6 +72,23 @@ describe('ProfileHeader', () => {
     expect(screen.getByText('Default')).toBeInTheDocument();
   });
 
+  it('keeps the badge cluster shrinkable so it can wrap at phone widths', () => {
+    // jsdom has no layout, so assert the invariant instead: a `flex-wrap` cluster
+    // that is also `flex-shrink-0` sizes to max-content and never wraps, which
+    // pushed the save state and actions menu past the viewport edge on phones.
+    render(
+      <ProfileHeader
+        {...base}
+        badges={[{ label: 'Default', tone: 'accent' }]}
+        saveStatus="saved"
+        actions={[{ label: 'Delete agent', onSelect: vi.fn() }]}
+      />
+    );
+    const cluster = screen.getByText('Default').parentElement!;
+    expect(cluster.className).toContain('flex-wrap');
+    expect(cluster.className).not.toContain('flex-shrink-0');
+  });
+
   it('renders the actions menu and fires the selected action', () => {
     const onDelete = vi.fn();
     render(

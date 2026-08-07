@@ -71,8 +71,12 @@ export function ProfileHeader({
           disabled={disabled}
           className="w-auto min-w-[3rem] max-w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-foreground [field-sizing:content] hover:border-border focus:border-border focus:bg-background/60 focus:outline-none disabled:cursor-default disabled:opacity-70"
         />
+        {/* The badge cluster must stay shrinkable: `flex-shrink-0` here would size
+            it to its max-content width, so its own `flex-wrap` would never trigger
+            and trailing badges (plus the actions menu) would be clipped off-screen
+            at phone widths instead of wrapping. */}
         {(badges.length > 0 || saveStatus || recordStatus || (actions && actions.length > 0)) && (
-          <div className="ml-auto flex min-w-0 flex-shrink-0 flex-wrap items-center justify-end gap-2 pl-2">
+          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 pl-2">
             {badges.map(b => (
               <Badge key={b.label} label={b.label} tone={b.tone} online={b.online} />
             ))}
