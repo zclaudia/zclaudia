@@ -13,13 +13,15 @@ vi.mock('../../workflows/components/WorkflowEditor', () => ({
 import { AutomationWorkflowDetail } from '../AutomationWorkflowDetail';
 import { useTopLevelViewStore } from '../../../stores/topLevelViewStore';
 
-function apiReturning(workflow: any) {
+function apiReturning(workflow: any, list: any[] = []) {
   return {
-    get: vi
-      .fn()
-      .mockImplementation((path: string) =>
-        path.includes('workflow-templates') ? Promise.resolve([]) : Promise.resolve(workflow)
-      ),
+    get: vi.fn().mockImplementation((path: string) => {
+      if (path.includes('workflow-templates')) return Promise.resolve([]);
+      // The unscoped list feeds the panel's own workflow picker; a path with an
+      // id resolves the selected workflow.
+      if (path === '/api/workflows') return Promise.resolve(list);
+      return Promise.resolve(workflow);
+    }),
     post: vi.fn().mockResolvedValue({}),
     patch: vi.fn().mockResolvedValue({}),
     del: vi.fn().mockResolvedValue(undefined),
@@ -41,10 +43,27 @@ beforeEach(() => {
 });
 
 describe('AutomationWorkflowDetail', () => {
-  it('shows the empty state with templates when nothing is selected', async () => {
+  it('prompts to enable a template when the project has no workflows', async () => {
     render(<AutomationWorkflowDetail api={apiReturning(sys) as never} {...baseProps} />);
-    expect(await screen.findByText(/select a workflow/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no workflows yet/i)).toBeInTheDocument();
     expect(screen.queryByTestId('wf-editor')).toBeNull();
+  });
+
+  it("lists the project's workflows and opens one on click", async () => {
+    // The sidebar tree is the only other route to a workflow, and its drawer
+    // closes on a project tap — so this list is the sole mobile path in.
+    const api = apiReturning(sys, [
+      { id: 'wf-1', name: 'Nightly Test & Fix', projectId: 'p1', status: 'active' },
+      { id: 'wf-global', name: 'Global Flow', status: 'active' },
+    ]);
+    render(<AutomationWorkflowDetail api={api as never} {...baseProps} />);
+
+    const row = await screen.findByRole('button', { name: /Nightly Test & Fix/ });
+    // A workflow on another scope must not leak into this project's list.
+    expect(screen.queryByText('Global Flow')).toBeNull();
+
+    fireEvent.click(row);
+    expect(useTopLevelViewStore.getState().selectedAutomationItemId).toBe('wf-1');
   });
 
   it('renders a read-only editor for a selected system workflow', async () => {

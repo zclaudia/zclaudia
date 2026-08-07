@@ -36,6 +36,7 @@ export function AutomationWorkflowDetail({
         effectiveProjectId={effectiveProjectId}
         selectedIsGlobal={selectedIsGlobal}
         onTemplateEnabled={bump}
+        onSelect={selectItem}
       />
     );
   }
@@ -58,6 +59,7 @@ interface EmptyStatePanelProps {
   effectiveProjectId: string;
   selectedIsGlobal: boolean;
   onTemplateEnabled: () => void;
+  onSelect: (id: string) => void;
 }
 
 function EmptyStatePanel({
@@ -65,8 +67,11 @@ function EmptyStatePanel({
   effectiveProjectId,
   selectedIsGlobal,
   onTemplateEnabled,
+  onSelect,
 }: EmptyStatePanelProps) {
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const refreshNonce = useTopLevelViewStore(s => s.automationListRefreshNonce);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,21 +90,76 @@ function EmptyStatePanel({
     };
   }, [api]);
 
+  // The sidebar tree is the only other route to a workflow, and on a phone that
+  // tree lives in a drawer which closes the moment a project row is tapped — so
+  // without this list an enabled workflow could not be opened at all.
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get('/api/workflows')
+      .then((list: Workflow[]) => {
+        if (cancelled) return;
+        setWorkflows(
+          list.filter(w =>
+            selectedIsGlobal || !effectiveProjectId
+              ? !w.projectId
+              : w.projectId === effectiveProjectId
+          )
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setWorkflows([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, effectiveProjectId, selectedIsGlobal, refreshNonce]);
+
   const handleEnableTemplate = async (templateId: string, projId: string) => {
     await api.post(`/api/projects/${projId}/workflows/from-template/${templateId}`).catch(() => {});
     onTemplateEnabled();
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-6 p-6">
-      <div className="text-center">
-        <p className="text-sm text-muted-foreground">Select a workflow to view or edit</p>
-      </div>
+    <div className="flex h-full flex-col items-center gap-6 p-6">
+      {workflows.length > 0 ? (
+        <div className="w-full max-w-lg">
+          <h3 className={`${SECTION_LABEL} mb-2`}>Workflows</h3>
+          <div className="space-y-1.5">
+            {workflows.map(w => (
+              <button
+                key={w.id}
+                type="button"
+                onClick={() => onSelect(w.id)}
+                className="flex w-full items-center gap-2 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-secondary/40"
+              >
+                <span
+                  className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${
+                    w.status === 'active' ? 'bg-green-500' : 'bg-muted-foreground/40'
+                  }`}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-medium">{w.name}</span>
+                  {w.description && (
+                    <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
+                      {w.description}
+                    </span>
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="pt-6 text-center">
+          <p className="text-sm text-muted-foreground">No workflows yet — enable one below.</p>
+        </div>
+      )}
 
       {templates.length > 0 && !selectedIsGlobal && (
         <div className="w-full max-w-lg">
           <h3 className={`${SECTION_LABEL} mb-2`}>Quick Start Templates</h3>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
             {templates.map(t => (
               <div
                 key={t.id}

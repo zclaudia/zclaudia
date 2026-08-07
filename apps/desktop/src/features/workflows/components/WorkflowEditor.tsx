@@ -98,7 +98,12 @@ export function WorkflowEditor({
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  // The palette is ~200px of a 375px screen and works by drag-and-drop, so on a
+  // phone it starts collapsed and the canvas gets the full width. The expand
+  // button stays available.
+  const [leftPanelOpen, setLeftPanelOpen] = useState(
+    () => typeof window === 'undefined' || window.innerWidth >= 768
+  );
   const [leftPanelMode, setLeftPanelMode] = useState<'toolbox' | 'ai'>(initialMode ?? 'toolbox');
   // Track workflow ID for standalone mode (may be assigned after first create)
   const [workflowId, setWorkflowId] = useState<string | undefined>(workflow?.id);
@@ -345,7 +350,7 @@ export function WorkflowEditor({
         )}
 
         <div
-          className={`flex items-center gap-2 px-3 ${standalone ? 'py-2' : 'pb-2'}`}
+          className={`flex flex-wrap items-center gap-x-2 gap-y-1 px-3 ${standalone ? 'py-2' : 'pb-2'}`}
           data-tauri-drag-region={standalone}
         >
           <input
@@ -357,14 +362,14 @@ export function WorkflowEditor({
             className="text-sm font-medium bg-transparent border-none outline-none placeholder:text-muted-foreground min-w-0 w-48 rounded-sm focus-visible:ring-1 focus-visible:ring-ring"
             readOnly={readOnly}
           />
-          <span className="text-muted-foreground/30 shrink-0">|</span>
+          <span className="hidden shrink-0 text-muted-foreground/30 md:inline">|</span>
           <input
             type="text"
             aria-label="Workflow description"
             value={description}
             onChange={e => setDescription(e.target.value)}
             placeholder="Description (optional)"
-            className="text-xs bg-transparent border-none outline-none text-muted-foreground placeholder:text-muted-foreground/40 flex-1 min-w-0 rounded-sm focus-visible:ring-1 focus-visible:ring-ring"
+            className="order-last w-full basis-full text-xs bg-transparent border-none outline-none text-muted-foreground placeholder:text-muted-foreground/40 min-w-0 rounded-sm focus-visible:ring-1 focus-visible:ring-ring md:order-none md:w-auto md:flex-1 md:basis-auto"
             readOnly={readOnly}
           />
           {readOnly && (

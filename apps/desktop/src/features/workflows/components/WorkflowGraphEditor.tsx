@@ -326,8 +326,10 @@ function GraphEditorInner({
       >
         <Background gap={16} size={1} className="!bg-background" />
         <Controls className="!bg-card !border-border !shadow-sm [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-secondary" />
+        {/* The minimap covers roughly a third of a phone-width canvas, which is
+            the space the graph itself needs. */}
         <MiniMap
-          className="!bg-card !border-border"
+          className="!hidden !bg-card !border-border md:!block"
           nodeColor="hsl(var(--muted-foreground) / 0.3)"
           maskColor="hsl(var(--background) / 0.7)"
         />
