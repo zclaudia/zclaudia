@@ -1,8 +1,7 @@
-import { useState } from 'react';
-import { ChevronRight, CornerDownRight, AlertTriangle, RotateCcw } from 'lucide-react';
+import { CornerDownRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import type { WorkflowDefinition, WorkflowNodeDef } from '@zclaudia/shared';
 import { buildWorkflowOutline, type WorkflowOutlineRow } from '../workflowOutline';
-import { getStepIcon } from './nodes/StepNode';
+import { WorkflowStepCard } from './WorkflowStepCard';
 import { SECTION_LABEL } from '../../../components/ui/typography';
 
 /**
@@ -31,7 +30,7 @@ export function WorkflowStepList({ definition }: { definition: WorkflowDefinitio
           <h4 className={`${SECTION_LABEL} mb-1.5`}>Not connected</h4>
           <div className="space-y-1.5">
             {outline.orphans.map(node => (
-              <StepCard key={node.id} node={node} />
+              <DefinitionStepCard key={node.id} node={node} />
             ))}
           </div>
         </div>
@@ -78,7 +77,7 @@ function OutlineRow({ row }: { row: WorkflowOutlineRow }) {
   return (
     <div style={indentStyle(row.depth)}>
       {row.via && <BranchLabel label={row.via} />}
-      <StepCard node={row.node} />
+      <DefinitionStepCard node={row.node} />
     </div>
   );
 }
@@ -92,56 +91,14 @@ function BranchLabel({ label }: { label: string }) {
   );
 }
 
-function StepCard({ node }: { node: WorkflowNodeDef }) {
-  const [open, setOpen] = useState(false);
-  const entries = configEntries(node);
-  const hasDetail = entries.length > 0;
-
+function DefinitionStepCard({ node }: { node: WorkflowNodeDef }) {
   return (
-    <div className="rounded-lg border border-border bg-card">
-      <button
-        type="button"
-        onClick={() => hasDetail && setOpen(v => !v)}
-        aria-expanded={hasDetail ? open : undefined}
-        disabled={!hasDetail}
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-left disabled:cursor-default"
-      >
-        <span className="shrink-0 text-muted-foreground">{getStepIcon(node.type)}</span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-medium">{node.name}</span>
-          <span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">
-            {node.type}
-          </span>
-        </span>
-        {node.onError === 'route' && (
-          <span className="shrink-0 rounded-full bg-warning/15 px-1.5 py-0.5 text-[9px] text-warning">
-            error route
-          </span>
-        )}
-        {hasDetail && (
-          <ChevronRight
-            size={14}
-            aria-hidden="true"
-            className={`shrink-0 text-muted-foreground/70 transition-transform ${open ? 'rotate-90' : ''}`}
-          />
-        )}
-      </button>
-
-      {open && (
-        <dl className="space-y-1.5 border-t border-border/60 px-3 py-2">
-          {entries.map(([key, value]) => (
-            <div key={key}>
-              <dt className="text-[10px] text-muted-foreground">{key}</dt>
-              {/* Prompts and shell commands run long and carry newlines, so the
-                  value wraps instead of being clipped to one line. */}
-              <dd className="whitespace-pre-wrap break-words font-mono text-[11px] text-foreground">
-                {value}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
-    </div>
+    <WorkflowStepCard
+      name={node.name}
+      type={node.type}
+      onErrorRoute={node.onError === 'route'}
+      details={configEntries(node)}
+    />
   );
 }
 

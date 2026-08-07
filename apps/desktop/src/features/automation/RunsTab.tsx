@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Loader2, RefreshCw, ArrowLeft } from 'lucide-react';
-import type { Workflow, WorkflowRun, WorkflowStepRun } from '@zclaudia/shared';
-import { StepRunCard, RunStatusBadge, formatDuration } from '../workflows/components/RunComponents';
+import type { Workflow, WorkflowDefinition, WorkflowRun, WorkflowStepRun } from '@zclaudia/shared';
+import { normalizeWorkflowDefinition } from '@zclaudia/shared';
+import { RunStatusBadge, formatDuration } from '../workflows/components/RunComponents';
+import { RunStepList } from '../workflows/components/RunStepList';
 import { IconButton } from '../../components/ui/Button';
 import type { AutomationApiType } from './useAutomationApi';
 
@@ -151,19 +153,50 @@ function RunDetail({
 }) {
   const [run, setRun] = useState<WorkflowRun | null>(null);
   const [stepRuns, setStepRuns] = useState<WorkflowStepRun[]>([]);
+  const [definition, setDefinition] = useState<WorkflowDefinition | undefined>();
   const [loading, setLoading] = useState(true);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busyStepRunId, setBusyStepRunId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const data: { run: WorkflowRun; stepRuns: WorkflowStepRun[] } = await api.get(
+      `/api/workflow-runs/${runId}`
+    );
+    setRun(data.run);
+    setStepRuns(data.stepRuns);
+    // Names only — the run's own records set the order, since the workflow may
+    // have been edited since it ran.
+    if (data.run.workflowId) {
+      try {
+        const wf: Workflow = await api.get(`/api/workflows/${data.run.workflowId}`);
+        setDefinition(normalizeWorkflowDefinition(wf.definition));
+      } catch {
+        setDefinition(undefined);
+      }
+    }
+  }, [api, runId]);
 
   useEffect(() => {
     setLoading(true);
-    api
-      .get(`/api/workflow-runs/${runId}`)
-      .then((data: { run: WorkflowRun; stepRuns: WorkflowStepRun[] }) => {
-        setRun(data.run);
-        setStepRuns(data.stepRuns);
-      })
+    load()
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [api, runId]);
+  }, [load]);
+
+  /** Approve/reject/cancel used to swallow their errors and never refresh, so a
+   *  failed tap looked identical to a successful one. */
+  const runAction = async (label: string, path: string, stepRunId?: string) => {
+    setActionError(null);
+    if (stepRunId) setBusyStepRunId(stepRunId);
+    try {
+      await api.post(path);
+      await load();
+    } catch (err) {
+      setActionError(`${label} failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+    } finally {
+      setBusyStepRunId(null);
+    }
+  };
 
   if (loading || !run) {
     return (
@@ -207,34 +240,24 @@ function RunDetail({
         </div>
         {(run.status === 'running' || run.status === 'pending') && (
           <button
-            onClick={() => {
-              api.post(`/api/workflow-runs/${runId}/cancel`).catch(() => {});
-            }}
-            className="px-3 py-1 text-xs rounded-md border border-border hover:bg-destructive hover:text-destructive-foreground transition-colors"
+            onClick={() => void runAction('Cancel', `/api/workflow-runs/${runId}/cancel`)}
+            className="shrink-0 rounded-md border border-border px-3 py-1 text-xs transition-colors hover:bg-destructive hover:text-destructive-foreground max-md:py-2"
           >
             Cancel
           </button>
         )}
       </div>
 
-      {/* Steps */}
-      <div className="space-y-2">
-        {stepRuns.map(stepRun => (
-          <StepRunCard
-            key={stepRun.id}
-            stepRun={stepRun}
-            onApprove={id => {
-              api.post(`/api/workflow-step-runs/${id}/approve`).catch(() => {});
-            }}
-            onReject={id => {
-              api.post(`/api/workflow-step-runs/${id}/reject`).catch(() => {});
-            }}
-          />
-        ))}
-        {stepRuns.length === 0 && (
-          <div className="text-sm text-muted-foreground text-center py-8">No steps recorded</div>
-        )}
-      </div>
+      {actionError && <p className="text-xs text-destructive">{actionError}</p>}
+
+      {/* Steps — the same card the workflow view uses, with the run overlaid. */}
+      <RunStepList
+        stepRuns={stepRuns}
+        definition={definition}
+        busyStepRunId={busyStepRunId}
+        onApprove={id => void runAction('Approve', `/api/workflow-step-runs/${id}/approve`, id)}
+        onReject={id => void runAction('Reject', `/api/workflow-step-runs/${id}/reject`, id)}
+      />
 
       {run.error && (
         <div className="text-xs text-destructive bg-destructive/10 rounded-md p-3">{run.error}</div>
