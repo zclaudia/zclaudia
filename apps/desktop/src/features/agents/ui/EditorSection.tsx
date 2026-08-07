@@ -50,25 +50,49 @@ export function EditorRow({
   control,
   children,
   align = 'center',
+  layout = 'inline',
 }: {
   title: ReactNode;
   description?: ReactNode;
   control?: ReactNode;
   children?: ReactNode;
   align?: 'center' | 'start';
+  /**
+   * `inline` (default) keeps the label and control side by side at every width.
+   * A short label next to a dropdown fits fine on a phone, and stacking every
+   * row cost ~95px each — five fields no longer fit on one screen.
+   *
+   * `stack` drops the control below the label under `md`. Use it for controls
+   * that genuinely need the full width (textareas, file paths) or when the
+   * row's description is a full sentence.
+   */
+  layout?: 'inline' | 'stack';
 }) {
+  const stacked = layout === 'stack';
+  // Written out rather than interpolated so Tailwind can see the class names.
+  const rowClass = stacked
+    ? align === 'start'
+      ? 'flex flex-col gap-3 md:flex-row md:items-start md:justify-between'
+      : 'flex flex-col gap-3 md:flex-row md:items-center md:justify-between'
+    : align === 'start'
+      ? 'flex items-start justify-between gap-3'
+      : 'flex items-center justify-between gap-3';
   return (
     <div className="px-4 py-3">
-      <div
-        className={`flex flex-col gap-3 md:flex-row ${align === 'start' ? 'md:items-start' : 'md:items-center'} md:justify-between`}
-      >
+      <div className={rowClass}>
         <div className="min-w-0">
           <div className="text-sm text-foreground">{title}</div>
           {description && <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>}
         </div>
-        {control && <div className="flex items-center gap-2 md:flex-shrink-0">{control}</div>}
+        {control && (
+          <div
+            className={`flex items-center gap-2 ${stacked ? 'md:flex-shrink-0' : 'flex-shrink-0'}`}
+          >
+            {control}
+          </div>
+        )}
       </div>
-      {children && <div className="mt-3">{children}</div>}
+      {children && <div className="mt-3 empty:hidden">{children}</div>}
     </div>
   );
 }

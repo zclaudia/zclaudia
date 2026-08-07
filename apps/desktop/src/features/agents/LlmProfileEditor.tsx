@@ -619,6 +619,9 @@ export function LlmProfileEditor({
       <div className="divide-y divide-border/60">
         <EditorRow
           title="Provider Type"
+          // Provider labels run long ("OpenAI Codex (ChatGPT Plus/Pro)"), so this
+          // one keeps the full width below md rather than truncating.
+          layout="stack"
           control={
             <div className="w-full md:w-56">
               <ProviderTypeSelector
@@ -634,6 +637,7 @@ export function LlmProfileEditor({
             title="Prompt cache retention"
             description='Anthropic prompt caching. "Off" is an escape hatch for proxies that reject cache_control.'
             align="start"
+            layout="stack"
             control={
               <select
                 value={formCacheRetention}

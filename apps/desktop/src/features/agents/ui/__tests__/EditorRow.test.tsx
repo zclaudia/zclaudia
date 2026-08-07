@@ -11,8 +11,22 @@ describe('EditorRow', () => {
     expect(screen.getByRole('button', { name: 'ctl' })).toBeInTheDocument();
   });
 
-  it('stacks label and control vertically below md and restores the row layout at md', () => {
+  it('keeps label and control side by side at every width by default', () => {
     const { container } = render(<EditorRow title="Agent Type" control={<button>ctl</button>} />);
+    const row = container.querySelector('.flex')!;
+    // Stacking every row cost ~95px each on a phone; a short label next to a
+    // dropdown fits, so `inline` is the default.
+    expect(row.className).not.toContain('flex-col');
+    expect(row.className).toContain('items-center');
+    expect(row.className).toContain('justify-between');
+    const controlWrap = screen.getByRole('button', { name: 'ctl' }).parentElement!;
+    expect(controlWrap.className).toMatch(/(^| )flex-shrink-0/);
+  });
+
+  it('stacks below md and restores the row layout at md when layout="stack"', () => {
+    const { container } = render(
+      <EditorRow title="Agent Type" layout="stack" control={<button>ctl</button>} />
+    );
     const row = container.querySelector('.flex.flex-col');
     expect(row).not.toBeNull();
     expect(row!.className).toContain('md:flex-row');
@@ -24,11 +38,16 @@ describe('EditorRow', () => {
     expect(controlWrap.className).not.toMatch(/(^| )flex-shrink-0/);
   });
 
-  it('uses items-start alignment at md when align="start"', () => {
+  it('uses items-start alignment when align="start"', () => {
     const { container } = render(<EditorRow title="Row" align="start" control={<span>c</span>} />);
-    const row = container.querySelector('.flex.flex-col');
-    expect(row!.className).toContain('md:items-start');
-    expect(row!.className).not.toContain('md:items-center');
+    expect(container.querySelector('.flex')!.className).toContain('items-start');
+
+    const stacked = render(
+      <EditorRow title="Row" align="start" layout="stack" control={<span>c</span>} />
+    );
+    const row = stacked.container.querySelector('.flex.flex-col')!;
+    expect(row.className).toContain('md:items-start');
+    expect(row.className).not.toContain('md:items-center');
   });
 
   it('renders a full-width body below the row when children are provided', () => {

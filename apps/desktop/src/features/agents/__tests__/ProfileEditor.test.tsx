@@ -306,6 +306,23 @@ describe('ProfileEditor', () => {
     expect(queryAllByLabelText(/enable full tool set/).length).toBeGreaterThan(0);
   });
 
+  it('gives the tool-set name the first line and drops the preview below it on phones', async () => {
+    await renderEditor(makeProfile('p1', 'Coding'));
+    fireEvent.click(screen.getByRole('tab', { name: /Capabilities/ }));
+
+    const row = screen.getByLabelText('expand tool set code-intelligence');
+    // The name previously shared one flex line with the count pill and the tool
+    // preview, and lost: "Code Intelligence" rendered as "Co...".
+    const name = row.querySelector('.font-medium')!;
+    expect(name.textContent).toBe('Code Intelligence');
+    expect(name.className).not.toContain('md:hidden');
+
+    // Count and preview ride a second line that only exists below md.
+    const secondLine = row.querySelector('.md\\:hidden')!;
+    expect(secondLine.textContent).toMatch(/^\d+ tools · /);
+    expect(row).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('Capabilities sub-tabs switch between Tools, Providers, and Skills', async () => {
     const { queryAllByLabelText } = await renderEditor(makeProfile('p1', 'Coding'));
 

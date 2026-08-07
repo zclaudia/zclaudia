@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, Check } from 'lucide-react';
 import type {
   AgentProfileConfig,
   ThinkingLevel,
@@ -36,6 +36,13 @@ import { ProfileHeader } from './ui/ProfileHeader';
 import type { DetailBadge } from './ui/DetailHeader';
 import type { ActionsMenuAction } from './ui/ActionsMenu';
 import { useIsMounted } from '../../hooks/useIsMounted';
+import { useIsMobile } from '../../hooks/useMediaQuery';
+import { Checkbox } from '../../components/ui/Checkbox';
+
+/** First few tool names of a set, as a one-line hint under/next to its label. */
+function toolSetPreview(tools: readonly string[]): string {
+  return tools.slice(0, 4).join(', ') + (tools.length > 4 ? '...' : '');
+}
 
 /**
  * Parent must remount this component per identity — key it by
@@ -78,6 +85,17 @@ function unavailableDescriptor(runtime: string): ProfileConfigDescriptor {
 const FIELD_CLASS =
   'w-full rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
 const MONO_FIELD_CLASS = `${FIELD_CLASS} font-mono`;
+/**
+ * Dropdown surface for the custom selectors below.
+ *
+ * Anchored to the trigger's right edge with a minimum width instead of simply
+ * matching it: the triggers sit in a ~176px column at phone width, which is
+ * plenty for the current value but far too narrow to browse full model ids in.
+ * Growing leftwards keeps the panel on screen (the column's right edge is one
+ * page gutter from the viewport edge).
+ */
+const SELECT_POPOVER_CLASS =
+  'absolute right-0 top-full mt-1 min-w-[min(20rem,calc(100vw-2.5rem))] md:left-0 md:min-w-0 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden';
 
 export const NAME_PLACEHOLDER = 'e.g., Default Coding Agent';
 
@@ -223,7 +241,11 @@ export function ProfileEditor({
   const [formError, setFormError] = useState<string | null>(null);
   const [customizedToolSetIds, setCustomizedToolSetIds] = useState<BuiltinToolSetId[]>([]);
   const [expandedToolSetIds, setExpandedToolSetIds] = useState<BuiltinToolSetId[]>([]);
-  const [systemPromptExpanded, setSystemPromptExpanded] = useState(false);
+  const isMobile = useIsMobile();
+  // On a phone the Prompt tab owns the whole screen, so the collapsed one-line
+  // preview would waste it; start expanded there. Desktop keeps the preview
+  // because the tab shares space with the rest of the editor.
+  const [systemPromptExpanded, setSystemPromptExpanded] = useState(isMobile);
   const [activeTab, setActiveTab] = useState<'model' | 'capabilities' | 'prompt'>('model');
   const [capabilityTab, setCapabilityTab] = useState<'tools' | 'providers' | 'skills'>('tools');
   // False until the form has been populated from `profile` (populate runs in an
@@ -783,7 +805,7 @@ export function ProfileEditor({
                   <EditorRow
                     title="Agent Type"
                     control={
-                      <div className="w-full md:w-56">
+                      <div className="w-48 md:w-56">
                         <RuntimeSelector
                           aria-label="Agent Type"
                           value={formRuntimeType}
@@ -800,7 +822,7 @@ export function ProfileEditor({
                         title="LLM Profile"
                         description="Required"
                         control={
-                          <div className="w-full md:w-56">
+                          <div className="w-48 md:w-56">
                             <LlmProfileSelector
                               hideLabel
                               aria-label="LLM Profile"
@@ -826,7 +848,7 @@ export function ProfileEditor({
                         title="Model"
                         description="Required"
                         control={
-                          <div className="w-full md:w-56">
+                          <div className="w-48 md:w-56">
                             <ModelSelector
                               hideLabel
                               aria-label="Model"
@@ -849,6 +871,7 @@ export function ProfileEditor({
                     <EditorRow
                       title={<label htmlFor="agent-profile-native-model">Model</label>}
                       description="Leave blank to use the runtime's default model."
+                      layout="stack"
                       control={
                         <input
                           id="agent-profile-native-model"
@@ -878,6 +901,7 @@ export function ProfileEditor({
                     <EditorRow
                       title={<label htmlFor="agent-profile-cli-path">CLI Path</label>}
                       description={`Optional — custom ${activeDescriptor.label} CLI binary`}
+                      layout="stack"
                       control={
                         <div className="w-full md:w-56">
                           <input
@@ -899,7 +923,7 @@ export function ProfileEditor({
                     <EditorRow
                       title="Thinking Level"
                       control={
-                        <div className="w-full md:w-56">
+                        <div className="w-48 md:w-56">
                           <ThinkingLevelSelector
                             hideLabel
                             aria-label="Thinking Level"
@@ -1027,35 +1051,50 @@ export function ProfileEditor({
                               }`}
                             >
                               <div className="flex items-center gap-3 min-w-0">
-                                <input
-                                  type="checkbox"
+                                <Checkbox
                                   checked={checked}
                                   onChange={() => toggleToolSet(set.id)}
                                   aria-label={`enable full tool set ${set.id}`}
-                                  className="rounded-md border-border shrink-0"
                                 />
                                 <button
                                   type="button"
                                   onClick={() => toggleToolSetExpanded(set.id)}
                                   aria-label={`expand tool set ${set.id}`}
-                                  className="min-w-0 flex-1 text-left"
+                                  aria-expanded={expanded}
+                                  className="min-w-0 flex-1 py-1 text-left"
                                 >
+                                  {/* The set name is what identifies the row, so it
+                                      keeps the first line to itself at phone width;
+                                      the tool preview drops below rather than
+                                      competing for the same shrinkable space. */}
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <div className="font-medium truncate">{set.label}</div>
-                                    <span className="shrink-0 rounded-full bg-background/70 border border-border/70 px-2 py-0.5 text-[10px] text-muted-foreground">
+                                    <div className="min-w-0 flex-1 truncate font-medium">
+                                      {set.label}
+                                    </div>
+                                    <span className="hidden shrink-0 rounded-full bg-background/70 border border-border/70 px-2 py-0.5 text-[10px] text-muted-foreground md:inline-block">
                                       {set.tools.length} tools
                                     </span>
-                                    <span className="min-w-0 truncate text-xs text-muted-foreground">
-                                      {set.tools.slice(0, 4).join(', ')}
-                                      {set.tools.length > 4 ? '...' : ''}
+                                    <span className="hidden min-w-0 flex-[2] truncate text-xs text-muted-foreground md:block">
+                                      {toolSetPreview(set.tools)}
                                     </span>
+                                    <ChevronRight
+                                      size={14}
+                                      strokeWidth={2}
+                                      aria-hidden="true"
+                                      className={`shrink-0 text-muted-foreground/70 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                                    />
+                                  </div>
+                                  {/* The count rides the preview line on a phone so the
+                                      set name keeps the first line to itself. */}
+                                  <div className="mt-0.5 truncate text-xs text-muted-foreground md:hidden">
+                                    {set.tools.length} tools · {toolSetPreview(set.tools)}
                                   </div>
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => toggleToolSetCustomize(set.id)}
                                   aria-label={`customize tool set ${set.id}`}
-                                  className={`shrink-0 rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                                  className={`shrink-0 rounded-md border px-2 py-1 text-[11px] transition-colors max-md:py-2 ${
                                     customized
                                       ? 'border-primary/40 bg-muted/60 text-primary'
                                       : 'border-border bg-background/70 text-muted-foreground hover:text-foreground'
@@ -1129,7 +1168,7 @@ export function ProfileEditor({
 
                 {capabilityTab === 'providers' &&
                   (activeDescriptor.capabilities.providers === 'profile' ? (
-                    <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
+                    <div className="rounded-lg text-sm max-md:border-0 max-md:bg-transparent max-md:p-0 md:border md:border-border md:bg-secondary/50 md:p-3">
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-xs text-muted-foreground">Configured MCP servers</p>
@@ -1253,7 +1292,7 @@ export function ProfileEditor({
 
                 {capabilityTab === 'skills' &&
                   (activeDescriptor.capabilities.skills === 'profile' ? (
-                    <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
+                    <div className="rounded-lg text-sm max-md:border-0 max-md:bg-transparent max-md:p-0 md:border md:border-border md:bg-secondary/50 md:p-3">
                       <div className="mb-3 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
                         <span>{skillProviderCount} sources</span>
                         <span>{skillIncludeCount} included</span>
@@ -1264,7 +1303,7 @@ export function ProfileEditor({
                         {(['workspace', 'external', 'plugin'] as SkillSource[]).map(source => (
                           <label
                             key={source}
-                            className="flex items-center gap-2 rounded-md bg-background/60 px-2 py-1.5 text-xs capitalize"
+                            className="flex cursor-pointer items-center gap-2 rounded-md bg-background/60 px-2 py-1.5 text-xs capitalize max-md:py-2.5"
                           >
                             <input
                               type="checkbox"
@@ -1426,7 +1465,10 @@ export function ProfileEditor({
                       onBlur={autosave.flush}
                       placeholder="You are a helpful coding agent..."
                       rows={9}
-                      className={`${MONO_FIELD_CLASS} min-h-[180px] resize-y`}
+                      // Grows to fill the phone screen (the tab is otherwise
+                      // mostly empty space below a 180px box); fixed on desktop,
+                      // where the editor shares the viewport.
+                      className={`${MONO_FIELD_CLASS} min-h-[55vh] resize-y md:min-h-[180px]`}
                     />
                   </div>
                 ) : (
@@ -1479,20 +1521,22 @@ function MultimodalFallbackSection({
         <EditorRow
           title="Fallback LLM Profile"
           control={
-            <select
-              aria-label="Fallback LLM Profile"
-              value={profileId}
-              onChange={event => onProfileChange(event.target.value)}
-              onBlur={onFlush}
-              className={`${FIELD_CLASS} md:w-56`}
-            >
-              <option value="">None</option>
-              {llmProfiles.map(profile => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.name}
-                </option>
-              ))}
-            </select>
+            <div className="w-48 md:w-56">
+              <select
+                aria-label="Fallback LLM Profile"
+                value={profileId}
+                onChange={event => onProfileChange(event.target.value)}
+                onBlur={onFlush}
+                className={FIELD_CLASS}
+              >
+                <option value="">None</option>
+                {llmProfiles.map(profile => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           }
         />
 
@@ -1501,24 +1545,26 @@ function MultimodalFallbackSection({
             title="Fallback Model"
             description="Must support image input"
             control={
-              <select
-                aria-label="Fallback Model"
-                value={modelValue}
-                onChange={event => onModelChange(event.target.value)}
-                onBlur={onFlush}
-                disabled={visionModels.length === 0}
-                className={`${FIELD_CLASS} md:w-56 disabled:opacity-50`}
-              >
-                <option value="">Select a Vision-capable model</option>
-                {visionModels.map(entry => {
-                  const label = entry.displayName || entry.modelId;
-                  return (
-                    <option key={entry.modelId} value={entry.modelId}>
-                      {label === entry.modelId ? label : `${label} (${entry.modelId})`}
-                    </option>
-                  );
-                })}
-              </select>
+              <div className="w-48 md:w-56">
+                <select
+                  aria-label="Fallback Model"
+                  value={modelValue}
+                  onChange={event => onModelChange(event.target.value)}
+                  onBlur={onFlush}
+                  disabled={visionModels.length === 0}
+                  className={`${FIELD_CLASS} disabled:opacity-50`}
+                >
+                  <option value="">Select a Vision-capable model</option>
+                  {visionModels.map(entry => {
+                    const label = entry.displayName || entry.modelId;
+                    return (
+                      <option key={entry.modelId} value={entry.modelId}>
+                        {label === entry.modelId ? label : `${label} (${entry.modelId})`}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
             }
           />
         )}
@@ -1528,15 +1574,17 @@ function MultimodalFallbackSection({
             title="Fallback Model"
             description="Must support image input"
             control={
-              <input
-                type="text"
-                aria-label="Fallback Model"
-                value={model}
-                onChange={event => onModelChange(event.target.value)}
-                onBlur={onFlush}
-                placeholder="model id"
-                className={`${MONO_FIELD_CLASS} md:w-56`}
-              />
+              <div className="w-48 md:w-56">
+                <input
+                  type="text"
+                  aria-label="Fallback Model"
+                  value={model}
+                  onChange={event => onModelChange(event.target.value)}
+                  onBlur={onFlush}
+                  placeholder="model id"
+                  className={MONO_FIELD_CLASS}
+                />
+              </div>
             }
           />
         )}
@@ -1656,7 +1704,7 @@ function ModelSelector({
         />
       </button>
       {open && hasModels && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden max-h-72 overflow-y-auto">
+        <div className={`${SELECT_POPOVER_CLASS} max-h-72 overflow-y-auto`}>
           {models.map(m => {
             const label = m.displayName || m.modelId;
             return (
@@ -1740,7 +1788,7 @@ function LlmProfileSelector({
         />
       </button>
       {open && profiles.length > 0 && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden">
+        <div className={SELECT_POPOVER_CLASS}>
           {profiles.map(p => (
             <button
               key={p.id}
@@ -1813,7 +1861,7 @@ function ThinkingLevelSelector({
         />
       </button>
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden">
+        <div className={SELECT_POPOVER_CLASS}>
           {THINKING_LEVEL_OPTIONS.map(opt => (
             <button
               key={opt.value || 'auto'}
@@ -1880,7 +1928,7 @@ function RuntimeSelector({
         />
       </button>
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden">
+        <div className={SELECT_POPOVER_CLASS}>
           {options.map(opt => (
             <button
               key={opt.runtime}
