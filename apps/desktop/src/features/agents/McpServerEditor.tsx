@@ -437,7 +437,7 @@ export function McpServerEditor({
                 onClick={() =>
                   void runAction(() => connectMcpServerForBackend(backendId, current.name))
                 }
-                className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground max-md:py-2"
                 title="Connect"
               >
                 Connect
@@ -447,7 +447,7 @@ export function McpServerEditor({
                 onClick={() =>
                   void runAction(() => disconnectMcpServerForBackend(backendId, current.name))
                 }
-                className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground max-md:py-2"
                 title="Disconnect"
               >
                 Disconnect
@@ -457,7 +457,7 @@ export function McpServerEditor({
                 onClick={() =>
                   void runAction(() => refreshMcpServerForBackend(backendId, current.name))
                 }
-                className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground max-md:py-2"
                 title="Refresh inventory"
               >
                 Refresh
@@ -491,7 +491,7 @@ export function McpServerEditor({
                       onClick={() =>
                         void runAction(() => signOutMcpOAuthForBackend(backendId, current.name))
                       }
-                      className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                      className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground max-md:py-2"
                       title="Sign out of MCP OAuth"
                     >
                       Sign out
@@ -649,7 +649,7 @@ export function McpServerEditor({
                   <button
                     type="button"
                     onClick={() => setFormEnvPairs([...formEnvPairs, { key: '', value: '' }])}
-                    className="text-xs text-primary transition-colors hover:text-primary/80"
+                    className="-m-2 p-2 text-xs text-primary transition-colors hover:text-primary/80 md:m-0 md:p-0"
                   >
                     + Add
                   </button>
@@ -710,7 +710,7 @@ export function McpServerEditor({
                   <button
                     type="button"
                     onClick={() => setFormHeaderPairs([...formHeaderPairs, { key: '', value: '' }])}
-                    className="text-xs text-primary transition-colors hover:text-primary/80"
+                    className="-m-2 p-2 text-xs text-primary transition-colors hover:text-primary/80 md:m-0 md:p-0"
                   >
                     + Add
                   </button>

@@ -36,7 +36,7 @@ export function EditorTabs({
             aria-selected={selected}
             onClick={() => onChange(tab.id)}
             className={`flex flex-1 items-center justify-center gap-1.5 rounded-md font-medium transition-colors ${
-              isSub ? 'px-2.5 py-1 text-xs' : 'px-3 py-1.5 text-sm'
+              isSub ? 'px-2.5 py-1 text-xs max-md:py-1.5' : 'px-3 py-1.5 text-sm max-md:py-2'
             } ${
               selected
                 ? 'bg-card text-foreground shadow-apple-sm'

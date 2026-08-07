@@ -18,7 +18,9 @@ export function Toggle({
       aria-label={ariaLabel}
       onClick={() => onChange(!checked)}
       disabled={disabled}
-      className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
+      // The switch itself stays 36x20; a `::before` overlay widens the tap
+      // target to 44x36 on touch without moving anything around it.
+      className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors before:absolute before:-inset-x-1 before:-inset-y-2 before:content-[''] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background md:before:content-none ${
         checked ? 'bg-primary' : 'bg-muted'
       }`}
     >

@@ -928,14 +928,14 @@ function ModelsSection({
           onClick={onFetch}
           disabled={fetchDisabled}
           title={fetchDisabledReason}
-          className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary disabled:opacity-50"
+          className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary disabled:opacity-50 max-md:py-2"
         >
           {fetching ? 'Fetching…' : 'Fetch from /models'}
         </button>
         <button
           type="button"
           onClick={onAdd}
-          className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary"
+          className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary max-md:py-2"
         >
           + Add model
         </button>
@@ -1118,7 +1118,7 @@ function ModelRow({
 
   return (
     <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         <div>
           <input
             type="text"
@@ -1150,7 +1150,7 @@ function ModelRow({
             inputMode="numeric"
             value={row.contextWindowStr}
             onChange={e => onChange({ contextWindowStr: e.target.value })}
-            placeholder="context window (optional override)"
+            placeholder="context window (optional)"
             aria-label="context window"
             className={`${MODEL_FIELD_BASE} font-mono ${errs.contextWindow ? 'border-destructive' : 'border-border/70'}`}
           />
@@ -1171,7 +1171,7 @@ function ModelRow({
             inputMode="numeric"
             value={row.maxTokensStr}
             onChange={e => onChange({ maxTokensStr: e.target.value })}
-            placeholder="max tokens (optional override)"
+            placeholder="max tokens (optional)"
             aria-label="max tokens"
             className={`${MODEL_FIELD_BASE} font-mono ${errs.maxTokens ? 'border-destructive' : 'border-border/70'}`}
           />
@@ -1180,10 +1180,12 @@ function ModelRow({
           )}
         </div>
       </div>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
+      {/* Stacked below md: when the left group wrapped, its second line ran
+          under the Test/Remove buttons and overlapped them by up to 46px. */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <ModelTestStatus status={row.testStatus} />
-          <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground max-md:py-1.5">
             <input
               type="checkbox"
               checked={row.supportsImage}
@@ -1196,13 +1198,13 @@ function ModelRow({
             Vision
           </label>
           {providerType !== 'anthropic' && (
-            <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <label className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground max-md:py-1.5">
               Dialect
               <select
                 value={row.dialect}
                 onChange={e => onChange({ dialect: e.target.value as '' | LlmModelDialect })}
                 aria-label={`dialect for model ${row.modelId.trim() || index + 1}`}
-                className={`max-w-[180px] rounded-md border bg-background/70 px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 ${
+                className={`min-w-0 flex-1 rounded-md border bg-background/70 px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 md:max-w-[180px] md:flex-none ${
                   row.dialect ? 'border-primary/50' : 'border-border/70'
                 }`}
               >
@@ -1221,13 +1223,13 @@ function ModelRow({
             </label>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 max-md:justify-end">
           <button
             type="button"
             onClick={onProbe}
             disabled={testDisabled}
             title={testDisabledReason}
-            className="rounded-md border border-border/70 bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary disabled:opacity-50"
+            className="rounded-md border border-border/70 bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary disabled:opacity-50 max-md:py-2"
           >
             {isRunning ? 'Testing…' : 'Test'}
           </button>
@@ -1235,7 +1237,7 @@ function ModelRow({
             type="button"
             onClick={onRemove}
             title="Remove model"
-            className="rounded-md border border-border/70 bg-background/70 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
+            className="rounded-md border border-border/70 bg-background/70 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 max-md:py-2"
           >
             Remove
           </button>

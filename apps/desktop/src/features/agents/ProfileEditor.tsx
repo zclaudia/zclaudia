@@ -1300,7 +1300,7 @@ export function ProfileEditor({
                         <span>{pinnedSkillCount} pinned inline</span>
                         <span>{skillPolicyOverrideCount} policy overrides</span>
                       </div>
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
                         {(['workspace', 'external', 'plugin'] as SkillSource[]).map(source => (
                           <label
                             key={source}
@@ -1368,7 +1368,7 @@ export function ProfileEditor({
                                 >
                                   {ref.source}/{skill.id} · {skill.description || 'No description'}
                                 </p>
-                                <div className="mt-2 grid gap-2 border-t border-border/60 pt-2 sm:grid-cols-2">
+                                <div className="mt-2 grid gap-2 border-t border-border/60 pt-2 md:grid-cols-2">
                                   <label className="min-w-0 text-[10px] text-muted-foreground">
                                     <span className="mb-1 block">Default mode</span>
                                     <select

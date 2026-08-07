@@ -65,7 +65,9 @@ export function ProfileHeader({
           type="button"
           onClick={onBack}
           aria-label={`Back to ${crumb}`}
-          className="inline-flex flex-shrink-0 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          // Icon-only below md, so it needs padding to stay tappable; the equal
+          // negative margin keeps the row's visual alignment unchanged.
+          className="-m-3 inline-flex flex-shrink-0 items-center gap-1 p-3 text-sm text-muted-foreground hover:text-foreground md:m-0 md:p-0"
         >
           <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
           {/* The crumb label repeats the app header's own title on a phone and
@@ -82,7 +84,7 @@ export function ProfileHeader({
           aria-label="Profile name"
           size={1}
           disabled={disabled}
-          className="min-w-0 max-w-full flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-foreground [field-sizing:content] hover:border-border focus:border-border focus:bg-background/60 focus:outline-none disabled:cursor-default disabled:opacity-70 md:w-auto md:min-w-[3rem] md:flex-none"
+          className="min-w-0 max-w-full flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-foreground max-md:py-1.5 [field-sizing:content] hover:border-border focus:border-border focus:bg-background/60 focus:outline-none disabled:cursor-default disabled:opacity-70 md:w-auto md:min-w-[3rem] md:flex-none"
         />
         {/* The badge cluster must stay shrinkable: `flex-shrink-0` here would size
             it to its max-content width, so its own `flex-wrap` would never trigger
