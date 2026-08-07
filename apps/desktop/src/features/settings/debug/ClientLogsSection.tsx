@@ -45,7 +45,7 @@ export function ClientLogsSection() {
             onClick={() => {
               clearLogs();
             }}
-            className="px-2 py-1 text-xs bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg transition-colors"
+            className="px-2 py-1 text-xs bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg transition-colors max-md:py-2"
           >
             Clear
           </button>
@@ -53,7 +53,7 @@ export function ClientLogsSection() {
             onClick={() => {
               void handleExportLogs();
             }}
-            className="px-3 py-1 text-xs bg-muted/60 hover:bg-muted text-foreground rounded-lg font-medium transition-colors"
+            className="px-3 py-1 text-xs bg-muted/60 hover:bg-muted text-foreground rounded-lg font-medium transition-colors max-md:py-2"
           >
             Export Logs
           </button>

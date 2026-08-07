@@ -373,7 +373,7 @@ export function ManagedRuntimeSettings({
                   : `Removed ${result.removed.length} unreferenced managed runtime(s).`
             )
           }
-          className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-60"
+          className="-m-2 p-2 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-60 md:m-0 md:p-0"
         >
           Clean unreferenced runtimes
         </button>

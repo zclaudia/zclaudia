@@ -61,14 +61,14 @@ export function ThemeToggle() {
           ref={ref}
           {...props}
           aria-label="Change theme"
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-colors ${
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-colors max-md:py-2 ${
             open
               ? 'bg-card text-foreground shadow-apple-sm'
               : 'bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary'
           }`}
         >
           <ButtonIcon size={14} strokeWidth={1.75} />
-          <span className="hidden sm:inline">{currentOption.label}</span>
+          <span>{currentOption.label}</span>
           <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
       )}

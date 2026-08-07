@@ -29,8 +29,8 @@ const VARIANT: Record<ButtonVariant, string> = {
 /* h-7 matches the chrome row height; text tiers follow the composer (11px)
  * and modal-footer (13px) sizes already in use. */
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-6 px-2 text-[11px]',
-  md: 'h-7 px-3 text-[13px]',
+  sm: 'h-6 max-md:h-9 px-2 text-[11px]',
+  md: 'h-7 max-md:h-9 px-3 text-[13px]',
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

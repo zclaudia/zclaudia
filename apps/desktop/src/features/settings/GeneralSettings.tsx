@@ -47,7 +47,7 @@ function FontSizeToggle() {
         <button
           key={opt.key}
           onClick={() => setFontSize(opt.key)}
-          className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 ${
+          className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 max-md:py-2 ${
             fontSize === opt.key
               ? 'bg-card text-foreground shadow-apple-sm'
               : 'text-muted-foreground hover:text-foreground'

@@ -101,7 +101,7 @@ export function HookList({ hooks, onChange }: HookListProps) {
       ))}
       <button
         onClick={() => onChange([...hooks, { event: 'PreToolUse', command: '' }])}
-        className="text-sm text-primary hover:underline"
+        className="-m-2 self-start p-2 text-sm text-primary hover:underline md:m-0 md:p-0"
       >
         + Add hook
       </button>

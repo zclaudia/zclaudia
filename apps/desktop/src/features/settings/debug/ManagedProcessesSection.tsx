@@ -83,7 +83,7 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
             void handleRefreshProcesses();
           }}
           disabled={managedProcessesLoading || embeddedServerStatus === 'disabled'}
-          className="px-3 py-1 text-xs bg-secondary hover:bg-secondary/80 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground rounded-lg font-medium transition-colors"
+          className="px-3 py-1 text-xs bg-secondary hover:bg-secondary/80 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground rounded-lg font-medium transition-colors max-md:py-2"
         >
           {managedProcessesLoading ? 'Refreshing…' : 'Refresh'}
         </button>

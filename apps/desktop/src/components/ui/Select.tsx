@@ -39,13 +39,16 @@ export interface SelectProps<T extends string = string> {
   ariaLabel?: string;
 }
 
+/* Both compact tiers grow to 36px on touch. The chrome tiers are sized for a
+ * mouse; a 24px trigger is not a tap target, and fixing it here keeps every
+ * caller consistent instead of each one bolting on its own padding. */
 const SIZE_CLASSES: Record<SelectSize, { trigger: string; panelText: string }> = {
   sm: {
-    trigger: 'h-6 px-2 text-[11px] gap-1',
+    trigger: 'h-6 max-md:h-9 px-2 text-[11px] gap-1',
     panelText: 'text-[11px]',
   },
   md: {
-    trigger: 'h-7 px-2.5 text-[12px] gap-1.5',
+    trigger: 'h-7 max-md:h-9 px-2.5 text-[12px] gap-1.5',
     panelText: 'text-[12px]',
   },
   lg: {

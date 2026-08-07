@@ -186,9 +186,12 @@ export function AgentSettings() {
               ) : (
                 <div className="space-y-1">
                   {capabilities.tools.map(tool => (
-                    <div key={tool.id} className="flex items-center justify-between text-xs">
+                    <div
+                      key={tool.id}
+                      className="flex flex-col gap-0.5 text-xs md:flex-row md:items-center md:justify-between md:gap-2"
+                    >
                       <span className="font-mono text-foreground/80">{tool.name}</span>
-                      <span className="text-muted-foreground truncate ml-2 max-w-[50%] text-right">
+                      <span className="text-muted-foreground max-md:text-[11px] md:ml-2 md:max-w-[50%] md:truncate md:text-right">
                         {tool.description}
                       </span>
                     </div>
@@ -208,10 +211,13 @@ export function AgentSettings() {
                 </div>
                 <div className="space-y-1">
                   {capabilities.skills.map(skill => (
-                    <div key={skill.id} className="flex items-center justify-between text-xs">
+                    <div
+                      key={skill.id}
+                      className="flex flex-col gap-0.5 text-xs md:flex-row md:items-center md:justify-between md:gap-2"
+                    >
                       <span className="text-foreground/80">{skill.name}</span>
                       {skill.description && (
-                        <span className="text-muted-foreground truncate ml-2 max-w-[50%] text-right">
+                        <span className="text-muted-foreground max-md:text-[11px] md:ml-2 md:max-w-[50%] md:truncate md:text-right">
                           {skill.description}
                         </span>
                       )}

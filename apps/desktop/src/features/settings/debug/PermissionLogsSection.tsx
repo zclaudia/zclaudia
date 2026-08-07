@@ -46,7 +46,7 @@ export function PermissionLogsSection() {
             void loadPermissionLogs(0, permLogsFilter);
           }}
           disabled={permLogsLoading}
-          className="px-2 py-1 text-xs bg-secondary hover:bg-secondary/80 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground rounded-lg transition-colors"
+          className="px-2 py-1 text-xs bg-secondary hover:bg-secondary/80 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground rounded-lg transition-colors max-md:py-2"
         >
           {permLogsLoading ? 'Loading…' : 'Refresh'}
         </button>
@@ -62,7 +62,7 @@ export function PermissionLogsSection() {
                 setPermLogs([]);
                 setPermLogsFilter(filter);
               }}
-              className={`px-2 py-0.5 text-[11px] rounded-md transition-colors ${
+              className={`px-2 py-0.5 text-[11px] rounded-md transition-colors max-md:px-3 max-md:py-2 ${
                 permLogsFilter === filter
                   ? 'bg-muted/60 text-foreground'
                   : 'bg-secondary/80 text-muted-foreground hover:text-foreground'

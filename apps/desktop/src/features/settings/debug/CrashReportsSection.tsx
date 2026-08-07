@@ -45,7 +45,7 @@ export function CrashReportsSection({ embeddedServerStatus }: { embeddedServerSt
     <SettingsRow
       align="start"
       title="Crash reports"
-      description="Recent embedded server fatal crashes stored on disk."
+      description="Recent fatal server crashes stored on disk."
       control={
         <>
           <button
@@ -53,7 +53,7 @@ export function CrashReportsSection({ embeddedServerStatus }: { embeddedServerSt
               void loadCrashReports();
             }}
             disabled={crashReportsLoading || embeddedServerStatus === 'disabled'}
-            className="px-2 py-1 text-xs bg-secondary hover:bg-secondary/80 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground rounded-lg transition-colors"
+            className="px-2 py-1 text-xs bg-secondary hover:bg-secondary/80 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground rounded-lg transition-colors max-md:py-2"
           >
             {crashReportsLoading ? 'Refreshing…' : 'Refresh'}
           </button>
@@ -62,7 +62,7 @@ export function CrashReportsSection({ embeddedServerStatus }: { embeddedServerSt
               void handleCopyJSON();
             }}
             disabled={crashReports.length === 0}
-            className="px-2 py-1 text-xs bg-muted/60 hover:bg-muted disabled:bg-muted disabled:text-muted-foreground text-foreground rounded-lg transition-colors"
+            className="px-2 py-1 text-xs bg-muted/60 hover:bg-muted disabled:bg-muted disabled:text-muted-foreground text-foreground rounded-lg transition-colors max-md:py-2"
           >
             {copied ? 'Copied!' : 'Copy JSON'}
           </button>

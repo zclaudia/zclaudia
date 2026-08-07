@@ -22,6 +22,7 @@ import { DEFAULT_UNIFIED_POLICY, normalizeToUnifiedPolicy } from '@zclaudia/shar
 import { ToolRuleList } from '../../components/permission/ToolRuleList';
 import { HookList } from '../../components/permission/HookList';
 import { SettingsGroup, SettingsRow } from './ui/SettingsGroup';
+import { Checkbox } from '../../components/ui/Checkbox';
 import { Toggle } from '../../components/ui/Toggle';
 
 const PERMISSION_FALLBACK_TEMPLATE_ID = 'permission-escalation-default';
@@ -568,7 +569,7 @@ export function PermissionSettings() {
                       })
                     }
                     disabled={saving}
-                    className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
                   />
                 }
               />
@@ -591,7 +592,7 @@ export function PermissionSettings() {
                       })
                     }
                     disabled={saving}
-                    className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
                   />
                 }
               />
@@ -611,7 +612,7 @@ export function PermissionSettings() {
                       })
                     }
                     disabled={saving}
-                    className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
                   />
                 }
               />
@@ -667,13 +668,12 @@ export function PermissionSettings() {
             title="Protect sensitive files"
             description=".env, .ssh, credentials, *.key, *.pem — requires approval even if category is auto-approve"
             control={
-              <input
-                type="checkbox"
+              <Checkbox
                 aria-label="Protect sensitive files"
                 checked={policy.globalGuards.blockSensitiveFiles}
                 onChange={e => updateGuard('blockSensitiveFiles', e.target.checked)}
                 disabled={saving}
-                className="mt-0.5 rounded-md border-border"
+                className="mt-0.5"
               />
             }
           />
@@ -682,13 +682,12 @@ export function PermissionSettings() {
             title="Enforce workspace scope"
             description="Block file/bash operations targeting paths outside the project directory"
             control={
-              <input
-                type="checkbox"
+              <Checkbox
                 aria-label="Enforce workspace scope"
                 checked={policy.globalGuards.blockOutsideWorkspace}
                 onChange={e => updateGuard('blockOutsideWorkspace', e.target.checked)}
                 disabled={saving}
-                className="mt-0.5 rounded-md border-border"
+                className="mt-0.5"
               />
             }
           />
@@ -699,7 +698,7 @@ export function PermissionSettings() {
         <button
           onClick={resetDefaults}
           disabled={saving}
-          className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+          className="-m-2 p-2 text-xs text-muted-foreground transition-colors hover:text-foreground md:m-0 md:p-0"
         >
           Reset to defaults
         </button>
