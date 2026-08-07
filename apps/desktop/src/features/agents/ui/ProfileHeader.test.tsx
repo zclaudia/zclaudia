@@ -72,6 +72,65 @@ describe('ProfileHeader', () => {
     expect(screen.getByText('Default')).toBeInTheDocument();
   });
 
+  it('hides context badges and a settled save state below md', () => {
+    const { container } = render(
+      <ProfileHeader
+        {...base}
+        badges={[
+          { label: 'Dev MacBook', secondary: true },
+          { label: 'Read-only', tone: 'neutral' },
+        ]}
+        saveStatus="saved"
+      />
+    );
+    // Which backend a record lives on is context; read-only changes what you can
+    // do with it. Only the latter earns a slot on a phone.
+    expect(screen.getByText('Dev MacBook').closest('span.hidden')).not.toBeNull();
+    expect(screen.getByText('Read-only').closest('span.hidden')).toBeNull();
+    expect(screen.getByTestId('save-state').closest('span.hidden')).not.toBeNull();
+    // Read-only is a signal, so the cluster still takes its mobile line here.
+    expect(container.querySelector('.basis-full')!.className).not.toContain('hidden');
+  });
+
+  it('drops the cluster entirely below md when nothing needs attention', () => {
+    const { container } = render(
+      <ProfileHeader
+        {...base}
+        badges={[
+          { label: 'Dev MacBook', secondary: true },
+          { label: 'Default', tone: 'accent', secondary: true },
+        ]}
+        saveStatus="saved"
+      />
+    );
+    // Context only — a phone gets a one-line header.
+    expect(container.querySelector('.basis-full')!.className).toContain('hidden');
+  });
+
+  it('keeps an unsettled save state visible below md', () => {
+    render(<ProfileHeader {...base} saveStatus="failed" />);
+    expect(screen.getByTestId('save-state').closest('span.hidden')).toBeNull();
+  });
+
+  it('drops the crumb label below md but keeps the back button labelled', () => {
+    render(<ProfileHeader {...base} />);
+    const back = screen.getByRole('button', { name: 'Back to Agent Profiles' });
+    // The visible text is hidden below md; the accessible name is not.
+    expect(back.querySelector('span')!.className).toContain('hidden');
+  });
+
+  it('gives the status cluster its own line below md so the name is not clipped', () => {
+    const { container } = render(
+      <ProfileHeader {...base} recordStatus={{ completeness: 'draft', availability: {} }} />
+    );
+    const cluster = container.querySelector('.basis-full')!;
+    // A chip sharing the row with the name input clipped the name mid-word, and
+    // an input cannot ellipsize — so below md the cluster wraps to its own line.
+    expect(cluster.className).toContain('order-last');
+    expect(cluster.className).toContain('md:basis-auto');
+    expect(cluster.className).not.toContain('hidden');
+  });
+
   it('keeps the badge cluster shrinkable so it can wrap at phone widths', () => {
     // jsdom has no layout, so assert the invariant instead: a `flex-wrap` cluster
     // that is also `flex-shrink-0` sizes to max-content and never wraps, which

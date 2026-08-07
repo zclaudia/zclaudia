@@ -6,6 +6,13 @@ export interface DetailBadge {
   label: string;
   tone?: 'accent' | 'neutral';
   online?: boolean;
+  /**
+   * Context rather than a signal — which backend the record lives on, whether
+   * it is the default. `ProfileHeader` hides these below `md`, where a stack of
+   * non-actionable chips pushed the header to three lines. Anything the user
+   * may need to act on (read-only, an unhealthy record) must stay primary.
+   */
+  secondary?: boolean;
 }
 
 export function DetailHeader({

@@ -738,8 +738,9 @@ export function ProfileEditor({
   const isReadonly = profile.status === 'readonly';
 
   const headerBadges: DetailBadge[] = [
-    ...(backendName ? [{ label: backendName }] : []),
-    ...(profile.isDefault ? [{ label: 'Default', tone: 'accent' as const }] : []),
+    // Backend and default-ness are context; read-only changes what you can do.
+    ...(backendName ? [{ label: backendName, secondary: true }] : []),
+    ...(profile.isDefault ? [{ label: 'Default', tone: 'accent' as const, secondary: true }] : []),
     ...(isReadonly ? [{ label: 'Read-only', tone: 'neutral' as const }] : []),
   ];
 

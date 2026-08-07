@@ -600,9 +600,10 @@ export function LlmProfileEditor({
 
   const providerLabel = PROVIDER_TYPE_LABELS[formProviderType] ?? formProviderType;
   const headerBadges: DetailBadge[] = [
-    ...(backendName ? [{ label: backendName }] : []),
-    ...(formIsDefault ? [{ label: 'Default', tone: 'accent' as const }] : []),
-    { label: providerLabel, tone: 'neutral' as const },
+    ...(backendName ? [{ label: backendName, secondary: true }] : []),
+    ...(formIsDefault ? [{ label: 'Default', tone: 'accent' as const, secondary: true }] : []),
+    // The Provider Type field sits directly below and says the same thing.
+    { label: providerLabel, tone: 'neutral' as const, secondary: true },
   ];
 
   const modelCount = draftsToEntries(formModels).length;

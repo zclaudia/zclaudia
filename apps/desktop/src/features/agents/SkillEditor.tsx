@@ -137,7 +137,7 @@ export function SkillEditor({
   };
 
   const headerBadges: DetailBadge[] = [
-    ...(backendName ? [{ label: backendName }] : []),
+    ...(backendName ? [{ label: backendName, secondary: true }] : []),
     ...(!isWorkspace ? [{ label: 'Read-only', tone: 'neutral' as const }] : []),
   ];
 

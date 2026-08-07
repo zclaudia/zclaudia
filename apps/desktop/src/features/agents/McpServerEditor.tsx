@@ -528,7 +528,9 @@ export function McpServerEditor({
   // Enabled/Disabled is now surfaced by the header StatusChip (disabled) and the
   // Connection section (full detail) — no separate header badge, to avoid a
   // duplicate "Disabled" label next to the chip.
-  const headerBadges: DetailBadge[] = [...(backendName ? [{ label: backendName }] : [])];
+  const headerBadges: DetailBadge[] = [
+    ...(backendName ? [{ label: backendName, secondary: true }] : []),
+  ];
 
   const headerActions: ActionsMenuAction[] | undefined = server
     ? [
