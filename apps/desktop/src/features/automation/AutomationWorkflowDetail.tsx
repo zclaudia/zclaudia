@@ -6,6 +6,7 @@ import type { AutomationApiType } from './useAutomationApi';
 import type { ProjectInfo } from './automation-types';
 import { isInternalProject, CATEGORY_COLORS } from './automation-types';
 import { WorkflowEditor } from '../workflows/components/WorkflowEditor';
+import { WorkflowMobileView } from '../workflows/components/WorkflowMobileView';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 
 const PERMISSION_FALLBACK_TEMPLATE_ID = 'permission-escalation-default';
@@ -272,13 +273,33 @@ function WorkflowDetailPanel({
 
   return (
     <div className="h-full">
-      <WorkflowEditor
-        workflow={workflow}
-        projectId={workflow.projectId || effectiveProjectId}
-        readOnly={!!workflow.isSystem}
-        onBack={() => selectItem(null)}
-        onSaved={() => bump()}
-      />
+      {/* Below md the graph editor is replaced outright rather than adapted:
+          the canvas does not fit and its authoring gestures are drag-based.
+          Tablets keep the editor — 768px has room for canvas plus a collapsed
+          palette, and it is the breakpoint the rest of the app already uses. */}
+      <div className="h-full md:hidden">
+        <WorkflowMobileView
+          workflow={workflow}
+          onBack={() => selectItem(null)}
+          onRun={
+            workflow.isSystem
+              ? undefined
+              : async () => {
+                  await api.post(`/api/workflows/${workflow.id}/trigger`);
+                  bump();
+                }
+          }
+        />
+      </div>
+      <div className="hidden h-full md:block">
+        <WorkflowEditor
+          workflow={workflow}
+          projectId={workflow.projectId || effectiveProjectId}
+          readOnly={!!workflow.isSystem}
+          onBack={() => selectItem(null)}
+          onSaved={() => bump()}
+        />
+      </div>
     </div>
   );
 }
