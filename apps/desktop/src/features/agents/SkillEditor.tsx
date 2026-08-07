@@ -200,7 +200,9 @@ export function SkillEditor({
                   value={content}
                   onChange={e => setContent(e.target.value)}
                   onBlur={autosave.flush}
-                  className={`${FIELD_CLASS} h-80 resize-y font-mono`}
+                  // The editor is the whole point of this screen, so it grows to fill a
+                  // phone rather than sitting at 320px above dead space.
+                  className={`${FIELD_CLASS} h-80 resize-y font-mono max-md:h-[55vh]`}
                   spellCheck={false}
                 />
               </EditorSection>
@@ -232,8 +234,8 @@ function SkillInfoCard({ skill }: { skill: WorkspaceSkillInfo }) {
 
   return (
     <div className="p-3 bg-secondary/50 rounded-lg border border-border/50">
-      <div className="flex items-center gap-2">
-        <span className="font-medium text-sm truncate">{displayName}</span>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="min-w-0 max-w-full truncate font-medium text-sm">{displayName}</span>
         <span
           className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium ${
             isEligible ? TONE_BADGE.success : TONE_BADGE.destructive

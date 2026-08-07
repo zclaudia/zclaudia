@@ -469,7 +469,7 @@ export function McpServerEditor({
                     type="button"
                     onClick={() => void handleOAuthLogin('browser')}
                     disabled={startingOAuth}
-                    className={`rounded-md border border-[hsl(var(--glyph-orange)/0.3)] bg-[hsl(var(--glyph-orange)/0.15)] px-2.5 py-1 text-xs ${GLYPH_ORANGE_TEXT} transition-colors hover:bg-[hsl(var(--glyph-orange)/0.25)] disabled:opacity-50`}
+                    className={`rounded-md border border-[hsl(var(--glyph-orange)/0.3)] bg-[hsl(var(--glyph-orange)/0.15)] px-2.5 py-1 text-xs ${GLYPH_ORANGE_TEXT} transition-colors hover:bg-[hsl(var(--glyph-orange)/0.25)] disabled:opacity-50 max-md:py-2`}
                     title="Start MCP OAuth login"
                   >
                     OAuth Login
@@ -617,7 +617,7 @@ export function McpServerEditor({
                       value={formArgs}
                       onChange={e => setFormArgs(e.target.value)}
                       onBlur={autosave.flush}
-                      placeholder="e.g. -y @modelcontextprotocol/server-filesystem /path/to/dir"
+                      placeholder="e.g. -y @scope/server /path"
                       className="font-mono"
                     />
                   )}
@@ -649,7 +649,7 @@ export function McpServerEditor({
                   <button
                     type="button"
                     onClick={() => setFormEnvPairs([...formEnvPairs, { key: '', value: '' }])}
-                    className="-m-2 p-2 text-xs text-primary transition-colors hover:text-primary/80 md:m-0 md:p-0"
+                    className="-m-1.5 p-1.5 text-xs text-primary transition-colors hover:text-primary/80 md:m-0 md:p-0"
                   >
                     + Add
                   </button>
@@ -683,7 +683,7 @@ export function McpServerEditor({
                     <button
                       type="button"
                       onClick={() => setFormEnvPairs(formEnvPairs.filter((_, j) => j !== i))}
-                      className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+                      className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive max-md:p-2"
                       aria-label="Remove environment variable"
                     >
                       <svg
@@ -710,7 +710,7 @@ export function McpServerEditor({
                   <button
                     type="button"
                     onClick={() => setFormHeaderPairs([...formHeaderPairs, { key: '', value: '' }])}
-                    className="-m-2 p-2 text-xs text-primary transition-colors hover:text-primary/80 md:m-0 md:p-0"
+                    className="-m-1.5 p-1.5 text-xs text-primary transition-colors hover:text-primary/80 md:m-0 md:p-0"
                   >
                     + Add
                   </button>
@@ -744,7 +744,7 @@ export function McpServerEditor({
                     <button
                       type="button"
                       onClick={() => setFormHeaderPairs(formHeaderPairs.filter((_, j) => j !== i))}
-                      className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+                      className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive max-md:p-2"
                       aria-label="Remove header"
                     >
                       <svg
@@ -775,7 +775,7 @@ export function McpServerEditor({
                   value={formHeadersHelper}
                   onChange={e => setFormHeadersHelper(e.target.value)}
                   onBlur={autosave.flush}
-                  placeholder="Command that prints JSON headers, e.g. node ./headers-helper.js"
+                  placeholder="Command printing JSON headers"
                   className={`${FIELD_CLASS} font-mono`}
                 />
                 <p className="mt-1 text-[10px] text-muted-foreground">
@@ -788,7 +788,7 @@ export function McpServerEditor({
 
           {formTransport !== 'stdio' && (
             <EditorSection title="Authentication">
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground max-md:py-2">
                 <input
                   type="checkbox"
                   aria-label="Enable OAuth"
@@ -809,7 +809,7 @@ export function McpServerEditor({
                           value={formOAuthMetadataUrl}
                           onChange={e => setFormOAuthMetadataUrl(e.target.value)}
                           onBlur={autosave.flush}
-                          placeholder="https://auth.example.com/.well-known/oauth-authorization-server"
+                          placeholder="https://auth.example.com/.well-known/…"
                           className="text-xs font-mono"
                         />
                       )}
@@ -934,7 +934,7 @@ export function McpServerEditor({
                 </select>
               </div>
             </div>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground max-md:py-2">
               <input
                 type="checkbox"
                 checked={formTrustReadOnlyHint}

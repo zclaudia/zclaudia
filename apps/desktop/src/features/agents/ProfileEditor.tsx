@@ -1191,12 +1191,15 @@ export function ProfileEditor({
                             return (
                               <div
                                 key={server.id}
-                                className="flex min-w-0 items-center justify-between gap-3 rounded-md bg-background/60 px-2 py-2"
+                                className="flex min-w-0 flex-col gap-2 rounded-md bg-background/60 px-2 py-2 md:flex-row md:items-center md:justify-between md:gap-3"
                               >
                                 <div className="min-w-0 flex-1">
-                                  <div className="flex min-w-0 items-center gap-2">
+                                  {/* Wraps below md: the state pill is shrink-0, so
+                                      on one line the name was the only thing that
+                                      could give way. */}
+                                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 md:flex-nowrap">
                                     <span
-                                      className="truncate font-mono text-xs"
+                                      className="min-w-0 max-w-full truncate font-mono text-xs"
                                       title={`mcp/${server.name}`}
                                     >
                                       mcp/{server.name}
@@ -1234,7 +1237,7 @@ export function ProfileEditor({
                                 <button
                                   type="button"
                                   onClick={() => toggleMcpProvider(server.name)}
-                                  className={`shrink-0 rounded-md px-2 py-1 text-[10px] transition-colors ${
+                                  className={`shrink-0 rounded-md px-2 py-1 text-[10px] transition-colors max-md:w-full max-md:py-2 max-md:text-xs ${
                                     selected
                                       ? 'bg-muted text-primary hover:bg-muted'
                                       : 'bg-secondary text-muted-foreground hover:text-foreground'
@@ -1329,41 +1332,49 @@ export function ProfileEditor({
                             const executionOverride = skillExecutionOverrideFor(skill);
                             return (
                               <div key={key} className="rounded-md bg-background/60 px-2 py-2">
-                                <div className="flex min-w-0 items-center gap-2">
+                                {/* Name takes the line to itself below md — sharing
+                                    it with the select and Pin left it 177px of the
+                                    210px it needs. The two controls pair up beneath. */}
+                                <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:gap-2">
                                   <span
                                     className="min-w-0 flex-1 truncate font-medium text-xs"
                                     title={`${ref.source}/${skill.id}`}
                                   >
                                     {skill.name || skill.id}
                                   </span>
-                                  <select
-                                    aria-label={`skill visibility ${key}`}
-                                    value={skillVisibility(skill)}
-                                    onChange={event =>
-                                      setSkillVisibility(
-                                        skill,
-                                        event.target.value as 'default' | 'include' | 'exclude'
-                                      )
-                                    }
-                                    className="rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
-                                  >
-                                    <option value="default">Default</option>
-                                    <option value="include">Include</option>
-                                    <option value="exclude">Exclude</option>
-                                  </select>
-                                  <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                    <input
-                                      type="checkbox"
-                                      checked={pinned}
-                                      disabled={skillVisibility(skill) === 'exclude'}
-                                      onChange={() => togglePinnedSkill(skill)}
-                                      aria-label={`pin skill ${key}`}
-                                    />
-                                    Pin
-                                  </label>
+                                  <div className="flex items-center gap-2 md:contents">
+                                    <select
+                                      aria-label={`skill visibility ${key}`}
+                                      value={skillVisibility(skill)}
+                                      onChange={event =>
+                                        setSkillVisibility(
+                                          skill,
+                                          event.target.value as 'default' | 'include' | 'exclude'
+                                        )
+                                      }
+                                      className="rounded border border-border bg-secondary px-1 py-0.5 text-[10px] max-md:flex-1 max-md:py-1.5 max-md:text-xs"
+                                    >
+                                      <option value="default">Default</option>
+                                      <option value="include">Include</option>
+                                      <option value="exclude">Exclude</option>
+                                    </select>
+                                    <label className="flex cursor-pointer items-center gap-1 text-[10px] text-muted-foreground max-md:gap-2 max-md:px-2 max-md:py-1.5 max-md:text-xs">
+                                      <input
+                                        type="checkbox"
+                                        checked={pinned}
+                                        disabled={skillVisibility(skill) === 'exclude'}
+                                        onChange={() => togglePinnedSkill(skill)}
+                                        aria-label={`pin skill ${key}`}
+                                      />
+                                      Pin
+                                    </label>
+                                  </div>
                                 </div>
                                 <p
-                                  className="mt-1 truncate font-mono text-[10px] text-muted-foreground"
+                                  // Two lines below md: this is the only place the
+                                  // description shows, and a title tooltip is no
+                                  // help on a touch screen.
+                                  className="mt-1 truncate font-mono text-[10px] text-muted-foreground max-md:line-clamp-2 max-md:whitespace-normal"
                                   title={skill.description || `${ref.source}/${skill.id}`}
                                 >
                                   {ref.source}/{skill.id} · {skill.description || 'No description'}
@@ -1380,7 +1391,7 @@ export function ProfileEditor({
                                           event.target.value as SkillDefaultModeOption
                                         )
                                       }
-                                      className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
+                                      className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px] max-md:py-1.5 max-md:text-xs"
                                     >
                                       <option value="default">Default</option>
                                       <option value="inline">Inline</option>
@@ -1398,7 +1409,7 @@ export function ProfileEditor({
                                           event.target.value as SkillForkToolPolicyOption
                                         )
                                       }
-                                      className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
+                                      className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px] max-md:py-1.5 max-md:text-xs"
                                     >
                                       <option value="default">Default</option>
                                       <option value="read-only">Read-only</option>
@@ -1407,7 +1418,7 @@ export function ProfileEditor({
                                       <option value="agent-default">Agent default</option>
                                     </select>
                                   </label>
-                                  <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                  <label className="flex cursor-pointer items-center gap-1 text-[10px] text-muted-foreground max-md:gap-2 max-md:py-1.5 max-md:text-xs">
                                     <input
                                       type="checkbox"
                                       checked={
@@ -1418,7 +1429,7 @@ export function ProfileEditor({
                                     />
                                     Allow inline
                                   </label>
-                                  <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                  <label className="flex cursor-pointer items-center gap-1 text-[10px] text-muted-foreground max-md:gap-2 max-md:py-1.5 max-md:text-xs">
                                     <input
                                       type="checkbox"
                                       checked={
