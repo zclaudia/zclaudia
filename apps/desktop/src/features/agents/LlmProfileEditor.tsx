@@ -922,20 +922,22 @@ function ModelsSection({
   const fetchDisabled = !providerType || fetching;
   return (
     <div>
+      {/* Right-aligned from md up; below md they share the full width instead of
+          floating against an empty gutter. */}
       <div className="mb-2 flex items-center justify-end gap-2">
         <button
           type="button"
           onClick={onFetch}
           disabled={fetchDisabled}
           title={fetchDisabledReason}
-          className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary disabled:opacity-50 max-md:py-2"
+          className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary disabled:opacity-50 max-md:flex-1 max-md:py-2"
         >
           {fetching ? 'Fetching…' : 'Fetch from /models'}
         </button>
         <button
           type="button"
           onClick={onAdd}
-          className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary max-md:py-2"
+          className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary max-md:flex-1 max-md:py-2"
         >
           + Add model
         </button>
@@ -1180,12 +1182,16 @@ function ModelRow({
           )}
         </div>
       </div>
-      {/* Stacked below md: when the left group wrapped, its second line ran
-          under the Test/Remove buttons and overlapped them by up to 46px. */}
+      {/* Below md this is three stacked bands rather than one line: the settings
+          read as label-left / control-right like every other row in the editor,
+          and the actions get a divided footer. Left as a single line from md up,
+          where the row has the width for it. */}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-col gap-1 md:flex-row md:flex-wrap md:items-center md:gap-x-3">
           <ModelTestStatus status={row.testStatus} />
-          <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground max-md:py-1.5">
+          <label className="flex cursor-pointer items-center justify-between gap-1.5 text-[11px] text-muted-foreground max-md:py-1 md:justify-start">
+            {/* Control trails the label below md and leads it from md up, so the
+                desktop reading order ("[x] Vision") is unchanged. */}
             <input
               type="checkbox"
               checked={row.supportsImage}
@@ -1193,18 +1199,18 @@ function ModelRow({
                 onChange({ supportsImage: e.target.checked, inputModalitiesTouched: true })
               }
               aria-label={`model ${row.modelId.trim() || index + 1} supports image input`}
-              className="h-3.5 w-3.5 rounded border-border"
+              className="order-last h-3.5 w-3.5 rounded border-border md:order-none"
             />
             Vision
           </label>
           {providerType !== 'anthropic' && (
-            <label className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground max-md:py-1.5">
-              Dialect
+            <label className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground max-md:py-1">
+              <span className="flex-shrink-0">Dialect</span>
               <select
                 value={row.dialect}
                 onChange={e => onChange({ dialect: e.target.value as '' | LlmModelDialect })}
                 aria-label={`dialect for model ${row.modelId.trim() || index + 1}`}
-                className={`min-w-0 flex-1 rounded-md border bg-background/70 px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 md:max-w-[180px] md:flex-none ${
+                className={`min-w-0 flex-1 rounded-md border bg-background/70 px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 md:max-w-[15rem] md:flex-none ${
                   row.dialect ? 'border-primary/50' : 'border-border/70'
                 }`}
               >
@@ -1216,20 +1222,20 @@ function ModelRow({
                 ))}
               </select>
               {row.dialect && (
-                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                <span className="flex-shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
                   forced
                 </span>
               )}
             </label>
           )}
         </div>
-        <div className="flex items-center gap-1 max-md:justify-end">
+        <div className="flex items-center gap-2 max-md:border-t max-md:border-border/60 max-md:pt-2 md:gap-1">
           <button
             type="button"
             onClick={onProbe}
             disabled={testDisabled}
             title={testDisabledReason}
-            className="rounded-md border border-border/70 bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary disabled:opacity-50 max-md:py-2"
+            className="rounded-md border border-border/70 bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary disabled:opacity-50 max-md:flex-1 max-md:py-2"
           >
             {isRunning ? 'Testing…' : 'Test'}
           </button>
@@ -1237,7 +1243,7 @@ function ModelRow({
             type="button"
             onClick={onRemove}
             title="Remove model"
-            className="rounded-md border border-border/70 bg-background/70 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 max-md:py-2"
+            className="rounded-md border border-border/70 bg-background/70 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 max-md:flex-1 max-md:py-2"
           >
             Remove
           </button>
