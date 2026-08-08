@@ -16,9 +16,7 @@ export async function readActivePathRows(
   sessionId: string
 ): Promise<ProjectedMessageRow[]> {
   const storage = new SqliteSessionStorage(db, sessionId);
-  const leafId = await storage.getLeafId();
-  const path = leafId ? await storage.getPathToRoot(leafId) : [];
-  return projectEntriesToMessageRows(path);
+  return projectEntriesToMessageRows(await storage.getActivePath());
 }
 
 /**

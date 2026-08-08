@@ -1,4 +1,5 @@
 import type { Database } from 'better-sqlite3';
+import { MAIN_LANE } from '../../infra/providers/pi-runtime/session-tree/session-state.js';
 import { SqliteSessionStorage } from '../../infra/providers/pi-runtime/session-tree/sqlite-session-storage.js';
 import { readActivePathRows, writeProjectedMessages } from './reproject-messages.js';
 
@@ -41,7 +42,9 @@ export async function branchSessionAt(
     return { sessionId, leafId: entryId };
   }
 
-  await storage.setLeafId(entryId);
+  // 0.84: the leaf pointer is a lane. Branching is moving the main lane's
+  // cursor to the chosen entry.
+  await storage.moveLane(MAIN_LANE, entryId);
   const rows = await readActivePathRows(db, sessionId);
   db.transaction(() => {
     writeProjectedMessages(db, sessionId, rows);

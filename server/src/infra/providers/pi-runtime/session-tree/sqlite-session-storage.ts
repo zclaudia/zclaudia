@@ -1,177 +1,223 @@
 import type { Database } from 'better-sqlite3';
-import type {
-  SessionStorage,
-  SessionTreeEntry,
-  SessionMetadata,
-  LabelEntry,
-  LeafEntry,
+import {
+  SessionError,
+  type BranchBounds,
+  type Entry,
+  type EntryQuery,
+  type LaneRecord,
+  type LanePointer,
+  type LogItem,
+  type NewRecord,
+  type OperationStartedRecord,
+  type ProvisionedEntry,
+  type RecordQuery,
+  type SessionMetadata,
+  type SessionStats,
+  type SessionStorage,
 } from '@earendil-works/pi-agent-core';
-import { SessionError } from '@earendil-works/pi-agent-core';
-import { newId } from '../../../../utils/uuid.js';
+import { MAIN_LANE, SessionState, mutationSeq, type SessionMutation } from './session-state.js';
 
-interface EntryRow {
-  id: string;
-  parent_id: string | null;
-  type: string;
+interface LogRow {
+  seq: number;
   payload: string;
-  timestamp: string;
 }
 
 /**
- * The four base fields (id, parentId, type, timestamp) are split into their own columns and
- * intentionally excluded from `payload`; `fromRow` re-merges them so payload never contains them.
- */
-function toRow(entry: SessionTreeEntry): EntryRow {
-  const { id, parentId, type, timestamp, ...rest } = entry as SessionTreeEntry &
-    Record<string, unknown>;
-  return {
-    id,
-    parent_id: parentId ?? null,
-    type,
-    timestamp,
-    payload: JSON.stringify(rest),
-  } as EntryRow;
-}
-
-function fromRow(row: EntryRow): SessionTreeEntry {
-  const rest = JSON.parse(row.payload) as Record<string, unknown>;
-  return {
-    id: row.id,
-    parentId: row.parent_id,
-    type: row.type,
-    timestamp: row.timestamp,
-    ...rest,
-  } as SessionTreeEntry;
-}
-
-/**
- * pi `SessionStorage` over SQLite (sibling to pi's JsonlSessionStorage). The
- * storage-agnostic `Session` logic (buildContext / getBranch / moveTo) is
- * reused unchanged on top of this.
+ * pi `SessionStorage` over SQLite (sibling to pi's JsonlSessionStorage).
+ *
+ * pi 0.84 replaced the entry-tree-plus-leaf-pointer model with one ordered
+ * mutation stream: entries, lane moves, lane records and facts all draw from a
+ * single sequence, and `getLog` hands that stream back for replay. Storing the
+ * stream itself — one row per mutation — rather than a table per kind is both
+ * closer to the model and what makes `getLog` a plain range scan.
+ *
+ * Reads are served from a `SessionState` projection built by replaying the
+ * stream on first use, the same way pi's own JSONL backend reads its file. A
+ * session therefore costs memory proportional to its length once touched; that
+ * is already true of the context-tree UI, which loads whole sessions anyway.
  */
 export class SqliteSessionStorage implements SessionStorage {
+  private state: SessionState | undefined;
+
   constructor(
     private db: Database,
     private sessionId: string
   ) {}
 
+  /**
+   * Replays the persisted stream. Lazy rather than in the constructor because
+   * `SessionStorage` is constructed synchronously, and better-sqlite3 reads are
+   * synchronous, so the first call pays for it and nothing else notices.
+   */
+  private get projection(): SessionState {
+    if (!this.state) {
+      const state = new SessionState();
+      const rows = this.db
+        .prepare('SELECT seq, payload FROM session_log WHERE session_id = ? ORDER BY seq ASC')
+        .all(this.sessionId) as LogRow[];
+      for (const row of rows) {
+        // A stored mutation that no longer applies means the stream is
+        // corrupt; failing here beats serving a silently truncated session.
+        state.applyMutation(JSON.parse(row.payload) as SessionMutation, message => {
+          throw new SessionError(
+            'storage',
+            `Session ${this.sessionId} log is corrupt at seq ${row.seq}: ${message}`
+          );
+        });
+      }
+      this.state = state;
+    }
+    return this.state;
+  }
+
+  /** Persists a mutation and applies it, so memory and disk cannot diverge. */
+  private commit(mutation: SessionMutation): void {
+    const state = this.projection;
+    this.db
+      .prepare('INSERT INTO session_log (session_id, seq, kind, payload) VALUES (?, ?, ?, ?)')
+      .run(this.sessionId, mutationSeq(mutation), mutation.kind, JSON.stringify(mutation));
+    state.applyMutation(mutation);
+  }
+
   async getMetadata(): Promise<SessionMetadata> {
     const row = this.db
-      .prepare('SELECT id, created_at AS createdAt FROM sessions WHERE id = ?')
-      .get(this.sessionId) as { id: string; createdAt: number } | undefined;
-    if (!row) throw new Error(`session not found: ${this.sessionId}`);
-    return { id: row.id, createdAt: new Date(row.createdAt).toISOString() };
+      .prepare(
+        'SELECT id, created_at AS createdAt, parent_session_id AS parentSessionId FROM sessions WHERE id = ?'
+      )
+      .get(this.sessionId) as
+      | { id: string; createdAt: number; parentSessionId: string | null }
+      | undefined;
+    if (!row) throw new SessionError('not_found', `Session not found: ${this.sessionId}`);
+    return {
+      id: row.id,
+      createdAt: row.createdAt,
+      ...(row.parentSessionId ? { parentSessionId: row.parentSessionId } : {}),
+    };
   }
 
+  async getLanes(): Promise<LanePointer[]> {
+    return this.projection.getLanes();
+  }
+
+  /**
+   * The main lane's leaf — what `getLeafId()` meant before 0.84 moved the
+   * pointer into lanes. Not part of `SessionStorage`; kept for the callers that
+   * only ever work with the one lane.
+   */
   async getLeafId(): Promise<string | null> {
-    const row = this.db
-      .prepare('SELECT leaf_id AS leafId FROM session_leaf WHERE session_id = ?')
-      .get(this.sessionId) as { leafId: string | null } | undefined;
-    return row?.leafId ?? null;
+    return this.projection.requireLane(MAIN_LANE);
   }
 
-  private writeLeaf(leafId: string | null): void {
-    this.db
-      .prepare(
-        `INSERT INTO session_leaf (session_id, leaf_id) VALUES (?, ?)
-       ON CONFLICT(session_id) DO UPDATE SET leaf_id = excluded.leaf_id`
-      )
-      .run(this.sessionId, leafId);
+  /** Root → leaf, the path `getPathToRoot()` used to return reversed. */
+  async getActivePath(): Promise<Entry[]> {
+    const leafId = await this.getLeafId();
+    if (!leafId) return [];
+    return this.findEntriesOnBranch({ start: leafId, order: 'oldestFirst' });
   }
 
-  async setLeafId(leafId: string | null): Promise<void> {
-    if (leafId !== null) {
-      const exists = this.db
-        .prepare(`SELECT 1 FROM session_entries WHERE id = ? AND session_id = ?`)
-        .get(leafId, this.sessionId);
-      if (!exists) throw new SessionError('not_found', `Entry ${leafId} not found`);
+  async createLane(lane: string, at: string | null): Promise<void> {
+    const state = this.projection;
+    state.validateNewLane(lane);
+    state.validateTarget(at);
+    this.commit({ kind: 'lane', seq: state.nextSequence, lane, leafId: at });
+  }
+
+  async moveLane(lane: string, to: string | null): Promise<void> {
+    const state = this.projection;
+    state.requireLane(lane);
+    state.validateTarget(to);
+    this.commit({ kind: 'lane', seq: state.nextSequence, lane, leafId: to });
+  }
+
+  async appendEntry<TEntry extends Entry>(
+    newEntry: ProvisionedEntry<TEntry>,
+    lane: string
+  ): Promise<TEntry> {
+    const state = this.projection;
+    const parentId = state.requireLane(lane);
+    state.validateUnusedId(newEntry.id);
+    const entry = {
+      ...structuredClone(newEntry),
+      parentId,
+      seq: state.nextSequence,
+      timestamp: Date.now(),
+      // The provisioned shape plus the fields we just supplied is exactly
+      // TEntry, but TypeScript cannot see that through the distributive
+      // Omit that defines ProvisionedEntry.
+    } as unknown as TEntry;
+    this.commit({ kind: 'entry', lane, entry });
+    return structuredClone(entry);
+  }
+
+  async appendRecord<TRecord extends LaneRecord>(newRecord: NewRecord<TRecord>): Promise<TRecord> {
+    const state = this.projection;
+    state.requireLane(newRecord.lane);
+    state.validateUnusedId(newRecord.id);
+    const openId = state.findOpenOperations(newRecord.lane, { limit: 1 })[0]?.id;
+    if (newRecord.type === 'operation_started' && openId !== undefined) {
+      throw new SessionError(
+        'storage',
+        `Lane ${newRecord.lane} already has an open operation ${openId}`
+      );
     }
-    this.writeLeaf(leafId);
+    const record = {
+      ...structuredClone(newRecord),
+      seq: state.nextSequence,
+      timestamp: Date.now(),
+    } as unknown as TRecord;
+    this.commit({ kind: 'record', record });
+    return structuredClone(record);
   }
 
-  async createEntryId(): Promise<string> {
-    return newId();
+  async getEntry(id: string): Promise<Entry | undefined> {
+    const entry = this.projection.getEntry(id);
+    return entry === undefined ? undefined : structuredClone(entry);
   }
 
-  async appendEntry(entry: SessionTreeEntry): Promise<void> {
-    const row = toRow(entry);
-    this.db
-      .prepare(
-        `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
-       VALUES (?, ?, ?, ?, ?, ?)`
-      )
-      .run(row.id, this.sessionId, row.parent_id, row.type, row.payload, row.timestamp);
-    const newLeaf = entry.type === 'leaf' ? (entry as LeafEntry).targetId : entry.id;
-    this.writeLeaf(newLeaf);
+  async findEntries(query: EntryQuery = {}): Promise<Entry[]> {
+    return structuredClone(this.projection.findEntries(query));
   }
 
-  async getEntry(id: string): Promise<SessionTreeEntry | undefined> {
-    const row = this.db
-      .prepare(
-        `SELECT id, parent_id, type, payload, timestamp FROM session_entries WHERE id = ? AND session_id = ?`
-      )
-      .get(id, this.sessionId) as EntryRow | undefined;
-    return row ? fromRow(row) : undefined;
+  async findEntriesOnBranch(
+    query: EntryQuery & BranchBounds & { start: string }
+  ): Promise<Entry[]> {
+    return structuredClone(this.projection.findEntriesOnBranch(query));
   }
 
-  async findEntries<TType extends SessionTreeEntry['type']>(
-    type: TType
-  ): Promise<Array<Extract<SessionTreeEntry, { type: TType }>>> {
-    const rows = this.db
-      .prepare(
-        `SELECT id, parent_id, type, payload, timestamp FROM session_entries
-       WHERE session_id = ? AND type = ? ORDER BY timestamp ASC, id ASC`
-      )
-      .all(this.sessionId, type) as EntryRow[];
-    return rows.map(fromRow) as Array<Extract<SessionTreeEntry, { type: TType }>>;
+  async findRecords(query: RecordQuery = {}): Promise<LaneRecord[]> {
+    return structuredClone(this.projection.findRecords(query));
+  }
+
+  async findOpenOperations(
+    lane: string,
+    options?: { limit?: number }
+  ): Promise<OperationStartedRecord[]> {
+    return structuredClone(this.projection.findOpenOperations(lane, options));
+  }
+
+  async getLog(options: { afterSeq?: number; limit?: number } = {}): Promise<LogItem[]> {
+    return structuredClone(this.projection.getLog(options));
+  }
+
+  async getName(): Promise<string | undefined> {
+    return this.projection.getName();
+  }
+
+  async setName(name: string): Promise<void> {
+    this.commit({ kind: 'fact', seq: this.projection.nextSequence, fact: 'name', name });
   }
 
   async getLabel(id: string): Promise<string | undefined> {
-    // Scans label entries for the session and returns the latest matching targetId (latest-wins,
-    // matching pi). O(number of label entries) — acceptable: labels are not on any hot path (no
-    // label/moveTo UI this period) and findEntries already restricts to label-type rows.
-    const labels = (await this.findEntries('label')) as LabelEntry[];
-    const matching = labels.filter(l => l.targetId === id);
-    return matching.length ? matching[matching.length - 1].label : undefined;
+    return this.projection.getLabel(id);
   }
 
-  async getPathToRoot(leafId: string | null): Promise<SessionTreeEntry[]> {
-    if (!leafId) return [];
-    const rows = this.db
-      .prepare(
-        `WITH RECURSIVE path(id, parent_id, type, payload, timestamp, depth) AS (
-         SELECT id, parent_id, type, payload, timestamp, 0
-           FROM session_entries WHERE id = ? AND session_id = ?
-         UNION ALL
-         SELECT e.id, e.parent_id, e.type, e.payload, e.timestamp, p.depth + 1
-           FROM session_entries e JOIN path p ON e.id = p.parent_id
-           WHERE e.session_id = ?
-       )
-       SELECT id, parent_id, type, payload, timestamp FROM path ORDER BY depth DESC`
-      )
-      .all(leafId, this.sessionId, this.sessionId) as EntryRow[];
-    if (rows.length === 0) {
-      throw new SessionError('not_found', `Entry ${leafId} not found`);
-    }
-    // rows are ordered depth DESC, so rows[0] is the root-most entry on the path.
-    // If its parent_id is non-null the chain is broken (a parent row is missing),
-    // which would otherwise return a SILENTLY truncated context. Fail fast.
-    if (rows[0].parent_id !== null) {
-      throw new SessionError(
-        'invalid_session',
-        `Broken entry chain for leaf ${leafId}: path does not reach root (missing parent ${rows[0].parent_id})`
-      );
-    }
-    return rows.map(fromRow);
+  async setLabel(id: string, label: string | undefined): Promise<void> {
+    const state = this.projection;
+    state.validateTarget(id);
+    this.commit({ kind: 'fact', seq: state.nextSequence, fact: 'label', targetId: id, label });
   }
 
-  async getEntries(): Promise<SessionTreeEntry[]> {
-    const rows = this.db
-      .prepare(
-        `SELECT id, parent_id, type, payload, timestamp FROM session_entries
-       WHERE session_id = ? ORDER BY timestamp ASC, id ASC`
-      )
-      .all(this.sessionId) as EntryRow[];
-    return rows.map(fromRow);
+  async getStats(): Promise<SessionStats> {
+    return structuredClone(this.projection.getStats());
   }
 }
