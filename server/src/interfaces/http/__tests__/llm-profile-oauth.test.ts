@@ -7,11 +7,22 @@ import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.j
 import { CodexOAuthSessionManager } from '../../../domains/llm-profiles/codex-oauth-session.js';
 import { createLlmProfileOauthRouter } from '../llm-profile-oauth.js';
 
-vi.mock('@earendil-works/pi-ai/oauth', () => ({
-  loginOpenAICodex: vi.fn(),
-  loginOpenAICodexDeviceCode: vi.fn(),
+vi.mock('../../../domains/llm-profiles/codex-oauth-pi.js', async importActual => ({
+  ...(await importActual<typeof import('../../../domains/llm-profiles/codex-oauth-pi.js')>()),
+  codexOAuth: vi.fn(),
 }));
-import { loginOpenAICodex, loginOpenAICodexDeviceCode } from '@earendil-works/pi-ai/oauth';
+import { codexOAuth } from '../../../domains/llm-profiles/codex-oauth-pi.js';
+import type { ProviderAuthInteraction } from '@earendil-works/pi-ai';
+
+/** Installs a fake `OAuthAuth` whose `login` is the given implementation. */
+function mockLogin(login: (interaction: ProviderAuthInteraction) => Promise<unknown>): void {
+  (codexOAuth as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    name: 'OpenAI (test)',
+    login,
+    refresh: vi.fn(),
+    toAuth: vi.fn(),
+  });
+}
 
 function makeApp() {
   const db = new Database(':memory:');
@@ -42,8 +53,8 @@ describe('llm-profile-oauth router', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('POST /:id/oauth/start (browser) returns sessionId and authUrl', async () => {
-    (loginOpenAICodex as any).mockImplementation(async (opts: any) => {
-      opts.onAuth({ url: 'https://auth.openai.com/oauth/authorize?x=1' });
+    mockLogin(async interaction => {
+      interaction.notify({ url: 'https://auth.openai.com/oauth/authorize?x=1', type: 'auth_url' });
       return new Promise(() => {}); // never resolves
     });
 
@@ -57,8 +68,9 @@ describe('llm-profile-oauth router', () => {
   });
 
   it('POST /:id/oauth/start (device_code) returns user_code', async () => {
-    (loginOpenAICodexDeviceCode as any).mockImplementation(async (opts: any) => {
-      opts.onDeviceCode({
+    mockLogin(async interaction => {
+      interaction.notify({
+        type: 'device_code',
         userCode: 'ABCD-1234',
         verificationUri: 'https://auth.openai.com/codex/device',
       });
@@ -74,9 +86,11 @@ describe('llm-profile-oauth router', () => {
   });
 
   it('POST /:id/oauth/start (device_code) returns a concise error for Cloudflare challenges', async () => {
-    (loginOpenAICodexDeviceCode as any).mockRejectedValue(
-      new Error(
-        'OpenAI Codex device code request failed with status 429: <!DOCTYPE html><html><title>Just a moment...</title><body>Enable JavaScript and cookies to continue<script>window._cf_chl_opt = {}</script></body></html>'
+    mockLogin(() =>
+      Promise.reject(
+        new Error(
+          'OpenAI Codex device code request failed with status 429: <!DOCTYPE html><html><title>Just a moment...</title><body>Enable JavaScript and cookies to continue<script>window._cf_chl_opt = {}</script></body></html>'
+        )
       )
     );
 
@@ -92,8 +106,8 @@ describe('llm-profile-oauth router', () => {
 
   it('GET /:id/oauth/status returns pending then success', async () => {
     let resolveLogin!: (creds: any) => void;
-    (loginOpenAICodex as any).mockImplementation((opts: any) => {
-      opts.onAuth({ url: 'http://x' });
+    mockLogin(interaction => {
+      interaction.notify({ type: 'auth_url', url: 'http://x' });
       return new Promise(r => {
         resolveLogin = r;
       });
@@ -108,7 +122,7 @@ describe('llm-profile-oauth router', () => {
     const pendingResp = await request(app).get(`/api/llm-profiles/p1/oauth/status/${sessionId}`);
     expect(pendingResp.body.data.state).toBe('pending');
 
-    resolveLogin({ access: 'a', refresh: 'r', expires: 1, accountId: 'acct_x' });
+    resolveLogin({ type: 'oauth', access: 'a', refresh: 'r', expires: 1, accountId: 'acct_x' });
     await new Promise(r => setTimeout(r, 10));
 
     const successResp = await request(app).get(`/api/llm-profiles/p1/oauth/status/${sessionId}`);
@@ -122,10 +136,10 @@ describe('llm-profile-oauth router', () => {
 
   it('POST /:id/oauth/cancel aborts the session', async () => {
     let aborted = false;
-    (loginOpenAICodex as any).mockImplementation((opts: any) => {
-      opts.onAuth({ url: 'http://x' });
+    mockLogin(interaction => {
+      interaction.notify({ type: 'auth_url', url: 'http://x' });
       return new Promise((_, rej) => {
-        opts.signal?.addEventListener('abort', () => {
+        interaction.signal.addEventListener('abort', () => {
           aborted = true;
           rej(new Error('aborted'));
         });
@@ -161,8 +175,8 @@ describe('llm-profile-oauth router', () => {
   });
 
   it('returns success envelope on /oauth/start', async () => {
-    (loginOpenAICodex as any).mockImplementation(async (opts: any) => {
-      opts.onAuth({ url: 'https://x' });
+    mockLogin(async interaction => {
+      interaction.notify({ type: 'auth_url', url: 'https://x' });
       return new Promise(() => {});
     });
     const { app } = makeApp();

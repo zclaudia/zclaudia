@@ -1,7 +1,12 @@
 import { Mutex } from 'async-mutex';
-import { getOAuthApiKey, type OAuthCredentials } from '@earendil-works/pi-ai/oauth';
 import type { LlmProfileConfig, CodexOAuthCredentials } from '@zclaudia/shared/core/llm-profile';
 import { CodexOAuthError } from './codex-oauth-errors.js';
+import {
+  codexOAuth,
+  expiresSoon,
+  toCodexCredentials,
+  toOAuthCredential,
+} from './codex-oauth-pi.js';
 
 export interface OAuthCredentialsWriter {
   updateOAuthCredentials(
@@ -35,6 +40,9 @@ function getEntry(profileId: string): FlightEntry {
   return entry;
 }
 
+/** Ceiling on a single refresh exchange; pi's own refresh takes no deadline. */
+const REFRESH_TIMEOUT_MS = 30_000;
+
 const TERMINAL_PATTERNS = [
   /refresh_token_expired/i,
   /refresh_token_invalidated/i,
@@ -47,28 +55,6 @@ function classifyRefreshError(err: unknown): 'TERMINAL' | 'TRANSIENT' {
   return TERMINAL_PATTERNS.some(re => re.test(msg)) ? 'TERMINAL' : 'TRANSIENT';
 }
 
-function asCodexCredentials(creds: unknown): CodexOAuthCredentials {
-  if (!creds || typeof creds !== 'object') {
-    throw new CodexOAuthError(
-      'REFRESH_FAILED_TRANSIENT',
-      'pi-ai returned credentials without expected fields (accountId missing or wrong type)'
-    );
-  }
-  const candidate = creds as Record<string, unknown>;
-  if (
-    typeof candidate.access === 'string' &&
-    typeof candidate.refresh === 'string' &&
-    typeof candidate.expires === 'number' &&
-    typeof candidate.accountId === 'string'
-  ) {
-    return creds as CodexOAuthCredentials;
-  }
-  throw new CodexOAuthError(
-    'REFRESH_FAILED_TRANSIENT',
-    'pi-ai returned credentials without expected fields (accountId missing or wrong type)'
-  );
-}
-
 function startFlight(
   profile: LlmProfileConfig,
   entry: FlightEntry,
@@ -76,27 +62,24 @@ function startFlight(
 ): Promise<CodexOAuthCredentials> {
   const promise = (async (): Promise<CodexOAuthCredentials> => {
     try {
-      const oauthCredentials = profile.oauthCredentials;
-      if (!oauthCredentials) {
+      const current = profile.oauthCredentials;
+      if (!current) {
         throw new CodexOAuthError(
           'NOT_AUTHENTICATED',
           'NOT_AUTHENTICATED: OAuth credentials missing for openai-codex'
         );
       }
-      const currentCredentials = oauthCredentials as unknown as OAuthCredentials;
-      const result = await getOAuthApiKey('openai-codex', {
-        'openai-codex': currentCredentials,
-      });
-      if (!result) {
-        throw new CodexOAuthError(
-          'NOT_AUTHENTICATED',
-          'NOT_AUTHENTICATED: OAuth credentials missing for openai-codex'
-        );
-      }
-      const fresh = asCodexCredentials(result.newCredentials);
-      if (fresh !== (profile.oauthCredentials as unknown)) {
-        await writer.updateOAuthCredentials(profile.id, fresh);
-      }
+      // pi 0.84 dropped `getOAuthApiKey`, which decided for itself whether a
+      // token was close enough to expiry to rotate. `OAuthAuth.refresh` always
+      // performs the exchange, so the expiry check is ours to make now.
+      if (!expiresSoon(current.expires)) return current;
+
+      const rotated = await codexOAuth().refresh(
+        toOAuthCredential(current),
+        AbortSignal.timeout(REFRESH_TIMEOUT_MS)
+      );
+      const fresh = toCodexCredentials(rotated);
+      await writer.updateOAuthCredentials(profile.id, fresh);
       return fresh;
     } catch (err) {
       if (err instanceof CodexOAuthError) throw err;

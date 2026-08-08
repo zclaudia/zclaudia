@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { loginOpenAICodex, loginOpenAICodexDeviceCode } from '@earendil-works/pi-ai/oauth';
+import type { AuthEvent, AuthPrompt, ProviderAuthInteraction } from '@earendil-works/pi-ai';
 import type { CodexOAuthCredentials } from '@zclaudia/shared/core/llm-profile';
 import { CodexOAuthError, type CodexOAuthErrorCode } from './codex-oauth-errors.js';
+import {
+  CODEX_LOGIN_METHOD,
+  codexOAuth,
+  toCodexCredentials,
+  type CodexLoginMethod,
+} from './codex-oauth-pi.js';
 import type { OAuthCredentialsWriter } from './codex-oauth-service.js';
 
 interface BaseSession {
@@ -74,92 +80,94 @@ export class CodexOAuthSessionManager {
   }
 
   async startBrowserFlow(profileId: string): Promise<CodexOAuthStartResult> {
-    const sessionId = randomUUID();
-    const controller = new AbortController();
-    let resolveAuth!: (info: { url: string; instructions?: string }) => void;
-    let rejectAuth!: (err: Error) => void;
-    const authReady = new Promise<{ url: string; instructions?: string }>((res, rej) => {
-      resolveAuth = res;
-      rejectAuth = rej;
-    });
-
-    const promise = (loginOpenAICodex as any)({
-      originator: 'zclaudia',
-      onAuth: (info: { url: string; instructions?: string }) => resolveAuth(info),
-      onPrompt: async () => {
-        throw new CodexOAuthError('OAUTH_TIMEOUT', 'Manual prompt not supported via HTTP flow');
-      },
-      signal: controller.signal,
-    } as any).then(
-      async (creds: unknown) => {
-        await this.markSuccess(sessionId, creds as any);
-      },
-      (err: unknown) => {
-        if (controller.signal.aborted) {
-          this.markCancelled(sessionId);
-          return;
-        }
-        const classified = this.classifyLoginError(err);
-        this.markError(sessionId, classified.code, classified.message);
-        if (classified.code === 'OAUTH_PORT_CONFLICT') {
-          rejectAuth(new CodexOAuthError('OAUTH_PORT_CONFLICT', classified.message));
-        } else {
-          rejectAuth(new CodexOAuthError(classified.code, classified.message));
-        }
-      }
-    );
-
-    this.sessions.set(sessionId, {
-      sessionId,
-      profileId,
-      createdAt: Date.now(),
-      controller,
-      promise,
-      status: { state: 'pending' },
-    });
-
-    try {
-      const info = await authReady;
-      return { sessionId, method: 'browser', authUrl: info.url, instructions: info.instructions };
-    } catch (err) {
+    const { sessionId, first } = this.start(profileId, CODEX_LOGIN_METHOD.browser);
+    const event = await first;
+    if (event.type !== 'auth_url') {
       this.sessions.delete(sessionId);
-      throw err;
+      throw new CodexOAuthError('OAUTH_TIMEOUT', `Unexpected login event: ${event.type}`);
     }
+    return {
+      sessionId,
+      method: 'browser',
+      authUrl: event.url,
+      instructions: event.instructions,
+    };
   }
 
   async startDeviceCodeFlow(profileId: string): Promise<CodexOAuthStartResult> {
+    const { sessionId, first } = this.start(profileId, CODEX_LOGIN_METHOD.deviceCode);
+    const event = await first;
+    if (event.type !== 'device_code') {
+      this.sessions.delete(sessionId);
+      throw new CodexOAuthError('OAUTH_TIMEOUT', `Unexpected login event: ${event.type}`);
+    }
+    return {
+      sessionId,
+      method: 'device_code',
+      userCode: event.userCode,
+      verificationUri: event.verificationUri,
+      expiresAt: Date.now() + (event.expiresInSeconds ?? 900) * 1000,
+    };
+  }
+
+  /**
+   * Runs `OAuthAuth.login` against a scripted interaction and registers the
+   * session. Resolves `first` with the event that carries what the caller must
+   * show the user — the auth URL for a browser login, the user code for a
+   * device-code login — which is the point where the HTTP request can return
+   * while the flow keeps running in the background.
+   */
+  private start(
+    profileId: string,
+    method: CodexLoginMethod
+  ): { sessionId: string; first: Promise<AuthEvent> } {
     const sessionId = randomUUID();
     const controller = new AbortController();
-    let resolveDevice!: (info: {
-      userCode: string;
-      verificationUri: string;
-      expiresInSeconds?: number;
-    }) => void;
-    let rejectDevice!: (err: Error) => void;
-    const deviceReady = new Promise<{
-      userCode: string;
-      verificationUri: string;
-      expiresInSeconds?: number;
-    }>((res, rej) => {
-      resolveDevice = res;
-      rejectDevice = rej;
+
+    let resolveFirst!: (event: AuthEvent) => void;
+    let rejectFirst!: (err: Error) => void;
+    let settled = false;
+    const first = new Promise<AuthEvent>((res, rej) => {
+      resolveFirst = event => {
+        if (settled) return;
+        settled = true;
+        res(event);
+      };
+      rejectFirst = err => {
+        if (settled) return;
+        settled = true;
+        rej(err);
+      };
     });
 
-    const promise = loginOpenAICodexDeviceCode({
-      onDeviceCode: info => resolveDevice(info),
+    const interaction: ProviderAuthInteraction = {
       signal: controller.signal,
-    }).then(
-      async creds => this.markSuccess(sessionId, creds as any),
-      err => {
-        if (controller.signal.aborted) {
-          this.markCancelled(sessionId);
-          return;
+      prompt: (prompt: AuthPrompt) => this.answerPrompt(prompt, method, controller.signal),
+      notify: (event: AuthEvent) => {
+        if (event.type === 'auth_url' || event.type === 'device_code') resolveFirst(event);
+      },
+    };
+
+    // The credential shape check belongs inside the chain, not in the success
+    // handler: a login that returns something unexpected has to land in the
+    // same error path as a login that threw, or it escapes unhandled and the
+    // session sits at `pending` forever.
+    const promise = (async () => toCodexCredentials(await codexOAuth().login(interaction)))()
+      .then(
+        async credentials => {
+          await this.markSuccess(sessionId, credentials);
+        },
+        (err: unknown) => {
+          if (controller.signal.aborted) {
+            this.markCancelled(sessionId);
+            rejectFirst(new CodexOAuthError('OAUTH_CANCELLED', 'OAuth login cancelled.'));
+            return;
+          }
+          const classified = this.classifyLoginError(err);
+          this.markError(sessionId, classified.code, classified.message);
+          rejectFirst(new CodexOAuthError(classified.code, classified.message));
         }
-        const classified = this.classifyLoginError(err);
-        this.markError(sessionId, classified.code, classified.message);
-        rejectDevice(new CodexOAuthError(classified.code, classified.message));
-      }
-    );
+      );
 
     this.sessions.set(sessionId, {
       sessionId,
@@ -170,20 +178,43 @@ export class CodexOAuthSessionManager {
       status: { state: 'pending' },
     });
 
-    try {
-      const info = await deviceReady;
-      const expiresAt = Date.now() + (info.expiresInSeconds ?? 900) * 1000;
-      return {
-        sessionId,
-        method: 'device_code',
-        userCode: info.userCode,
-        verificationUri: info.verificationUri,
-        expiresAt,
-      };
-    } catch (err) {
-      this.sessions.delete(sessionId);
-      throw err;
+    return {
+      sessionId,
+      first: first.catch(err => {
+        this.sessions.delete(sessionId);
+        throw err;
+      }),
+    };
+  }
+
+  /**
+   * Answers the prompts `openaiCodexOAuth.login` asks.
+   *
+   * The method `select` is answered from the endpoint the caller hit. The
+   * browser flow then races its local callback server against a `manual_code`
+   * prompt for pasting the redirect URL — there is nowhere to paste one in an
+   * HTTP flow, so that prompt stays unanswered until the flow ends. It must
+   * still settle on abort: pi awaits the prompt when the callback server
+   * returns no code, so resolving it never would hang a cancelled login.
+   */
+  private answerPrompt(
+    prompt: AuthPrompt,
+    method: CodexLoginMethod,
+    signal: AbortSignal
+  ): Promise<string> {
+    if (prompt.type === 'select') return Promise.resolve(method);
+    if (prompt.type === 'manual_code') {
+      return new Promise<string>((_resolve, reject) => {
+        const abort = () =>
+          reject(new CodexOAuthError('OAUTH_CANCELLED', 'OAuth login cancelled.'));
+        if (signal.aborted || prompt.signal?.aborted) return abort();
+        signal.addEventListener('abort', abort, { once: true });
+        prompt.signal?.addEventListener('abort', abort, { once: true });
+      });
     }
+    return Promise.reject(
+      new CodexOAuthError('OAUTH_TIMEOUT', `Unsupported login prompt: ${prompt.type}`)
+    );
   }
 
   getStatus(sessionId: string): CodexOAuthStatus | undefined {
