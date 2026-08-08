@@ -24,6 +24,8 @@ import { HookList } from '../../components/permission/HookList';
 import { SettingsGroup, SettingsRow } from './ui/SettingsGroup';
 import { Checkbox } from '../../components/ui/Checkbox';
 import { Toggle } from '../../components/ui/Toggle';
+import { useSettingsSurface } from './settingsSurface';
+import { Button } from '../../components/ui/Button';
 
 const PERMISSION_FALLBACK_TEMPLATE_ID = 'permission-escalation-default';
 
@@ -207,6 +209,15 @@ export function PermissionSettings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hookList, setHookList] = useState<UserHookDefinition[]>([]);
+
+  // Adjudication (what gets auto-approved, what is guarded) stays fully editable
+  // everywhere — it is the reason to open this page from a phone. Authoring the
+  // rule and hook DSLs does not travel, and the AI review knobs are not worth
+  // the vertical space at that width.
+  const toolRulesSurface = useSettingsSurface('permissions.tool-rules');
+  const hooksSurface = useSettingsSurface('permissions.hooks');
+  const aiTuningSurface = useSettingsSurface('permissions.ai-review-tuning');
+  const [showAiTuning, setShowAiTuning] = useState(false);
 
   // Resolve which backend this page edits: this device's local backend when
   // one exists (desktop), otherwise the active backend (mobile has no local
@@ -512,10 +523,12 @@ export function PermissionSettings() {
             <p className="text-xs text-muted-foreground">
               Fine-grained per-tool rules like <code className="font-mono">Bash(git *)</code>. Deny
               outranks guards; Allow cannot bypass sensitive-file protection.
+              {toolRulesSurface.readOnly && ' Edit these on a larger screen.'}
             </p>
             <ToolRuleList
               rules={policy.customRules}
               onChange={customRules => savePolicy({ ...policy, customRules })}
+              readOnly={toolRulesSurface.readOnly}
             />
           </div>
         </SettingsGroup>
@@ -526,12 +539,14 @@ export function PermissionSettings() {
           <p className="text-xs text-muted-foreground">
             Shell commands that run before/after tool calls. Exit code 2 from a PreToolUse hook
             blocks the call.
+            {hooksSurface.readOnly && ' Edit these on a larger screen.'}
           </p>
           <HookList
             hooks={hookList}
             onChange={next => {
               void saveHooks(next);
             }}
+            readOnly={hooksSurface.readOnly}
           />
         </div>
       </SettingsGroup>
@@ -553,69 +568,89 @@ export function PermissionSettings() {
           />
           {policy.aiReview.enabled && (
             <>
-              <SettingsRow
-                title="Review timeout"
-                description="Seconds before triggering AI review"
-                control={
-                  <input
-                    type="number"
-                    aria-label="Review timeout"
-                    min={10}
-                    max={300}
-                    defaultValue={policy.aiReview.timeoutBeforeReview}
-                    onBlur={e =>
-                      updateAIReview({
-                        timeoutBeforeReview: Math.max(10, parseInt(e.target.value) || 60),
-                      })
+              {aiTuningSurface.collapsed && (
+                <SettingsRow
+                  title="Review tuning"
+                  description="Timeout, confidence threshold and rate limit"
+                  control={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAiTuning(v => !v)}
+                      aria-expanded={showAiTuning}
+                    >
+                      {showAiTuning ? 'Hide' : 'Show'}
+                    </Button>
+                  }
+                />
+              )}
+              {(!aiTuningSurface.collapsed || showAiTuning) && (
+                <>
+                  <SettingsRow
+                    title="Review timeout"
+                    description="Seconds before triggering AI review"
+                    control={
+                      <input
+                        type="number"
+                        aria-label="Review timeout"
+                        min={10}
+                        max={300}
+                        defaultValue={policy.aiReview.timeoutBeforeReview}
+                        onBlur={e =>
+                          updateAIReview({
+                            timeoutBeforeReview: Math.max(10, parseInt(e.target.value) || 60),
+                          })
+                        }
+                        disabled={saving}
+                        className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
+                      />
                     }
-                    disabled={saving}
-                    className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
                   />
-                }
-              />
-              <SettingsRow
-                title="Confidence threshold"
-                description="AI must be this confident to auto-approve (%)"
-                control={
-                  <input
-                    type="number"
-                    aria-label="Confidence threshold"
-                    min={50}
-                    max={100}
-                    defaultValue={Math.round(policy.aiReview.confidenceThreshold * 100)}
-                    onBlur={e =>
-                      updateAIReview({
-                        confidenceThreshold: Math.max(
-                          0.5,
-                          Math.min(1, (parseInt(e.target.value) || 80) / 100)
-                        ),
-                      })
+                  <SettingsRow
+                    title="Confidence threshold"
+                    description="AI must be this confident to auto-approve (%)"
+                    control={
+                      <input
+                        type="number"
+                        aria-label="Confidence threshold"
+                        min={50}
+                        max={100}
+                        defaultValue={Math.round(policy.aiReview.confidenceThreshold * 100)}
+                        onBlur={e =>
+                          updateAIReview({
+                            confidenceThreshold: Math.max(
+                              0.5,
+                              Math.min(1, (parseInt(e.target.value) || 80) / 100)
+                            ),
+                          })
+                        }
+                        disabled={saving}
+                        className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
+                      />
                     }
-                    disabled={saving}
-                    className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
                   />
-                }
-              />
-              <SettingsRow
-                title="Rate limit"
-                description="Max auto-approvals per minute"
-                control={
-                  <input
-                    type="number"
-                    aria-label="Rate limit"
-                    min={1}
-                    max={60}
-                    defaultValue={policy.aiReview.maxAutoApprovalsPerMinute}
-                    onBlur={e =>
-                      updateAIReview({
-                        maxAutoApprovalsPerMinute: Math.max(1, parseInt(e.target.value) || 10),
-                      })
+                  <SettingsRow
+                    title="Rate limit"
+                    description="Max auto-approvals per minute"
+                    control={
+                      <input
+                        type="number"
+                        aria-label="Rate limit"
+                        min={1}
+                        max={60}
+                        defaultValue={policy.aiReview.maxAutoApprovalsPerMinute}
+                        onBlur={e =>
+                          updateAIReview({
+                            maxAutoApprovalsPerMinute: Math.max(1, parseInt(e.target.value) || 10),
+                          })
+                        }
+                        disabled={saving}
+                        className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
+                      />
                     }
-                    disabled={saving}
-                    className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
                   />
-                }
-              />
+                </>
+              )}
               <AIReviewProviderSelector
                 value={policy.aiReview.analysisLlmProfileId}
                 onChange={id => updateAIReview({ analysisLlmProfileId: id })}

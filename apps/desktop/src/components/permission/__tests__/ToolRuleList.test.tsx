@@ -58,3 +58,20 @@ describe('ToolRuleList', () => {
     expect(screen.queryAllByLabelText(/remove rule/i)).toHaveLength(0);
   });
 });
+
+describe('ToolRuleList read-only', () => {
+  it('shows the rules in force but offers no way to change them', () => {
+    const onChange = vi.fn();
+    render(<ToolRuleList rules={rules} onChange={onChange} readOnly />);
+
+    expect(screen.getByText('Bash(git *)')).toBeInTheDocument();
+    expect(screen.getByText('Bash(rm *)')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Bash(git *)')).toBeNull();
+    expect(screen.queryByLabelText('remove rule')).toBeNull();
+  });
+
+  it('says "None" for a group with no rules instead of leaving it blank', () => {
+    render(<ToolRuleList rules={[]} onChange={vi.fn()} readOnly />);
+    expect(screen.getAllByText('None')).toHaveLength(3);
+  });
+});

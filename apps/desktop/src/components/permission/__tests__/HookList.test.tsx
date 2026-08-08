@@ -54,3 +54,24 @@ it('edits the command', () => {
   fireEvent.change(screen.getByDisplayValue('old.sh'), { target: { value: 'new.sh' } });
   expect(onChange).toHaveBeenCalledWith([{ event: 'PreToolUse', command: 'new.sh' }]);
 });
+
+describe('HookList read-only', () => {
+  it('renders each hook as static text with no fields or add button', () => {
+    render(<HookList hooks={hooks} onChange={vi.fn()} readOnly />);
+
+    expect(screen.getByText('Bash(git *)')).toBeInTheDocument();
+    expect(screen.getByText('lint.sh')).toBeInTheDocument();
+    expect(screen.getByText('audit.sh')).toBeInTheDocument();
+    expect(screen.getByText('(disabled)')).toBeInTheDocument();
+
+    expect(screen.queryByDisplayValue('lint.sh')).toBeNull();
+    expect(screen.queryByText(/add hook/i)).toBeNull();
+    expect(screen.queryByLabelText('remove hook')).toBeNull();
+  });
+
+  it('keeps the privilege warning, which is the reason to show them at all', () => {
+    render(<HookList hooks={[]} onChange={vi.fn()} readOnly />);
+    expect(screen.getByText(/arbitrary shell commands/i)).toBeInTheDocument();
+    expect(screen.getByText('No hooks configured.')).toBeInTheDocument();
+  });
+});

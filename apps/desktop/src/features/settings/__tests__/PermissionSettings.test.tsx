@@ -15,6 +15,12 @@ const mockGetProviderCapabilities = vi.fn();
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
+const useIsMobile = vi.fn(() => false);
+vi.mock('../../../hooks/useMediaQuery', async importOriginal => {
+  const mod = await importOriginal<Record<string, unknown>>();
+  return { ...mod, useIsMobile: () => useIsMobile() };
+});
+
 vi.mock('../../../utils/platform', async importOriginal => {
   const mod = await importOriginal<Record<string, unknown>>();
   return { ...mod, isMacOS: vi.fn(() => false) };
@@ -59,6 +65,7 @@ describe('PermissionSettings', () => {
     mockListLlmProfilesForBackend.mockReset();
     mockGetProviderCapabilities.mockReset();
     vi.mocked(isMacOS).mockReturnValue(false);
+    useIsMobile.mockReturnValue(false);
     vi.mocked(invoke).mockReset();
 
     useServerStore.setState({ activeServerId: 'local' } as any);
@@ -337,6 +344,51 @@ describe('PermissionSettings', () => {
 
     expect(screen.getByLabelText(/protect sensitive files/i)).toBeTruthy();
     expect(screen.getByLabelText(/enforce workspace scope/i)).toBeTruthy();
+  });
+
+  it('keeps the adjudication controls editable on a phone', async () => {
+    useIsMobile.mockReturnValue(true);
+    render(<PermissionSettings />);
+
+    await screen.findByText('Auto-approve tools');
+    expect(screen.getByLabelText('Auto-approve tools')).toBeEnabled();
+    expect(screen.getByLabelText(/protect sensitive files/i)).toBeEnabled();
+    expect(screen.getByLabelText(/enforce workspace scope/i)).toBeEnabled();
+  });
+
+  it('shows tool rules and hooks on a phone without letting them be authored', async () => {
+    useIsMobile.mockReturnValue(true);
+    render(<PermissionSettings />);
+
+    await screen.findByText('Tool rules');
+    expect(screen.getByText('Hooks')).toBeTruthy();
+    // The rule/hook DSL inputs and their add/remove affordances are gone.
+    expect(screen.queryByPlaceholderText('Bash(git *)')).toBeNull();
+    expect(screen.queryByText(/add hook/i)).toBeNull();
+    expect(screen.getAllByText(/Edit these on a larger screen/i).length).toBe(2);
+  });
+
+  it('collapses the AI review knobs on a phone and opens them on demand', async () => {
+    useIsMobile.mockReturnValue(true);
+    render(<PermissionSettings />);
+
+    await screen.findByText('Enable AI review');
+    expect(screen.getByText('Review tuning')).toBeTruthy();
+    expect(screen.queryByLabelText('Review timeout')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }));
+    expect(screen.getByLabelText('Review timeout')).toBeTruthy();
+    expect(screen.getByLabelText('Confidence threshold')).toBeTruthy();
+    expect(screen.getByLabelText('Rate limit')).toBeTruthy();
+  });
+
+  it('leaves the AI review knobs expanded and the lists editable on desktop', async () => {
+    render(<PermissionSettings />);
+
+    await screen.findByText('Enable AI review');
+    expect(screen.queryByText('Review tuning')).toBeNull();
+    expect(screen.getByLabelText('Review timeout')).toBeTruthy();
+    expect(screen.getAllByPlaceholderText('Bash(git *)').length).toBeGreaterThan(0);
   });
 
   it('does not render the System permissions section off macOS', async () => {

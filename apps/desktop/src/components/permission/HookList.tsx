@@ -4,9 +4,15 @@ import { parseToolRule, type UserHookDefinition } from '@zclaudia/shared';
 interface HookListProps {
   hooks: UserHookDefinition[];
   onChange: (hooks: UserHookDefinition[]) => void;
+  /**
+   * Show the hooks in force without offering to change them. Used on phones:
+   * authoring a privileged shell command in a four-field row by thumb is a bad
+   * idea, but knowing which commands run around every tool call is not.
+   */
+  readOnly?: boolean;
 }
 
-export function HookList({ hooks, onChange }: HookListProps) {
+export function HookList({ hooks, onChange, readOnly = false }: HookListProps) {
   const [matcherErrors, setMatcherErrors] = useState<Record<number, string>>({});
 
   const update = (i: number, patch: Partial<UserHookDefinition>) => {
@@ -40,6 +46,31 @@ export function HookList({ hooks, onChange }: HookListProps) {
       update(i, { enabled: true });
     }
   };
+
+  if (readOnly) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-amber-600">
+          Hooks run arbitrary shell commands with the server&apos;s privileges.
+        </p>
+        {hooks.length === 0 && (
+          <p className="text-xs text-muted-foreground">No hooks configured.</p>
+        )}
+        {hooks.map((hook, i) => (
+          <div key={i} className="space-y-0.5 rounded bg-secondary p-2">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-medium">{hook.event}</span>
+              {hook.matcher && (
+                <span className="font-mono text-muted-foreground">{hook.matcher}</span>
+              )}
+              {hook.enabled === false && <span className="text-muted-foreground">(disabled)</span>}
+            </div>
+            <div className="break-all font-mono text-xs text-muted-foreground">{hook.command}</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
