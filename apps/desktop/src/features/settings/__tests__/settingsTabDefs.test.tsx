@@ -53,6 +53,28 @@ describe('getSettingsTabs', () => {
     expect(gateway?.label).toBe('Gateway');
   });
 
+  it('hoists Gateway to second on mobile, where it is the first thing you configure', () => {
+    const tabs = getSettingsTabs({
+      isMobile: true,
+      pluginSettingsTabs: [{ id: 'p1', label: 'My Plugin' }],
+    });
+    expect(tabs.map(t => t.id)).toEqual([
+      'general',
+      'gateway',
+      'agent',
+      'permissions',
+      'plugin:p1',
+      'debug',
+      'about',
+    ]);
+  });
+
+  it('keeps Notifications on Android mobile without displacing Gateway', () => {
+    vi.mocked(isAndroid).mockReturnValue(true);
+    const ids = getSettingsTabs({ isMobile: true, pluginSettingsTabs: [] }).map(t => t.id);
+    expect(ids.slice(0, 3)).toEqual(['general', 'gateway', 'notifications']);
+  });
+
   it('includes the Notifications tab only on Android', () => {
     expect(
       getSettingsTabs({ isMobile: false, pluginSettingsTabs: [] }).map(t => t.id)
