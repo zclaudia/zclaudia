@@ -205,14 +205,14 @@ importers:
         specifier: ^0.43.0
         version: 0.43.0
       '@earendil-works/pi-agent-core':
-        specifier: ^0.79.3
-        version: 0.79.3(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)
+        specifier: ^0.79.10
+        version: 0.79.10(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)
       '@earendil-works/pi-ai':
-        specifier: ^0.79.3
-        version: 0.79.3(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)
+        specifier: ^0.79.10
+        version: 0.79.10(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)
       '@modelcontextprotocol/sdk':
-        specifier: ^1.29.0
-        version: 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
+        specifier: ^1.30.0
+        version: 1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
       '@mozilla/readability':
         specifier: ^0.6.0
         version: 0.6.0
@@ -347,8 +347,8 @@ importers:
   shared:
     dependencies:
       '@earendil-works/pi-ai':
-        specifier: ^0.79.3
-        version: 0.79.3(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)
+        specifier: ^0.79.10
+        version: 0.79.10(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)
       '@zclaudia/plugin-sdk':
         specifier: ^0.1.0
         version: 0.1.0
@@ -831,12 +831,12 @@ packages:
     peerDependencies:
       react: '>=16.8.0'
 
-  '@earendil-works/pi-agent-core@0.79.3':
-    resolution: {integrity: sha512-Ksvnu6CpQLYGbCSgnQEetzliI7yb+QkqtSlmmunJ69QluT45kd3DjQZRNHfRLk++Dd02Y8QvsRKMopSJCcWoWw==}
+  '@earendil-works/pi-agent-core@0.79.10':
+    resolution: {integrity: sha512-XKxgdjhcPuyjrthCOFSgfzT3xZ1uBrJ1IMVDxci1to6hIN6BIg9J5iY8q0pGXK1DLgATLP23da+1UyZLwA360Q==}
     engines: {node: '>=22.19.0'}
 
-  '@earendil-works/pi-ai@0.79.3':
-    resolution: {integrity: sha512-lMSput/haP5uZAGbXhS5rAYd3GB7GYdJkoAUxg3VFummBeqGqGqllaTWrbHFN12kVGyVfWHhdySNXkiqVh65Iw==}
+  '@earendil-works/pi-ai@0.79.10':
+    resolution: {integrity: sha512-9jR23tOl0BIUdQMn70Gr72xYBpM7Xgl9Lyv7gAnU1USfkNRuYG/f/edLl+n/Dp/RafDW3JI4DF7y/GhgkORuew==}
     engines: {node: '>=22.19.0'}
     hasBin: true
 
@@ -1621,14 +1621,19 @@ packages:
     peerDependencies:
       tslib: '2'
 
-  '@mistralai/mistralai@2.2.1':
-    resolution: {integrity: sha512-uKU8CZmL2RzYKmplsU01hii4p3pe4HqJefpWNRWXm1Tcm0Sm4xXfwSLIy4k7ZCPlbETCGcp69E7hZs+WOJ5itQ==}
+  '@mistralai/mistralai@2.2.6':
+    resolution: {integrity: sha512-W8pX7zHxjJvMIpw8JMxeJEleapXX0Q9NPszdNzqkM3MIEoIGPObdodujj+WHteXEvGfaP/AMwlNyRfEzSY6dQQ==}
+    peerDependencies:
+      '@opentelemetry/api': ^1.9.0
+    peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
 
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
 
-  '@modelcontextprotocol/sdk@1.29.0':
-    resolution: {integrity: sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==}
+  '@modelcontextprotocol/sdk@1.30.0':
+    resolution: {integrity: sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -1669,6 +1674,10 @@ packages:
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
     engines: {node: '>=8.0.0'}
+
+  '@opentelemetry/semantic-conventions@1.43.0':
+    resolution: {integrity: sha512-eSYWTm620tTk45EKSedaUL8MFYI8hW164hIXsgIHyxu3VobUB3fFCu5t0hQby6OoWRPsG1KkKUG2M5UadiLiVg==}
+    engines: {node: '>=14'}
 
   '@oxc-project/types@0.133.0':
     resolution: {integrity: sha512-KzkdCd6Uxqnf6l3HOw1xfatAlUURA0g14cvBYFyJ5SaNOQbOUvBr9PKArcPcrNIeRsBdgcUzOGrhKveVpvOIGA==}
@@ -5724,8 +5733,8 @@ snapshots:
       '@ai-sdk/provider': 2.0.3
       '@anthropic-ai/sdk': 0.39.0
       '@browserbasehq/sdk': 2.14.0
-      '@google/genai': 1.52.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)
-      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
+      '@google/genai': 1.52.0(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)
+      '@modelcontextprotocol/sdk': 1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
       ai: 5.0.201(zod@4.4.3)
       devtools-protocol: 0.0.1464554
       fetch-cookie: 3.2.0
@@ -5820,9 +5829,9 @@ snapshots:
       react: 19.2.7
       tslib: 2.8.1
 
-  '@earendil-works/pi-agent-core@0.79.3(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)':
+  '@earendil-works/pi-agent-core@0.79.10(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)':
     dependencies:
-      '@earendil-works/pi-ai': 0.79.3(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)
+      '@earendil-works/pi-ai': 0.79.10(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)
       ignore: 7.0.5
       typebox: 1.1.38
       yaml: 2.9.0
@@ -5834,12 +5843,13 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-ai@0.79.3(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)':
+  '@earendil-works/pi-ai@0.79.10(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.91.1(zod@4.4.3)
       '@aws-sdk/client-bedrock-runtime': 3.1048.0
-      '@google/genai': 1.52.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)
-      '@mistralai/mistralai': 2.2.1(bufferutil@4.1.0)
+      '@google/genai': 1.52.0(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)
+      '@mistralai/mistralai': 2.2.6(@opentelemetry/api@1.9.0)(bufferutil@4.1.0)
+      '@opentelemetry/api': 1.9.0
       '@smithy/node-http-handler': 4.7.3
       http-proxy-agent: 7.0.2
       https-proxy-agent: 7.0.6
@@ -6062,14 +6072,14 @@ snapshots:
 
   '@fontsource/jetbrains-mono@5.2.8': {}
 
-  '@google/genai@1.52.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)':
+  '@google/genai@1.52.0(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)':
     dependencies:
       google-auth-library: 10.7.0
       p-retry: 4.6.2
       protobufjs: 7.6.4
       ws: 8.21.0(bufferutil@4.1.0)
     optionalDependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -6562,18 +6572,21 @@ snapshots:
       '@jsonjoy.com/codegen': 17.67.0(tslib@2.8.1)
       tslib: 2.8.1
 
-  '@mistralai/mistralai@2.2.1(bufferutil@4.1.0)':
+  '@mistralai/mistralai@2.2.6(@opentelemetry/api@1.9.0)(bufferutil@4.1.0)':
     dependencies:
+      '@opentelemetry/semantic-conventions': 1.43.0
       ws: 8.21.0(bufferutil@4.1.0)
       zod: 4.4.3
       zod-to-json-schema: 3.25.2(zod@4.4.3)
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
   '@mixmark-io/domino@2.2.0': {}
 
-  '@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)':
+  '@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)':
     dependencies:
       '@hono/node-server': 1.19.14(hono@4.12.25)
       ajv: 8.20.0
@@ -6623,6 +6636,8 @@ snapshots:
       fastq: 1.20.1
 
   '@opentelemetry/api@1.9.0': {}
+
+  '@opentelemetry/semantic-conventions@1.43.0': {}
 
   '@oxc-project/types@0.133.0': {}
 
