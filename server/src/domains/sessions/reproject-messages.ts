@@ -47,8 +47,7 @@ export function writeProjectedMessages(
     // increases along the path (root → leaf). A fork/branch projects the whole
     // path in one tick; without this every row would share one created_at and the
     // UI's created_at-ordered initial load would scramble the message order.
-    const parsed = row.timestamp ? Date.parse(row.timestamp) : NaN;
-    let createdAt = Number.isFinite(parsed) ? parsed : baseNow + i;
+    let createdAt = Number.isFinite(row.timestamp) ? row.timestamp : baseNow + i;
     if (createdAt <= prevCreatedAt) createdAt = prevCreatedAt + 1;
     prevCreatedAt = createdAt;
 

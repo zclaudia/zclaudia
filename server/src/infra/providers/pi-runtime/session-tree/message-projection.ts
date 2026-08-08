@@ -1,10 +1,10 @@
-import type { SessionTreeEntry, MessageEntry } from '@earendil-works/pi-agent-core';
+import type { Entry, MessageEntry } from '@earendil-works/pi-agent-core';
 
 export interface ProjectedMessageRow {
   /** Source tree entry id (the assistant/user message entry). Stored on the messages row for the two-way link. */
   entryId: string;
-  /** Source entry ISO timestamp — carried so the projection preserves per-message times (and ordering). */
-  timestamp: string;
+  /** Source entry timestamp (ms epoch) — carried so the projection preserves per-message times (and ordering). */
+  timestamp: number;
   role: 'user' | 'assistant';
   content: string;
   metadata?: {
@@ -20,7 +20,7 @@ export interface ProjectedMessageRow {
   };
 }
 
-function isMessageEntry(e: SessionTreeEntry): e is MessageEntry {
+function isMessageEntry(e: Entry): e is MessageEntry {
   return e.type === 'message';
 }
 
@@ -83,7 +83,7 @@ function isToolResultMessage(message: unknown): message is ToolResultMessageLike
   );
 }
 
-function isToolResultEntry(entry: SessionTreeEntry | undefined): entry is MessageEntry & {
+function isToolResultEntry(entry: Entry | undefined): entry is MessageEntry & {
   message: ToolResultMessageLike;
 } {
   return !!entry && isMessageEntry(entry) && isToolResultMessage(entry.message);
@@ -109,7 +109,7 @@ function joinedTextFromContent(content: unknown): string {
  * old messages-row→message expansion. Non-message entries (compaction /
  * state-change) are skipped here — compaction projects separately.
  */
-export function projectEntriesToMessageRows(entries: SessionTreeEntry[]): ProjectedMessageRow[] {
+export function projectEntriesToMessageRows(entries: Entry[]): ProjectedMessageRow[] {
   const rows: ProjectedMessageRow[] = [];
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
