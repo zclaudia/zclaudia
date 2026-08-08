@@ -3,12 +3,18 @@ import * as api from '../../../services/api';
 import type { ManagedProcessRecord } from '../../../services/api/debug';
 import { SettingsRow } from '../ui/SettingsGroup';
 import { SECTION_LABEL } from '../../../components/ui/typography';
+import { useSettingsTargetBackend } from '../../../hooks/useSettingsTargetBackend';
 
-interface ManagedProcessesSectionProps {
-  embeddedServerStatus: string;
-}
-
-export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcessesSectionProps) {
+/**
+ * The process registry of whichever backend the settings target resolves to.
+ *
+ * Like {@link CrashReportsSection}, this was gated on the *embedded* server's
+ * status — `disabled` on mobile and in the browser shell — so the poll never
+ * ran there and the section claimed nothing was running on a host that was
+ * busy. The gate now asks whether there is a backend to poll.
+ */
+export function ManagedProcessesSection() {
+  const { targetBackendId } = useSettingsTargetBackend();
   const [managedProcesses, setManagedProcesses] = useState<ManagedProcessRecord[]>([]);
   const [managedProcessesLoading, setManagedProcessesLoading] = useState(false);
   const [managedProcessesError, setManagedProcessesError] = useState<string | null>(null);
@@ -30,7 +36,7 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
 
   // Auto-load managed processes on mount + poll every 5s
   useEffect(() => {
-    if (embeddedServerStatus === 'disabled') return;
+    if (!targetBackendId) return;
 
     let cancelled = false;
 
@@ -70,7 +76,7 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
       cancelled = true;
       clearInterval(interval);
     };
-  }, [embeddedServerStatus]);
+  }, [targetBackendId]);
 
   return (
     <SettingsRow
@@ -82,7 +88,7 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
           onClick={() => {
             void handleRefreshProcesses();
           }}
-          disabled={managedProcessesLoading || embeddedServerStatus === 'disabled'}
+          disabled={managedProcessesLoading || !targetBackendId}
           className="px-3 py-1 text-xs bg-secondary hover:bg-secondary/80 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground rounded-lg font-medium transition-colors max-md:py-2"
         >
           {managedProcessesLoading ? 'Refreshing…' : 'Refresh'}
@@ -94,7 +100,11 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
           <div className="text-xs text-destructive">{managedProcessesError}</div>
         )}
         {!managedProcessesError && managedProcesses.length === 0 && !managedProcessesLoading && (
-          <div className="text-xs text-muted-foreground">No managed processes recorded yet.</div>
+          <div className="text-xs text-muted-foreground">
+            {targetBackendId
+              ? 'No managed processes recorded yet.'
+              : 'Connect to a backend to read its process registry.'}
+          </div>
         )}
         {managedProcesses.length > 0 && (
           <div className="space-y-2 max-h-72 overflow-auto">

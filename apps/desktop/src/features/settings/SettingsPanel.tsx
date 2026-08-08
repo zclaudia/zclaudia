@@ -43,7 +43,7 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
   // Settings always show/edit this device's local backend; backend switching
   // lives in the sidebar's backend tree, not in this panel.
   const activeServerId = useServerStore(s => s.activeServerId);
-  const { sendMessage, embeddedServerStatus } = useConnection();
+  const { sendMessage } = useConnection();
 
   const facadeBackends = useFacadeStore(s => s.backends);
   const facadeConnectionState = useFacadeStore(s => s.connectionState);
@@ -259,11 +259,7 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                 )}
 
                 {activeTab === 'debug' && (
-                  <DebugSettings
-                    isConnected={isConnected}
-                    sendMessage={sendMessage}
-                    embeddedServerStatus={embeddedServerStatus}
-                  />
+                  <DebugSettings isConnected={isConnected} sendMessage={sendMessage} />
                 )}
 
                 {activeTab === 'about' && <AboutSettings isOpen={isOpen} />}

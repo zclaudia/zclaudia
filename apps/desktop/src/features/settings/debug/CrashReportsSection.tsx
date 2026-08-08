@@ -2,8 +2,19 @@ import { useState, useEffect, useCallback } from 'react';
 import * as api from '../../../services/api';
 import type { CrashReportEntry } from '../../../services/api/debug';
 import { SettingsRow } from '../ui/SettingsGroup';
+import { useSettingsTargetBackend } from '../../../hooks/useSettingsTargetBackend';
 
-export function CrashReportsSection({ embeddedServerStatus }: { embeddedServerStatus: string }) {
+/**
+ * Crash reports come from whichever backend the settings target resolves to.
+ *
+ * This used to be gated on the *embedded* server's status, which is `disabled`
+ * on mobile and in the browser shell — so both showed "No crash reports
+ * recorded." with Refresh greyed out, even though the backend they were
+ * connected to had reports to hand over. The api layer already routes to the
+ * right host; only the gate was wrong.
+ */
+export function CrashReportsSection() {
+  const { targetBackendId } = useSettingsTargetBackend();
   const [crashReports, setCrashReports] = useState<CrashReportEntry[]>([]);
   const [crashReportsPath, setCrashReportsPath] = useState<string | null>(null);
   const [crashReportsLoading, setCrashReportsLoading] = useState(false);
@@ -37,9 +48,9 @@ export function CrashReportsSection({ embeddedServerStatus }: { embeddedServerSt
   }, [crashReports]);
 
   useEffect(() => {
-    if (embeddedServerStatus === 'disabled') return;
+    if (!targetBackendId) return;
     void loadCrashReports();
-  }, [embeddedServerStatus, loadCrashReports]);
+  }, [targetBackendId, loadCrashReports]);
 
   return (
     <SettingsRow
@@ -52,7 +63,7 @@ export function CrashReportsSection({ embeddedServerStatus }: { embeddedServerSt
             onClick={() => {
               void loadCrashReports();
             }}
-            disabled={crashReportsLoading || embeddedServerStatus === 'disabled'}
+            disabled={crashReportsLoading || !targetBackendId}
             className="px-2 py-1 text-xs bg-secondary hover:bg-secondary/80 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground rounded-lg transition-colors max-md:py-2"
           >
             {crashReportsLoading ? 'Refreshing…' : 'Refresh'}
@@ -75,7 +86,11 @@ export function CrashReportsSection({ embeddedServerStatus }: { embeddedServerSt
         )}
         {crashReportsError && <div className="text-xs text-destructive">{crashReportsError}</div>}
         {!crashReportsError && crashReports.length === 0 && !crashReportsLoading && (
-          <div className="text-xs text-muted-foreground">No crash reports recorded.</div>
+          <div className="text-xs text-muted-foreground">
+            {targetBackendId
+              ? 'No crash reports recorded.'
+              : 'Connect to a backend to read its crash reports.'}
+          </div>
         )}
         {crashReports.length > 0 && (
           <div className="space-y-2">
