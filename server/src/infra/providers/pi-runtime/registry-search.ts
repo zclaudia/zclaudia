@@ -1,4 +1,4 @@
-import { getModel, getModels, getProviders, type Model } from '@earendil-works/pi-ai';
+import { getModel, getModels, getProviders, type Model } from '@earendil-works/pi-ai/compat';
 
 /**
  * Result of a registry lookup. Returns both the model literal AND the

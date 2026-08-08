@@ -23,8 +23,8 @@
   "dependencies": {
     "@anthropic-ai/sandbox-runtime": "^0.0.54",
     "@ast-grep/napi": "^0.43.0",
-    "@earendil-works/pi-agent-core": "^0.79.10",
-    "@earendil-works/pi-ai": "^0.79.10",
+    "@earendil-works/pi-agent-core": "^0.84.1",
+    "@earendil-works/pi-ai": "^0.84.1",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@mozilla/readability": "^0.6.0",
     "@puppeteer/browsers": "^3.0.6",

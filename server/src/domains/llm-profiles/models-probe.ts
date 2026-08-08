@@ -1,4 +1,4 @@
-import { completeSimple } from '@earendil-works/pi-ai';
+import { completeSimple } from '@earendil-works/pi-ai/compat';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { buildModel } from '../../infra/providers/pi-runtime/build-model.js';
 

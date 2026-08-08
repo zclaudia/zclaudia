@@ -12,7 +12,7 @@ import {
   estimateContextTokensForThreshold,
 } from './context-estimate.js';
 import { summarizeChunked, summaryChunkBudget } from './chunked-summary.js';
-import type { Usage } from '@earendil-works/pi-ai';
+import type { Usage } from '@earendil-works/pi-ai/compat';
 import type { Database } from 'better-sqlite3';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { streamSimple } from '@earendil-works/pi-ai';
+import { streamSimple } from '@earendil-works/pi-ai/compat';
 import {
   Agent,
   type AgentOptions,

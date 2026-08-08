@@ -1,4 +1,4 @@
-import { getModels } from '@earendil-works/pi-ai';
+import { getModels } from '@earendil-works/pi-ai/compat';
 
 const CONTEXT_WINDOW = 272_000;
 const TTL_MS = 5 * 60 * 1000;

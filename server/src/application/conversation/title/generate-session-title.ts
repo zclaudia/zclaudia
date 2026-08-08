@@ -1,5 +1,5 @@
-import { completeSimple } from '@earendil-works/pi-ai';
-import type { Message } from '@earendil-works/pi-ai';
+import { completeSimple } from '@earendil-works/pi-ai/compat';
+import type { Message } from '@earendil-works/pi-ai/compat';
 import { buildModel, modelEntryFor } from '../../../infra/providers/pi-runtime/build-model.js';
 import { readRecentMessages } from '../../../infra/providers/pi-runtime/session-tree/index.js';
 import type { TitleGenerateInput } from './session-title-service.js';
