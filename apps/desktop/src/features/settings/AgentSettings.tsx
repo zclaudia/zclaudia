@@ -9,6 +9,7 @@ import { useSettingsTargetBackend } from '../../hooks/useSettingsTargetBackend';
 import { TargetBackendBanner, NoTargetBackendNotice } from './ui/TargetBackendNotice';
 import { Select } from '../../components/ui/Select';
 import { ManagedRuntimeSettings } from './ManagedRuntimeSettings';
+import { OnSurface } from './ui/OnSurface';
 
 interface AgentCapabilities {
   tools: Array<{ id: string; name: string; description: string; scope: string[] }>;
@@ -164,87 +165,93 @@ export function AgentSettings() {
         </div>
       )}
 
-      <div>
-        <h3 className="text-sm font-medium mb-3">Managed Agent CLIs</h3>
-        {/* This page already shows the target-backend banner at the top. */}
-        <ManagedRuntimeSettings hideTargetBanner />
-      </div>
-
-      {/* Capabilities */}
-      {capabilities && (
+      {/* Installing, pinning and garbage-collecting CLIs on the backend host is
+          desktop work — on mobile the host is a machine you are not sitting at. */}
+      <OnSurface id="agent.managed-clis">
         <div>
-          <h3 className="text-sm font-medium mb-3">Capabilities</h3>
-          <div className="space-y-2">
-            {/* Tools */}
-            <div className="p-3 bg-secondary/50 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm">Tools</span>
-                <span className="text-xs text-muted-foreground">{capabilities.tools.length}</span>
-              </div>
-              {capabilities.tools.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No agent tools registered.</p>
-              ) : (
-                <div className="space-y-1">
-                  {capabilities.tools.map(tool => (
-                    <div
-                      key={tool.id}
-                      className="flex flex-col gap-0.5 text-xs md:flex-row md:items-center md:justify-between md:gap-2"
-                    >
-                      <span className="font-mono text-foreground/80">{tool.name}</span>
-                      <span className="text-muted-foreground max-md:text-[11px] md:ml-2 md:max-w-[50%] md:truncate md:text-right">
-                        {tool.description}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          <h3 className="text-sm font-medium mb-3">Managed Agent CLIs</h3>
+          {/* This page already shows the target-backend banner at the top. */}
+          <ManagedRuntimeSettings hideTargetBanner />
+        </div>
+      </OnSurface>
 
-            {/* Skills */}
-            {capabilities.skills.length > 0 && (
+      {/* Capabilities — a long read-only inventory with nothing to act on. */}
+      {capabilities && (
+        <OnSurface id="agent.capabilities">
+          <div>
+            <h3 className="text-sm font-medium mb-3">Capabilities</h3>
+            <div className="space-y-2">
+              {/* Tools */}
               <div className="p-3 bg-secondary/50 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm">Skills</span>
-                  <span className="text-xs text-muted-foreground">
-                    {capabilities.skills.length}
-                  </span>
+                  <span className="text-sm">Tools</span>
+                  <span className="text-xs text-muted-foreground">{capabilities.tools.length}</span>
+                </div>
+                {capabilities.tools.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No agent tools registered.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {capabilities.tools.map(tool => (
+                      <div
+                        key={tool.id}
+                        className="flex flex-col gap-0.5 text-xs md:flex-row md:items-center md:justify-between md:gap-2"
+                      >
+                        <span className="font-mono text-foreground/80">{tool.name}</span>
+                        <span className="text-muted-foreground max-md:text-[11px] md:ml-2 md:max-w-[50%] md:truncate md:text-right">
+                          {tool.description}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Skills */}
+              {capabilities.skills.length > 0 && (
+                <div className="p-3 bg-secondary/50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm">Skills</span>
+                    <span className="text-xs text-muted-foreground">
+                      {capabilities.skills.length}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {capabilities.skills.map(skill => (
+                      <div
+                        key={skill.id}
+                        className="flex flex-col gap-0.5 text-xs md:flex-row md:items-center md:justify-between md:gap-2"
+                      >
+                        <span className="text-foreground/80">{skill.name}</span>
+                        {skill.description && (
+                          <span className="text-muted-foreground max-md:text-[11px] md:ml-2 md:max-w-[50%] md:truncate md:text-right">
+                            {skill.description}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Runtime */}
+              <div className="p-3 bg-secondary/50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm">Runtime</span>
                 </div>
                 <div className="space-y-1">
-                  {capabilities.skills.map(skill => (
-                    <div
-                      key={skill.id}
-                      className="flex flex-col gap-0.5 text-xs md:flex-row md:items-center md:justify-between md:gap-2"
-                    >
-                      <span className="text-foreground/80">{skill.name}</span>
-                      {skill.description && (
-                        <span className="text-muted-foreground max-md:text-[11px] md:ml-2 md:max-w-[50%] md:truncate md:text-right">
-                          {skill.description}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Runtime */}
-            <div className="p-3 bg-secondary/50 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm">Runtime</span>
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Max Concurrent Tasks</span>
-                  <span className="font-mono">{capabilities.maxConcurrentTasks}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Context Templates</span>
-                  <span className="font-mono">{capabilities.contextTemplates.join(', ')}</span>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Max Concurrent Tasks</span>
+                    <span className="font-mono">{capabilities.maxConcurrentTasks}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Context Templates</span>
+                    <span className="font-mono">{capabilities.contextTemplates.join(', ')}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </OnSurface>
       )}
     </div>
   );

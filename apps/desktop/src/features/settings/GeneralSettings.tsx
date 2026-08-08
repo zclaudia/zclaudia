@@ -2,15 +2,13 @@ import { useState, useEffect } from 'react';
 import { Bell, Monitor, Moon, Type } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { useUIStore, type FontSizePreset } from '../../stores/uiStore';
-import { useIsMobile } from '../../hooks/useMediaQuery';
 import { ThemeToggle } from './ThemeToggle';
 import { Select } from '../../components/ui/Select';
 import { SettingsGroup, SettingsRow } from './ui/SettingsGroup';
 import { Toggle } from '../../components/ui/Toggle';
+import { OnSurface } from './ui/OnSurface';
 
 export function GeneralSettings() {
-  const isMobile = useIsMobile();
-
   return (
     <div className="space-y-6">
       <SettingsGroup label="Appearance">
@@ -24,8 +22,10 @@ export function GeneralSettings() {
           title="Font size"
           control={<FontSizeToggle />}
         />
-        {!isMobile && <NotchPanelToggle />}
-        {!isMobile && <NotchMonitorSelector />}
+        <OnSurface id="general.notch-panel">
+          <NotchPanelToggle />
+          <NotchMonitorSelector />
+        </OnSurface>
       </SettingsGroup>
     </div>
   );

@@ -32,6 +32,12 @@ vi.mock('../ManagedRuntimeSettings', () => ({
   ManagedRuntimeSettings: () => <div data-testid="managed-runtime-stub" />,
 }));
 
+const useIsMobile = vi.fn(() => false);
+vi.mock('../../../hooks/useMediaQuery', async importOriginal => {
+  const mod = await importOriginal<Record<string, unknown>>();
+  return { ...mod, useIsMobile: () => useIsMobile() };
+});
+
 const AGENT_CONFIG = {
   id: 1,
   enabled: true,
@@ -48,6 +54,7 @@ describe('AgentSettings', () => {
     mockUpdateAgentConfig.mockReset();
     mockFetchApiForBackend.mockReset();
     mockListLlmProfilesForBackend.mockReset();
+    useIsMobile.mockReturnValue(false);
 
     useAgentConfigStore.setState({
       config: null,
@@ -112,5 +119,46 @@ describe('AgentSettings', () => {
     expect(screen.queryByText('Claudia')).toBeNull();
     expect(mockGetAgentConfig).not.toHaveBeenCalled();
     expect(mockFetchApiForBackend).not.toHaveBeenCalled();
+  });
+
+  it('shows host administration and the capability inventory on desktop', async () => {
+    mockFetchApiForBackend.mockResolvedValue({
+      success: true,
+      data: {
+        tools: [{ id: 't1', name: 'Bash', description: 'Runs shell commands', scope: [] }],
+        skills: [],
+        contextTemplates: ['default'],
+        maxConcurrentTasks: 2,
+      },
+    });
+
+    render(<AgentSettings />);
+
+    expect(await screen.findByText('Managed Agent CLIs')).toBeInTheDocument();
+    expect(screen.getByTestId('managed-runtime-stub')).toBeInTheDocument();
+    expect(screen.getByText('Capabilities')).toBeInTheDocument();
+  });
+
+  it('drops both from a phone, leaving only what you would actually change there', async () => {
+    useIsMobile.mockReturnValue(true);
+    mockFetchApiForBackend.mockResolvedValue({
+      success: true,
+      data: {
+        tools: [{ id: 't1', name: 'Bash', description: 'Runs shell commands', scope: [] }],
+        skills: [],
+        contextTemplates: ['default'],
+        maxConcurrentTasks: 2,
+      },
+    });
+
+    render(<AgentSettings />);
+
+    // The enable toggle and provider picker stay — they are the reason to open this page.
+    expect(await screen.findByText('Claudia')).toBeInTheDocument();
+    expect(screen.getByText('Provider')).toBeInTheDocument();
+
+    expect(screen.queryByText('Managed Agent CLIs')).toBeNull();
+    expect(screen.queryByTestId('managed-runtime-stub')).toBeNull();
+    expect(screen.queryByText('Capabilities')).toBeNull();
   });
 });
