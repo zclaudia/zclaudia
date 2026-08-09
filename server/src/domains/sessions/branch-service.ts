@@ -13,10 +13,14 @@ export class BranchError extends Error {
   }
 }
 
-function entryBelongsToSession(db: Database, sessionId: string, entryId: string): boolean {
-  return !!db
-    .prepare(`SELECT 1 FROM session_entries WHERE id = ? AND session_id = ?`)
-    .get(entryId, sessionId);
+async function entryBelongsToSession(
+  db: Database,
+  sessionId: string,
+  entryId: string
+): Promise<boolean> {
+  // Entries live inside the session's mutation log now, so ownership is a
+  // question for the storage rather than a row lookup.
+  return (await new SqliteSessionStorage(db, sessionId).getEntry(entryId)) !== undefined;
 }
 
 /**
@@ -32,7 +36,7 @@ export async function branchSessionAt(
   if (!db.prepare(`SELECT 1 FROM sessions WHERE id = ?`).get(sessionId)) {
     throw new BranchError(404, 'NOT_FOUND', `session not found: ${sessionId}`);
   }
-  if (!entryBelongsToSession(db, sessionId, entryId)) {
+  if (!(await entryBelongsToSession(db, sessionId, entryId))) {
     throw new BranchError(400, 'INVALID_ENTRY', `entry ${entryId} not in session ${sessionId}`);
   }
 

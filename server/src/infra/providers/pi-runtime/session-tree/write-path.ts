@@ -2,6 +2,8 @@ import type { Database } from 'better-sqlite3';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { MessageAttachment } from '@zclaudia/shared/core/message';
 import { newId } from '../../../../utils/uuid.js';
+import { SqliteSessionStorage } from './sqlite-session-storage.js';
+import { MAIN_LANE } from './session-state.js';
 
 export interface AssistantTurnData {
   fullContent: string;
@@ -92,27 +94,16 @@ export function appendMessagesToTree(
   sessionId: string,
   messages: AgentMessage[]
 ): string[] {
-  const insert = db.prepare(
-    `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  );
-  const setLeaf = db.prepare(
-    `INSERT INTO session_leaf (session_id, leaf_id) VALUES (?, ?)
-     ON CONFLICT(session_id) DO UPDATE SET leaf_id = excluded.leaf_id`
-  );
-  const getLeaf = db.prepare(`SELECT leaf_id AS leafId FROM session_leaf WHERE session_id = ?`);
+  const storage = new SqliteSessionStorage(db, sessionId);
   // One transaction per turn: a mid-batch failure (e.g. a bad payload) must not
-  // leave a half-written turn or a leaf pointing into the middle of one.
+  // leave a half-written turn or a lane pointing into the middle of one. The
+  // append has to be the synchronous one — a rejected promise inside a
+  // better-sqlite3 transaction neither rolls it back nor reaches the caller.
   const appendAll = db.transaction((msgs: AgentMessage[]): string[] => {
     const ids: string[] = [];
     for (const message of msgs) {
       const id = newId();
-      const parentRow = getLeaf.get(sessionId) as { leafId: string | null } | undefined;
-      const parentId = parentRow?.leafId ?? null;
-      const timestamp = new Date().toISOString();
-      const payload = JSON.stringify({ message });
-      insert.run(id, sessionId, parentId, 'message', payload, timestamp);
-      setLeaf.run(sessionId, id);
+      storage.appendEntrySync({ type: 'message', id, message }, MAIN_LANE);
       ids.push(id);
     }
     return ids;

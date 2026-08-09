@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { Session } from '@earendil-works/pi-agent-core';
-import { migration } from '../../../../storage/migrations/021_session_entries.js';
+import { Session, buildSessionContext } from '@earendil-works/pi-agent-core';
+import { makeSessionDb } from './fixture.js';
 import { SqliteSessionStorage } from '../sqlite-session-storage.js';
 import { projectEntriesToMessageRows } from '../message-projection.js';
 import {
@@ -10,13 +10,6 @@ import {
   appendMessagesToTree,
 } from '../write-path.js';
 
-function makeDb(): Database.Database {
-  const db = new Database(':memory:');
-  db.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, created_at INTEGER NOT NULL);`);
-  db.exec(`INSERT INTO sessions (id, created_at) VALUES ('s1', 1000);`);
-  db.exec(migration.sql);
-  return db;
-}
 
 describe('write-path builders', () => {
   it('buildUserMessage: plain text', () => {
@@ -79,7 +72,7 @@ describe('write-path builders', () => {
     const { Session: _S } = await import('@earendil-works/pi-agent-core');
     const { lastAssistantPromptTokens } =
       await import('../../../../../application/conversation/compaction/context-estimate.js');
-    const db = makeDb();
+    const db = makeSessionDb();
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
     appendMessagesToTree(
       db,
@@ -90,26 +83,34 @@ describe('write-path builders', () => {
         usage: { input: 1000, cacheRead: 500, output: 20 },
       })
     );
-    const ctx = await new _S(new SqliteSessionStorage(db, 's1')).buildContext();
+    const ctx = buildSessionContext(
+      await new Session(new SqliteSessionStorage(db, 's1')).findEntriesOnBranch({
+        order: 'oldestFirst',
+      })
+    );
     // input + cacheRead + cacheWrite (output excluded) = 1500
     expect(lastAssistantPromptTokens(ctx.messages as any)).toBe(1500);
   });
 
   it('appendMessagesToTree writes entries readable via buildContext, chained + leaf advanced', async () => {
-    const db = makeDb();
+    const db = makeSessionDb();
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
     appendMessagesToTree(
       db,
       's1',
       buildAssistantTurnMessages({ fullContent: 'a', collectedToolCalls: [] })
     );
-    const ctx = await new Session(new SqliteSessionStorage(db, 's1')).buildContext();
+    const ctx = buildSessionContext(
+      await new Session(new SqliteSessionStorage(db, 's1')).findEntriesOnBranch({
+        order: 'oldestFirst',
+      })
+    );
     expect(ctx.messages.map((m: any) => m.role)).toEqual(['user', 'assistant']);
     expect((ctx.messages[0] as any).content).toBe('q');
   });
 
   it('appendMessagesToTree is atomic: a mid-batch failure rolls back the whole turn + leaf', () => {
-    const db = makeDb();
+    const db = makeSessionDb();
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
     const leafBefore = (
       db.prepare(`SELECT leaf_id AS l FROM session_leaf WHERE session_id='s1'`).get() as {
@@ -117,7 +118,7 @@ describe('write-path builders', () => {
       }
     ).l;
     const countBefore = (
-      db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as {
+      db.prepare(`SELECT count(*) AS c FROM session_log WHERE session_id='s1' AND kind='entry'`).get() as {
         c: number;
       }
     ).c;
@@ -130,7 +131,7 @@ describe('write-path builders', () => {
     ).toThrow();
 
     const countAfter = (
-      db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as {
+      db.prepare(`SELECT count(*) AS c FROM session_log WHERE session_id='s1' AND kind='entry'`).get() as {
         c: number;
       }
     ).c;
@@ -146,7 +147,7 @@ describe('write-path builders', () => {
   it('nests inside an outer transaction (savepoint) — a tree failure rolls back the whole turn across tables', () => {
     // This is the cross-table atomicity contract the run-bootstrap / run-lifecycle
     // dual-write call sites rely on: messages-table row + tree entry commit together.
-    const db = makeDb();
+    const db = makeSessionDb();
     db.exec(`CREATE TABLE messages (id TEXT PRIMARY KEY, session_id TEXT, content TEXT);`);
     const circular: any = { role: 'assistant', content: 'x' };
     circular.content = circular; // JSON.stringify throws inside appendMessagesToTree
@@ -163,7 +164,7 @@ describe('write-path builders', () => {
     expect((db.prepare(`SELECT count(*) AS c FROM messages`).get() as { c: number }).c).toBe(0);
     expect(
       (
-        db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as {
+        db.prepare(`SELECT count(*) AS c FROM session_log WHERE session_id='s1' AND kind='entry'`).get() as {
           c: number;
         }
       ).c
@@ -171,7 +172,7 @@ describe('write-path builders', () => {
   });
 
   it('projection parity: tree entries collapse to the coarse messages rows', async () => {
-    const db = makeDb();
+    const db = makeSessionDb();
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
     appendMessagesToTree(
       db,
@@ -183,7 +184,7 @@ describe('write-path builders', () => {
         ],
       })
     );
-    const branch = await new SqliteSessionStorage(db, 's1').getEntries();
+    const branch = await new SqliteSessionStorage(db, 's1').findEntries();
     const rows = projectEntriesToMessageRows(branch);
     expect(rows.map(r => r.role)).toEqual(['user', 'assistant']);
     expect(rows[0].content).toBe('q');

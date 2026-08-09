@@ -19,6 +19,8 @@ import {
 import { assertPlanStatusTransition, isSessionArchived } from './plan-status-machine.js';
 import type { EventDispatcher } from '../supervision/event-dispatcher.js';
 import type { SessionDomainEvent } from './session-events.js';
+import { SqliteSessionStorage } from '../../infra/providers/pi-runtime/session-tree/sqlite-session-storage.js';
+import { MAIN_LANE } from '../../infra/providers/pi-runtime/session-tree/session-state.js';
 
 type SessionEventType = 'created' | 'updated' | 'deleted';
 
@@ -333,10 +335,10 @@ export class SessionLifecycleService {
       Omit<Session, 'id' | 'createdAt' | 'updatedAt'>
     >);
     // CLI providers resume via sdk_session_id, but the internal pi-runtime
-    // rebuilds its context from the session tree leaf pointer. Clearing the
-    // leaf makes the next run start with an empty context; the entries (and
+    // rebuilds its context from the session tree's lane. Repointing the lane at
+    // nothing makes the next run start with an empty context; the entries (and
     // therefore the visible transcript) are left intact.
-    this.db.prepare('UPDATE session_leaf SET leaf_id = NULL WHERE session_id = ?').run(sessionId);
+    void new SqliteSessionStorage(this.db, sessionId).moveLane(MAIN_LANE, null);
     const updatedSession = this.repo.findById(sessionId);
     if (updatedSession) {
       this.publishUpdatedSession(updatedSession);
@@ -381,11 +383,10 @@ export class SessionLifecycleService {
       throw new SessionLifecycleError(404, 'NOT_FOUND', 'Session not found');
     }
 
-    // The session-tree tables (Route C) have no FK to sessions, so the sessions
-    // delete doesn't cascade to them — remove their rows explicitly to avoid
-    // orphaned tree entries accumulating after a session is deleted.
-    this.db.prepare('DELETE FROM session_entries WHERE session_id = ?').run(sessionId);
-    this.db.prepare('DELETE FROM session_leaf WHERE session_id = ?').run(sessionId);
+    // The session log has no FK to sessions, so the sessions delete doesn't
+    // cascade to it — remove its rows explicitly to avoid an orphaned tree
+    // accumulating after a session is deleted.
+    this.db.prepare('DELETE FROM session_log WHERE session_id = ?').run(sessionId);
 
     this.broadcastSessionEvent('deleted', session);
     this.emitPluginEvent('session.deleted', { sessionId, session }).catch(() => {});

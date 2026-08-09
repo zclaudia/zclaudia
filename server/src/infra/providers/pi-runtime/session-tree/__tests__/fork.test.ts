@@ -2,24 +2,17 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { Session } from '@earendil-works/pi-agent-core';
 import type { MessageEntry } from '@earendil-works/pi-agent-core';
-import { migration } from '../../../../storage/migrations/021_session_entries.js';
+import { makeSessionDb } from './fixture.js';
 import { SqliteSessionStorage } from '../sqlite-session-storage.js';
 import { forkSessionAt } from '../fork.js';
 
-function makeDb(): Database.Database {
-  const db = new Database(':memory:');
-  db.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, created_at INTEGER NOT NULL);`);
-  db.exec(`INSERT INTO sessions (id, created_at) VALUES ('src', 1000), ('dst', 2000);`);
-  db.exec(migration.sql);
-  return db;
-}
 const msg = (role: 'user' | 'assistant', content: string) =>
   ({ role, content }) as MessageEntry['message'];
 
 describe('forkSessionAt (position "at")', () => {
   let db: Database.Database;
   beforeEach(() => {
-    db = makeDb();
+    db = makeSessionDb();
   });
 
   it('copies the path up to and including the entry into a new session, sets its leaf', async () => {
@@ -48,7 +41,7 @@ describe('forkSessionAt (position "at")', () => {
   });
 
   it('throws for a non-existent fork target', () => {
-    const db2 = makeDb();
+    const db2 = makeSessionDb();
     expect(() => forkSessionAt(db2, 'src', 'ghost', 'dst')).toThrow();
   });
 });

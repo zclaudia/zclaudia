@@ -1,23 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import Database from 'better-sqlite3';
-import type { MessageEntry } from '@earendil-works/pi-agent-core';
-import { migration } from '../../../../storage/migrations/021_session_entries.js';
+import type Database from 'better-sqlite3';
+import type { MessageEntry, ProvisionedEntry } from '@earendil-works/pi-agent-core';
 import { SqliteSessionStorage } from '../sqlite-session-storage.js';
+import { MAIN_LANE } from '../session-state.js';
+import { makeSessionDb } from './fixture.js';
 
-function makeDb(): Database.Database {
-  const db = new Database(':memory:');
-  db.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, created_at INTEGER NOT NULL);`);
-  db.exec(`INSERT INTO sessions (id, created_at) VALUES ('s1', 1000);`);
-  db.exec(migration.sql);
-  return db;
-}
-
-function userEntry(id: string, parentId: string | null, text: string): MessageEntry {
+/**
+ * 0.84 provisions entries: the caller supplies the id and payload, storage
+ * supplies parentId / seq / timestamp.
+ */
+function userEntry(id: string, text: string): ProvisionedEntry<MessageEntry> {
   return {
     type: 'message',
     id,
-    parentId,
-    timestamp: '2026-06-20T00:00:00.000Z',
     message: { role: 'user', content: text } as MessageEntry['message'],
   };
 }
@@ -26,127 +21,248 @@ describe('SqliteSessionStorage', () => {
   let db: Database.Database;
   let storage: SqliteSessionStorage;
   beforeEach(() => {
-    db = makeDb();
+    db = makeSessionDb();
     storage = new SqliteSessionStorage(db, 's1');
   });
 
-  it('createEntryId returns a fresh uuid each call', async () => {
-    const a = await storage.createEntryId();
-    const b = await storage.createEntryId();
-    expect(a).not.toEqual(b);
-    expect(a).toMatch(/[0-9a-f-]{36}/);
-  });
-
   it('appendEntry + getEntry round-trips a typed entry', async () => {
-    const e = userEntry('e1', null, 'hello');
-    await storage.appendEntry(e);
-    expect(await storage.getEntry('e1')).toEqual(e);
+    const appended = await storage.appendEntry(userEntry('e1', 'hello'), MAIN_LANE);
+    expect(appended).toMatchObject({ id: 'e1', type: 'message', parentId: null, seq: 1 });
+    expect(await storage.getEntry('e1')).toMatchObject({ id: 'e1', type: 'message' });
   });
 
-  it('getLeafId / setLeafId persists the active leaf', async () => {
-    expect(await storage.getLeafId()).toBeNull();
-    await storage.appendEntry(userEntry('e2', null, 'x'));
-    await storage.setLeafId('e2');
-    expect(await storage.getLeafId()).toBe('e2');
-    await storage.appendEntry(userEntry('e3', 'e2', 'y'));
-    await storage.setLeafId('e3');
-    expect(await storage.getLeafId()).toBe('e3');
+  it('stamps parentId from the lane leaf and a monotonic seq', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    const second = await storage.appendEntry(userEntry('e2', 'b'), MAIN_LANE);
+    expect(second.parentId).toBe('e1');
+    expect(second.seq).toBe(2);
   });
 
-  it('appendEntry advances the leaf to the appended entry', async () => {
-    await storage.appendEntry(userEntry('e1', null, 'a'));
+  it('starts with a main lane pointing at nothing and advances it on append', async () => {
+    expect(await storage.getLanes()).toEqual([{ lane: MAIN_LANE, leafId: null }]);
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    expect(await storage.getLanes()).toEqual([{ lane: MAIN_LANE, leafId: 'e1' }]);
+  });
+
+  it('moveLane repoints the lane and rejects an unknown target', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    await storage.appendEntry(userEntry('e2', 'b'), MAIN_LANE);
+    await storage.moveLane(MAIN_LANE, 'e1');
     expect(await storage.getLeafId()).toBe('e1');
-    await storage.appendEntry(userEntry('e2', 'e1', 'b'));
-    expect(await storage.getLeafId()).toBe('e2');
+    await expect(storage.moveLane(MAIN_LANE, 'nope')).rejects.toMatchObject({ code: 'not_found' });
   });
 
-  it('setLeafId throws not_found for a non-existent target', async () => {
-    await expect(storage.setLeafId('ghost')).rejects.toThrow(/not found/i);
-  });
-
-  it('setLeafId(null) is allowed (resets to empty)', async () => {
-    await storage.appendEntry(userEntry('e1', null, 'a'));
-    await storage.setLeafId(null);
+  it('moveLane(null) resets the lane to empty', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    await storage.moveLane(MAIN_LANE, null);
     expect(await storage.getLeafId()).toBeNull();
   });
 
-  it('getPathToRoot walks parent_id from leaf to root in root→leaf order', async () => {
-    await storage.appendEntry(userEntry('e1', null, 'a'));
-    await storage.appendEntry(userEntry('e2', 'e1', 'b'));
-    await storage.appendEntry(userEntry('e3', 'e2', 'c'));
-    const path = await storage.getPathToRoot('e3');
-    expect(path.map(p => p.id)).toEqual(['e1', 'e2', 'e3']);
+  it('appending after a move branches from the new leaf', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    await storage.appendEntry(userEntry('e2', 'b'), MAIN_LANE);
+    await storage.moveLane(MAIN_LANE, 'e1');
+    const branched = await storage.appendEntry(userEntry('e3', 'c'), MAIN_LANE);
+    expect(branched.parentId).toBe('e1');
+    // e2 is still there — branching does not delete the abandoned path.
+    expect(await storage.getEntry('e2')).toBeDefined();
   });
 
-  it('getPathToRoot(null) returns empty', async () => {
-    expect(await storage.getPathToRoot(null)).toEqual([]);
+  it('rejects a duplicate entry id', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    await expect(storage.appendEntry(userEntry('e1', 'again'), MAIN_LANE)).rejects.toMatchObject({
+      code: 'already_exists',
+    });
+  });
+
+  it('rejects an append to an unknown lane', async () => {
+    await expect(storage.appendEntry(userEntry('e1', 'a'), 'nope')).rejects.toMatchObject({
+      code: 'invalid_lane',
+    });
+  });
+
+  it('getActivePath returns root→leaf', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    await storage.appendEntry(userEntry('e2', 'b'), MAIN_LANE);
+    await storage.appendEntry(userEntry('e3', 'c'), MAIN_LANE);
+    expect((await storage.getActivePath()).map(e => e.id)).toEqual(['e1', 'e2', 'e3']);
+  });
+
+  it('getActivePath is empty while the lane points at nothing', async () => {
+    expect(await storage.getActivePath()).toEqual([]);
+  });
+
+  it('findEntriesOnBranch stops at a bound and excludes the abandoned branch', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    await storage.appendEntry(userEntry('e2', 'b'), MAIN_LANE);
+    await storage.moveLane(MAIN_LANE, 'e1');
+    await storage.appendEntry(userEntry('e3', 'c'), MAIN_LANE);
+
+    const branch = await storage.findEntriesOnBranch({ start: 'e3', order: 'oldestFirst' });
+    expect(branch.map(e => e.id)).toEqual(['e1', 'e3']);
+
+    const bounded = await storage.findEntriesOnBranch({ start: 'e3', stopAtId: 'e3' });
+    expect(bounded.map(e => e.id)).toEqual(['e3']);
   });
 
   it('findEntries filters by type', async () => {
-    await storage.appendEntry(userEntry('e1', null, 'a'));
-    expect((await storage.findEntries('message')).map(e => e.id)).toEqual(['e1']);
-    expect(await storage.findEntries('compaction')).toEqual([]);
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    await storage.appendEntry(
+      { type: 'custom', id: 'c1', customType: 'note' },
+      MAIN_LANE
+    );
+    expect((await storage.findEntries({ type: 'message' })).map(e => e.id)).toEqual(['e1']);
+    expect((await storage.findEntries({ customType: 'note' })).map(e => e.id)).toEqual(['c1']);
   });
 
-  it('getLabel returns the latest label targeting an entry', async () => {
-    await storage.appendEntry(userEntry('e1', null, 'a'));
-    await storage.appendEntry({
-      type: 'label',
-      id: 'l1',
-      parentId: 'e1',
-      timestamp: '2026-06-20T00:00:01.000Z',
-      targetId: 'e1',
-      label: 'first',
-    });
-    await storage.appendEntry({
-      type: 'label',
-      id: 'l2',
-      parentId: 'l1',
-      timestamp: '2026-06-20T00:00:02.000Z',
-      targetId: 'e1',
-      label: 'second',
-    });
+  it('setLabel / getLabel keeps the latest label and rejects an unknown target', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    await storage.setLabel('e1', 'first');
+    await storage.setLabel('e1', 'second');
     expect(await storage.getLabel('e1')).toBe('second');
+    await storage.setLabel('e1', undefined);
+    expect(await storage.getLabel('e1')).toBeUndefined();
+    await expect(storage.setLabel('nope', 'x')).rejects.toMatchObject({ code: 'not_found' });
   });
 
-  it('getMetadata returns id + ISO createdAt, throws when session missing', async () => {
-    const meta = await storage.getMetadata();
-    expect(meta.id).toBe('s1');
-    expect(meta.createdAt).toBe(new Date(1000).toISOString());
-    const missing = new SqliteSessionStorage(db, 'nope');
-    await expect(missing.getMetadata()).rejects.toThrow();
+  it('setName / getName round-trips', async () => {
+    expect(await storage.getName()).toBeUndefined();
+    await storage.setName('triage');
+    expect(await storage.getName()).toBe('triage');
+  });
+
+  it('records share the entries sequence and report open operations', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    const started = await storage.appendRecord({
+      type: 'operation_started',
+      id: 'r1',
+      lane: MAIN_LANE,
+      sourceLeafId: 'e1',
+      intent: { kind: 'run', originalPrompt: [], initialMessages: [] },
+    });
+    expect(started.seq).toBe(2);
+    expect((await storage.findOpenOperations(MAIN_LANE)).map(r => r.id)).toEqual(['r1']);
+
+    await storage.appendRecord({
+      type: 'operation_finished',
+      id: 'r2',
+      lane: MAIN_LANE,
+      runId: 'r1',
+      outcome: 'completed',
+    });
+    expect(await storage.findOpenOperations(MAIN_LANE)).toEqual([]);
+  });
+
+  it('refuses a second open operation on the same lane', async () => {
+    const open = {
+      type: 'operation_started' as const,
+      lane: MAIN_LANE,
+      sourceLeafId: null,
+      intent: { kind: 'run' as const, originalPrompt: [], initialMessages: [] },
+    };
+    await storage.appendRecord({ ...open, id: 'r1' });
+    await expect(storage.appendRecord({ ...open, id: 'r2' })).rejects.toMatchObject({
+      code: 'storage',
+    });
+  });
+
+  it('getLog replays entries, lane moves and facts in one sequence', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    await storage.setName('triage');
+    await storage.moveLane(MAIN_LANE, null);
+
+    const log = await storage.getLog();
+    expect(log.map(item => item.kind)).toEqual(['entry', 'fact', 'lane']);
+    expect(log.map(item => item.seq)).toEqual([1, 2, 3]);
+    expect(await storage.getLog({ afterSeq: 2 })).toHaveLength(1);
+  });
+
+  it('survives a reopen — state is rebuilt from the persisted log', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    await storage.appendEntry(userEntry('e2', 'b'), MAIN_LANE);
+    await storage.setLabel('e1', 'start');
+    await storage.setName('triage');
+
+    const reopened = new SqliteSessionStorage(db, 's1');
+    expect(await reopened.getLeafId()).toBe('e2');
+    expect(await reopened.getLabel('e1')).toBe('start');
+    expect(await reopened.getName()).toBe('triage');
+    expect((await reopened.getActivePath()).map(e => e.id)).toEqual(['e1', 'e2']);
+  });
+
+  it('counts messages and accumulates usage into stats', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    await storage.appendRecord({
+      type: 'usage',
+      id: 'u1',
+      lane: MAIN_LANE,
+      cause: 'adjustment',
+      usage: {
+        input: 10,
+        output: 5,
+        cacheRead: 3,
+        cacheWrite: 2,
+        totalTokens: 20,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.5 },
+      },
+    });
+    expect(await storage.getStats()).toMatchObject({
+      messageCount: 1,
+      cachedTokens: 3,
+      uncachedTokens: 12,
+      totalTokens: 20,
+      costTotal: 0.5,
+    });
+  });
+
+  it('getMetadata returns an epoch createdAt and throws when the session is missing', async () => {
+    expect(await storage.getMetadata()).toEqual({ id: 's1', createdAt: 1000 });
+    await expect(new SqliteSessionStorage(db, 'missing').getMetadata()).rejects.toMatchObject({
+      code: 'not_found',
+    });
   });
 
   it('getEntry returns undefined for a missing id', async () => {
-    expect(await storage.getEntry('nonexistent')).toBeUndefined();
+    expect(await storage.getEntry('nope')).toBeUndefined();
   });
 
-  it('getPathToRoot throws for a non-existent non-null leaf', async () => {
-    await expect(storage.getPathToRoot('ghost')).rejects.toThrow(/not found/i);
+  it('fails loudly when a stored row disagrees with the mutation it holds', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    // Replay reads the sequence off the mutation but orders by the column, so
+    // the two disagreeing would apply rows in an order the sequence does not
+    // describe.
+    db.prepare('UPDATE session_log SET seq = 5 WHERE seq = 1').run();
+    await expect(new SqliteSessionStorage(db, 's1').getLanes()).rejects.toThrow(/corrupt/);
   });
 
-  it('getPathToRoot throws when the parent chain is broken (does not reach root)', async () => {
-    await storage.appendEntry(userEntry('e1', null, 'a'));
-    await storage.appendEntry(userEntry('e2', 'e1', 'b'));
-    await storage.appendEntry(userEntry('e3', 'e2', 'c'));
-    // Break the chain: remove the middle entry so e3's path can't reach root.
-    db.prepare(`DELETE FROM session_entries WHERE id = 'e2' AND session_id = 's1'`).run();
-    await expect(storage.getPathToRoot('e3')).rejects.toThrow(/broken|root/i);
+  it('fails loudly when a mutation is missing from the log', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    await storage.appendEntry(userEntry('e2', 'b'), MAIN_LANE);
+    db.prepare('DELETE FROM session_log WHERE seq = 1').run();
+    // A gap would otherwise replay as a session that silently lost its head.
+    await expect(new SqliteSessionStorage(db, 's1').getLanes()).rejects.toThrow(/corrupt/);
   });
 
-  it('round-trips a CompactionEntry with optional details + fromHook', async () => {
-    const entry = {
-      type: 'compaction' as const,
-      id: 'c1',
-      parentId: 'e1',
-      timestamp: '2026-06-20T00:00:05.000Z',
-      summary: 'SUM',
-      firstKeptEntryId: 'e1',
-      tokensBefore: 42,
-      details: { source: 'auto', readFiles: ['a.ts'], modifiedFiles: [] },
-      fromHook: false,
-    };
-    await storage.appendEntry(entry as Parameters<typeof storage.appendEntry>[0]);
-    expect(await storage.getEntry('c1')).toEqual(entry);
+  it('round-trips a compaction entry with its retained tail', async () => {
+    await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
+    const retainedTail = [{ role: 'user', content: 'kept' }] as MessageEntry['message'][];
+    await storage.appendEntry(
+      {
+        type: 'compaction',
+        id: 'k1',
+        summary: 'summary text',
+        retainedTail,
+        tokensBefore: 1234,
+        details: { source: 'manual' },
+      },
+      MAIN_LANE
+    );
+    expect(await storage.getEntry('k1')).toMatchObject({
+      type: 'compaction',
+      summary: 'summary text',
+      tokensBefore: 1234,
+      retainedTail,
+      details: { source: 'manual' },
+    });
   });
 });

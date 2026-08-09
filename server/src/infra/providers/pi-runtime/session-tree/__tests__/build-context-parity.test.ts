@@ -2,16 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { Session } from '@earendil-works/pi-agent-core';
 import type { MessageEntry } from '@earendil-works/pi-agent-core';
-import { migration } from '../../../../storage/migrations/021_session_entries.js';
+import { makeSessionDb } from './fixture.js';
 import { SqliteSessionStorage } from '../sqlite-session-storage.js';
 
-function makeDb(): Database.Database {
-  const db = new Database(':memory:');
-  db.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, created_at INTEGER NOT NULL);`);
-  db.exec(`INSERT INTO sessions (id, created_at) VALUES ('s1', 1000);`);
-  db.exec(migration.sql);
-  return db;
-}
 
 function msg(role: 'user' | 'assistant', content: string): MessageEntry['message'] {
   return { role, content } as MessageEntry['message'];
@@ -21,7 +14,7 @@ describe('buildContext over SqliteSessionStorage', () => {
   let db: Database.Database;
   let storage: SqliteSessionStorage;
   beforeEach(() => {
-    db = makeDb();
+    db = makeSessionDb();
     storage = new SqliteSessionStorage(db, 's1');
   });
 

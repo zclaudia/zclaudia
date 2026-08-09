@@ -3,6 +3,7 @@ import type { Session } from '@zclaudia/shared/core/session';
 import { SessionRepository } from './repository.js';
 import { forkSessionAt } from '../../infra/providers/pi-runtime/session-tree/fork.js';
 import { readActivePathRows, writeProjectedMessages } from './reproject-messages.js';
+import { SqliteSessionStorage } from '../../infra/providers/pi-runtime/session-tree/sqlite-session-storage.js';
 
 export class ForkError extends Error {
   constructor(
@@ -40,9 +41,9 @@ export async function forkSession(
   if (!source)
     throw new ForkError(404, 'NOT_FOUND', `source session not found: ${input.sourceSessionId}`);
 
-  const owns = db
-    .prepare(`SELECT 1 FROM session_entries WHERE id = ? AND session_id = ?`)
-    .get(input.treeEntryId, input.sourceSessionId);
+  const owns = await new SqliteSessionStorage(db, input.sourceSessionId).getEntry(
+    input.treeEntryId
+  );
   if (!owns)
     throw new ForkError(
       400,

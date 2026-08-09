@@ -56,14 +56,24 @@ export class SqliteSessionStorage implements SessionStorage {
         .prepare('SELECT seq, payload FROM session_log WHERE session_id = ? ORDER BY seq ASC')
         .all(this.sessionId) as LogRow[];
       for (const row of rows) {
-        // A stored mutation that no longer applies means the stream is
-        // corrupt; failing here beats serving a silently truncated session.
-        state.applyMutation(JSON.parse(row.payload) as SessionMutation, message => {
+        const mutation = JSON.parse(row.payload) as SessionMutation;
+        const corrupt = (message: string): never => {
           throw new SessionError(
             'storage',
             `Session ${this.sessionId} log is corrupt at seq ${row.seq}: ${message}`
           );
-        });
+        };
+        // The sequence lives in two places — the column we order by and the
+        // mutation itself — and replay reads the latter. If they disagree the
+        // rows would be applied in an order the sequence does not describe, so
+        // check rather than trust.
+        if (mutationSeq(mutation) !== row.seq) {
+          corrupt(`row claims seq ${row.seq} but holds ${mutationSeq(mutation)}`);
+        }
+        // A stored mutation that no longer applies (a gap, a missing parent)
+        // means the stream is broken; failing here beats serving a silently
+        // truncated session.
+        state.applyMutation(mutation, corrupt);
       }
       this.state = state;
     }
@@ -129,10 +139,18 @@ export class SqliteSessionStorage implements SessionStorage {
     this.commit({ kind: 'lane', seq: state.nextSequence, lane, leafId: to });
   }
 
-  async appendEntry<TEntry extends Entry>(
+  /**
+   * Synchronous append.
+   *
+   * better-sqlite3 transactions cannot await, and a rejected promise inside one
+   * neither rolls the transaction back nor reaches the caller. Callers that
+   * batch a turn under `db.transaction` need the throw to be synchronous, so
+   * the real work lives here and `appendEntry` is the async face of it.
+   */
+  appendEntrySync<TEntry extends Entry>(
     newEntry: ProvisionedEntry<TEntry>,
     lane: string
-  ): Promise<TEntry> {
+  ): TEntry {
     const state = this.projection;
     const parentId = state.requireLane(lane);
     state.validateUnusedId(newEntry.id);
@@ -147,6 +165,13 @@ export class SqliteSessionStorage implements SessionStorage {
     } as unknown as TEntry;
     this.commit({ kind: 'entry', lane, entry });
     return structuredClone(entry);
+  }
+
+  async appendEntry<TEntry extends Entry>(
+    newEntry: ProvisionedEntry<TEntry>,
+    lane: string
+  ): Promise<TEntry> {
+    return this.appendEntrySync(newEntry, lane);
   }
 
   async appendRecord<TRecord extends LaneRecord>(newRecord: NewRecord<TRecord>): Promise<TRecord> {

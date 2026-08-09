@@ -26,7 +26,7 @@ export async function generateSessionTitle(input: TitleGenerateInput): Promise<s
   // Title only needs a handful of messages (pickTitleWindow keeps ~9). Read a
   // bounded recent window from the session tree (Route C) so long sessions don't
   // reconstruct the whole branch just to drop most of it.
-  const messages = readRecentMessages(db, sessionId, 16) as unknown as Message[];
+  const messages = (await readRecentMessages(db, sessionId, 16)) as unknown as Message[];
   if (messages.length === 0) return null;
 
   const window = pickTitleWindow(messages);
