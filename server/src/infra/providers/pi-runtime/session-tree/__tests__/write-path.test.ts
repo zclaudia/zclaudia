@@ -109,14 +109,10 @@ describe('write-path builders', () => {
     expect((ctx.messages[0] as any).content).toBe('q');
   });
 
-  it('appendMessagesToTree is atomic: a mid-batch failure rolls back the whole turn + leaf', () => {
+  it('appendMessagesToTree is atomic: a mid-batch failure rolls back the whole turn + leaf', async () => {
     const db = makeSessionDb();
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
-    const leafBefore = (
-      db.prepare(`SELECT leaf_id AS l FROM session_leaf WHERE session_id='s1'`).get() as {
-        l: string;
-      }
-    ).l;
+    const leafBefore = await new SqliteSessionStorage(db, 's1').getLeafId();
     const countBefore = (
       db.prepare(`SELECT count(*) AS c FROM session_log WHERE session_id='s1' AND kind='entry'`).get() as {
         c: number;
@@ -135,16 +131,12 @@ describe('write-path builders', () => {
         c: number;
       }
     ).c;
-    const leafAfter = (
-      db.prepare(`SELECT leaf_id AS l FROM session_leaf WHERE session_id='s1'`).get() as {
-        l: string;
-      }
-    ).l;
+    const leafAfter = await new SqliteSessionStorage(db, 's1').getLeafId();
     expect(countAfter).toBe(countBefore); // the 'ok' entry was rolled back
     expect(leafAfter).toBe(leafBefore); // leaf not advanced
   });
 
-  it('nests inside an outer transaction (savepoint) — a tree failure rolls back the whole turn across tables', () => {
+  it('nests inside an outer transaction (savepoint) — a tree failure rolls back the whole turn across tables', async () => {
     // This is the cross-table atomicity contract the run-bootstrap / run-lifecycle
     // dual-write call sites rely on: messages-table row + tree entry commit together.
     const db = makeSessionDb();
@@ -184,7 +176,10 @@ describe('write-path builders', () => {
         ],
       })
     );
-    const branch = await new SqliteSessionStorage(db, 's1').findEntries();
+    // `findEntries` defaults to newestFirst in 0.84; the projection reads a path.
+    const branch = await new SqliteSessionStorage(db, 's1').findEntries({
+      order: 'oldestFirst',
+    });
     const rows = projectEntriesToMessageRows(branch);
     expect(rows.map(r => r.role)).toEqual(['user', 'assistant']);
     expect(rows[0].content).toBe('q');

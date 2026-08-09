@@ -1,4 +1,6 @@
 import type { Database } from 'better-sqlite3';
+import type { Entry } from '@earendil-works/pi-agent-core';
+import { SqliteSessionStorage } from '../../infra/providers/pi-runtime/session-tree/sqlite-session-storage.js';
 import type {
   ContextGraph,
   SessionLane,
@@ -6,12 +8,22 @@ import type {
   GraphNode,
 } from '@zclaudia/shared/core/context-graph';
 
+/**
+ * Flattened view of a tree entry. The graph builder was written against SQL
+ * rows and still reads that shape; entries now come from the session's log, so
+ * this is the adapter between the two.
+ */
 interface EntryRow {
   id: string;
   parent_id: string | null;
   type: string;
   payload: string;
-  timestamp: string;
+  timestamp: number;
+}
+
+function toRow(entry: Entry): EntryRow {
+  const { id, parentId, type, ...rest } = entry as Entry & Record<string, unknown>;
+  return { id, parent_id: parentId, type, payload: JSON.stringify(rest), timestamp: entry.timestamp };
 }
 
 const NODE_ENTRY_TYPES = new Set(['message', 'compaction', 'label', 'leaf']);
@@ -50,29 +62,24 @@ export interface SubgraphOptions {
  * Build one session's structural GraphNode[] from a synchronous, in-memory parent
  * map (no recursive CTE — cycle-safe + node-capped). Pure read.
  */
-export function buildSessionSubgraph(
+export async function buildSessionSubgraph(
   db: Database,
   sessionId: string,
   opts: SubgraphOptions
-): { nodes: GraphNode[]; truncated: boolean } {
+): Promise<{ nodes: GraphNode[]; truncated: boolean }> {
+  const storage = new SqliteSessionStorage(db, sessionId);
   // Truncation is first-N-by-insertion-order (rowid), NOT a connected prefix: under
   // truncation a kept entry may reference a dropped parent/fork entry. That is handled
   // downstream by the dangling parentNodeId / fork-edge filters in buildContextGraph.
-  const rawRows = db
-    .prepare(
-      `SELECT id, parent_id, type, payload, timestamp FROM session_entries WHERE session_id = ? ORDER BY rowid LIMIT ?`
-    )
-    .all(sessionId, opts.nodeCap + 1) as EntryRow[];
+  // Insertion order is the log's own sequence.
+  const rawRows = (
+    await storage.findEntries({ order: 'oldestFirst', limit: opts.nodeCap + 1 })
+  ).map(toRow);
   const truncated = rawRows.length > opts.nodeCap;
   const rows = truncated ? rawRows.slice(0, opts.nodeCap) : rawRows;
   if (rows.length === 0) return { nodes: [], truncated };
 
-  const leafId =
-    (
-      db.prepare(`SELECT leaf_id AS l FROM session_leaf WHERE session_id = ?`).get(sessionId) as
-        | { l: string | null }
-        | undefined
-    )?.l ?? null;
+  const leafId = await storage.getLeafId();
 
   const byId = new Map<string, EntryRow>();
   const parentOf = new Map<string, string | null>();
@@ -178,7 +185,8 @@ export function buildSessionSubgraph(
       onActivePath: activePath.has(r.id),
       parentNodeId,
       incomingMessageCount: count,
-      timestamp: r.timestamp,
+      // GraphNode's timestamp is a string on the wire; entries carry epochs now.
+      timestamp: new Date(r.timestamp).toISOString(),
       jump: { messageId, compactionId: r.type === 'compaction' ? r.id : null },
     };
     if (r.type === 'compaction') {
@@ -214,7 +222,10 @@ interface SessionRow {
  * Build the whole fork family's context graph for any member session. Synchronous,
  * direct-SQL, pure read. Returns null if the session does not exist.
  */
-export function buildContextGraph(db: Database, sessionId: string): ContextGraph | null {
+export async function buildContextGraph(
+  db: Database,
+  sessionId: string
+): Promise<ContextGraph | null> {
   const focus = db.prepare(`SELECT project_id AS p FROM sessions WHERE id = ?`).get(sessionId) as
     | { p: string }
     | undefined;
@@ -308,7 +319,7 @@ export function buildContextGraph(db: Database, sessionId: string): ContextGraph
   for (const lane of lanes) {
     const s = byId.get(lane.id);
     if (!s) continue;
-    const sub = buildSessionSubgraph(db, lane.id, {
+    const sub = await buildSessionSubgraph(db, lane.id, {
       forkBaseEntryId: parentInProject(s) ? s.fork_entry_id : null,
       forkPointEntryIds: forkSources.get(lane.id) ?? new Set<string>(),
       nodeCap: Math.max(0, remaining),

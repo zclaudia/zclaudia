@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { Session } from '@earendil-works/pi-agent-core';
+import { Session, buildSessionContext} from '@earendil-works/pi-agent-core';
 import type { MessageEntry } from '@earendil-works/pi-agent-core';
 import { makeSessionDb } from './fixture.js';
 import { SqliteSessionStorage } from '../sqlite-session-storage.js';
@@ -24,7 +24,7 @@ describe('forkSessionAt (position "at")', () => {
     forkSessionAt(db, 'src', forkPoint, 'dst');
 
     const dst = new Session(new SqliteSessionStorage(db, 'dst'));
-    const ctx = await dst.buildContext();
+    const ctx = buildSessionContext(await dst.findEntriesOnBranch({ order: 'oldestFirst' }));
     expect(ctx.messages.map(m => (m as { content: string }).content)).toEqual(['a', 'b']);
   });
 
@@ -36,7 +36,7 @@ describe('forkSessionAt (position "at")', () => {
 
     forkSessionAt(db, 'src', forkPoint, 'dst');
 
-    const ctx = await src.buildContext();
+    const ctx = buildSessionContext(await src.findEntriesOnBranch({ order: 'oldestFirst' }));
     expect(ctx.messages.map(m => (m as { content: string }).content)).toEqual(['a', 'b', 'c']);
   });
 

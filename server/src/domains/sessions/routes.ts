@@ -197,9 +197,9 @@ export function createSessionRoutes(
   });
 
   // Context graph: the whole fork family's structural lineage graph (read-only, SP-B).
-  router.get('/:id/context-graph', (req: Request, res: Response) => {
+  router.get('/:id/context-graph', async (req: Request, res: Response) => {
     try {
-      const graph = buildContextGraph(db, req.params.id);
+      const graph = await buildContextGraph(db, req.params.id);
       if (!graph) {
         sendApiError(res, 404, 'NOT_FOUND', 'Session not found');
         return;
@@ -441,10 +441,10 @@ export function createSessionRoutes(
   // Get a single compaction record (UI uses this to populate marker card details
   // after receiving a compaction_completed event without re-fetching the whole
   // messages list).
-  router.get('/:id/compactions/:compactionId', (req: Request, res: Response) => {
+  router.get('/:id/compactions/:compactionId', async (req: Request, res: Response) => {
     try {
       const { id: sessionId, compactionId } = req.params;
-      const compaction = getCompactionById(db, sessionId, compactionId);
+      const compaction = await getCompactionById(db, sessionId, compactionId);
       if (!compaction) {
         sendApiError(res, 404, 'NOT_FOUND', 'Compaction not found');
         return;

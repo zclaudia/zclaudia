@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { Session } from '@earendil-works/pi-agent-core';
+import { Session, buildSessionContext} from '@earendil-works/pi-agent-core';
 import type { MessageEntry } from '@earendil-works/pi-agent-core';
 import { makeSessionDb } from './fixture.js';
 import { SqliteSessionStorage } from '../sqlite-session-storage.js';
@@ -24,7 +24,7 @@ describe('buildContext over SqliteSessionStorage', () => {
     const id2 = await session.appendMessage(msg('assistant', 'two'));
     await session.appendMessage(msg('user', 'three'));
 
-    const ctx = await session.buildContext();
+    const ctx = buildSessionContext(await session.findEntriesOnBranch({ order: 'oldestFirst' }));
     expect(ctx.messages.map(m => (m as { content: string }).content)).toEqual([
       'one',
       'two',
@@ -36,11 +36,25 @@ describe('buildContext over SqliteSessionStorage', () => {
   it('drops pre-boundary messages and prepends the summary after compaction', async () => {
     const session = new Session(storage);
     await session.appendMessage(msg('user', 'old-1'));
-    const keepId = await session.appendMessage(msg('user', 'kept-boundary'));
-    await session.appendMessage(msg('assistant', 'after'));
-    await session.appendCompaction('SUMMARY TEXT', keepId, 1234);
+    const kept = msg('user', 'kept-boundary');
+    const keepId = await session.appendMessage(kept);
+    const after = msg('assistant', 'after');
+    await session.appendMessage(after);
+    // 0.84 has no appendCompaction helper, and the boundary moved: the entry
+    // carries the messages that survive rather than naming the first one to
+    // keep, so what used to follow from tree position is now listed outright.
+    await session.appendEntry(
+      {
+        type: 'compaction',
+        id: 'k1',
+        summary: 'SUMMARY TEXT',
+        retainedTail: [kept, after],
+        tokensBefore: 1234,
+      },
+      'main'
+    );
 
-    const ctx = await session.buildContext();
+    const ctx = buildSessionContext(await session.findEntriesOnBranch({ order: 'oldestFirst' }));
     // The compaction-summary message uses role 'compactionSummary' with a `summary`
     // field; regular messages carry string `content`. Read whichever is present.
     const texts = ctx.messages.map(m => {

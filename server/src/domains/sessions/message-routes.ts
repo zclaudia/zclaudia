@@ -54,7 +54,7 @@ export function mountMessageRoutes(
   const repo = new SessionMessageRepository(db);
   const sessionRepo = new SessionRepository(db);
 
-  router.get('/:id/messages', (req: Request, res: Response) => {
+  router.get('/:id/messages', async (req: Request, res: Response) => {
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
       const before = req.query.before ? parseInt(req.query.before as string) : undefined;
@@ -102,7 +102,7 @@ export function mountMessageRoutes(
       const oldestInPage = parsedMessages.length > 0 ? parsedMessages[0].createdAt : undefined;
       const newestInPage =
         parsedMessages.length > 0 ? parsedMessages[parsedMessages.length - 1].createdAt : undefined;
-      const allCompactions = listCompactions(db, req.params.id);
+      const allCompactions = await listCompactions(db, req.params.id);
       const markerEntries = allCompactions
         .filter(c => {
           if (oldestInPage == null || newestInPage == null) return parsedMessages.length === 0;
