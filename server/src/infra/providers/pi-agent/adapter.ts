@@ -1,5 +1,5 @@
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { Session } from '@earendil-works/pi-agent-core';
+import { Session, buildSessionContext} from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import { ALL_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
@@ -218,11 +218,12 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
     if (options.db && options.claudiaSessionId) {
       try {
         const session = new Session(new SqliteSessionStorage(options.db, options.claudiaSessionId));
-        // buildContext().messages is AgentMessage[] at runtime; postprocessors expect
-        // pi-ai Message[] (structurally equivalent for user/assistant turns). Cast
-        // through unknown for both directions.
-
-        let messages = (await session.buildContext())
+        // 0.84 moved context assembly off Session onto a free function over the
+        // branch entries. `messages` is AgentMessage[] at runtime; postprocessors
+        // expect pi-ai Message[] (structurally equivalent for user/assistant
+        // turns). Cast through unknown for both directions.
+        const branch = await session.findEntriesOnBranch({ order: 'oldestFirst' });
+        let messages = buildSessionContext(branch)
           .messages as unknown as import('@earendil-works/pi-ai').Message[];
         messages = resolveImagesInMessages(messages, {
           resolve: atts => {

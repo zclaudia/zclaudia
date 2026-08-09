@@ -3,21 +3,24 @@ import {
   generateSummary,
   prepareCompaction,
   Session,
+  buildSessionContext,
   DEFAULT_COMPACTION_SETTINGS,
   type AgentMessage,
-  type SessionTreeEntry,
+  type Entry,
 } from '@earendil-works/pi-agent-core';
 import {
   compactionTriggerThreshold,
   estimateContextTokensForThreshold,
 } from './context-estimate.js';
 import { summarizeChunked, summaryChunkBudget } from './chunked-summary.js';
-import type { Usage } from '@earendil-works/pi-ai/compat';
+import type { Usage } from '@earendil-works/pi-ai';
 import type { Database } from 'better-sqlite3';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { SqliteSessionStorage } from '../../../infra/providers/pi-runtime/session-tree/index.js';
 import { buildModel, modelEntryFor } from '../../../infra/providers/pi-runtime/build-model.js';
+import { modelsFor } from '../../../infra/providers/pi-runtime/models-registry.js';
+import { newId } from '../../../utils/uuid.js';
 import { resolveContextWindow } from './context-windows.js';
 import { compactionCircuitBreaker } from './circuit-breaker.js';
 
@@ -216,7 +219,7 @@ async function compactForOverflowUnlocked(ctx: CompactionContext): Promise<Compa
 interface TreeSnapshot {
   session: Session;
   /** Root→leaf path entries (what pi's prepareCompaction consumes). */
-  branch: SessionTreeEntry[];
+  branch: Entry[];
   /** buildContext projection — used for the token estimate / threshold decision. */
   messages: AgentMessage[];
 }
@@ -224,14 +227,21 @@ interface TreeSnapshot {
 /** Load the session tree's active branch and its projected messages (Route C). */
 async function loadTreeSnapshot(ctx: CompactionContext): Promise<TreeSnapshot> {
   const session = new Session(new SqliteSessionStorage(ctx.db, ctx.sessionId));
-  const branch = await session.getBranch();
-  const messages = (await session.buildContext()).messages;
+  // 0.84: the branch is a query on the session, and context assembly is a free
+  // function over the entries it returns.
+  const branch = await session.findEntriesOnBranch({ order: 'oldestFirst' });
+  const messages = buildSessionContext(branch).messages;
   return { session, branch, messages };
 }
 
 export interface TreeCompactionInput {
   summary: string;
-  firstKeptEntryId: string;
+  /**
+   * Messages kept after the boundary. 0.84 stores them on the compaction entry
+   * itself rather than pointing at the first surviving entry, so the entry is
+   * self-contained and a later edit to the branch cannot strand the boundary.
+   */
+  retainedTail: AgentMessage[];
   tokensBefore: number;
   details: {
     source: string;
@@ -243,22 +253,28 @@ export interface TreeCompactionInput {
 
 /**
  * Append a native pi `CompactionEntry` to the session tree and return its id.
- * `appendCompaction` over `SqliteSessionStorage` advances the leaf to the new
- * entry, so the next `buildContext` honors the boundary natively (drops
- * pre-boundary history, prepends the summary). Replaces the old
- * `session_compactions` table write.
+ *
+ * `appendEntry` on the main lane advances the leaf to the new entry, so the
+ * next `buildSessionContext` honors the boundary natively (drops pre-boundary
+ * history, prepends the summary). 0.84 has no `appendCompaction` helper and no
+ * id provisioning, so the entry is assembled and its id minted here.
  */
 export async function appendCompactionToTree(
   session: Session,
   input: TreeCompactionInput
 ): Promise<string> {
-  return session.appendCompaction(
-    input.summary,
-    input.firstKeptEntryId,
-    input.tokensBefore,
-    input.details,
-    false
+  const entry = await session.appendEntry(
+    {
+      type: 'compaction',
+      id: newId(),
+      summary: input.summary,
+      retainedTail: input.retainedTail,
+      tokensBefore: input.tokensBefore,
+      details: input.details,
+    },
+    'main'
   );
+  return entry.id;
 }
 
 /** Mirror of pi's (non-exported) computeFileLists: modified = written ∪ edited; read-only excludes modified. */
@@ -276,7 +292,7 @@ function computeFileLists(fileOps: {
 async function runCompaction(
   ctx: CompactionContext,
   session: Session,
-  branch: SessionTreeEntry[],
+  branch: Entry[],
   tokens: number
 ): Promise<CompactionOutcome> {
   // pi resolves the cut point natively over the tree entries — no fake-entry
@@ -322,12 +338,14 @@ async function runCompaction(
     // compactions UPDATE rather than re-summarize from scratch (pi semantics).
     previousSummary: preparation.previousSummary,
     generate: (chunk, previousSummary) =>
+      // 0.84 resolves the key through the Models registry instead of taking an
+      // apiKey argument; see models-registry.ts for how a profile maps onto a
+      // provider registration.
       generateSummary(
         chunk,
+        modelsFor(built.model, ctx.llmProfile),
         built.model,
         DEFAULT_COMPACTION_SETTINGS.reserveTokens,
-        ctx.llmProfile.apiKey ?? '',
-        undefined, // headers
         ctx.signal,
         ctx.customInstructions,
         previousSummary,
@@ -340,7 +358,7 @@ async function runCompaction(
   const { readFiles, modifiedFiles } = computeFileLists(preparation.fileOps);
   const compactionId = await appendCompactionToTree(session, {
     summary,
-    firstKeptEntryId: preparation.firstKeptEntryId,
+    retainedTail: preparation.retainedTail,
     tokensBefore: tokens,
     details: {
       source: ctx.source,

@@ -14,6 +14,7 @@ import {
 import { refreshIfNeeded } from '../../../domains/llm-profiles/codex-oauth-service.js';
 import { getLlmProfileWriter } from '../../../domains/llm-profiles/repository-registry.js';
 import { resolveEnvModel } from './env-model.js';
+import { providerIdFor } from './models-registry.js';
 
 const DEFAULT_PROVIDER = 'anthropic';
 
@@ -329,6 +330,12 @@ export function buildModel(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (model as any).compat = { ...((model as any).compat ?? {}), supportsDeveloperRole: false };
   }
+
+  // Auth identity for the 0.84 `Models` registry. An OAuth profile registers
+  // under its own id so its credential (and pi's refresh lock) are per profile;
+  // api-key profiles keep the provider string the wires branch on. See
+  // models-registry.ts.
+  model.provider = providerIdFor(profile, model.provider);
 
   if (profile?.requestHeaders && profile.providerType !== 'openai-codex') {
     model.headers = { ...(model.headers ?? {}), ...profile.requestHeaders };
