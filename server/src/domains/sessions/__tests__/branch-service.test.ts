@@ -1,5 +1,10 @@
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
+import {
+  seedEntry,
+  seedLane,
+} from '../../../infra/providers/pi-runtime/session-tree/__tests__/fixture.js';
+import { SqliteSessionStorage } from '../../../infra/providers/pi-runtime/session-tree/sqlite-session-storage.js';
 import { branchSessionAt, BranchError } from '../branch-service.js';
 
 function setup() {
@@ -16,24 +21,19 @@ function setup() {
     `INSERT INTO sessions (id, project_id, agent_profile_id, type, created_at, updated_at) VALUES ('s','p','a','regular',1,1)`
   ).run();
   const e = (id: string, parent: string | null, msg: unknown) => {
-    db.prepare(
-      `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp) VALUES (?, 's', ?, 'message', ?, ?)`
-    ).run(id, parent, JSON.stringify({ message: msg }), new Date().toISOString());
+    seedEntry(db, 's', { id, parentId: parent, type: 'message', message: msg });
   };
   e('e1', null, { role: 'user', content: 'q1' });
   e('e2', 'e1', { role: 'assistant', content: [{ type: 'text', text: 'a1' }] });
   e('e3', 'e2', { role: 'user', content: 'q2' });
-  db.prepare(`INSERT INTO session_leaf (session_id, leaf_id) VALUES ('s','e3')`).run();
+  seedLane(db, 's', 'e3');
   return db;
 }
 
 it('moves leaf and reprojects messages to the new active path', async () => {
   const db = setup();
   await branchSessionAt(db, 's', 'e1');
-  const leaf = db.prepare(`SELECT leaf_id AS l FROM session_leaf WHERE session_id='s'`).get() as {
-    l: string;
-  };
-  expect(leaf.l).toBe('e1');
+  expect(await new SqliteSessionStorage(db, 's').getLeafId()).toBe('e1');
   const rows = db
     .prepare(
       `SELECT content, tree_entry_id AS t FROM messages WHERE session_id='s' ORDER BY offset`

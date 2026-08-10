@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
+import {
+  seedEntry,
+  seedLane,
+} from '../../../infra/providers/pi-runtime/session-tree/__tests__/fixture.js';
+import { SqliteSessionStorage } from '../../../infra/providers/pi-runtime/session-tree/sqlite-session-storage.js';
 import { SessionLifecycleError, SessionLifecycleService } from '../lifecycle-service.js';
 import {
   createAgentProfilesTable,
@@ -39,12 +44,11 @@ function createTestDb(): Database.Database {
       updated_at INTEGER NOT NULL
     );
 
-    CREATE TABLE session_entries (
-      id TEXT NOT NULL, session_id TEXT NOT NULL, parent_id TEXT,
-      type TEXT NOT NULL, payload TEXT NOT NULL, timestamp TEXT NOT NULL,
-      PRIMARY KEY (session_id, id)
+    CREATE TABLE session_log (
+      session_id TEXT NOT NULL, seq INTEGER NOT NULL,
+      kind TEXT NOT NULL, payload TEXT NOT NULL,
+      PRIMARY KEY (session_id, seq)
     );
-    CREATE TABLE session_leaf (session_id TEXT PRIMARY KEY, leaf_id TEXT);
   `);
   createAgentProfilesTable(db);
   return db;
@@ -309,7 +313,7 @@ describe('SessionLifecycleService', () => {
     );
   });
 
-  it('resetSdkSession also clears the pi-runtime session tree leaf but keeps entries', () => {
+  it('resetSdkSession also clears the pi-runtime session tree leaf but keeps entries', async () => {
     const service = new SessionLifecycleService(db, {});
     const now = Date.now();
     db.prepare(
@@ -317,25 +321,15 @@ describe('SessionLifecycleService', () => {
     ).run('s1', 'project-1', 'S1', 'sdk-123', 0, now, now);
     // The internal pi-runtime rebuilds its context from the session tree leaf
     // pointer, not from sdk_session_id — reset must clear the leaf too.
-    db.prepare(
-      `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp) VALUES (?,?,?,?,?,?)`
-    ).run('e1', 's1', null, 'message', '{}', '2026-06-21T00:00:00.000Z');
-    db.prepare(`INSERT INTO session_leaf (session_id, leaf_id) VALUES (?, ?)`).run('s1', 'e1');
+    seedEntry(db, 's1', { id: 'e1', parentId: null, type: 'message', message: {} });
+    seedLane(db, 's1', 'e1');
 
     service.resetSdkSession('s1');
 
-    const leaf = db
-      .prepare('SELECT leaf_id AS leafId FROM session_leaf WHERE session_id = ?')
-      .get('s1') as { leafId: string | null } | undefined;
-    expect(leaf?.leafId ?? null).toBeNull();
+    const storage = new SqliteSessionStorage(db, 's1');
+    expect(await storage.getLeafId()).toBeNull();
     // Entries stay (option A: visible chat / transcript history is preserved).
-    expect(
-      (
-        db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as {
-          c: number;
-        }
-      ).c
-    ).toBe(1);
+    expect(await storage.findEntries()).toHaveLength(1);
   });
 
   it('dismisses interrupted status and emits updated side effects', () => {
@@ -413,29 +407,20 @@ describe('SessionLifecycleService', () => {
     );
   });
 
-  it('deleteSession removes the session tree rows (session_entries lack an FK cascade)', () => {
+  it('deleteSession removes the session tree rows (session_log lacks an FK cascade)', () => {
     const service = new SessionLifecycleService(db, {});
     const now = Date.now();
     db.prepare(
       `INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at) VALUES (?,?,?,?,?,?)`
     ).run('s1', 'project-1', 'S1', 0, now, now);
-    db.prepare(
-      `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp) VALUES (?,?,?,?,?,?)`
-    ).run('e1', 's1', null, 'message', '{}', '2026-06-21T00:00:00.000Z');
-    db.prepare(`INSERT INTO session_leaf (session_id, leaf_id) VALUES (?, ?)`).run('s1', 'e1');
+    seedEntry(db, 's1', { id: 'e1', parentId: null, type: 'message', message: {} });
+    seedLane(db, 's1', 'e1');
 
     service.deleteSession('s1');
 
     expect(
       (
-        db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as {
-          c: number;
-        }
-      ).c
-    ).toBe(0);
-    expect(
-      (
-        db.prepare(`SELECT count(*) AS c FROM session_leaf WHERE session_id='s1'`).get() as {
+        db.prepare(`SELECT count(*) AS c FROM session_log WHERE session_id='s1'`).get() as {
           c: number;
         }
       ).c

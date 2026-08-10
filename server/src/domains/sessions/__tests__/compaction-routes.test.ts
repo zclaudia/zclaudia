@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import Database from 'better-sqlite3';
+import {
+  seedEntry,
+  seedLane,
+} from '../../../infra/providers/pi-runtime/session-tree/__tests__/fixture.js';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { newId } from '../../../utils/uuid.js';
 import { createSessionRoutes } from '../routes.js';
@@ -38,16 +42,14 @@ function insertCompactionEntry(
     },
     fromHook: false,
   });
-  db.prepare(
-    `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
-     VALUES (?, ?, ?, 'compaction', ?, ?)`
-  ).run(
-    input.id,
-    sessionId,
-    input.firstKeptEntryId,
-    payload,
-    new Date(input.createdAt).toISOString()
-  );
+  seedEntry(db, sessionId, {
+    id: input.id,
+    parentId: null,
+    type: 'compaction',
+    timestamp: input.createdAt,
+    ...(JSON.parse(payload) as Record<string, unknown>),
+  });
+  seedLane(db, sessionId, input.id);
 }
 
 vi.mock('../../../infra/events/index.js', () => ({

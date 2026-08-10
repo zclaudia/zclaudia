@@ -1,5 +1,10 @@
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
+import {
+  seedEntry,
+  seedLane,
+} from '../../../infra/providers/pi-runtime/session-tree/__tests__/fixture.js';
+import { SqliteSessionStorage } from '../../../infra/providers/pi-runtime/session-tree/sqlite-session-storage.js';
 import { forkSession, ForkError } from '../fork-service.js';
 
 function setup() {
@@ -16,15 +21,11 @@ function setup() {
     `INSERT INTO sessions (id, project_id, name, agent_profile_id, type, working_directory, created_at, updated_at) VALUES ('s','p','Orig','a','regular','/tmp',1,1)`
   ).run();
   const e = (id: string, parent: string | null, msg: unknown) =>
-    db
-      .prepare(
-        `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp) VALUES (?, 's', ?, 'message', ?, ?)`
-      )
-      .run(id, parent, JSON.stringify({ message: msg }), new Date().toISOString());
+    seedEntry(db, 's', { id, parentId: parent, type: 'message', message: msg });
   e('e1', null, { role: 'user', content: 'q1' });
   e('e2', 'e1', { role: 'assistant', content: [{ type: 'text', text: 'a1' }] });
   e('e3', 'e2', { role: 'user', content: 'q2' });
-  db.prepare(`INSERT INTO session_leaf (session_id, leaf_id) VALUES ('s','e3')`).run();
+  seedLane(db, 's', 'e3');
   return db;
 }
 
@@ -44,15 +45,10 @@ it('creates a new session with lineage, copied entries, projection, and leaf', a
   expect(session.name).toBe('Orig (fork)');
   expect(session.workingDirectory).toBe('/tmp');
 
-  const leaf = db
-    .prepare(`SELECT leaf_id AS l FROM session_leaf WHERE session_id=?`)
-    .get(session.id) as { l: string };
-  expect(leaf.l).toBe('e2');
-
-  const entries = db
-    .prepare(`SELECT id FROM session_entries WHERE session_id=? ORDER BY id`)
-    .all(session.id) as Array<{ id: string }>;
-  expect(entries.map(x => x.id).sort()).toEqual(['e1', 'e2']);
+  const forked = new SqliteSessionStorage(db, session.id);
+  expect(await forked.getLeafId()).toBe('e2');
+  const entries = await forked.findEntries({ order: 'oldestFirst' });
+  expect(entries.map(e => e.id)).toEqual(['e1', 'e2']);
 
   const msgs = db
     .prepare(`SELECT content, tree_entry_id AS t FROM messages WHERE session_id=? ORDER BY offset`)

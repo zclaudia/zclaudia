@@ -1,4 +1,8 @@
 import Database from 'better-sqlite3';
+import {
+  seedEntry,
+  seedLane,
+} from '../../../infra/providers/pi-runtime/session-tree/__tests__/fixture.js';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { readActivePathRows, writeProjectedMessages } from '../reproject-messages.js';
 
@@ -9,12 +13,8 @@ function insertEntry(
   parentId: string | null,
   message: unknown
 ) {
-  db.prepare(
-    `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp) VALUES (?, ?, ?, 'message', ?, ?)`
-  ).run(id, sessionId, parentId, JSON.stringify({ message }), new Date().toISOString());
-  db.prepare(
-    `INSERT INTO session_leaf (session_id, leaf_id) VALUES (?, ?) ON CONFLICT(session_id) DO UPDATE SET leaf_id = excluded.leaf_id`
-  ).run(sessionId, id);
+  seedEntry(db, sessionId, { id, parentId, type: 'message', message });
+  seedLane(db, sessionId, id);
 }
 
 async function reproject(db: Database.Database, sessionId: string) {
