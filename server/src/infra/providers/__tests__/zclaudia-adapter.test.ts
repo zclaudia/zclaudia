@@ -24,9 +24,13 @@ vi.mock('../pi-runtime/sandbox.js', () => ({
 // existing assertions about contextWindow=200_000 still hold; getProviders
 // returns the known providers so cross-provider sweep can iterate; getModels
 // returns the entry only when the provider+id pair would have hit getModel.
-vi.mock('@earendil-works/pi-ai', async () => {
+// The runtime reads the model catalog and the stream helpers from the compat
+// entry point, so that is the module this has to stand in for.
+vi.mock('@earendil-works/pi-ai/compat', async () => {
   const actual =
-    await vi.importActual<typeof import('@earendil-works/pi-ai')>('@earendil-works/pi-ai');
+    await vi.importActual<typeof import('@earendil-works/pi-ai/compat')>(
+      '@earendil-works/pi-ai/compat'
+    );
   const KNOWN_PROVIDERS = ['anthropic', 'openai', 'deepseek'];
   function buildEntry(provider: string, model: string) {
     return {
@@ -97,10 +101,10 @@ const { mockAgentInstances, scriptQueue, mockSessionContextQueue, mockSessionErr
       rejectWith?: Error;
       waitForPromise?: Promise<void>;
     }>,
-    // Queue of AgentMessage[] arrays for MockSession.buildContext() to return.
-    // Each entry is consumed once. If empty, buildContext returns { messages: [] }.
+    // Queue of AgentMessage[] arrays the mocked branch read returns.
+    // Each entry is consumed once; empty means an empty branch.
     mockSessionContextQueue: [] as AgentMessage[][],
-    // Queue of errors for MockSession.buildContext() to throw.
+    // Queue of errors for the mocked branch read to throw.
     // Each entry is consumed once before checking mockSessionContextQueue.
     mockSessionErrorQueue: [] as Error[],
   }));
@@ -152,17 +156,30 @@ vi.mock('@earendil-works/pi-agent-core', () => {
     }
   }
 
+  // 0.84 split context assembly off Session: the adapter reads the branch from
+  // the session and hands it to the free `buildSessionContext`. The queued
+  // messages ride on the branch so the stand-in for that function can hand them
+  // straight back.
   class MockSession {
     constructor(_storage: any) {}
-    async buildContext() {
+    async findEntriesOnBranch() {
       const err = mockSessionErrorQueue.shift();
       if (err) throw err;
-      const messages = mockSessionContextQueue.shift() ?? [];
-      return { messages, thinkingLevel: 'none', model: null, activeToolNames: null };
+      return mockSessionContextQueue.shift() ?? [];
     }
   }
 
-  return { Agent: MockAgent, Session: MockSession, convertToLlm: vi.fn() };
+  return {
+    Agent: MockAgent,
+    Session: MockSession,
+    buildSessionContext: (messages: unknown[]) => ({
+      messages,
+      thinkingLevel: 'none',
+      model: null,
+      activeToolNames: null,
+    }),
+    convertToLlm: vi.fn(),
+  };
 });
 
 // Helper to enqueue the script that the next `new Agent()` will play back.
@@ -732,8 +749,8 @@ describe('PiAgentProviderAdapter.run', () => {
     });
   });
 
-  it('loads history from session tree (buildContext) and passes it to Agent initialState', async () => {
-    // Seed MockSession.buildContext() to return two history messages + the current
+  it('loads history from the session tree and passes it to Agent initialState', async () => {
+    // Seed the mocked branch read with two history messages + the current
     // user turn (which the adapter pops before passing to the Agent).
     mockSessionContextQueue.push([
       { role: 'user', content: 'prev question' } as AgentMessage,
@@ -801,7 +818,7 @@ describe('PiAgentProviderAdapter.run', () => {
   });
 
   it('history load failure: yields non-terminal error then continues with empty history', async () => {
-    // Simulate buildContext() throwing (e.g. DB error). MockSession checks
+    // Simulate the branch read throwing (e.g. DB error). MockSession checks
     // mockSessionErrorQueue first; if non-empty it throws instead of returning messages.
     mockSessionErrorQueue.push(new Error('disk error'));
 
@@ -1777,7 +1794,7 @@ describe('prompt cache wiring', () => {
 
     const opts = mockAgentInstances[0].constructorOpts;
     expect(typeof opts.streamFn).toBe('function');
-    const { streamSimple } = await import('@earendil-works/pi-ai');
+    const { streamSimple } = await import('@earendil-works/pi-ai/compat');
     opts.streamFn({ id: 'm' }, { messages: [] }, { temperature: 0 });
     expect(vi.mocked(streamSimple)).toHaveBeenCalledWith(
       { id: 'm' },
@@ -1802,7 +1819,7 @@ describe('prompt cache wiring', () => {
 
     // streamFn is now always set (retry wrapper is unconditional).
     expect(typeof mockAgentInstances[0].constructorOpts.streamFn).toBe('function');
-    const { streamSimple } = await import('@earendil-works/pi-ai');
+    const { streamSimple } = await import('@earendil-works/pi-ai/compat');
     mockAgentInstances[0].constructorOpts.streamFn(
       { id: 'm' },
       { messages: [] },
@@ -1845,7 +1862,7 @@ describe('prompt cache wiring', () => {
 
     const opts = mockAgentInstances[0].constructorOpts;
     expect(typeof opts.streamFn).toBe('function');
-    const { streamSimple } = await import('@earendil-works/pi-ai');
+    const { streamSimple } = await import('@earendil-works/pi-ai/compat');
     opts.streamFn({ id: 'm' }, { messages: [] }, { temperature: 0 });
     expect(vi.mocked(streamSimple)).toHaveBeenCalledWith(
       { id: 'm' },
@@ -1901,7 +1918,7 @@ describe('stream retry wiring', () => {
     });
 
     const opts = mockAgentInstances[0].constructorOpts;
-    const { streamSimple } = await import('@earendil-works/pi-ai');
+    const { streamSimple } = await import('@earendil-works/pi-ai/compat');
     opts.streamFn({ id: 'm' }, { messages: [] }, { temperature: 0 });
     await vi.waitFor(() => {
       expect(vi.mocked(streamSimple)).toHaveBeenCalledWith(
@@ -1927,7 +1944,7 @@ describe('stream retry wiring', () => {
     });
 
     const opts = mockAgentInstances[0].constructorOpts;
-    const { streamSimple } = await import('@earendil-works/pi-ai');
+    const { streamSimple } = await import('@earendil-works/pi-ai/compat');
     vi.mocked(streamSimple).mockClear();
     opts.streamFn({ id: 'm' }, { messages: [] }, { temperature: 0 });
     await vi.waitFor(() => {
@@ -1955,7 +1972,7 @@ describe('stream retry wiring', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
 
     const { createAssistantMessageEventStream, streamSimple } =
-      await import('@earendil-works/pi-ai');
+      await import('@earendil-works/pi-ai/compat');
 
     // First streamSimple call: fire onResponse(429) then push an error event.
     vi.mocked(streamSimple).mockImplementationOnce((_model, _ctx, opts) => {
@@ -2055,7 +2072,7 @@ describe('vision gating', () => {
 
   it('degrades images to text notices for non-vision models', async () => {
     // Override getModel to return a text-only entry for this run
-    const piAi = await import('@earendil-works/pi-ai');
+    const piAi = await import('@earendil-works/pi-ai/compat');
     vi.mocked(piAi.getModel).mockImplementationOnce((provider: string, model: string) => {
       if (provider === 'unknown') throw new Error(`unknown provider: ${provider}`);
       return {
