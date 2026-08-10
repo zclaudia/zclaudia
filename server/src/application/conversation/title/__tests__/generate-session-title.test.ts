@@ -3,7 +3,7 @@ import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { generateSessionTitle } from '../generate-session-title.js';
 import { buildModel } from '../../../../infra/providers/pi-runtime/build-model.js';
-import { completeSimple } from '@earendil-works/pi-ai';
+import { completeSimple } from '@earendil-works/pi-ai/compat';
 
 // Mock the model build + LLM call — this test exercises the wiring from the
 // profile config into buildModel, not the title text itself. modelEntryFor
@@ -24,7 +24,7 @@ vi.mock('../../../../infra/providers/pi-runtime/build-model.js', async importOri
     },
   })),
 }));
-vi.mock('@earendil-works/pi-ai', () => ({
+vi.mock('@earendil-works/pi-ai/compat', () => ({
   completeSimple: vi.fn(async () => ({
     content: [{ type: 'text', text: 'Project Overview' }],
   })),

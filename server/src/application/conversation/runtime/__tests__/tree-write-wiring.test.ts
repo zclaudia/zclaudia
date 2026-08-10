@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
-import { Session } from '@earendil-works/pi-agent-core';
+import { Session, buildSessionContext} from '@earendil-works/pi-agent-core';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { SqliteSessionStorage } from '../../../../infra/providers/pi-runtime/session-tree/sqlite-session-storage.js';
 import { upsertAssistantMessage } from '../run-lifecycle.js';
@@ -35,18 +35,20 @@ describe('Route C tree write wiring (assistant final save)', () => {
     const db = makeDb();
     const run = fakeRun(db);
     upsertAssistantMessage(run, { indexMetadata: true });
-    const ctx = await new Session(new SqliteSessionStorage(db, 's1')).buildContext();
+    const ctx = buildSessionContext(
+      await new SqliteSessionStorage(db, 's1').getActivePath()
+    );
     expect(ctx.messages.map((m: any) => m.role)).toEqual(['assistant']);
     expect((ctx.messages[0] as any).content.find((b: any) => b.type === 'text').text).toBe(
       'hello world'
     );
 
-    // The assistant messages row must be back-linked to its session_entries id.
+    // The assistant messages row must be back-linked to its tree entry id.
     const msgRow = db.prepare('SELECT tree_entry_id FROM messages WHERE id = ?').get('a1') as {
       tree_entry_id: string | null;
     };
     const entryRow = db
-      .prepare('SELECT id FROM session_entries WHERE session_id = ? AND type = ?')
+      .prepare("SELECT json_extract(payload, '$.entry.id') AS id FROM session_log WHERE session_id = ? AND json_extract(payload, '$.entry.type') = ?")
       .get('s1', 'message') as { id: string } | undefined;
     expect(msgRow.tree_entry_id).toBeTruthy();
     expect(msgRow.tree_entry_id).toBe(entryRow?.id);
@@ -57,7 +59,7 @@ describe('Route C tree write wiring (assistant final save)', () => {
     const run = fakeRun(db);
     upsertAssistantMessage(run, { indexMetadata: true });
     upsertAssistantMessage(run, { indexMetadata: true });
-    const entries = await new SqliteSessionStorage(db, 's1').getEntries();
+    const entries = await new SqliteSessionStorage(db, 's1').findEntries({ order: 'oldestFirst' });
     const assistantEntries = entries.filter((e: any) => e.type === 'message');
     expect(assistantEntries).toHaveLength(1);
   });
@@ -66,7 +68,7 @@ describe('Route C tree write wiring (assistant final save)', () => {
     const db = makeDb();
     const run = fakeRun(db);
     upsertAssistantMessage(run, {}); // no indexMetadata
-    const entries = await new SqliteSessionStorage(db, 's1').getEntries();
+    const entries = await new SqliteSessionStorage(db, 's1').findEntries({ order: 'oldestFirst' });
     expect(entries).toHaveLength(0);
   });
 });

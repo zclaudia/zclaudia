@@ -1,38 +1,41 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import Database from 'better-sqlite3';
-import { Session } from '@earendil-works/pi-agent-core';
-import { migration } from '../../../../infra/storage/migrations/021_session_entries.js';
+import type Database from 'better-sqlite3';
+import { Session, buildSessionContext, type CompactionEntry } from '@earendil-works/pi-agent-core';
 import { SqliteSessionStorage } from '../../../../infra/providers/pi-runtime/session-tree/index.js';
+import { makeSessionDb } from '../../../../infra/providers/pi-runtime/session-tree/__tests__/fixture.js';
 import { appendCompactionToTree } from '../compaction-service.js';
 
-function makeDb(): Database.Database {
-  const db = new Database(':memory:');
-  db.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, created_at INTEGER NOT NULL);`);
-  db.exec(`INSERT INTO sessions (id, created_at) VALUES ('s1', 1);`);
-  db.exec(migration.sql);
-  return db;
-}
+const DETAILS = {
+  source: 'auto' as const,
+  customInstructions: null,
+  readFiles: [] as string[],
+  modifiedFiles: [] as string[],
+};
 
 describe('appendCompactionToTree', () => {
   let db: Database.Database;
   beforeEach(() => {
-    db = makeDb();
+    db = makeSessionDb();
   });
 
-  it('writes a compaction entry that buildContext honors as a boundary', async () => {
-    const session = new Session(new SqliteSessionStorage(db, 's1'));
+  it('writes a compaction entry that context assembly honors as a boundary', async () => {
+    const storage = new SqliteSessionStorage(db, 's1');
+    const session = new Session(storage);
     await session.appendMessage({ role: 'user', content: 'old' } as never);
-    const keep = await session.appendMessage({ role: 'user', content: 'keep' } as never);
+    const keep = { role: 'user', content: 'keep' };
+    await session.appendMessage(keep as never);
 
+    // 0.84 keeps the surviving messages on the entry rather than naming the
+    // first entry to keep, so the retained tail is what carries them across.
     const id = await appendCompactionToTree(session, {
       summary: 'SUM',
-      firstKeptEntryId: keep,
+      retainedTail: [keep as never],
       tokensBefore: 99,
-      details: { source: 'auto', customInstructions: null, readFiles: [], modifiedFiles: [] },
+      details: DETAILS,
     });
     expect(id).toBeTruthy();
 
-    const ctx = await session.buildContext();
+    const ctx = buildSessionContext(await storage.getActivePath());
     // The boundary is materialized as a synthetic `compactionSummary` message
     // (carrying `summary`) followed by the kept tail of real messages.
     const summaryMsgs = ctx.messages.filter(
@@ -44,12 +47,14 @@ describe('appendCompactionToTree', () => {
     expect(contents).toContain('keep');
   });
 
-  it('persists rich details under the entry payload for the timeline reader', async () => {
-    const session = new Session(new SqliteSessionStorage(db, 's1'));
-    const keep = await session.appendMessage({ role: 'user', content: 'keep' } as never);
+  it('persists rich details on the entry for the timeline reader', async () => {
+    const storage = new SqliteSessionStorage(db, 's1');
+    const session = new Session(storage);
+    const keep = { role: 'user', content: 'keep' };
+    await session.appendMessage(keep as never);
     const id = await appendCompactionToTree(session, {
       summary: 'SUM',
-      firstKeptEntryId: keep,
+      retainedTail: [keep as never],
       tokensBefore: 1234,
       details: {
         source: 'manual',
@@ -59,14 +64,12 @@ describe('appendCompactionToTree', () => {
       },
     });
 
-    const row = db
-      .prepare(`SELECT payload FROM session_entries WHERE id = ? AND type = 'compaction'`)
-      .get(id) as { payload: string };
-    const payload = JSON.parse(row.payload);
-    expect(payload.summary).toBe('SUM');
-    expect(payload.firstKeptEntryId).toBe(keep);
-    expect(payload.tokensBefore).toBe(1234);
-    expect(payload.details).toMatchObject({
+    const entry = (await storage.getEntry(id)) as CompactionEntry | undefined;
+    expect(entry?.type).toBe('compaction');
+    expect(entry?.summary).toBe('SUM');
+    expect(entry?.tokensBefore).toBe(1234);
+    expect(entry?.retainedTail).toHaveLength(1);
+    expect(entry?.details).toMatchObject({
       source: 'manual',
       customInstructions: 'focus on auth',
       readFiles: ['a.ts'],

@@ -8,6 +8,7 @@ import {
   type SessionCompaction,
 } from '../../../../domains/sessions/compaction-tree-read.js';
 import { appendMessagesToTree } from '../../../../infra/providers/pi-runtime/session-tree/write-path.js';
+import { SqliteSessionStorage } from '../../../../infra/providers/pi-runtime/session-tree/sqlite-session-storage.js';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import {
   maybeCompact,
@@ -19,8 +20,11 @@ import { compactionCircuitBreaker } from '../circuit-breaker.js';
 import * as pi from '@earendil-works/pi-agent-core';
 
 /** Latest compaction (tree is the source of truth; entries are oldest-first). */
-function latestCompaction(db: Database.Database, sessionId: string): SessionCompaction | null {
-  const all = listCompactions(db, sessionId);
+async function latestCompaction(
+  db: Database.Database,
+  sessionId: string
+): Promise<SessionCompaction | null> {
+  const all = await listCompactions(db, sessionId);
   return all.length ? all[all.length - 1] : null;
 }
 
@@ -150,7 +154,7 @@ describe('compaction-service', () => {
     });
     expect(result.compacted).toBe(true);
     expect(result.compactionId).toBeTruthy();
-    const created = latestCompaction(db, 's1')!;
+    const created = (await latestCompaction(db, 's1'))!;
     expect(created.summary).toBe('MOCKED-SUMMARY');
     expect(created.source).toBe('auto');
   });
@@ -168,7 +172,7 @@ describe('compaction-service', () => {
       customInstructions: 'focus on auth',
     });
     expect(result.compacted).toBe(true);
-    const created = latestCompaction(db, 's1')!;
+    const created = (await latestCompaction(db, 's1'))!;
     expect(created.source).toBe('manual');
     expect(created.customInstructions).toBe('focus on auth');
   });
@@ -321,13 +325,14 @@ describe('compaction-service', () => {
       source: 'manual',
     });
     expect(result.compacted).toBe(true);
-    const created = latestCompaction(db, 's1')!;
-    // firstKeptMessageId is now a tree entry id — assert it resolves to a real message entry.
-    expect(created.firstKeptMessageId).toBeTruthy();
-    const entry = db
-      .prepare(`SELECT type FROM session_entries WHERE session_id = 's1' AND id = ?`)
-      .get(created.firstKeptMessageId) as { type: string } | undefined;
-    expect(entry?.type).toBe('message');
+    const created = (await latestCompaction(db, 's1'))!;
+    // 0.84 stores the surviving messages on the entry rather than naming a
+    // boundary entry, so what has to be true is that the tail is non-empty and
+    // the entry is really in the tree.
+    expect(created.id).toBeTruthy();
+    const entry = await new SqliteSessionStorage(db, 's1').getEntry(created.id);
+    expect(entry?.type).toBe('compaction');
+    expect((entry as { retainedTail?: unknown[] }).retainedTail?.length).toBeGreaterThan(0);
   });
 });
 
@@ -502,7 +507,7 @@ describe('compactForOverflow', () => {
     });
     expect(result.outcome).toBe('compacted');
     expect(result.compacted).toBe(true);
-    const created = latestCompaction(db, 's1')!;
+    const created = (await latestCompaction(db, 's1'))!;
     expect(created.source).toBe('overflow');
   });
 
