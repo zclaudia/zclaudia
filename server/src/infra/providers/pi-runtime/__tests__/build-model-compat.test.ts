@@ -99,9 +99,12 @@ describe('buildModel — model dialect', () => {
     // same-provider hit means Auto mode has nothing to infer — the profile's
     // own providerType covers the id, so no other allowlisted registration
     // (here 'openai') may stamp a dialect.
-    const { model } = buildModel(proxyProfile({ providerType: 'openai-codex' }), 'gpt-5.5');
+    const profile = proxyProfile({ providerType: 'openai-codex' });
+    const { model } = buildModel(profile, 'gpt-5.5');
     expect((model as any).dialect).toBeUndefined();
-    expect(model.provider).toBe('openai-codex');
+    // No dialect was stamped, so `provider` is left to the registry: an OAuth
+    // profile keys on its own id (models-registry.ts).
+    expect(model.provider).toBe(profile.id);
   });
 
   it('does not inherit registry providers outside the dialect allowlist', () => {

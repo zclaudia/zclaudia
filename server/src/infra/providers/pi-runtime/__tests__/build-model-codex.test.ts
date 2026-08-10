@@ -31,9 +31,14 @@ describe('buildModel — openai-codex', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('maps to openai-codex-responses API', () => {
-    const { model } = buildModel(makeCodexProfile(), 'gpt-5-codex');
+    const profile = makeCodexProfile();
+    const { model } = buildModel(profile, 'gpt-5-codex');
     expect(model.api).toBe('openai-codex-responses');
-    expect(model.provider).toBe('openai-codex');
+    // An OAuth profile registers with the Models registry under its own id, and
+    // `model.provider` is how the registry is keyed — so it carries the profile
+    // id, not the provider type. Safe here because the codex wire only reads
+    // the field for error text. See models-registry.ts.
+    expect(model.provider).toBe(profile.id);
   });
 
   it('does NOT override baseUrl with OPENAI_BASE_URL env', () => {

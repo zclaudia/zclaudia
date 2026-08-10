@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { streamSimple } from '@earendil-works/pi-ai';
+import { modelsFor } from '../models-registry.js';
 import { buildModel } from '../build-model.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 
 /**
  * Capture the provider payload via onPayload, then throw a sentinel to stop
- * the request BEFORE any network I/O (pi-ai awaits onPayload pre-send in both
- * the anthropic and openai-completions providers).
+ * the request BEFORE any network I/O (pi awaits onPayload pre-send in both the
+ * anthropic and openai-completions providers).
+ *
+ * 0.84 removed the free `streamSimple`: streaming is a `Models` method now, and
+ * auth comes from the provider registration rather than a per-call apiKey.
  */
 const SENTINEL = new Error('payload captured — abort before network');
 
@@ -25,13 +28,19 @@ async function capturePayload(
 ): Promise<Record<string, unknown>> {
   let captured: Record<string, unknown> | undefined;
   try {
-    const stream = streamSimple(model, context as never, {
+    const stream = modelsFor(model, {
+      id: `payload-${model.provider}`,
+      name: 'payload-test',
+      providerType: 'anthropic',
       apiKey: 'test-key',
+      createdAt: 1,
+      updatedAt: 1,
+    } as LlmProfileConfig).streamSimple(model, context as never, {
       onPayload: (payload: unknown) => {
         captured = payload as Record<string, unknown>;
         throw SENTINEL;
       },
-    });
+    } as never);
 
     for await (const _event of stream) {
       /* drain until error */

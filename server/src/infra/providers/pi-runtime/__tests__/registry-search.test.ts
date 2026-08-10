@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // Mock pi-ai's registry so we can exercise hit/miss paths deterministically.
-vi.mock('@earendil-works/pi-ai', () => {
+// The path has to match what registry-search imports: the generated catalog
+// reads still live on the compat entry point in 0.84.
+vi.mock('@earendil-works/pi-ai/compat', () => {
   const providers: Record<
     string,
     Array<{ id: string; contextWindow?: number; provider?: string }>
