@@ -176,8 +176,8 @@ describe('handleRunSteer — persistence', () => {
             stmts.push({ sql, args });
             return { next: 5 };
           }
-          // session_leaf leaf read inside appendMessagesToTree.
-          if (sql.includes('FROM session_leaf')) {
+          // Lane leaf read inside appendMessagesToTree.
+          if (sql.includes('FROM session_log')) {
             stmts.push({ sql, args });
             return undefined;
           }
@@ -251,8 +251,8 @@ describe('handleRunSteer — persistence', () => {
     // later history-sync dedup lands on the same row instead of a duplicate.
     expect(id).toBe(`steer-r1-${createdAt}`);
 
-    // session-tree was appended (session_entries write + leaf advance).
-    const treeWrite = db.__stmts.find(s => s.sql.includes('INSERT INTO session_entries'));
+    // session-tree was appended (a log mutation carrying the entry).
+    const treeWrite = db.__stmts.find(s => s.sql.includes('INSERT INTO session_log'));
     expect(treeWrite).toBeTruthy();
 
     // messages row back-linked to the tree entry.
