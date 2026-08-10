@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
+import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { buildSkillRuntimeState, initializeRunBootstrap } from '../run-bootstrap.js';
 import { createAgentProfilesTable } from '../../../../test-helpers/seed-default-agent.js';
 
@@ -8,7 +9,6 @@ interface CreateDbOptions {
   profileIsDefault?: boolean;
   apiKey?: string | null;
   baseUrl?: string | null;
-  env?: string | null;
   /** llm_profile_id stored on the agent profile. `null` ⇒ agent has no llm_profile_id (forces default fallback). */
   agentLlmProfileId?: string | null;
   /** Override fields on the seeded agent profile. */
@@ -26,81 +26,12 @@ interface CreateDbOptions {
 
 function createDb(providerType: string, options: CreateDbOptions = {}): Database.Database {
   const db = new Database(':memory:');
-  db.exec(`
-    CREATE TABLE llm_profiles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      provider_type TEXT NOT NULL DEFAULT 'anthropic',
-      base_url TEXT,
-      api_key TEXT,
-      compat TEXT,
-      env TEXT,
-      is_default INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE projects (
-      id TEXT PRIMARY KEY,
-      llm_profile_id TEXT,
-      root_path TEXT,
-      system_prompt TEXT
-    );
-
-    CREATE TABLE sessions (
-      id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL,
-      name TEXT,
-      sdk_session_id TEXT,
-      type TEXT,
-      working_directory TEXT,
-      project_role TEXT,
-      plan_status TEXT,
-      task_id TEXT,
-      agent_profile_id TEXT,
-      last_run_status TEXT,
-      created_at INTEGER,
-      updated_at INTEGER
-    );
-
-    CREATE TABLE messages (
-      id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      metadata TEXT,
-      created_at INTEGER NOT NULL,
-      offset INTEGER,
-      tree_entry_id TEXT
-    );
-
-    CREATE TABLE permission_memories (
-      session_id TEXT,
-      remember_key TEXT,
-      decision TEXT
-    );
-
-    CREATE TABLE permission_outside_workspace_roots (
-      project_id TEXT,
-      allowed_root TEXT
-    );
-
-    CREATE TABLE session_entries (
-      id          TEXT NOT NULL,
-      session_id  TEXT NOT NULL,
-      parent_id   TEXT,
-      type        TEXT NOT NULL,
-      payload     TEXT NOT NULL,
-      timestamp   TEXT NOT NULL,
-      PRIMARY KEY (session_id, id)
-    );
-
-    CREATE TABLE session_leaf (
-      session_id  TEXT PRIMARY KEY,
-      leaf_id     TEXT
-    );
-  `);
-  createAgentProfilesTable(db);
+  applyMigrations(db);
+  // Migrations leave `foreign_keys` ON. Two tests deliberately seed a stale
+  // agent/llm id to exercise the runtime's fallback — a row the constraints
+  // would now reject, but which a database predating them can still hold. The
+  // fallback is defensive code for exactly that, so the seeding opts out.
+  db.pragma('foreign_keys = OFF');
 
   const now = Date.now();
   const insertProfile = options.insertProfile !== false;
@@ -114,15 +45,14 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
   if (insertProfile) {
     db.prepare(
       `
-      INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, env, is_default, created_at, updated_at)
-      VALUES ('provider-1', ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, is_default, created_at, updated_at)
+      VALUES ('provider-1', ?, ?, ?, ?, ?, ?, ?)
     `
     ).run(
       providerType,
       providerType,
       options.baseUrl ?? null,
       options.apiKey ?? null,
-      options.env ?? null,
       options.profileIsDefault ? 1 : 0,
       now,
       now
@@ -131,8 +61,8 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
 
   db.prepare(
     `
-    INSERT INTO projects (id, llm_profile_id, root_path, system_prompt)
-    VALUES ('project-1', NULL, '/tmp/project', NULL)
+    INSERT INTO projects (id, name, root_path, system_prompt, created_at, updated_at)
+    VALUES ('project-1', 'Test Project', '/tmp/project', NULL, 1, 1)
   `
   ).run();
 
@@ -675,7 +605,7 @@ describe('initializeRunBootstrap message INSERT — parsed text + metadata', () 
 });
 
 describe('initializeRunBootstrap dual-write — messages.tree_entry_id', () => {
-  it('populates tree_entry_id on the user messages row to match the session_entries id', () => {
+  it('populates tree_entry_id on the user messages row to match the tree entry id', () => {
     const { result, db } = bootstrapWithDb('zclaudia', 'default', 'hello world');
     expect(result?.userMessageId).toBeDefined();
 
@@ -685,7 +615,9 @@ describe('initializeRunBootstrap dual-write — messages.tree_entry_id', () => {
 
     const entry = db
       .prepare(
-        `SELECT id FROM session_entries WHERE session_id = ? AND type = 'message' ORDER BY rowid ASC LIMIT 1`
+        `SELECT json_extract(payload, '$.entry.id') AS id FROM session_log
+         WHERE session_id = ? AND json_extract(payload, '$.entry.type') = 'message'
+         ORDER BY seq ASC LIMIT 1`
       )
       .get('session-1') as { id: string } | undefined;
 

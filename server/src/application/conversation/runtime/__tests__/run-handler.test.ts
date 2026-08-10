@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
+import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { createAgentProfilesTable } from '../../../../test-helpers/seed-default-agent.js';
 
 const sendMessageMock = vi.fn();
@@ -29,6 +30,9 @@ vi.mock('../run-lifecycle.js', () => ({
   upsertAssistantMessage: upsertAssistantMessageMock,
   findProcessPidsByTaskCommand: findProcessPidsByTaskCommandMock,
   cleanupPendingPermissions: cleanupPendingPermissionsMock,
+  // Real export the module gained; the partial mock has to carry it or the
+  // handler's save path throws mid-run.
+  getSessionMessageVersion: () => 1,
 }));
 
 vi.mock('../../../../application/plugins/skill-tools.js', () => ({
@@ -111,97 +115,9 @@ vi.mock('../../../../infra/storage/fileStore.js', () => ({
 
 function createDb(): Database.Database {
   const db = new Database(':memory:');
-  db.exec(`
-    CREATE TABLE llm_profiles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      provider_type TEXT NOT NULL DEFAULT 'anthropic',
-      base_url TEXT,
-      api_key TEXT,
-      compat TEXT,
-      env TEXT,
-      is_default INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE projects (
-      id TEXT PRIMARY KEY,
-      llm_profile_id TEXT,
-      root_path TEXT,
-      system_prompt TEXT,
-      hooks_override TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS agent_config (
-      id INTEGER PRIMARY KEY,
-      hooks TEXT
-    );
-
-    CREATE TABLE sessions (
-      id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL,
-      name TEXT,
-      created_at INTEGER,
-      sdk_session_id TEXT,
-      type TEXT,
-      parent_session_id TEXT,
-      working_directory TEXT,
-      project_role TEXT,
-      plan_status TEXT,
-      task_id TEXT,
-      agent_profile_id TEXT,
-      system_prompt TEXT,
-      is_read_only INTEGER,
-      last_run_status TEXT,
-      updated_at INTEGER,
-      archived_at INTEGER,
-      forked_from_session_id TEXT,
-      fork_entry_id TEXT
-    );
-
-    CREATE TABLE messages (
-      id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      metadata TEXT,
-      created_at INTEGER NOT NULL,
-      offset INTEGER,
-      tree_entry_id TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS permission_memories (
-      id INTEGER PRIMARY KEY,
-      session_id TEXT,
-      remember_key TEXT,
-      decision TEXT,
-      created_at INTEGER
-    );
-
-    CREATE TABLE IF NOT EXISTS permission_outside_workspace_roots (
-      id INTEGER PRIMARY KEY,
-      project_id TEXT,
-      allowed_root TEXT,
-      created_at INTEGER
-    );
-
-    -- Session tree (Route C): the run lifecycle dual-writes message entries here.
-    CREATE TABLE IF NOT EXISTS session_entries (
-      id          TEXT NOT NULL,
-      session_id  TEXT NOT NULL,
-      parent_id   TEXT,
-      type        TEXT NOT NULL,
-      payload     TEXT NOT NULL,
-      timestamp   TEXT NOT NULL,
-      PRIMARY KEY (session_id, id)
-    );
-    CREATE TABLE IF NOT EXISTS session_leaf (
-      session_id  TEXT PRIMARY KEY,
-      leaf_id     TEXT
-    );
-  `);
-  createAgentProfilesTable(db);
+  applyMigrations(db);
+  // Migrations leave `foreign_keys` ON; the seeds here reference ids loosely.
+  db.pragma('foreign_keys = OFF');
   const agentProfileColumns = db.prepare(`PRAGMA table_info(agent_profiles)`).all() as Array<{
     name: string;
   }>;
@@ -219,8 +135,8 @@ function createDb(): Database.Database {
 
   db.prepare(
     `
-    INSERT INTO projects (id, llm_profile_id, root_path, system_prompt)
-    VALUES ('project-1', 'provider-1', '/tmp', 'project system prompt')
+    INSERT INTO projects (id, name, root_path, system_prompt, created_at, updated_at)
+    VALUES ('project-1', 'Test Project', '/tmp', 'project system prompt', 1, 1)
   `
   ).run();
 
@@ -228,10 +144,10 @@ function createDb(): Database.Database {
     `
     INSERT INTO agent_profiles (
       id, name, llm_profile_id, model, system_prompt, enabled_tools,
-      is_default, created_at, updated_at
+      runtime_type, is_default, created_at, updated_at
     )
     VALUES ('agent-1', 'Test Agent', 'provider-1', 'claude-sonnet-4-6', 'agent system prompt',
-      '["read","write","edit","bash","grep","find","ls"]', 1, ?, ?)
+      '["read","write","edit","bash","grep","find","ls"]', 'zclaudia', 1, ?, ?)
   `
   ).run(now, now);
 
@@ -250,9 +166,9 @@ function insertSession(
     `
     INSERT INTO sessions (
       id, project_id, name, sdk_session_id, type, parent_session_id, working_directory, project_role,
-      plan_status, task_id, agent_profile_id, system_prompt, is_read_only, last_run_status, created_at, updated_at, archived_at
+      plan_status, task_id, agent_profile_id, is_read_only, last_run_status, created_at, updated_at, archived_at
     )
-    VALUES (?, 'project-1', 'Test Session', NULL, ?, NULL, NULL, NULL, NULL, NULL, 'agent-1', NULL, NULL, NULL, ?, ?, NULL)
+    VALUES (?, 'project-1', 'Test Session', NULL, ?, NULL, NULL, NULL, NULL, NULL, 'agent-1', NULL, NULL, ?, ?, NULL)
   `
   ).run(values.id, values.type, Date.now(), Date.now());
 
@@ -329,9 +245,13 @@ describe('ws/run-handler', () => {
       runtimeType: 'claude' | 'zclaudia' | null
     ) => {
       const db = createDb();
-      db.prepare(`UPDATE agent_profiles SET runtime_type = ? WHERE id = 'agent-1'`).run(
-        runtimeType
-      );
+      // `runtime_type` is NOT NULL DEFAULT 'zclaudia', so "unset" means the
+      // column default — a NULL row is not a state the schema can hold.
+      if (runtimeType !== null) {
+        db.prepare(`UPDATE agent_profiles SET runtime_type = ? WHERE id = 'agent-1'`).run(
+          runtimeType
+        );
+      }
       insertSession(db, { id: sessionId, type: 'regular' });
 
       mockProviderRegistry.get.mockClear();
@@ -361,6 +281,7 @@ describe('ws/run-handler', () => {
     expect(mockProviderRegistry.get).toHaveBeenCalledWith('claude');
     expect(mockProviderRegistry.get).not.toHaveBeenCalledWith('anthropic');
 
+    // Left at the column default.
     await runWithRuntimeType('session-default-runtime', null);
     expect(mockProviderRegistry.get).toHaveBeenCalledWith('zclaudia');
 

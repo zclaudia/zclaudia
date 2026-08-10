@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vites
 import express from 'express';
 import request from 'supertest';
 import Database from 'better-sqlite3';
+import { applyMigrations } from '../../../infra/storage/migrations/index.js';
+import {
+  seedEntry,
+  seedLane,
+} from '../../../infra/providers/pi-runtime/session-tree/__tests__/fixture.js';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { createSessionRoutes } from '../../../domains/sessions/routes.js';
@@ -28,86 +33,9 @@ let mockBroadcastSessionEvent: ReturnType<typeof vi.fn>;
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
 
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS projects (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      type TEXT CHECK(type IN ('chat_only', 'code')) DEFAULT 'code',
-      llm_profile_id TEXT,
-      root_path TEXT,
-      agent TEXT,
-      context_sync_status TEXT NOT NULL DEFAULT 'synced',
-      review_llm_profile_id TEXT,
-      is_internal INTEGER NOT NULL DEFAULT 0,
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL,
-      name TEXT,
-      agent_profile_id TEXT,
-      sdk_session_id TEXT,
-      type TEXT DEFAULT 'regular',
-      parent_session_id TEXT,
-      archived_at INTEGER,
-      working_directory TEXT,
-      project_role TEXT,
-      task_id TEXT,
-      plan_status TEXT,
-      is_read_only INTEGER DEFAULT 0,
-      last_run_status TEXT,
-      forked_from_session_id TEXT,
-      fork_entry_id TEXT,
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      message_version INTEGER NOT NULL DEFAULT 0,
-      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS messages (
-      id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL,
-      role TEXT CHECK(role IN ('user', 'assistant', 'system')) NOT NULL,
-      content TEXT NOT NULL,
-      metadata TEXT,
-      created_at INTEGER NOT NULL,
-      offset INTEGER,
-      tree_entry_id TEXT,
-      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
-    );
-    CREATE INDEX IF NOT EXISTS idx_messages_session_offset ON messages(session_id, offset);
-
-    CREATE TABLE IF NOT EXISTS search_history (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL DEFAULT 'default',
-      query TEXT NOT NULL,
-      result_count INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL
-    );
-
-    -- The session tree (Route C) is consulted by GET /:id/messages to interleave
-    -- compaction markers (native CompactionEntry nodes). Create the tables empty
-    -- so the marker query is a no-op.
-    CREATE TABLE IF NOT EXISTS session_entries (
-      id          TEXT NOT NULL,
-      session_id  TEXT NOT NULL,
-      parent_id   TEXT,
-      type        TEXT NOT NULL,
-      payload     TEXT NOT NULL,
-      timestamp   TEXT NOT NULL,
-      PRIMARY KEY (session_id, id)
-    );
-    CREATE TABLE IF NOT EXISTS session_leaf (
-      session_id  TEXT PRIMARY KEY,
-      leaf_id     TEXT
-    );
-
-  `);
-  createAgentProfilesTable(db);
+  applyMigrations(db);
+  // Migrations leave `foreign_keys` ON; these seeds reference ids loosely.
+  db.pragma('foreign_keys = OFF');
 
   return db;
 }
@@ -140,11 +68,14 @@ describe('sessions routes', () => {
   });
 
   beforeEach(() => {
-    // Drop FTS trigger to avoid conflicts during cleanup, then recreate
+    // Drop the FTS triggers before the table, then recreate both. The real
+    // schema carries delete and update triggers too — leaving those behind
+    // while the table is gone makes the `DELETE FROM messages` below fail.
     db.exec('DROP TRIGGER IF EXISTS messages_fts_insert');
+    db.exec('DROP TRIGGER IF EXISTS messages_fts_delete');
+    db.exec('DROP TRIGGER IF EXISTS messages_fts_update');
     db.exec('DROP TABLE IF EXISTS messages_fts');
-    db.exec('DELETE FROM session_entries');
-    db.exec('DELETE FROM session_leaf');
+    db.exec('DELETE FROM session_log');
     db.exec('DELETE FROM messages');
     db.exec('DELETE FROM sessions');
     db.exec('DELETE FROM projects');
@@ -160,6 +91,9 @@ describe('sessions routes', () => {
       CREATE TRIGGER IF NOT EXISTS messages_fts_insert AFTER INSERT ON messages BEGIN
         INSERT INTO messages_fts(rowid, content, session_id, role)
           VALUES (NEW.rowid, NEW.content, NEW.session_id, NEW.role);
+      END;
+      CREATE TRIGGER IF NOT EXISTS messages_fts_delete AFTER DELETE ON messages BEGIN
+        DELETE FROM messages_fts WHERE rowid = OLD.rowid;
       END;
     `);
 
@@ -198,14 +132,14 @@ describe('sessions routes', () => {
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Session 1', now, now);
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s2', 'project-1', 'Session 2', now + 1000, now + 1000);
 
@@ -227,14 +161,14 @@ describe('sessions routes', () => {
 
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Session 1', now, now);
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s2', 'project-2', 'Session 2', now, now);
 
@@ -249,8 +183,8 @@ describe('sessions routes', () => {
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, archived_at, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Archived Session', now, now, now);
 
@@ -272,14 +206,14 @@ describe('sessions routes', () => {
 
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, archived_at, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Archived In Project 1', now, now, now);
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, archived_at, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s2', 'project-2', 'Archived In Project 2', now, now, now);
 
@@ -294,14 +228,14 @@ describe('sessions routes', () => {
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Older', now, now);
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s2', 'project-1', 'Newer', now, now + 1000);
 
@@ -315,14 +249,14 @@ describe('sessions routes', () => {
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, sort_order, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Pinned Older', 0, now, now);
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, sort_order, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s2', 'project-1', 'Newer But Later In Sort', 1, now, now + 1000);
 
@@ -339,8 +273,8 @@ describe('sessions routes', () => {
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, sdk_session_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, sdk_session_id, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Test Session', 'sdk-123', now, now);
 
@@ -405,14 +339,14 @@ describe('sessions routes', () => {
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, sort_order, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Existing 1', 0, now, now);
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, sort_order, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s2', 'project-1', 'Existing 2', 1, now, now);
 
@@ -521,8 +455,8 @@ describe('sessions routes', () => {
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Original', now, now);
 
@@ -614,8 +548,8 @@ describe('sessions routes', () => {
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'To Delete', now, now);
 
@@ -643,8 +577,8 @@ describe('sessions routes', () => {
       // Create a session for message tests
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Test Session', now, now);
     });
@@ -799,8 +733,8 @@ describe('sessions routes', () => {
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Test Session', now, now);
     });
@@ -873,8 +807,8 @@ describe('sessions routes', () => {
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Export Test Session', now, now);
     });
@@ -962,8 +896,8 @@ describe('sessions routes', () => {
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s2', 'project-1', null, now, now);
 
@@ -979,8 +913,8 @@ describe('sessions routes', () => {
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Session 1', now, now);
 
@@ -1034,8 +968,8 @@ describe('sessions routes', () => {
       ).run('project-2', 'Other Project', 'code', now, now);
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s2', 'project-2', 'Session 2', now, now);
       db.prepare(
@@ -1127,14 +1061,14 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, archived_at, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s-active', 'project-1', 'Active', null, now, now);
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, archived_at, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s-archived', 'project-1', 'Archived', now, now, now);
 
@@ -1148,14 +1082,14 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, archived_at, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s-active', 'project-1', 'Active', null, now, now);
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, archived_at, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s-archived', 'project-1', 'Archived', now, now, now);
 
@@ -1170,14 +1104,14 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, archived_at, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s-active', 'project-1', 'Active', null, now, now);
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, archived_at, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s-archived', 'project-1', 'Archived', now, now, now);
 
@@ -1199,14 +1133,14 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Session 1', now, now);
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s2', 'project-1', 'Session 2', now, now);
 
@@ -1239,8 +1173,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, archived_at, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Session 1', now, now, now);
 
@@ -1267,14 +1201,14 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Old', now - 10000, now - 10000);
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s2', 'project-1', 'New', now, now);
 
@@ -1290,8 +1224,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'S1', now, now);
 
@@ -1310,8 +1244,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, archived_at, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s-archived', 'project-1', 'Archived', now, now, now);
 
@@ -1324,8 +1258,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Running', now, now);
       activeRuns.set('run-1', { sessionId: 's1', phase: 'running', sessionType: 'regular' });
@@ -1371,8 +1305,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, project_role, is_read_only, plan_status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, project_role, is_read_only, plan_status, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Locked', 'task', 1, 'completed', now, now);
 
@@ -1391,8 +1325,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, is_read_only, plan_status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, is_read_only, plan_status, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?, ?)
       `
       ).run('s2', 'project-1', 'Locked Regular', 1, 'completed', now, now);
 
@@ -1418,8 +1352,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, sdk_session_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, sdk_session_id, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Test', 'sdk-123', now, now);
 
@@ -1443,8 +1377,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, last_run_status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, last_run_status, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Test', 'interrupted', now, now);
 
@@ -1485,8 +1419,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('parent-1', 'project-1', 'Parent', now, now);
 
@@ -1507,8 +1441,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Test Session', now, now);
 
@@ -1604,8 +1538,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Test', now, now);
 
@@ -1634,8 +1568,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, project_role, plan_status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, project_role, plan_status, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Task', 'task', 'planning', now, now);
 
@@ -1651,8 +1585,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Test', now, now);
 
@@ -1673,8 +1607,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, working_directory, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, working_directory, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Test', '/old/path', now, now);
 
@@ -1690,8 +1624,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Session 1', now, now);
 
@@ -1802,8 +1736,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Original', now, now);
 
@@ -1819,8 +1753,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'To Delete', now, now);
 
@@ -1836,8 +1770,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Session', now, now);
 
@@ -1855,8 +1789,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, archived_at, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Session', now, now, now);
 
@@ -1874,8 +1808,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, is_read_only, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, is_read_only, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Locked', 1, now, now);
 
@@ -1891,8 +1825,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, sdk_session_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, sdk_session_id, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Test', 'sdk-123', now, now);
 
@@ -1908,8 +1842,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, last_run_status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, last_run_status, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Interrupted', 'interrupted', now, now);
 
@@ -1927,8 +1861,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Test', now, now);
 
@@ -1961,8 +1895,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Test', now, now);
 
@@ -2024,14 +1958,14 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, sort_order, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s1', 'project-1', 'Session 1', 0, now, now);
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_profile_id, project_id, name, sort_order, created_at, updated_at)
+        VALUES (?, 'agent-1', ?, ?, ?, ?, ?)
       `
       ).run('s2', 'project-1', 'Session 2', 1, now, now + 1000);
 
@@ -2060,8 +1994,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Test Session', now, now);
     });
@@ -2113,43 +2047,27 @@ internal reasoning zclaudia plan
       sessionId = 'cg-s1';
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run(sessionId, 'project-1', 'Graph Session', now, now);
 
-      // Seed two entries + leaf for the graph builder to read
-      db.prepare(
-        `
-        INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `
-      ).run(
-        'e1',
-        sessionId,
-        null,
-        'message',
-        JSON.stringify({ message: { role: 'user', content: 'u1' } }),
-        new Date(now).toISOString()
-      );
-      db.prepare(
-        `
-        INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `
-      ).run(
-        'e2',
-        sessionId,
-        'e1',
-        'message',
-        JSON.stringify({ message: { role: 'assistant', content: [{ type: 'text', text: 'a1' }] } }),
-        new Date(now + 1000).toISOString()
-      );
-      db.prepare(
-        `
-        INSERT INTO session_leaf (session_id, leaf_id) VALUES (?, ?)
-      `
-      ).run(sessionId, 'e2');
+      // Seed two entries + the lane for the graph builder to read
+      seedEntry(db, sessionId, {
+        id: 'e1',
+        parentId: null,
+        type: 'message',
+        timestamp: now,
+        message: { role: 'user', content: 'u1' },
+      });
+      seedEntry(db, sessionId, {
+        id: 'e2',
+        parentId: 'e1',
+        type: 'message',
+        timestamp: now + 1000,
+        message: { role: 'assistant', content: [{ type: 'text', text: 'a1' }] },
+      });
+      seedLane(db, sessionId, 'e2');
     });
 
     it('returns 200 with a context graph for a known session', async () => {
@@ -2172,8 +2090,8 @@ internal reasoning zclaudia plan
       const now = Date.now();
       db.prepare(
         `
-        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, 'agent-1', ?, ?)
       `
       ).run('s1', 'project-1', 'Test Session', now, now);
     });
