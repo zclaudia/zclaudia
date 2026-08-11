@@ -4,6 +4,7 @@ import {
   type BranchBounds,
   type Entry,
   type EntryQuery,
+  type ForkOptions,
   type LaneRecord,
   type LanePointer,
   type LogItem,
@@ -175,53 +176,25 @@ export class SqliteSessionStorage implements SessionStorage {
   }
 
   /**
-   * Copy this session's root→`entryId` branch into another session's log and
-   * point that session's main lane at the fork point. Synchronous, so callers
-   * can wrap it in a transaction and have a partial copy roll back.
+   * Re-issue this session as a new one, per pi's fork semantics. Synchronous so
+   * a caller can wrap it in a transaction and have a partial copy roll back.
    *
-   * Entry ids are reused rather than reminted: payloads carry intra-tree
-   * references (a branch summary's `fromId`, a label's target) that would
-   * dangle otherwise, and a log row is scoped by session_id so the same id
-   * under a new session is unambiguous. Sequence numbers are re-issued from 1
-   * because they are per session. Labels on copied entries come along; this
-   * mirrors what pi's own fork does.
-   *
-   * Fails if the target already holds a log — forking into a live session would
-   * interleave two sequences.
+   * Refuses a target that already holds a log — forking into a live session
+   * would interleave two sequences.
    */
-  forkBranchInto(targetSessionId: string, entryId: string): void {
-    const branch = this.projection.findEntriesOnBranch({ start: entryId, order: 'oldestFirst' });
-    if (branch.length === 0) {
-      throw new SessionError(
-        'invalid_fork_target',
-        `fork target ${entryId} not found in session ${this.sessionId}`
-      );
-    }
+  forkInto(targetSessionId: string, options: ForkOptions): void {
+    const mutations = this.projection.createForkMutations(options);
     const existing = this.db
       .prepare('SELECT 1 FROM session_log WHERE session_id = ? LIMIT 1')
       .get(targetSessionId);
     if (existing) {
       throw new SessionError('already_exists', `session ${targetSessionId} already has a tree`);
     }
-
     const insert = this.db.prepare(
       'INSERT INTO session_log (session_id, seq, kind, payload) VALUES (?, ?, ?, ?)'
     );
-    const write = (seq: number, mutation: SessionMutation) =>
-      insert.run(targetSessionId, seq, mutation.kind, JSON.stringify(mutation));
-
-    let seq = 1;
-    for (const entry of branch) {
-      write(seq, { kind: 'entry', entry: { ...structuredClone(entry), seq } });
-      seq += 1;
-    }
-    write(seq, { kind: 'lane', seq, lane: MAIN_LANE, leafId: entryId });
-    seq += 1;
-    for (const entry of branch) {
-      const label = this.projection.getLabel(entry.id);
-      if (label === undefined) continue;
-      write(seq, { kind: 'fact', seq, fact: 'label', targetId: entry.id, label });
-      seq += 1;
+    for (const mutation of mutations) {
+      insert.run(targetSessionId, mutationSeq(mutation), mutation.kind, JSON.stringify(mutation));
     }
   }
 

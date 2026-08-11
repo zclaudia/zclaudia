@@ -4,6 +4,7 @@ import {
   type Entry,
   type EntryOrder,
   type EntryQuery,
+  type ForkOptions,
   type LaneRecord,
   type LanePointer,
   type LogItem,
@@ -291,6 +292,73 @@ export class SessionState {
 
   getStats(): SessionStats {
     return this.stats;
+  }
+
+  /**
+   * The mutations that reproduce this session in a fresh one. Ported from pi
+   * alongside the rest of this class.
+   *
+   * Entry ids are kept and only sequence numbers are re-issued: payloads
+   * reference other entries by id (a branch summary's `fromId`, a label's
+   * target), and those references have to keep resolving in the copy.
+   */
+  createForkMutations(options: ForkOptions): SessionMutation[] {
+    let copiedEntries: Entry[];
+    let forkLanes: LanePointer[];
+
+    if (options.scope === 'tree') {
+      copiedEntries = this.findEntries({ order: 'oldestFirst' });
+      forkLanes = this.getLanes();
+    } else {
+      const selectedEntryId = options.entryId ?? this.requireLane(MAIN_LANE);
+      let targetId: string | null = null;
+      if (selectedEntryId !== null) {
+        const entry = this.getEntry(selectedEntryId);
+        if (!entry || entry.type !== 'message') {
+          throw new SessionError(
+            'invalid_fork_target',
+            `Fork target is not a message entry: ${selectedEntryId}`
+          );
+        }
+        // Naming an entry means "fork before it"; taking the lane's own leaf
+        // means "fork at it".
+        const position = options.position ?? (options.entryId === undefined ? 'at' : 'before');
+        targetId = position === 'at' ? entry.id : entry.parentId;
+      }
+      copiedEntries =
+        targetId === null ? [] : this.findEntriesOnBranch({ start: targetId, order: 'oldestFirst' });
+      forkLanes = [{ lane: MAIN_LANE, leafId: targetId }];
+    }
+
+    const mutations: SessionMutation[] = [];
+    let sequence = 1;
+    for (const sourceEntry of copiedEntries) {
+      mutations.push({ kind: 'entry', entry: { ...structuredClone(sourceEntry), seq: sequence++ } });
+    }
+    for (const pointer of forkLanes) {
+      mutations.push({
+        kind: 'lane',
+        seq: sequence++,
+        lane: pointer.lane,
+        leafId: pointer.leafId,
+      });
+    }
+    if (this.name !== undefined) {
+      mutations.push({ kind: 'fact', seq: sequence++, fact: 'name', name: this.name });
+    }
+    for (const entry of copiedEntries) {
+      const label = this.labels.get(entry.id);
+      if (label !== undefined) {
+        mutations.push({
+          kind: 'fact',
+          seq: sequence++,
+          fact: 'label',
+          targetId: entry.id,
+          label,
+        });
+      }
+    }
+    return mutations;
   }
 
   private *walkToRoot(start: string | null, bounds?: BranchBounds): Generator<Entry> {

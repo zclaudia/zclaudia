@@ -8,7 +8,7 @@ import { SqliteSessionStorage } from './sqlite-session-storage.js';
  *
  * The copying itself belongs to the storage — a session is a mutation stream
  * now, and re-issuing that stream under a new session id is a storage concern,
- * not something to assemble from SQL out here. See `forkBranchInto` for why
+ * not something to assemble from SQL out here. See `forkInto` / `createForkMutations` for why
  * entry ids are reused and sequence numbers are not.
  *
  * Wrapped in a transaction so a partial copy can never leave a dangling tree.
@@ -20,6 +20,6 @@ export function forkSessionAt(
   newSessionId: string
 ): void {
   db.transaction(() => {
-    new SqliteSessionStorage(db, sourceSessionId).forkBranchInto(newSessionId, entryId);
+    new SqliteSessionStorage(db, sourceSessionId).forkInto(newSessionId, { entryId, position: 'at' });
   })();
 }
