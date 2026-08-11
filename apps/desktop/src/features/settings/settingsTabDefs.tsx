@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { Bell, Bug, Globe, Puzzle, Settings, ShieldCheck, Sparkles, Zap } from 'lucide-react';
+import { Bell, Bug, Globe, Info, Puzzle, Settings, ShieldCheck, Zap } from 'lucide-react';
 import { isAndroid } from '../../utils/platform';
 import { SETTINGS_SURFACES, isVisibleOnSurface, type SettingsSurfaceId } from './settingsSurface';
 
@@ -84,7 +84,7 @@ export function getSettingsTabs({
     {
       id: 'about',
       label: 'About',
-      icon: <Sparkles className="w-4 h-4" strokeWidth={1.75} />,
+      icon: <Info className="w-4 h-4" strokeWidth={1.75} />,
     },
   ];
 
