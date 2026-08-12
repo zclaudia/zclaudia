@@ -78,6 +78,7 @@ const mockFileViewerState = {
   inFileSearchOpen: false,
   inFileSearchQuery: '',
   inFileSearchCaseSensitive: false,
+  markdownSourceView: false,
   showTree: true,
   fullscreen: false,
   projectRoot: null as string | null,
@@ -89,6 +90,7 @@ const mockFileViewerState = {
   setInFileSearchQuery: vi.fn(),
   toggleInFileSearchCaseSensitive: vi.fn(),
   resetInFileSearch: vi.fn(),
+  toggleMarkdownSourceView: vi.fn(),
   setFullscreen: vi.fn(),
   toggleTree: vi.fn(),
   setShowTree: vi.fn(),
@@ -135,6 +137,7 @@ beforeEach(() => {
   mockFileViewerState.inFileSearchOpen = false;
   mockFileViewerState.inFileSearchQuery = '';
   mockFileViewerState.inFileSearchCaseSensitive = false;
+  mockFileViewerState.markdownSourceView = false;
   mockFileViewerState.showTree = true;
   mockFileViewerState.treeWidthPx = 256;
   mockFileViewerState.projectRoot = null;
@@ -279,6 +282,15 @@ describe('FileViewerPanel', () => {
     render(<FileViewerPanel projectRoot="/project" />);
     expect(screen.getByTestId('markdown')).toBeInTheDocument();
     expect(screen.queryByTestId('code-viewer')).not.toBeInTheDocument();
+  });
+
+  it('renders markdown as source in the code viewer when markdownSourceView is on', () => {
+    mockFileViewerState.filePath = 'docs/readme.md';
+    mockFileViewerState.content = '# Title\n\nSome text';
+    mockFileViewerState.markdownSourceView = true;
+    render(<FileViewerPanel projectRoot="/project" />);
+    expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
+    expect(screen.queryByTestId('markdown')).not.toBeInTheDocument();
   });
 
   it('highlights in-file search matches inside the rendered markdown', () => {
@@ -494,5 +506,35 @@ describe('FileViewerActions', () => {
     const { container } = render(<FileViewerActions />);
     expect(container.querySelector('button[title="Hide file tree"]')).not.toBeInTheDocument();
     expect(container.querySelector('button[title="Show file tree"]')).not.toBeInTheDocument();
+  });
+
+  it('shows the markdown source toggle for markdown files and toggles the view', () => {
+    mockFileViewerState.filePath = 'docs/readme.md';
+    mockFileViewerState.content = '# Title';
+    const { container } = render(<FileViewerActions />);
+    const toggleBtn = container.querySelector(
+      'button[title="Show markdown source"]'
+    ) as HTMLButtonElement;
+    expect(toggleBtn).toBeInTheDocument();
+    toggleBtn.click();
+    expect(mockFileViewerState.toggleMarkdownSourceView).toHaveBeenCalled();
+  });
+
+  it('labels the markdown toggle as preview when source view is active', () => {
+    mockFileViewerState.filePath = 'docs/readme.md';
+    mockFileViewerState.content = '# Title';
+    mockFileViewerState.markdownSourceView = true;
+    const { container } = render(<FileViewerActions />);
+    expect(container.querySelector('button[title="Show rendered preview"]')).toBeInTheDocument();
+  });
+
+  it('does not show the markdown source toggle for non-markdown files', () => {
+    mockFileViewerState.filePath = 'src/index.ts';
+    mockFileViewerState.content = 'const x = 1;';
+    const { container } = render(<FileViewerActions />);
+    expect(container.querySelector('button[title="Show markdown source"]')).not.toBeInTheDocument();
+    expect(
+      container.querySelector('button[title="Show rendered preview"]')
+    ).not.toBeInTheDocument();
   });
 });

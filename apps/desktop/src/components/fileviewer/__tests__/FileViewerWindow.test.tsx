@@ -65,6 +65,35 @@ describe('FileViewerWindow', () => {
     expect(screen.queryByTestId('syntax-highlighter')).not.toBeInTheDocument();
   });
 
+  it('toggles between markdown preview and source via the header button', async () => {
+    render(<FileViewerWindow filePath="docs/readme.md" projectRoot="/project" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('markdown')).toBeInTheDocument();
+    });
+
+    const toggleBtn = screen.getByRole('button', { name: 'Show markdown source' });
+    toggleBtn.click();
+    await waitFor(() => {
+      expect(screen.getByTestId('syntax-highlighter')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('markdown')).not.toBeInTheDocument();
+
+    screen.getByRole('button', { name: 'Show rendered preview' }).click();
+    await waitFor(() => {
+      expect(screen.getByTestId('markdown')).toBeInTheDocument();
+    });
+  });
+
+  it('does not show the markdown source toggle for non-markdown files', async () => {
+    render(<FileViewerWindow filePath="src/app.ts" projectRoot="/project" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('syntax-highlighter')).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Show markdown source' })
+    ).not.toBeInTheDocument();
+  });
+
   it('renders close button when onClose is provided', async () => {
     await mockPendingApiLoad();
     const onClose = vi.fn();

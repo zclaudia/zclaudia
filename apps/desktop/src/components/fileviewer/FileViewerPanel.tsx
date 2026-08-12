@@ -19,6 +19,7 @@ import { List, useListRef, type RowComponentProps, type ListImperativeAPI } from
 import {
   Check,
   ChevronLeft,
+  Code,
   Copy,
   ExternalLink,
   FileText,
@@ -403,8 +404,11 @@ export function FileViewerActions() {
     setFullscreen,
     showTree,
     toggleTree,
+    markdownSourceView,
+    toggleMarkdownSourceView,
   } = useFileViewerStore();
   const showFileTree = isMobile ? !filePath : showTree;
+  const isMarkdown = !!filePath && detectLanguage(filePath) === 'markdown';
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -456,6 +460,21 @@ export function FileViewerActions() {
       >
         <Search className="w-3.5 h-3.5" aria-hidden="true" />
       </button>
+      {content && isMarkdown && (
+        <button
+          onClick={toggleMarkdownSourceView}
+          className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
+            markdownSourceView
+              ? 'bg-secondary text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          } hover:bg-secondary`}
+          title={markdownSourceView ? 'Show rendered preview' : 'Show markdown source'}
+          aria-label={markdownSourceView ? 'Show rendered preview' : 'Show markdown source'}
+          aria-pressed={markdownSourceView}
+        >
+          <Code className="w-3.5 h-3.5" aria-hidden="true" />
+        </button>
+      )}
       {content && (
         <button
           onClick={() => setInFileSearchOpen(!inFileSearchOpen)}
@@ -530,6 +549,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
     treeWidthPx,
     setTreeWidthPx,
     backToTree,
+    markdownSourceView,
   } = store;
   const treeResizeCleanupRef = useRef<(() => void) | null>(null);
   // Guards an in-flight stat/content poll so overlapping setInterval ticks do
@@ -637,6 +657,10 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const lang = filePath ? detectLanguage(filePath) : 'text';
   const codeTheme = isDarkTheme(resolvedTheme) ? prismThemes.oneDark : prismThemes.oneLight;
   const isMarkdown = lang === 'markdown';
+  // Markdown renders as a preview by default; the toolbar toggle switches to
+  // the raw source, which reuses the virtualized code view (line numbers,
+  // line-based search & scroll-to-line all behave like any other code file).
+  const showMarkdownPreview = isMarkdown && !markdownSourceView;
 
   // In-file search state derived from the store. We keep the active match in a
   // local state so the panel can scroll the virtualized list to it.
@@ -659,7 +683,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
 
   // Scroll the virtualized list to the active match line whenever it changes.
   useEffect(() => {
-    if (!activeMatch || isMarkdown) return;
+    if (!activeMatch || showMarkdownPreview) return;
     if (loading || !content) return;
     const id = window.setTimeout(() => {
       try {
@@ -673,7 +697,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
       }
     }, 0);
     return () => window.clearTimeout(id);
-  }, [activeMatch, content, loading, isMarkdown, listRef]);
+  }, [activeMatch, content, loading, showMarkdownPreview, listRef]);
 
   // Keyboard shortcut: Cmd/Ctrl+F opens in-file search, Escape closes it.
   useEffect(() => {
@@ -742,7 +766,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
 
   // Scroll the virtualized list to the target line when one is set / changed.
   useEffect(() => {
-    if (!highlightStart || isMarkdown) return;
+    if (!highlightStart || showMarkdownPreview) return;
     if (loading || !content) return;
     // Defer one tick so Highlight has already produced tokens by the time
     // the list responds to scrollToRow.
@@ -758,7 +782,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
       }
     }, 0);
     return () => window.clearTimeout(id);
-  }, [highlightStart, content, loading, isMarkdown, targetNonce, listRef]);
+  }, [highlightStart, content, loading, showMarkdownPreview, targetNonce, listRef]);
 
   const isBrowseMode = !filePath && !loading && !error;
 
@@ -887,7 +911,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
               )}
               {content &&
                 !loading &&
-                (isMarkdown ? (
+                (showMarkdownPreview ? (
                   <div className="h-full overflow-auto">
                     <MarkdownFileContent
                       content={content}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Code } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useTheme, isDarkTheme } from '../../contexts/ThemeContext';
@@ -80,6 +81,8 @@ export function FileViewerWindow({
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Markdown only: show raw source instead of the rendered preview.
+  const [markdownSourceView, setMarkdownSourceView] = useState(false);
   const { resolvedTheme } = useTheme();
 
   // Mirror `content` into a ref so the polling closure can read the latest
@@ -234,6 +237,21 @@ export function FileViewerWindow({
         <span className="text-xs font-mono text-muted-foreground truncate" title={filePath}>
           {filePath}
         </span>
+        {isMarkdown && content && (
+          <button
+            onClick={() => setMarkdownSourceView(v => !v)}
+            className={`ml-auto inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
+              markdownSourceView
+                ? 'bg-secondary text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            } hover:bg-secondary`}
+            title={markdownSourceView ? 'Show rendered preview' : 'Show markdown source'}
+            aria-label={markdownSourceView ? 'Show rendered preview' : 'Show markdown source'}
+            aria-pressed={markdownSourceView}
+          >
+            <Code className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       {/* Content */}
@@ -250,7 +268,7 @@ export function FileViewerWindow({
         )}
         {content &&
           !loading &&
-          (isMarkdown ? (
+          (isMarkdown && !markdownSourceView ? (
             <MarkdownFileContent content={content} />
           ) : (
             <SyntaxHighlighter

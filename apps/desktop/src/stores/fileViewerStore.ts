@@ -41,6 +41,9 @@ interface FileViewerState {
   inFileSearchOpen: boolean;
   inFileSearchQuery: string;
   inFileSearchCaseSensitive: boolean;
+  // Markdown files: show the raw source instead of the rendered preview.
+  // Reset on every openFile so each file starts in preview mode.
+  markdownSourceView: boolean;
   // LRU content cache  (key = "projectRoot\0relativePath")
   contentCache: Map<string, CacheEntry>;
 
@@ -70,6 +73,7 @@ interface FileViewerState {
   setInFileSearchQuery: (query: string) => void;
   toggleInFileSearchCaseSensitive: () => void;
   resetInFileSearch: () => void;
+  toggleMarkdownSourceView: () => void;
   getCached: (projectRoot: string, relativePath: string) => string | undefined;
   /** Remove a cached entry so the next open forces a fresh fetch. */
   invalidate: (projectRoot: string, relativePath: string) => void;
@@ -107,6 +111,7 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   inFileSearchOpen: false,
   inFileSearchQuery: '',
   inFileSearchCaseSensitive: false,
+  markdownSourceView: false,
   contentCache: new Map(),
 
   openFile: (
@@ -133,6 +138,7 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
       searchOpen: false,
       inFileSearchOpen: false,
       inFileSearchQuery: '',
+      markdownSourceView: false,
     }));
     // Show file viewer panel in bottom panel
     usePluginStore.getState().updatePanelVisibility('file-viewer', true);
@@ -213,6 +219,9 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
 
   resetInFileSearch: () =>
     set({ inFileSearchOpen: false, inFileSearchQuery: '', inFileSearchCaseSensitive: false }),
+
+  toggleMarkdownSourceView: () =>
+    set(state => ({ markdownSourceView: !state.markdownSourceView })),
 
   getCached: (projectRoot: string, relativePath: string) =>
     get().contentCache.get(cacheKey(projectRoot, relativePath))?.content,

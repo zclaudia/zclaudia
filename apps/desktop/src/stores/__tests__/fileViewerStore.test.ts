@@ -96,6 +96,15 @@ describe('fileViewerStore', () => {
       expect(state.targetEndLine).toBe(20);
     });
 
+    it('resets the markdown source view so each file opens in preview mode', () => {
+      useFileViewerStore.getState().openFile('/project', 'docs/readme.md');
+      useFileViewerStore.getState().toggleMarkdownSourceView();
+      expect(useFileViewerStore.getState().markdownSourceView).toBe(true);
+
+      useFileViewerStore.getState().openFile('/project', 'docs/other.md');
+      expect(useFileViewerStore.getState().markdownSourceView).toBe(false);
+    });
+
     it('clears the target when reopening without one', () => {
       useFileViewerStore.getState().openFile('/project', 'src/index.ts', 42);
       useFileViewerStore.getState().openFile('/project', 'src/other.ts');
