@@ -31,6 +31,22 @@ describe('mapPointer', () => {
       .toMatchObject({ button: 'middle' });
   });
 
+  it('letterboxes a fixed device viewport: uniform fit scale, centering offset, margin clamp', () => {
+    // 100×300 device viewport in a 400×300 box → fit 1, x0 = 150 (centered).
+    const box = { width: 400, height: 300 };
+    const device = { width: 100, height: 300 };
+    expect(mapPointer({ offsetX: 160, offsetY: 30, button: 0, type: 'pointerdown', ...noMods }, box, device))
+      .toMatchObject({ x: 10, y: 30 });
+    // Clicks in the letterbox margins clamp to the page edges.
+    expect(mapPointer({ offsetX: 10, offsetY: 30, button: 0, type: 'pointerdown', ...noMods }, box, device))
+      .toMatchObject({ x: 0 });
+    expect(mapPointer({ offsetX: 390, offsetY: 30, button: 0, type: 'pointerdown', ...noMods }, box, device))
+      .toMatchObject({ x: 99 });
+    // Downscaled viewport: 800×600 in 200×300 → fit 0.25, y0 = 75.
+    expect(mapPointer({ offsetX: 100, offsetY: 150, button: 0, type: 'pointerdown', ...noMods }, { width: 200, height: 300 }, viewport))
+      .toMatchObject({ x: 400, y: 300 });
+  });
+
   it('returns null for unknown event types', () => {
     expect(mapPointer({ offsetX: 0, offsetY: 0, button: 0, type: 'pointercancel', ...noMods }, rect, viewport)).toBeNull();
   });

@@ -1,15 +1,27 @@
 import type {
+  BrowserConsoleEntry,
+  BrowserDeviceEmulation,
   BrowserInputEvent,
+  BrowserNetworkEntry,
   BrowserPageState,
   BrowserViewport,
   ServerMessage,
 } from '@zclaudia/shared';
 import type { BrowserEngine, EngineSession } from './engine.js';
 
+const CONSOLE_BUFFER_MAX = 500;
+const CONSOLE_TEXT_MAX = 2000;
+const NETWORK_BUFFER_MAX = 300;
+
 interface ManagedBrowserSession {
   session: EngineSession;
   attachedClientId: string | null;
   streaming: boolean;
+  emulation: BrowserDeviceEmulation | null;
+  /** Ring buffer; accrues even while detached so the agent can read it. */
+  console: BrowserConsoleEntry[];
+  /** Insertion-ordered upsert-by-id buffer (same detached-accrual rule). */
+  network: Map<string, BrowserNetworkEntry>;
 }
 
 /**
@@ -119,6 +131,9 @@ export class BrowserManager {
       session: null as unknown as EngineSession,
       attachedClientId: null,
       streaming: false,
+      emulation: null,
+      console: [],
+      network: new Map(),
     };
     entry.session = await this.engine.createSession({
       onFrame: (data, metadata) => {
@@ -128,6 +143,32 @@ export class BrowserManager {
       onCrashed: () => {
         this.send(entry, { type: 'browser_closed', sessionId, reason: 'crash' });
         this.sessions.delete(sessionId);
+      },
+      onConsole: (raw) => {
+        const item: BrowserConsoleEntry =
+          raw.text.length > CONSOLE_TEXT_MAX ? { ...raw, text: `${raw.text.slice(0, CONSOLE_TEXT_MAX)}…` } : raw;
+        entry.console.push(item);
+        if (entry.console.length > CONSOLE_BUFFER_MAX) entry.console.splice(0, entry.console.length - CONSOLE_BUFFER_MAX);
+        this.send(entry, { type: 'browser_console', sessionId, entries: [item] });
+      },
+      onConsoleReset: () => {
+        entry.console = [];
+        this.send(entry, { type: 'browser_console', sessionId, entries: [], replace: true });
+      },
+      onNetwork: (item) => {
+        if (!entry.network.has(item.id) && entry.network.size >= NETWORK_BUFFER_MAX) {
+          const oldest = entry.network.keys().next().value;
+          if (oldest !== undefined) entry.network.delete(oldest);
+        }
+        entry.network.set(item.id, item);
+        this.send(entry, { type: 'browser_network', sessionId, entries: [item] });
+      },
+      onNetworkReset: () => {
+        entry.network.clear();
+        this.send(entry, { type: 'browser_network', sessionId, entries: [], replace: true });
+      },
+      onElementPicked: (element) => {
+        this.send(entry, { type: 'browser_element_picked', sessionId, element });
       },
     });
     this.sessions.set(sessionId, entry);
@@ -140,9 +181,15 @@ export class BrowserManager {
     if (!managed) return;
     managed.attachedClientId = clientId;
     managed.streaming = true;
-    await managed.session.setViewport(viewport);
+    // An emulated session keeps its pinned device viewport — the client's
+    // container measure only applies in desktop mode.
+    if (!managed.emulation) await managed.session.setViewport(viewport);
     await managed.session.startScreencast();
     this.send(managed, { type: 'browser_state', sessionId, state: managed.session.getState() });
+    // Resync toggle state and replay the console buffer for (re)connecting clients.
+    this.send(managed, { type: 'browser_emulation', sessionId, emulation: managed.emulation });
+    this.send(managed, { type: 'browser_console', sessionId, entries: managed.console, replace: true });
+    this.send(managed, { type: 'browser_network', sessionId, entries: [...managed.network.values()], replace: true });
   }
 
   async detach(clientId: string, sessionId: string): Promise<void> {
@@ -203,7 +250,36 @@ export class BrowserManager {
 
   async resize(sessionId: string, viewport: BrowserViewport): Promise<void> {
     await this.ready(sessionId);
-    await this.sessions.get(sessionId)?.session.setViewport(viewport);
+    const managed = this.sessions.get(sessionId);
+    if (!managed || managed.emulation) return; // device viewport is pinned while emulating
+    await managed.session.setViewport(viewport);
+  }
+
+  async setEmulation(
+    sessionId: string,
+    emulation: BrowserDeviceEmulation | null,
+    fallbackViewport: BrowserViewport
+  ): Promise<void> {
+    await this.ready(sessionId);
+    const managed = this.sessions.get(sessionId);
+    if (!managed) return;
+    managed.emulation = emulation;
+    await managed.session.setEmulation(emulation, fallbackViewport);
+    this.send(managed, { type: 'browser_emulation', sessionId, emulation });
+  }
+
+  getConsole(sessionId: string): BrowserConsoleEntry[] | null {
+    return this.sessions.get(sessionId)?.console ?? null;
+  }
+
+  getNetwork(sessionId: string): BrowserNetworkEntry[] | null {
+    const managed = this.sessions.get(sessionId);
+    return managed ? [...managed.network.values()] : null;
+  }
+
+  async pickElement(sessionId: string, active: boolean): Promise<void> {
+    await this.ready(sessionId);
+    await this.sessions.get(sessionId)?.session.setInspectMode(active);
   }
 
   /** WS connection closed: stop streams for that client; pages stay alive. */

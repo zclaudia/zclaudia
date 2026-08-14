@@ -13,6 +13,8 @@ function stubManager() {
     stop: vi.fn(async () => {}),
     input: vi.fn(async () => {}),
     resize: vi.fn(async () => {}),
+    setEmulation: vi.fn(async () => {}),
+    pickElement: vi.fn(async () => {}),
   };
 }
 
@@ -67,5 +69,38 @@ describe('handleBrowserMessage', () => {
     handleBrowserMessage(client, { type: 'browser_resize', sessionId: 's1', viewport }, mgr as never, () => {});
     expect(mgr.input).toHaveBeenCalledWith('s1', event);
     expect(mgr.resize).toHaveBeenCalledWith('s1', viewport);
+  });
+
+  it('routes set_emulation with the fallback viewport (and null for disable)', () => {
+    const emulation = {
+      presetId: 'iphone-15-pro',
+      width: 393,
+      height: 852,
+      dpr: 3,
+      userAgent: 'ua',
+      mobile: true,
+      hasTouch: true,
+    };
+    handleBrowserMessage(
+      client,
+      { type: 'browser_set_emulation', sessionId: 's1', emulation, viewport },
+      mgr as never,
+      () => {}
+    );
+    expect(mgr.setEmulation).toHaveBeenCalledWith('s1', emulation, viewport);
+    handleBrowserMessage(
+      client,
+      { type: 'browser_set_emulation', sessionId: 's1', emulation: null, viewport },
+      mgr as never,
+      () => {}
+    );
+    expect(mgr.setEmulation).toHaveBeenCalledWith('s1', null, viewport);
+  });
+
+  it('routes pick_element toggles', () => {
+    handleBrowserMessage(client, { type: 'browser_pick_element', sessionId: 's1', active: true }, mgr as never, () => {});
+    expect(mgr.pickElement).toHaveBeenCalledWith('s1', true);
+    handleBrowserMessage(client, { type: 'browser_pick_element', sessionId: 's1', active: false }, mgr as never, () => {});
+    expect(mgr.pickElement).toHaveBeenCalledWith('s1', false);
   });
 });

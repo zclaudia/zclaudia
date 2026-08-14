@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { handleBrowserMessage } from '../handlers';
+import { formatPickedElement, handleBrowserMessage } from '../handlers';
 import { useBrowserStore } from '../browserStore';
+import { useComposerStore } from '../../../stores/composerStore';
 import { useSelectionStore } from '../../../stores/selectionStore';
 import { useRightWorkspaceStore, newPane } from '../../../stores/rightWorkspaceStore';
 
@@ -60,6 +61,71 @@ describe('handleBrowserMessage', () => {
     expect(useBrowserStore.getState().sessions['s1'].error).toBe('nav failed');
     handleBrowserMessage({ type: 'browser_engine_status', status: 'downloading', progress: 0.4 } as never);
     expect(useBrowserStore.getState().engine).toMatchObject({ status: 'downloading', progress: 0.4 });
+  });
+
+  it('browser_emulation stores the echoed device (and null on disable)', () => {
+    const emulation = { presetId: 'iphone-15-pro', width: 393, height: 852, dpr: 3, userAgent: 'ua', mobile: true, hasTouch: true };
+    handleBrowserMessage({ type: 'browser_emulation', sessionId: 's1', emulation } as never);
+    expect(useBrowserStore.getState().sessions['s1'].emulation).toEqual(emulation);
+    handleBrowserMessage({ type: 'browser_emulation', sessionId: 's1', emulation: null } as never);
+    expect(useBrowserStore.getState().sessions['s1'].emulation).toBeNull();
+  });
+
+  it('browser_console appends entries, replaces on replace:true, and caps at 500', () => {
+    const e = (text: string) => ({ level: 'log', text, ts: 1 });
+    handleBrowserMessage({ type: 'browser_console', sessionId: 's1', entries: [e('a')] } as never);
+    handleBrowserMessage({ type: 'browser_console', sessionId: 's1', entries: [e('b')] } as never);
+    expect(useBrowserStore.getState().sessions['s1'].console.map((x) => x.text)).toEqual(['a', 'b']);
+    handleBrowserMessage({ type: 'browser_console', sessionId: 's1', entries: [e('fresh')], replace: true } as never);
+    expect(useBrowserStore.getState().sessions['s1'].console.map((x) => x.text)).toEqual(['fresh']);
+    const many = Array.from({ length: 600 }, (_, i) => e(`m${i}`));
+    handleBrowserMessage({ type: 'browser_console', sessionId: 's1', entries: many } as never);
+    const buf = useBrowserStore.getState().sessions['s1'].console;
+    expect(buf).toHaveLength(500);
+    expect(buf[buf.length - 1].text).toBe('m599');
+  });
+
+  it('browser_network upserts by id and swaps the list on replace', () => {
+    const req = (id: string, patch: Record<string, unknown> = {}) => ({
+      id, url: `http://x/${id}`, method: 'GET', resourceType: 'fetch', ts: 1, ...patch,
+    });
+    handleBrowserMessage({ type: 'browser_network', sessionId: 's1', entries: [req('a'), req('b')] } as never);
+    handleBrowserMessage({ type: 'browser_network', sessionId: 's1', entries: [req('a', { status: 200 })] } as never);
+    let net = useBrowserStore.getState().sessions['s1'].network;
+    expect(net.map((e) => [e.id, e.status])).toEqual([['a', 200], ['b', undefined]]);
+    handleBrowserMessage({ type: 'browser_network', sessionId: 's1', entries: [], replace: true } as never);
+    net = useBrowserStore.getState().sessions['s1'].network;
+    expect(net).toEqual([]);
+  });
+
+  it('browser_element_picked prefills the composer and turns pick mode off', () => {
+    useBrowserStore.getState().patchSession('s1', { pickActive: true });
+    useComposerStore.setState({ drafts: {}, pendingPrefills: {} });
+    const element = {
+      selector: '#cta', tag: 'button', classes: ['cta'], text: 'Save',
+      outerHtml: '<button id="cta" class="cta">Save</button>', pageUrl: 'http://localhost:5173/',
+    };
+    handleBrowserMessage({ type: 'browser_element_picked', sessionId: 's1', element } as never);
+    expect(useBrowserStore.getState().sessions['s1'].pickActive).toBe(false);
+    const prefill = useComposerStore.getState().pendingPrefills['s1'];
+    expect(prefill?.content).toBe(formatPickedElement(element));
+    expect(prefill?.content).toContain('#cta');
+    expect(prefill?.content).toContain('```html');
+  });
+
+  it('browser_element_picked appends below an existing draft instead of clobbering it', () => {
+    useComposerStore.setState({
+      drafts: { s1: { content: 'please fix this:', attachments: [] } },
+      pendingPrefills: {},
+    });
+    const element = {
+      selector: 'div.card', tag: 'div', classes: ['card'],
+      outerHtml: '<div class="card"></div>', pageUrl: 'http://x/',
+    };
+    handleBrowserMessage({ type: 'browser_element_picked', sessionId: 's1', element } as never);
+    const prefill = useComposerStore.getState().pendingPrefills['s1'];
+    expect(prefill?.content.startsWith('please fix this:\n\n')).toBe(true);
+    expect(prefill?.content).toContain('div.card');
   });
 
   it('browser_agent_activity toggles agentActive', () => {

@@ -1,5 +1,13 @@
-import type { Browser, CDPSession, Page } from 'puppeteer-core';
-import type { BrowserInputEvent, BrowserPageState, BrowserViewport } from '@zclaudia/shared';
+import type { Browser, CDPSession, HTTPRequest, Page } from 'puppeteer-core';
+import type {
+  BrowserConsoleEntry,
+  BrowserDeviceEmulation,
+  BrowserInputEvent,
+  BrowserNetworkEntry,
+  BrowserPageState,
+  BrowserPickedElement,
+  BrowserViewport,
+} from '@zclaudia/shared';
 import type { BrowserEngine, EngineSession, EngineSessionCallbacks, EngineStatus } from './engine.js';
 import { defaultChromeDiscoveryDeps, resolveChromePath } from './chrome-discovery.js';
 import { toCdpInput } from './input-mapping.js';
@@ -13,6 +21,61 @@ declare const document: {
 };
 
 const SCREENCAST_QUALITY = 60;
+/**
+ * Screencast frames are capped at 2x regardless of the emulated dpr: an
+ * iPhone-class 3x device would otherwise stream 1179×2556 JPEGs over JSON.
+ * Page rendering keeps the true dpr so media queries and srcset stay accurate.
+ */
+const SCREENCAST_MAX_DPR = 2;
+
+/**
+ * Element summary computed inside the page on the picked node (`this` is the
+ * element in Runtime.callFunctionOn). Builds a short unique-ish selector
+ * (id-anchored when possible, else tag.class:nth-of-type chain, ≤5 segments).
+ */
+const PICK_SUMMARY_FN = `function () {
+  const esc = (s) => (window.CSS && CSS.escape ? CSS.escape(s) : s);
+  const seg = (n) => {
+    if (n.id) return '#' + esc(n.id);
+    let s = n.tagName.toLowerCase();
+    const cls = Array.from(n.classList).slice(0, 2);
+    if (cls.length) s += '.' + cls.map(esc).join('.');
+    const parent = n.parentElement;
+    if (parent) {
+      const same = Array.from(parent.children).filter((c) => c.tagName === n.tagName);
+      if (same.length > 1) s += ':nth-of-type(' + (same.indexOf(n) + 1) + ')';
+    }
+    return s;
+  };
+  const parts = [];
+  let n = this;
+  while (n && n.nodeType === 1 && parts.length < 5) {
+    parts.unshift(seg(n));
+    if (n.id) break;
+    n = n.parentElement;
+    if (n && n.tagName === 'BODY') break;
+  }
+  const text = (this.innerText || '').trim().slice(0, 200);
+  return {
+    selector: parts.join(' > '),
+    tag: this.tagName.toLowerCase(),
+    id: this.id || undefined,
+    classes: Array.from(this.classList).slice(0, 10),
+    text: text || undefined,
+    outerHtml: this.outerHTML.slice(0, 1500),
+  };
+}`;
+
+const CONSOLE_LEVELS: Record<string, BrowserConsoleEntry['level']> = {
+  log: 'log',
+  info: 'info',
+  warn: 'warn',
+  warning: 'warn',
+  error: 'error',
+  assert: 'error',
+  debug: 'debug',
+  verbose: 'debug',
+};
 
 export class PuppeteerEngine implements BrowserEngine {
   private browser: Browser | null = null;
@@ -90,6 +153,10 @@ class PuppeteerSession implements EngineSession {
   private closedByUs = false;
   private viewport: BrowserViewport = { width: 1024, height: 768, dpr: 1 };
   private screencasting = false;
+  private emulation: BrowserDeviceEmulation | null = null;
+  private defaultUserAgent = '';
+  private networkEntries = new WeakMap<HTTPRequest, BrowserNetworkEntry>();
+  private networkIdCounter = 0;
 
   constructor(
     private page: Page,
@@ -99,8 +166,70 @@ class PuppeteerSession implements EngineSession {
   ) {}
 
   async init(): Promise<void> {
+    this.defaultUserAgent = await this.page.browser().userAgent();
     this.page.on('framenavigated', (frame) => {
-      if (frame === this.page.mainFrame()) void this.refreshState({ loading: true });
+      if (frame !== this.page.mainFrame()) return;
+      this.callbacks.onConsoleReset();
+      void this.refreshState({ loading: true });
+    });
+    this.page.on('console', (msg) => {
+      const loc = msg.location();
+      this.callbacks.onConsole({
+        level: CONSOLE_LEVELS[msg.type()] ?? 'log',
+        text: msg.text(),
+        ts: Date.now(),
+        ...(loc.url ? { location: `${loc.url}:${(loc.lineNumber ?? 0) + 1}` } : {}),
+      });
+    });
+    this.page.on('pageerror', (err) => {
+      this.callbacks.onConsole({
+        level: 'error',
+        text: err instanceof Error ? (err.stack ?? err.message) : String(err),
+        ts: Date.now(),
+      });
+    });
+    this.page.on('request', (req) => {
+      // DevTools semantics: a fresh main-frame navigation clears the log and
+      // becomes its first entry (clearing on framenavigated instead would drop
+      // the document request, which fires earlier).
+      if (req.isNavigationRequest() && req.frame() === this.page.mainFrame() && req.redirectChain().length === 0) {
+        this.callbacks.onNetworkReset();
+      }
+      const entry: BrowserNetworkEntry = {
+        id: `n${this.networkIdCounter++}`,
+        url: req.url(),
+        method: req.method(),
+        resourceType: req.resourceType(),
+        ts: Date.now(),
+      };
+      this.networkEntries.set(req, entry);
+      this.callbacks.onNetwork({ ...entry });
+    });
+    this.page.on('response', (res) => {
+      const entry = this.networkEntries.get(res.request());
+      if (!entry) return;
+      entry.status = res.status();
+      const contentType = res.headers()['content-type'];
+      if (contentType) entry.contentType = contentType.split(';')[0].trim();
+      const contentLength = Number(res.headers()['content-length']);
+      if (Number.isFinite(contentLength)) entry.sizeBytes = contentLength;
+      this.callbacks.onNetwork({ ...entry });
+    });
+    this.page.on('requestfinished', (req) => {
+      const entry = this.networkEntries.get(req);
+      if (!entry) return;
+      entry.durationMs = Date.now() - entry.ts;
+      this.callbacks.onNetwork({ ...entry });
+    });
+    this.page.on('requestfailed', (req) => {
+      const entry = this.networkEntries.get(req);
+      if (!entry) return;
+      entry.errorText = req.failure()?.errorText ?? 'failed';
+      entry.durationMs = Date.now() - entry.ts;
+      this.callbacks.onNetwork({ ...entry });
+    });
+    this.cdp.on('Overlay.inspectNodeRequested', ({ backendNodeId }) => {
+      void this.resolvePickedNode(backendNodeId);
     });
     this.page.on('load', () => void this.refreshState({ loading: false }));
     this.page.on('close', () => {
@@ -154,11 +283,23 @@ class PuppeteerSession implements EngineSession {
   }
 
   async setViewport(viewport: BrowserViewport): Promise<void> {
+    // Emulation pins the logical viewport; a late-arriving panel resize must
+    // not clobber it (BrowserManager also guards, this is belt-and-braces).
+    if (this.emulation) return;
+    await this.applyViewport(viewport, { isMobile: false, hasTouch: false });
+  }
+
+  private async applyViewport(
+    viewport: BrowserViewport,
+    opts: { isMobile: boolean; hasTouch: boolean }
+  ): Promise<void> {
     this.viewport = viewport;
     await this.page.setViewport({
       width: Math.max(1, Math.round(viewport.width)),
       height: Math.max(1, Math.round(viewport.height)),
       deviceScaleFactor: viewport.dpr,
+      isMobile: opts.isMobile,
+      hasTouch: opts.hasTouch,
     });
     if (this.screencasting) {
       // restart screencast so maxWidth/maxHeight track the new size
@@ -167,13 +308,80 @@ class PuppeteerSession implements EngineSession {
     }
   }
 
+  async setEmulation(
+    emulation: BrowserDeviceEmulation | null,
+    fallbackViewport: BrowserViewport
+  ): Promise<void> {
+    this.emulation = emulation;
+    if (emulation) {
+      await this.page.setUserAgent(emulation.userAgent);
+      // Injected mouse events become touch events, so touch-only pages
+      // (carousels, mobile menus) respond to panel interaction.
+      await this.cdp
+        .send('Emulation.setEmitTouchEventsForMouse', { enabled: emulation.hasTouch, configuration: 'mobile' })
+        .catch(() => {});
+      await this.applyViewport(
+        { width: emulation.width, height: emulation.height, dpr: emulation.dpr },
+        { isMobile: emulation.mobile, hasTouch: emulation.hasTouch }
+      );
+    } else {
+      await this.page.setUserAgent(this.defaultUserAgent);
+      await this.cdp.send('Emulation.setEmitTouchEventsForMouse', { enabled: false }).catch(() => {});
+      await this.applyViewport(fallbackViewport, { isMobile: false, hasTouch: false });
+    }
+    // UA and server-side responsive rendering only take effect on reload.
+    if (this.page.url() !== 'about:blank') await this.page.reload().catch(() => {});
+  }
+
+  async setInspectMode(active: boolean): Promise<void> {
+    if (active) {
+      await this.cdp.send('DOM.enable');
+      await this.cdp.send('Overlay.enable');
+      await this.cdp.send('Overlay.setInspectMode', {
+        mode: 'searchForNode',
+        // DevTools' default inspect palette (content blue / padding green / margin orange).
+        highlightConfig: {
+          showInfo: true,
+          contentColor: { r: 111, g: 168, b: 220, a: 0.35 },
+          paddingColor: { r: 147, g: 196, b: 125, a: 0.35 },
+          marginColor: { r: 246, g: 178, b: 107, a: 0.35 },
+        },
+      });
+    } else {
+      await this.cdp.send('Overlay.setInspectMode', { mode: 'none' }).catch(() => {});
+      await this.cdp.send('Overlay.disable').catch(() => {});
+    }
+  }
+
+  /** Overlay click → resolve the node in-page into a serializable summary. */
+  private async resolvePickedNode(backendNodeId: number): Promise<void> {
+    try {
+      await this.setInspectMode(false);
+      const { object } = await this.cdp.send('DOM.resolveNode', { backendNodeId });
+      if (!object.objectId) return;
+      const { result } = await this.cdp.send('Runtime.callFunctionOn', {
+        objectId: object.objectId,
+        functionDeclaration: PICK_SUMMARY_FN,
+        returnByValue: true,
+      });
+      await this.cdp.send('Runtime.releaseObject', { objectId: object.objectId }).catch(() => {});
+      const summary = result.value as Omit<BrowserPickedElement, 'pageUrl'> | undefined;
+      if (summary?.selector) {
+        this.callbacks.onElementPicked({ ...summary, classes: summary.classes ?? [], pageUrl: this.page.url() });
+      }
+    } catch {
+      /* page navigated/closed mid-pick; nothing to deliver */
+    }
+  }
+
   async startScreencast(): Promise<void> {
     this.screencasting = true;
+    const captureDpr = Math.min(this.viewport.dpr, SCREENCAST_MAX_DPR);
     await this.cdp.send('Page.startScreencast', {
       format: 'jpeg',
       quality: SCREENCAST_QUALITY,
-      maxWidth: Math.round(this.viewport.width * this.viewport.dpr),
-      maxHeight: Math.round(this.viewport.height * this.viewport.dpr),
+      maxWidth: Math.round(this.viewport.width * captureDpr),
+      maxHeight: Math.round(this.viewport.height * captureDpr),
       everyNthFrame: 1,
     });
   }

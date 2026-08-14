@@ -127,7 +127,10 @@ export function registerBrowserTool(deps: BrowserToolDeps): void {
           "Drive the session's shared browser (the user watches it live in their Browser panel). " +
           'Actions: navigate (load a URL), read_page (visible text of the current page), screenshot ' +
           '(saves a JPEG, returns its file path), click (CSS selector or x/y page coordinates), type ' +
-          '(into the focused element, optional submit=Enter), scroll (up/down). Legacy action fetch ' +
+          '(into the focused element, optional submit=Enter), scroll (up/down), read_console (recent ' +
+          'console output and uncaught page errors — check this after loading or interacting with a ' +
+          'page you are debugging), read_network (recent network requests with status/timing — check ' +
+          'this to diagnose failing API calls or missing assets). Legacy action fetch ' +
           '(default when action is omitted) does a plain HTTP fetch with text extraction and works ' +
           'without a browser engine — useful for reading documentation, API responses, or web pages ' +
           'without executing JavaScript.',
@@ -136,7 +139,7 @@ export function registerBrowserTool(deps: BrowserToolDeps): void {
           properties: {
             action: {
               type: 'string',
-              enum: ['navigate', 'read_page', 'screenshot', 'click', 'type', 'scroll', 'fetch'],
+              enum: ['navigate', 'read_page', 'screenshot', 'click', 'type', 'scroll', 'read_console', 'read_network', 'fetch'],
               description: 'Defaults to fetch when omitted.',
             },
             url: { type: 'string', description: 'navigate/fetch target' },
@@ -147,6 +150,17 @@ export function registerBrowserTool(deps: BrowserToolDeps): void {
             submit: { type: 'boolean', description: 'type: press Enter after (default false)' },
             direction: { type: 'string', enum: ['up', 'down'], description: 'scroll (default down)' },
             amount: { type: 'number', description: 'scroll: pixels (default 600)' },
+            level: {
+              type: 'string',
+              enum: ['error', 'warn'],
+              description: 'read_console: error = errors only, warn = warnings + errors (default all levels)',
+            },
+            limit: { type: 'number', description: 'read_console/read_network: max entries, most recent (default 50)' },
+            filter: {
+              type: 'string',
+              enum: ['error'],
+              description: 'read_network: only failed requests (network errors or status >= 400)',
+            },
             format: {
               type: 'string',
               enum: ['text', 'html', 'raw'],
@@ -267,6 +281,35 @@ async function runBrowserAction(
       if (!text && !submit) return JSON.stringify({ error: 'type requires text or submit' });
       await manager.typeText(sessionId, text, submit);
       return JSON.stringify({ ok: true });
+    }
+    case 'read_console': {
+      const entries = manager.getConsole(sessionId);
+      if (!entries) return JSON.stringify({ error: 'no page' });
+      const level = args.level as string | undefined;
+      const wanted =
+        level === 'error'
+          ? entries.filter((e) => e.level === 'error')
+          : level === 'warn'
+            ? entries.filter((e) => e.level === 'error' || e.level === 'warn')
+            : entries;
+      const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.floor(args.limit) : 50;
+      return JSON.stringify({
+        total: wanted.length,
+        entries: wanted.slice(-limit),
+      });
+    }
+    case 'read_network': {
+      const entries = manager.getNetwork(sessionId);
+      if (!entries) return JSON.stringify({ error: 'no page' });
+      const wanted =
+        args.filter === 'error'
+          ? entries.filter((e) => e.errorText !== undefined || (e.status !== undefined && e.status >= 400))
+          : entries;
+      const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.floor(args.limit) : 50;
+      return JSON.stringify({
+        total: wanted.length,
+        entries: wanted.slice(-limit),
+      });
     }
     case 'scroll': {
       const amount = typeof args.amount === 'number' ? args.amount : 600;

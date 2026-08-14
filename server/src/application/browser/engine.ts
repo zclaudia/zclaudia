@@ -1,10 +1,28 @@
-import type { BrowserInputEvent, BrowserPageState, BrowserViewport } from '@zclaudia/shared';
+import type {
+  BrowserConsoleEntry,
+  BrowserDeviceEmulation,
+  BrowserInputEvent,
+  BrowserNetworkEntry,
+  BrowserPageState,
+  BrowserPickedElement,
+  BrowserViewport,
+} from '@zclaudia/shared';
 
 export interface EngineSessionCallbacks {
   onFrame(data: string, metadata: { deviceWidth: number; deviceHeight: number }): void;
   onState(state: BrowserPageState): void;
   /** Fired when the page/browser dies underneath us (not via close()). */
   onCrashed(): void;
+  /** Console API calls and uncaught page errors. */
+  onConsole(entry: BrowserConsoleEntry): void;
+  /** Main-frame navigation — mirrors Chrome's clear-console-on-navigation. */
+  onConsoleReset(): void;
+  /** Request lifecycle updates; the same entry id is re-emitted as it progresses. */
+  onNetwork(entry: BrowserNetworkEntry): void;
+  /** A main-frame navigation request started — clear the network log (DevTools behavior). */
+  onNetworkReset(): void;
+  /** The user picked an element via Overlay inspect mode. */
+  onElementPicked(element: BrowserPickedElement): void;
 }
 
 export interface EngineSession {
@@ -13,6 +31,16 @@ export interface EngineSession {
   reload(): Promise<void>;
   stop(): Promise<void>;
   setViewport(viewport: BrowserViewport): Promise<void>;
+  /**
+   * Enable device emulation (fixed viewport + UA + touch, then reload), or
+   * disable it (null) and fall back to `fallbackViewport`.
+   */
+  setEmulation(emulation: BrowserDeviceEmulation | null, fallbackViewport: BrowserViewport): Promise<void>;
+  /**
+   * Toggle Overlay element-inspect mode: hover highlights render into the
+   * screencast, a click fires onElementPicked and auto-disables the mode.
+   */
+  setInspectMode(active: boolean): Promise<void>;
   startScreencast(): Promise<void>;
   stopScreencast(): Promise<void>;
   dispatchInput(event: BrowserInputEvent): Promise<void>;

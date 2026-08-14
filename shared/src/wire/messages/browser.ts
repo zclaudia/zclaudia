@@ -8,6 +8,62 @@ export interface BrowserViewport {
   dpr: number; // devicePixelRatio
 }
 
+/**
+ * Device emulation descriptor. Presets live client-side; the server applies
+ * these values verbatim. `null` (in messages) means desktop mode — the
+ * viewport passively tracks the panel container via browser_resize.
+ */
+export interface BrowserDeviceEmulation {
+  /** Preset identity for UI display sync; opaque to the server. */
+  presetId: string;
+  width: number; // CSS px
+  height: number; // CSS px
+  dpr: number;
+  userAgent: string;
+  /** CDP isMobile: mobile layout viewport + meta-viewport handling. */
+  mobile: boolean;
+  hasTouch: boolean;
+}
+
+export interface BrowserConsoleEntry {
+  level: 'log' | 'info' | 'warn' | 'error' | 'debug';
+  text: string;
+  /** epoch ms */
+  ts: number;
+  /** source location, e.g. "http://localhost:5173/src/App.tsx:12" */
+  location?: string;
+}
+
+/** One network request's lifecycle, upserted by id as request → response → finished/failed. */
+export interface BrowserNetworkEntry {
+  id: string;
+  url: string;
+  method: string;
+  /** CDP resource type, e.g. "document", "xhr", "fetch", "script". */
+  resourceType: string;
+  status?: number;
+  /** Set when the request failed at the network level (DNS, refused, aborted…). */
+  errorText?: string;
+  contentType?: string;
+  sizeBytes?: number;
+  durationMs?: number;
+  /** epoch ms of the request start */
+  ts: number;
+}
+
+/** Summary of an element the user picked in the panel (Overlay inspect mode). */
+export interface BrowserPickedElement {
+  selector: string;
+  tag: string;
+  id?: string;
+  classes: string[];
+  /** truncated innerText */
+  text?: string;
+  /** truncated outerHTML */
+  outerHtml: string;
+  pageUrl: string;
+}
+
 export interface BrowserPageState {
   url: string;
   title: string;
@@ -106,6 +162,22 @@ export interface BrowserEngineInstallMessage {
   type: 'browser_engine_install';
 }
 
+/** Toggle Overlay inspect mode; the server auto-disables it after a pick. */
+export interface BrowserPickElementMessage {
+  type: 'browser_pick_element';
+  sessionId: string;
+  active: boolean;
+}
+
+export interface BrowserSetEmulationMessage {
+  type: 'browser_set_emulation';
+  sessionId: string;
+  /** null = back to desktop mode. */
+  emulation: BrowserDeviceEmulation | null;
+  /** Current container viewport — the fallback applied when emulation is disabled. */
+  viewport: BrowserViewport;
+}
+
 // ---- server → client ----
 
 export interface BrowserOpenedMessage {
@@ -150,6 +222,35 @@ export interface BrowserEngineStatusMessage {
   message?: string;
 }
 
+/** Echoed on every emulation change and on attach (server is the source of truth). */
+export interface BrowserEmulationMessage {
+  type: 'browser_emulation';
+  sessionId: string;
+  emulation: BrowserDeviceEmulation | null;
+}
+
+export interface BrowserConsoleMessage {
+  type: 'browser_console';
+  sessionId: string;
+  entries: BrowserConsoleEntry[];
+  /** true = replace the whole list (attach replay, navigation clear); default append. */
+  replace?: boolean;
+}
+
+/** Entries upsert by id; replace swaps the whole list (attach replay, navigation clear). */
+export interface BrowserNetworkMessage {
+  type: 'browser_network';
+  sessionId: string;
+  entries: BrowserNetworkEntry[];
+  replace?: boolean;
+}
+
+export interface BrowserElementPickedMessage {
+  type: 'browser_element_picked';
+  sessionId: string;
+  element: BrowserPickedElement;
+}
+
 /** Phase 3 uses this; defined now so the protocol doesn't churn. */
 export interface BrowserAgentActivityMessage {
   type: 'browser_agent_activity';
@@ -168,7 +269,9 @@ export type BrowserClientMessage =
   | BrowserStopMessage
   | BrowserInputMessage
   | BrowserResizeMessage
-  | BrowserEngineInstallMessage;
+  | BrowserEngineInstallMessage
+  | BrowserSetEmulationMessage
+  | BrowserPickElementMessage;
 
 export type BrowserServerMessage =
   | BrowserOpenedMessage
@@ -177,4 +280,8 @@ export type BrowserServerMessage =
   | BrowserClosedMessage
   | BrowserErrorMessage
   | BrowserEngineStatusMessage
+  | BrowserEmulationMessage
+  | BrowserConsoleMessage
+  | BrowserNetworkMessage
+  | BrowserElementPickedMessage
   | BrowserAgentActivityMessage;
