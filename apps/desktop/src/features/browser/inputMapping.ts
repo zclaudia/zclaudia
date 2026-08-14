@@ -24,10 +24,25 @@ interface Size {
   height: number;
 }
 
+/**
+ * Element coords → page coords. The canvas renders with object-contain, so the
+ * page occupies a centered scale-to-fit box inside the element; subtract the
+ * letterbox offsets and divide by the fit scale. In desktop mode the viewport
+ * equals the element box, degrading to the previous 1:1 mapping. Points in the
+ * letterbox margin clamp to the page edge.
+ */
 function scale(offsetX: number, offsetY: number, rect: Size, viewport: Size): { x: number; y: number } {
-  const sx = rect.width > 0 ? viewport.width / rect.width : 1;
-  const sy = rect.height > 0 ? viewport.height / rect.height : 1;
-  return { x: Math.round(offsetX * sx), y: Math.round(offsetY * sy) };
+  if (rect.width <= 0 || rect.height <= 0 || viewport.width <= 0 || viewport.height <= 0) {
+    return { x: Math.round(offsetX), y: Math.round(offsetY) };
+  }
+  const fit = Math.min(rect.width / viewport.width, rect.height / viewport.height);
+  const x0 = (rect.width - viewport.width * fit) / 2;
+  const y0 = (rect.height - viewport.height * fit) / 2;
+  const clamp = (v: number, max: number) => Math.min(Math.max(v, 0), max);
+  return {
+    x: Math.round(clamp((offsetX - x0) / fit, viewport.width - 1)),
+    y: Math.round(clamp((offsetY - y0) / fit, viewport.height - 1)),
+  };
 }
 
 export function mapPointer(

@@ -6,7 +6,10 @@ import { useBrowserStore } from './browserStore';
 import { BrowserToolbar } from './BrowserToolbar';
 import { BrowserViewportView } from './BrowserViewportView';
 import { BrowserEngineGate } from './BrowserEngineGate';
-import type { BrowserInputEvent } from '@zclaudia/shared';
+import { DeviceBar } from './DeviceBar';
+import { ConsoleStrip } from './ConsoleStrip';
+import { DEFAULT_PRESET_ID, DEVICE_PRESETS, toEmulation } from './devicePresets';
+import type { BrowserDeviceEmulation, BrowserInputEvent } from '@zclaudia/shared';
 
 const RESIZE_DEBOUNCE_MS = 200;
 
@@ -17,6 +20,12 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
   const view = useBrowserStore((s) => (sessionId ? s.sessions[sessionId] : undefined));
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ width: 1024, height: 768 });
+  const emulation = view?.emulation ?? null;
+  // Remember the last device so the toolbar toggle is one click both ways.
+  const lastPresetRef = useRef(DEFAULT_PRESET_ID);
+  useEffect(() => {
+    if (emulation) lastPresetRef.current = emulation.presetId;
+  }, [emulation]);
 
   const measure = useCallback(() => {
     const el = containerRef.current;
@@ -72,7 +81,10 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
     }
   }, [isConnected, sessionId, openAndAttach]);
 
-  // Debounced resize → browser_resize.
+  // Debounced resize → browser_resize. While device emulation is active the
+  // logical viewport is pinned by the preset, so panel resizes are not sent
+  // (the server ignores them too); checked at fire time via getState() so the
+  // observer doesn't resubscribe on every emulation change.
   useEffect(() => {
     if (!sessionId || !containerRef.current) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -80,7 +92,8 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         const vp = measure();
-        if (vp) {
+        const emulated = useBrowserStore.getState().sessions[sessionId]?.emulation != null;
+        if (vp && !emulated) {
           setViewport({ width: vp.width, height: vp.height });
           sendMessage({ type: 'browser_resize', sessionId, viewport: vp });
         }
@@ -92,6 +105,24 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
       observer.disconnect();
     };
   }, [sessionId, sendMessage, measure]);
+
+  const applyEmulation = useCallback(
+    (emu: BrowserDeviceEmulation | null) => {
+      if (!sessionId) return;
+      const vp = measure() ?? { width: 1024, height: 768, dpr: 1 };
+      sendMessage({ type: 'browser_set_emulation', sessionId, emulation: emu, viewport: vp });
+    },
+    [sessionId, sendMessage, measure]
+  );
+
+  const toggleEmulation = useCallback(() => {
+    if (emulation) {
+      applyEmulation(null);
+    } else {
+      const preset = DEVICE_PRESETS.find((p) => p.id === lastPresetRef.current) ?? DEVICE_PRESETS[0];
+      applyEmulation(toEmulation(preset));
+    }
+  }, [emulation, applyEmulation]);
 
   const onInput = useCallback(
     (event: BrowserInputEvent) => {
@@ -126,12 +157,15 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
       <BrowserToolbar
         state={view?.state ?? null}
         agentActive={view?.agentActive ?? false}
+        emulationActive={emulation !== null}
         onNavigate={(url) => sendMessage({ type: 'browser_navigate', sessionId, url })}
         onHistory={(direction) => sendMessage({ type: 'browser_history', sessionId, direction })}
         onReload={() => sendMessage({ type: 'browser_reload', sessionId })}
         onStop={() => sendMessage({ type: 'browser_stop', sessionId })}
+        onToggleEmulation={toggleEmulation}
         onOpenExternal={openExternal}
       />
+      {emulation && <DeviceBar emulation={emulation} onChange={applyEmulation} />}
       {view?.error && (
         <div className="px-2 py-1 text-[11px] font-medium text-destructive border-b border-border">{view.error}</div>
       )}
@@ -149,9 +183,14 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
             </button>
           </div>
         ) : (
-          <BrowserViewportView frame={view?.frame ?? null} viewport={viewport} onInput={onInput} />
+          <BrowserViewportView
+            frame={view?.frame ?? null}
+            viewport={emulation ? { width: emulation.width, height: emulation.height } : viewport}
+            onInput={onInput}
+          />
         )}
       </div>
+      {!gateNeeded && <ConsoleStrip entries={view?.console ?? []} />}
     </div>
   );
 }

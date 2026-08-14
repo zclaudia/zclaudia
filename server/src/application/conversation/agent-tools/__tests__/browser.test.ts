@@ -24,6 +24,11 @@ const manager = {
   clickSelector: vi.fn(async () => true),
   typeText: vi.fn(async () => true),
   input: vi.fn(async () => {}),
+  getConsole: vi.fn((): Array<{ level: string; text: string; ts: number }> | null => [
+    { level: 'log', text: 'boot', ts: 1 },
+    { level: 'warn', text: 'deprecated', ts: 2 },
+    { level: 'error', text: 'kaboom', ts: 3 },
+  ]),
   getState: vi.fn(() => ({
     url: 'http://x/',
     title: 'X',
@@ -157,6 +162,28 @@ describe('agent_browser actions', () => {
     const out = JSON.parse(await run({ action: 'type' }));
     expect(out.error).toMatch(/text or submit/i);
     expect(manager.typeText).not.toHaveBeenCalled();
+  });
+
+  it('read_console returns buffered entries with level filtering and limit', async () => {
+    const all = JSON.parse(await run({ action: 'read_console' }));
+    expect(all.total).toBe(3);
+    expect(all.entries.map((e: { text: string }) => e.text)).toEqual(['boot', 'deprecated', 'kaboom']);
+
+    const errors = JSON.parse(await run({ action: 'read_console', level: 'error' }));
+    expect(errors.entries).toEqual([{ level: 'error', text: 'kaboom', ts: 3 }]);
+
+    const warnPlus = JSON.parse(await run({ action: 'read_console', level: 'warn' }));
+    expect(warnPlus.entries.map((e: { text: string }) => e.text)).toEqual(['deprecated', 'kaboom']);
+
+    const limited = JSON.parse(await run({ action: 'read_console', limit: 1 }));
+    expect(limited.total).toBe(3); // total reflects the filtered set, entries the tail
+    expect(limited.entries.map((e: { text: string }) => e.text)).toEqual(['kaboom']);
+  });
+
+  it('read_console reports no page when the session has no console buffer', async () => {
+    manager.getConsole.mockReturnValueOnce(null);
+    const out = JSON.parse(await run({ action: 'read_console' }));
+    expect(out.error).toMatch(/no page/i);
   });
 
   it('engine missing yields a helpful error and no activity trailing state leak', async () => {

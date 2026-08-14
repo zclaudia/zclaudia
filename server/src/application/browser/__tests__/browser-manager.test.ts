@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { ServerMessage, BrowserPageState } from '@zclaudia/shared';
+import type {
+  ServerMessage,
+  BrowserConsoleEntry,
+  BrowserDeviceEmulation,
+  BrowserPageState,
+  BrowserViewport,
+} from '@zclaudia/shared';
 import type { BrowserEngine, EngineSession, EngineSessionCallbacks } from '../engine.js';
 import { BrowserManager } from '../browser-manager.js';
 
@@ -40,6 +46,13 @@ class FakeSession implements EngineSession {
   async setViewport(v: unknown) {
     this.viewport = v;
     this.resizes.push(v);
+  }
+  emulations: Array<{ emulation: BrowserDeviceEmulation | null; fallback: BrowserViewport }> = [];
+  async setEmulation(emulation: BrowserDeviceEmulation | null, fallback: BrowserViewport) {
+    this.emulations.push({ emulation, fallback });
+    this.viewport = emulation
+      ? { width: emulation.width, height: emulation.height, dpr: emulation.dpr }
+      : fallback;
   }
   async startScreencast() {
     this.screencasting = true;
@@ -251,6 +264,100 @@ describe('BrowserManager', () => {
     await manager.resize('s1', { width: 1024, height: 768, dpr: 1.5 });
     expect(engine.sessions[0].resizes).toHaveLength(2); // 1 from attach, 1 from resize
     expect(engine.sessions[0].resizes[1]).toEqual({ width: 1024, height: 768, dpr: 1.5 });
+  });
+
+  describe('device emulation', () => {
+    const DEVICE: BrowserDeviceEmulation = {
+      presetId: 'iphone-15-pro',
+      width: 393,
+      height: 852,
+      dpr: 3,
+      userAgent: 'ua',
+      mobile: true,
+      hasTouch: true,
+    };
+    const CONTAINER: BrowserViewport = { width: 800, height: 600, dpr: 1 };
+
+    it('setEmulation delegates to the session and echoes browser_emulation to the attached client', async () => {
+      await manager.open('c1', 's1');
+      await manager.attach('c1', 's1', CONTAINER);
+      await manager.setEmulation('s1', DEVICE, CONTAINER);
+      expect(engine.sessions[0].emulations).toEqual([{ emulation: DEVICE, fallback: CONTAINER }]);
+      const echoes = of('browser_emulation');
+      // 1 from attach (null resync), 1 from the change
+      expect(echoes).toHaveLength(2);
+      expect((echoes[1].msg as { emulation: unknown }).emulation).toEqual(DEVICE);
+    });
+
+    it('resize is ignored while emulation is active, and applies again after disabling', async () => {
+      await manager.open('c1', 's1');
+      await manager.attach('c1', 's1', CONTAINER);
+      await manager.setEmulation('s1', DEVICE, CONTAINER);
+      const before = engine.sessions[0].resizes.length;
+      await manager.resize('s1', { width: 1200, height: 900, dpr: 2 });
+      expect(engine.sessions[0].resizes).toHaveLength(before);
+      await manager.setEmulation('s1', null, CONTAINER);
+      await manager.resize('s1', { width: 1200, height: 900, dpr: 2 });
+      expect(engine.sessions[0].resizes).toHaveLength(before + 1);
+    });
+
+    it('attach keeps the pinned device viewport instead of the client container viewport', async () => {
+      await manager.open('c1', 's1');
+      await manager.setEmulation('s1', DEVICE, CONTAINER);
+      await manager.attach('c1', 's1', { width: 500, height: 400, dpr: 1 });
+      expect(engine.sessions[0].viewport).toEqual({ width: 393, height: 852, dpr: 3 });
+      const echoes = of('browser_emulation');
+      expect(echoes).toHaveLength(1); // attach resync (the earlier change had no attached client)
+      expect((echoes[0].msg as { emulation: unknown }).emulation).toEqual(DEVICE);
+    });
+  });
+
+  describe('console capture', () => {
+    const entry = (text: string, level: BrowserConsoleEntry['level'] = 'log'): BrowserConsoleEntry => ({
+      level,
+      text,
+      ts: 1,
+    });
+
+    it('buffers entries, forwards them to the attached client, and replays on attach', async () => {
+      await manager.open('c1', 's1');
+      engine.sessions[0].callbacks.onConsole(entry('early'));
+      expect(of('browser_console')).toHaveLength(0); // nobody attached yet
+      await manager.attach('c1', 's1', { width: 800, height: 600, dpr: 1 });
+      const replay = of('browser_console');
+      expect(replay).toHaveLength(1);
+      expect(replay[0].msg).toMatchObject({ replace: true, entries: [entry('early')] });
+      engine.sessions[0].callbacks.onConsole(entry('live', 'error'));
+      const live = of('browser_console')[1].msg as { entries: BrowserConsoleEntry[]; replace?: boolean };
+      expect(live.replace).toBeUndefined();
+      expect(live.entries).toEqual([entry('live', 'error')]);
+      expect(manager.getConsole('s1')).toEqual([entry('early'), entry('live', 'error')]);
+    });
+
+    it('truncates long entries and caps the ring buffer at 500', async () => {
+      await manager.open('c1', 's1');
+      const cb = engine.sessions[0].callbacks;
+      cb.onConsole(entry('x'.repeat(3000)));
+      expect(manager.getConsole('s1')![0].text).toHaveLength(2001); // 2000 + ellipsis
+      for (let i = 0; i < 600; i++) cb.onConsole(entry(`m${i}`));
+      const buf = manager.getConsole('s1')!;
+      expect(buf).toHaveLength(500);
+      expect(buf[buf.length - 1].text).toBe('m599');
+    });
+
+    it('main-frame navigation clears the buffer and broadcasts a replace', async () => {
+      await manager.open('c1', 's1');
+      await manager.attach('c1', 's1', { width: 800, height: 600, dpr: 1 });
+      engine.sessions[0].callbacks.onConsole(entry('old'));
+      engine.sessions[0].callbacks.onConsoleReset();
+      expect(manager.getConsole('s1')).toEqual([]);
+      const msgs = of('browser_console');
+      expect(msgs[msgs.length - 1].msg).toMatchObject({ replace: true, entries: [] });
+    });
+
+    it('getConsole returns null when no session exists', () => {
+      expect(manager.getConsole('nope')).toBeNull();
+    });
   });
 
   describe('agent methods', () => {

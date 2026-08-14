@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { BrowserPageState } from '@zclaudia/shared';
+import type { BrowserConsoleEntry, BrowserDeviceEmulation, BrowserPageState } from '@zclaudia/shared';
 
 export interface BrowserSessionView {
   state: BrowserPageState | null;
@@ -7,6 +7,9 @@ export interface BrowserSessionView {
   closedReason: 'user' | 'crash' | 'idle' | 'shutdown' | null;
   error: string | null;
   agentActive: boolean;
+  /** Server-echoed device emulation; null = desktop mode. */
+  emulation: BrowserDeviceEmulation | null;
+  console: BrowserConsoleEntry[];
 }
 
 export interface BrowserEngineView {
@@ -21,6 +24,8 @@ const EMPTY_SESSION: BrowserSessionView = {
   closedReason: null,
   error: null,
   agentActive: false,
+  emulation: null,
+  console: [],
 };
 
 interface BrowserStore {

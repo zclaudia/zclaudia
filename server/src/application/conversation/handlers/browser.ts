@@ -18,6 +18,7 @@ const BROWSER_TYPES = new Set<string>([
   'browser_stop',
   'browser_input',
   'browser_resize',
+  'browser_set_emulation',
   'browser_engine_install',
 ]);
 
@@ -91,6 +92,9 @@ export function handleBrowserMessage(
       break;
     case 'browser_resize':
       run(msg.sessionId, browserMgr.resize(msg.sessionId, msg.viewport));
+      break;
+    case 'browser_set_emulation':
+      run(msg.sessionId, browserMgr.setEmulation(msg.sessionId, msg.emulation, msg.viewport));
       break;
     case 'browser_engine_install':
       if (installEngineFn) run(undefined, installEngineFn(broadcastEngineStatus));

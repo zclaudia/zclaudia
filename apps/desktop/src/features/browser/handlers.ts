@@ -28,6 +28,16 @@ export function handleBrowserMessage(msg: ServerMessage): boolean {
     case 'browser_engine_status':
       store.setEngine({ status: msg.status, progress: msg.progress, message: msg.message });
       return true;
+    case 'browser_emulation':
+      store.patchSession(msg.sessionId, { emulation: msg.emulation });
+      return true;
+    case 'browser_console': {
+      const prev = useBrowserStore.getState().sessions[msg.sessionId]?.console ?? [];
+      const next = msg.replace ? msg.entries : [...prev, ...msg.entries];
+      // Mirror the server's ring-buffer cap so a chatty page can't grow the store unbounded.
+      store.patchSession(msg.sessionId, { console: next.slice(-500) });
+      return true;
+    }
     case 'browser_agent_activity': {
       store.patchSession(msg.sessionId, { agentActive: msg.active });
       // Auto-open only for the session the user is currently looking at, and

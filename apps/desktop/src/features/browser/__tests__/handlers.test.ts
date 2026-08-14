@@ -62,6 +62,28 @@ describe('handleBrowserMessage', () => {
     expect(useBrowserStore.getState().engine).toMatchObject({ status: 'downloading', progress: 0.4 });
   });
 
+  it('browser_emulation stores the echoed device (and null on disable)', () => {
+    const emulation = { presetId: 'iphone-15-pro', width: 393, height: 852, dpr: 3, userAgent: 'ua', mobile: true, hasTouch: true };
+    handleBrowserMessage({ type: 'browser_emulation', sessionId: 's1', emulation } as never);
+    expect(useBrowserStore.getState().sessions['s1'].emulation).toEqual(emulation);
+    handleBrowserMessage({ type: 'browser_emulation', sessionId: 's1', emulation: null } as never);
+    expect(useBrowserStore.getState().sessions['s1'].emulation).toBeNull();
+  });
+
+  it('browser_console appends entries, replaces on replace:true, and caps at 500', () => {
+    const e = (text: string) => ({ level: 'log', text, ts: 1 });
+    handleBrowserMessage({ type: 'browser_console', sessionId: 's1', entries: [e('a')] } as never);
+    handleBrowserMessage({ type: 'browser_console', sessionId: 's1', entries: [e('b')] } as never);
+    expect(useBrowserStore.getState().sessions['s1'].console.map((x) => x.text)).toEqual(['a', 'b']);
+    handleBrowserMessage({ type: 'browser_console', sessionId: 's1', entries: [e('fresh')], replace: true } as never);
+    expect(useBrowserStore.getState().sessions['s1'].console.map((x) => x.text)).toEqual(['fresh']);
+    const many = Array.from({ length: 600 }, (_, i) => e(`m${i}`));
+    handleBrowserMessage({ type: 'browser_console', sessionId: 's1', entries: many } as never);
+    const buf = useBrowserStore.getState().sessions['s1'].console;
+    expect(buf).toHaveLength(500);
+    expect(buf[buf.length - 1].text).toBe('m599');
+  });
+
   it('browser_agent_activity toggles agentActive', () => {
     handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: true } as never);
     expect(useBrowserStore.getState().sessions['s1'].agentActive).toBe(true);

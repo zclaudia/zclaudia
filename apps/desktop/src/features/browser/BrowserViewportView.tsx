@@ -30,11 +30,13 @@ export function BrowserViewportView({ frame, viewport, onInput }: Props) {
     return { width: c?.clientWidth ?? 1, height: c?.clientHeight ?? 1 };
   };
 
+  // object-contain letterboxes the fixed device viewport in emulation mode; in
+  // desktop mode the frame matches the element box, so it renders 1:1.
   return (
     <canvas
       ref={canvasRef}
       tabIndex={0}
-      className="w-full h-full outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-default"
+      className="w-full h-full object-contain outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-default"
       onPointerDown={(e) => {
         e.currentTarget.focus();
         e.currentTarget.setPointerCapture(e.pointerId);
