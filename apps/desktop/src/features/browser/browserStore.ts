@@ -1,5 +1,10 @@
 import { create } from 'zustand';
-import type { BrowserConsoleEntry, BrowserDeviceEmulation, BrowserPageState } from '@zclaudia/shared';
+import type {
+  BrowserConsoleEntry,
+  BrowserDeviceEmulation,
+  BrowserNetworkEntry,
+  BrowserPageState,
+} from '@zclaudia/shared';
 
 export interface BrowserSessionView {
   state: BrowserPageState | null;
@@ -10,6 +15,9 @@ export interface BrowserSessionView {
   /** Server-echoed device emulation; null = desktop mode. */
   emulation: BrowserDeviceEmulation | null;
   console: BrowserConsoleEntry[];
+  network: BrowserNetworkEntry[];
+  /** Overlay element-inspect mode; flips off when a pick arrives. */
+  pickActive: boolean;
 }
 
 export interface BrowserEngineView {
@@ -26,6 +34,8 @@ const EMPTY_SESSION: BrowserSessionView = {
   agentActive: false,
   emulation: null,
   console: [],
+  network: [],
+  pickActive: false,
 };
 
 interface BrowserStore {

@@ -29,6 +29,13 @@ const manager = {
     { level: 'warn', text: 'deprecated', ts: 2 },
     { level: 'error', text: 'kaboom', ts: 3 },
   ]),
+  getNetwork: vi.fn(
+    (): Array<{ id: string; url: string; method: string; resourceType: string; ts: number; status?: number; errorText?: string }> | null => [
+      { id: 'a', url: 'http://x/ok', method: 'GET', resourceType: 'fetch', ts: 1, status: 200 },
+      { id: 'b', url: 'http://x/miss', method: 'GET', resourceType: 'fetch', ts: 2, status: 404 },
+      { id: 'c', url: 'http://x/dead', method: 'POST', resourceType: 'xhr', ts: 3, errorText: 'net::ERR_CONNECTION_REFUSED' },
+    ]
+  ),
   getState: vi.fn(() => ({
     url: 'http://x/',
     title: 'X',
@@ -184,6 +191,18 @@ describe('agent_browser actions', () => {
     manager.getConsole.mockReturnValueOnce(null);
     const out = JSON.parse(await run({ action: 'read_console' }));
     expect(out.error).toMatch(/no page/i);
+  });
+
+  it('read_network returns entries; filter=error keeps HTTP >=400 and network failures', async () => {
+    const all = JSON.parse(await run({ action: 'read_network' }));
+    expect(all.total).toBe(3);
+    const errors = JSON.parse(await run({ action: 'read_network', filter: 'error' }));
+    expect(errors.entries.map((e: { id: string }) => e.id)).toEqual(['b', 'c']);
+    const limited = JSON.parse(await run({ action: 'read_network', limit: 1 }));
+    expect(limited.entries.map((e: { id: string }) => e.id)).toEqual(['c']);
+    manager.getNetwork.mockReturnValueOnce(null);
+    const none = JSON.parse(await run({ action: 'read_network' }));
+    expect(none.error).toMatch(/no page/i);
   });
 
   it('engine missing yields a helpful error and no activity trailing state leak', async () => {

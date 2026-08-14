@@ -14,6 +14,7 @@ function stubManager() {
     input: vi.fn(async () => {}),
     resize: vi.fn(async () => {}),
     setEmulation: vi.fn(async () => {}),
+    pickElement: vi.fn(async () => {}),
   };
 }
 
@@ -94,5 +95,12 @@ describe('handleBrowserMessage', () => {
       () => {}
     );
     expect(mgr.setEmulation).toHaveBeenCalledWith('s1', null, viewport);
+  });
+
+  it('routes pick_element toggles', () => {
+    handleBrowserMessage(client, { type: 'browser_pick_element', sessionId: 's1', active: true }, mgr as never, () => {});
+    expect(mgr.pickElement).toHaveBeenCalledWith('s1', true);
+    handleBrowserMessage(client, { type: 'browser_pick_element', sessionId: 's1', active: false }, mgr as never, () => {});
+    expect(mgr.pickElement).toHaveBeenCalledWith('s1', false);
   });
 });

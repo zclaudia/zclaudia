@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, ExternalLink, RotateCw, Smartphone, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ExternalLink, RotateCw, Smartphone, SquareDashedMousePointer, X } from 'lucide-react';
 import type { BrowserPageState } from '@zclaudia/shared';
 
 interface Props {
   state: BrowserPageState | null;
   agentActive: boolean;
   emulationActive: boolean;
+  pickActive: boolean;
   onNavigate(url: string): void;
   onHistory(direction: 'back' | 'forward'): void;
   onReload(): void;
   onStop(): void;
   onToggleEmulation(): void;
+  onTogglePick(): void;
   onOpenExternal(): void;
 }
 
@@ -21,11 +23,13 @@ export function BrowserToolbar({
   state,
   agentActive,
   emulationActive,
+  pickActive,
   onNavigate,
   onHistory,
   onReload,
   onStop,
   onToggleEmulation,
+  onTogglePick,
   onOpenExternal,
 }: Props) {
   const [draft, setDraft] = useState(state?.url ?? '');
@@ -84,6 +88,14 @@ export function BrowserToolbar({
           Agent
         </span>
       )}
+      <button
+        aria-label="Select element to chat"
+        aria-pressed={pickActive}
+        className={`${BTN} ${pickActive ? 'bg-secondary text-foreground' : ''}`}
+        onClick={onTogglePick}
+      >
+        <SquareDashedMousePointer size={14} strokeWidth={1.75} />
+      </button>
       <button
         aria-label="Toggle device emulation"
         aria-pressed={emulationActive}

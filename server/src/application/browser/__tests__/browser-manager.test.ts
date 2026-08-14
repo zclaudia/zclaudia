@@ -3,6 +3,7 @@ import type {
   ServerMessage,
   BrowserConsoleEntry,
   BrowserDeviceEmulation,
+  BrowserNetworkEntry,
   BrowserPageState,
   BrowserViewport,
 } from '@zclaudia/shared';
@@ -53,6 +54,10 @@ class FakeSession implements EngineSession {
     this.viewport = emulation
       ? { width: emulation.width, height: emulation.height, dpr: emulation.dpr }
       : fallback;
+  }
+  inspectModes: boolean[] = [];
+  async setInspectMode(active: boolean) {
+    this.inspectModes.push(active);
   }
   async startScreencast() {
     this.screencasting = true;
@@ -357,6 +362,79 @@ describe('BrowserManager', () => {
 
     it('getConsole returns null when no session exists', () => {
       expect(manager.getConsole('nope')).toBeNull();
+    });
+  });
+
+  describe('network capture', () => {
+    const req = (id: string, patch: Partial<BrowserNetworkEntry> = {}): BrowserNetworkEntry => ({
+      id,
+      url: `http://x/${id}`,
+      method: 'GET',
+      resourceType: 'fetch',
+      ts: 1,
+      ...patch,
+    });
+
+    it('upserts by id (lifecycle updates keep the original position), replays on attach', async () => {
+      await manager.open('c1', 's1');
+      const cb = engine.sessions[0].callbacks;
+      cb.onNetwork(req('a'));
+      cb.onNetwork(req('b'));
+      cb.onNetwork(req('a', { status: 200, durationMs: 12 }));
+      expect(manager.getNetwork('s1')!.map((e) => [e.id, e.status])).toEqual([
+        ['a', 200],
+        ['b', undefined],
+      ]);
+      await manager.attach('c1', 's1', { width: 800, height: 600, dpr: 1 });
+      const replay = of('browser_network');
+      expect(replay).toHaveLength(1);
+      expect((replay[0].msg as { replace?: boolean }).replace).toBe(true);
+      expect((replay[0].msg as { entries: BrowserNetworkEntry[] }).entries.map((e) => e.id)).toEqual(['a', 'b']);
+      cb.onNetwork(req('c'));
+      expect(of('browser_network')).toHaveLength(2); // live update reaches the attached client
+    });
+
+    it('caps the buffer at 300 without evicting on updates to existing ids', async () => {
+      await manager.open('c1', 's1');
+      const cb = engine.sessions[0].callbacks;
+      for (let i = 0; i < 350; i++) cb.onNetwork(req(`r${i}`));
+      let buf = manager.getNetwork('s1')!;
+      expect(buf).toHaveLength(300);
+      expect(buf[0].id).toBe('r50');
+      cb.onNetwork(req('r50', { status: 404 }));
+      buf = manager.getNetwork('s1')!;
+      expect(buf).toHaveLength(300);
+      expect(buf[0].status).toBe(404);
+    });
+
+    it('a navigation reset clears the buffer and broadcasts a replace', async () => {
+      await manager.open('c1', 's1');
+      await manager.attach('c1', 's1', { width: 800, height: 600, dpr: 1 });
+      const cb = engine.sessions[0].callbacks;
+      cb.onNetwork(req('old'));
+      cb.onNetworkReset();
+      expect(manager.getNetwork('s1')).toEqual([]);
+      const msgs = of('browser_network');
+      expect(msgs[msgs.length - 1].msg).toMatchObject({ replace: true, entries: [] });
+    });
+
+    it('getNetwork returns null when no session exists', () => {
+      expect(manager.getNetwork('nope')).toBeNull();
+    });
+  });
+
+  describe('element pick', () => {
+    it('pickElement delegates inspect mode; picks are forwarded to the attached client', async () => {
+      await manager.open('c1', 's1');
+      await manager.attach('c1', 's1', { width: 800, height: 600, dpr: 1 });
+      await manager.pickElement('s1', true);
+      await manager.pickElement('s1', false);
+      expect(engine.sessions[0].inspectModes).toEqual([true, false]);
+      const element = { selector: '#x', tag: 'div', classes: [], outerHtml: '<div id="x"></div>', pageUrl: 'http://x/' };
+      engine.sessions[0].callbacks.onElementPicked(element);
+      const picked = of('browser_element_picked');
+      expect(picked).toHaveLength(1);
+      expect((picked[0].msg as { element: unknown }).element).toEqual(element);
     });
   });
 

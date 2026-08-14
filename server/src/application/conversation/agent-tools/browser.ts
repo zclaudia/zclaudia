@@ -129,7 +129,8 @@ export function registerBrowserTool(deps: BrowserToolDeps): void {
           '(saves a JPEG, returns its file path), click (CSS selector or x/y page coordinates), type ' +
           '(into the focused element, optional submit=Enter), scroll (up/down), read_console (recent ' +
           'console output and uncaught page errors — check this after loading or interacting with a ' +
-          'page you are debugging). Legacy action fetch ' +
+          'page you are debugging), read_network (recent network requests with status/timing — check ' +
+          'this to diagnose failing API calls or missing assets). Legacy action fetch ' +
           '(default when action is omitted) does a plain HTTP fetch with text extraction and works ' +
           'without a browser engine — useful for reading documentation, API responses, or web pages ' +
           'without executing JavaScript.',
@@ -138,7 +139,7 @@ export function registerBrowserTool(deps: BrowserToolDeps): void {
           properties: {
             action: {
               type: 'string',
-              enum: ['navigate', 'read_page', 'screenshot', 'click', 'type', 'scroll', 'read_console', 'fetch'],
+              enum: ['navigate', 'read_page', 'screenshot', 'click', 'type', 'scroll', 'read_console', 'read_network', 'fetch'],
               description: 'Defaults to fetch when omitted.',
             },
             url: { type: 'string', description: 'navigate/fetch target' },
@@ -154,7 +155,12 @@ export function registerBrowserTool(deps: BrowserToolDeps): void {
               enum: ['error', 'warn'],
               description: 'read_console: error = errors only, warn = warnings + errors (default all levels)',
             },
-            limit: { type: 'number', description: 'read_console: max entries, most recent (default 50)' },
+            limit: { type: 'number', description: 'read_console/read_network: max entries, most recent (default 50)' },
+            filter: {
+              type: 'string',
+              enum: ['error'],
+              description: 'read_network: only failed requests (network errors or status >= 400)',
+            },
             format: {
               type: 'string',
               enum: ['text', 'html', 'raw'],
@@ -286,6 +292,19 @@ async function runBrowserAction(
           : level === 'warn'
             ? entries.filter((e) => e.level === 'error' || e.level === 'warn')
             : entries;
+      const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.floor(args.limit) : 50;
+      return JSON.stringify({
+        total: wanted.length,
+        entries: wanted.slice(-limit),
+      });
+    }
+    case 'read_network': {
+      const entries = manager.getNetwork(sessionId);
+      if (!entries) return JSON.stringify({ error: 'no page' });
+      const wanted =
+        args.filter === 'error'
+          ? entries.filter((e) => e.errorText !== undefined || (e.status !== undefined && e.status >= 400))
+          : entries;
       const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.floor(args.limit) : 50;
       return JSON.stringify({
         total: wanted.length,

@@ -34,6 +34,36 @@ export interface BrowserConsoleEntry {
   location?: string;
 }
 
+/** One network request's lifecycle, upserted by id as request → response → finished/failed. */
+export interface BrowserNetworkEntry {
+  id: string;
+  url: string;
+  method: string;
+  /** CDP resource type, e.g. "document", "xhr", "fetch", "script". */
+  resourceType: string;
+  status?: number;
+  /** Set when the request failed at the network level (DNS, refused, aborted…). */
+  errorText?: string;
+  contentType?: string;
+  sizeBytes?: number;
+  durationMs?: number;
+  /** epoch ms of the request start */
+  ts: number;
+}
+
+/** Summary of an element the user picked in the panel (Overlay inspect mode). */
+export interface BrowserPickedElement {
+  selector: string;
+  tag: string;
+  id?: string;
+  classes: string[];
+  /** truncated innerText */
+  text?: string;
+  /** truncated outerHTML */
+  outerHtml: string;
+  pageUrl: string;
+}
+
 export interface BrowserPageState {
   url: string;
   title: string;
@@ -132,6 +162,13 @@ export interface BrowserEngineInstallMessage {
   type: 'browser_engine_install';
 }
 
+/** Toggle Overlay inspect mode; the server auto-disables it after a pick. */
+export interface BrowserPickElementMessage {
+  type: 'browser_pick_element';
+  sessionId: string;
+  active: boolean;
+}
+
 export interface BrowserSetEmulationMessage {
   type: 'browser_set_emulation';
   sessionId: string;
@@ -200,6 +237,20 @@ export interface BrowserConsoleMessage {
   replace?: boolean;
 }
 
+/** Entries upsert by id; replace swaps the whole list (attach replay, navigation clear). */
+export interface BrowserNetworkMessage {
+  type: 'browser_network';
+  sessionId: string;
+  entries: BrowserNetworkEntry[];
+  replace?: boolean;
+}
+
+export interface BrowserElementPickedMessage {
+  type: 'browser_element_picked';
+  sessionId: string;
+  element: BrowserPickedElement;
+}
+
 /** Phase 3 uses this; defined now so the protocol doesn't churn. */
 export interface BrowserAgentActivityMessage {
   type: 'browser_agent_activity';
@@ -219,7 +270,8 @@ export type BrowserClientMessage =
   | BrowserInputMessage
   | BrowserResizeMessage
   | BrowserEngineInstallMessage
-  | BrowserSetEmulationMessage;
+  | BrowserSetEmulationMessage
+  | BrowserPickElementMessage;
 
 export type BrowserServerMessage =
   | BrowserOpenedMessage
@@ -230,4 +282,6 @@ export type BrowserServerMessage =
   | BrowserEngineStatusMessage
   | BrowserEmulationMessage
   | BrowserConsoleMessage
+  | BrowserNetworkMessage
+  | BrowserElementPickedMessage
   | BrowserAgentActivityMessage;

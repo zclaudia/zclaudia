@@ -2,7 +2,9 @@ import type {
   BrowserConsoleEntry,
   BrowserDeviceEmulation,
   BrowserInputEvent,
+  BrowserNetworkEntry,
   BrowserPageState,
+  BrowserPickedElement,
   BrowserViewport,
 } from '@zclaudia/shared';
 
@@ -15,6 +17,12 @@ export interface EngineSessionCallbacks {
   onConsole(entry: BrowserConsoleEntry): void;
   /** Main-frame navigation — mirrors Chrome's clear-console-on-navigation. */
   onConsoleReset(): void;
+  /** Request lifecycle updates; the same entry id is re-emitted as it progresses. */
+  onNetwork(entry: BrowserNetworkEntry): void;
+  /** A main-frame navigation request started — clear the network log (DevTools behavior). */
+  onNetworkReset(): void;
+  /** The user picked an element via Overlay inspect mode. */
+  onElementPicked(element: BrowserPickedElement): void;
 }
 
 export interface EngineSession {
@@ -28,6 +36,11 @@ export interface EngineSession {
    * disable it (null) and fall back to `fallbackViewport`.
    */
   setEmulation(emulation: BrowserDeviceEmulation | null, fallbackViewport: BrowserViewport): Promise<void>;
+  /**
+   * Toggle Overlay element-inspect mode: hover highlights render into the
+   * screencast, a click fires onElementPicked and auto-disables the mode.
+   */
+  setInspectMode(active: boolean): Promise<void>;
   startScreencast(): Promise<void>;
   stopScreencast(): Promise<void>;
   dispatchInput(event: BrowserInputEvent): Promise<void>;

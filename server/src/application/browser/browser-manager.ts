@@ -2,6 +2,7 @@ import type {
   BrowserConsoleEntry,
   BrowserDeviceEmulation,
   BrowserInputEvent,
+  BrowserNetworkEntry,
   BrowserPageState,
   BrowserViewport,
   ServerMessage,
@@ -10,6 +11,7 @@ import type { BrowserEngine, EngineSession } from './engine.js';
 
 const CONSOLE_BUFFER_MAX = 500;
 const CONSOLE_TEXT_MAX = 2000;
+const NETWORK_BUFFER_MAX = 300;
 
 interface ManagedBrowserSession {
   session: EngineSession;
@@ -18,6 +20,8 @@ interface ManagedBrowserSession {
   emulation: BrowserDeviceEmulation | null;
   /** Ring buffer; accrues even while detached so the agent can read it. */
   console: BrowserConsoleEntry[];
+  /** Insertion-ordered upsert-by-id buffer (same detached-accrual rule). */
+  network: Map<string, BrowserNetworkEntry>;
 }
 
 /**
@@ -129,6 +133,7 @@ export class BrowserManager {
       streaming: false,
       emulation: null,
       console: [],
+      network: new Map(),
     };
     entry.session = await this.engine.createSession({
       onFrame: (data, metadata) => {
@@ -150,6 +155,21 @@ export class BrowserManager {
         entry.console = [];
         this.send(entry, { type: 'browser_console', sessionId, entries: [], replace: true });
       },
+      onNetwork: (item) => {
+        if (!entry.network.has(item.id) && entry.network.size >= NETWORK_BUFFER_MAX) {
+          const oldest = entry.network.keys().next().value;
+          if (oldest !== undefined) entry.network.delete(oldest);
+        }
+        entry.network.set(item.id, item);
+        this.send(entry, { type: 'browser_network', sessionId, entries: [item] });
+      },
+      onNetworkReset: () => {
+        entry.network.clear();
+        this.send(entry, { type: 'browser_network', sessionId, entries: [], replace: true });
+      },
+      onElementPicked: (element) => {
+        this.send(entry, { type: 'browser_element_picked', sessionId, element });
+      },
     });
     this.sessions.set(sessionId, entry);
     if (url) await entry.session.navigate(url);
@@ -169,6 +189,7 @@ export class BrowserManager {
     // Resync toggle state and replay the console buffer for (re)connecting clients.
     this.send(managed, { type: 'browser_emulation', sessionId, emulation: managed.emulation });
     this.send(managed, { type: 'browser_console', sessionId, entries: managed.console, replace: true });
+    this.send(managed, { type: 'browser_network', sessionId, entries: [...managed.network.values()], replace: true });
   }
 
   async detach(clientId: string, sessionId: string): Promise<void> {
@@ -249,6 +270,16 @@ export class BrowserManager {
 
   getConsole(sessionId: string): BrowserConsoleEntry[] | null {
     return this.sessions.get(sessionId)?.console ?? null;
+  }
+
+  getNetwork(sessionId: string): BrowserNetworkEntry[] | null {
+    const managed = this.sessions.get(sessionId);
+    return managed ? [...managed.network.values()] : null;
+  }
+
+  async pickElement(sessionId: string, active: boolean): Promise<void> {
+    await this.ready(sessionId);
+    await this.sessions.get(sessionId)?.session.setInspectMode(active);
   }
 
   /** WS connection closed: stop streams for that client; pages stay alive. */

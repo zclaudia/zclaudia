@@ -8,6 +8,7 @@ import { BrowserViewportView } from './BrowserViewportView';
 import { BrowserEngineGate } from './BrowserEngineGate';
 import { DeviceBar } from './DeviceBar';
 import { ConsoleStrip } from './ConsoleStrip';
+import { NetworkStrip } from './NetworkStrip';
 import { DEFAULT_PRESET_ID, DEVICE_PRESETS, toEmulation } from './devicePresets';
 import type { BrowserDeviceEmulation, BrowserInputEvent } from '@zclaudia/shared';
 
@@ -115,6 +116,16 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
     [sessionId, sendMessage, measure]
   );
 
+  const pickActive = view?.pickActive ?? false;
+  const setPick = useCallback(
+    (active: boolean) => {
+      if (!sessionId) return;
+      useBrowserStore.getState().patchSession(sessionId, { pickActive: active });
+      sendMessage({ type: 'browser_pick_element', sessionId, active });
+    },
+    [sessionId, sendMessage]
+  );
+
   const toggleEmulation = useCallback(() => {
     if (emulation) {
       applyEmulation(null);
@@ -162,14 +173,27 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
         onHistory={(direction) => sendMessage({ type: 'browser_history', sessionId, direction })}
         onReload={() => sendMessage({ type: 'browser_reload', sessionId })}
         onStop={() => sendMessage({ type: 'browser_stop', sessionId })}
+        pickActive={pickActive}
         onToggleEmulation={toggleEmulation}
+        onTogglePick={() => setPick(!pickActive)}
         onOpenExternal={openExternal}
       />
       {emulation && <DeviceBar emulation={emulation} onChange={applyEmulation} />}
       {view?.error && (
         <div className="px-2 py-1 text-[11px] font-medium text-destructive border-b border-border">{view.error}</div>
       )}
-      <div ref={containerRef} className="relative flex-1 min-h-0 overflow-hidden bg-background">
+      <div
+        ref={containerRef}
+        className="relative flex-1 min-h-0 overflow-hidden bg-background"
+        onKeyDownCapture={(e) => {
+          // Escape cancels element-pick mode before the canvas forwards it to the page.
+          if (pickActive && e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            setPick(false);
+          }
+        }}
+      >
         {gateNeeded ? (
           <BrowserEngineGate engine={engine} onInstall={() => sendMessage({ type: 'browser_engine_install' })} />
         ) : view?.closedReason === 'crash' ? (
@@ -190,6 +214,7 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
           />
         )}
       </div>
+      {!gateNeeded && <NetworkStrip entries={view?.network ?? []} />}
       {!gateNeeded && <ConsoleStrip entries={view?.console ?? []} />}
     </div>
   );
