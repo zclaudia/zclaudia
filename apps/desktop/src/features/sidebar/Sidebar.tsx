@@ -1,6 +1,12 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type RefObject,
+} from 'react';
 import { createPortal } from 'react-dom';
-import { useSwipeBack } from '../../hooks/useSwipeBack';
 import { ProjectSettings } from '../settings/ProjectSettings';
 import { PluginPermissionDialog } from '../../components/permission/PluginPermissionDialog';
 import { SortableList, SortableItem } from '../../components/SortableList';
@@ -72,6 +78,8 @@ interface SidebarProps {
   isMobile?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
+  drawerPanelRef?: RefObject<HTMLDivElement | null>;
+  drawerBackdropRef?: RefObject<HTMLDivElement | null>;
   onOpenDashboard?: (projectId: string) => void;
   onOpenAutomations?: () => void;
   /** When present, the sidebar renders in automation mode (tab nav + scope list). */
@@ -118,6 +126,8 @@ export function Sidebar({
   isMobile,
   isOpen,
   onClose,
+  drawerPanelRef,
+  drawerBackdropRef,
   onOpenDashboard,
   onOpenAutomations,
   automationMode,
@@ -134,6 +144,8 @@ export function Sidebar({
   searchOpen: searchOpenProp,
   onSearchOpenChange,
 }: SidebarProps) {
+  const internalDrawerPanelRef = useRef<HTMLDivElement>(null);
+  const mobileDrawerPanelRef = drawerPanelRef ?? internalDrawerPanelRef;
   const data = useSidebarData();
   const {
     sessions,
@@ -482,22 +494,14 @@ export function Sidebar({
     setContextMenuProject(contextMenuProject === id ? null : id);
   };
 
-  const sidebarSwipeRef = useSwipeBack({
-    onSwipe: () => onClose?.(),
-    enabled: isMobile && !!isOpen,
-    direction: 'left',
-    fullWidth: true,
-    threshold: 60,
-  });
-
   // Mobile drawer is a modal dialog: move focus into it on open so keyboard
   // and screen-reader users land inside instead of on whatever was focused
   // behind the (still-mounted) app.
   useEffect(() => {
     if (isMobile && isOpen) {
-      sidebarSwipeRef.current?.focus();
+      mobileDrawerPanelRef.current?.focus();
     }
-  }, [isMobile, isOpen, sidebarSwipeRef]);
+  }, [isMobile, isOpen, mobileDrawerPanelRef]);
 
   // Escape closes the drawer; Tab/Shift+Tab is trapped within the panel so
   // keyboard focus can't leak out to the visually-hidden app behind the scrim.
@@ -509,7 +513,7 @@ export function Sidebar({
         return;
       }
       if (e.key !== 'Tab') return;
-      const focusable = sidebarSwipeRef.current?.querySelectorAll<HTMLElement>(
+      const focusable = mobileDrawerPanelRef.current?.querySelectorAll<HTMLElement>(
         'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
       );
       if (!focusable || focusable.length === 0) return;
@@ -525,7 +529,7 @@ export function Sidebar({
         first.focus();
       }
     },
-    [onClose, sidebarSwipeRef]
+    [onClose, mobileDrawerPanelRef]
   );
 
   // Returns true if creation may proceed; otherwise opens the guidance dialog.
@@ -773,23 +777,40 @@ export function Sidebar({
     </>
   );
 
-  // Mobile: render as overlay drawer. When the drawer is closed, still render
-  // the portaled modals (body portals) so quick actions from the Home page can
-  // open them — same pattern as the desktop-collapsed branch below.
+  // Mobile: keep the overlay drawer mounted offscreen so an opening drag can
+  // reveal its real content immediately. Inert/pointer-events prevent the
+  // closed panel from participating in focus or hit testing.
   if (isMobile) {
-    if (!isOpen) return renderPortaledModals();
-
     return (
       <>
-        <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} aria-hidden="true" />
         <div
-          ref={sidebarSwipeRef}
+          ref={drawerBackdropRef}
+          className={`mobile-drawer-backdrop fixed inset-0 bg-black z-40 ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          style={
+            {
+              '--drawer-backdrop-opacity': isOpen ? '0.5' : '0',
+              '--drawer-transition-duration': '350ms',
+            } as CSSProperties
+          }
+          onClick={isOpen ? onClose : undefined}
+          aria-hidden="true"
+        />
+        <div
+          ref={mobileDrawerPanelRef}
           role="dialog"
-          aria-modal="true"
+          aria-modal={isOpen ? 'true' : undefined}
+          aria-hidden={isOpen ? undefined : 'true'}
+          inert={!isOpen}
           aria-label="Navigation"
           tabIndex={-1}
           onKeyDown={handleDrawerKeyDown}
-          className="fixed inset-y-0 left-0 w-64 bg-card/80 glass z-50 shadow-apple-xl flex flex-col safe-top-pad safe-bottom-pad outline-none"
+          className={`mobile-drawer-panel fixed inset-y-0 left-0 w-64 bg-card/80 glass z-50 shadow-apple-xl flex flex-col safe-top-pad safe-bottom-pad outline-none ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          style={
+            {
+              '--drawer-panel-x': isOpen ? '0px' : '-100%',
+              '--drawer-transition-duration': '350ms',
+            } as CSSProperties
+          }
         >
           <MobileSidebarHeader
             onClose={onClose}
@@ -901,6 +922,7 @@ export function Sidebar({
                 getProjectsForBackend={getProjectsForBackend}
                 expandedBackendIds={expandedBackendIds}
                 onToggleBackend={toggleBackend}
+                enabled={isOpen}
                 onSelectScope={(backendId, projectId) => {
                   automationMode.onSelectScope(backendId, projectId);
                   onClose?.();

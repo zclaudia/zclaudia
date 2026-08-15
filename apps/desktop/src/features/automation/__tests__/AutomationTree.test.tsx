@@ -28,6 +28,11 @@ beforeEach(() => {
 });
 
 describe('AutomationTree', () => {
+  it('does not fetch item leaves while its offscreen drawer is disabled', () => {
+    render(<AutomationTree {...baseProps} tab="workflows" enabled={false} />);
+    expect(api.get).not.toHaveBeenCalled();
+  });
+
   it('workflows tab: expanding a project reveals workflow leaves', async () => {
     api.get.mockResolvedValue([
       { id: 'w1', name: 'Daily backup', status: 'active', projectId: 'p1' },

@@ -709,6 +709,28 @@ body.notch-window {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
+/* Mobile navigation drawer. Horizontal ownership is decided by
+   useHorizontalDrag; pan-y leaves normal document/list scrolling native. */
+.mobile-drawer-gesture-surface {
+  touch-action: pan-y;
+}
+
+.mobile-drawer-panel {
+  transform: translate3d(var(--drawer-panel-x, -100%), 0, 0);
+  transition-property: transform;
+  transition-duration: var(--drawer-transition-duration, 350ms);
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.mobile-drawer-backdrop {
+  opacity: var(--drawer-backdrop-opacity, 0);
+  transition-property: opacity;
+  transition-duration: var(--drawer-transition-duration, 350ms);
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity;
+}
+
 /*
  * Prevent wide content (tables, code blocks, long URLs) from overflowing
  * message bubbles on narrow screens. The prose container and its direct

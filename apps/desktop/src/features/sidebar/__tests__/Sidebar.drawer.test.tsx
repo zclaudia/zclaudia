@@ -254,7 +254,7 @@ describe('Sidebar mobile drawer — modal dialog semantics', () => {
 
   it('hides the click-scrim from assistive tech', () => {
     const { container } = renderSidebarMobileOpen();
-    const scrim = container.querySelector('.fixed.inset-0.bg-black\\/50');
+    const scrim = container.querySelector('.mobile-drawer-backdrop');
     expect(scrim).toBeTruthy();
     expect(scrim?.getAttribute('aria-hidden')).toBe('true');
   });

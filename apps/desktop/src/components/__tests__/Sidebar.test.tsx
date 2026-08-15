@@ -1519,11 +1519,11 @@ describe('Sidebar', () => {
     // Should show mobile header with ZClaudia title
     expect(container.textContent).toContain('ZClaudia');
     // Should have backdrop
-    const backdrop = container.querySelector('.fixed.inset-0.bg-black\\/50');
+    const backdrop = container.querySelector('.mobile-drawer-backdrop');
     expect(backdrop).toBeTruthy();
   });
 
-  it('returns null in mobile mode when not open', () => {
+  it('keeps the mobile drawer mounted offscreen when not open', () => {
     const { container } = render(
       <Sidebar
         collapsed={false}
@@ -1533,7 +1533,11 @@ describe('Sidebar', () => {
         onClose={vi.fn()}
       />
     );
-    expect(container.innerHTML).toBe('');
+    const dialog = container.querySelector('[role="dialog"]');
+    expect(dialog).toBeTruthy();
+    expect(dialog?.getAttribute('aria-hidden')).toBe('true');
+    expect(dialog?.hasAttribute('inert')).toBe(true);
+    expect((dialog as HTMLElement).style.getPropertyValue('--drawer-panel-x')).toBe('-100%');
   });
 
   it('closes mobile drawer when backdrop is clicked', () => {

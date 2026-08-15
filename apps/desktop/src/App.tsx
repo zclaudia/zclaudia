@@ -19,6 +19,7 @@ import { useSelectionCoordinator } from './hooks/useSelectionCoordinator';
 import { useIsMobile } from './hooks/useMediaQuery';
 import { useAndroidBack } from './hooks/useAndroidBack';
 import { useSwipeBack } from './hooks/useSwipeBack';
+import { isInteractiveHorizontalDragStart, useHorizontalDrag } from './hooks/useHorizontalDrag';
 import { useNotchBridgeHost } from './hooks/useNotchBridgeHost';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useServerLatencyMonitor } from './hooks/useServerLatencyMonitor';
@@ -75,6 +76,9 @@ const PluginsContent = lazy(() =>
 const NO_AGENTS_BACKENDS: AgentsBackend[] = [];
 const MOBILE_TOAST_CONTAINER_CLASS =
   'fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2';
+const MOBILE_DRAWER_WIDTH_PX = 256;
+const MOBILE_DRAWER_BACKDROP_MAX_OPACITY = 0.5;
+const MOBILE_DRAWER_SETTLE_DURATION_MS = 350;
 
 const LazyFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -146,6 +150,8 @@ function AppContent() {
   }>({ mode: null, progress: 0 });
 
   const hasConnected = useRef(false);
+  const drawerPanelRef = useRef<HTMLDivElement>(null);
+  const drawerBackdropRef = useRef<HTMLDivElement>(null);
 
   // --- Derived state ---
   const controlPlaneState = usesMobileControlPlane
@@ -383,6 +389,64 @@ function AppContent() {
     velocityThreshold: 0.18,
   });
 
+  const setDrawerVisualPosition = useCallback(
+    (open: boolean, distance: number, transitionDurationMs: number) => {
+      const clampedDistance = Math.min(MOBILE_DRAWER_WIDTH_PX, Math.max(0, distance));
+      const progress = clampedDistance / MOBILE_DRAWER_WIDTH_PX;
+      const panelX = open ? -clampedDistance : -MOBILE_DRAWER_WIDTH_PX + clampedDistance;
+      const backdropOpacity = MOBILE_DRAWER_BACKDROP_MAX_OPACITY * (open ? 1 - progress : progress);
+      const transitionDuration = `${transitionDurationMs}ms`;
+
+      drawerPanelRef.current?.style.setProperty('--drawer-transition-duration', transitionDuration);
+      drawerPanelRef.current?.style.setProperty('--drawer-panel-x', `${panelX}px`);
+      drawerBackdropRef.current?.style.setProperty(
+        '--drawer-transition-duration',
+        transitionDuration
+      );
+      drawerBackdropRef.current?.style.setProperty(
+        '--drawer-backdrop-opacity',
+        String(backdropOpacity)
+      );
+    },
+    []
+  );
+
+  const settleDrawer = useCallback(
+    (open: boolean) => {
+      setDrawerVisualPosition(open, 0, MOBILE_DRAWER_SETTLE_DURATION_MS);
+    },
+    [setDrawerVisualPosition]
+  );
+
+  // Button, backdrop, Escape, Android back, and menu navigation all continue to
+  // drive the existing boolean state; mirror those changes into the same CSS
+  // variables used by touch dragging.
+  useEffect(() => {
+    settleDrawer(sidebarOpen);
+  }, [sidebarOpen, settleDrawer]);
+
+  const drawerGestureRef = useHorizontalDrag<HTMLDivElement>({
+    enabled:
+      (isAppTopLevelView || isShellTopLevelView) &&
+      isMobile &&
+      !isAgentExpanded &&
+      !isFeedOpen &&
+      !fileViewerFullscreen,
+    direction: sidebarOpen ? 'left' : 'right',
+    maxDistance: MOBILE_DRAWER_WIDTH_PX,
+    completionThreshold: 0.32,
+    velocityThreshold: 0.45,
+    shouldStart: target => sidebarOpen || !isInteractiveHorizontalDragStart(target),
+    onDragStart: () => setDrawerVisualPosition(sidebarOpen, 0, 0),
+    onDrag: ({ distance }) => setDrawerVisualPosition(sidebarOpen, distance, 0),
+    onEnd: ({ shouldComplete }) => {
+      const nextOpen = shouldComplete ? !sidebarOpen : sidebarOpen;
+      settleDrawer(nextOpen);
+      if (nextOpen !== sidebarOpen) setSidebarOpen(nextOpen);
+    },
+    onCancel: () => settleDrawer(sidebarOpen),
+  });
+
   // --- Conditional early returns (setup / loading screens) ---
   const requiresDirectGatewaySetup = shouldShowDirectGatewaySetup({
     directGatewayUrl,
@@ -506,13 +570,18 @@ function AppContent() {
 
       {!isMobile && <UpdateBanner />}
 
-      <div className="flex flex-1 overflow-hidden">
+      <div
+        ref={drawerGestureRef}
+        className={`flex flex-1 overflow-hidden ${isMobile ? 'mobile-drawer-gesture-surface' : ''}`}
+      >
         <Sidebar
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
           isMobile={isMobile}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          drawerPanelRef={drawerPanelRef}
+          drawerBackdropRef={drawerBackdropRef}
           disableNotifications={disabledBuiltinPanels.includes('notifications')}
           onOpenNotifications={openNotifications}
           searchOpen={!isMobile ? sidebarSearchOpen : undefined}

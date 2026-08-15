@@ -25,6 +25,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup-unit.ts'],
     include: [
       'src/hooks/__tests__/useAndroidBack.test.ts',
+      'src/hooks/__tests__/useHorizontalDrag.test.tsx',
       'src/hooks/__tests__/useDataLoader.test.ts',
       'src/hooks/__tests__/useGatewayConnection.features.test.ts',
       'src/hooks/__tests__/useBackendFacade.test.ts',

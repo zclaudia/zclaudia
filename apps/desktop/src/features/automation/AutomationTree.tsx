@@ -27,6 +27,8 @@ export interface AutomationTreeProps {
   expandedBackendIds: string[];
   onToggleBackend: (backendId: string) => void;
   onSelectScope: (backendId: string, projectId?: string) => void;
+  /** Keep the offscreen mobile drawer mounted without fetching until it opens. */
+  enabled?: boolean;
 }
 
 const rowBase =
@@ -47,6 +49,7 @@ export function AutomationTree({
   expandedBackendIds,
   onToggleBackend,
   onSelectScope,
+  enabled = true,
 }: AutomationTreeProps) {
   const selectedItemId = useTopLevelViewStore(s => s.selectedAutomationItemId);
   const selectItem = useTopLevelViewStore(s => s.selectAutomationItem);
@@ -63,8 +66,8 @@ export function AutomationTree({
   }, [tab]);
 
   useEffect(() => {
-    if (!expandable) {
-      setItems([]);
+    if (!enabled || !expandable) {
+      setItems(current => (current.length === 0 ? current : []));
       return;
     }
     let cancelled = false;
@@ -90,7 +93,7 @@ export function AutomationTree({
     return () => {
       cancelled = true;
     };
-  }, [api, tab, expandable, refreshNonce]);
+  }, [api, tab, enabled, expandable, refreshNonce]);
 
   const leavesFor = (project: ScopeProject): Array<Workflow | Automation> =>
     isInternalProject(project.name)
