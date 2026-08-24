@@ -1,5 +1,16 @@
 import { create } from 'zustand';
 import type { ContentBlock, RunHealthStatus, ToolEffect, ToolSemantic } from '@zclaudia/shared';
+import type {
+  AssistantTurnItem,
+  ToolCallView,
+  TranscriptEvent,
+  TranscriptState,
+} from '@zclaudia/agent-transcript-kit';
+import {
+  applyTranscriptEvent,
+  initialTranscriptState,
+  orderedToolCalls,
+} from '@zclaudia/agent-transcript-kit';
 import { useSessionConfigStore } from './sessionConfigStore';
 import { useChatMessageStore, findLastAssistantMessageIndex } from './chatMessageStore';
 
@@ -52,11 +63,19 @@ interface RunState {
   runHealth: Record<string, RunHealth>;
   // Retry status while LLM call is in backoff: runId → RunRetryStatus
   runRetryStatus: Record<string, RunRetryStatus>;
-  // Active tool calls per run: runId → { toolUseId → ToolCallState }
+  /**
+   * Per-run transcript source of truth (@zclaudia/agent-transcript-kit): one
+   * single-turn TranscriptState per run, turnId = runId. The three fields
+   * below are projections of it and must not be mutated directly.
+   */
+  runTranscripts: Record<string, TranscriptState>;
+  /** ToolEffect has no kit slot yet; carried host-side and merged in projection. */
+  runToolEffects: Record<string, Record<string, ToolEffect>>;
+  // Active tool calls per run (projected): runId → { toolUseId → ToolCallState }
   activeToolCalls: Record<string, Record<string, ToolCallState>>;
-  // Tool calls history per run: runId → ToolCallState[] (preserves order)
+  // Tool calls history per run (projected): runId → ToolCallState[] (block order)
   toolCallsHistory: Record<string, ToolCallState[]>;
-  // Content blocks per run: runId → ContentBlock[] (text/tool_use interleaved sequence)
+  // Content blocks per run (projected): runId → ContentBlock[] (text/tool_use interleaved)
   runContentBlocks: Record<string, ContentBlock[]>;
 
   // Actions — Run lifecycle
@@ -120,12 +139,89 @@ interface RunState {
   getSessionToolCallHistory: (sessionId: string) => ToolCallState[];
 }
 
+// ── Kit transcript projection ─────────────────────────────────────
+
+function runTurn(transcript: TranscriptState, runId: string): AssistantTurnItem | undefined {
+  const item = transcript.items.find(entry => entry.kind === 'assistant_turn' && entry.id === runId);
+  return item as AssistantTurnItem | undefined;
+}
+
+function toToolCallState(
+  tool: ToolCallView,
+  effects: Record<string, ToolEffect> | undefined
+): ToolCallState {
+  return {
+    id: tool.id,
+    toolName: tool.name,
+    toolInput: tool.input,
+    // The store never grew a 'cancelled' status; kit-cancelled projects as error.
+    status:
+      tool.status === 'running' ? 'running' : tool.status === 'success' ? 'completed' : 'error',
+    result: tool.result,
+    isError: tool.status === 'error' ? true : undefined,
+    activity: tool.summary,
+    semantic: tool.semantic as ToolSemantic | undefined,
+    effect: effects?.[tool.id],
+  };
+}
+
+function projectBlocks(turn: AssistantTurnItem | undefined): ContentBlock[] {
+  if (!turn) return [];
+  return turn.blocks.map(block =>
+    block.kind === 'text'
+      ? { type: 'text' as const, content: block.text }
+      : block.kind === 'thinking'
+        ? {
+            type: 'thinking' as const,
+            content: block.text,
+            ...(block.signature !== undefined ? { signature: block.signature } : {}),
+          }
+        : { type: 'tool_use' as const, toolUseId: block.toolCallId }
+  );
+}
+
+/**
+ * Fold kit events into the run's transcript and refresh the projected
+ * blocks/tool-call fields. Returns {} (no update) when the reducer no-ops,
+ * so replayed duplicates keep referential equality for selectors.
+ */
+function applyRunEvents(
+  state: RunState,
+  runId: string,
+  events: TranscriptEvent[],
+  effects?: Record<string, Record<string, ToolEffect>>
+): Partial<RunState> {
+  const previous = state.runTranscripts[runId] ?? initialTranscriptState;
+  const transcript = events.reduce(
+    (current, event) => applyTranscriptEvent(current, event),
+    previous
+  );
+  const nextEffects = effects ?? state.runToolEffects;
+  if (transcript === previous && nextEffects === state.runToolEffects) return {};
+  const turn = runTurn(transcript, runId);
+  const history = turn
+    ? orderedToolCalls(turn).map(tool => toToolCallState(tool, nextEffects[runId]))
+    : [];
+  return {
+    runTranscripts: { ...state.runTranscripts, [runId]: transcript },
+    runToolEffects: nextEffects,
+    runContentBlocks: { ...state.runContentBlocks, [runId]: projectBlocks(turn) },
+    activeToolCalls: {
+      ...state.activeToolCalls,
+      [runId]: Object.fromEntries(history.map(tool => [tool.id, tool])),
+    },
+    toolCallsHistory: { ...state.toolCallsHistory, [runId]: history },
+  };
+}
+
 export const useRunStore = create<RunState>((set, get) => ({
   activeRuns: {},
   assistantMessageIds: {},
   backgroundRunIds: new Set<string>(),
   runHealth: {},
   runRetryStatus: {},
+  runTranscripts: {},
+  runToolEffects: {},
   activeToolCalls: {},
   toolCallsHistory: {},
   runContentBlocks: {},
@@ -135,12 +231,21 @@ export const useRunStore = create<RunState>((set, get) => ({
   startRun: (runId, sessionId, isBackground, assistantMessageId) => {
     const newBackgroundRunIds = new Set(get().backgroundRunIds);
     if (isBackground) newBackgroundRunIds.add(runId);
+    // A (re)start resets the run's buckets, matching the pre-kit behavior:
+    // stale-seq replays are filtered before reaching the store, so a fresh
+    // run_started means a genuinely fresh accumulation.
+    const transcript = applyTranscriptEvent(initialTranscriptState, {
+      type: 'turn_started',
+      turnId: runId,
+    });
     set(state => ({
       activeRuns: { ...state.activeRuns, [runId]: sessionId },
       assistantMessageIds: assistantMessageId
         ? { ...state.assistantMessageIds, [runId]: assistantMessageId }
         : state.assistantMessageIds,
       backgroundRunIds: newBackgroundRunIds,
+      runTranscripts: { ...state.runTranscripts, [runId]: transcript },
+      runToolEffects: { ...state.runToolEffects, [runId]: {} },
       activeToolCalls: { ...state.activeToolCalls, [runId]: {} },
       toolCallsHistory: { ...state.toolCallsHistory, [runId]: [] },
       runContentBlocks: { ...state.runContentBlocks, [runId]: [] },
@@ -152,6 +257,8 @@ export const useRunStore = create<RunState>((set, get) => ({
     set(state => {
       const { [runId]: _removedRun, ...remainingRuns } = state.activeRuns;
       const { [runId]: _removedMessageId, ...remainingMessageIds } = state.assistantMessageIds;
+      const { [runId]: _removedTranscript, ...remainingTranscripts } = state.runTranscripts;
+      const { [runId]: _removedEffects, ...remainingEffects } = state.runToolEffects;
       const { [runId]: _removedTC, ...remainingTC } = state.activeToolCalls;
       const { [runId]: _removedHist, ...remainingHist } = state.toolCallsHistory;
       const { [runId]: _removedCB, ...remainingCB } = state.runContentBlocks;
@@ -163,6 +270,8 @@ export const useRunStore = create<RunState>((set, get) => ({
         activeRuns: remainingRuns,
         assistantMessageIds: remainingMessageIds,
         backgroundRunIds: newBackgroundRunIds,
+        runTranscripts: remainingTranscripts,
+        runToolEffects: remainingEffects,
         activeToolCalls: remainingTC,
         toolCallsHistory: remainingHist,
         runContentBlocks: remainingCB,
@@ -201,115 +310,83 @@ export const useRunStore = create<RunState>((set, get) => ({
 
   addToolCall: (runId, toolUseId, toolName, toolInput, semantic, effect) =>
     set(state => {
-      const newToolCall: ToolCallState = {
-        id: toolUseId,
-        toolName,
-        toolInput,
-        status: 'running',
-        semantic,
-        effect,
-      };
-      const runToolCalls = state.activeToolCalls[runId] || {};
-      const runHistory = state.toolCallsHistory[runId] || [];
-      // Business idempotency: skip push if toolUseId already in history
-      const alreadyInHistory = runHistory.some(tc => tc.id === toolUseId);
-      return {
-        activeToolCalls: {
-          ...state.activeToolCalls,
-          [runId]: { ...runToolCalls, [toolUseId]: newToolCall },
-        },
-        toolCallsHistory: {
-          ...state.toolCallsHistory,
-          [runId]: alreadyInHistory ? runHistory : [...runHistory, newToolCall],
-        },
-      };
+      const effects = effect
+        ? {
+            ...state.runToolEffects,
+            [runId]: { ...state.runToolEffects[runId], [toolUseId]: effect },
+          }
+        : undefined;
+      return applyRunEvents(
+        state,
+        runId,
+        [
+          {
+            type: 'tool_started',
+            turnId: runId,
+            toolCallId: toolUseId,
+            name: toolName,
+            input: toolInput,
+            semantic,
+          },
+        ],
+        effects
+      );
     }),
 
   updateToolCallResult: (runId, toolUseId, result, isError, effect) =>
     set(state => {
-      const runToolCalls = state.activeToolCalls[runId];
-      if (!runToolCalls) return state;
-      const existing = runToolCalls[toolUseId];
-      if (!existing) return state;
-      // Business idempotency: skip if already completed/error
-      if (existing.status === 'completed' || existing.status === 'error') return state;
-
-      const updatedToolCall = {
-        ...existing,
-        status: isError ? ('error' as const) : ('completed' as const),
-        result,
-        isError,
-        effect: effect ?? existing.effect,
-      };
-
-      const runHistory = state.toolCallsHistory[runId] || [];
-      return {
-        activeToolCalls: {
-          ...state.activeToolCalls,
-          [runId]: { ...runToolCalls, [toolUseId]: updatedToolCall },
-        },
-        toolCallsHistory: {
-          ...state.toolCallsHistory,
-          [runId]: runHistory.map(tc => (tc.id === toolUseId ? updatedToolCall : tc)),
-        },
-      };
+      // Business idempotency (first-wins, unlike the kit's latest-wins): the
+      // result is ignored for unknown tools and for already-terminal ones.
+      const existing = state.activeToolCalls[runId]?.[toolUseId];
+      if (!existing || existing.status !== 'running') return state;
+      const effects = effect
+        ? {
+            ...state.runToolEffects,
+            [runId]: { ...state.runToolEffects[runId], [toolUseId]: effect },
+          }
+        : undefined;
+      return applyRunEvents(
+        state,
+        runId,
+        [
+          {
+            type: 'tool_finished',
+            turnId: runId,
+            toolCallId: toolUseId,
+            result,
+            isError,
+          },
+        ],
+        effects
+      );
     }),
 
   updateToolCallActivity: (runId, toolUseId, activity) =>
     set(state => {
-      const runToolCalls = state.activeToolCalls[runId];
-      if (!runToolCalls) return state;
-      const existing = runToolCalls[toolUseId];
+      // Activity is a live progress line; ignore it for tools that are not
+      // (or no longer) running, matching the pre-kit behavior.
+      const existing = state.activeToolCalls[runId]?.[toolUseId];
       if (!existing || existing.status !== 'running') return state;
-
-      const updated = { ...existing, activity };
-      const runHistory = state.toolCallsHistory[runId] || [];
-      return {
-        activeToolCalls: {
-          ...state.activeToolCalls,
-          [runId]: { ...runToolCalls, [toolUseId]: updated },
-        },
-        toolCallsHistory: {
-          ...state.toolCallsHistory,
-          [runId]: runHistory.map(tc => (tc.id === toolUseId ? updated : tc)),
-        },
-      };
+      return applyRunEvents(state, runId, [
+        { type: 'tool_activity', turnId: runId, toolCallId: toolUseId, summary: activity },
+      ]);
     }),
 
   // ── Content block actions (per run) ──────────────────────────
 
   appendTextBlock: (runId, content) =>
-    set(state => {
-      const blocks = state.runContentBlocks[runId] || [];
-      const lastBlock = blocks[blocks.length - 1];
-      let updatedBlocks: ContentBlock[];
-      if (lastBlock && lastBlock.type === 'text') {
-        updatedBlocks = [
-          ...blocks.slice(0, -1),
-          { type: 'text', content: lastBlock.content + content },
-        ];
-      } else {
-        updatedBlocks = [...blocks, { type: 'text', content }];
-      }
-      return {
-        runContentBlocks: { ...state.runContentBlocks, [runId]: updatedBlocks },
-      };
-    }),
+    set(state =>
+      applyRunEvents(state, runId, [{ type: 'text_delta', turnId: runId, delta: content }])
+    ),
 
   addToolUseBlock: (runId, toolUseId) =>
-    set(state => {
-      const blocks = state.runContentBlocks[runId] || [];
-      // Business idempotency: skip if toolUseId already in content blocks
-      if (blocks.some(b => b.type === 'tool_use' && b.toolUseId === toolUseId)) {
-        return state;
-      }
-      return {
-        runContentBlocks: {
-          ...state.runContentBlocks,
-          [runId]: [...blocks, { type: 'tool_use', toolUseId }],
-        },
-      };
-    }),
+    set(state =>
+      // tool_started both registers the tool and appends its block; when
+      // addToolCall already ran (the normal order) this is a strict no-op.
+      applyRunEvents(state, runId, [
+        { type: 'tool_started', turnId: runId, toolCallId: toolUseId, name: '' },
+      ])
+    ),
 
   // Finalize run data (tool calls + content blocks) onto the assistant message in one atomic update.
   // Prefers existing data when it's more complete (e.g., from API/metadata loaded before mid-stream join).
