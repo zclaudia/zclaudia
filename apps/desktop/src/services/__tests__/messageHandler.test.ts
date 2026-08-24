@@ -644,6 +644,40 @@ describe('handleServerMessage', () => {
       expect(mockChatStore.addToolUseBlock).toHaveBeenCalledWith('r1', 'tu1');
     });
 
+    it('commits buffered deltas before the tool block, preserving stream order', () => {
+      // Queue mode: hold the rAF callback so the delta stays buffered when
+      // tool_use arrives in the same frame. The tool_use must flush the text
+      // first — otherwise the tool block lands ahead of prose streamed
+      // before it.
+      let pendingCb: FrameRequestCallback | null = null;
+      (
+        globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }
+      ).requestAnimationFrame = (cb: FrameRequestCallback) => {
+        pendingCb = cb;
+        return 1;
+      };
+      mockChatStore.activeRuns = { r1: 's1' };
+
+      handleServerMessage(
+        { type: 'delta', sessionId: 's1', runId: 'r1', content: 'Let me look. ' },
+        makeCtx()
+      );
+      handleServerMessage(
+        { type: 'tool_use', sessionId: 's1', runId: 'r1', toolUseId: 'tu1', toolName: 'Read' },
+        makeCtx()
+      );
+
+      expect(mockChatStore.appendTextBlock).toHaveBeenCalledWith('r1', 'Let me look. ');
+      const textOrder = mockChatStore.appendTextBlock.mock.invocationCallOrder[0];
+      const toolOrder = mockChatStore.addToolCall.mock.invocationCallOrder[0];
+      expect(textOrder).toBeLessThan(toolOrder);
+
+      // The lingering rAF is a no-op — nothing double-commits.
+      mockChatStore.appendTextBlock.mockClear();
+      pendingCb?.(0);
+      expect(mockChatStore.appendTextBlock).not.toHaveBeenCalled();
+    });
+
     it('warns on untracked run', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       handleServerMessage(

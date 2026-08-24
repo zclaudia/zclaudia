@@ -12,7 +12,7 @@ import { useServerStore } from '../../stores/serverStore';
 import { useToastStore } from '../../stores/toastStore';
 import { eagerSyncCurrentSession, recoverCurrentSessionTail } from '../sessionSync';
 import { getSessionCompaction } from '../api/sessions';
-import { scheduleDelta } from './delta-buffer';
+import { scheduleDelta, scheduleToolUse } from './delta-buffer';
 import { finalizeRunLifecycle } from './run-finalization';
 
 /**
@@ -256,17 +256,17 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       useRunStore.getState().clearRunRetryStatus(msg.runId);
       const toolSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
       if (toolSession) {
-        useRunStore
-          .getState()
-          .addToolCall(
-            msg.runId,
-            msg.toolUseId,
-            msg.toolName,
-            msg.toolInput,
-            msg.semantic,
-            msg.effect
-          );
-        useRunStore.getState().addToolUseBlock(msg.runId, msg.toolUseId);
+        // Through the delta queue so buffered text commits first — the
+        // batcher flushes synchronously on tool_use, preserving block order.
+        scheduleToolUse(
+          toolSession,
+          msg.runId,
+          msg.toolUseId,
+          msg.toolName,
+          msg.toolInput,
+          msg.semantic,
+          msg.effect
+        );
       } else if (msg.runId) {
         console.warn(`[${logTag}] tool_use for untracked run ${msg.runId}`);
       }
