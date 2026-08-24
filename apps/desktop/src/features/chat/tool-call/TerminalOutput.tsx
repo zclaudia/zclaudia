@@ -1,43 +1,24 @@
 import { useState, useMemo } from 'react';
-import { useTerminalStore } from '../../../stores/terminalStore';
-import { useProjectStore } from '../../../stores/projectStore';
-import { useSelectionStore } from '../../../stores/selectionStore';
-import { useConnection } from '../../../contexts/ConnectionContext';
-import { useServerStore } from '../../../stores/serverStore';
-import { activatePanel } from '../../../utils/openPanel';
 import { ansiToHtml } from './toolFormatters';
 
 // Max lines to show before collapsing terminal output
 const TERMINAL_PREVIEW_LINES = 10;
 
-// Button to run a command in the remote terminal
-function RunInTerminalButton({ command }: { command: string }) {
-  const { sendMessage } = useConnection();
-  const hasTerminal = useServerStore.getState().activeServerSupports('remoteTerminal');
-
-  if (!hasTerminal) return null;
-
+// Button to run a command in the remote terminal. Pure: the host decides
+// whether the capability exists and how to route the command (see
+// useRunInTerminal) — render this only when a handler is available.
+function RunInTerminalButton({
+  command,
+  onRun,
+}: {
+  command: string;
+  onRun: (command: string) => void;
+}) {
   return (
     <button
-      onClick={async e => {
+      onClick={e => {
         e.stopPropagation();
-        const { selectedSessionId } = useSelectionStore.getState();
-        const { sessions } = useProjectStore.getState();
-        const session = sessions.find(s => s.id === selectedSessionId);
-        if (!session?.projectId) return;
-
-        const store = useTerminalStore.getState();
-        if (!store.getTerminalId(session.projectId)) {
-          store.openTerminal(session.projectId);
-        }
-        store.setDrawerOpen(session.projectId, true);
-        activatePanel('terminal');
-
-        const terminalId = useTerminalStore.getState().getTerminalId(session.projectId);
-        if (terminalId) {
-          await useTerminalStore.getState().waitForReady(terminalId);
-          sendMessage({ type: 'terminal_input', terminalId, data: command });
-        }
+        onRun(command);
       }}
       className="absolute top-1 right-1 p-1 rounded-md opacity-100 md:opacity-0 md:group-hover/cmd:opacity-100 hover:bg-accent text-muted-foreground hover:text-foreground transition-opacity"
       title="Paste to terminal"

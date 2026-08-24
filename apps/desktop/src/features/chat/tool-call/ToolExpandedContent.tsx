@@ -70,6 +70,7 @@ function ToolExpandedContent({
   isError,
   semantic,
   effect,
+  runInTerminal,
 }: {
   toolName: string;
   toolInput: unknown;
@@ -78,6 +79,8 @@ function ToolExpandedContent({
   isError?: boolean;
   semantic?: ToolSemantic;
   effect?: ToolEffect;
+  /** Host capability: paste a command into the terminal. Absent ⇒ no button. */
+  runInTerminal?: (command: string) => void;
 }) {
   // Check for custom plugin tool renderer
   const CustomRenderer = toolRendererRegistry.get(toolName);
@@ -228,7 +231,7 @@ function ToolExpandedContent({
               <pre className="text-xs font-mono p-2 bg-secondary text-success overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre relative group/cmd">
                 <span className="text-muted-foreground select-none">$ </span>
                 {command}
-                <RunInTerminalButton command={command} />
+                {runInTerminal && <RunInTerminalButton command={command} onRun={runInTerminal} />}
               </pre>
             </div>
           </div>

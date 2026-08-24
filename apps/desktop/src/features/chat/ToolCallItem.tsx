@@ -1,64 +1,35 @@
-import { useState, useMemo, useEffect, useRef, memo } from 'react';
+import { useMemo, memo } from 'react';
 import { type ToolCallState } from '../../stores/runStore';
-import { getToolIcon } from '../../config/icons';
-import { Icon } from '../../components/ui/Icon';
-import {
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  ChevronDown,
-  ChevronRight,
-  SendToBack,
-} from 'lucide-react';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { usePromptRequestStore } from '../../stores/promptRequestStore';
 import { InteractionItem } from './InteractionItem';
-import {
-  isTodoTool,
-  isAskUserFormTool,
-  isApprovalTool,
-  isPushFileTool,
-  isPlanProposalTool,
-  isInteractionTool,
-} from './tool-call/toolClassifiers';
+import { isPlanProposalTool, isInteractionTool } from './tool-call/toolClassifiers';
 import {
   normalizeToolInput,
   extractQuestions,
   extractInteractionId,
   buildAskUserQuestionInteraction,
-  formatToolInput,
 } from './tool-call/toolFormatters';
-import { ToolExpandedContent } from './tool-call/ToolExpandedContent';
+import { ToolCallCard } from './tool-call/ToolCallCard';
+import { useRunInTerminal } from './tool-call/useRunInTerminal';
 
 interface ToolCallItemProps {
   toolCall: ToolCallState;
 }
 
+/**
+ * Connected wrapper around the pure ToolCallCard: resolves the session and
+ * any interaction that supersedes the tool card (store lookups stay host-side
+ * so the card itself has zero global dependencies), and wires the host
+ * capabilities (send-to-background, run-in-terminal) as callbacks.
+ */
 export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallItemProps) {
-  // Plan proposals auto-expand on completion so the plan body and the
-  // "Execute plan" button are visible without an extra click. The state is
-  // user-toggleable afterwards; `autoExpandedRef` ensures we only auto-expand
-  // once per tool call (so user collapses stick).
-  const [isExpanded, setIsExpanded] = useState(
-    () =>
-      isPlanProposalTool(toolCall.toolName, toolCall.semantic) && toolCall.status === 'completed'
-  );
-  const autoExpandedRef = useRef(
-    isPlanProposalTool(toolCall.toolName, toolCall.semantic) && toolCall.status === 'completed'
-  );
-  useEffect(() => {
-    if (autoExpandedRef.current) return;
-    if (!isPlanProposalTool(toolCall.toolName, toolCall.semantic)) return;
-    if (toolCall.status !== 'completed') return;
-    autoExpandedRef.current = true;
-    setIsExpanded(true);
-  }, [toolCall.status, toolCall.toolName, toolCall.semantic]);
-  const { toolName, toolInput, status, result, isError, activity, semantic, effect } = toolCall;
+  const { toolName, toolInput, result, semantic } = toolCall;
   const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
   const { sendMessage } = useConnection();
-  const [backgroundRequested, setBackgroundRequested] = useState(false);
+  const runInTerminal = useRunInTerminal();
   const pendingPromptRequest = usePromptRequestStore(s => {
     if (!selectedSessionId || toolName !== 'AskUserQuestion') return null;
     for (let i = s.pendingRequests.length - 1; i >= 0; i--) {
@@ -103,6 +74,17 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
 
     return undefined;
   });
+  const onSendToBackground = useMemo(() => {
+    if (!selectedSessionId) return undefined;
+    return () => {
+      sendMessage({
+        type: 'background_running_command',
+        sessionId: selectedSessionId,
+        toolUseId: toolCall.id,
+      });
+    };
+  }, [selectedSessionId, sendMessage, toolCall.id]);
+
   const resolvedInteraction = interaction ?? fallbackPromptInteraction;
   if (resolvedInteraction && isInteractionTool(toolName, semantic)) {
     if (
@@ -120,110 +102,11 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
     }
   }
 
-  const icon = getToolIcon(toolName);
-  const displayName = isTodoTool(toolName)
-    ? 'TodoWrite'
-    : isAskUserFormTool(toolName)
-      ? 'AskUserForm'
-      : isApprovalTool(toolName)
-        ? 'RequestApproval'
-        : isPushFileTool(toolName)
-          ? 'PushFile'
-          : toolName;
-  const summary = formatToolInput(toolName, toolInput, semantic);
-
-  // AskUserQuestion: user answers come back as "deny" (isError=true), but that's expected behavior
-  const showAsError = isError && toolName !== 'AskUserQuestion';
-
   return (
-    <div
-      data-testid="tool-use"
-      className={`my-2 rounded-xl shadow-apple-sm border ${
-        status === 'running'
-          ? 'border-primary/30 bg-muted/40'
-          : showAsError
-            ? 'border-destructive/30 bg-destructive/5'
-            : 'border-success/30 bg-success/5'
-      }`}
-    >
-      {/* Header - clickable to expand/collapse */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 active:bg-muted/50 rounded-lg transition-colors"
-      >
-        {/* Status indicator */}
-        {status === 'running' ? (
-          <Loader2 size={14} className="animate-spin text-primary" />
-        ) : showAsError ? (
-          <XCircle size={14} className="text-destructive" />
-        ) : (
-          <CheckCircle2 size={14} className="text-success" />
-        )}
-
-        {/* Tool icon and name */}
-        <Icon icon={icon} size={14} className="text-muted-foreground" />
-        <span className="text-xs font-medium text-foreground" data-testid="tool-name">
-          {displayName}
-        </span>
-
-        {/* Summary */}
-        <span className="flex-1 text-xs text-muted-foreground truncate ml-2">{summary}</span>
-
-        {/* Expand/collapse indicator */}
-        <span className="text-muted-foreground">
-          {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        </span>
-      </button>
-
-      {/* Running Bash: let the user free the session by sending the command to background */}
-      {status === 'running' && toolName === 'Bash' && selectedSessionId && (
-        <div className="px-3 pb-2 -mt-1 pl-9">
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              if (backgroundRequested) return;
-              setBackgroundRequested(true);
-              sendMessage({
-                type: 'background_running_command',
-                sessionId: selectedSessionId,
-                toolUseId: toolCall.id,
-              });
-            }}
-            disabled={backgroundRequested}
-            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
-          >
-            <SendToBack size={11} />
-            {backgroundRequested ? 'Moving to background…' : 'Send to background'}
-          </button>
-        </div>
-      )}
-
-      {/* Subagent activity indicator — shows what the Agent is currently doing */}
-      {status === 'running' && activity && toolName === 'Agent' && (
-        <div className="px-3 pb-2 -mt-1">
-          <div className="text-[11px] text-muted-foreground truncate pl-6">{activity}</div>
-        </div>
-      )}
-
-      {/* Expanded content — tool-specific rendering */}
-      {isExpanded && (
-        <ToolExpandedContent
-          toolName={toolName}
-          toolInput={toolInput}
-          status={status}
-          result={result}
-          isError={isError}
-          semantic={semantic}
-          effect={effect}
-        />
-      )}
-    </div>
+    <ToolCallCard
+      toolCall={toolCall}
+      onSendToBackground={onSendToBackground}
+      runInTerminal={runInTerminal}
+    />
   );
 });
-
-/**
- * Interactive inline answer UI for AskUserQuestion tool calls.
- * Rendered when the tool call is still running (status='running'),
- * allowing the user to answer directly from the tool call card
- * — works on both desktop and mobile/gateway clients.
- */
