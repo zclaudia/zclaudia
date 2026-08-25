@@ -20,6 +20,14 @@ import { useIsMobile } from './hooks/useMediaQuery';
 import { useAndroidBack } from './hooks/useAndroidBack';
 import { useSwipeBack } from './hooks/useSwipeBack';
 import { isInteractiveHorizontalDragStart, useHorizontalDrag } from './hooks/useHorizontalDrag';
+import {
+  DRAWER_PEEK_WIDTH_PX,
+  drawerExpandedWidth,
+  drawerStageBelow,
+  drawerStagePosition,
+  resolveDrawerStage,
+  type DrawerStage,
+} from './features/sidebar/drawerStage';
 import { useNotchBridgeHost } from './hooks/useNotchBridgeHost';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useServerLatencyMonitor } from './hooks/useServerLatencyMonitor';
@@ -76,7 +84,6 @@ const PluginsContent = lazy(() =>
 const NO_AGENTS_BACKENDS: AgentsBackend[] = [];
 const MOBILE_TOAST_CONTAINER_CLASS =
   'fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2';
-const MOBILE_DRAWER_WIDTH_PX = 256;
 const MOBILE_DRAWER_BACKDROP_MAX_OPACITY = 0.5;
 const MOBILE_DRAWER_SETTLE_DURATION_MS = 350;
 
@@ -141,7 +148,14 @@ function AppContent() {
   // --- Local state ---
   const [dashboardProjectId, setDashboardProjectId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // The mobile drawer has three detents; everything outside the gesture layer
+  // still thinks in "open or not", so keep a boolean view over the stage.
+  const [drawerStage, setDrawerStage] = useState<DrawerStage>('closed');
+  const sidebarOpen = drawerStage !== 'closed';
+  const setSidebarOpen = useCallback(
+    (open: boolean) => setDrawerStage(open ? 'peek' : 'closed'),
+    []
+  );
   const [sidebarSearchOpen, setSidebarSearchOpen] = useState(false);
   const [isFeedOpen, setFeedOpen] = useState(false);
   const [agentSwipePreview, setAgentSwipePreview] = useState<{
@@ -345,8 +359,10 @@ function AppContent() {
     (isAppTopLevelView || isShellTopLevelView) && isMobile && isAgentExpanded,
     20
   );
+  // Back steps down one detent (expanded → drawer → closed) so it undoes the
+  // same amount a leftward swipe would.
   useAndroidBack(
-    () => setSidebarOpen(false),
+    () => setDrawerStage(drawerStageBelow(drawerStage)),
     (isAppTopLevelView || isShellTopLevelView) && isMobile && sidebarOpen,
     10
   );
@@ -389,16 +405,28 @@ function AppContent() {
     velocityThreshold: 0.18,
   });
 
+  const viewportDrawerWidth = useCallback(
+    () => drawerExpandedWidth(typeof window === 'undefined' ? 0 : window.innerWidth),
+    []
+  );
+
+  /**
+   * Paint the drawer at `position` pixels of revealed width. Below the peek
+   * width the 256px panel slides in; above it the panel grows in place.
+   */
   const setDrawerVisualPosition = useCallback(
-    (open: boolean, distance: number, transitionDurationMs: number) => {
-      const clampedDistance = Math.min(MOBILE_DRAWER_WIDTH_PX, Math.max(0, distance));
-      const progress = clampedDistance / MOBILE_DRAWER_WIDTH_PX;
-      const panelX = open ? -clampedDistance : -MOBILE_DRAWER_WIDTH_PX + clampedDistance;
-      const backdropOpacity = MOBILE_DRAWER_BACKDROP_MAX_OPACITY * (open ? 1 - progress : progress);
+    (position: number, transitionDurationMs: number) => {
+      const expandedWidth = viewportDrawerWidth();
+      const clamped = Math.min(expandedWidth, Math.max(0, position));
+      const width = Math.max(DRAWER_PEEK_WIDTH_PX, clamped);
+      const panelX = Math.min(0, clamped - DRAWER_PEEK_WIDTH_PX);
+      const revealProgress = Math.min(1, clamped / DRAWER_PEEK_WIDTH_PX);
+      const backdropOpacity = MOBILE_DRAWER_BACKDROP_MAX_OPACITY * revealProgress;
       const transitionDuration = `${transitionDurationMs}ms`;
 
       drawerPanelRef.current?.style.setProperty('--drawer-transition-duration', transitionDuration);
       drawerPanelRef.current?.style.setProperty('--drawer-panel-x', `${panelX}px`);
+      drawerPanelRef.current?.style.setProperty('--drawer-width', `${width}px`);
       drawerBackdropRef.current?.style.setProperty(
         '--drawer-transition-duration',
         transitionDuration
@@ -408,22 +436,35 @@ function AppContent() {
         String(backdropOpacity)
       );
     },
-    []
+    [viewportDrawerWidth]
   );
 
   const settleDrawer = useCallback(
-    (open: boolean) => {
-      setDrawerVisualPosition(open, 0, MOBILE_DRAWER_SETTLE_DURATION_MS);
+    (stage: DrawerStage) => {
+      setDrawerVisualPosition(
+        drawerStagePosition(stage, viewportDrawerWidth()),
+        MOBILE_DRAWER_SETTLE_DURATION_MS
+      );
     },
-    [setDrawerVisualPosition]
+    [setDrawerVisualPosition, viewportDrawerWidth]
   );
 
   // Button, backdrop, Escape, Android back, and menu navigation all continue to
-  // drive the existing boolean state; mirror those changes into the same CSS
-  // variables used by touch dragging.
+  // drive the stage state; mirror those changes into the same CSS variables
+  // used by touch dragging.
   useEffect(() => {
-    settleDrawer(sidebarOpen);
-  }, [sidebarOpen, settleDrawer]);
+    settleDrawer(drawerStage);
+  }, [drawerStage, settleDrawer]);
+
+  // The expanded stage is viewport-relative, so a rotation has to repaint it.
+  useEffect(() => {
+    if (drawerStage !== 'full' || typeof window === 'undefined') return;
+    const repaint = () => settleDrawer('full');
+    window.addEventListener('resize', repaint);
+    return () => window.removeEventListener('resize', repaint);
+  }, [drawerStage, settleDrawer]);
+
+  const dragStartPositionRef = useRef(0);
 
   const drawerGestureRef = useHorizontalDrag<HTMLDivElement>({
     enabled:
@@ -432,19 +473,28 @@ function AppContent() {
       !isAgentExpanded &&
       !isFeedOpen &&
       !fileViewerFullscreen,
-    direction: sidebarOpen ? 'left' : 'right',
-    maxDistance: MOBILE_DRAWER_WIDTH_PX,
+    // Once open the drawer can move either way: further right widens it to the
+    // expanded stage, left steps back toward closed.
+    direction: drawerStage === 'closed' ? 'right' : 'both',
+    maxDistance: viewportDrawerWidth(),
     completionThreshold: 0.32,
     velocityThreshold: 0.45,
     shouldStart: target => sidebarOpen || !isInteractiveHorizontalDragStart(target),
-    onDragStart: () => setDrawerVisualPosition(sidebarOpen, 0, 0),
-    onDrag: ({ distance }) => setDrawerVisualPosition(sidebarOpen, distance, 0),
-    onEnd: ({ shouldComplete }) => {
-      const nextOpen = shouldComplete ? !sidebarOpen : sidebarOpen;
-      settleDrawer(nextOpen);
-      if (nextOpen !== sidebarOpen) setSidebarOpen(nextOpen);
+    onDragStart: () => {
+      dragStartPositionRef.current = drawerStagePosition(drawerStage, viewportDrawerWidth());
+      setDrawerVisualPosition(dragStartPositionRef.current, 0);
     },
-    onCancel: () => settleDrawer(sidebarOpen),
+    onDrag: ({ distance }) => setDrawerVisualPosition(dragStartPositionRef.current + distance, 0),
+    onEnd: ({ distance, velocity }) => {
+      const nextStage = resolveDrawerStage(
+        dragStartPositionRef.current + distance,
+        velocity,
+        viewportDrawerWidth()
+      );
+      settleDrawer(nextStage);
+      if (nextStage !== drawerStage) setDrawerStage(nextStage);
+    },
+    onCancel: () => settleDrawer(drawerStage),
   });
 
   // --- Conditional early returns (setup / loading screens) ---

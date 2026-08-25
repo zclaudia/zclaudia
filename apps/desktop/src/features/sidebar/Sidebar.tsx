@@ -804,7 +804,7 @@ export function Sidebar({
           aria-label="Navigation"
           tabIndex={-1}
           onKeyDown={handleDrawerKeyDown}
-          className={`mobile-drawer-panel fixed inset-y-0 left-0 w-64 bg-[hsl(var(--sidebar))] border-r border-border/60 z-50 shadow-apple-xl flex flex-col safe-top-pad safe-bottom-pad outline-none ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          className={`mobile-drawer-panel fixed inset-y-0 left-0 bg-[hsl(var(--sidebar))] border-r border-border/60 z-50 shadow-apple-xl flex flex-col safe-top-pad safe-bottom-pad outline-none ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
           style={
             {
               '--drawer-panel-x': isOpen ? '0px' : '-100%',

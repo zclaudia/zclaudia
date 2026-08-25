@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
+import type { Ref } from 'react';
 
 const { mockUseIsMobile, mockUseAndroidBack, mockIsAndroid, mockShouldShowDirectGatewaySetup } =
   vi.hoisted(() => ({
@@ -17,11 +18,19 @@ vi.mock('../../features/sidebar/Sidebar', () => ({
   Sidebar: ({
     onOpenSettings,
     isOpen,
+    drawerPanelRef,
+    drawerBackdropRef,
   }: {
     onOpenSettings?: (tab?: 'permissions') => void;
     isOpen?: boolean;
+    drawerPanelRef?: Ref<HTMLDivElement>;
+    drawerBackdropRef?: Ref<HTMLDivElement>;
   }) => (
     <aside data-testid="app-sidebar" data-open={isOpen ? 'true' : 'false'}>
+      {/* Stand-ins for the real drawer panel and backdrop so the gesture layer
+          has something to paint its CSS variables onto. */}
+      <div data-testid="drawer-panel" ref={drawerPanelRef} />
+      <div data-testid="drawer-backdrop" ref={drawerBackdropRef} />
       <button onClick={() => onOpenSettings?.('permissions')}>Open Settings</button>
     </aside>
   ),
@@ -325,6 +334,141 @@ describe('App shell modes on mobile', () => {
     });
     expect(getByTestId('app-sidebar').getAttribute('data-open')).toBe('false');
     expect(useTopLevelViewStore.getState().view.kind).toBe('agents');
+  });
+});
+
+describe('Mobile drawer detents', () => {
+  // jsdom reports a 1024px viewport, so the expanded stage lands on the cap.
+  const EXPANDED_WIDTH_PX = 420;
+  const PEEK_WIDTH_PX = 256;
+
+  beforeEach(() => {
+    resetStores();
+    vi.clearAllMocks();
+    mockUseIsMobile.mockReturnValue(true);
+  });
+
+  function touch(target: Element, type: string, x: number) {
+    const point = { identifier: 1, target, clientX: x, clientY: 100 } as unknown as Touch;
+    const isEnd = type === 'touchend' || type === 'touchcancel';
+    act(() =>
+      target.dispatchEvent(
+        new TouchEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          touches: isEnd ? [] : [point],
+          changedTouches: [point],
+        })
+      )
+    );
+  }
+
+  // AppHeader is stubbed out in this harness, so the hamburger comes from the
+  // shell-mode header.
+  async function renderOpenDrawer() {
+    const view = render(<App />);
+    act(() => {
+      useTopLevelViewStore.getState().openPlugins();
+    });
+    await view.findByTestId('plugins-view');
+    fireEvent.click(view.getByRole('button', { name: 'Open menu' }));
+    const surface = view.container.querySelector('.mobile-drawer-gesture-surface');
+    if (!surface) throw new Error('drawer gesture surface not rendered');
+    return {
+      ...view,
+      surface,
+      drawerWidth: () =>
+        view.getByTestId('drawer-panel').style.getPropertyValue('--drawer-width'),
+      isOpen: () => view.getByTestId('app-sidebar').getAttribute('data-open') === 'true',
+    };
+  }
+
+  /**
+   * Drag and release with no flick velocity. Timestamps have to be explicit:
+   * touches dispatched within the same millisecond would otherwise read as an
+   * infinitely fast flick.
+   */
+  function slowDrag(surface: Element, deltaX: number) {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      touch(surface, 'touchstart', 200);
+      vi.setSystemTime(500);
+      touch(surface, 'touchmove', 200 + deltaX);
+      vi.setSystemTime(1000);
+      touch(surface, 'touchend', 200 + deltaX);
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
+  it('widens the open drawer to the expanded stage on a further right drag', async () => {
+    const { surface, drawerWidth, isOpen } = await renderOpenDrawer();
+    expect(drawerWidth()).toBe(`${PEEK_WIDTH_PX}px`);
+
+    slowDrag(surface, 140);
+
+    expect(drawerWidth()).toBe(`${EXPANDED_WIDTH_PX}px`);
+    expect(isOpen()).toBe(true);
+  });
+
+  it('steps the expanded drawer back to the standard width instead of closing', async () => {
+    const { surface, drawerWidth, isOpen } = await renderOpenDrawer();
+    slowDrag(surface, 140);
+    expect(drawerWidth()).toBe(`${EXPANDED_WIDTH_PX}px`);
+
+    slowDrag(surface, -170);
+
+    expect(drawerWidth()).toBe(`${PEEK_WIDTH_PX}px`);
+    expect(isOpen()).toBe(true);
+  });
+
+  it('closes from the expanded stage on a hard leftward fling', async () => {
+    const { surface, isOpen } = await renderOpenDrawer();
+    slowDrag(surface, 140);
+    expect(isOpen()).toBe(true);
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      touch(surface, 'touchstart', 300);
+      vi.setSystemTime(10);
+      touch(surface, 'touchmove', 280);
+      vi.setSystemTime(20);
+      touch(surface, 'touchend', 260);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(isOpen()).toBe(false);
+  });
+
+  it('keeps the drawer put when a drag never reaches the next detent', async () => {
+    const { surface, drawerWidth, isOpen } = await renderOpenDrawer();
+
+    slowDrag(surface, 40);
+
+    expect(drawerWidth()).toBe(`${PEEK_WIDTH_PX}px`);
+    expect(isOpen()).toBe(true);
+  });
+
+  it('walks Android back down one detent at a time', async () => {
+    const { surface, drawerWidth, isOpen } = await renderOpenDrawer();
+    slowDrag(surface, 140);
+    expect(drawerWidth()).toBe(`${EXPANDED_WIDTH_PX}px`);
+
+    const stepBack = () => {
+      const call = mockUseAndroidBack.mock.calls.filter(([, , priority]) => priority === 10).at(-1)!;
+      expect(call[1]).toBe(true);
+      act(() => call[0]());
+    };
+
+    stepBack();
+    expect(isOpen()).toBe(true);
+    expect(drawerWidth()).toBe(`${PEEK_WIDTH_PX}px`);
+
+    stepBack();
+    expect(isOpen()).toBe(false);
   });
 });
 

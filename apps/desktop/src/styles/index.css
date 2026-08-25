@@ -715,9 +715,12 @@ body.notch-window {
   touch-action: pan-y;
 }
 
+/* Width is a variable so the expanded detent can grow the panel in place while
+   the same drag keeps driving the slide-in transform. */
 .mobile-drawer-panel {
+  width: var(--drawer-width, 16rem);
   transform: translate3d(var(--drawer-panel-x, -100%), 0, 0);
-  transition-property: transform;
+  transition-property: transform, width;
   transition-duration: var(--drawer-transition-duration, 350ms);
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
