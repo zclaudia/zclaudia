@@ -373,7 +373,7 @@ if [ -f "$GRADLE_FILE" ] && ! grep -q 'manifestPlaceholders\["appIcon"\]' "$GRAD
       print "        manifestPlaceholders[\"appRoundIcon\"] = \"@mipmap/ic_launcher_round\""
       next
     }
-    /resValue\("string", "app_name", "ZClaudia Dev"\)/ {
+    /resValue\("string", "app_name",/ {
       print
       print "                manifestPlaceholders[\"appIcon\"] = \"@mipmap/ic_launcher_dev\""
       print "                manifestPlaceholders[\"appRoundIcon\"] = \"@mipmap/ic_launcher_dev_round\""
@@ -423,7 +423,7 @@ if [ -f "$GRADLE_FILE" ] && ! grep -q "isDevBuild" "$GRADLE_FILE"; then
       print "            if (isDevBuild) {"
       print "                applicationIdSuffix = \".dev\""
       print "                versionNameSuffix = \"-dev\""
-      print "                resValue(\"string\", \"app_name\", \"ZClaudia Dev\")"
+      print "                resValue(\"string\", \"app_name\", \"Claudia Dev\")"
       print "            }"
       next
     }

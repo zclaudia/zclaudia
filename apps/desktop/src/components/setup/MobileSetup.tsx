@@ -241,7 +241,7 @@ export function MobileSetup() {
             >
               <Bot size={32} strokeWidth={1.5} className="text-primary" />
             </button>
-            <h1 className="text-xl font-bold text-foreground">ZClaudia</h1>
+            <h1 className="text-xl font-bold text-foreground">Claudia</h1>
             <p className="text-sm text-muted-foreground mt-1">Connect to your server via Gateway</p>
           </div>
 

@@ -380,7 +380,7 @@ export function AgentPlaygroundApp() {
             </Button>
             {!state.status?.toolBridgeAvailable && (
               <p className="text-[10px] leading-4 text-muted-foreground">
-                ZClaudia MCP bridge is disabled. Provider-native tools remain available.
+                Claudia MCP bridge is disabled. Provider-native tools remain available.
               </p>
             )}
           </div>

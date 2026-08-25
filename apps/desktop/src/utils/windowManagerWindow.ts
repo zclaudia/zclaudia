@@ -11,7 +11,7 @@ export async function openWindowManagerWindow(): Promise<void> {
   }
   new WebviewWindow('window-manager', {
     url: `${window.location.origin}${window.location.pathname}?windowManager=1`,
-    title: 'Windows — ZClaudia',
+    title: 'Windows — Claudia',
     width: 680,
     height: 480,
     center: true,

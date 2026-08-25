@@ -1516,8 +1516,8 @@ describe('Sidebar', () => {
         onClose={onClose}
       />
     );
-    // Should show mobile header with ZClaudia title
-    expect(container.textContent).toContain('ZClaudia');
+    // Should show mobile header with Claudia title
+    expect(container.textContent).toContain('Claudia');
     // Should have backdrop
     const backdrop = container.querySelector('.mobile-drawer-backdrop');
     expect(backdrop).toBeTruthy();

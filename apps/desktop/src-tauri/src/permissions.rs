@@ -44,7 +44,7 @@ pub struct FolderPermission {
 /// Probe access to TCC-protected folders (Desktop, Documents, Downloads).
 ///
 /// On first call for each folder, macOS will show a consent dialog.
-/// The TCC decision is attributed to ZClaudia.app, so child processes
+/// The TCC decision is attributed to Claudia.app, so child processes
 /// (embedded node server, Claude CLI) inherit the permission.
 #[tauri::command]
 pub fn check_folder_permissions() -> Vec<FolderPermission> {

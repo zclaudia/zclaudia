@@ -388,7 +388,7 @@ export function ManagedRuntimeSettings({
             Download {approval.runtime} {approval.version}?
           </div>
           <p className="text-[11px] text-muted-foreground">
-            ZClaudia will download this artifact into its private runtime store, verify SHA-256,
+            Claudia will download this artifact into its private runtime store, verify SHA-256,
             probe the executable, and keep your normal HOME, Keychain, and provider authentication
             environment unchanged.
           </p>

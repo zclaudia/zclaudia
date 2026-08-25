@@ -101,6 +101,7 @@ vi.mock('../../hooks/useMobileInit', () => ({ useMobileInit: () => undefined }))
 vi.mock('../../hooks/useTauriWindowEvents', () => ({ useTauriWindowEvents: () => undefined }));
 
 vi.mock('../../utils/platform', () => ({
+  isTauri: () => false,
   isDesktopTauri: () => false,
   isAndroid: mockIsAndroid,
 }));

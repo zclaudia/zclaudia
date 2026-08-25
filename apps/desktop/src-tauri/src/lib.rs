@@ -45,7 +45,7 @@ use shortcuts::{ShortcutConfigState, ShortcutStateHandle, DEFAULT_CLAUDIA_SHORTC
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
-    format!("Hello, {}! Welcome to ZClaudia!", name)
+    format!("Hello, {}! Welcome to Claudia!", name)
 }
 
 /// Focus a window by label (bring to front, unminimize if needed)
@@ -217,7 +217,7 @@ pub fn run() {
         });
 
         // System tray icon
-        let show_item = MenuItemBuilder::with_id("show", "Show ZClaudia").build(app)?;
+        let show_item = MenuItemBuilder::with_id("show", "Show Claudia").build(app)?;
         let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
         let tray_menu = MenuBuilder::new(app)
             .items(&[&show_item, &quit_item])
@@ -231,7 +231,7 @@ pub fn run() {
             .icon(tray_icon)
             .icon_as_template(true)
             .menu(&tray_menu)
-            .tooltip("ZClaudia")
+            .tooltip("Claudia")
             .on_menu_event(|app, event| match event.id().as_ref() {
                 "show" => {
                     if let Some(window) = app.get_webview_window("main") {

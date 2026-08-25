@@ -17,7 +17,7 @@ export function PluginPermissionsPreview({ permissions }: { permissions: string[
         </div>
       ))}
       <p className="text-[11px] text-muted-foreground">
-        Installation does not grant these permissions. ZClaudia asks when the plugin first uses
+        Installation does not grant these permissions. Claudia asks when the plugin first uses
         them.
       </p>
     </div>

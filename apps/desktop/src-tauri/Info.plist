@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>NSLocalNetworkUsageDescription</key>
-  <string>ZClaudia needs local network access to reach self-hosted model endpoints and local development services.</string>
+  <string>Claudia needs local network access to reach self-hosted model endpoints and local development services.</string>
   <key>NSAppTransportSecurity</key>
   <dict>
     <key>NSAllowsLocalNetworking</key>

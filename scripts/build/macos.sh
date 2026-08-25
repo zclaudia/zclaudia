@@ -168,7 +168,7 @@ cleanup_macos_dmg_artifacts() {
 
   # Force-unmount any volumes named after the app. These are the usual cause of
   # sporadic `hdiutil create ... Resource busy` failures on CI runners.
-  for vol in /Volumes/ZClaudia*; do
+  for vol in /Volumes/Claudia*; do
     if [ -d "$vol" ]; then
       echo "  Force unmounting volume: $vol"
       hdiutil detach "$vol" -force 2>/dev/null || diskutil unmount force "$vol" 2>/dev/null || true
@@ -187,13 +187,13 @@ create_macos_dmg_with_retry() {
   trap 'rm -rf "$temp_root"' RETURN
 
   # Build from a staging copy to avoid hdiutil racing with the just re-signed bundle.
-  ditto "$app_bundle" "$temp_root/ZClaudia.app"
+  ditto "$app_bundle" "$temp_root/Claudia.app"
 
   for attempt in $(seq 1 "$attempts"); do
-    temp_dmg="$temp_root/ZClaudia.dmg"
+    temp_dmg="$temp_root/Claudia.dmg"
     rm -f "$temp_dmg" "$dmg_path"
 
-    if hdiutil create -volname "ZClaudia" -srcfolder "$temp_root/ZClaudia.app" -ov -format UDZO "$temp_dmg"; then
+    if hdiutil create -volname "Claudia" -srcfolder "$temp_root/Claudia.app" -ov -format UDZO "$temp_dmg"; then
       mv "$temp_dmg" "$dmg_path"
       rm -rf "$temp_root"
       trap - RETURN
@@ -353,7 +353,7 @@ pnpm --filter @zclaudia/desktop exec tauri build --bundles app,updater --config 
 rm -f "$TAURI_CONFIG_FILE"
 echo ""
 
-verify_release_bundle "$BUNDLE_DIR/macos/ZClaudia.app"
+verify_release_bundle "$BUNDLE_DIR/macos/Claudia.app"
 
 # --- Re-sign native modules and node sidecar ---
 # Tauri signs the node sidecar with hardened runtime, but self-signed certificates
@@ -362,7 +362,7 @@ verify_release_bundle "$BUNDLE_DIR/macos/ZClaudia.app"
 # under hardened runtime → SIGTRAP. Fix: sign .node files with same identity, and
 # re-sign node WITHOUT hardened runtime so it can load third-party native modules.
 if [ "${SKIP_SIGNING:-}" != "1" ]; then
-  APP_BUNDLE="$BUNDLE_DIR/macos/ZClaudia.app"
+  APP_BUNDLE="$BUNDLE_DIR/macos/Claudia.app"
   SIGNING_IDENTITY="${MACOS_SIGNING_IDENTITY:-ZClaudia Signing}"
 
   if [ -d "$APP_BUNDLE" ]; then
@@ -392,10 +392,10 @@ if [ "${SKIP_SIGNING:-}" != "1" ]; then
     # the original (incorrect) signatures. We must rebuild them.
 
     # Rebuild .app.tar.gz (updater artifact)
-    TAR_GZ_PATH="$BUNDLE_DIR/macos/ZClaudia.app.tar.gz"
+    TAR_GZ_PATH="$BUNDLE_DIR/macos/Claudia.app.tar.gz"
     if [ -f "$TAR_GZ_PATH" ]; then
       echo "  Rebuilding updater tar.gz with corrected signatures"
-      tar -czf "$TAR_GZ_PATH" -C "$BUNDLE_DIR/macos" "ZClaudia.app"
+      tar -czf "$TAR_GZ_PATH" -C "$BUNDLE_DIR/macos" "Claudia.app"
       # Re-sign the tar.gz if signing key is available
       if [ -n "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ] || [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
         echo "  Re-signing updater artifact"
@@ -413,7 +413,7 @@ if [ "${SKIP_SIGNING:-}" != "1" ]; then
     cleanup_macos_dmg_artifacts "$BUNDLE_DIR"
     sleep 1
     # Create new DMG
-    DMG_NAME="ZClaudia_${VERSION}_$(uname -m).dmg"
+    DMG_NAME="Claudia_${VERSION}_$(uname -m).dmg"
     DMG_PATH="$DMG_DIR/$DMG_NAME"
     mkdir -p "$DMG_DIR"
     create_macos_dmg_with_retry "$APP_BUNDLE" "$DMG_PATH"
@@ -427,16 +427,16 @@ fi
 # --- Rename outputs with version ---
 echo "=== Renaming outputs with version ==="
 
-# .app stays as ZClaudia.app (it's a folder, no version needed)
-if [ -d "$BUNDLE_DIR/macos/ZClaudia.app" ]; then
-  echo "  APP: $BUNDLE_DIR/macos/ZClaudia.app"
+# .app stays as Claudia.app (it's a folder, no version needed)
+if [ -d "$BUNDLE_DIR/macos/Claudia.app" ]; then
+  echo "  APP: $BUNDLE_DIR/macos/Claudia.app"
 fi
 
-# Rename .dmg → ZClaudia-{version}_{arch}.dmg
+# Rename .dmg → Claudia-{version}_{arch}.dmg
 if [ -d "$BUNDLE_DIR/dmg" ]; then
-  for dmg in "$BUNDLE_DIR"/dmg/ZClaudia_*.dmg; do
+  for dmg in "$BUNDLE_DIR"/dmg/Claudia_*.dmg; do
     [ -f "$dmg" ] || continue
-    VERSIONED_DMG="$BUNDLE_DIR/dmg/ZClaudia-${VERSION}_${ARCH}.dmg"
+    VERSIONED_DMG="$BUNDLE_DIR/dmg/Claudia-${VERSION}_${ARCH}.dmg"
     mv "$dmg" "$VERSIONED_DMG"
     echo "  DMG: $VERSIONED_DMG"
     ls -lh "$VERSIONED_DMG"
@@ -444,11 +444,11 @@ if [ -d "$BUNDLE_DIR/dmg" ]; then
 fi
 
 # --- Rename updater artifacts with architecture ---
-# Tauri produces ZClaudia.app.tar.gz; rename to include arch so dual-arch
+# Tauri produces Claudia.app.tar.gz; rename to include arch so dual-arch
 # builds (aarch64 + x86_64) don't collide on the same release.
-TAR_GZ_ORIG="$BUNDLE_DIR/macos/ZClaudia.app.tar.gz"
-TAR_SIG_ORIG="$BUNDLE_DIR/macos/ZClaudia.app.tar.gz.sig"
-TAR_GZ_NAME="ZClaudia_${TAURI_ARCH}.app.tar.gz"
+TAR_GZ_ORIG="$BUNDLE_DIR/macos/Claudia.app.tar.gz"
+TAR_SIG_ORIG="$BUNDLE_DIR/macos/Claudia.app.tar.gz.sig"
+TAR_GZ_NAME="Claudia_${TAURI_ARCH}.app.tar.gz"
 TAR_GZ="$BUNDLE_DIR/macos/$TAR_GZ_NAME"
 TAR_SIG="$BUNDLE_DIR/macos/${TAR_GZ_NAME}.sig"
 

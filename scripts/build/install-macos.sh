@@ -7,8 +7,8 @@ cd "$(dirname "$0")/../.."
 # --- Build ---
 bash scripts/build/macos.sh
 
-APP_SRC="$(pwd)/apps/desktop/src-tauri/target/release/bundle/macos/ZClaudia.app"
-APP_DEST="/Applications/ZClaudia.app"
+APP_SRC="$(pwd)/apps/desktop/src-tauri/target/release/bundle/macos/Claudia.app"
+APP_DEST="/Applications/Claudia.app"
 
 if [ ! -d "$APP_SRC" ]; then
   echo "ERROR: Build output not found at $APP_SRC"
@@ -22,7 +22,7 @@ echo "=== Starting upgrade (close → install → relaunch) ==="
 # so killing ZClaudia does not affect this script. No need for launchd.
 if pgrep -x "zclaudia" >/dev/null 2>&1; then
   echo "  Closing ZClaudia..."
-  osascript -e 'quit app "ZClaudia"' 2>/dev/null || true
+  osascript -e 'quit app "Claudia"' 2>/dev/null || true
   for _ in {1..10}; do
     pgrep -x "zclaudia" >/dev/null 2>&1 || break
     sleep 0.5

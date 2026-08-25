@@ -19,7 +19,7 @@ object NotificationRenderer {
   fun post(context: Context, intent: Intent, source: String) {
     ensureChannel(context)
 
-    val title = intent.getStringExtra("title")?.take(120)?.ifBlank { "ZClaudia" } ?: "ZClaudia"
+    val title = intent.getStringExtra("title")?.take(120)?.ifBlank { "Claudia" } ?: "Claudia"
     val body = intent.getStringExtra("body")?.take(500) ?: ""
     val tags = intent.getStringExtra("tags") ?: ""
     val messageId = intent.getStringExtra("message_id") ?: ""
