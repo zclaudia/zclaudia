@@ -1,4 +1,7 @@
-import type { ToolSemantic } from '@zclaudia/shared';
+// The kit's ToolSemantic is an open union: adapters may pass a value this
+// build does not know yet, and these predicates only compare against the ones
+// they do know. Accepting the open type keeps renderers usable by any host.
+import type { ToolSemantic } from '@zclaudia/agent-transcript-kit';
 
 function hasInteractionToolSuffix(toolName: string, suffix: string): boolean {
   return (

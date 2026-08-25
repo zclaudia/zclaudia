@@ -13,6 +13,7 @@ import {
   buildAskUserQuestionInteraction,
 } from './tool-call/toolFormatters';
 import { ToolCallCard } from './tool-call/ToolCallCard';
+import { toToolCallView } from './tool-call/toolCallView';
 import { useRunInTerminal } from './tool-call/useRunInTerminal';
 
 interface ToolCallItemProps {
@@ -85,6 +86,11 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
     };
   }, [selectedSessionId, sendMessage, toolCall.id]);
 
+  // Host shape → kit shape at the connected boundary: the card below is a pure
+  // kit-typed renderer, while stores and persisted history keep their own
+  // shape. Memoized so the card's memo still holds.
+  const view = useMemo(() => toToolCallView(toolCall), [toolCall]);
+
   const resolvedInteraction = interaction ?? fallbackPromptInteraction;
   if (resolvedInteraction && isInteractionTool(toolName, semantic)) {
     if (
@@ -104,7 +110,7 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
 
   return (
     <ToolCallCard
-      toolCall={toolCall}
+      toolCall={view}
       onSendToBackground={onSendToBackground}
       runInTerminal={runInTerminal}
     />

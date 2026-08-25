@@ -7,7 +7,7 @@ import {
   ChevronRight,
   SendToBack,
 } from 'lucide-react';
-import { type ToolCallState } from '../../../stores/runStore';
+import type { ToolCallView } from '@zclaudia/agent-transcript-kit';
 import { getToolIcon } from '../../../config/icons';
 import { Icon } from '../../../components/ui/Icon';
 import {
@@ -19,9 +19,10 @@ import {
 } from './toolClassifiers';
 import { formatToolInput } from './toolFormatters';
 import { ToolExpandedContent } from './ToolExpandedContent';
+import { toolCallEffect } from './toolCallView';
 
 export interface ToolCallCardProps {
-  toolCall: ToolCallState;
+  toolCall: ToolCallView;
   /**
    * Host capability: move this running command to the background. Present ⇒
    * a running Bash card offers "Send to background".
@@ -49,21 +50,23 @@ export const ToolCallCard = memo(function ToolCallCard({
   // user-toggleable afterwards; `autoExpandedRef` ensures we only auto-expand
   // once per tool call (so user collapses stick).
   const [isExpanded, setIsExpanded] = useState(
-    () =>
-      isPlanProposalTool(toolCall.toolName, toolCall.semantic) && toolCall.status === 'completed'
+    () => isPlanProposalTool(toolCall.name, toolCall.semantic) && toolCall.status === 'success'
   );
   const autoExpandedRef = useRef(
-    isPlanProposalTool(toolCall.toolName, toolCall.semantic) && toolCall.status === 'completed'
+    isPlanProposalTool(toolCall.name, toolCall.semantic) && toolCall.status === 'success'
   );
   useEffect(() => {
     if (autoExpandedRef.current) return;
-    if (!isPlanProposalTool(toolCall.toolName, toolCall.semantic)) return;
-    if (toolCall.status !== 'completed') return;
+    if (!isPlanProposalTool(toolCall.name, toolCall.semantic)) return;
+    if (toolCall.status !== 'success') return;
     autoExpandedRef.current = true;
     setIsExpanded(true);
-  }, [toolCall.status, toolCall.toolName, toolCall.semantic]);
+  }, [toolCall.status, toolCall.name, toolCall.semantic]);
   const [backgroundRequested, setBackgroundRequested] = useState(false);
-  const { toolName, toolInput, status, result, isError, activity, semantic, effect } = toolCall;
+  const { name: toolName, input: toolInput, result, semantic, summary: activity } = toolCall;
+  const status = toolCall.status === 'running' ? 'running' : 'completed';
+  const isError = toolCall.status === 'error' || toolCall.status === 'cancelled';
+  const effect = toolCallEffect(toolCall);
 
   const icon = getToolIcon(toolName);
   const displayName = isTodoTool(toolName)

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ToolCallCard } from '../tool-call/ToolCallCard';
-import type { ToolCallState } from '../../../stores/runStore';
+import type { ToolCallView } from '@zclaudia/agent-transcript-kit';
 
 // Purity contract: unlike ToolCallItem.test.tsx, this file mocks NO stores and
 // NO contexts. The card must render from props alone — that is what makes it
@@ -15,11 +15,11 @@ vi.mock('../../../components/renderers/DiffViewer', () => ({
   UnifiedDiffViewer: () => <div data-testid="unified-diff-viewer" />,
 }));
 
-function createToolCall(overrides: Partial<ToolCallState> = {}): ToolCallState {
+function createToolCall(overrides: Partial<ToolCallView> = {}): ToolCallView {
   return {
     id: 'tool-1',
-    toolName: 'Bash',
-    toolInput: { command: 'npm test' },
+    name: 'Bash',
+    input: { command: 'npm test' },
     status: 'running',
     ...overrides,
   };
