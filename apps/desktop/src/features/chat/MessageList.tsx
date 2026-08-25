@@ -10,15 +10,10 @@ import {
 } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import {
   Brain,
   ChevronRight,
   Image,
-  Copy,
-  Check,
-  Terminal,
   MoreHorizontal,
   GitFork,
   GitBranch,
@@ -44,17 +39,18 @@ import {
   normalizeMarkdownForRender,
   tryParseMessageInput,
 } from '../../utils/messageContent';
-import { useTerminalStore } from '../../stores/terminalStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { useConnection } from '../../contexts/ConnectionContext';
-import { useServerStore } from '../../stores/serverStore';
 import { TextWithFileRefs, MarkdownChildrenWithFileRefs } from './FileReference';
+import {
+  TranscriptCapabilitiesProvider,
+  type TranscriptCapabilities,
+} from './TranscriptCapabilities';
+import { useRunInTerminal } from './tool-call/useRunInTerminal';
+import { CodeBlock } from './CodeBlock';
 import {
   hasInlineMarkdownIcon,
   TextWithInlineMarkdownIcons,
 } from '../../components/markdown/InlineMarkdownIcons';
 import { FileLineReference, INLINE_FILE_REF_REGEX } from './FileLineReference';
-import { activatePanel } from '../../utils/openPanel';
 import { formatMessageTimestamp } from './messageTimestamp';
 import { useAnimationFrameThrottle } from '../../hooks/useAnimationFrameThrottle';
 
@@ -212,6 +208,14 @@ export const MessageList = memo(function MessageList({
   const fileRefContextValue = useMemo<FileRefContextValue>(
     () => ({ projectRoot: fileReferenceRoot, backendId: fileReferenceBackendId }),
     [fileReferenceRoot, fileReferenceBackendId]
+  );
+  // Host capabilities are resolved once here, at the container boundary, and
+  // handed to the renderers by context — they never reach into stores.
+  const runInTerminal = useRunInTerminal();
+  const { resolvedTheme } = useTheme();
+  const capabilities = useMemo<TranscriptCapabilities>(
+    () => ({ runInTerminal, isDarkCode: isDarkTheme(resolvedTheme) }),
+    [runInTerminal, resolvedTheme]
   );
   // Subscribe to filePushStore for download status updates
   const filePushItems = useFilePushStore(state => state.items);
@@ -513,137 +517,41 @@ export const MessageList = memo(function MessageList({
 
   if (!shouldVirtualize) {
     return (
-      <FileRefContext.Provider value={fileRefContextValue}>
-        <div data-testid="message-list" className="space-y-5 min-w-0 max-w-full">
-          {filteredMessages.map((message, index) => renderMessage(message, index))}
-        </div>
-        {previewModal}
-      </FileRefContext.Provider>
+      <TranscriptCapabilitiesProvider value={capabilities}>
+        <FileRefContext.Provider value={fileRefContextValue}>
+          <div data-testid="message-list" className="space-y-5 min-w-0 max-w-full">
+            {filteredMessages.map((message, index) => renderMessage(message, index))}
+          </div>
+          {previewModal}
+        </FileRefContext.Provider>
+      </TranscriptCapabilitiesProvider>
     );
   }
 
   return (
-    <FileRefContext.Provider value={fileRefContextValue}>
-      <div data-testid="message-list" className="min-w-0 max-w-full">
-        {virtualWindow.topPadding > 0 && <div style={{ height: virtualWindow.topPadding }} />}
-        {filteredMessages.slice(virtualWindow.start, virtualWindow.end).map((message, idx) => {
-          const absoluteIndex = virtualWindow.start + idx;
-          return (
-            <div
-              key={message.id}
-              ref={getMeasureRef(absoluteIndex)}
-              className="mb-4 min-w-0 max-w-full"
-            >
-              {renderMessage(message, absoluteIndex)}
-            </div>
-          );
-        })}
-        {virtualWindow.bottomPadding > 0 && <div style={{ height: virtualWindow.bottomPadding }} />}
-      </div>
-      {previewModal}
-    </FileRefContext.Provider>
-  );
-});
-
-const SHELL_LANGUAGES = new Set(['bash', 'shell', 'sh', 'zsh']);
-
-// Memoized so completed code blocks in a streaming message don't re-run Prism
-// tokenization on every token — only the block whose code string changed does.
-const CodeBlock = memo(function CodeBlock({
-  language,
-  children,
-}: {
-  language: string;
-  children: string;
-}) {
-  const [copied, setCopied] = useState(false);
-  const { resolvedTheme } = useTheme();
-  const { sendMessage } = useConnection();
-  const isShell = SHELL_LANGUAGES.has(language.toLowerCase());
-  const hasTerminal = isShell && useServerStore.getState().activeServerSupports('remoteTerminal');
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(children);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleRunInTerminal = async () => {
-    const { selectedSessionId, sessions } = useProjectStore.getState();
-    const session = sessions.find(s => s.id === selectedSessionId);
-    if (!session?.projectId) return;
-
-    const store = useTerminalStore.getState();
-    if (!store.getTerminalId(session.projectId)) {
-      store.openTerminal(session.projectId);
-    }
-    store.setDrawerOpen(session.projectId, true);
-    activatePanel('terminal');
-
-    const terminalId = useTerminalStore.getState().getTerminalId(session.projectId);
-    if (terminalId) {
-      await useTerminalStore.getState().waitForReady(terminalId);
-      sendMessage({ type: 'terminal_input', terminalId, data: children });
-    }
-  };
-
-  const codeStyle = isDarkTheme(resolvedTheme) ? oneDark : oneLight;
-
-  return (
-    <div className="not-prose rounded-lg overflow-hidden border border-border max-w-full">
-      {/* Header bar - like GPT style */}
-      <div className="flex items-center justify-between px-4 py-2 bg-secondary border-b border-border">
-        <span className="text-xs text-muted-foreground font-medium">{language}</span>
-        <div className="flex items-center gap-3">
-          {isShell && hasTerminal && (
-            <button
-              onClick={handleRunInTerminal}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Terminal size={16} strokeWidth={1.75} />
-              Run in terminal
-            </button>
+    <TranscriptCapabilitiesProvider value={capabilities}>
+      <FileRefContext.Provider value={fileRefContextValue}>
+        <div data-testid="message-list" className="min-w-0 max-w-full">
+          {virtualWindow.topPadding > 0 && <div style={{ height: virtualWindow.topPadding }} />}
+          {filteredMessages.slice(virtualWindow.start, virtualWindow.end).map((message, idx) => {
+            const absoluteIndex = virtualWindow.start + idx;
+            return (
+              <div
+                key={message.id}
+                ref={getMeasureRef(absoluteIndex)}
+                className="mb-4 min-w-0 max-w-full"
+              >
+                {renderMessage(message, absoluteIndex)}
+              </div>
+            );
+          })}
+          {virtualWindow.bottomPadding > 0 && (
+            <div style={{ height: virtualWindow.bottomPadding }} />
           )}
-          <button
-            onClick={handleCopy}
-            className={`
-              flex items-center gap-1.5 text-xs transition-colors
-              ${copied ? 'text-success' : 'text-muted-foreground hover:text-foreground'}
-            `}
-          >
-            {copied ? (
-              <>
-                <Check size={16} strokeWidth={1.75} />
-                Copied!
-              </>
-            ) : (
-              <>
-                <Copy size={16} strokeWidth={1.75} />
-                Copy code
-              </>
-            )}
-          </button>
         </div>
-      </div>
-      {/* Code content */}
-      <div className="overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch]">
-        <SyntaxHighlighter
-          style={codeStyle}
-          language={language}
-          PreTag="div"
-          customStyle={{
-            margin: 0,
-            borderRadius: 0,
-            padding: '0.75rem',
-            fontSize: 'var(--chat-font-code, 0.75rem)',
-            overflowX: 'auto',
-            whiteSpace: 'pre',
-          }}
-        >
-          {children}
-        </SyntaxHighlighter>
-      </div>
-    </div>
+        {previewModal}
+      </FileRefContext.Provider>
+    </TranscriptCapabilitiesProvider>
   );
 });
 
