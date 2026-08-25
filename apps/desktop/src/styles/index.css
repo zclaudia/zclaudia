@@ -63,6 +63,20 @@
     --terminal-ansi-bright-magenta: 285 50% 58%;
     --terminal-ansi-bright-cyan: 190 60% 40%;
     --terminal-ansi-bright-white: 45 10% 88%;
+    --code-bg: 45 15% 95%;
+    --code-comment: 45 5% 45%;
+    --code-punctuation: 45 5% 38%;
+    --code-keyword: 265 45% 48%;
+    --code-string: 150 48% 30%;
+    --code-function: 214 70% 42%;
+    --code-number: 24 70% 40%;
+    --code-class: 42 72% 34%;
+    --code-variable: 190 60% 30%;
+    --code-tag: 4 60% 44%;
+    --code-attr: 24 65% 40%;
+    --code-regex: 190 55% 32%;
+    --code-deleted: 4 66% 45%;
+    --code-inserted: 150 48% 33%;
     /* @generated:tokens end */
 
     /* Radius */
@@ -135,6 +149,20 @@
     --terminal-ansi-bright-magenta: 285 50% 58%;
     --terminal-ansi-bright-cyan: 190 60% 40%;
     --terminal-ansi-bright-white: 45 10% 88%;
+    --code-bg: 225 10% 95%;
+    --code-comment: 225 5% 45%;
+    --code-punctuation: 225 5% 38%;
+    --code-keyword: 265 45% 48%;
+    --code-string: 150 48% 30%;
+    --code-function: 214 70% 42%;
+    --code-number: 24 70% 40%;
+    --code-class: 42 72% 34%;
+    --code-variable: 190 60% 30%;
+    --code-tag: 4 60% 44%;
+    --code-attr: 24 65% 40%;
+    --code-regex: 190 55% 32%;
+    --code-deleted: 4 66% 45%;
+    --code-inserted: 150 48% 33%;
     /* @generated:tokens end */
   }
 
@@ -198,6 +226,20 @@
     --terminal-ansi-bright-magenta: 285 50% 74%;
     --terminal-ansi-bright-cyan: 185 50% 63%;
     --terminal-ansi-bright-white: 35 12% 93%;
+    --code-bg: 35 6% 6.5%;
+    --code-comment: 35 6% 50%;
+    --code-punctuation: 35 6% 62%;
+    --code-keyword: 265 45% 70%;
+    --code-string: 150 45% 60%;
+    --code-function: 214 70% 66%;
+    --code-number: 24 70% 64%;
+    --code-class: 42 70% 62%;
+    --code-variable: 190 55% 62%;
+    --code-tag: 4 62% 64%;
+    --code-attr: 24 65% 64%;
+    --code-regex: 190 55% 62%;
+    --code-deleted: 4 62% 62%;
+    --code-inserted: 150 45% 58%;
     /* @generated:tokens end */
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
@@ -266,6 +308,20 @@
     --terminal-ansi-bright-magenta: 285 50% 74%;
     --terminal-ansi-bright-cyan: 185 50% 63%;
     --terminal-ansi-bright-white: 35 12% 93%;
+    --code-bg: 30 7% 6.5%;
+    --code-comment: 30 6% 50%;
+    --code-punctuation: 30 6% 62%;
+    --code-keyword: 265 45% 70%;
+    --code-string: 150 45% 60%;
+    --code-function: 214 70% 66%;
+    --code-number: 24 70% 64%;
+    --code-class: 42 70% 62%;
+    --code-variable: 190 55% 62%;
+    --code-tag: 4 62% 64%;
+    --code-attr: 24 65% 64%;
+    --code-regex: 190 55% 62%;
+    --code-deleted: 4 62% 62%;
+    --code-inserted: 150 45% 58%;
     /* @generated:tokens end */
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
@@ -334,6 +390,20 @@
     --terminal-ansi-bright-magenta: 285 50% 74%;
     --terminal-ansi-bright-cyan: 185 50% 63%;
     --terminal-ansi-bright-white: 35 12% 93%;
+    --code-bg: 225 13% 6.5%;
+    --code-comment: 225 6% 50%;
+    --code-punctuation: 225 6% 62%;
+    --code-keyword: 265 45% 70%;
+    --code-string: 150 45% 60%;
+    --code-function: 214 70% 66%;
+    --code-number: 24 70% 64%;
+    --code-class: 42 70% 62%;
+    --code-variable: 190 55% 62%;
+    --code-tag: 4 62% 64%;
+    --code-attr: 24 65% 64%;
+    --code-regex: 190 55% 62%;
+    --code-deleted: 4 62% 62%;
+    --code-inserted: 150 45% 58%;
     /* @generated:tokens end */
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
@@ -345,25 +415,11 @@
 
 :root {
   --font-sans:
-    -apple-system,
-    BlinkMacSystemFont,
-    'SF Pro Text',
-    'SF Pro Display',
-    system-ui,
-    'PingFang SC',
-    'Microsoft YaHei',
-    'Noto Sans SC',
-    sans-serif;
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, 'PingFang SC',
+    'Microsoft YaHei', 'Noto Sans SC', sans-serif;
   --font-mono:
-    'JetBrains Mono',
-    'SF Mono',
-    ui-monospace,
-    Menlo,
-    Monaco,
-    Consolas,
-    'PingFang SC',
-    'Microsoft YaHei',
-    monospace;
+    'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Monaco, Consolas, 'PingFang SC',
+    'Microsoft YaHei', monospace;
 
   font-family: var(--font-sans);
   line-height: 1.6;
@@ -384,6 +440,105 @@ body {
   color: hsl(var(--foreground));
   /* No trackpad rubber-band on the app shell; inner scrollers still bounce. */
   overscroll-behavior: none;
+}
+
+/* Syntax highlighting — the theme's own --code-* tokens, applied to Prism's
+   standard token classes. Highlighters emit these class names rather than
+   inline styles (`useInlineStyles={false}`), so the palette follows the
+   active theme across all five variants and the renderer never imports a
+   library-specific JS style object. Anything unmatched inherits --code-fg. */
+.zc-code,
+.zc-code code[class*='language-'],
+.zc-code pre[class*='language-'] {
+  color: hsl(var(--foreground));
+  background: none;
+  text-shadow: none;
+  font-family: var(--font-mono);
+}
+
+.zc-code .token.comment,
+.zc-code .token.prolog,
+.zc-code .token.doctype,
+.zc-code .token.cdata {
+  color: hsl(var(--code-comment));
+  font-style: italic;
+}
+
+.zc-code .token.punctuation {
+  color: hsl(var(--code-punctuation));
+}
+
+.zc-code .token.keyword,
+.zc-code .token.important,
+.zc-code .token.atrule,
+.zc-code .token.rule {
+  color: hsl(var(--code-keyword));
+}
+
+.zc-code .token.string,
+.zc-code .token.char,
+.zc-code .token.attr-value,
+.zc-code .token.template-string {
+  color: hsl(var(--code-string));
+}
+
+.zc-code .token.function,
+.zc-code .token.method,
+.zc-code .token.function-name {
+  color: hsl(var(--code-function));
+}
+
+.zc-code .token.number,
+.zc-code .token.boolean,
+.zc-code .token.constant,
+.zc-code .token.symbol,
+.zc-code .token.unit {
+  color: hsl(var(--code-number));
+}
+
+.zc-code .token.class-name,
+.zc-code .token.builtin,
+.zc-code .token.namespace,
+.zc-code .token.type-class-name {
+  color: hsl(var(--code-class));
+}
+
+.zc-code .token.variable,
+.zc-code .token.property,
+.zc-code .token.parameter {
+  color: hsl(var(--code-variable));
+}
+
+.zc-code .token.tag,
+.zc-code .token.selector {
+  color: hsl(var(--code-tag));
+}
+
+.zc-code .token.attr-name,
+.zc-code .token.operator,
+.zc-code .token.entity,
+.zc-code .token.url {
+  color: hsl(var(--code-attr));
+}
+
+.zc-code .token.regex {
+  color: hsl(var(--code-regex));
+}
+
+.zc-code .token.deleted {
+  color: hsl(var(--code-deleted));
+}
+
+.zc-code .token.inserted {
+  color: hsl(var(--code-inserted));
+}
+
+.zc-code .token.bold {
+  font-weight: 600;
+}
+
+.zc-code .token.italic {
+  font-style: italic;
 }
 
 /* Desktop chrome discipline: control labels are not selectable text. Content
@@ -422,7 +577,6 @@ body.notch-window {
   min-height: 100%;
   overflow: hidden;
 }
-
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
@@ -589,8 +743,8 @@ body.notch-window {
 [data-tauri-drag-region] input,
 [data-tauri-drag-region] select,
 [data-tauri-drag-region] textarea,
-[data-tauri-drag-region] [contenteditable="true"],
-[data-tauri-drag-region] [role="button"] {
+[data-tauri-drag-region] [contenteditable='true'],
+[data-tauri-drag-region] [role='button'] {
   -webkit-app-region: no-drag;
 }
 
@@ -615,34 +769,35 @@ body.notch-window {
 }
 
 /* Heading hierarchy in prose (sizes from --chat-font-h* via uiStore) */
-.prose.prose-sm :where(h1, h2, h3, h4, h5, h6):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+.prose.prose-sm
+  :where(h1, h2, h3, h4, h5, h6):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
   font-weight: 500;
   line-height: 1.4;
   margin-top: 1.15em;
   margin-bottom: 0.45em;
 }
-.prose.prose-sm :where(h1):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+.prose.prose-sm :where(h1):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
   font-size: var(--chat-font-h1, 1.15em);
 }
-.prose.prose-sm :where(h2):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+.prose.prose-sm :where(h2):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
   font-size: var(--chat-font-h2, 1.08em);
 }
-.prose.prose-sm :where(h3):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+.prose.prose-sm :where(h3):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
   font-size: var(--chat-font-h3, 1em);
 }
-.prose.prose-sm :where(h4, h5, h6):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+.prose.prose-sm :where(h4, h5, h6):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
   font-size: 0.95em;
 }
-.prose.prose-sm :where(table, th, td):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+.prose.prose-sm :where(table, th, td):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
   font-size: inherit;
 }
-.prose.prose-sm :where(blockquote):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+.prose.prose-sm :where(blockquote):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
   font-size: inherit;
 }
-.prose.prose-sm :where(strong, b):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+.prose.prose-sm :where(strong, b):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
   font-weight: inherit;
 }
-.prose.prose-sm :where(:not(pre) > code):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+.prose.prose-sm :where(:not(pre) > code):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
   font-family: var(--font-mono);
   font-size: 1em;
   padding: 0.1em 0.4em;
@@ -659,7 +814,8 @@ body.notch-window {
   justify-content: center;
   vertical-align: middle;
   line-height: 1;
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", emoji, sans-serif;
+  font-family:
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Twemoji Mozilla', emoji, sans-serif;
   font-size: 1em;
   font-variant-emoji: emoji;
 }
@@ -752,24 +908,24 @@ body.notch-window {
 }
 
 /* Increase line spacing in chat messages */
-.prose :where(p):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+.prose :where(p):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
   line-height: 1.65;
   margin-top: 0.75em;
   margin-bottom: 0.75em;
 }
 
-.prose :where(ul, ol):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+.prose :where(ul, ol):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
   margin-top: 0.75em;
   margin-bottom: 0.75em;
 }
 
-.prose :where(li):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+.prose :where(li):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
   margin-top: 0.35em;
   margin-bottom: 0.35em;
   line-height: 1.55;
 }
 
-.prose :where(pre):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+.prose :where(pre):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
   margin-top: 1em;
   margin-bottom: 1em;
 }

@@ -30,7 +30,6 @@ import type { MessageWithToolCalls } from '../../stores/chatMessageStore';
 import type { ToolCallState } from '../../stores/runStore';
 import type { ContentBlock, ThinkingBlock as ThinkingBlockMeta } from '@zclaudia/shared';
 import { useFilePushStore, type FilePushItem } from '../../stores/filePushStore';
-import { useTheme, isDarkTheme } from '../../contexts/ThemeContext';
 import { downloadFile } from '../../services/fileUpload';
 import type { MessageAttachment } from '@zclaudia/shared';
 import {
@@ -212,11 +211,7 @@ export const MessageList = memo(function MessageList({
   // Host capabilities are resolved once here, at the container boundary, and
   // handed to the renderers by context — they never reach into stores.
   const runInTerminal = useRunInTerminal();
-  const { resolvedTheme } = useTheme();
-  const capabilities = useMemo<TranscriptCapabilities>(
-    () => ({ runInTerminal, isDarkCode: isDarkTheme(resolvedTheme) }),
-    [runInTerminal, resolvedTheme]
-  );
+  const capabilities = useMemo<TranscriptCapabilities>(() => ({ runInTerminal }), [runInTerminal]);
   // Subscribe to filePushStore for download status updates
   const filePushItems = useFilePushStore(state => state.items);
   const [previewItem, setPreviewItem] = useState<FilePushItem | null>(null);

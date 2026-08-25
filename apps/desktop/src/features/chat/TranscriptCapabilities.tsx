@@ -17,8 +17,6 @@ import { createContext, useContext } from 'react';
 export interface TranscriptCapabilities {
   /** Paste a command/snippet into the host's terminal. */
   runInTerminal?: (command: string) => void;
-  /** Code highlighting theme, expressed neutrally (no host theme types). */
-  isDarkCode?: boolean;
 }
 
 const TranscriptCapabilitiesContext = createContext<TranscriptCapabilities>({});

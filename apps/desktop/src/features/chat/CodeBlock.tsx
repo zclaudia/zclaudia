@@ -1,6 +1,5 @@
 import { useState, memo } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Terminal, Copy, Check } from 'lucide-react';
 import { useTranscriptCapabilities } from './TranscriptCapabilities';
 
@@ -27,7 +26,7 @@ export const CodeBlock = memo(function CodeBlock({
   children: string;
 }) {
   const [copied, setCopied] = useState(false);
-  const { runInTerminal, isDarkCode } = useTranscriptCapabilities();
+  const { runInTerminal } = useTranscriptCapabilities();
   const isShell = SHELL_LANGUAGES.has(language.toLowerCase());
   const canRunInTerminal = isShell && Boolean(runInTerminal);
 
@@ -36,8 +35,6 @@ export const CodeBlock = memo(function CodeBlock({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  const codeStyle = isDarkCode ? oneDark : oneLight;
 
   return (
     <div className="not-prose rounded-lg overflow-hidden border border-border max-w-full">
@@ -75,10 +72,14 @@ export const CodeBlock = memo(function CodeBlock({
           </button>
         </div>
       </div>
-      {/* Code content */}
-      <div className="overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch]">
+      {/* Code content — colors come from the theme's --code-* tokens via the
+          .zc-code rules, not from a highlighter style object. */}
+      <div
+        className="zc-code overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch]"
+        style={{ background: 'hsl(var(--code-bg))' }}
+      >
         <SyntaxHighlighter
-          style={codeStyle}
+          useInlineStyles={false}
           language={language}
           PreTag="div"
           customStyle={{

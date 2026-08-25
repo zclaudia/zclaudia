@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTheme, isDarkTheme } from '../../contexts/ThemeContext';
@@ -310,10 +309,13 @@ export function FilePreviewModal({ item, onClose }: FilePreviewModalProps) {
         )}
 
         {!loading && !error && previewType === 'text' && textContent !== null && (
-          <div className="w-full h-full overflow-auto">
+          <div
+            className="zc-code w-full h-full overflow-auto"
+            style={{ background: 'hsl(var(--code-bg))' }}
+          >
             <SyntaxHighlighter
               language={detectLanguage(item.fileName)}
-              style={dark ? oneDark : oneLight}
+              useInlineStyles={false}
               showLineNumbers
               customStyle={{
                 margin: 0,

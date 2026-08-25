@@ -75,6 +75,57 @@ const darkAnsi = {
   'terminal-ansi-bright-white': [35, 12, 93],
 };
 
+// Syntax highlighting palette — hue-anchored to the same axis as the accents
+// and glyphs (red 4 = destructive, green 150 = success, amber 42 = warning,
+// blue 214 = primary, purple 265 = thinking, cyan 190 = teal glyph) so code
+// sits inside the theme instead of importing a foreign one. Consumed through
+// CSS classes (`.token.keyword`, …) rather than a highlighter's JS style
+// object, which is what lets the renderer stay library-agnostic.
+const lightCodeAccents = {
+  'code-keyword': [265, 45, 48],
+  'code-string': [150, 48, 30],
+  'code-function': [214, 70, 42],
+  'code-number': [24, 70, 40],
+  'code-class': [42, 72, 34],
+  'code-variable': [190, 60, 30],
+  'code-tag': [4, 60, 44],
+  'code-attr': [24, 65, 40],
+  'code-regex': [190, 55, 32],
+  'code-deleted': [4, 66, 45],
+  'code-inserted': [150, 48, 33],
+};
+
+const darkCodeAccents = {
+  'code-keyword': [265, 45, 70],
+  'code-string': [150, 45, 60],
+  'code-function': [214, 70, 66],
+  'code-number': [24, 70, 64],
+  'code-class': [42, 70, 62],
+  'code-variable': [190, 55, 62],
+  'code-tag': [4, 62, 64],
+  'code-attr': [24, 65, 64],
+  'code-regex': [190, 55, 62],
+  'code-deleted': [4, 62, 62],
+  'code-inserted': [150, 45, 58],
+};
+
+// The neutral members (bg / comment / punctuation) ride the theme's own hue
+// axis, like terminal-bg does, so a code block reads as part of the surface
+// ladder rather than a pasted-in panel.
+const lightCode = (hue, sat) => ({
+  'code-bg': [hue, sat, 95],
+  'code-comment': [hue, 5, 45],
+  'code-punctuation': [hue, 5, 38],
+  ...lightCodeAccents,
+});
+
+const darkCode = (hue, sat) => ({
+  'code-bg': [hue, sat, 6.5],
+  'code-comment': [hue, 6, 50],
+  'code-punctuation': [hue, 6, 62],
+  ...darkCodeAccents,
+});
+
 const lightAccents = {
   primary: [214, 70, 45],
   'primary-foreground': [0, 0, 100],
@@ -162,7 +213,7 @@ export const themes = [
       'terminal-bg': [45, 15, 95],
       'terminal-fg': [45, 8, 10],
     },
-    accents: lightAccents,
+    accents: { ...lightAccents, ...lightCode(45, 15) },
   },
   {
     name: 'light-cool',
@@ -189,27 +240,27 @@ export const themes = [
       'terminal-bg': [225, 10, 95],
       'terminal-fg': [225, 12, 10],
     },
-    accents: lightAccents,
+    accents: { ...lightAccents, ...lightCode(225, 10) },
   },
   {
     name: 'dark',
     selector: '.dark',
     hue: 35,
     neutrals: darkNeutrals(35, 6, 10),
-    accents: { ...darkAccents, 'terminal-selection': [35, 6, 20] },
+    accents: { ...darkAccents, 'terminal-selection': [35, 6, 20], ...darkCode(35, 6) },
   },
   {
     name: 'dark-warm',
     selector: '.dark.dark-warm',
     hue: 30,
     neutrals: darkNeutrals(30, 7, 12),
-    accents: { ...darkAccents, 'terminal-selection': [30, 7, 20] },
+    accents: { ...darkAccents, 'terminal-selection': [30, 7, 20], ...darkCode(30, 7) },
   },
   {
     name: 'dark-cool',
     selector: '.dark.dark-cool',
     hue: 225,
     neutrals: darkNeutrals(225, 13, 18),
-    accents: { ...darkAccents, 'terminal-selection': [225, 13, 20] },
+    accents: { ...darkAccents, 'terminal-selection': [225, 13, 20], ...darkCode(225, 13) },
   },
 ];
