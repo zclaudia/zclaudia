@@ -442,6 +442,35 @@ body {
   overscroll-behavior: none;
 }
 
+/* Transcript kit theming interface: map this app's tokens onto the kit's
+   --ztk-* contract once, and every kit renderer follows the active theme.
+   Loaded after the kit stylesheet (see main.tsx), so these win. */
+:root {
+  --ztk-fg: hsl(var(--foreground));
+  --ztk-fg-muted: hsl(var(--muted-foreground));
+  --ztk-bg-subtle: hsl(var(--secondary));
+  --ztk-border: hsl(var(--border));
+  --ztk-radius: 0.5rem;
+  --ztk-font-mono: var(--font-mono);
+  --ztk-font-size-sm: 0.75rem;
+  --ztk-code-font-size: var(--chat-font-code, 0.75rem);
+  --ztk-code-bg: hsl(var(--code-bg));
+  --ztk-code-fg: hsl(var(--foreground));
+  --ztk-code-comment: hsl(var(--code-comment));
+  --ztk-code-punctuation: hsl(var(--code-punctuation));
+  --ztk-code-keyword: hsl(var(--code-keyword));
+  --ztk-code-string: hsl(var(--code-string));
+  --ztk-code-function: hsl(var(--code-function));
+  --ztk-code-number: hsl(var(--code-number));
+  --ztk-code-class: hsl(var(--code-class));
+  --ztk-code-variable: hsl(var(--code-variable));
+  --ztk-code-tag: hsl(var(--code-tag));
+  --ztk-code-attr: hsl(var(--code-attr));
+  --ztk-code-regex: hsl(var(--code-regex));
+  --ztk-code-deleted: hsl(var(--code-deleted));
+  --ztk-code-inserted: hsl(var(--code-inserted));
+}
+
 /* Syntax highlighting — the theme's own --code-* tokens, applied to Prism's
    standard token classes. Highlighters emit these class names rather than
    inline styles (`useInlineStyles={false}`), so the palette follows the

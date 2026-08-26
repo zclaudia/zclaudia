@@ -42,9 +42,9 @@ import { TextWithFileRefs, MarkdownChildrenWithFileRefs } from './FileReference'
 import {
   TranscriptCapabilitiesProvider,
   type TranscriptCapabilities,
-} from './TranscriptCapabilities';
+} from '@zclaudia/agent-transcript-kit/react';
 import { useRunInTerminal } from './tool-call/useRunInTerminal';
-import { CodeBlock } from './CodeBlock';
+import { CodeBlock, highlightCode } from './CodeBlock';
 import {
   hasInlineMarkdownIcon,
   TextWithInlineMarkdownIcons,
@@ -211,7 +211,10 @@ export const MessageList = memo(function MessageList({
   // Host capabilities are resolved once here, at the container boundary, and
   // handed to the renderers by context — they never reach into stores.
   const runInTerminal = useRunInTerminal();
-  const capabilities = useMemo<TranscriptCapabilities>(() => ({ runInTerminal }), [runInTerminal]);
+  const capabilities = useMemo<TranscriptCapabilities>(
+    () => ({ runInTerminal, highlightCode }),
+    [runInTerminal]
+  );
   // Subscribe to filePushStore for download status updates
   const filePushItems = useFilePushStore(state => state.items);
   const [previewItem, setPreviewItem] = useState<FilePushItem | null>(null);
