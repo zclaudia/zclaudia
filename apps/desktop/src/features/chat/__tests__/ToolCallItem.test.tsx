@@ -193,42 +193,37 @@ describe('ToolCallItem', () => {
       const { container } = render(
         <ToolCallItem toolCall={createToolCall({ status: 'running' })} />
       );
-      const spinner = container.querySelector('.animate-spin');
-      expect(spinner).toBeInTheDocument();
+      expect(screen.getByTestId('tool-use')).toHaveAttribute('data-status', 'running');
+      // The status glyph animates; the class is the kit's, the state is ours.
+      expect(container.querySelector('.ztk-spin')).toBeInTheDocument();
     });
 
     it('shows success checkmark when completed without error', () => {
-      const { container } = render(
-        <ToolCallItem toolCall={createToolCall({ status: 'completed', isError: false })} />
-      );
-      const checkIcon = container.querySelector('.text-success');
-      expect(checkIcon).toBeInTheDocument();
+      render(<ToolCallItem toolCall={createToolCall({ status: 'completed', isError: false })} />);
+      expect(screen.getByTestId('tool-use')).toHaveAttribute('data-status', 'done');
     });
 
     it('shows error icon when completed with error', () => {
-      const { container } = render(
-        <ToolCallItem toolCall={createToolCall({ status: 'completed', isError: true })} />
-      );
-      const errorIcon = container.querySelector('.text-destructive');
-      expect(errorIcon).toBeInTheDocument();
+      render(<ToolCallItem toolCall={createToolCall({ status: 'completed', isError: true })} />);
+      expect(screen.getByTestId('tool-use')).toHaveAttribute('data-status', 'error');
     });
 
     it('uses primary border for running status', () => {
       render(<ToolCallItem toolCall={createToolCall({ status: 'running' })} />);
       const el = screen.getByTestId('tool-use');
-      expect(el.className).toContain('border-primary/30');
+      expect(el).toHaveAttribute('data-status', 'running');
     });
 
     it('uses destructive border for error status', () => {
       render(<ToolCallItem toolCall={createToolCall({ status: 'completed', isError: true })} />);
       const el = screen.getByTestId('tool-use');
-      expect(el.className).toContain('border-destructive/30');
+      expect(el).toHaveAttribute('data-status', 'error');
     });
 
     it('uses success border for completed status without error', () => {
       render(<ToolCallItem toolCall={createToolCall({ status: 'completed', isError: false })} />);
       const el = screen.getByTestId('tool-use');
-      expect(el.className).toContain('border-success/30');
+      expect(el).toHaveAttribute('data-status', 'done');
     });
 
     it('AskUserQuestion with isError shows as success (not error)', () => {
@@ -243,7 +238,7 @@ describe('ToolCallItem', () => {
       );
       const el = screen.getByTestId('tool-use');
       // AskUserQuestion treats isError as expected behavior, not destructive
-      expect(el.className).toContain('border-success/30');
+      expect(el).toHaveAttribute('data-status', 'done');
     });
   });
 

@@ -454,6 +454,10 @@ body {
   --ztk-font-mono: var(--font-mono);
   --ztk-font-size-sm: 0.75rem;
   --ztk-code-font-size: var(--chat-font-code, 0.75rem);
+  --ztk-accent: hsl(var(--primary));
+  --ztk-success: hsl(var(--success));
+  --ztk-danger: hsl(var(--destructive));
+  --ztk-surface-muted: hsl(var(--muted));
   --ztk-code-bg: hsl(var(--code-bg));
   --ztk-code-fg: hsl(var(--foreground));
   --ztk-code-comment: hsl(var(--code-comment));

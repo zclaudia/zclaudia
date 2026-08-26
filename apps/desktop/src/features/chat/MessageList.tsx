@@ -45,6 +45,7 @@ import {
 } from '@zclaudia/agent-transcript-kit/react';
 import { useRunInTerminal } from './tool-call/useRunInTerminal';
 import { CodeBlock, highlightCode } from './CodeBlock';
+import { toolIcon } from './tool-call/toolIcon';
 import {
   hasInlineMarkdownIcon,
   TextWithInlineMarkdownIcons,
@@ -212,7 +213,7 @@ export const MessageList = memo(function MessageList({
   // handed to the renderers by context — they never reach into stores.
   const runInTerminal = useRunInTerminal();
   const capabilities = useMemo<TranscriptCapabilities>(
-    () => ({ runInTerminal, highlightCode }),
+    () => ({ runInTerminal, highlightCode, toolIcon }),
     [runInTerminal]
   );
   // Subscribe to filePushStore for download status updates
