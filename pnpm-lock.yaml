@@ -105,8 +105,8 @@ importers:
         specifier: ^12.11.0
         version: 12.11.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@zclaudia/agent-transcript-kit':
-        specifier: file:../../../zclaudia-agent-transcript-kit
-        version: file:../zclaudia-agent-transcript-kit(react@19.2.7)
+        specifier: ^0.2.0
+        version: 0.2.0(react@19.2.7)
       '@zclaudia/protocol':
         specifier: ^0.2.0
         version: 0.2.0
@@ -2352,8 +2352,8 @@ packages:
     engines: {node: '>=22.19.0'}
     hasBin: true
 
-  '@zclaudia/agent-transcript-kit@file:../zclaudia-agent-transcript-kit':
-    resolution: {directory: ../zclaudia-agent-transcript-kit, type: directory}
+  '@zclaudia/agent-transcript-kit@0.2.0':
+    resolution: {integrity: sha512-+LoN6AxJhSWn6n8sK2umHOEgHS1c8r6pd6QLJTMA29rKfImAh9Jidh/fwtGaUcaYTLHvNGiLo93FLhK42YOcXw==}
     peerDependencies:
       react: '>=18'
     peerDependenciesMeta:
@@ -7387,7 +7387,7 @@ snapshots:
     dependencies:
       '@zclaudia/plugin-sdk': 0.1.0
 
-  '@zclaudia/agent-transcript-kit@file:../zclaudia-agent-transcript-kit(react@19.2.7)':
+  '@zclaudia/agent-transcript-kit@0.2.0(react@19.2.7)':
     optionalDependencies:
       react: 19.2.7
 
