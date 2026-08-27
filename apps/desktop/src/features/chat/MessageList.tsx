@@ -11,7 +11,6 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
-  Brain,
   ChevronRight,
   Image,
   MoreHorizontal,
@@ -28,7 +27,7 @@ import { ContextUsageCard } from './ContextUsageCard';
 import { ChatLink } from '../browser/ChatLink';
 import type { MessageWithToolCalls } from '../../stores/chatMessageStore';
 import type { ToolCallState } from '../../stores/runStore';
-import type { ContentBlock, ThinkingBlock as ThinkingBlockMeta } from '@zclaudia/shared';
+import type { ContentBlock } from '@zclaudia/shared';
 import { useFilePushStore, type FilePushItem } from '../../stores/filePushStore';
 import { downloadFile } from '../../services/fileUpload';
 import type { MessageAttachment } from '@zclaudia/shared';
@@ -40,6 +39,7 @@ import {
 } from '../../utils/messageContent';
 import { TextWithFileRefs, MarkdownChildrenWithFileRefs } from './FileReference';
 import {
+  ThinkingBlock,
   TranscriptCapabilitiesProvider,
   type TranscriptCapabilities,
 } from '@zclaudia/agent-transcript-kit/react';
@@ -60,108 +60,6 @@ interface FileRefContextValue {
 }
 
 const FileRefContext = createContext<FileRefContextValue>({});
-
-/** Number of preview lines shown when collapsed */
-const THINKING_PREVIEW_LINES = 2;
-
-/** Collapsible thinking block with purple accent and content preview */
-function ThinkingBlock({ content }: { content: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const lines = content.split('\n');
-  const nonEmptyLines = lines.filter(l => l.trim().length > 0);
-  const lineCount = nonEmptyLines.length;
-
-  // Build preview: first N non-empty lines
-  const previewLines = nonEmptyLines.slice(0, THINKING_PREVIEW_LINES);
-  const previewText = previewLines.join('\n');
-  const hasMore = lineCount > THINKING_PREVIEW_LINES;
-
-  return (
-    <div className="mb-2 rounded-lg border border-thinking/30 bg-thinking/5 text-xs">
-      {/* Header */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1.5 w-full px-3 py-1.5 text-thinking hover:text-foreground transition-colors"
-      >
-        <Brain size={14} strokeWidth={1.75} className="flex-shrink-0" />
-        <ChevronRight
-          size={12}
-          strokeWidth={1.75}
-          className={`transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`}
-        />
-        <span className="font-medium">Thinking</span>
-        {/* Line count */}
-        <span className="text-thinking/50 ml-auto text-[10px]">
-          {lineCount} line{lineCount !== 1 ? 's' : ''}
-        </span>
-      </button>
-
-      {/* Preview (when collapsed) */}
-      {!expanded && previewText && (
-        <div className="px-3 pb-2 text-muted-foreground italic leading-relaxed line-clamp-2">
-          {previewText}
-          {hasMore && <span className="text-thinking/40"> ...</span>}
-        </div>
-      )}
-
-      {/* Full content (when expanded) */}
-      {expanded && (
-        <div className="px-3 pb-2 border-t border-thinking/10">
-          <div className="pt-2 text-muted-foreground whitespace-pre-wrap leading-relaxed italic">
-            {content}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Folded card rendering structured thinking blocks from `message.metadata.thinkingBlocks`
- * (populated by the pi-runtime). Distinct from the in-text `<ThinkingBlock>` above, which
- * parses legacy `<thinking>` tags out of the message content.
- */
-function ThinkingBlocksCard({ blocks }: { blocks: ThinkingBlockMeta[] }) {
-  const [expanded, setExpanded] = useState(false);
-  if (!blocks || blocks.length === 0) return null;
-
-  const count = blocks.length;
-
-  return (
-    <div className="mb-2 rounded-lg border border-thinking/30 bg-thinking/5 text-xs">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1.5 w-full px-3 py-1.5 text-thinking hover:text-foreground transition-colors"
-      >
-        <Brain size={14} strokeWidth={1.75} className="flex-shrink-0" />
-        <ChevronRight
-          size={12}
-          strokeWidth={1.75}
-          className={`transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`}
-        />
-        <span className="font-medium">Thinking</span>
-        <span className="text-thinking/50 ml-auto text-[10px]">
-          {count} block{count !== 1 ? 's' : ''}
-        </span>
-      </button>
-
-      {expanded && (
-        <div className="px-3 pb-2 border-t border-thinking/10">
-          <div className="pt-2 space-y-2 text-muted-foreground italic leading-relaxed whitespace-pre-wrap">
-            {blocks.map((b, i) => (
-              <div key={i}>
-                {b.redacted && (
-                  <span className="text-warning not-italic mr-1">[Redacted by safety filter]</span>
-                )}
-                {b.text}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 interface MessageListProps {
   messages: MessageWithToolCalls[];
@@ -941,7 +839,7 @@ const MessageItem = memo(function MessageItem({
       >
         {hasMetadataThinking && (
           <div className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0">
-            <ThinkingBlocksCard blocks={metadataThinkingBlocks} />
+            <ThinkingBlock content={metadataThinkingBlocks} />
           </div>
         )}
         {shouldRenderFallbackContent && (
@@ -982,7 +880,7 @@ const MessageItem = memo(function MessageItem({
       {/* Structured thinking blocks from metadata (pi-runtime) */}
       {hasMetadataThinking && (
         <div className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0">
-          <ThinkingBlocksCard blocks={metadataThinkingBlocks} />
+          <ThinkingBlock content={metadataThinkingBlocks} />
         </div>
       )}
 
