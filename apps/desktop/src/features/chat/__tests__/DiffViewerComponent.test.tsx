@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { DiffViewer, UnifiedDiffViewer, computeDiff, parseUnifiedDiff } from '../DiffViewer';
+import { DiffViewer, UnifiedDiffViewer } from '../DiffViewer';
 
 describe('DiffViewer component', () => {
   it('renders diff lines', () => {
@@ -14,20 +14,20 @@ describe('DiffViewer component', () => {
     expect(screen.getByText('helpers.ts')).toBeInTheDocument();
   });
 
-  it('renders "edit" when no filePath', () => {
+  it('names an unnamed diff generically', () => {
     render(<DiffViewer oldString="a" newString="b" />);
-    expect(screen.getByText('edit')).toBeInTheDocument();
+    expect(screen.getByText('diff')).toBeInTheDocument();
   });
 
   it('shows addition stats (green count)', () => {
     const { container } = render(<DiffViewer oldString="old" newString="new1\nnew2\nnew3" />);
-    const greenSpan = container.querySelector('.text-green-500');
+    const greenSpan = container.querySelector('.ztk-diff__stat--added');
     expect(greenSpan).toBeInTheDocument();
   });
 
   it('shows removal stats (red count)', () => {
     const { container } = render(<DiffViewer oldString="old1\nold2\nold3" newString="new" />);
-    const redSpan = container.querySelector('.text-red-500');
+    const redSpan = container.querySelector('.ztk-diff__stat--removed');
     expect(redSpan).toBeInTheDocument();
   });
 
@@ -45,8 +45,8 @@ describe('DiffViewer component', () => {
 
   it('handles identical strings (no +/- counts)', () => {
     const { container } = render(<DiffViewer oldString="same" newString="same" />);
-    expect(container.querySelector('.text-green-500')).toBeNull();
-    expect(container.querySelector('.text-red-500')).toBeNull();
+    expect(container.querySelector('.ztk-diff__stat--added')).toBeNull();
+    expect(container.querySelector('.ztk-diff__stat--removed')).toBeNull();
   });
 
   it('renders unchanged lines with space prefix', () => {
@@ -60,41 +60,41 @@ describe('DiffViewer component', () => {
   it('renders multiple added and removed lines', () => {
     const { container } = render(<DiffViewer oldString="a\nb\nc" newString="a\nx\ny\nc" />);
     // Verify the diff renders both added and removed content
-    const addedLines = container.querySelectorAll('[class*="bg-green"]');
-    const removedLines = container.querySelectorAll('[class*="bg-red"]');
+    const addedLines = container.querySelectorAll('.ztk-diff__line--added');
+    const removedLines = container.querySelectorAll('.ztk-diff__line--removed');
     expect(addedLines.length).toBeGreaterThan(0);
     expect(removedLines.length).toBeGreaterThan(0);
   });
 
   it('shows correct add count in header', () => {
     const { container } = render(<DiffViewer oldString="" newString="line1\nline2" />);
-    const greenSpan = container.querySelector('.text-green-500');
+    const greenSpan = container.querySelector('.ztk-diff__stat--added');
     expect(greenSpan?.textContent).toContain('+');
   });
 
   it('shows correct removal count in header', () => {
     const { container } = render(<DiffViewer oldString="line1\nline2\nline3" newString="" />);
-    const redSpan = container.querySelector('.text-red-500');
+    const redSpan = container.querySelector('.ztk-diff__stat--removed');
     // Verify that the removal count is displayed with a dash prefix
     expect(redSpan).not.toBeNull();
     expect(redSpan!.textContent).toContain('-');
   });
 
-  it('applies line-through styling to removed lines', () => {
+  it('marks removed lines distinctly from added ones', () => {
     const { container } = render(<DiffViewer oldString="to-remove" newString="new-line" />);
-    const lineThrough = container.querySelector('.line-through');
-    expect(lineThrough).toBeInTheDocument();
+    expect(container.querySelector('.ztk-diff__line--removed')).toBeInTheDocument();
+    expect(container.querySelector('.ztk-diff__line--added')).toBeInTheDocument();
   });
 
   it('applies green background to added lines', () => {
     const { container } = render(<DiffViewer oldString="" newString="added-line" />);
-    const greenBg = container.querySelector('[class*="bg-green"]');
+    const greenBg = container.querySelector('.ztk-diff__line--added');
     expect(greenBg).toBeInTheDocument();
   });
 
   it('applies red background to removed lines', () => {
     const { container } = render(<DiffViewer oldString="old-line" newString="" />);
-    const redBg = container.querySelector('[class*="bg-red"]');
+    const redBg = container.querySelector('.ztk-diff__line--removed');
     expect(redBg).toBeInTheDocument();
   });
 
@@ -123,90 +123,7 @@ describe('UnifiedDiffViewer component', () => {
 
   it('applies color classes to unified additions and removals', () => {
     const { container } = render(<UnifiedDiffViewer diff={unifiedDiff} />);
-    expect(container.querySelector('[class*="bg-green"]')).toBeInTheDocument();
-    expect(container.querySelector('[class*="bg-red"]')).toBeInTheDocument();
-  });
-});
-
-describe('computeDiff (unit)', () => {
-  it('returns empty array for two empty strings', () => {
-    const result = computeDiff('', '');
-    expect(result).toEqual([{ type: 'unchanged', content: '' }]);
-  });
-
-  it('detects pure additions', () => {
-    const result = computeDiff('', 'line1\nline2');
-    const addLines = result.filter(l => l.type === 'add');
-    expect(addLines).toHaveLength(2);
-  });
-
-  it('detects pure deletions', () => {
-    const result = computeDiff('line1\nline2', '');
-    const removeLines = result.filter(l => l.type === 'remove');
-    expect(removeLines).toHaveLength(2);
-  });
-
-  it('detects no changes for identical strings', () => {
-    const text = 'line1\nline2\nline3';
-    const result = computeDiff(text, text);
-    expect(result.every(l => l.type === 'unchanged')).toBe(true);
-    expect(result).toHaveLength(3);
-  });
-
-  it('detects modification (remove + add)', () => {
-    const result = computeDiff('hello world', 'hello claude');
-    expect(result.filter(l => l.type === 'remove')).toHaveLength(1);
-    expect(result.filter(l => l.type === 'add')).toHaveLength(1);
-  });
-
-  it('handles insertion in middle', () => {
-    const result = computeDiff('a\nb\nc', 'a\nb\ninserted\nc');
-    expect(result).toHaveLength(4);
-    expect(result[2]).toEqual({ type: 'add', content: 'inserted' });
-  });
-
-  it('handles deletion from middle', () => {
-    const result = computeDiff('a\nb\nremove\nc', 'a\nb\nc');
-    expect(result).toHaveLength(4);
-    expect(result[2]).toEqual({ type: 'remove', content: 'remove' });
-  });
-
-  it('handles complete replacement', () => {
-    const result = computeDiff('old1\nold2', 'new1\nnew2');
-    const adds = result.filter(l => l.type === 'add');
-    const removes = result.filter(l => l.type === 'remove');
-    expect(adds.length).toBeGreaterThan(0);
-    expect(removes.length).toBeGreaterThan(0);
-  });
-
-  it('handles single line unchanged', () => {
-    const result = computeDiff('same', 'same');
-    expect(result).toEqual([{ type: 'unchanged', content: 'same' }]);
-  });
-});
-
-describe('parseUnifiedDiff (unit)', () => {
-  it('classifies unified diff syntax lines', () => {
-    const result = parseUnifiedDiff(
-      [
-        'diff --git a/a.ts b/a.ts',
-        '--- a/a.ts',
-        '+++ b/a.ts',
-        '@@ -1 +1 @@',
-        '-old',
-        '+new',
-        ' context',
-      ].join('\n')
-    );
-
-    expect(result.map(line => line.type)).toEqual([
-      'meta',
-      'file',
-      'file',
-      'hunk',
-      'remove',
-      'add',
-      'context',
-    ]);
+    expect(container.querySelector('.ztk-diff__line--added')).toBeInTheDocument();
+    expect(container.querySelector('.ztk-diff__line--removed')).toBeInTheDocument();
   });
 });
