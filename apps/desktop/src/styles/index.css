@@ -454,6 +454,9 @@ body {
   --ztk-font-mono: var(--font-mono);
   --ztk-font-size-sm: 0.75rem;
   --ztk-code-font-size: var(--chat-font-code, 0.75rem);
+  /* A long code block scrolls inside itself rather than pushing the rest of
+     the conversation off screen. */
+  --ztk-code-max-height: 24rem;
   --ztk-accent: hsl(var(--primary));
   --ztk-success: hsl(var(--success));
   --ztk-danger: hsl(var(--destructive));
