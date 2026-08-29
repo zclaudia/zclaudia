@@ -207,7 +207,7 @@ export function PluginDetailModal({
             <h3 className="text-xs font-medium text-foreground">Development plugin</h3>
             <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
               This plugin is loaded directly from a development directory. Manage its files and
-              versions outside ZClaudia.
+              versions outside Claudia.
             </p>
             <button
               type="button"

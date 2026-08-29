@@ -53,7 +53,7 @@ export function AppHeader({
             className="font-semibold text-sm text-foreground leading-tight"
             data-tauri-drag-region
           >
-            ZClaudia
+            Claudia
           </span>
         </div>
       </div>
@@ -61,9 +61,7 @@ export function AppHeader({
       {/* Center section: title (mobile only) */}
       <div className="flex-1 flex items-center justify-start ml-2 md:ml-4 min-w-0 gap-2">
         {isMobile && (
-          <span className="font-semibold text-sm text-foreground">
-            {isAgentExpanded ? 'Claudia' : 'ZClaudia'}
-          </span>
+          <span className="font-semibold text-sm text-foreground">Claudia</span>
         )}
       </div>
 

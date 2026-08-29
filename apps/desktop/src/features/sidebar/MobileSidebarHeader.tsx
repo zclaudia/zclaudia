@@ -21,7 +21,7 @@ export function MobileSidebarHeader({
           live in the tree below (which owns status and switching), so there is
           no separate picker row here. */}
       <div className="h-[72px] border-b border-border flex items-center gap-1 px-3">
-        <h1 className="min-w-0 flex-1 truncate font-semibold text-lg">ZClaudia</h1>
+        <h1 className="min-w-0 flex-1 truncate font-semibold text-lg">Claudia</h1>
         <button
           onClick={() => {
             onOpenNotifications?.();

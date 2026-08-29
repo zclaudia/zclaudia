@@ -670,7 +670,7 @@ export function NotchWindow() {
           >
             {closedLeading}
             <span className="text-[13px] font-semibold tracking-tight text-white truncate max-w-[150px]">
-              {pillPreview?.title ?? 'ZClaudia'}
+              {pillPreview?.title ?? 'Claudia'}
             </span>
             {closedTrailing}
           </div>
@@ -691,7 +691,7 @@ export function NotchWindow() {
                     draggable={false}
                   />
                   <span className="text-[13px] font-semibold tracking-tight text-white">
-                    ZClaudia
+                    Claudia
                   </span>
                 </div>
                 <div className="flex items-center gap-1 relative z-10">

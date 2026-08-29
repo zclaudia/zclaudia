@@ -165,7 +165,7 @@ export async function downloadAndInstallApk(): Promise<void> {
     const { downloadDir } = await import('@tauri-apps/api/path');
     const { writeFile } = await import('@tauri-apps/plugin-fs');
 
-    const fileName = `ZClaudia-${store.availableVersion}.apk`;
+    const fileName = `Claudia-${store.availableVersion}.apk`;
     const dir = await downloadDir();
     const filePath = `${dir}/${fileName}`;
 

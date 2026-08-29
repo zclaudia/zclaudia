@@ -69,7 +69,7 @@ describe('E2E global setup planning', () => {
     expect(
       validateReusableServiceResponse('Desktop', {
         status: 200,
-        body: '<!doctype html><html><head><title>ZClaudia</title></head><div id="root"></div>',
+        body: '<!doctype html><html><head><title>Claudia</title></head><div id="root"></div>',
         contentType: 'text/html',
       })
     ).toBe(true);

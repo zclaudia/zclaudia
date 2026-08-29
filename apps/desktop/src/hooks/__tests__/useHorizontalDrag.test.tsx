@@ -184,6 +184,50 @@ describe('useHorizontalDrag', () => {
     expect(fast.onEnd.mock.calls[0][0].shouldComplete).toBe(true);
   });
 
+  it('reports signed distance in both directions when direction is "both"', () => {
+    const { content, onDrag, onEnd } = setup({ direction: 'both' });
+    dispatchTouch(content, 'touchstart', 50, 50);
+    dispatchTouch(content, 'touchmove', 80, 50);
+    dispatchTouch(content, 'touchmove', 20, 50);
+    dispatchTouch(content, 'touchend', 20, 50);
+
+    expect(onDrag.mock.calls.map(([update]) => update.distance)).toEqual([30, -30]);
+    expect(onEnd.mock.calls[0][0]).toMatchObject({ distance: -30, progress: -0.3 });
+  });
+
+  it('claims a leftward start in "both" that a right-only drag would ignore', () => {
+    const { content, onDragStart, onEnd } = setup({ direction: 'both' });
+    dispatchTouch(content, 'touchstart', 50, 50);
+    dispatchTouch(content, 'touchmove', 25, 50);
+    dispatchTouch(content, 'touchend', 10, 50);
+
+    expect(onDragStart).toHaveBeenCalledTimes(1);
+    expect(onEnd.mock.calls[0][0]).toMatchObject({ distance: -40, shouldComplete: true });
+  });
+
+  it('clamps both directions to maxDistance', () => {
+    const { content, onEnd } = setup({ direction: 'both', maxDistance: 50 });
+    dispatchTouch(content, 'touchstart', 200, 50);
+    dispatchTouch(content, 'touchmove', 100, 50);
+    dispatchTouch(content, 'touchend', 100, 50);
+
+    expect(onEnd.mock.calls[0][0]).toMatchObject({ distance: -50, progress: -1 });
+  });
+
+  it('keeps a reverse flick from completing a single-direction drag', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const { content, onEnd } = setup({ direction: 'right', maxDistance: 200 });
+    dispatchTouch(content, 'touchstart', 100, 50);
+    vi.setSystemTime(10);
+    dispatchTouch(content, 'touchmove', 120, 50);
+    vi.setSystemTime(20);
+    dispatchTouch(content, 'touchend', 100, 50);
+
+    expect(onEnd.mock.calls[0][0].velocity).toBeLessThan(0);
+    expect(onEnd.mock.calls[0][0].shouldComplete).toBe(false);
+  });
+
   it('can exclude interactive controls from opening drags', () => {
     const { getByTestId, onDrag } = setup({
       shouldStart: target => !isInteractiveHorizontalDragStart(target),

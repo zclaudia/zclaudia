@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useRef, type RefCallback } from 'react';
 
-export type HorizontalDragDirection = 'left' | 'right';
+/**
+ * Which way a drag counts. `'both'` recognizes either direction and reports
+ * signed values (right positive), for surfaces that can move forward and back
+ * from their current state.
+ */
+export type HorizontalDragDirection = 'left' | 'right' | 'both';
 
 export interface HorizontalDragUpdate {
-  /** Directional distance in pixels, clamped to maxDistance. */
+  /** Directional distance in pixels, clamped to maxDistance. Signed in 'both'. */
   distance: number;
-  /** Normalized directional progress from 0 to 1. */
+  /** Normalized directional progress from 0 to 1, or -1 to 1 in 'both'. */
   progress: number;
 }
 
 export interface HorizontalDragEnd extends HorizontalDragUpdate {
-  /** Directional release velocity in px/ms. */
+  /** Directional release velocity in px/ms. Signed in 'both'. */
   velocity: number;
   /** True when either the distance or velocity completion rule was met. */
   shouldComplete: boolean;
@@ -77,7 +82,19 @@ function findTouch(touches: TouchList, identifier: number): Touch | null {
 }
 
 function directionalDelta(direction: HorizontalDragDirection, startX: number, x: number): number {
-  return direction === 'right' ? x - startX : startX - x;
+  return direction === 'left' ? startX - x : x - startX;
+}
+
+/** Clamp to the travel range, keeping the sign when both directions count. */
+function clampDelta(
+  direction: HorizontalDragDirection,
+  delta: number,
+  maxDistance: number
+): number {
+  if (direction === 'both') {
+    return Math.min(maxDistance, Math.max(-maxDistance, delta));
+  }
+  return Math.min(maxDistance, Math.max(0, delta));
 }
 
 /**
@@ -162,7 +179,10 @@ export function useHorizontalDrag<E extends HTMLElement = HTMLDivElement>(
             reset(false);
             return;
           }
-          if (directionalDelta(current.direction, state.startX, touch.clientX) <= 0) {
+          if (
+            current.direction !== 'both' &&
+            directionalDelta(current.direction, state.startX, touch.clientX) <= 0
+          ) {
             reset(false);
             return;
           }
@@ -181,9 +201,10 @@ export function useHorizontalDrag<E extends HTMLElement = HTMLDivElement>(
         state.lastTime = now;
 
         const maxDistance = Math.max(1, current.maxDistance);
-        const distance = Math.min(
-          maxDistance,
-          Math.max(0, directionalDelta(current.direction, state.startX, touch.clientX))
+        const distance = clampDelta(
+          current.direction,
+          directionalDelta(current.direction, state.startX, touch.clientX),
+          maxDistance
         );
         event.preventDefault();
         current.onDrag({ distance, progress: distance / maxDistance });
@@ -203,9 +224,10 @@ export function useHorizontalDrag<E extends HTMLElement = HTMLDivElement>(
 
         const now = Date.now();
         const maxDistance = Math.max(1, current.maxDistance);
-        const distance = Math.min(
-          maxDistance,
-          Math.max(0, directionalDelta(current.direction, state.startX, touch.clientX))
+        const distance = clampDelta(
+          current.direction,
+          directionalDelta(current.direction, state.startX, touch.clientX),
+          maxDistance
         );
         const elapsed = now - state.lastTime;
         const endSegment = directionalDelta(current.direction, state.lastX, touch.clientX);
@@ -217,8 +239,14 @@ export function useHorizontalDrag<E extends HTMLElement = HTMLDivElement>(
               : 0;
         const completionThreshold = current.completionThreshold ?? 0.32;
         const velocityThreshold = current.velocityThreshold ?? 0.45;
+        // Single-direction drags only complete when the release pushed the way
+        // the drag counts; in 'both' the caller decides what each direction
+        // means, so completion just reports that a threshold was cleared.
         const shouldComplete =
-          distance / maxDistance >= completionThreshold || velocity >= velocityThreshold;
+          current.direction === 'both'
+            ? Math.abs(distance) / maxDistance >= completionThreshold ||
+              Math.abs(velocity) >= velocityThreshold
+            : distance / maxDistance >= completionThreshold || velocity >= velocityThreshold;
 
         stateRef.current = { ...INITIAL_STATE };
         current.onEnd({

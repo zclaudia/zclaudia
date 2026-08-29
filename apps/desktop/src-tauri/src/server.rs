@@ -414,7 +414,7 @@ pub async fn start_server(
 
     // Resolve the main app's bundle identifier so child processes (node sidecar,
     // Claude CLI) share the same macOS TCC permission entry as the main app.
-    // Without this, macOS shows duplicate permission dialogs — once for "ZClaudia"
+    // Without this, macOS shows duplicate permission dialogs — once for "Claudia"
     // and once for "zclaudia" (the node binary).
     let bundle_id = _app.config().identifier.clone();
 

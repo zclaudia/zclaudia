@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { useGatewayStore, shouldShowBackend } from '../gatewayStore';
+import { canPersistGatewaySecret, useGatewayStore, shouldShowBackend } from '../gatewayStore';
 import { useFacadeStore } from '../facadeStore';
 import type { GatewayBackendInfo } from '@zclaudia/shared';
 
@@ -82,19 +82,47 @@ describe('gatewayStore', () => {
     expect(state.gatewaySecret).toBe('secret');
   });
 
-  it('does not persist direct gateway secrets', () => {
+  it('does not persist direct gateway secrets in the browser shell', () => {
+    const tauriInternals = (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+    delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+    try {
+      expect(canPersistGatewaySecret()).toBe(false);
+
+      localStorage.removeItem('zclaudia-gateway');
+      useGatewayStore.getState().setDirectGatewayConfig('https://gw', 'secret');
+
+      const persisted = localStorage.getItem('zclaudia-gateway');
+
+      expect(persisted).not.toContain('secret');
+      expect(JSON.parse(persisted!)).toEqual({
+        state: {
+          directGatewayUrl: 'https://gw',
+          lastActiveBackendId: null,
+        },
+        version: 7,
+      });
+    } finally {
+      Object.defineProperty(window, '__TAURI_INTERNALS__', {
+        value: tauriInternals,
+        configurable: true,
+        writable: true,
+      });
+    }
+  });
+
+  it('persists the direct gateway secret inside the native app sandbox', () => {
+    expect(canPersistGatewaySecret()).toBe(true);
+
     localStorage.removeItem('zclaudia-gateway');
     useGatewayStore.getState().setDirectGatewayConfig('https://gw', 'secret');
 
-    const persisted = localStorage.getItem('zclaudia-gateway');
-
-    expect(persisted).not.toContain('secret');
-    expect(JSON.parse(persisted!)).toEqual({
+    expect(JSON.parse(localStorage.getItem('zclaudia-gateway')!)).toEqual({
       state: {
         directGatewayUrl: 'https://gw',
+        directGatewaySecret: 'secret',
         lastActiveBackendId: null,
       },
-      version: 6,
+      version: 7,
     });
   });
 

@@ -186,7 +186,7 @@ export function validateReusableServiceResponse(
   }
 
   if (serviceName === 'Desktop') {
-    return response.body.includes('<title>ZClaudia</title>') && response.body.includes('id="root"');
+    return response.body.includes('<title>Claudia</title>') && response.body.includes('id="root"');
   }
 
   return true;

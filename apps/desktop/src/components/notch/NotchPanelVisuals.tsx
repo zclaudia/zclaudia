@@ -217,7 +217,7 @@ export interface ClosedPillProps {
   hasPendingAttention: boolean;
   preview: PillPreview | null;
   onClick: () => void;
-  /** Logo URL (project can override, default ZClaudia logo). */
+  /** Logo URL (project can override, default Claudia logo). */
   logoUrl?: string;
 }
 
@@ -276,7 +276,7 @@ export function ClosedPill({
     >
       {leading}
       <span className="text-[12px] font-medium tracking-tight text-white/92 truncate max-w-[220px]">
-        {preview?.title ?? 'ZClaudia'}
+        {preview?.title ?? 'Claudia'}
       </span>
       {trailing}
     </button>
@@ -415,7 +415,7 @@ export function OpenedRow({
   onClick,
   onDismiss,
 }: OpenedRowProps) {
-  const label = projectName ?? 'ZClaudia';
+  const label = projectName ?? 'Claudia';
   const statusDot =
     status === 'running'
       ? 'bg-amber-400 animate-pulse'
