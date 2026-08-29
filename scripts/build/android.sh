@@ -138,7 +138,7 @@ ANDROID_RES_DIR="$ANDROID_APP_DIR/res"
 ANDROID_OVERRIDES_DIR="apps/desktop/src-tauri/android-overrides/app/src/main"
 ANDROID_APP_ID="com.zclaudia.mobile"
 ANDROID_APP_PACKAGE_PATH="com/zclaudia/mobile"
-ANDROID_SOURCE_PACKAGE_PATH="com/zclaudia/desktop"
+ANDROID_SOURCE_PACKAGE_PATH="com/zclaudia/mobile"
 
 # --- Install / update dependencies ---
 if [ "$INSTALL_ONLY" = false ]; then
