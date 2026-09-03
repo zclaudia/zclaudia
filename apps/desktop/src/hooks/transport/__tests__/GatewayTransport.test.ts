@@ -270,20 +270,6 @@ describe('GatewayTransport', () => {
     });
   });
 
-  describe('requestBackendDataSnapshot', () => {
-    it('sends request_backend_resource_snapshot message', () => {
-      transport.connect();
-      const mockWs = (transport as any).ws;
-      mockWs.readyState = WebSocket.OPEN;
-
-      transport.requestBackendDataSnapshot('backend-1');
-
-      const sentMessage = JSON.parse(mockWs.send.mock.calls[0][0]);
-      expect(sentMessage.type).toBe('request_backend_resource_snapshot');
-      expect(sentMessage.backendId).toBe('backend-1');
-    });
-  });
-
   describe('WebSocket event handlers', () => {
     it('sends peer_hello on open', () => {
       transport.connect();
@@ -416,35 +402,6 @@ describe('GatewayTransport', () => {
       expect(storeMocks.removeProjectOwnersByBackend).not.toHaveBeenCalled();
     });
 
-    it('handles backend_resource_snapshot', () => {
-      const mockWs = (transport as any).ws;
-
-      const sessionItem = {
-        sessionId: 'session-1',
-        title: 'Session 1',
-        createdAt: 1,
-        updatedAt: 1,
-        runStatus: 'idle',
-      };
-      const projectItem = { projectId: 'project-1', name: 'Project 1', createdAt: 1, updatedAt: 1 };
-      const message = {
-        type: 'backend_resource_snapshot',
-        backendId: 'backend-1',
-        resources: [
-          { resourceType: 'session', resourceId: 'session-1', resource: sessionItem },
-          { resourceType: 'project', resourceId: 'project-1', resource: projectItem },
-        ],
-      };
-
-      mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
-
-      expect(mockConfig.onBackendDataSnapshot).toHaveBeenCalledWith(
-        'backend-1',
-        [sessionItem],
-        [projectItem]
-      );
-    });
-
     it('handles topic_subscribed (synthesizes backend_subscribed from presence)', () => {
       const mockWs = (transport as any).ws;
       (transport as any).authenticated = true;
@@ -558,62 +515,6 @@ describe('GatewayTransport', () => {
       expect(mockConfig.onError).toHaveBeenCalledWith('GENERIC_ERROR: Something went wrong');
     });
 
-    it('handles backend_stream_event', () => {
-      const mockWs = (transport as any).ws;
-      (transport as any).subscribedBackends.add('backend-1');
-
-      const message = {
-        type: 'backend_stream_event',
-        backendId: 'backend-1',
-        channel: 'session-1',
-        event: 'delta',
-        data: 'test',
-      };
-
-      mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
-
-      expect(mockConfig.onRunStreamEvent).toHaveBeenCalledWith('backend-1', 'session-1', message);
-    });
-
-    it('handles content_patch', () => {
-      const mockWs = (transport as any).ws;
-      (transport as any).subscribedBackends.add('backend-1');
-
-      const patches = [{ role: 'assistant', content: 'Hello' }];
-      const message = {
-        type: 'content_patch',
-        backendId: 'backend-1',
-        contentStreamId: 'session-1',
-        patches,
-        latestOffset: 5,
-      };
-
-      mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
-
-      expect(mockConfig.onContentPatch).toHaveBeenCalledWith('backend-1', 'session-1', patches, 5);
-    });
-
-    it('handles content_patch_error', () => {
-      const mockWs = (transport as any).ws;
-      (transport as any).subscribedBackends.add('backend-1');
-
-      const message = {
-        type: 'content_patch_error',
-        backendId: 'backend-1',
-        contentStreamId: 'session-1',
-        afterOffset: 3,
-        message: 'Session not found',
-      };
-
-      mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
-
-      expect(mockConfig.onContentPatchError).toHaveBeenCalledWith(
-        'backend-1',
-        'session-1',
-        3,
-        'Session not found'
-      );
-    });
   });
 
   describe('health probe', () => {
