@@ -39,7 +39,12 @@ import { getOrCreateDeviceId } from './gateway-device-id.js';
 import { GatewayHeartbeat } from './gateway-heartbeat.js';
 import type { ChannelOfferMessage } from '@zclaudia/gateway-protocol';
 import { handleHttpChannelOffer } from './gateway-channel-http.js';
-import { GatewayMessageChannels, MESSAGE_CHANNEL_KIND } from './gateway-channel-messages.js';
+import {
+  GatewayMessageChannels,
+  GatewayOutgoingChannels,
+  MESSAGE_CHANNEL_KIND,
+} from './gateway-channel-messages.js';
+import { RESOURCES_TOPIC } from './gateway-backend-data-publisher.js';
 import { handleHttpProxyRequest } from './gateway-http-proxy.js';
 import { createSocksProxyAgent } from './gateway-proxy-agent.js';
 import { GatewayTransport } from './gateway-transport.js';
@@ -273,6 +278,7 @@ export class GatewayClient {
   private onBackendMessageHandler: BackendMessageHandler | null = null;
   private onBackendClosedHandler: BackendClosedHandler | null = null;
   private messageChannels: GatewayMessageChannels;
+  private outgoingChannels: GatewayOutgoingChannels;
 
   // Outgoing subscriptions (facade client role)
   private subscribedBackends = new Set<string>();
@@ -333,6 +339,17 @@ export class GatewayClient {
         }
       },
       onClosed: channelId => this.onBackendClosedHandler?.(channelId),
+    });
+    // Facade-client role: channels this server opens toward REMOTE backends.
+    this.outgoingChannels = new GatewayOutgoingChannels({
+      resolveWsBase: () => this.config.gatewayUrl.replace(/^http/, 'ws'),
+      createAgent: () => this.createHttpAgent(),
+      sendControl: message => this.transport.send(message),
+      onFrame: (backendId, frame) => this.handleOutgoingChannelFrame(backendId, frame),
+      onClosed: () => {
+        // Reopen on next send (frames queue); subscription state is
+        // governed by topics, not channel liveness.
+      },
     });
     console.log(`[Gateway] Instance ID: ${this.instanceId} (channel=${this.channel})`);
 
@@ -512,30 +529,35 @@ export class GatewayClient {
     return this.registryItems;
   }
 
+  /** Whether a remote backend registered with gateway protocol v4. */
+  private isV4Backend(backendId: string): boolean {
+    const presence = this.registryItems.get(backendId) as
+      | (BackendPresence & { gatewayProtocolVersion?: number })
+      | undefined;
+    return presence?.gatewayProtocolVersion === 4;
+  }
+
   subscribeBackend(targetBackendId: string): void {
     if (!this.transport.hasSocket() || !this.isConnected) return;
-    this.transport.send({
-      type: 'subscribe_backend',
-      backendId: targetBackendId,
-    } satisfies SubscribeBackendMessage);
+    if (this.subscribedBackends.has(targetBackendId)) return;
+    if (!this.isV4Backend(targetBackendId)) {
+      console.warn('[Gateway] Backend does not speak protocol v4, cannot subscribe:', targetBackendId);
+      return;
+    }
+    this.transport.send({ type: 'topic_subscribe', backendId: targetBackendId, topic: RESOURCES_TOPIC });
   }
 
   unsubscribeBackend(targetBackendId: string): void {
     if (!this.transport.hasSocket() || !this.isConnected) return;
-    this.transport.send({
-      type: 'unsubscribe_backend',
-      backendId: targetBackendId,
-    } satisfies UnsubscribeBackendMessage);
+    this.transport.send({ type: 'topic_unsubscribe', backendId: targetBackendId, topic: RESOURCES_TOPIC });
     this.subscribedBackends.delete(targetBackendId);
+    this.outgoingChannels.close(targetBackendId);
   }
 
   sendToBackend(targetBackendId: string, message: ClientMessage): void {
     if (!this.transport.hasSocket() || !this.isConnected) return;
-    this.transport.send({
-      type: 'backend_client_message',
-      backendId: targetBackendId,
-      message,
-    } satisfies BackendClientMessage);
+    // The message channel is the targeted path; frames queue while it opens.
+    this.outgoingChannels.send(targetBackendId, message);
   }
 
   isBackendSubscribed(backendId: string): boolean {
@@ -544,7 +566,7 @@ export class GatewayClient {
 
   catchUpOutgoingStream(backendId: string, sessionId: string, afterOffset: number): void {
     if (!this.transport.hasSocket() || !this.isConnected) return;
-    this.transport.send({
+    this.outgoingChannels.send(backendId, {
       type: 'catch_up_content',
       backendId,
       contentStreamId: sessionId,
@@ -750,12 +772,25 @@ export class GatewayClient {
         }
         break;
       }
-      // Backend subscription events (facade client role)
-      case 'backend_subscribed':
-        this.handleBackendSubscribed(msg as unknown as BackendSubscribedMessage);
+      // Backend subscription events (facade client role, v4 topics)
+      case 'topic_subscribed':
+        this.handleTopicSubscribed(msg as unknown as { backendId: string; topic: string });
         break;
-      case 'backend_unsubscribed':
-        this.handleBackendUnsubscribed(msg as unknown as BackendUnsubscribedMessage);
+      case 'topic_unsubscribed':
+        this.handleTopicUnsubscribed(msg as unknown as { backendId: string; topic: string });
+        break;
+      case 'topic_message':
+        this.handleTopicMessage(
+          msg as unknown as { backendId: string; topic: string; payload?: unknown }
+        );
+        break;
+      case 'channel_ready':
+        this.outgoingChannels.handleChannelReady(
+          msg as unknown as import('@zclaudia/gateway-protocol').ChannelReadyMessage
+        );
+        break;
+      case 'channel_closed':
+        this.outgoingChannels.handleChannelClosed((msg as unknown as { channelId: string }).channelId);
         break;
       // Backend data (subscribed to remote backend)
       case 'backend_resource_snapshot':
@@ -784,6 +819,9 @@ export class GatewayClient {
         this.handleOutgoingContentPatchError(msg as unknown as ContentPatchErrorMessage);
         break;
       case 'gateway_error':
+        // A failed channel_open answers as a gateway_error; consume it as
+        // the FIFO reply so the open queue keeps moving.
+        if (this.outgoingChannels.handleGatewayError(msg.code as string)) break;
         console.error(`[Gateway] Error: ${msg.code} — ${msg.message}`);
         break;
     }
@@ -918,14 +956,59 @@ export class GatewayClient {
   // Internal — Outgoing Backend Subscription Routing
   // ==========================================================================
 
-  private handleBackendSubscribed(msg: BackendSubscribedMessage): void {
+  // Synthesized from topic_subscribed + registry presence (v4 data plane)
+  private handleTopicSubscribed(msg: { backendId: string; topic: string }): void {
+    if (msg.topic !== RESOURCES_TOPIC) return;
     this.subscribedBackends.add(msg.backendId);
-    this.outgoingEvents.onOutgoingBackendSubscribed?.(msg.backendId, msg.epoch, msg.capabilities);
+    const presence = this.registryItems.get(msg.backendId);
+    this.outgoingEvents.onOutgoingBackendSubscribed?.(
+      msg.backendId,
+      presence?.epoch ?? 0,
+      presence?.capabilities ?? []
+    );
+    // Open the targeted-message channel alongside the subscription
+    this.outgoingChannels.request(msg.backendId);
   }
 
-  private handleBackendUnsubscribed(msg: BackendUnsubscribedMessage): void {
+  private handleTopicUnsubscribed(msg: { backendId: string; topic: string }): void {
+    if (msg.topic !== RESOURCES_TOPIC) return;
     this.subscribedBackends.delete(msg.backendId);
-    this.outgoingEvents.onOutgoingBackendUnsubscribed?.(msg.backendId, msg.reason);
+    this.outgoingChannels.close(msg.backendId);
+    this.outgoingEvents.onOutgoingBackendUnsubscribed?.(msg.backendId, 'client_unsubscribed');
+  }
+
+  private handleTopicMessage(msg: { backendId: string; topic: string; payload?: unknown }): void {
+    if (msg.topic !== RESOURCES_TOPIC) return;
+    const payload = msg.payload as { type?: string } | undefined;
+    if (!payload) return;
+    if (payload.type === 'backend_resource_snapshot') {
+      this.handleOutgoingBackendDataSnapshot({
+        ...(payload as BackendResourceSnapshotMessage),
+        backendId: msg.backendId,
+      } as BackendResourceSnapshotMessage);
+    } else if (payload.type === 'backend_resource_event') {
+      this.handleOutgoingBackendDataEvent({
+        ...(payload as BackendDataEventMessage),
+        backendId: msg.backendId,
+      } as BackendDataEventMessage);
+    }
+  }
+
+  /** Route an inbound frame from an outgoing message channel. */
+  private handleOutgoingChannelFrame(backendId: string, frame: Record<string, unknown>): void {
+    if (frame.type === 'content_patch') {
+      this.handleOutgoingContentPatch(frame as unknown as ContentPatchMessage);
+      return;
+    }
+    if (frame.type === 'content_patch_error') {
+      this.handleOutgoingContentPatchError(frame as unknown as ContentPatchErrorMessage);
+      return;
+    }
+    this.handleOutgoingBackendServerMessage({
+      type: 'backend_server_message',
+      backendId,
+      message: frame,
+    } as unknown as BackendServerMessage);
   }
 
   private handleOutgoingBackendDataSnapshot(msg: BackendResourceSnapshotMessage): void {
@@ -1017,6 +1100,7 @@ export class GatewayClient {
     // Message channels die with the control connection (fast-reopen model);
     // their close events fire onClosed → virtual client teardown upstream.
     this.messageChannels.closeAll();
+    this.outgoingChannels.closeAll();
     if (wasConnected) this.outgoingEvents.onConnectionStateChanged?.(false);
   }
 }

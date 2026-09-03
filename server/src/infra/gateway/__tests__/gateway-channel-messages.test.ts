@@ -3,7 +3,7 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AddressInfo } from 'node:net';
 import { WebSocketServer, WebSocket } from 'ws';
-import { GatewayMessageChannels } from '../gateway-channel-messages.js';
+import { GatewayMessageChannels, GatewayOutgoingChannels } from '../gateway-channel-messages.js';
 import type { ChannelOfferMessage } from '@zclaudia/gateway-protocol';
 
 describe('gateway-channel-messages', () => {
@@ -91,6 +91,58 @@ describe('gateway-channel-messages', () => {
     await until(() => onClosed.mock.calls.length === 1);
     expect(onClosed).toHaveBeenCalledWith('ch-c');
     expect(channels.send('ch-c', { type: 'state' })).toBe(false);
+  });
+
+  test('outgoing: frames queue before channel_ready, flush after dial, replies route back', async () => {
+    const sendControl = vi.fn();
+    const onFrame = vi.fn();
+    const outgoing = new GatewayOutgoingChannels({
+      resolveWsBase: () => `ws://127.0.0.1:${wsPort}`,
+      createAgent: () => undefined,
+      sendControl,
+      onFrame,
+      onClosed: vi.fn(),
+    });
+
+    const connP = nextConnection();
+    outgoing.send('backend-x', { type: 'ping' });
+    // channel_open went out; the frame waits
+    expect(sendControl).toHaveBeenCalledWith({ type: 'channel_open', target: 'backend-x', kind: 'zclaudia' });
+    expect(outgoing.has('backend-x')).toBe(false);
+
+    outgoing.handleChannelReady({ type: 'channel_ready', channelId: 'ch-o1', ticket: 't', dataPath: '/' });
+    const socket = await connP;
+    const received: unknown[] = [];
+    socket.on('message', d => received.push(JSON.parse(d.toString())));
+    await until(() => outgoing.has('backend-x') && received.length === 1);
+    expect(received[0]).toEqual({ type: 'ping' });
+
+    socket.send(JSON.stringify({ type: 'content_patch', latestOffset: 9 }));
+    await until(() => onFrame.mock.calls.length === 1);
+    expect(onFrame).toHaveBeenCalledWith('backend-x', { type: 'content_patch', latestOffset: 9 });
+    outgoing.closeAll();
+  });
+
+  test('outgoing: gateway_error consumes an in-flight open and the queue advances', async () => {
+    const sendControl = vi.fn();
+    const outgoing = new GatewayOutgoingChannels({
+      resolveWsBase: () => `ws://127.0.0.1:${wsPort}`,
+      createAgent: () => undefined,
+      sendControl,
+      onFrame: vi.fn(),
+      onClosed: vi.fn(),
+    });
+
+    outgoing.request('dead-backend');
+    outgoing.request('live-backend');
+    expect(sendControl).toHaveBeenCalledTimes(1);
+
+    expect(outgoing.handleGatewayError('BACKEND_OFFLINE')).toBe(true);
+    await until(() => sendControl.mock.calls.length === 2);
+    expect(sendControl.mock.calls[1][0]).toMatchObject({ target: 'live-backend' });
+    // Unrelated errors are not consumed
+    expect(outgoing.handleGatewayError('UNAUTHORIZED')).toBe(false);
+    outgoing.closeAll();
   });
 
   test('closeAll closes every channel and each fires onClosed', async () => {

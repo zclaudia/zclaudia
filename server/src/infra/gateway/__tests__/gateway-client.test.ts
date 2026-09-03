@@ -443,7 +443,7 @@ describe('GatewayClient', () => {
       );
     });
 
-    it('removes backend from subscribedBackends on unsubscribed event', () => {
+    it('removes backend from subscribedBackends on topic_unsubscribed', () => {
       const onOutgoingBackendUnsubscribed = vi.fn();
       client.events.setOutgoingEvents({ onOutgoingBackendUnsubscribed });
       (client as any).backendId = 'local-backend';
@@ -451,14 +451,63 @@ describe('GatewayClient', () => {
       // Simulate a subscribed backend
       (client as any).subscribedBackends.add('remote-backend');
 
-      (client as any).handleBackendUnsubscribed({
-        type: 'backend_unsubscribed',
+      (client as any).handleTopicUnsubscribed({
+        type: 'topic_unsubscribed',
         backendId: 'remote-backend',
-        reason: 'peer_closed',
+        topic: 'resources',
       });
 
       expect((client as any).subscribedBackends.has('remote-backend')).toBe(false);
-      expect(onOutgoingBackendUnsubscribed).toHaveBeenCalledWith('remote-backend', 'peer_closed');
+      expect(onOutgoingBackendUnsubscribed).toHaveBeenCalledWith(
+        'remote-backend',
+        'client_unsubscribed'
+      );
+    });
+
+    it('synthesizes backend_subscribed from topic_subscribed and presence', () => {
+      const onOutgoingBackendSubscribed = vi.fn();
+      client.events.setOutgoingEvents({ onOutgoingBackendSubscribed });
+      (client as any).registryItems.set('remote-backend', {
+        backendId: 'remote-backend',
+        epoch: 3,
+        capabilities: ['run', 'streamingUpload'],
+        gatewayProtocolVersion: 4,
+      });
+
+      (client as any).handleTopicSubscribed({
+        type: 'topic_subscribed',
+        backendId: 'remote-backend',
+        topic: 'resources',
+      });
+
+      expect((client as any).subscribedBackends.has('remote-backend')).toBe(true);
+      expect(onOutgoingBackendSubscribed).toHaveBeenCalledWith('remote-backend', 3, [
+        'run',
+        'streamingUpload',
+      ]);
+    });
+
+    it('routes topic_message resource payloads to the outgoing data handlers', () => {
+      const onOutgoingBackendDataSnapshot = vi.fn();
+      client.events.setOutgoingEvents({ onOutgoingBackendDataSnapshot });
+
+      (client as any).handleTopicMessage({
+        type: 'topic_message',
+        backendId: 'remote-backend',
+        topic: 'resources',
+        payload: {
+          type: 'backend_resource_snapshot',
+          resources: [
+            { resourceType: 'session', resourceId: 's1', resource: { sessionId: 's1' } },
+          ],
+        },
+      });
+
+      expect(onOutgoingBackendDataSnapshot).toHaveBeenCalledWith(
+        'remote-backend',
+        [{ sessionId: 's1' }],
+        []
+      );
     });
 
     it('forwards all outgoing backend data messages to event handlers', () => {
