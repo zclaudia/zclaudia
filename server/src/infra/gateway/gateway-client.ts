@@ -39,6 +39,7 @@ import { getOrCreateDeviceId } from './gateway-device-id.js';
 import { GatewayHeartbeat } from './gateway-heartbeat.js';
 import type { ChannelOfferMessage } from '@zclaudia/gateway-protocol';
 import { handleHttpChannelOffer } from './gateway-channel-http.js';
+import { GatewayMessageChannels, MESSAGE_CHANNEL_KIND } from './gateway-channel-messages.js';
 import { handleHttpProxyRequest } from './gateway-http-proxy.js';
 import { createSocksProxyAgent } from './gateway-proxy-agent.js';
 import { GatewayTransport } from './gateway-transport.js';
@@ -271,6 +272,7 @@ export class GatewayClient {
     | null = null;
   private onBackendMessageHandler: BackendMessageHandler | null = null;
   private onBackendClosedHandler: BackendClosedHandler | null = null;
+  private messageChannels: GatewayMessageChannels;
 
   // Outgoing subscriptions (facade client role)
   private subscribedBackends = new Set<string>();
@@ -307,6 +309,21 @@ export class GatewayClient {
               this.transport.send({ type: 'topic_publish', topic, payload, retain: options?.retain });
             }
           : undefined,
+    });
+    // v4 message channels feed the same virtual-client machinery as v3
+    // backend_client_message, keyed by channelId instead of peerSessionId.
+    this.messageChannels = new GatewayMessageChannels({
+      resolveWsBase: () => this.config.gatewayUrl.replace(/^http/, 'ws'),
+      createAgent: () => this.createHttpAgent(),
+      onMessage: (channelId, message) => {
+        if (!this.onBackendMessageHandler) return;
+        try {
+          void this.onBackendMessageHandler(channelId, message as ClientMessage);
+        } catch (error) {
+          console.error('[Gateway] Message channel handler error:', error);
+        }
+      },
+      onClosed: channelId => this.onBackendClosedHandler?.(channelId),
     });
     console.log(`[Gateway] Instance ID: ${this.instanceId} (channel=${this.channel})`);
 
@@ -440,8 +457,10 @@ export class GatewayClient {
     this.onBackendClosedHandler = handler;
   }
 
-  /** Send a message to a subscribing client via backend_server_message. */
+  /** Send a message to a subscribing client. Prefers the client's v4 message
+   *  channel; falls back to v3 backend_server_message over the control plane. */
   sendToChannel(targetPeerSessionId: string, message: ServerMessage): void {
+    if (this.messageChannels.send(targetPeerSessionId, message)) return;
     const backendId = this.backendId || targetPeerSessionId;
     this.transport.send(
       {
@@ -711,6 +730,8 @@ export class GatewayClient {
             resolveWsBase: () => this.config.gatewayUrl.replace(/^http/, 'ws'),
             createAgent: () => this.createHttpAgent(),
           });
+        } else if (offer.kind === MESSAGE_CHANNEL_KIND) {
+          this.messageChannels.handleOffer(offer);
         } else {
           this.transport.send({
             type: 'channel_reject',
@@ -976,6 +997,9 @@ export class GatewayClient {
     this.subscribedBackends.clear();
     this.heartbeat.stop();
     this.stopBackendDataPush();
+    // Message channels die with the control connection (fast-reopen model);
+    // their close events fire onClosed → virtual client teardown upstream.
+    this.messageChannels.closeAll();
     if (wasConnected) this.outgoingEvents.onConnectionStateChanged?.(false);
   }
 }
