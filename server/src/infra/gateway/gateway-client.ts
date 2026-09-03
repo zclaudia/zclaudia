@@ -316,6 +316,15 @@ export class GatewayClient {
       resolveWsBase: () => this.config.gatewayUrl.replace(/^http/, 'ws'),
       createAgent: () => this.createHttpAgent(),
       onMessage: (channelId, message) => {
+        // Content catch-up is served in-band on v4 channels: the patch goes
+        // back over the same channel instead of a gateway broadcast.
+        const typed = message as { type?: string };
+        if (typed.type === 'catch_up_content') {
+          void this.handleCatchUpRequest(message as CatchUpContentMessage, m =>
+            this.messageChannels.send(channelId, m)
+          );
+          return;
+        }
         if (!this.onBackendMessageHandler) return;
         try {
           void this.onBackendMessageHandler(channelId, message as ClientMessage);
@@ -854,7 +863,15 @@ export class GatewayClient {
   // Internal — Content Catch-Up
   // ==========================================================================
 
-  private async handleCatchUpRequest(msg: CatchUpContentMessage): Promise<void> {
+  /**
+   * Serve a catch-up request. v3 requests arrive on the control plane and
+   * reply there (gateway broadcasts to subscribers); v4 requests arrive as
+   * message-channel frames and reply over the same channel.
+   */
+  private async handleCatchUpRequest(
+    msg: CatchUpContentMessage,
+    reply: (message: unknown) => void = m => this.transport.send(m)
+  ): Promise<void> {
     if (!this.onCatchUpHandler) return;
     const sessionId = msg.contentStreamId;
     try {
@@ -868,10 +885,10 @@ export class GatewayClient {
         patches: messages,
         latestOffset: maxOffset,
       };
-      this.transport.send(patch);
+      reply(patch);
     } catch (error) {
       console.error('[Gateway] Catch-up error:', error);
-      this.transport.send({
+      reply({
         type: 'content_patch_error',
         backendId: msg.backendId,
         contentStreamId: sessionId,

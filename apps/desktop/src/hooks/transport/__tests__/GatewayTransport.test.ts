@@ -149,18 +149,47 @@ describe('GatewayTransport', () => {
     });
   });
 
+  function seedV4Backend(backendId: string, extra: Record<string, unknown> = {}) {
+    (transport as any).registryItems.set(backendId, {
+      backendId,
+      namespace: 'zclaudia',
+      epoch: 1,
+      capabilities: [],
+      gatewayProtocolVersion: 4,
+      ...extra,
+    });
+  }
+
   describe('subscribe', () => {
-    it('sends subscribe_backend message when connected', () => {
+    it('sends topic_subscribe for v4 backends', () => {
       transport.connect();
       const mockWs = (transport as any).ws;
       mockWs.readyState = WebSocket.OPEN;
       (transport as any).authenticated = true;
+      seedV4Backend('backend-123');
 
       transport.subscribe('backend-123');
 
       const sentMessage = JSON.parse(mockWs.send.mock.calls[0][0]);
-      expect(sentMessage.type).toBe('subscribe_backend');
-      expect(sentMessage.backendId).toBe('backend-123');
+      expect(sentMessage).toEqual({
+        type: 'topic_subscribe',
+        backendId: 'backend-123',
+        topic: 'resources',
+      });
+    });
+
+    it('refuses non-v4 backends', () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      transport.connect();
+      const mockWs = (transport as any).ws;
+      mockWs.readyState = WebSocket.OPEN;
+      (transport as any).authenticated = true;
+      (transport as any).registryItems.set('backend-v3', { backendId: 'backend-v3' });
+
+      transport.subscribe('backend-v3');
+
+      expect(mockWs.send).not.toHaveBeenCalled();
+      consoleSpy.mockRestore();
     });
 
     it('does not send if already subscribed to backend', () => {
@@ -177,7 +206,7 @@ describe('GatewayTransport', () => {
   });
 
   describe('unsubscribe', () => {
-    it('sends unsubscribe_backend message', () => {
+    it('sends topic_unsubscribe', () => {
       transport.connect();
       const mockWs = (transport as any).ws;
       mockWs.readyState = WebSocket.OPEN;
@@ -185,16 +214,21 @@ describe('GatewayTransport', () => {
       transport.unsubscribe('backend-123');
 
       const sentMessage = JSON.parse(mockWs.send.mock.calls[0][0]);
-      expect(sentMessage.type).toBe('unsubscribe_backend');
-      expect(sentMessage.backendId).toBe('backend-123');
+      expect(sentMessage).toEqual({
+        type: 'topic_unsubscribe',
+        backendId: 'backend-123',
+        topic: 'resources',
+      });
     });
   });
 
   describe('sendToBackend', () => {
-    it('sends message when subscribed to backend', () => {
+    it('queues the frame and requests a channel when none is open yet', () => {
       transport.connect();
       const mockWs = (transport as any).ws;
       mockWs.readyState = WebSocket.OPEN;
+      (transport as any).authenticated = true;
+      seedV4Backend('backend-123');
       transport.subscribedBackends.add('backend-123');
 
       const message: ClientMessage = {
@@ -206,10 +240,16 @@ describe('GatewayTransport', () => {
 
       transport.sendToBackend('backend-123', message);
 
+      // The message waits for the channel; a channel_open goes out
+      const queued = (transport as any).pendingChannelFrames.get('backend-123');
+      expect(queued).toHaveLength(1);
+      expect(JSON.parse(queued[0])).toEqual(message);
       const sentMessage = JSON.parse(mockWs.send.mock.calls[0][0]);
-      expect(sentMessage.type).toBe('backend_client_message');
-      expect(sentMessage.backendId).toBe('backend-123');
-      expect(sentMessage.message).toEqual(message);
+      expect(sentMessage).toMatchObject({
+        type: 'channel_open',
+        target: 'backend-123',
+        kind: 'zclaudia',
+      });
     });
 
     it('logs error when not subscribed to backend', () => {
@@ -405,32 +445,70 @@ describe('GatewayTransport', () => {
       );
     });
 
-    it('handles backend_subscribed', () => {
+    it('handles topic_subscribed (synthesizes backend_subscribed from presence)', () => {
       const mockWs = (transport as any).ws;
+      (transport as any).authenticated = true;
+      seedV4Backend('backend-123', { epoch: 5, capabilities: ['run'] });
 
-      const message = {
-        type: 'backend_subscribed',
-        backendId: 'backend-123',
-        epoch: 1,
-        capabilities: ['run'],
-      };
-
-      mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
+      mockWs.onmessage({
+        data: JSON.stringify({
+          type: 'topic_subscribed',
+          backendId: 'backend-123',
+          topic: 'resources',
+        }),
+      } as MessageEvent);
 
       expect(transport.subscribedBackends.has('backend-123')).toBe(true);
       expect(transport.isBackendSubscribed('backend-123')).toBe(true);
-      expect(mockConfig.onBackendSubscribed).toHaveBeenCalledWith('backend-123', 1, ['run']);
+      expect(mockConfig.onBackendSubscribed).toHaveBeenCalledWith('backend-123', 5, ['run']);
     });
 
-    it('handles backend_unsubscribed', () => {
+    it('routes topic_message resource payloads through the data callbacks', () => {
+      const mockWs = (transport as any).ws;
+      mockWs.onmessage({
+        data: JSON.stringify({
+          type: 'topic_message',
+          backendId: 'backend-123',
+          topic: 'resources',
+          payload: {
+            type: 'backend_resource_snapshot',
+            resources: [
+              { resourceType: 'session', resourceId: 's1', resource: { sessionId: 's1' } },
+              { resourceType: 'project', resourceId: 'p1', resource: { projectId: 'p1' } },
+            ],
+          },
+        }),
+      } as MessageEvent);
+
+      expect(mockConfig.onBackendDataSnapshot).toHaveBeenCalledWith(
+        'backend-123',
+        [{ sessionId: 's1' }],
+        [{ projectId: 'p1' }]
+      );
+
+      mockWs.onmessage({
+        data: JSON.stringify({
+          type: 'topic_message',
+          backendId: 'backend-123',
+          topic: 'resources',
+          payload: { type: 'backend_resource_event', op: 'remove', resourceType: 'session', resourceId: 's1' },
+        }),
+      } as MessageEvent);
+      expect(mockConfig.onBackendDataEvent).toHaveBeenCalledWith(
+        'backend-123',
+        expect.objectContaining({ op: 'remove', resourceId: 's1' })
+      );
+    });
+
+    it('handles topic_unsubscribed', () => {
       const mockWs = (transport as any).ws;
       // Set up an existing subscription
       transport.subscribedBackends.add('backend-123');
 
       const message = {
-        type: 'backend_unsubscribed',
+        type: 'topic_unsubscribed',
         backendId: 'backend-123',
-        reason: 'Backend disconnected',
+        topic: 'resources',
       };
 
       mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
@@ -439,7 +517,7 @@ describe('GatewayTransport', () => {
       expect(transport.isBackendSubscribed('backend-123')).toBe(false);
       expect(mockConfig.onBackendUnsubscribed).toHaveBeenCalledWith(
         'backend-123',
-        'Backend disconnected'
+        'client_unsubscribed'
       );
     });
 
@@ -572,18 +650,25 @@ describe('GatewayTransport', () => {
   });
 
   describe('content operations', () => {
-    it('sends catch_up_content message', () => {
+    it('sends catch_up_content over the message channel (queued until open)', () => {
       transport.connect();
       const mockWs = (transport as any).ws;
       mockWs.readyState = WebSocket.OPEN;
+      (transport as any).authenticated = true;
+      seedV4Backend('backend-1');
 
       transport.catchUpContent('backend-1', 'session-1', 10);
 
+      const queued = (transport as any).pendingChannelFrames.get('backend-1');
+      expect(queued).toHaveLength(1);
+      expect(JSON.parse(queued[0])).toEqual({
+        type: 'catch_up_content',
+        backendId: 'backend-1',
+        contentStreamId: 'session-1',
+        afterOffset: 10,
+      });
       const sentMessage = JSON.parse(mockWs.send.mock.calls[0][0]);
-      expect(sentMessage.type).toBe('catch_up_content');
-      expect(sentMessage.backendId).toBe('backend-1');
-      expect(sentMessage.contentStreamId).toBe('session-1');
-      expect(sentMessage.afterOffset).toBe(10);
+      expect(sentMessage.type).toBe('channel_open');
     });
   });
 
@@ -650,29 +735,32 @@ describe('GatewayTransport', () => {
       return ctl;
     }
 
-    function feedSubscribed(ctl: any, backendId: string) {
+    function subscribeAndConfirm(ctl: any, backendId: string) {
+      transport.subscribe(backendId);
       ctl.onmessage({
-        data: JSON.stringify({ type: 'backend_subscribed', backendId, epoch: 1, capabilities: [] }),
+        data: JSON.stringify({ type: 'topic_subscribed', backendId, topic: 'resources' }),
       });
     }
 
-    it('opens a channel on subscribe for v4 backends only', async () => {
-      const ctl = await connectReady([presence('b4', 4), presence('b3')]);
-      feedSubscribed(ctl, 'b3');
-      feedSubscribed(ctl, 'b4');
+    it('subscribe drives topic_subscribe then a channel_open', async () => {
+      const ctl = await connectReady([presence('b4', 4)]);
+      subscribeAndConfirm(ctl, 'b4');
       await flush();
 
-      const opens = ctl.send.mock.calls
-        .map((c: any[]) => JSON.parse(c[0]))
-        .filter((m: any) => m.type === 'channel_open');
+      const sent = ctl.send.mock.calls.map((c: any[]) => JSON.parse(c[0]));
+      expect(sent.filter((m: any) => m.type === 'topic_subscribe')).toHaveLength(1);
+      const opens = sent.filter((m: any) => m.type === 'channel_open');
       expect(opens).toHaveLength(1);
       expect(opens[0]).toMatchObject({ target: 'b4', kind: 'zclaudia' });
     });
 
-    it('dials the data socket on channel_ready and prefers it for sends', async () => {
+    it('dials the data socket on channel_ready, flushes queued frames, and routes replies', async () => {
       const ctl = await connectReady([presence('b4', 4)]);
-      feedSubscribed(ctl, 'b4');
+      subscribeAndConfirm(ctl, 'b4');
       await flush();
+
+      // Sent before the channel is up: must be queued, then flushed on open
+      transport.sendToBackend('b4', { type: 'early' } as never);
 
       ctl.onmessage({
         data: JSON.stringify({
@@ -687,24 +775,31 @@ describe('GatewayTransport', () => {
       const dataWs = wsInstances.find((w: any) => String(w.url).includes('/channel/'));
       expect(dataWs).toBeDefined();
       expect(dataWs.url).toBe('ws://gateway.example.com/channel/ch-1?ticket=tk1');
+      expect(JSON.parse(dataWs.send.mock.calls[0][0])).toEqual({ type: 'early' });
 
       transport.sendToBackend('b4', { type: 'ping' } as ClientMessage);
-      expect(JSON.parse(dataWs.send.mock.calls[0][0])).toEqual({ type: 'ping' });
-      const v3Sends = ctl.send.mock.calls
-        .map((c: any[]) => JSON.parse(c[0]))
-        .filter((m: any) => m.type === 'backend_client_message');
-      expect(v3Sends).toHaveLength(0);
+      expect(JSON.parse(dataWs.send.mock.calls[1][0])).toEqual({ type: 'ping' });
 
-      // Inbound frames route as backend server messages
+      // Inbound frames: server messages and in-band content patches
       dataWs.onmessage({ data: JSON.stringify({ type: 'state_heartbeat' }) });
       expect(mockConfig.onBackendServerMessage).toHaveBeenCalledWith('b4', {
         type: 'state_heartbeat',
       });
+      dataWs.onmessage({
+        data: JSON.stringify({
+          type: 'content_patch',
+          backendId: 'b4',
+          contentStreamId: 'sess-1',
+          patches: [{ offset: 7 }],
+          latestOffset: 7,
+        }),
+      });
+      expect(mockConfig.onContentPatch).toHaveBeenCalledWith('b4', 'sess-1', [{ offset: 7 }], 7);
     });
 
-    it('falls back to the v3 path and queues a reopen when the channel drops', async () => {
+    it('queues frames and reopens when the channel drops', async () => {
       const ctl = await connectReady([presence('b4', 4)]);
-      feedSubscribed(ctl, 'b4');
+      subscribeAndConfirm(ctl, 'b4');
       await flush();
       ctl.onmessage({
         data: JSON.stringify({
@@ -722,14 +817,30 @@ describe('GatewayTransport', () => {
       transport.sendToBackend('b4', { type: 'ping' } as ClientMessage);
       await flush();
 
+      // No v3 fallback exists any more: the frame waits for the reopen
+      const queued = (transport as any).pendingChannelFrames.get('b4');
+      expect(queued).toHaveLength(1);
       const sent = ctl.send.mock.calls.map((c: any[]) => JSON.parse(c[0]));
-      expect(sent.some((m: any) => m.type === 'backend_client_message')).toBe(true);
       expect(sent.some((m: any) => m.type === 'channel_open')).toBe(true);
+      expect(sent.some((m: any) => m.type === 'backend_client_message')).toBe(false);
+
+      // Reopen completes: the queued frame flushes on the new socket
+      ctl.onmessage({
+        data: JSON.stringify({
+          type: 'channel_ready',
+          channelId: 'ch-2',
+          ticket: 'tk2',
+          dataPath: '/channel/ch-2',
+        }),
+      });
+      await flush();
+      const dataWs2 = wsInstances.find((w: any) => String(w.url).includes('/channel/ch-2'));
+      expect(JSON.parse(dataWs2.send.mock.calls[0][0])).toEqual({ type: 'ping' });
     });
 
     it('consumes channel-open failures without escalating onError', async () => {
       const ctl = await connectReady([presence('b4', 4)]);
-      feedSubscribed(ctl, 'b4');
+      subscribeAndConfirm(ctl, 'b4');
       await flush();
 
       ctl.onmessage({
