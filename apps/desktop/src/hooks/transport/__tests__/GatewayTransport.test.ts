@@ -253,7 +253,7 @@ describe('GatewayTransport', () => {
       const sentMessage = JSON.parse(mockWs.send.mock.calls[0][0]);
       expect(sentMessage.type).toBe('peer_hello');
       expect(sentMessage.gatewaySecret).toBe('test-secret');
-      expect(sentMessage.protocolVersion).toBe(3);
+      expect(sentMessage.protocolVersion).toBe(4);
       expect(sentMessage.namespace).toBe('zclaudia');
       expect(sentMessage.clientProtocolVersion).toBe(1);
       expect(sentMessage.peerType).toBe('client-only');
@@ -596,6 +596,147 @@ describe('GatewayTransport', () => {
 
       expect(firstWs.close).toHaveBeenCalled();
       expect((transport as any).reconnectAttempt).toBe(0);
+    });
+  });
+
+  describe('v4 message channels', () => {
+    let wsInstances: any[];
+
+    beforeEach(() => {
+      wsInstances = [];
+      const Base: any = globalThis.WebSocket;
+      class Tracked extends Base {
+        constructor(url: string) {
+          super(url);
+          wsInstances.push(this);
+        }
+      }
+      vi.stubGlobal('WebSocket', Tracked);
+      transport = new GatewayTransport(mockConfig);
+    });
+
+    const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+
+    function presence(backendId: string, gatewayProtocolVersion?: number) {
+      return {
+        backendId,
+        namespace: 'zclaudia',
+        instanceId: `inst-${backendId}`,
+        deviceId: `dev-${backendId}`,
+        name: backendId,
+        channel: 'prod',
+        visible: true,
+        capabilities: [],
+        backendProtocolVersion: 1,
+        epoch: 1,
+        connectedAt: 0,
+        lastSeenAt: 0,
+        ...(gatewayProtocolVersion ? { gatewayProtocolVersion } : {}),
+      };
+    }
+
+    async function connectReady(items: unknown[]) {
+      transport.connect();
+      await flush();
+      const ctl = wsInstances[0];
+      ctl.onmessage({
+        data: JSON.stringify({
+          type: 'peer_ready',
+          peerSessionId: 'peer-1',
+          recoveryToken: 'rt',
+          registrySync: { items },
+        }),
+      });
+      return ctl;
+    }
+
+    function feedSubscribed(ctl: any, backendId: string) {
+      ctl.onmessage({
+        data: JSON.stringify({ type: 'backend_subscribed', backendId, epoch: 1, capabilities: [] }),
+      });
+    }
+
+    it('opens a channel on subscribe for v4 backends only', async () => {
+      const ctl = await connectReady([presence('b4', 4), presence('b3')]);
+      feedSubscribed(ctl, 'b3');
+      feedSubscribed(ctl, 'b4');
+      await flush();
+
+      const opens = ctl.send.mock.calls
+        .map((c: any[]) => JSON.parse(c[0]))
+        .filter((m: any) => m.type === 'channel_open');
+      expect(opens).toHaveLength(1);
+      expect(opens[0]).toMatchObject({ target: 'b4', kind: 'zclaudia' });
+    });
+
+    it('dials the data socket on channel_ready and prefers it for sends', async () => {
+      const ctl = await connectReady([presence('b4', 4)]);
+      feedSubscribed(ctl, 'b4');
+      await flush();
+
+      ctl.onmessage({
+        data: JSON.stringify({
+          type: 'channel_ready',
+          channelId: 'ch-1',
+          ticket: 'tk1',
+          dataPath: '/channel/ch-1',
+        }),
+      });
+      await flush();
+
+      const dataWs = wsInstances.find((w: any) => String(w.url).includes('/channel/'));
+      expect(dataWs).toBeDefined();
+      expect(dataWs.url).toBe('ws://gateway.example.com/channel/ch-1?ticket=tk1');
+
+      transport.sendToBackend('b4', { type: 'ping' } as ClientMessage);
+      expect(JSON.parse(dataWs.send.mock.calls[0][0])).toEqual({ type: 'ping' });
+      const v3Sends = ctl.send.mock.calls
+        .map((c: any[]) => JSON.parse(c[0]))
+        .filter((m: any) => m.type === 'backend_client_message');
+      expect(v3Sends).toHaveLength(0);
+
+      // Inbound frames route as backend server messages
+      dataWs.onmessage({ data: JSON.stringify({ type: 'state_heartbeat' }) });
+      expect(mockConfig.onBackendServerMessage).toHaveBeenCalledWith('b4', {
+        type: 'state_heartbeat',
+      });
+    });
+
+    it('falls back to the v3 path and queues a reopen when the channel drops', async () => {
+      const ctl = await connectReady([presence('b4', 4)]);
+      feedSubscribed(ctl, 'b4');
+      await flush();
+      ctl.onmessage({
+        data: JSON.stringify({
+          type: 'channel_ready',
+          channelId: 'ch-1',
+          ticket: 'tk1',
+          dataPath: '/channel/ch-1',
+        }),
+      });
+      await flush();
+      const dataWs = wsInstances.find((w: any) => String(w.url).includes('/channel/'));
+      dataWs.onclose(new CloseEvent('close'));
+
+      ctl.send.mockClear();
+      transport.sendToBackend('b4', { type: 'ping' } as ClientMessage);
+      await flush();
+
+      const sent = ctl.send.mock.calls.map((c: any[]) => JSON.parse(c[0]));
+      expect(sent.some((m: any) => m.type === 'backend_client_message')).toBe(true);
+      expect(sent.some((m: any) => m.type === 'channel_open')).toBe(true);
+    });
+
+    it('consumes channel-open failures without escalating onError', async () => {
+      const ctl = await connectReady([presence('b4', 4)]);
+      feedSubscribed(ctl, 'b4');
+      await flush();
+
+      ctl.onmessage({
+        data: JSON.stringify({ type: 'gateway_error', code: 'BACKEND_OFFLINE', message: 'gone' }),
+      });
+      expect(mockConfig.onError).not.toHaveBeenCalled();
+      expect((transport as any).channelOpenInFlight).toBe(false);
     });
   });
 });
