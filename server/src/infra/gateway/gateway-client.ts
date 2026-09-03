@@ -297,6 +297,16 @@ export class GatewayClient {
       db,
       activeRuns: activeRuns ?? new Map(),
       sendMessage: message => this.transport.send(message),
+      // v4 dual-publish: mirror snapshots/events to the resources topic so
+      // topic subscribers (and retained-state cold starts) work while v3
+      // subscribers keep the legacy broadcast.
+      publishTopic:
+        (config.protocolVersion ?? 4) === 4
+          ? (topic, payload, options) => {
+              if (!this.transport.hasSocket() || !this.isConnected) return;
+              this.transport.send({ type: 'topic_publish', topic, payload, retain: options?.retain });
+            }
+          : undefined,
     });
     console.log(`[Gateway] Instance ID: ${this.instanceId} (channel=${this.channel})`);
 
@@ -520,7 +530,9 @@ export class GatewayClient {
 
   publishBackendDataSnapshot(targetPeerSessionId?: string): void {
     if (!this.transport.hasSocket() || !this.isConnected || !this.epoch) return;
-    const published = this.backendDataPublisher.publishSnapshot();
+    const published = this.backendDataPublisher.publishSnapshot({
+      mirrorToTopic: !targetPeerSessionId,
+    });
     if (published && targetPeerSessionId && this.config.getStateHeartbeat) {
       this.sendToChannel(targetPeerSessionId, this.config.getStateHeartbeat());
     }
