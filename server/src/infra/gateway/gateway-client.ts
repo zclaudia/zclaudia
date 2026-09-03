@@ -37,6 +37,8 @@ import type { ClientMessage, ServerMessage } from '@zclaudia/shared/wire/message
 import { GatewayBackendDataPublisher } from './gateway-backend-data-publisher.js';
 import { getOrCreateDeviceId } from './gateway-device-id.js';
 import { GatewayHeartbeat } from './gateway-heartbeat.js';
+import type { ChannelOfferMessage } from '@zclaudia/gateway-protocol';
+import { handleHttpChannelOffer } from './gateway-channel-http.js';
 import { handleHttpProxyRequest } from './gateway-http-proxy.js';
 import { createSocksProxyAgent } from './gateway-proxy-agent.js';
 import { GatewayTransport } from './gateway-transport.js';
@@ -48,6 +50,13 @@ import { GatewayTransport } from './gateway-transport.js';
 export interface GatewayClientConfig {
   gatewayUrl: string;
   gatewaySecret: string;
+  /**
+   * Gateway sync protocol version. 4 (default) enables channels: the gateway
+   * serves /api/proxy for this backend over streaming per-channel WebSockets.
+   * Set 3 (or GATEWAY_PROTOCOL_VERSION=3) to fall back to the legacy
+   * http_proxy_* message path.
+   */
+  protocolVersion?: 3 | 4;
   namespace?: string;
   clientProtocolVersion?: number;
   backendProtocolVersion?: number;
@@ -623,7 +632,7 @@ export class GatewayClient {
   private sendPeerHello(): void {
     const msg: PeerHelloMessage = {
       type: 'peer_hello',
-      protocolVersion: 3,
+      protocolVersion: this.config.protocolVersion ?? 4,
       namespace: this.config.namespace ?? 'zclaudia',
       clientProtocolVersion: this.config.clientProtocolVersion ?? 1,
       peerType: 'client+backend',
@@ -679,6 +688,26 @@ export class GatewayClient {
           sendWs: data => this.transport.send(data),
         });
         break;
+      // Protocol v4: the gateway offers a per-channel data socket. Only the
+      // 'http' kind (streaming /api/proxy) is served; anything else is
+      // rejected so the opener gets a fast channel_closed.
+      case 'channel_offer': {
+        const offer = msg as unknown as ChannelOfferMessage;
+        if (offer.kind === 'http') {
+          handleHttpChannelOffer(offer, {
+            serverPort: this.config.serverPort || 3100,
+            resolveWsBase: () => this.config.gatewayUrl.replace(/^http/, 'ws'),
+            createAgent: () => this.createHttpAgent(),
+          });
+        } else {
+          this.transport.send({
+            type: 'channel_reject',
+            channelId: offer.channelId,
+            reason: 'unsupported_kind',
+          });
+        }
+        break;
+      }
       // Backend subscription events (facade client role)
       case 'backend_subscribed':
         this.handleBackendSubscribed(msg as unknown as BackendSubscribedMessage);

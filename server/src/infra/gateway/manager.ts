@@ -208,6 +208,9 @@ export class GatewayManager {
     const gatewayClientConfig: GatewayClientConfig = {
       gatewayUrl: config.gatewayUrl,
       gatewaySecret: config.gatewaySecret,
+      // Escape hatch while v4 rolls out: GATEWAY_PROTOCOL_VERSION=3 restores
+      // the legacy http_proxy_* path against older gateways.
+      protocolVersion: process.env.GATEWAY_PROTOCOL_VERSION === '3' ? 3 : 4,
       name: config.backendName || `Backend on ${os.hostname()}`,
       channel: process.env.ZCLAUDIA_CHANNEL || 'prod',
       serverPort: this.actualPort,
