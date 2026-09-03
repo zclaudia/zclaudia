@@ -26,18 +26,20 @@ describe('GatewayBackendDataPublisher', () => {
         throw new Error(`unexpected SQL: ${sql}`);
       }),
     } as unknown as BetterDatabase;
-    const sendMessage = vi.fn();
+    const publishTopic = vi.fn();
     const publisher = new GatewayBackendDataPublisher({
       db,
       activeRuns: new Map(),
-      sendMessage,
+      publishTopic,
     });
 
     const published = publisher.publishSnapshot();
 
     expect(published).toBe(true);
-    expect(sendMessage).toHaveBeenCalledTimes(1);
-    const message = sendMessage.mock.calls[0][0] as BackendResourceSnapshotMessage;
+    expect(publishTopic).toHaveBeenCalledTimes(1);
+    expect(publishTopic.mock.calls[0][0]).toBe(RESOURCES_TOPIC);
+    expect(publishTopic.mock.calls[0][2]).toEqual({ retain: true });
+    const message = publishTopic.mock.calls[0][1] as BackendResourceSnapshotMessage;
     expect(message).toMatchObject({
       type: 'backend_resource_snapshot',
       namespace: 'zclaudia',
@@ -60,16 +62,14 @@ describe('GatewayBackendDataPublisher', () => {
     ]);
   });
 
-  it('dual-publishes to the resources topic: snapshots retained, events not', () => {
+  it('publishes to the resources topic: snapshots retained, events not', () => {
     const db = {
       prepare: vi.fn(() => ({ all: () => [] })),
     } as unknown as BetterDatabase;
-    const sendMessage = vi.fn();
     const publishTopic = vi.fn();
     const publisher = new GatewayBackendDataPublisher({
       db,
       activeRuns: new Map(),
-      sendMessage,
       publishTopic,
     });
 
@@ -96,22 +96,5 @@ describe('GatewayBackendDataPublisher', () => {
       undefined
     );
 
-    // Topic payload and legacy message are the SAME object shape
-    expect(publishTopic.mock.calls[0][1]).toBe(sendMessage.mock.calls[0][0]);
-
-    // Targeted republish (late v3 subscriber) skips the topic mirror
-    publishTopic.mockClear();
-    publisher.publishSnapshot({ mirrorToTopic: false });
-    expect(publishTopic).not.toHaveBeenCalled();
-  });
-
-  it('does not touch topics when publishTopic is not provided (v3 mode)', () => {
-    const sendMessage = vi.fn();
-    const publisher = new GatewayBackendDataPublisher({
-      activeRuns: new Map(),
-      sendMessage,
-    });
-    publisher.publishSessionEvent('upsert', { id: 's1', updatedAt: 1 });
-    expect(sendMessage).toHaveBeenCalledTimes(1);
   });
 });

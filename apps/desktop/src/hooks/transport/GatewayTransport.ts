@@ -18,7 +18,6 @@ import type {
   PeerReadyMessage,
   BackendResourceSnapshotMessage,
   BackendResourceEventMessage,
-  RequestBackendResourceSnapshotMessage,
   BackendServerMessage,
   GatewayStreamEvent,
   CatchUpContentMessage,
@@ -195,14 +194,6 @@ export class GatewayTransport {
 
   isConnected(): boolean {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN && this.authenticated;
-  }
-
-  // --- Backend Data ---
-  requestBackendDataSnapshot(backendId: string): void {
-    this.send({
-      type: 'request_backend_resource_snapshot',
-      backendId,
-    } satisfies RequestBackendResourceSnapshotMessage);
   }
 
   // --- Backend Subscription (v4: resources topic + message channel) ---
@@ -409,12 +400,6 @@ export class GatewayTransport {
       case 'registry_snapshot':
         this.handleRegistrySnapshot(message);
         break;
-      case 'backend_resource_snapshot':
-        this.handleBackendDataSnapshot(message);
-        break;
-      case 'backend_resource_event':
-        this.handleBackendDataEvent(message);
-        break;
       case 'topic_subscribed':
         this.handleTopicSubscribed(message);
         break;
@@ -424,17 +409,10 @@ export class GatewayTransport {
       case 'topic_message':
         this.handleTopicMessage(message);
         break;
+      // Fallback targeted path (used while a message channel reopens);
+      // resource data and content patches ride on topics/channels.
       case 'backend_server_message':
         this.handleBackendServerMessage(message);
-        break;
-      case 'backend_stream_event':
-        this.handleRunStreamEvent(message);
-        break;
-      case 'content_patch':
-        this.handleContentPatch(message);
-        break;
-      case 'content_patch_error':
-        this.handleContentPatchError(message);
         break;
       case 'channel_ready':
         this.handleChannelReady(message);
@@ -566,32 +544,6 @@ export class GatewayTransport {
   private handleBackendServerMessage(msg: BackendServerMessage): void {
     if (!this.subscribedBackends.has(msg.backendId)) return;
     this.config.onBackendServerMessage(msg.backendId, msg.message as ServerMessage);
-  }
-
-  // --- Stream ---
-  private handleRunStreamEvent(msg: GatewayStreamEvent): void {
-    if (!this.subscribedBackends.has(msg.backendId)) return;
-    this.config.onRunStreamEvent(msg.backendId, msg.channel ?? '', msg);
-  }
-
-  // --- Content ---
-  private handleContentPatch(msg: ContentPatchMessage): void {
-    if (!this.subscribedBackends.has(msg.backendId)) return;
-    this.config.onContentPatch(
-      msg.backendId,
-      msg.contentStreamId,
-      msg.patches as SessionMessage[],
-      msg.latestOffset
-    );
-  }
-  private handleContentPatchError(msg: ContentPatchErrorMessage): void {
-    if (!this.subscribedBackends.has(msg.backendId)) return;
-    this.config.onContentPatchError(
-      msg.backendId,
-      msg.contentStreamId,
-      msg.afterOffset,
-      msg.message
-    );
   }
 
   // --- Protocol v4 message channels ---

@@ -13,22 +13,12 @@ import type {
   RegistrySyncPayload,
   BackendPresence,
   RegistrySnapshotMessage,
-  HeartbeatAckMessage,
-  StreamDemandMessage,
   BackendResourceSnapshotMessage,
   BackendResourceEventMessage,
-  RequestBackendResourceSnapshotMessage,
   BackendStreamEvent,
-  GatewayStreamEvent,
   ContentPatchMessage,
   ContentPatchErrorMessage,
-  BackendClientMessage,
   BackendServerMessage,
-  GatewayHttpProxyRequest,
-  SubscribeBackendMessage,
-  BackendSubscribedMessage,
-  UnsubscribeBackendMessage,
-  BackendUnsubscribedMessage,
   CatchUpContentMessage,
 } from '@zclaudia/protocol/gateway';
 import type { ProjectItem, SessionItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
@@ -45,7 +35,6 @@ import {
   MESSAGE_CHANNEL_KIND,
 } from './gateway-channel-messages.js';
 import { RESOURCES_TOPIC } from './gateway-backend-data-publisher.js';
-import { handleHttpProxyRequest } from './gateway-http-proxy.js';
 import { createSocksProxyAgent } from './gateway-proxy-agent.js';
 import { GatewayTransport } from './gateway-transport.js';
 
@@ -56,13 +45,6 @@ import { GatewayTransport } from './gateway-transport.js';
 export interface GatewayClientConfig {
   gatewayUrl: string;
   gatewaySecret: string;
-  /**
-   * Gateway sync protocol version. 4 (default) enables channels: the gateway
-   * serves /api/proxy for this backend over streaming per-channel WebSockets.
-   * Set 3 (or GATEWAY_PROTOCOL_VERSION=3) to fall back to the legacy
-   * http_proxy_* message path.
-   */
-  protocolVersion?: 3 | 4;
   namespace?: string;
   clientProtocolVersion?: number;
   backendProtocolVersion?: number;
@@ -264,11 +246,11 @@ export class GatewayClient {
     send: msg => this.transport.send(msg),
   });
 
-  private streamDemandActive = false;
+  /** Always false since the v4 data plane: retained topics replaced the
+   *  demand-gated periodic snapshot push. Kept for the queries interface. */
+  private readonly streamDemandActive = false;
 
   private registryItems = new Map<string, BackendPresence>();
-
-  private backendDataPushInterval: NodeJS.Timeout | null = null;
 
   private backendDataPublisher: GatewayBackendDataPublisher;
 
@@ -304,17 +286,10 @@ export class GatewayClient {
     this.backendDataPublisher = new GatewayBackendDataPublisher({
       db,
       activeRuns: activeRuns ?? new Map(),
-      sendMessage: message => this.transport.send(message),
-      // v4 dual-publish: mirror snapshots/events to the resources topic so
-      // topic subscribers (and retained-state cold starts) work while v3
-      // subscribers keep the legacy broadcast.
-      publishTopic:
-        (config.protocolVersion ?? 4) === 4
-          ? (topic, payload, options) => {
-              if (!this.transport.hasSocket() || !this.isConnected) return;
-              this.transport.send({ type: 'topic_publish', topic, payload, retain: options?.retain });
-            }
-          : undefined,
+      publishTopic: (topic, payload, options) => {
+        if (!this.transport.hasSocket() || !this.isConnected) return;
+        this.transport.send({ type: 'topic_publish', topic, payload, retain: options?.retain });
+      },
     });
     // v4 message channels feed the same virtual-client machinery as v3
     // backend_client_message, keyed by channelId instead of peerSessionId.
@@ -578,14 +553,9 @@ export class GatewayClient {
   // Backend Data (sessions + projects publishing)
   // ==========================================================================
 
-  publishBackendDataSnapshot(targetPeerSessionId?: string): void {
+  publishBackendDataSnapshot(): void {
     if (!this.transport.hasSocket() || !this.isConnected || !this.epoch) return;
-    const published = this.backendDataPublisher.publishSnapshot({
-      mirrorToTopic: !targetPeerSessionId,
-    });
-    if (published && targetPeerSessionId && this.config.getStateHeartbeat) {
-      this.sendToChannel(targetPeerSessionId, this.config.getStateHeartbeat());
-    }
+    this.backendDataPublisher.publishSnapshot();
   }
 
   publishBackendDataEvent(
@@ -694,7 +664,7 @@ export class GatewayClient {
   private sendPeerHello(): void {
     const msg: PeerHelloMessage = {
       type: 'peer_hello',
-      protocolVersion: this.config.protocolVersion ?? 4,
+      protocolVersion: 4,
       namespace: this.config.namespace ?? 'zclaudia',
       clientProtocolVersion: this.config.clientProtocolVersion ?? 1,
       peerType: 'client+backend',
@@ -727,28 +697,6 @@ export class GatewayClient {
         break;
       case 'registry_snapshot':
         this.handleRegistrySnapshot(msg as unknown as RegistrySnapshotMessage);
-        break;
-      case 'heartbeat_ack':
-        this.handleHeartbeatAck(msg as unknown as HeartbeatAckMessage);
-        break;
-      case 'backend_stream_demand':
-        this.handleStreamDemand(msg as unknown as StreamDemandMessage);
-        break;
-      // Incoming messages (backend-peer role)
-      case 'backend_client_message':
-        void this.handleBackendClientMsg(msg as unknown as BackendClientMessage);
-        break;
-      case 'subscriber_disconnected':
-        this.handleSubscriberDisconnected(msg as unknown as { peerSessionId: string });
-        break;
-      case 'catch_up_content':
-        this.handleCatchUpRequest(msg as unknown as CatchUpContentMessage);
-        break;
-      case 'http_proxy_request':
-        void handleHttpProxyRequest(msg as unknown as GatewayHttpProxyRequest, {
-          serverPort: this.config.serverPort || 3100,
-          sendWs: data => this.transport.send(data),
-        });
         break;
       // Protocol v4: the gateway offers a per-channel data socket. Only the
       // 'http' kind (streaming /api/proxy) is served; anything else is
@@ -792,31 +740,10 @@ export class GatewayClient {
       case 'channel_closed':
         this.outgoingChannels.handleChannelClosed((msg as unknown as { channelId: string }).channelId);
         break;
-      // Backend data (subscribed to remote backend)
-      case 'backend_resource_snapshot':
-        this.handleOutgoingBackendDataSnapshot(msg as unknown as BackendResourceSnapshotMessage);
-        break;
-      case 'backend_resource_event':
-        this.handleOutgoingBackendDataEvent(msg as unknown as BackendDataEventMessage);
-        break;
-      // Handle request_backend_resource_snapshot from gateway (backend-peer role)
-      case 'request_backend_resource_snapshot': {
-        const request = msg as unknown as RequestBackendResourceSnapshotMessage;
-        this.publishBackendDataSnapshot(request.targetPeerSessionId);
-        break;
-      }
-      // Outgoing stream events (from subscribed backends)
+      // Fallback targeted path from remote backends (used while their
+      // channel toward us reopens); resource data itself rides on topics.
       case 'backend_server_message':
         this.handleOutgoingBackendServerMessage(msg as unknown as BackendServerMessage);
-        break;
-      case 'backend_stream_event':
-        this.handleOutgoingRunStreamEvent(msg as unknown as GatewayStreamEvent);
-        break;
-      case 'content_patch':
-        this.handleOutgoingContentPatch(msg as unknown as ContentPatchMessage);
-        break;
-      case 'content_patch_error':
-        this.handleOutgoingContentPatchError(msg as unknown as ContentPatchErrorMessage);
         break;
       case 'gateway_error':
         // A failed channel_open answers as a gateway_error; consume it as
@@ -843,42 +770,11 @@ export class GatewayClient {
     }
     this.applyRegistrySync(msg.registrySync);
     this.heartbeat.start();
+    // Refresh the retained resources-topic snapshot for this (new) epoch;
+    // events keep it current from here, no periodic push needed.
     this.publishBackendDataSnapshot();
-    this.startBackendDataPush();
     this.transport.flushQueue();
     this.outgoingEvents.onConnectionStateChanged?.(true);
-  }
-
-  private handleHeartbeatAck(msg: HeartbeatAckMessage): void {
-    if (msg.epoch !== this.epoch) return;
-    this.streamDemandActive = msg.streamDemand;
-  }
-
-  private handleStreamDemand(msg: StreamDemandMessage): void {
-    const prev = this.streamDemandActive;
-    this.streamDemandActive = msg.active;
-    if (prev !== msg.active)
-      console.log(`[Gateway] Stream demand: ${msg.active ? 'active' : 'inactive'}`);
-  }
-
-  // ==========================================================================
-  // Internal — Periodic Backend Data Push
-  // ==========================================================================
-
-  private startBackendDataPush(): void {
-    this.stopBackendDataPush();
-    this.backendDataPushInterval = setInterval(() => {
-      if (this.streamDemandActive) {
-        this.publishBackendDataSnapshot();
-      }
-    }, 30_000);
-  }
-
-  private stopBackendDataPush(): void {
-    if (this.backendDataPushInterval) {
-      clearInterval(this.backendDataPushInterval);
-      this.backendDataPushInterval = null;
-    }
   }
 
   // ==========================================================================
@@ -902,13 +798,12 @@ export class GatewayClient {
   // ==========================================================================
 
   /**
-   * Serve a catch-up request. v3 requests arrive on the control plane and
-   * reply there (gateway broadcasts to subscribers); v4 requests arrive as
-   * message-channel frames and reply over the same channel.
+   * Serve a catch-up request arriving as a message-channel frame; the
+   * content_patch / content_patch_error reply goes over the same channel.
    */
   private async handleCatchUpRequest(
     msg: CatchUpContentMessage,
-    reply: (message: unknown) => void = m => this.transport.send(m)
+    reply: (message: unknown) => void
   ): Promise<void> {
     if (!this.onCatchUpHandler) return;
     const sessionId = msg.contentStreamId;
@@ -934,22 +829,6 @@ export class GatewayClient {
         message: error instanceof Error ? error.message : 'Catch-up failed',
       } satisfies ContentPatchErrorMessage);
     }
-  }
-
-  private async handleBackendClientMsg(msg: BackendClientMessage): Promise<void> {
-    if (!this.onBackendMessageHandler) return;
-    try {
-      // Use sourcePeerSessionId (set by gateway) as client identity for virtualClient keying
-      const clientId = msg.sourcePeerSessionId || msg.backendId;
-      await this.onBackendMessageHandler(clientId, msg.message as ClientMessage);
-    } catch (error) {
-      console.error('[Gateway] Backend client message handler error:', error);
-    }
-  }
-
-  private handleSubscriberDisconnected(msg: { peerSessionId: string }): void {
-    if (!this.onBackendClosedHandler) return;
-    this.onBackendClosedHandler(msg.peerSessionId);
   }
 
   // ==========================================================================
@@ -1050,16 +929,6 @@ export class GatewayClient {
     }
   }
 
-  private handleOutgoingRunStreamEvent(msg: GatewayStreamEvent): void {
-    this.outgoingEvents.onOutgoingRunEvent?.(msg.backendId, msg.channel ?? '', {
-      type: msg.type,
-      eventName: msg.eventName,
-      streamId: msg.streamId,
-      seq: msg.seq,
-      payload: msg.payload,
-    } as unknown as ServerMessage);
-  }
-
   private handleOutgoingContentPatch(msg: ContentPatchMessage): void {
     this.outgoingEvents.onOutgoingContentPatch?.(
       msg.backendId,
@@ -1089,14 +958,12 @@ export class GatewayClient {
     this.epoch = null;
     this.peerSessionId = null;
     this.recoveryToken = null;
-    this.streamDemandActive = false;
     // Fire unsubscribed events before clearing, so adapter can update state
     for (const backendId of this.subscribedBackends) {
       this.outgoingEvents.onOutgoingBackendUnsubscribed?.(backendId, 'peer_disconnected');
     }
     this.subscribedBackends.clear();
     this.heartbeat.stop();
-    this.stopBackendDataPush();
     // Message channels die with the control connection (fast-reopen model);
     // their close events fire onClosed → virtual client teardown upstream.
     this.messageChannels.closeAll();

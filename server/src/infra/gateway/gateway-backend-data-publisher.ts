@@ -9,19 +9,16 @@ import { resolveSessionRunStatus } from '../../utils/run-state.js';
 
 type ActiveRunsMap = Map<string, ActiveRun>;
 type BackendDataMessage = BackendResourceSnapshotMessage | BackendResourceEventMessage;
-type SendBackendDataMessage = (message: BackendDataMessage) => void;
 
 export interface GatewayBackendDataPublisherOptions {
   db?: BetterDatabase;
   activeRuns: ActiveRunsMap;
-  sendMessage: SendBackendDataMessage;
   /**
-   * Protocol v4 dual-publish: when set, every snapshot/event is also
-   * published to the RESOURCES_TOPIC (snapshots retained, so cold topic
-   * subscribers get current state instantly). Payloads are the exact v3
-   * message objects — consumers share parsing with the legacy path.
+   * Publish to the RESOURCES_TOPIC (snapshots retained, so cold topic
+   * subscribers get current state instantly). Payloads keep the
+   * backend_resource_snapshot / backend_resource_event message shapes.
    */
-  publishTopic?: (topic: string, payload: unknown, options?: { retain?: boolean }) => void;
+  publishTopic: (topic: string, payload: unknown, options?: { retain?: boolean }) => void;
   namespace?: string;
   logger?: Pick<Console, 'log' | 'error'>;
 }
@@ -61,32 +58,23 @@ export interface GatewayProjectRecord {
 export class GatewayBackendDataPublisher {
   private readonly db: BetterDatabase | null;
   private readonly activeRuns: ActiveRunsMap;
-  private readonly sendMessage: SendBackendDataMessage;
-  private readonly publishTopic?: GatewayBackendDataPublisherOptions['publishTopic'];
+  private readonly publishTopic: GatewayBackendDataPublisherOptions['publishTopic'];
   private readonly namespace: string;
   private readonly logger: Pick<Console, 'log' | 'error'>;
 
   constructor(options: GatewayBackendDataPublisherOptions) {
     this.db = options.db ?? null;
     this.activeRuns = options.activeRuns;
-    this.sendMessage = options.sendMessage;
     this.publishTopic = options.publishTopic;
     this.namespace = options.namespace ?? 'zclaudia';
     this.logger = options.logger ?? console;
   }
 
-  /** Send on the legacy path and mirror to the resources topic (v4). */
   private emit(message: BackendDataMessage, retain: boolean): void {
-    this.sendMessage(message);
-    this.publishTopic?.(RESOURCES_TOPIC, message, retain ? { retain: true } : undefined);
+    this.publishTopic(RESOURCES_TOPIC, message, retain ? { retain: true } : undefined);
   }
 
-  /**
-   * mirrorToTopic: false for targeted republishes (a single late v3
-   * subscriber requested it) — the topic already has the retained snapshot,
-   * so mirroring would just duplicate traffic to every topic subscriber.
-   */
-  publishSnapshot(options?: { mirrorToTopic?: boolean }): boolean {
+  publishSnapshot(): boolean {
     if (!this.db) return false;
     const db = this.db;
     try {
@@ -111,8 +99,7 @@ export class GatewayBackendDataPublisher {
         ],
       };
 
-      if (options?.mirrorToTopic === false) this.sendMessage(msg);
-      else this.emit(msg, true);
+      this.emit(msg, true);
       this.logger.log(
         `[Gateway] Published backend data snapshot: ${sessionItems.length} sessions, ${projectItems.length} projects`
       );
