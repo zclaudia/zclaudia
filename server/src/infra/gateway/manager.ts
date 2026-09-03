@@ -205,17 +205,23 @@ export class GatewayManager {
 
     const serverContext = this.serverContext;
 
+    // Escape hatch while v4 rolls out: GATEWAY_PROTOCOL_VERSION=3 restores
+    // the legacy http_proxy_* path against older gateways.
+    const gatewayProtocolVersion = process.env.GATEWAY_PROTOCOL_VERSION === '3' ? 3 : (4 as const);
     const gatewayClientConfig: GatewayClientConfig = {
       gatewayUrl: config.gatewayUrl,
       gatewaySecret: config.gatewaySecret,
-      // Escape hatch while v4 rolls out: GATEWAY_PROTOCOL_VERSION=3 restores
-      // the legacy http_proxy_* path against older gateways.
-      protocolVersion: process.env.GATEWAY_PROTOCOL_VERSION === '3' ? 3 : 4,
+      protocolVersion: gatewayProtocolVersion,
       name: config.backendName || `Backend on ${os.hostname()}`,
       channel: process.env.ZCLAUDIA_CHANNEL || 'prod',
       serverPort: this.actualPort,
       visible: config.registerAsBackend !== false,
-      capabilities: ALL_SERVER_FEATURES,
+      // streamingUpload rides on the v4 channel proxy (multipart bodies pass
+      // through verbatim); v3's http_proxy_* path cannot carry it.
+      capabilities:
+        gatewayProtocolVersion === 4
+          ? [...ALL_SERVER_FEATURES, 'streamingUpload']
+          : ALL_SERVER_FEATURES,
       getStateHeartbeat: () => serverContext.getStateHeartbeat(),
     };
 

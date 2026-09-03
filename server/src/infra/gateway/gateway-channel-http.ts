@@ -1,7 +1,9 @@
 // HTTP-over-channel serving for Gateway Protocol v4. When this server registers
 // with protocolVersion 4, the gateway routes /api/proxy/:backendId/* through a
 // dedicated per-channel WebSocket (kind 'http') instead of http_proxy_* control
-// messages: no base64, response bodies stream frame-by-frame. Mirrors
+// messages: no base64, and BOTH directions stream — request bodies are piped
+// into the local fetch as frames arrive (multipart uploads never buffer in
+// memory here), response bodies stream back frame-by-frame. Mirrors
 // gateway-http-proxy.ts in spirit — a cohesive unit depending only on the local
 // server port and dial context. Frame protocol: zclaudia-gateway
 // docs/protocol-v4.md §7.
@@ -20,6 +22,8 @@ export interface ChannelHttpDeps {
 
 /** Pause streaming to the socket above this send-buffer size. */
 const SEND_HIGH_WATER = 4 * 1024 * 1024;
+/** Request-body queue budget before pausing the data socket. */
+const BODY_HIGH_WATER = 4 * 1024 * 1024;
 
 /** Send with backpressure: await the write when the buffer is over the mark. */
 function sendWithBackpressure(ws: WebSocket, data: Buffer): Promise<void> {
@@ -34,7 +38,9 @@ function sendWithBackpressure(ws: WebSocket, data: Buffer): Promise<void> {
 
 /**
  * Dial the offered data socket and serve one HTTP request over it.
- * Request bodies are buffered (as the v3 path did); response bodies stream.
+ * The local fetch starts as soon as the request meta frame arrives; body
+ * frames are piped into it with backpressure (the data socket is paused
+ * while the local server is slower than the gateway).
  */
 export function handleHttpChannelOffer(offer: ChannelOfferMessage, deps: ChannelHttpDeps): void {
   const url = `${deps.resolveWsBase()}${offer.dataPath}?ticket=${encodeURIComponent(offer.ticket)}`;
@@ -43,14 +49,16 @@ export function handleHttpChannelOffer(offer: ChannelOfferMessage, deps: Channel
   if (proxyAgent) wsOptions.agent = proxyAgent;
   const ws = new WebSocket(url, wsOptions);
 
-  let meta: HttpRequestFrame | null = null;
-  const chunks: Buffer[] = [];
   const abort = new AbortController();
-  let responding = false;
+  let bodyController: ReadableStreamDefaultController<Uint8Array> | null = null;
+  let started = false;
 
   ws.on('message', (data: Buffer, isBinary: boolean) => {
     if (isBinary) {
-      chunks.push(data);
+      if (bodyController) {
+        bodyController.enqueue(new Uint8Array(data));
+        if ((bodyController.desiredSize ?? 1) <= 0) ws.pause();
+      }
       return;
     }
     let frame: { type?: string };
@@ -59,16 +67,47 @@ export function handleHttpChannelOffer(offer: ChannelOfferMessage, deps: Channel
     } catch {
       return;
     }
-    if (frame.type === 'http_request') {
-      meta = frame as HttpRequestFrame;
-    } else if (frame.type === 'http_request_end' && meta && !responding) {
-      responding = true;
-      void serve(ws, meta, Buffer.concat(chunks), deps, abort.signal);
+    if (frame.type === 'http_request' && !started) {
+      started = true;
+      const meta = frame as HttpRequestFrame;
+      let body: ReadableStream<Uint8Array> | undefined;
+      if (!['GET', 'HEAD'].includes(meta.method)) {
+        body = new ReadableStream<Uint8Array>(
+          {
+            start: controller => {
+              bodyController = controller;
+            },
+            pull: () => {
+              ws.resume();
+            },
+            cancel: () => {
+              bodyController = null;
+            },
+          },
+          new ByteLengthQueuingStrategy({ highWaterMark: BODY_HIGH_WATER })
+        );
+      }
+      void serve(ws, meta, body, deps, abort.signal);
+    } else if (frame.type === 'http_request_end') {
+      try {
+        bodyController?.close();
+      } catch {
+        // already closed/errored
+      }
+      bodyController = null;
     }
   });
 
   // Channel torn down (client gone, epoch change, timeout): stop local work.
-  ws.on('close', () => abort.abort());
+  ws.on('close', () => {
+    abort.abort();
+    try {
+      bodyController?.error(new Error('channel closed'));
+    } catch {
+      // already closed
+    }
+    bodyController = null;
+  });
   ws.on('error', error => {
     console.error('[Gateway] HTTP channel error:', error);
     abort.abort();
@@ -78,7 +117,7 @@ export function handleHttpChannelOffer(offer: ChannelOfferMessage, deps: Channel
 async function serve(
   ws: WebSocket,
   meta: HttpRequestFrame,
-  body: Buffer,
+  body: ReadableStream<Uint8Array> | undefined,
   deps: ChannelHttpDeps,
   signal: AbortSignal
 ): Promise<void> {
@@ -87,9 +126,11 @@ async function serve(
     const resp = await fetch(url, {
       method: meta.method,
       headers: meta.headers,
-      body: !['GET', 'HEAD'].includes(meta.method) && body.length > 0 ? body : undefined,
+      body,
       signal,
-    });
+      // Required by undici for streamed request bodies
+      ...(body ? { duplex: 'half' as const } : {}),
+    } as RequestInit);
     const headers: Record<string, string> = {};
     resp.headers.forEach((value, key) => {
       headers[key] = value;

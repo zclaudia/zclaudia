@@ -2,7 +2,14 @@
 // Consumers can continue importing from '../services/api' without changes.
 
 // Base utilities
-export { AuthError, getBaseUrl, getAuthHeaders, fetchApi, fetchLocalApi } from './api/base';
+export {
+  AuthError,
+  getBaseUrl,
+  getAuthHeaders,
+  fetchApi,
+  fetchLocalApi,
+  activeServerSupports,
+} from './api/base';
 export { ApiError, apiCall, apiCallVoid } from './api/unwrap';
 
 // Domain APIs

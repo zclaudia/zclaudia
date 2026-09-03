@@ -128,6 +128,51 @@ describe('gateway-channel-http', () => {
     expect(JSON.parse(Buffer.concat(result.chunks).toString())).toEqual({ ok: true });
   });
 
+  test('request body streams: local fetch starts before http_request_end', async () => {
+    let sawHeadersAt = 0;
+    let bodyDoneAt = 0;
+    let received: Buffer | null = null;
+    localHandler = (req, res) => {
+      sawHeadersAt = Date.now();
+      const parts: Buffer[] = [];
+      req.on('data', c => parts.push(c));
+      req.on('end', () => {
+        bodyDoneAt = Date.now();
+        received = Buffer.concat(parts);
+        res.end('done');
+      });
+    };
+
+    const chunk = Buffer.alloc(64 * 1024, 3);
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('stream test timeout')), 5000);
+      wss.once('connection', (socket: WebSocket) => {
+        socket.send(
+          JSON.stringify({ type: 'http_request', method: 'POST', path: '/stream', headers: {} })
+        );
+        socket.send(chunk);
+        // Hold the tail back long enough to observe the early fetch dispatch
+        setTimeout(() => {
+          socket.send(chunk);
+          socket.send(JSON.stringify({ type: 'http_request_end' }));
+        }, 300);
+        socket.on('close', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+      handleHttpChannelOffer(
+        { type: 'channel_offer', channelId: 'ch-stream', kind: 'http', ticket: 't', dataPath: '/' },
+        { serverPort: localPort, resolveWsBase: () => `ws://127.0.0.1:${wsPort}`, createAgent: () => undefined }
+      );
+    });
+
+    expect(received!.length).toBe(chunk.length * 2);
+    // The local request began (headers seen) well before the body finished —
+    // i.e. the adapter did not buffer the request before dispatching.
+    expect(bodyDoneAt - sawHeadersAt).toBeGreaterThanOrEqual(250);
+  });
+
   test('unreachable local server yields a 502 frame', async () => {
     await new Promise<void>(resolve => localServer.close(() => resolve()));
     localServer = http.createServer(() => {}); // afterEach still has something to close
