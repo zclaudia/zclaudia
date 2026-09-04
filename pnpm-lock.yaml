@@ -226,8 +226,8 @@ importers:
         specifier: ^0.1.0
         version: 0.1.0
       '@zclaudia/gateway-protocol':
-        specifier: link:../../zclaudia-gateway/packages/protocol
-        version: link:../../zclaudia-gateway/packages/protocol
+        specifier: ^0.1.0
+        version: 0.1.0
       '@zclaudia/protocol':
         specifier: ^0.2.0
         version: 0.2.0
@@ -2362,6 +2362,9 @@ packages:
     peerDependenciesMeta:
       react:
         optional: true
+
+  '@zclaudia/gateway-protocol@0.1.0':
+    resolution: {integrity: sha512-2DZ/TOxOXDDcz7WOumGoqV+nDQ60E3p+DpBlc+puCVWHE/d2T0lLyEd3gBdSiYu20sL9b7bG1lzQZRgHJDSAKQ==}
 
   '@zclaudia/plugin-sdk@0.1.0':
     resolution: {integrity: sha512-Njpk7b02nENaoJhyE3WsgBfoRRUzHPxsL+1Kr5zCOst0HfxM3unkOhJ5HIU5lTpPF1F3fJcEzZvrWliXqWnkig==}
@@ -7393,6 +7396,8 @@ snapshots:
   '@zclaudia/agent-transcript-kit@0.7.0(react@19.2.7)':
     optionalDependencies:
       react: 19.2.7
+
+  '@zclaudia/gateway-protocol@0.1.0': {}
 
   '@zclaudia/plugin-sdk@0.1.0': {}
 
