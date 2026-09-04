@@ -6,6 +6,7 @@ const mockServerStoreState = {
 
 let mockControlPlaneMode = 'embedded-local';
 let mockIsLocalBackendId = true;
+let mockStreamingUpload = false;
 
 vi.mock('../../stores/serverStore', () => ({
   useServerStore: {
@@ -21,6 +22,7 @@ vi.mock('../../utils/controlPlane', () => ({
 vi.mock('../api', () => ({
   getBaseUrl: vi.fn(() => 'http://localhost:3100'),
   getAuthHeaders: vi.fn(() => ({ Authorization: 'Bearer token' })),
+  activeServerSupports: vi.fn(() => mockStreamingUpload),
 }));
 
 class MockFileReader {
@@ -51,6 +53,7 @@ class MockXMLHttpRequest {
   };
   addEventListener: ReturnType<typeof vi.fn>;
   open = vi.fn();
+  setRequestHeader = vi.fn();
   send: ReturnType<typeof vi.fn>;
   private listeners = new Map<string, () => void>();
   private progressHandler?: (e: {
@@ -103,6 +106,7 @@ describe('services/fileUpload', () => {
     });
     mockControlPlaneMode = 'embedded-local';
     mockIsLocalBackendId = true;
+    mockStreamingUpload = false;
     mockFetch.mockReset();
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -201,6 +205,22 @@ describe('services/fileUpload', () => {
     expect(progressCallback).toHaveBeenCalledWith(
       expect.objectContaining({ loaded: file.size, total: file.size, percentage: 100 })
     );
+  });
+
+  it('uploads via multipart when the gateway backend advertises streamingUpload', async () => {
+    mockControlPlaneMode = 'gateway-direct';
+    mockIsLocalBackendId = false;
+    mockStreamingUpload = true;
+
+    const file = new File(['test content'], 'test.txt', { type: 'text/plain' });
+    const result = await uploadFile(file);
+
+    expect(result.fileId).toBe('file-123');
+    // Multipart path through the gateway proxy — no base64 JSON fallback
+    expect(mockFetch).not.toHaveBeenCalled();
+    const xhr = MockXMLHttpRequest.instances[0];
+    expect(xhr.open).toHaveBeenCalledWith('POST', 'http://localhost:3100/api/files/upload');
+    expect(xhr.setRequestHeader).toHaveBeenCalledWith('Authorization', 'Bearer token');
   });
 
   it('handles direct upload failure', async () => {

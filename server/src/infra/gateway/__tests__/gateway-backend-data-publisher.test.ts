@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { BackendResourceSnapshotMessage } from '@zclaudia/protocol/gateway';
 import type { Database as BetterDatabase } from 'better-sqlite3';
-import { GatewayBackendDataPublisher } from '../gateway-backend-data-publisher.js';
+import { GatewayBackendDataPublisher, RESOURCES_TOPIC } from '../gateway-backend-data-publisher.js';
 
 describe('GatewayBackendDataPublisher', () => {
   it('publishes session snapshot even when projects cannot be queried', () => {
@@ -26,18 +26,20 @@ describe('GatewayBackendDataPublisher', () => {
         throw new Error(`unexpected SQL: ${sql}`);
       }),
     } as unknown as BetterDatabase;
-    const sendMessage = vi.fn();
+    const publishTopic = vi.fn();
     const publisher = new GatewayBackendDataPublisher({
       db,
       activeRuns: new Map(),
-      sendMessage,
+      publishTopic,
     });
 
     const published = publisher.publishSnapshot();
 
     expect(published).toBe(true);
-    expect(sendMessage).toHaveBeenCalledTimes(1);
-    const message = sendMessage.mock.calls[0][0] as BackendResourceSnapshotMessage;
+    expect(publishTopic).toHaveBeenCalledTimes(1);
+    expect(publishTopic.mock.calls[0][0]).toBe(RESOURCES_TOPIC);
+    expect(publishTopic.mock.calls[0][2]).toEqual({ retain: true });
+    const message = publishTopic.mock.calls[0][1] as BackendResourceSnapshotMessage;
     expect(message).toMatchObject({
       type: 'backend_resource_snapshot',
       namespace: 'zclaudia',
@@ -58,5 +60,41 @@ describe('GatewayBackendDataPublisher', () => {
         updatedAt: 20,
       },
     ]);
+  });
+
+  it('publishes to the resources topic: snapshots retained, events not', () => {
+    const db = {
+      prepare: vi.fn(() => ({ all: () => [] })),
+    } as unknown as BetterDatabase;
+    const publishTopic = vi.fn();
+    const publisher = new GatewayBackendDataPublisher({
+      db,
+      activeRuns: new Map(),
+      publishTopic,
+    });
+
+    publisher.publishSnapshot();
+    expect(publishTopic).toHaveBeenCalledTimes(1);
+    expect(publishTopic).toHaveBeenLastCalledWith(
+      RESOURCES_TOPIC,
+      expect.objectContaining({ type: 'backend_resource_snapshot' }),
+      { retain: true }
+    );
+
+    publisher.publishSessionEvent('upsert', { id: 's1', name: 'S', updatedAt: 5 });
+    expect(publishTopic).toHaveBeenCalledTimes(2);
+    expect(publishTopic).toHaveBeenLastCalledWith(
+      RESOURCES_TOPIC,
+      expect.objectContaining({ type: 'backend_resource_event', op: 'upsert', resourceId: 's1' }),
+      undefined
+    );
+
+    publisher.broadcastProjectEvent('deleted', { id: 'p1' });
+    expect(publishTopic).toHaveBeenLastCalledWith(
+      RESOURCES_TOPIC,
+      expect.objectContaining({ type: 'backend_resource_event', op: 'remove', resourceId: 'p1' }),
+      undefined
+    );
+
   });
 });

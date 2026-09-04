@@ -1,7 +1,7 @@
 import { useServerStore } from '../stores/serverStore';
 import { getControlPlaneMode, isLocalBackendId } from '../utils/controlPlane';
 
-import { getBaseUrl, getAuthHeaders } from './api';
+import { getBaseUrl, getAuthHeaders, activeServerSupports } from './api';
 
 export interface UploadedFile {
   fileId: string;
@@ -36,7 +36,11 @@ export function readFileAsBase64(file: File): Promise<string> {
 /**
  * Upload a file to the server.
  * - Direct mode: multipart FormData to /api/files/upload
- * - Gateway mode: JSON body to /api/files/upload-json (gateway proxy serializes as JSON)
+ * - Gateway mode, backend advertises `streamingUpload` (gateway v4): same
+ *   multipart path — the v4 channel proxy forwards the body verbatim,
+ *   streaming end to end with no base64 inflation
+ * - Gateway mode, legacy backends: JSON body to /api/files/upload-json
+ *   (the v3 proxy serializes bodies as JSON)
  */
 export async function uploadFile(
   file: File,
@@ -49,8 +53,8 @@ export async function uploadFile(
   const viaGateway =
     !!activeId && !(controlPlaneMode === 'embedded-local' && isLocalBackendId(activeId));
 
-  if (viaGateway) {
-    // Gateway mode: send as JSON (gateway proxy can't forward multipart)
+  if (viaGateway && !activeServerSupports('streamingUpload')) {
+    // Legacy gateway mode: send as JSON (the v3 proxy can't forward multipart)
     const base64Data = await readFileAsBase64(file);
 
     onProgress?.({ loaded: file.size, total: file.size, percentage: 100 });
@@ -79,7 +83,8 @@ export async function uploadFile(
     return result.data;
   }
 
-  // Direct mode: multipart FormData with progress tracking
+  // Direct mode or streaming-capable gateway: multipart FormData with
+  // progress tracking
   const formData = new FormData();
   formData.append('file', file);
 
@@ -119,6 +124,10 @@ export async function uploadFile(
     xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
 
     xhr.open('POST', `${baseUrl}/api/files/upload`);
+    // Gateway mode authenticates at the proxy; direct mode headers are a no-op
+    for (const [key, value] of Object.entries(authHeaders)) {
+      xhr.setRequestHeader(key, value);
+    }
     xhr.send(formData);
   });
 }

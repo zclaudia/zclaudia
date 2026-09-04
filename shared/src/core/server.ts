@@ -23,7 +23,8 @@ export type ServerFeature =
   | 'search' // GET /api/sessions/search/*
   | 'fileUpload' // POST /api/files/upload
   | 'remoteTerminal' // WebSocket-based PTY terminal
-  | 'filePush'; // POST /api/files/push — server-to-client file delivery
+  | 'filePush' // POST /api/files/push — server-to-client file delivery
+  | 'streamingUpload'; // Gateway v4 only: /api/proxy forwards multipart/binary bodies verbatim, so clients can POST /api/files/upload through the gateway instead of the base64 upload-json fallback
 
 /** All features supported by the current server version. */
 export const ALL_SERVER_FEATURES: ServerFeature[] = [

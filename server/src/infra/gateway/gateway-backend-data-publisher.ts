@@ -9,15 +9,22 @@ import { resolveSessionRunStatus } from '../../utils/run-state.js';
 
 type ActiveRunsMap = Map<string, ActiveRun>;
 type BackendDataMessage = BackendResourceSnapshotMessage | BackendResourceEventMessage;
-type SendBackendDataMessage = (message: BackendDataMessage) => void;
 
 export interface GatewayBackendDataPublisherOptions {
   db?: BetterDatabase;
   activeRuns: ActiveRunsMap;
-  sendMessage: SendBackendDataMessage;
+  /**
+   * Publish to the RESOURCES_TOPIC (snapshots retained, so cold topic
+   * subscribers get current state instantly). Payloads keep the
+   * backend_resource_snapshot / backend_resource_event message shapes.
+   */
+  publishTopic: (topic: string, payload: unknown, options?: { retain?: boolean }) => void;
   namespace?: string;
   logger?: Pick<Console, 'log' | 'error'>;
 }
+
+/** Topic carrying backend_resource_snapshot / backend_resource_event payloads. */
+export const RESOURCES_TOPIC = 'resources';
 
 export interface GatewaySessionRecord {
   id: string;
@@ -51,16 +58,20 @@ export interface GatewayProjectRecord {
 export class GatewayBackendDataPublisher {
   private readonly db: BetterDatabase | null;
   private readonly activeRuns: ActiveRunsMap;
-  private readonly sendMessage: SendBackendDataMessage;
+  private readonly publishTopic: GatewayBackendDataPublisherOptions['publishTopic'];
   private readonly namespace: string;
   private readonly logger: Pick<Console, 'log' | 'error'>;
 
   constructor(options: GatewayBackendDataPublisherOptions) {
     this.db = options.db ?? null;
     this.activeRuns = options.activeRuns;
-    this.sendMessage = options.sendMessage;
+    this.publishTopic = options.publishTopic;
     this.namespace = options.namespace ?? 'zclaudia';
     this.logger = options.logger ?? console;
+  }
+
+  private emit(message: BackendDataMessage, retain: boolean): void {
+    this.publishTopic(RESOURCES_TOPIC, message, retain ? { retain: true } : undefined);
   }
 
   publishSnapshot(): boolean {
@@ -88,7 +99,7 @@ export class GatewayBackendDataPublisher {
         ],
       };
 
-      this.sendMessage(msg);
+      this.emit(msg, true);
       this.logger.log(
         `[Gateway] Published backend data snapshot: ${sessionItems.length} sessions, ${projectItems.length} projects`
       );
@@ -111,7 +122,7 @@ export class GatewayBackendDataPublisher {
         resource: item,
         updatedAt: item.updatedAt,
       };
-      this.sendMessage(msg);
+      this.emit(msg, false);
       return;
     }
 
@@ -121,7 +132,7 @@ export class GatewayBackendDataPublisher {
       resourceType: 'session',
       resourceId: session.id,
     };
-    this.sendMessage(msg);
+    this.emit(msg, false);
   }
 
   broadcastSessionEvent(
@@ -142,7 +153,7 @@ export class GatewayBackendDataPublisher {
         resourceType: 'project',
         resourceId: project.id,
       };
-      this.sendMessage(msg);
+      this.emit(msg, false);
       return;
     }
 
@@ -154,7 +165,7 @@ export class GatewayBackendDataPublisher {
       resourceId: item.projectId,
       resource: item,
     };
-    this.sendMessage(msg);
+    this.emit(msg, false);
   }
 
   private loadSessionItems(db: BetterDatabase): SessionItem[] {

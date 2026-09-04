@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GatewayClient } from '../gateway-client.js';
-import { shouldStream } from '../gateway-http-proxy.js';
 import WebSocket from 'ws';
 import * as fs from 'fs';
 import * as uuidModule from '../../../utils/uuid.js';
@@ -281,32 +280,6 @@ describe('GatewayClient', () => {
     });
   });
 
-  describe('HTTP proxy content handling', () => {
-    it('does not stream known text-like content types', () => {
-      expect(shouldStream({ 'content-type': 'application/json' })).toBe(false);
-      expect(shouldStream({ 'content-type': 'text/plain; charset=utf-8' })).toBe(false);
-      expect(shouldStream({ 'content-type': 'application/problem+json' })).toBe(false);
-      expect(shouldStream({ 'content-type': 'application/xml' })).toBe(false);
-    });
-
-    it('streams binary content types to avoid UTF-8 corruption', () => {
-      expect(shouldStream({ 'content-type': 'image/png' })).toBe(true);
-      expect(shouldStream({ 'content-type': 'application/pdf' })).toBe(true);
-      expect(shouldStream({ 'content-type': 'application/octet-stream' })).toBe(true);
-      expect(shouldStream({ 'content-type': 'application/vnd.android.package-archive' })).toBe(
-        true
-      );
-    });
-
-    it('streams large payloads regardless of content type', () => {
-      expect(
-        shouldStream({
-          'content-type': 'application/json',
-          'content-length': String(2 * 1024 * 1024),
-        })
-      ).toBe(true);
-    });
-  });
 
   describe('message handling', () => {
     beforeEach(() => {
@@ -426,12 +399,15 @@ describe('GatewayClient', () => {
         throw new Error('catch-up query failed');
       });
 
-      await (client as any).handleCatchUpRequest({
-        type: 'catch_up_session_content',
-        backendId: 'backend-1',
-        sessionId: 'session-1',
-        afterOffset: 7,
-      });
+      await (client as any).handleCatchUpRequest(
+        {
+          type: 'catch_up_session_content',
+          backendId: 'backend-1',
+          sessionId: 'session-1',
+          afterOffset: 7,
+        },
+        (m: unknown) => (client as any).transport.send(m)
+      );
 
       expect(sendWsSpy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -443,7 +419,7 @@ describe('GatewayClient', () => {
       );
     });
 
-    it('removes backend from subscribedBackends on unsubscribed event', () => {
+    it('removes backend from subscribedBackends on topic_unsubscribed', () => {
       const onOutgoingBackendUnsubscribed = vi.fn();
       client.events.setOutgoingEvents({ onOutgoingBackendUnsubscribed });
       (client as any).backendId = 'local-backend';
@@ -451,14 +427,63 @@ describe('GatewayClient', () => {
       // Simulate a subscribed backend
       (client as any).subscribedBackends.add('remote-backend');
 
-      (client as any).handleBackendUnsubscribed({
-        type: 'backend_unsubscribed',
+      (client as any).handleTopicUnsubscribed({
+        type: 'topic_unsubscribed',
         backendId: 'remote-backend',
-        reason: 'peer_closed',
+        topic: 'resources',
       });
 
       expect((client as any).subscribedBackends.has('remote-backend')).toBe(false);
-      expect(onOutgoingBackendUnsubscribed).toHaveBeenCalledWith('remote-backend', 'peer_closed');
+      expect(onOutgoingBackendUnsubscribed).toHaveBeenCalledWith(
+        'remote-backend',
+        'client_unsubscribed'
+      );
+    });
+
+    it('synthesizes backend_subscribed from topic_subscribed and presence', () => {
+      const onOutgoingBackendSubscribed = vi.fn();
+      client.events.setOutgoingEvents({ onOutgoingBackendSubscribed });
+      (client as any).registryItems.set('remote-backend', {
+        backendId: 'remote-backend',
+        epoch: 3,
+        capabilities: ['run', 'streamingUpload'],
+        gatewayProtocolVersion: 4,
+      });
+
+      (client as any).handleTopicSubscribed({
+        type: 'topic_subscribed',
+        backendId: 'remote-backend',
+        topic: 'resources',
+      });
+
+      expect((client as any).subscribedBackends.has('remote-backend')).toBe(true);
+      expect(onOutgoingBackendSubscribed).toHaveBeenCalledWith('remote-backend', 3, [
+        'run',
+        'streamingUpload',
+      ]);
+    });
+
+    it('routes topic_message resource payloads to the outgoing data handlers', () => {
+      const onOutgoingBackendDataSnapshot = vi.fn();
+      client.events.setOutgoingEvents({ onOutgoingBackendDataSnapshot });
+
+      (client as any).handleTopicMessage({
+        type: 'topic_message',
+        backendId: 'remote-backend',
+        topic: 'resources',
+        payload: {
+          type: 'backend_resource_snapshot',
+          resources: [
+            { resourceType: 'session', resourceId: 's1', resource: { sessionId: 's1' } },
+          ],
+        },
+      });
+
+      expect(onOutgoingBackendDataSnapshot).toHaveBeenCalledWith(
+        'remote-backend',
+        [{ sessionId: 's1' }],
+        []
+      );
     });
 
     it('forwards all outgoing backend data messages to event handlers', () => {
@@ -551,7 +576,9 @@ describe('GatewayClient', () => {
       });
 
       const sent = JSON.parse(mockWs.send.mock.calls[0][0]);
-      expect(sent).toMatchObject({
+      expect(sent.type).toBe('topic_publish');
+      expect(sent.topic).toBe('resources');
+      expect(sent.payload).toMatchObject({
         type: 'backend_resource_event',
         op: 'remove',
         resourceType: 'session',
@@ -576,7 +603,8 @@ describe('GatewayClient', () => {
       });
 
       const sent = JSON.parse(mockWs.send.mock.calls[0][0]);
-      expect(sent).toMatchObject({
+      expect(sent.type).toBe('topic_publish');
+      expect(sent.payload).toMatchObject({
         type: 'backend_resource_event',
         op: 'upsert',
         resourceType: 'project',
@@ -602,7 +630,8 @@ describe('GatewayClient', () => {
       client.commands.backendData.broadcastProjectEvent('deleted', { id: 'project-1' });
 
       const sent = JSON.parse(mockWs.send.mock.calls[0][0]);
-      expect(sent).toMatchObject({
+      expect(sent.type).toBe('topic_publish');
+      expect(sent.payload).toMatchObject({
         type: 'backend_resource_event',
         op: 'remove',
         resourceType: 'project',
@@ -617,36 +646,6 @@ describe('GatewayClient', () => {
 
       // Should not throw
       client.broadcastSessionEvent('created', { id: 'session-1' });
-    });
-  });
-
-  describe('additional content type handling', () => {
-    it('handles empty content-type header', () => {
-      expect(shouldStream({})).toBe(false);
-      expect(shouldStream({ 'content-type': '' })).toBe(false);
-    });
-
-    it('handles content-type with charset and other params', () => {
-      expect(shouldStream({ 'content-type': 'text/html; charset=utf-8' })).toBe(false);
-      expect(shouldStream({ 'content-type': 'application/json; charset=utf-8' })).toBe(false);
-    });
-
-    it('handles javascript content types', () => {
-      expect(shouldStream({ 'content-type': 'application/javascript' })).toBe(false);
-      expect(shouldStream({ 'content-type': 'text/javascript' })).toBe(false);
-    });
-
-    it('handles form-urlencoded content type', () => {
-      expect(shouldStream({ 'content-type': 'application/x-www-form-urlencoded' })).toBe(false);
-    });
-
-    it('handles graphql response content type', () => {
-      expect(shouldStream({ 'content-type': 'application/graphql-response+json' })).toBe(false);
-    });
-
-    it('streams unknown content types', () => {
-      expect(shouldStream({ 'content-type': 'application/unknown' })).toBe(true);
-      expect(shouldStream({ 'content-type': 'video/mp4' })).toBe(true);
     });
   });
 
@@ -667,14 +666,8 @@ describe('GatewayClient', () => {
       client.sendToChannel('channel-1', { type: 'test' } as any);
     });
 
-    it('sends a targeted state heartbeat alongside snapshot requests for late subscribers', () => {
-      const getStateHeartbeat = vi.fn(() => ({
-        type: 'state_heartbeat',
-        activeRuns: [],
-        pendingPermissions: [],
-        pendingQuestions: [],
-      }));
-      client = new GatewayClient({ ...mockConfig, getStateHeartbeat }, mockDb, mockActiveRuns);
+    it('publishes the snapshot as a retained topic message', () => {
+      client = new GatewayClient(mockConfig, mockDb, mockActiveRuns);
       const ws = {
         send: vi.fn(),
         readyState: 1,
@@ -711,21 +704,15 @@ describe('GatewayClient', () => {
           ]),
         });
 
-      client.publishBackendDataSnapshot('peer-session-1');
+      client.publishBackendDataSnapshot();
 
-      expect(getStateHeartbeat).toHaveBeenCalledTimes(1);
-      expect(ws.send).toHaveBeenCalledTimes(2);
-      expect(JSON.parse(ws.send.mock.calls[0][0])).toMatchObject({
-        type: 'backend_resource_snapshot',
-      });
-      expect(JSON.parse(ws.send.mock.calls[1][0])).toMatchObject({
-        type: 'backend_server_message',
-        backendId: 'local-backend',
-        targetPeerSessionId: 'peer-session-1',
-        message: {
-          type: 'state_heartbeat',
-          pendingQuestions: [],
-        },
+      expect(ws.send).toHaveBeenCalledTimes(1);
+      const sent = JSON.parse(ws.send.mock.calls[0][0]);
+      expect(sent).toMatchObject({
+        type: 'topic_publish',
+        topic: 'resources',
+        retain: true,
+        payload: { type: 'backend_resource_snapshot' },
       });
     });
   });

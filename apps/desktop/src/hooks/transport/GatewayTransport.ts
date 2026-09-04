@@ -18,12 +18,6 @@ import type {
   PeerReadyMessage,
   BackendResourceSnapshotMessage,
   BackendResourceEventMessage,
-  RequestBackendResourceSnapshotMessage,
-  SubscribeBackendMessage,
-  BackendSubscribedMessage,
-  UnsubscribeBackendMessage,
-  BackendUnsubscribedMessage,
-  BackendClientMessage,
   BackendServerMessage,
   GatewayStreamEvent,
   CatchUpContentMessage,
@@ -32,6 +26,42 @@ import type {
   GatewayErrorMessage,
 } from '@zclaudia/protocol/gateway';
 import type { ProjectItem, SessionItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
+
+// --- Protocol v4 frames (local declarations until @zclaudia/gateway-protocol
+// ships to npm; wire spec: zclaudia-gateway docs/protocol-v4.md) ---
+interface ChannelReadyMessage {
+  type: 'channel_ready';
+  channelId: string;
+  ticket: string;
+  dataPath: string;
+}
+interface ChannelClosedMessage {
+  type: 'channel_closed';
+  channelId: string;
+  reason: string;
+}
+interface TopicSubscribedMessage {
+  type: 'topic_subscribed';
+  backendId: string;
+  topic: string;
+}
+interface TopicUnsubscribedMessage {
+  type: 'topic_unsubscribed';
+  backendId: string;
+  topic: string;
+}
+interface TopicMessage {
+  type: 'topic_message';
+  backendId: string;
+  topic: string;
+  payload?: unknown;
+}
+/** Channel kind carrying zclaudia business messages (server: MESSAGE_CHANNEL_KIND). */
+const MESSAGE_CHANNEL_KIND = 'zclaudia';
+/** Topic carrying resource snapshots/events (server: RESOURCES_TOPIC). */
+const RESOURCES_TOPIC = 'resources';
+/** Max frames queued per backend while its message channel (re)opens. */
+const MAX_PENDING_CHANNEL_FRAMES = 100;
 
 // ============================================================================
 // Config & Callbacks
@@ -96,6 +126,23 @@ export class GatewayTransport {
   /** Set of backendIds we are currently subscribed to. */
   subscribedBackends = new Set<string>();
 
+  // --- Protocol v4 message channels (per-backend dedicated pipe) ---
+  /** backendId → open data socket. Targeted messages prefer this pipe. */
+  private messageChannels = new Map<string, { channelId: string; ws: WebSocket }>();
+  /**
+   * channel_ready carries no request correlation, so opens run one at a
+   * time and are matched FIFO (same contract as the SDK client).
+   */
+  private pendingChannelOpens: string[] = [];
+  private channelOpenInFlight = false;
+  private channelOpenTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Frames waiting for the backend's channel to (re)open. The channel is
+   * the only targeted path in the v4 data plane, so setup/reopen gaps queue
+   * instead of dropping (bounded, oldest dropped first).
+   */
+  private pendingChannelFrames = new Map<string, string[]>();
+
   constructor(config: GatewayTransportConfig) {
     this.config = config;
   }
@@ -149,22 +196,19 @@ export class GatewayTransport {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN && this.authenticated;
   }
 
-  // --- Backend Data ---
-  requestBackendDataSnapshot(backendId: string): void {
-    this.send({
-      type: 'request_backend_resource_snapshot',
-      backendId,
-    } satisfies RequestBackendResourceSnapshotMessage);
-  }
-
-  // --- Backend Subscription ---
+  // --- Backend Subscription (v4: resources topic + message channel) ---
   subscribe(backendId: string): void {
     if (this.subscribedBackends.has(backendId)) return;
-    this.send({ type: 'subscribe_backend', backendId } satisfies SubscribeBackendMessage);
+    if (!this.isV4Backend(backendId)) {
+      console.warn('[GatewayTransport] Backend does not speak protocol v4, cannot subscribe:', backendId);
+      return;
+    }
+    this.send({ type: 'topic_subscribe', backendId, topic: RESOURCES_TOPIC });
   }
 
   unsubscribe(backendId: string): void {
-    this.send({ type: 'unsubscribe_backend', backendId } satisfies UnsubscribeBackendMessage);
+    this.send({ type: 'topic_unsubscribe', backendId, topic: RESOURCES_TOPIC });
+    this.closeMessageChannel(backendId);
   }
 
   sendToBackend(backendId: string, message: ClientMessage): void {
@@ -172,11 +216,28 @@ export class GatewayTransport {
       console.error('[GatewayTransport] Cannot send: not subscribed to backend', backendId);
       return;
     }
-    this.send({
-      type: 'backend_client_message',
-      backendId,
-      message,
-    } satisfies BackendClientMessage);
+    this.sendChannelFrame(backendId, message);
+  }
+
+  /**
+   * Send a frame over the backend's message channel, queueing while the
+   * channel (re)opens — it is the only targeted path in the v4 data plane.
+   */
+  private sendChannelFrame(backendId: string, frame: unknown): void {
+    const serialized = JSON.stringify(frame);
+    const channel = this.messageChannels.get(backendId);
+    if (channel && channel.ws.readyState === WebSocket.OPEN) {
+      channel.ws.send(serialized);
+      return;
+    }
+    let queue = this.pendingChannelFrames.get(backendId);
+    if (!queue) {
+      queue = [];
+      this.pendingChannelFrames.set(backendId, queue);
+    }
+    if (queue.length >= MAX_PENDING_CHANNEL_FRAMES) queue.shift();
+    queue.push(serialized);
+    this.maybeOpenMessageChannel(backendId);
   }
 
   isBackendSubscribed(backendId: string): boolean {
@@ -185,7 +246,9 @@ export class GatewayTransport {
 
   // --- Content ---
   catchUpContent(backendId: string, sessionId: string, afterOffset: number): void {
-    this.send({
+    // v4: catch-up is served in-band on the message channel; the patch
+    // comes back over the same channel.
+    this.sendChannelFrame(backendId, {
       type: 'catch_up_content',
       backendId,
       contentStreamId: sessionId,
@@ -270,6 +333,7 @@ export class GatewayTransport {
       if (this.ws !== null && this.ws !== currentWs) return;
       this.ws = null;
       this.authenticated = false;
+      this.closeAllMessageChannels();
       if (!expectedClose) {
         this.config.onDisconnected();
         this.subscribedBackends.clear();
@@ -314,7 +378,7 @@ export class GatewayTransport {
   private sendPeerHello(): void {
     const msg: PeerHelloMessage = {
       type: 'peer_hello',
-      protocolVersion: 3,
+      protocolVersion: 4,
       namespace: 'zclaudia',
       clientProtocolVersion: 1,
       peerType: 'client-only',
@@ -336,29 +400,25 @@ export class GatewayTransport {
       case 'registry_snapshot':
         this.handleRegistrySnapshot(message);
         break;
-      case 'backend_resource_snapshot':
-        this.handleBackendDataSnapshot(message);
+      case 'topic_subscribed':
+        this.handleTopicSubscribed(message);
         break;
-      case 'backend_resource_event':
-        this.handleBackendDataEvent(message);
+      case 'topic_unsubscribed':
+        this.handleTopicUnsubscribed(message);
         break;
-      case 'backend_subscribed':
-        this.handleBackendSubscribed(message);
+      case 'topic_message':
+        this.handleTopicMessage(message);
         break;
-      case 'backend_unsubscribed':
-        this.handleBackendUnsubscribed(message);
-        break;
+      // Fallback targeted path (used while a message channel reopens);
+      // resource data and content patches ride on topics/channels.
       case 'backend_server_message':
         this.handleBackendServerMessage(message);
         break;
-      case 'backend_stream_event':
-        this.handleRunStreamEvent(message);
+      case 'channel_ready':
+        this.handleChannelReady(message);
         break;
-      case 'content_patch':
-        this.handleContentPatch(message);
-        break;
-      case 'content_patch_error':
-        this.handleContentPatchError(message);
+      case 'channel_closed':
+        this.handleChannelClosed(message);
         break;
       case 'pong':
         this.handlePong(message);
@@ -397,6 +457,7 @@ export class GatewayTransport {
     for (const [backendId] of this.registryItems) {
       if (!newIds.has(backendId)) {
         this.subscribedBackends.delete(backendId);
+        this.closeMessageChannel(backendId);
         removedBackendIds.push(backendId);
       }
     }
@@ -439,15 +500,45 @@ export class GatewayTransport {
     this.config.onBackendDataEvent(backendId, msg);
   }
 
-  // --- Backend Subscription ---
-  private handleBackendSubscribed(msg: BackendSubscribedMessage): void {
+  // --- Backend Subscription (synthesized from topic + presence) ---
+  private handleTopicSubscribed(msg: TopicSubscribedMessage): void {
+    if (msg.topic !== RESOURCES_TOPIC) return;
     this.subscribedBackends.add(msg.backendId);
-    this.config.onBackendSubscribed(msg.backendId, msg.epoch, msg.capabilities);
+    const presence = this.registryItems.get(msg.backendId);
+    this.config.onBackendSubscribed(
+      msg.backendId,
+      presence?.epoch ?? 0,
+      presence?.capabilities ?? []
+    );
+    // The dedicated message channel opens alongside the subscription
+    this.maybeOpenMessageChannel(msg.backendId);
   }
 
-  private handleBackendUnsubscribed(msg: BackendUnsubscribedMessage): void {
+  private handleTopicUnsubscribed(msg: TopicUnsubscribedMessage): void {
+    if (msg.topic !== RESOURCES_TOPIC) return;
     this.subscribedBackends.delete(msg.backendId);
-    this.config.onBackendUnsubscribed(msg.backendId, msg.reason);
+    this.closeMessageChannel(msg.backendId);
+    this.config.onBackendUnsubscribed(msg.backendId, 'client_unsubscribed');
+  }
+
+  private handleTopicMessage(msg: TopicMessage): void {
+    if (msg.topic !== RESOURCES_TOPIC) return;
+    // Payloads are the exact v3 resource message shapes (see server-side
+    // GatewayBackendDataPublisher); the authoritative backendId comes from
+    // the topic envelope.
+    const payload = msg.payload as { type?: string } | undefined;
+    if (!payload) return;
+    if (payload.type === 'backend_resource_snapshot') {
+      this.handleBackendDataSnapshot({
+        ...(payload as BackendResourceSnapshotMessage),
+        backendId: msg.backendId,
+      });
+    } else if (payload.type === 'backend_resource_event') {
+      this.handleBackendDataEvent({
+        ...(payload as BackendResourceEventMessage),
+        backendId: msg.backendId,
+      });
+    }
   }
 
   private handleBackendServerMessage(msg: BackendServerMessage): void {
@@ -455,30 +546,142 @@ export class GatewayTransport {
     this.config.onBackendServerMessage(msg.backendId, msg.message as ServerMessage);
   }
 
-  // --- Stream ---
-  private handleRunStreamEvent(msg: GatewayStreamEvent): void {
-    if (!this.subscribedBackends.has(msg.backendId)) return;
-    this.config.onRunStreamEvent(msg.backendId, msg.channel ?? '', msg);
+  // --- Protocol v4 message channels ---
+
+  private isV4Backend(backendId: string): boolean {
+    const presence = this.registryItems.get(backendId) as
+      | (BackendPresence & { gatewayProtocolVersion?: number })
+      | undefined;
+    return presence?.gatewayProtocolVersion === 4;
   }
 
-  // --- Content ---
-  private handleContentPatch(msg: ContentPatchMessage): void {
-    if (!this.subscribedBackends.has(msg.backendId)) return;
-    this.config.onContentPatch(
-      msg.backendId,
-      msg.contentStreamId,
-      msg.patches as SessionMessage[],
-      msg.latestOffset
-    );
+  private maybeOpenMessageChannel(backendId: string): void {
+    if (!this.isV4Backend(backendId)) return;
+    if (this.messageChannels.has(backendId)) return;
+    if (this.pendingChannelOpens.includes(backendId)) return;
+    this.pendingChannelOpens.push(backendId);
+    this.pumpChannelOpens();
   }
-  private handleContentPatchError(msg: ContentPatchErrorMessage): void {
-    if (!this.subscribedBackends.has(msg.backendId)) return;
-    this.config.onContentPatchError(
-      msg.backendId,
-      msg.contentStreamId,
-      msg.afterOffset,
-      msg.message
-    );
+
+  private pumpChannelOpens(): void {
+    if (this.channelOpenInFlight || this.pendingChannelOpens.length === 0) return;
+    if (!this.isConnected()) {
+      this.pendingChannelOpens = [];
+      return;
+    }
+    this.channelOpenInFlight = true;
+    const backendId = this.pendingChannelOpens[0];
+    this.send({ type: 'channel_open', target: backendId, kind: MESSAGE_CHANNEL_KIND });
+    // No reply within the pairing budget: drop and move on (v3 path keeps
+    // working; the next sendToBackend retries the open).
+    this.channelOpenTimer = setTimeout(() => this.settleChannelOpen(), 10_000);
+  }
+
+  /** Consume the FIFO head after channel_ready / error / timeout. */
+  private settleChannelOpen(): string | undefined {
+    if (this.channelOpenTimer) {
+      clearTimeout(this.channelOpenTimer);
+      this.channelOpenTimer = null;
+    }
+    const backendId = this.pendingChannelOpens.shift();
+    this.channelOpenInFlight = false;
+    queueMicrotask(() => this.pumpChannelOpens());
+    return backendId;
+  }
+
+  private handleChannelReady(msg: ChannelReadyMessage): void {
+    const backendId = this.settleChannelOpen();
+    if (!backendId) return;
+    const base = (this.resolvedUrl ?? '').replace(/\/ws$/, '');
+    const dataWs = new WebSocket(`${base}${msg.dataPath}?ticket=${encodeURIComponent(msg.ticket)}`);
+    dataWs.onopen = () => {
+      // The backend may have gone away while dialing
+      if (!this.subscribedBackends.has(backendId)) {
+        dataWs.close();
+        return;
+      }
+      this.messageChannels.set(backendId, { channelId: msg.channelId, ws: dataWs });
+      // Flush frames queued while the channel was (re)opening
+      const queued = this.pendingChannelFrames.get(backendId);
+      if (queued) {
+        this.pendingChannelFrames.delete(backendId);
+        for (const frame of queued) dataWs.send(frame);
+      }
+    };
+    dataWs.onmessage = (event: MessageEvent) => {
+      if (typeof event.data !== 'string') return;
+      try {
+        this.routeChannelFrame(backendId, JSON.parse(event.data));
+      } catch (error) {
+        console.error('[GatewayTransport] Failed to parse channel message:', error);
+      }
+    };
+    dataWs.onclose = () => {
+      const current = this.messageChannels.get(backendId);
+      if (current?.ws === dataWs) {
+        this.messageChannels.delete(backendId);
+        // Targeted messages transparently fall back to the v3 path; the
+        // next sendToBackend queues a reopen.
+      }
+    };
+    dataWs.onerror = () => {
+      // onclose follows; nothing to do here
+    };
+  }
+
+  /** Route an inbound message-channel frame: catch-up replies to the content
+   *  callbacks, everything else is a backend server message. */
+  private routeChannelFrame(backendId: string, frame: { type?: string }): void {
+    if (frame.type === 'content_patch') {
+      const patch = frame as ContentPatchMessage;
+      this.config.onContentPatch(
+        backendId,
+        patch.contentStreamId,
+        patch.patches as SessionMessage[],
+        patch.latestOffset
+      );
+      return;
+    }
+    if (frame.type === 'content_patch_error') {
+      const err = frame as ContentPatchErrorMessage;
+      this.config.onContentPatchError(backendId, err.contentStreamId, err.afterOffset, err.message);
+      return;
+    }
+    this.config.onBackendServerMessage(backendId, frame as ServerMessage);
+  }
+
+  private handleChannelClosed(msg: ChannelClosedMessage): void {
+    for (const [backendId, channel] of this.messageChannels) {
+      if (channel.channelId === msg.channelId) {
+        this.messageChannels.delete(backendId);
+        channel.ws.close();
+        break;
+      }
+    }
+  }
+
+  private closeMessageChannel(backendId: string): void {
+    const channel = this.messageChannels.get(backendId);
+    if (channel) {
+      this.messageChannels.delete(backendId);
+      channel.ws.close();
+    }
+    this.pendingChannelOpens = this.pendingChannelOpens.filter(id => id !== backendId);
+    this.pendingChannelFrames.delete(backendId);
+  }
+
+  private closeAllMessageChannels(): void {
+    for (const channel of this.messageChannels.values()) {
+      channel.ws.close();
+    }
+    this.messageChannels.clear();
+    this.pendingChannelOpens = [];
+    this.pendingChannelFrames.clear();
+    this.channelOpenInFlight = false;
+    if (this.channelOpenTimer) {
+      clearTimeout(this.channelOpenTimer);
+      this.channelOpenTimer = null;
+    }
   }
 
   // --- Pong ---
@@ -489,6 +692,16 @@ export class GatewayTransport {
   // --- Error ---
   private handleGatewayError(msg: GatewayErrorMessage): void {
     console.error(`[GatewayTransport] Error: ${msg.code} — ${msg.message}`);
+    // A failed channel_open answers with BACKEND_OFFLINE / RATE_LIMITED and
+    // no recovery hint; consume it as the FIFO reply instead of escalating —
+    // targeted messages keep flowing on the v3 path.
+    if (
+      this.channelOpenInFlight &&
+      (msg.code === 'BACKEND_OFFLINE' || msg.code === 'RATE_LIMITED')
+    ) {
+      this.settleChannelOpen();
+      return;
+    }
     if (msg.recovery) {
       switch (msg.recovery) {
         case 'resubscribe': {
@@ -519,6 +732,7 @@ export class GatewayTransport {
     this.peerSessionId = null;
     this.recoveryToken = null;
     this.subscribedBackends.clear();
+    this.closeAllMessageChannels();
     this.clearHealthProbe();
   }
 }

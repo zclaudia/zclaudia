@@ -212,7 +212,9 @@ export class GatewayManager {
       channel: process.env.ZCLAUDIA_CHANNEL || 'prod',
       serverPort: this.actualPort,
       visible: config.registerAsBackend !== false,
-      capabilities: ALL_SERVER_FEATURES,
+      // streamingUpload rides on the v4 channel proxy (multipart bodies
+      // pass through verbatim).
+      capabilities: [...ALL_SERVER_FEATURES, 'streamingUpload'],
       getStateHeartbeat: () => serverContext.getStateHeartbeat(),
     };
 
