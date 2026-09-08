@@ -32,7 +32,7 @@ import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useServerLatencyMonitor } from './hooks/useServerLatencyMonitor';
 import { useActiveSessionStream } from './hooks/useActiveSessionStream';
 import { useMainWindowGeometry } from './hooks/useMainWindowGeometry';
-import { useClaudiaDesktop } from './hooks/useClaudiaDesktop';
+import { useAgentInitialization } from './hooks/useAgentInitialization';
 import { useDeepLinkNavigation } from './hooks/useDeepLinkNavigation';
 import { useMobileInit } from './hooks/useMobileInit';
 import { useTauriWindowEvents } from './hooks/useTauriWindowEvents';
@@ -54,9 +54,8 @@ import { useRecoveryStore } from './stores/recoveryStore';
 import { useNotificationFeedStore } from './stores/notificationFeedStore';
 import { useNotificationsModalStore } from './stores/notificationsModalStore';
 import { useGatewayStore } from './stores/gatewayStore';
-import { useShortcutStore } from './stores/shortcutStore';
 import { useHomeQuickActionsStore } from './stores/homeQuickActionsStore';
-import { isAndroid, isDesktopTauri } from './utils/platform';
+import { isAndroid } from './utils/platform';
 import { initBuiltinPanels } from './plugins/builtinPanels';
 import { shouldShowDirectGatewaySetup } from './utils/directGatewaySetup';
 import { getMobileControlPlaneState } from './services/mobileConnectionState';
@@ -111,8 +110,6 @@ function AppContent() {
   const facadeBackends = useFacadeStore(s => s.backends);
   const localBackendId = useFacadeStore(s => s.localBackendId);
   const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
-  const selectedProjectId = useSelectionStore(s => s.selectedProjectId);
-  const sessions = useProjectStore(s => s.sessions);
   const projects = useProjectStore(s => s.projects);
   const selectSession = useProjectStore(s => s.selectSession);
   const setDashboardView = useSelectionStore(s => s.setDashboardView);
@@ -179,9 +176,6 @@ function AppContent() {
     hasConnected.current = true;
   }
 
-  const selectedSession = selectedSessionId
-    ? (sessions.find(s => s.id === selectedSessionId) ?? null)
-    : null;
   const dashboardProject = dashboardProjectId
     ? projects.find(p => p.id === dashboardProjectId) || null
     : null;
@@ -201,9 +195,6 @@ function AppContent() {
   const mobileToastContainer = isMobile ? (
     <ToastContainer className={MOBILE_TOAST_CONTAINER_CLASS} />
   ) : null;
-
-  const currentContextProjectId =
-    selectedSession?.projectId || dashboardProjectId || selectedProjectId || null;
 
   const claudiaSwipePreviewProgress = useMemo(() => {
     const progress = Math.max(0, Math.min(1, agentSwipePreview.progress));
@@ -301,12 +292,7 @@ function AppContent() {
       : undefined;
 
   // --- Extracted hooks ---
-  useClaudiaDesktop({
-    isMobile,
-    controlPlaneState,
-    claudiaContextProjectId: currentContextProjectId,
-  });
-
+  useAgentInitialization(controlPlaneState);
   useDeepLinkNavigation(controlPlaneState);
   useMobileInit(usesMobileControlPlane);
   useTauriWindowEvents();
@@ -319,13 +305,6 @@ function AppContent() {
   // Register builtin plugin panels once
   useEffect(() => {
     initBuiltinPanels();
-  }, []);
-
-  // Initialize global shortcut config (desktop only)
-  useEffect(() => {
-    if (!isDesktopTauri()) return;
-    const { loadConfig } = useShortcutStore.getState();
-    void loadConfig();
   }, []);
 
   // When a session is selected, exit the dashboard view

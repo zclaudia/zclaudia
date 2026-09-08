@@ -18,9 +18,9 @@ describe('resolveStandaloneWindowRoute', () => {
     expect(routeId('sessionWindow=session-1')).toBe('session-chat');
     expect(routeId('draftWindow=session-1')).toBe('draft');
     expect(routeId('terminalWindow=terminal-1')).toBe('terminal');
-    expect(routeId('claudiaBall=1')).toBe('claudia-ball');
+    expect(routeId('claudiaBall=1')).toBeNull();
     expect(routeId('notchWindow=1')).toBeNull();
-    expect(routeId('claudiaChat=1')).toBe('claudia-chat');
+    expect(routeId('claudiaChat=1')).toBeNull();
     expect(routeId('windowManager=1')).toBe('window-manager');
     expect(routeId('pluginWindow=plugin-1')).toBe('plugin');
   });

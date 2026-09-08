@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { listLlmProfilesForBackend } from '../../services/api';
 import { fetchApiForBackend } from '../../services/api/base';
 import type { LlmProfileConfig } from '@zclaudia/shared';
-import { ShortcutSettings } from './ShortcutSettings';
-import { isDesktopTauri } from '../../utils/platform';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useSettingsTargetBackend } from '../../hooks/useSettingsTargetBackend';
 import { TargetBackendBanner, NoTargetBackendNotice } from './ui/TargetBackendNotice';
@@ -156,14 +154,6 @@ export function AgentSettings() {
           </div>
         </div>
       </div>
-
-      {/* Global Shortcut - desktop only */}
-      {isDesktopTauri() && (
-        <div>
-          <h3 className="text-sm font-medium mb-3">Shortcut</h3>
-          <ShortcutSettings disabled={!config?.enabled} />
-        </div>
-      )}
 
       {/* Installing, pinning and garbage-collecting CLIs on the backend host is
           desktop work — on mobile the host is a machine you are not sitting at. */}

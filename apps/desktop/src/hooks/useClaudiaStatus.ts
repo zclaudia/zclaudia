@@ -4,7 +4,7 @@ import { usePermissionStore } from '../stores/permissionStore';
 
 /**
  * Derives Claudia-level status flags from task + permission stores.
- * Used by App.tsx (to emit Tauri events) and ClaudiaChatWindow (to sync ring state).
+ * Used by the mobile sidebar to show activity and attention badges.
  */
 export function useClaudiaStatus() {
   const tasks = useClaudiaStore(s => s.tasks);

@@ -103,7 +103,7 @@ vi.mock('../../hooks/useServerLatencyMonitor', () => ({
 }));
 vi.mock('../../hooks/useActiveSessionStream', () => ({ useActiveSessionStream: () => undefined }));
 vi.mock('../../hooks/useMainWindowGeometry', () => ({ useMainWindowGeometry: () => undefined }));
-vi.mock('../../hooks/useClaudiaDesktop', () => ({ useClaudiaDesktop: () => undefined }));
+vi.mock('../../hooks/useAgentInitialization', () => ({ useAgentInitialization: () => undefined }));
 vi.mock('../../hooks/useDeepLinkNavigation', () => ({ useDeepLinkNavigation: () => undefined }));
 vi.mock('../../hooks/useMobileInit', () => ({ useMobileInit: () => undefined }));
 vi.mock('../../hooks/useTauriWindowEvents', () => ({ useTauriWindowEvents: () => undefined }));

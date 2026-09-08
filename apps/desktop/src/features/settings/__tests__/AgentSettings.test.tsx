@@ -25,7 +25,7 @@ vi.mock('../../../services/api/base', () => ({
 
 vi.mock('../../../utils/platform', async importOriginal => {
   const mod = await importOriginal<Record<string, unknown>>();
-  return { ...mod, isDesktopTauri: () => false };
+  return { ...mod, isDesktopTauri: () => true };
 });
 
 vi.mock('../ManagedRuntimeSettings', () => ({
@@ -137,6 +137,9 @@ describe('AgentSettings', () => {
     expect(await screen.findByText('Managed Agent CLIs')).toBeInTheDocument();
     expect(screen.getByTestId('managed-runtime-stub')).toBeInTheDocument();
     expect(screen.getByText('Capabilities')).toBeInTheDocument();
+    expect(screen.queryByText('Shortcut')).toBeNull();
+    expect(screen.queryByText('Global Shortcut')).toBeNull();
+    expect(screen.queryByText('Toggle Claudia from anywhere')).toBeNull();
   });
 
   it('drops both from a phone, leaving only what you would actually change there', async () => {

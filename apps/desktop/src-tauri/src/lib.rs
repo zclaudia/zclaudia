@@ -1,13 +1,9 @@
 #[cfg(not(target_os = "android"))]
-use std::sync::Mutex;
-#[cfg(not(target_os = "android"))]
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 #[cfg(not(target_os = "android"))]
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 #[cfg(not(target_os = "android"))]
 use tauri::Manager;
-#[cfg(not(target_os = "android"))]
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState as GlobalShortcutState};
 
 #[cfg(not(target_os = "android"))]
 mod server;
@@ -25,22 +21,10 @@ mod wsl;
 mod android_bridge;
 
 #[cfg(not(target_os = "android"))]
-mod claudia_ball;
-
-#[cfg(not(target_os = "android"))]
-mod claudia_chat;
-
-#[cfg(not(target_os = "android"))]
 mod window_manager;
 
 #[cfg(not(target_os = "android"))]
-mod shortcuts;
-
-#[cfg(not(target_os = "android"))]
 mod traffic_lights;
-
-#[cfg(not(target_os = "android"))]
-use shortcuts::{ShortcutConfigState, ShortcutStateHandle, DEFAULT_CLAUDIA_SHORTCUT};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -80,13 +64,9 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init());
 
-    // Global shortcut plugin — initialized without fixed shortcuts, will be configured dynamically
-    #[cfg(not(target_os = "android"))]
-    let builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
-
     // Keep desktop app single-instance. The clean dev launcher uses a separate
     // identifier, so dev and production can still coexist without spawning
-    // duplicate floating windows inside the same channel.
+    // duplicate app instances inside the same channel.
     #[cfg(not(target_os = "android"))]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
         // When a second instance is launched, focus the existing window
@@ -97,36 +77,26 @@ pub fn run() {
     }));
 
     #[cfg(not(target_os = "android"))]
-    let builder = builder
-        .manage(Mutex::new(ShortcutConfigState {
-            current_shortcut: None,
-        }))
-        .invoke_handler(tauri::generate_handler![
-            greet,
-            server::start_server,
-            server::stop_server,
-            server::register_dev_server_pid,
-            server::get_shell_network_env,
-            network_probe::probe_opencode_endpoints,
-            network_probe::probe_network_endpoint,
-            permissions::check_full_disk_access,
-            permissions::open_full_disk_access_settings,
-            permissions::check_folder_permissions,
-            permissions::open_files_and_folders_settings,
-            focus_window,
-            close_window,
-            window_manager::list_windows,
-            claudia_ball::create_claudia_ball,
-            claudia_chat::toggle_claudia_chat,
-            claudia_chat::show_claudia_chat,
-            claudia_chat::hide_claudia_chat,
-            claudia_chat::preload_claudia_chat,
-            shortcuts::update_global_shortcut,
-            #[cfg(target_os = "windows")]
-            wsl::wsl_exec,
-            #[cfg(target_os = "windows")]
-            wsl::wsl_start_server,
-        ]);
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        greet,
+        server::start_server,
+        server::stop_server,
+        server::register_dev_server_pid,
+        server::get_shell_network_env,
+        network_probe::probe_opencode_endpoints,
+        network_probe::probe_network_endpoint,
+        permissions::check_full_disk_access,
+        permissions::open_full_disk_access_settings,
+        permissions::check_folder_permissions,
+        permissions::open_files_and_folders_settings,
+        focus_window,
+        close_window,
+        window_manager::list_windows,
+        #[cfg(target_os = "windows")]
+        wsl::wsl_exec,
+        #[cfg(target_os = "windows")]
+        wsl::wsl_start_server,
+    ]);
 
     #[cfg(target_os = "android")]
     let builder = builder.invoke_handler(tauri::generate_handler![
@@ -135,28 +105,9 @@ pub fn run() {
         android_bridge::android_sync_ntfy_bridge,
     ]);
 
-    // Setup: initialize default shortcut and macOS permissions
+    // Setup: initialize the system tray and macOS permissions
     #[cfg(not(target_os = "android"))]
     let builder = builder.setup(|app| {
-        // Register default shortcut (will be overridden if frontend has different config)
-        let default_shortcut = DEFAULT_CLAUDIA_SHORTCUT
-            .parse::<tauri_plugin_global_shortcut::Shortcut>()
-            .expect("failed to parse default shortcut");
-
-        app.global_shortcut()
-            .on_shortcut(default_shortcut, |app, _, event| {
-                if event.state == GlobalShortcutState::Pressed {
-                    claudia_chat::toggle_claudia_visibility(app);
-                }
-            })
-            .expect("failed to register default shortcut");
-
-        // Update state to track the default shortcut
-        let state = app.state::<ShortcutStateHandle>();
-        if let Ok(mut state) = state.lock() {
-            state.current_shortcut = Some(DEFAULT_CLAUDIA_SHORTCUT.to_string());
-        }
-
         // macOS: probe TCC-protected folders at startup
         #[cfg(target_os = "macos")]
         std::thread::spawn(|| {
@@ -173,7 +124,7 @@ pub fn run() {
         });
 
         // System tray icon
-        let show_item = MenuItemBuilder::with_id("show", "Show Claudia").build(app)?;
+        let show_item = MenuItemBuilder::with_id("show", "Show Main Window").build(app)?;
         let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
         let tray_menu = MenuBuilder::new(app)
             .items(&[&show_item, &quit_item])
@@ -239,11 +190,6 @@ pub fn run() {
             #[cfg(not(target_os = "android"))]
             match event {
                 tauri::RunEvent::WindowEvent { label, event, .. } => {
-                    if label == "claudia-chat"
-                        && matches!(event, tauri::WindowEvent::Focused(false))
-                    {
-                        let _ = claudia_chat::hide_claudia_chat(app.clone());
-                    }
                     // Close button on main window: hide to tray instead of quitting
                     if label == "main" {
                         // Re-drop the traffic lights on relayout (resize / fullscreen

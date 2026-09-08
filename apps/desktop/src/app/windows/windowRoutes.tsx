@@ -33,12 +33,6 @@ const DraftWindow = lazy(() =>
 const PluginWindow = lazy(() =>
   import('../../components/plugins/PluginWindow').then(m => ({ default: m.PluginWindow }))
 );
-const ClaudiaBallWindow = lazy(() =>
-  import('../../features/claudia/ClaudiaBallWindow').then(m => ({ default: m.ClaudiaBallWindow }))
-);
-const ClaudiaChatWindow = lazy(() =>
-  import('../../features/claudia/ClaudiaChatWindow').then(m => ({ default: m.ClaudiaChatWindow }))
-);
 const WindowManagerWindow = lazy(() =>
   import('../../components/windowmanager/WindowManagerWindow').then(m => ({
     default: m.WindowManagerWindow,
@@ -198,35 +192,6 @@ export const standaloneWindowRoutes: StandaloneWindowRoute[] = [
             serverName={optionalParam(params, 'serverName')}
             gatewayUrl={optionalParam(params, 'gatewayUrl')}
             gatewaySecret={optionalParam(params, 'gatewaySecret')}
-          />
-        </WindowShell>
-      );
-    },
-  },
-  {
-    id: 'claudia-ball',
-    render: params =>
-      params.get('claudiaBall') ? (
-        <WindowShell withTheme={false}>
-          <ClaudiaBallWindow />
-        </WindowShell>
-      ) : null,
-  },
-  {
-    id: 'claudia-chat',
-    render: params => {
-      if (!params.get('claudiaChat')) return null;
-      return (
-        <WindowShell withTheme={false}>
-          <ClaudiaChatWindow
-            serverUrl={params.get('serverUrl') || ''}
-            authToken={params.get('authToken') || ''}
-            serverId={optionalParam(params, 'serverId')}
-            serverName={optionalParam(params, 'serverName')}
-            gatewayUrl={optionalParam(params, 'gatewayUrl')}
-            gatewaySecret={optionalParam(params, 'gatewaySecret')}
-            projectId={optionalParam(params, 'projectId')}
-            contextProjectId={optionalParam(params, 'contextProjectId')}
           />
         </WindowShell>
       );

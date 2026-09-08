@@ -8,9 +8,7 @@
     "session-chat-*",
     "terminal-*",
     "plugin-*",
-    "workflow-editor-*",
-    "claudia-ball",
-    "claudia-chat"
+    "workflow-editor-*"
   ],
   "platforms": ["macOS", "linux", "windows"],
   "permissions": [
@@ -27,7 +25,6 @@
     "core:window:allow-hide",
     "core:window:allow-outer-position",
     "core:event:default",
-    "global-shortcut:default",
     "shell:allow-open",
     "fs:default",
     "fs:allow-download-read-recursive",
