@@ -28,7 +28,6 @@ import {
   resolveDrawerStage,
   type DrawerStage,
 } from './features/sidebar/drawerStage';
-import { useNotchBridgeHost } from './hooks/useNotchBridgeHost';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useServerLatencyMonitor } from './hooks/useServerLatencyMonitor';
 import { useActiveSessionStream } from './hooks/useActiveSessionStream';
@@ -312,7 +311,6 @@ function AppContent() {
   useMobileInit(usesMobileControlPlane);
   useTauriWindowEvents();
   useMainWindowGeometry();
-  useNotchBridgeHost({ enabled: !isMobile });
   useActiveSessionStream();
   useAutoUpdate();
   useServerLatencyMonitor();

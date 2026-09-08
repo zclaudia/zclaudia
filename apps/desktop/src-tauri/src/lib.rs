@@ -31,7 +31,7 @@ mod claudia_ball;
 mod claudia_chat;
 
 #[cfg(not(target_os = "android"))]
-mod notch;
+mod window_manager;
 
 #[cfg(not(target_os = "android"))]
 mod shortcuts;
@@ -115,21 +115,13 @@ pub fn run() {
             permissions::open_files_and_folders_settings,
             focus_window,
             close_window,
-            notch::list_windows,
+            window_manager::list_windows,
             claudia_ball::create_claudia_ball,
             claudia_chat::toggle_claudia_chat,
             claudia_chat::show_claudia_chat,
             claudia_chat::hide_claudia_chat,
             claudia_chat::preload_claudia_chat,
             shortcuts::update_global_shortcut,
-            notch::list_monitors,
-            notch::create_notch_window,
-            notch::resize_notch_window,
-            notch::set_notch_passthrough,
-            notch::check_notch_hover,
-            notch::check_notch_panel_hover,
-            notch::move_notch_to_monitor,
-            notch::recenter_notch,
             #[cfg(target_os = "windows")]
             wsl::wsl_exec,
             #[cfg(target_os = "windows")]
@@ -163,42 +155,6 @@ pub fn run() {
         let state = app.state::<ShortcutStateHandle>();
         if let Ok(mut state) = state.lock() {
             state.current_shortcut = Some(DEFAULT_CLAUDIA_SHORTCUT.to_string());
-        }
-
-        // macOS: listen for display configuration changes (monitor plug/unplug/rearrange)
-        // and recenter the notch window automatically.
-        #[cfg(target_os = "macos")]
-        {
-            let app_handle = app.handle().clone();
-            std::thread::spawn(move || unsafe {
-                use objc2::msg_send;
-                use objc2::runtime::{AnyClass, AnyObject};
-                use objc2_foundation::NSString;
-
-                let nc: *mut AnyObject = msg_send![
-                    AnyClass::get(c"NSNotificationCenter").unwrap(),
-                    defaultCenter
-                ];
-                if nc.is_null() {
-                    return;
-                }
-
-                let name = NSString::from_str("NSApplicationDidChangeScreenParametersNotification");
-
-                let handle = app_handle.clone();
-                let block = block2::StackBlock::new(move |_notif: *mut AnyObject| {
-                    notch::recenter_notch_on_current_screen(&handle);
-                });
-                let block = block.copy();
-
-                let _: *mut AnyObject = msg_send![
-                    nc,
-                    addObserverForName: &*name,
-                    object: std::ptr::null::<AnyObject>(),
-                    queue: std::ptr::null::<AnyObject>(),
-                    usingBlock: &*block
-                ];
-            });
         }
 
         // macOS: probe TCC-protected folders at startup

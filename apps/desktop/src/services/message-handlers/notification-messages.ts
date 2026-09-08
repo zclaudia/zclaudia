@@ -2,7 +2,6 @@
  * Notification feed message handlers.
  */
 import type { ServerMessage } from '@zclaudia/shared';
-import { useNotchPanelStore } from '../../stores/notchPanelStore';
 import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../utils/controlPlane';
 import { parseBackendId } from '../../stores/gatewayStore';
 
@@ -29,8 +28,6 @@ export function handleNotificationMessage(
         })
       );
       if (item.status === 'completed' || item.status === 'failed') {
-        const notchTab =
-          item.initiator === 'claudia' ? ('claudia' as const) : ('sessions' as const);
         import('../../stores/toastStore').then(m => {
           m.useToastStore.getState().add({
             title: item.title,
@@ -46,7 +43,6 @@ export function handleNotificationMessage(
             initiator: item.initiator,
           });
         });
-        useNotchPanelStore.getState().open({ auto: true, previewTitle: item.title, tab: notchTab });
       }
       return true;
     }

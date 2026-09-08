@@ -10,8 +10,7 @@
     "plugin-*",
     "workflow-editor-*",
     "claudia-ball",
-    "claudia-chat",
-    "notch"
+    "claudia-chat"
   ],
   "platforms": ["macOS", "linux", "windows"],
   "permissions": [

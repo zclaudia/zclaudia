@@ -39,8 +39,6 @@ const FONT_CONFIGS: Record<FontSizePreset, FontSizeConfig> = {
 };
 
 const STORAGE_KEY = 'zclaudia-font-size';
-const NOTCH_PANEL_KEY = 'zclaudia-show-notch-panel';
-const NOTCH_MONITOR_KEY = 'zclaudia-notch-monitor';
 
 function loadFontSize(): FontSizePreset {
   try {
@@ -77,11 +75,6 @@ interface UIState {
   pendingMessageJump: { sessionId: string; messageId: string } | null;
   requestMessageJump: (sessionId: string, messageId: string) => void;
   clearMessageJump: (sessionId: string, messageId: string) => void;
-  showNotchPanel: boolean;
-  setShowNotchPanel: (show: boolean) => void;
-  /** Which monitor to show the notch on (index into available_monitors). null = primary. */
-  notchMonitor: number | null;
-  setNotchMonitor: (index: number | null) => void;
   // Tracks sessions that have been popped out to standalone windows: sessionId → windowLabel
   poppedOutSessions: Map<string, string>;
   addPoppedOutSession: (sessionId: string, windowLabel: string) => void;
@@ -93,43 +86,12 @@ export const useUIStore = create<UIState>(set => {
   // Apply on store creation
   applyFontVars(initial);
 
-  let notchInitial = true;
-  try {
-    const saved = localStorage.getItem(NOTCH_PANEL_KEY);
-    if (saved !== null) notchInitial = saved !== 'false';
-  } catch {
-    /* ignore */
-  }
-
-  let notchMonitorInitial: number | null = null;
-  try {
-    const saved = localStorage.getItem(NOTCH_MONITOR_KEY);
-    if (saved !== null) notchMonitorInitial = parseInt(saved, 10);
-    if (notchMonitorInitial !== null && isNaN(notchMonitorInitial)) notchMonitorInitial = null;
-  } catch {
-    /* ignore */
-  }
-
   return {
     fontSize: initial,
     setFontSize: size => {
       localStorage.setItem(STORAGE_KEY, size);
       applyFontVars(size);
       set({ fontSize: size });
-    },
-    showNotchPanel: notchInitial,
-    setShowNotchPanel: show => {
-      localStorage.setItem(NOTCH_PANEL_KEY, String(show));
-      set({ showNotchPanel: show });
-    },
-    notchMonitor: notchMonitorInitial,
-    setNotchMonitor: index => {
-      if (index === null) {
-        localStorage.removeItem(NOTCH_MONITOR_KEY);
-      } else {
-        localStorage.setItem(NOTCH_MONITOR_KEY, String(index));
-      }
-      set({ notchMonitor: index });
     },
     forceScrollToBottomSessionId: null,
     requestForceScrollToBottom: sessionId => {

@@ -1,12 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Bell, Monitor, Moon, Type } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
+import { Moon, Type } from 'lucide-react';
 import { useUIStore, type FontSizePreset } from '../../stores/uiStore';
 import { ThemeToggle } from './ThemeToggle';
-import { Select } from '../../components/ui/Select';
 import { SettingsGroup, SettingsRow } from './ui/SettingsGroup';
-import { Toggle } from '../../components/ui/Toggle';
-import { OnSurface } from './ui/OnSurface';
 
 export function GeneralSettings() {
   return (
@@ -22,10 +17,6 @@ export function GeneralSettings() {
           title="Font size"
           control={<FontSizeToggle />}
         />
-        <OnSurface id="general.notch-panel">
-          <NotchPanelToggle />
-          <NotchMonitorSelector />
-        </OnSurface>
       </SettingsGroup>
     </div>
   );
@@ -57,67 +48,5 @@ function FontSizeToggle() {
         </button>
       ))}
     </div>
-  );
-}
-
-function NotchPanelToggle() {
-  const { showNotchPanel, setShowNotchPanel } = useUIStore();
-  return (
-    <SettingsRow
-      icon={<Bell className="w-4 h-4" strokeWidth={1.75} />}
-      title="Notification Panel"
-      description="Show Dynamic Island-style notifications at top of screen"
-      control={
-        <Toggle
-          checked={showNotchPanel}
-          onChange={setShowNotchPanel}
-          aria-label="Notification panel"
-        />
-      }
-    />
-  );
-}
-
-interface MonitorInfo {
-  name: string | null;
-  width: number;
-  height: number;
-  scale_factor: number;
-}
-
-function NotchMonitorSelector() {
-  const { showNotchPanel, notchMonitor, setNotchMonitor } = useUIStore();
-  const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
-
-  useEffect(() => {
-    if (!showNotchPanel) return;
-    invoke<MonitorInfo[]>('list_monitors')
-      .then(setMonitors)
-      .catch(() => setMonitors([]));
-  }, [showNotchPanel]);
-
-  if (!showNotchPanel || monitors.length <= 1) return null;
-
-  return (
-    <SettingsRow
-      icon={<Monitor className="w-4 h-4" strokeWidth={1.75} />}
-      title="Notification Display"
-      control={
-        <Select
-          value={notchMonitor === null ? '' : String(notchMonitor)}
-          onChange={next => setNotchMonitor(next === '' ? null : parseInt(next, 10))}
-          size="md"
-          align="right"
-          triggerClassName="min-w-[160px]"
-          options={[
-            { value: '', label: 'Primary' },
-            ...monitors.map((m, i) => ({
-              value: String(i),
-              label: `${m.name || `Monitor ${i + 1}`} (${m.width}x${m.height})`,
-            })),
-          ]}
-        />
-      }
-    />
   );
 }

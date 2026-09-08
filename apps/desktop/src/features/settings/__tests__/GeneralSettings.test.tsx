@@ -1,19 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-vi.mock('../../../hooks/useMediaQuery', () => ({ useIsMobile: () => true }));
 vi.mock('../ThemeToggle', () => ({ ThemeToggle: () => <div>theme-toggle</div> }));
 vi.mock('../../../stores/uiStore', () => ({
   useUIStore: () => ({
     fontSize: 'medium',
     setFontSize: vi.fn(),
-    showNotchPanel: false,
-    setShowNotchPanel: vi.fn(),
-    notchMonitor: null,
-    setNotchMonitor: vi.fn(),
   }),
 }));
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue(undefined) }));
 
 import { GeneralSettings } from '../GeneralSettings';
 
@@ -25,6 +19,8 @@ describe('GeneralSettings', () => {
     expect(screen.getByText('Appearance')).toBeTruthy();
     expect(screen.getByText('Theme')).toBeTruthy();
     expect(screen.getByText('Font size')).toBeTruthy();
+    expect(screen.queryByText('Notification Panel')).toBeNull();
+    expect(screen.queryByText('Notification Display')).toBeNull();
   });
 
   it('no longer renders the Local server, Permissions, or About sections', () => {

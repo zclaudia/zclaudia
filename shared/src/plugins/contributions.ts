@@ -98,6 +98,7 @@ export type WorkflowStepHandler = (
   }
 ) => Promise<{ status: 'completed' | 'failed'; output: Record<string, unknown>; error?: string }>;
 
+/** @deprecated Legacy manifest metadata; the desktop no longer renders notch tabs. */
 export interface NotchTabContribution {
   /** Unique ID within the plugin (namespaced as 'pluginId/id' at runtime) */
   id: string;
@@ -147,6 +148,7 @@ export interface PluginContributes {
   triggerSources?: TriggerSourceContribution[];
   skills?: SkillContribution[];
   agentProfiles?: AgentProfileContribution[];
+  /** @deprecated Accepted for compatibility only. Use an external notification sink plugin. */
   notchTabs?: NotchTabContribution[];
   agentRuntimes?: AgentRuntimeContribution[];
 }

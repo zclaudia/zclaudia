@@ -5848,7 +5848,6 @@ dependencies = [
 name = "zclaudia"
 version = "0.1.1220"
 dependencies = [
- "block2",
  "libc",
  "objc2",
  "objc2-app-kit",

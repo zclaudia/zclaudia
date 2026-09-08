@@ -1881,6 +1881,49 @@ describe('handleServerMessage', () => {
   });
 
   describe('plugin messages', () => {
+    it('accepts legacy notch tab metadata while registering ordinary plugin panels', () => {
+      handleServerMessage(
+        {
+          type: 'plugin_state',
+          plugins: [
+            {
+              id: 'p1',
+              name: 'Test',
+              version: '1.0',
+              status: 'active',
+              enabled: true,
+              notchTabs: [{ id: 'p1/activity', label: 'Activity' }],
+              panels: [{ id: 'p1/tools', label: 'Tools' }],
+            },
+          ],
+        },
+        makeCtx()
+      );
+      expect(mockPluginStore.registerPanel).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'p1/tools', label: 'Tools' })
+      );
+      expect(() =>
+        handleServerMessage(
+          {
+            type: 'plugin_notch_tab_registered',
+            pluginId: 'p1',
+            tabId: 'p1/activity',
+            label: 'Activity',
+          },
+          makeCtx()
+        )
+      ).not.toThrow();
+      expect(() =>
+        handleServerMessage(
+          {
+            type: 'plugin_notch_tab_unregistered',
+            pluginId: 'p1',
+          },
+          makeCtx()
+        )
+      ).not.toThrow();
+    });
+
     it('handles plugin_state', () => {
       handleServerMessage(
         {
@@ -1951,6 +1994,44 @@ describe('handleServerMessage', () => {
         title: 'Hello',
         message: 'World',
         type: 'info',
+      });
+    });
+
+    it('keeps completed task notifications in the inbox and Toast UI', async () => {
+      handleServerMessage(
+        {
+          type: 'notification_update',
+          item: {
+            id: 'task-result',
+            source: 'session',
+            title: 'Build finished',
+            summary: 'All checks passed',
+            status: 'completed',
+            createdAt: Date.now(),
+            sessionId: 'session-1',
+            projectId: 'project-1',
+            initiator: 'claudia',
+          },
+        },
+        makeCtx({ serverId: 'gw:backend-1', backendId: null })
+      );
+      await vi.dynamicImportSettled();
+      expect(useNotificationFeedStore.getState().items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'task-result',
+            ownerBackendId: 'backend-1',
+            sessionId: 'session-1',
+            status: 'completed',
+          }),
+        ])
+      );
+      expect(useToastStore.getState().toasts[0]).toMatchObject({
+        title: 'Build finished',
+        message: 'All checks passed',
+        type: 'success',
+        sessionId: 'session-1',
+        serverId: 'gw:backend-1',
       });
     });
 

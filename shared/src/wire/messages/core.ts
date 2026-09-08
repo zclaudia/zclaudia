@@ -140,7 +140,7 @@ export interface StateHeartbeatMessage {
   }>;
   /** Unread Agent Feed item count — for badge display on reconnect */
   unreadFeedCount?: number;
-  /** Unread Agent Feed item count by tab — for notch and inbox badges on reconnect */
+  /** Unread Agent Feed item count by tab — for inbox badges on reconnect */
   unreadFeedCountsByTab?: NotificationUnreadCountsByTab;
   /** Version counters for stable application-layer entities.
    *  Client compares with its local cache and fetches via REST if stale. */

@@ -1,7 +1,7 @@
 /**
  * Window Router — detects URL params to render standalone windows
  * (file viewer, automation, workflow editor, session chat, terminal,
- * draft editor, claudia ball/chat, notch, plugin).
+ * draft editor, claudia ball/chat, plugin).
  * Falls through to the main AppContent if no standalone param is found.
  */
 import type { ReactNode } from 'react';

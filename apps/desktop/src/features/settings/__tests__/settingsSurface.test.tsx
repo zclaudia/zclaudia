@@ -47,7 +47,6 @@ describe('SETTINGS_SURFACES', () => {
       'agent.capabilities',
       'debug.process-cleanup',
       'debug.ai-review-simulator',
-      'general.notch-panel',
     ] as SettingsSurfaceId[]) {
       expect(isVisibleOnSurface(id, true)).toBe(false);
       expect(isVisibleOnSurface(id, false)).toBe(true);

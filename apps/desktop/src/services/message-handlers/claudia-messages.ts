@@ -4,7 +4,6 @@
 import type { ServerMessage } from '@zclaudia/shared';
 import { useClaudiaStore } from '../../stores/claudiaStore';
 import { useToastStore } from '../../stores/toastStore';
-import { useNotchPanelStore } from '../../stores/notchPanelStore';
 
 export function handleClaudiaMessage(msg: ServerMessage, serverId: string): boolean {
   switch (msg.type) {
@@ -183,7 +182,6 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
           sessionId: existing?.sessionId ?? updateMsg.sessionId ?? undefined,
           serverId,
         });
-        useNotchPanelStore.getState().open({ auto: true, previewTitle: taskTitle, tab: 'claudia' });
       }
       return true;
     }

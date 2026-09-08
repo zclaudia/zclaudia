@@ -68,21 +68,6 @@ export function handlePluginMessage(
             }
           }
         }
-        // Register notch tabs from plugin_state
-        if (p.status === 'active' && p.notchTabs?.length > 0) {
-          for (const tab of p.notchTabs) {
-            const existing = pluginStore.notchTabs.find((t: any) => t.id === tab.id);
-            if (!existing) {
-              pluginStore.registerNotchTab({
-                id: tab.id,
-                pluginId: tab.pluginId ?? p.id,
-                label: tab.label,
-                icon: tab.icon,
-                order: tab.order ?? 0,
-              });
-            }
-          }
-        }
       }
       return true;
     }
@@ -161,18 +146,9 @@ export function handlePluginMessage(
       usePluginStore.getState().clearPluginExtensions(msg.pluginId);
       return true;
 
+    // Older backends may still announce tabs for the retired built-in panel.
     case 'plugin_notch_tab_registered':
-      usePluginStore.getState().registerNotchTab({
-        id: msg.tabId,
-        pluginId: msg.pluginId,
-        label: msg.label,
-        icon: msg.icon,
-        order: msg.order ?? 0,
-      });
-      return true;
-
     case 'plugin_notch_tab_unregistered':
-      usePluginStore.getState().unregisterNotchTabs(msg.pluginId);
       return true;
 
     default:

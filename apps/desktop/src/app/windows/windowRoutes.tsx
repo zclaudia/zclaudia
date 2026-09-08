@@ -31,13 +31,10 @@ const DraftWindow = lazy(() =>
   import('../../components/draft/DraftWindow').then(m => ({ default: m.DraftWindow }))
 );
 const PluginWindow = lazy(() =>
-  import('../../components/notch/PluginWindow').then(m => ({ default: m.PluginWindow }))
+  import('../../components/plugins/PluginWindow').then(m => ({ default: m.PluginWindow }))
 );
 const ClaudiaBallWindow = lazy(() =>
   import('../../features/claudia/ClaudiaBallWindow').then(m => ({ default: m.ClaudiaBallWindow }))
-);
-const NotchWindowLazy = lazy(() =>
-  import('../../components/notch/NotchWindow').then(m => ({ default: m.NotchWindow }))
 );
 const ClaudiaChatWindow = lazy(() =>
   import('../../features/claudia/ClaudiaChatWindow').then(m => ({ default: m.ClaudiaChatWindow }))
@@ -212,15 +209,6 @@ export const standaloneWindowRoutes: StandaloneWindowRoute[] = [
       params.get('claudiaBall') ? (
         <WindowShell withTheme={false}>
           <ClaudiaBallWindow />
-        </WindowShell>
-      ) : null,
-  },
-  {
-    id: 'notch',
-    render: params =>
-      params.get('notchWindow') ? (
-        <WindowShell withTheme={false}>
-          <NotchWindowLazy />
         </WindowShell>
       ) : null,
   },

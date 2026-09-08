@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 /**
  * Open/closed state for the desktop Notifications popup — an independent
- * centered overlay (modeled on SearchModal), decoupled from the notch panel.
+ * centered overlay (modeled on SearchModal).
  * A store rather than local state because multiple desktop bells trigger it
  * and the modal is rendered once at the app root.
  */

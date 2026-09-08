@@ -9,7 +9,6 @@ import type {
 import type { MessageHandlerContext } from './types';
 import { useClaudiaStore } from '../../stores/claudiaStore';
 import { useInteractionStore } from '../../stores/interactionStore';
-import { useNotchPanelStore } from '../../stores/notchPanelStore';
 import { usePermissionStore } from '../../stores/permissionStore';
 import { usePromptRequestStore } from '../../stores/promptRequestStore';
 import { useToastStore } from '../../stores/toastStore';
@@ -80,9 +79,6 @@ export function handlePermissionMessage(msg: ServerMessage, ctx: MessageHandlerC
         sessionId: permMsg.sessionId,
         serverId,
       });
-      useNotchPanelStore
-        .getState()
-        .open({ auto: true, previewTitle: 'Permission required', tab: 'approvals' });
       return true;
     }
 

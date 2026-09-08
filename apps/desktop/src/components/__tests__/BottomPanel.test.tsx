@@ -4,7 +4,7 @@ import { usePluginStore } from '../../stores/pluginStore';
 import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 
 // Mock PluginPanelRenderer (used for iframe panels)
-vi.mock('../notch/PluginPanelRenderer', () => ({
+vi.mock('../plugins/PluginPanelRenderer', () => ({
   PluginPanelRenderer: ({ activePluginPanelId }: any) => (
     <div data-testid="plugin-panel">Plugin:{activePluginPanelId}</div>
   ),

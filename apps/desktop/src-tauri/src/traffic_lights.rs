@@ -12,7 +12,7 @@
 //! `standardWindowButton:` and centers them with
 //! `rect.origin.y = ((title_bar_height - button_height) / 2.0) - offset`, then
 //! applies the new origin with `setFrameOrigin:`. We implement the same idea
-//! inline with raw `objc2` `msg_send!` (matching the idioms in `notch.rs`) and
+//! inline with raw `objc2` `msg_send!` and
 //! with NO extra dependencies.
 
 /// Points to move the lights DOWN from their default vertical center.

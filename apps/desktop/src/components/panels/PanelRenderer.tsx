@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import type { UIExtension } from '../../stores/pluginStore';
-import { PluginPanelRenderer } from '../notch/PluginPanelRenderer';
+import { PluginPanelRenderer } from '../plugins/PluginPanelRenderer';
 
 export interface PanelRenderProps {
   panel: UIExtension;

@@ -9,7 +9,6 @@ import {
   File,
   FileEdit,
   Focus,
-  LayoutPanelTop,
   MessageCircle,
   MessageSquare,
   Puzzle,
@@ -41,7 +40,6 @@ function classifyWindow(label: string): WindowMeta {
   if (label === 'main') return { type: 'Main Window', Icon: SquareStack };
   if (label === 'claudia-ball') return { type: 'Floating Ball', Icon: Circle };
   if (label === 'claudia-chat') return { type: 'Claudia Chat', Icon: MessageCircle };
-  if (label === 'notch') return { type: 'Notch Panel', Icon: LayoutPanelTop };
   if (label.startsWith('session-chat-')) return { type: 'Session Chat', Icon: MessageSquare };
   if (label.startsWith('terminal-')) return { type: 'Terminal', Icon: Terminal };
   if (label.startsWith('draft-')) return { type: 'Draft Editor', Icon: FileEdit };
@@ -53,13 +51,7 @@ function classifyWindow(label: string): WindowMeta {
 }
 
 // System windows that should never be force-closed
-const PROTECTED_LABELS = new Set([
-  'main',
-  'window-manager',
-  'claudia-ball',
-  'claudia-chat',
-  'notch',
-]);
+const PROTECTED_LABELS = new Set(['main', 'window-manager', 'claudia-ball', 'claudia-chat']);
 
 export function WindowManagerWindow() {
   const [windows, setWindows] = useState<WindowInfo[]>([]);

@@ -46,7 +46,7 @@ export interface NotificationItem {
   status: NotificationStatus;
   error?: string;
   delegationContext?: DelegationContext;
-  /** Target plugin notch tab ID (namespaced as 'pluginId/tabId') */
+  /** Plugin notification channel ID (namespaced as 'pluginId/tabId'). */
   pluginTab?: string;
   createdAt: number;
   completedAt?: number;

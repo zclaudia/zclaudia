@@ -97,7 +97,6 @@ vi.mock('../../hooks/useSelectionCoordinator', () => ({
 vi.mock('../../hooks/useMediaQuery', () => ({ useIsMobile: mockUseIsMobile }));
 vi.mock('../../hooks/useAndroidBack', () => ({ useAndroidBack: mockUseAndroidBack }));
 vi.mock('../../hooks/useSwipeBack', () => ({ useSwipeBack: () => ({ current: null }) }));
-vi.mock('../../hooks/useNotchBridgeHost', () => ({ useNotchBridgeHost: () => undefined }));
 vi.mock('../../hooks/useAutoUpdate', () => ({ useAutoUpdate: () => undefined }));
 vi.mock('../../hooks/useServerLatencyMonitor', () => ({
   useServerLatencyMonitor: () => undefined,

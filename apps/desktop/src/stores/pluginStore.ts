@@ -110,15 +110,6 @@ export interface UIExtension {
   builtin?: boolean;
 }
 
-export interface PluginNotchTab {
-  /** Namespaced ID: 'pluginId/tabId' */
-  id: string;
-  pluginId: string;
-  label: string;
-  icon?: string;
-  order: number;
-}
-
 export interface PluginSettings {
   [pluginId: string]: Record<string, unknown>;
 }
@@ -133,7 +124,6 @@ interface PluginStoreState {
   panels: UIExtension[];
   settingsTabs: UIExtension[];
   toolbarItems: UIExtension[];
-  notchTabs: PluginNotchTab[];
 
   // Plugin settings
   settings: PluginSettings;
@@ -165,8 +155,6 @@ interface PluginStoreState {
   unregisterSettingsTab: (id: string) => void;
   registerToolbarItem: (extension: UIExtension) => void;
   unregisterToolbarItem: (id: string) => void;
-  registerNotchTab: (tab: PluginNotchTab) => void;
-  unregisterNotchTabs: (pluginId: string) => void;
   clearPluginExtensions: (pluginId: string) => void;
 
   // Actions - Settings
@@ -198,7 +186,6 @@ export const usePluginStore = create<PluginStoreState>()(
       panels: [],
       settingsTabs: [],
       toolbarItems: [],
-      notchTabs: [],
       settings: {},
       pendingPermissionRequest: null,
       disabledBuiltinPanels: [],
@@ -287,22 +274,11 @@ export const usePluginStore = create<PluginStoreState>()(
           toolbarItems: state.toolbarItems.filter(t => t.id !== id),
         })),
 
-      registerNotchTab: tab =>
-        set(state => ({
-          notchTabs: [...state.notchTabs.filter(t => t.id !== tab.id), tab],
-        })),
-
-      unregisterNotchTabs: pluginId =>
-        set(state => ({
-          notchTabs: state.notchTabs.filter(t => t.pluginId !== pluginId),
-        })),
-
       clearPluginExtensions: pluginId =>
         set(state => ({
           panels: state.panels.filter(p => p.pluginId !== pluginId),
           settingsTabs: state.settingsTabs.filter(t => t.pluginId !== pluginId),
           toolbarItems: state.toolbarItems.filter(t => t.pluginId !== pluginId),
-          notchTabs: state.notchTabs.filter(t => t.pluginId !== pluginId),
         })),
 
       // Settings Actions
@@ -380,9 +356,6 @@ export const selectPluginPanels = (state: PluginStoreState): UIExtension[] =>
 
 export const selectPluginSettingsTabs = (state: PluginStoreState): UIExtension[] =>
   state.settingsTabs.sort((a, b) => (a.order || 0) - (b.order || 0));
-
-export const selectPluginNotchTabs = (state: PluginStoreState): PluginNotchTab[] =>
-  [...state.notchTabs].sort((a, b) => a.order - b.order);
 
 /**
  * Resolve effective placement for a panel.

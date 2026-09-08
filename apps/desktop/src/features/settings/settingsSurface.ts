@@ -38,10 +38,6 @@ export const SETTINGS_SURFACES = {
 
   // --- General ------------------------------------------------------------
   'general.appearance': { surface: 'both' },
-  'general.notch-panel': {
-    surface: 'desktop',
-    why: 'Positions an overlay window on a desktop display',
-  },
 
   // --- Claudia (agent) ----------------------------------------------------
   'agent.general': { surface: 'both' },

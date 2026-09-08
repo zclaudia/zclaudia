@@ -1,6 +1,4 @@
 import { create } from 'zustand';
-import { useNotchPanelStore } from './notchPanelStore';
-import { classifyToast, type NotchTab } from '../utils/notchTabCategory';
 
 export type ToastIcon = 'system' | 'permission' | 'task' | 'error';
 
@@ -12,7 +10,7 @@ export interface Toast {
   createdAt: number;
   /** Optional callback when toast is clicked */
   onClick?: () => void;
-  /** Project this toast relates to — used by NotchPanel to render project avatar/name. */
+  /** Project this toast relates to. */
   projectId?: string;
   /** Session this toast relates to — used for click-to-navigate. */
   sessionId?: string;
@@ -20,11 +18,9 @@ export interface Toast {
   serverId?: string;
   /** Icon category when there is no project context. */
   icon?: ToastIcon;
-  /** Who initiated this toast — used to route to the Claudia tab. */
+  /** Who initiated this toast. */
   initiator?: 'system' | 'claudia';
-  /** Auto-computed tab category for notch panel filtering. */
-  category?: NotchTab;
-  /** Target plugin notch tab (namespaced 'pluginId/tabId') — routes toast to plugin tab. */
+  /** Plugin notification channel (namespaced 'pluginId/tabId'). */
   pluginTab?: string;
 }
 
@@ -43,7 +39,6 @@ export const useToastStore = create<ToastState>(set => ({
   add: toast => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const entry: Toast = { ...toast, id, createdAt: Date.now() };
-    entry.category = classifyToast(entry);
 
     set(state => {
       const base = toast.sessionId
@@ -51,12 +46,6 @@ export const useToastStore = create<ToastState>(set => ({
         : state.toasts;
       return { toasts: [entry, ...base].slice(0, MAX_TOASTS) };
     });
-
-    // Mirror title into the NotchPanel closed-pill preview so users see the
-    // latest event even if they don't have the panel open.
-    const notchStore = useNotchPanelStore.getState();
-    notchStore.setPreviewTitle(entry.title);
-    notchStore.setLastActivityTab(entry.category);
 
     // Auto-dismiss
     setTimeout(() => {
@@ -72,7 +61,7 @@ export const useToastStore = create<ToastState>(set => ({
     })),
 }));
 
-// Dev-only: expose store on window for manual testing (e.g. NotchPanel demo)
+// Dev-only: expose store on window for manual testing
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   (window as any).__toastStore = useToastStore;
 }

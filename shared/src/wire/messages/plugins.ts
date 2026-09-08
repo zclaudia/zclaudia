@@ -33,7 +33,7 @@ export interface PluginNotificationMessage {
   pluginId: string;
   title: string;
   body: string;
-  /** Target plugin notch tab ID (namespaced as 'pluginId/tabId') */
+  /** Legacy plugin channel ID (namespaced as 'pluginId/tabId'); no built-in notch UI. */
   notchTab?: string;
 }
 
@@ -61,7 +61,7 @@ export interface PluginPanelUnregisteredMessage {
   pluginId: string;
 }
 
-// Plugin notch tab registered (Server → Client) — sent when a plugin activates with notchTabs
+// Legacy tab metadata (Server → Client); ignored by current desktop clients.
 export interface PluginNotchTabRegisteredMessage {
   type: 'plugin_notch_tab_registered';
   tabId: string;
@@ -71,7 +71,7 @@ export interface PluginNotchTabRegisteredMessage {
   order?: number;
 }
 
-// Plugin notch tab unregistered (Server → Client) — sent when a plugin deactivates
+// Legacy tab metadata removal (Server → Client); ignored by current desktop clients.
 export interface PluginNotchTabUnregisteredMessage {
   type: 'plugin_notch_tab_unregistered';
   pluginId: string;

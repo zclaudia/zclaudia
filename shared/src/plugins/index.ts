@@ -6,3 +6,4 @@ export * from './contributions.js';
 export * from './manifest.js';
 export * from './runtime-apis.js';
 export * from './context.js';
+export * from './notification-sink.js';
