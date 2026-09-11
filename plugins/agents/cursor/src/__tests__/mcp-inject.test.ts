@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, mkdirSync, writeFileSync, existsSync } from 
 import { tmpdir } from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { injectCursorMcpBridge } from '../mcp-inject.js';
+import { externalizeBridgeEnv, injectCursorMcpBridge } from '../mcp-inject.js';
 
 describe('injectCursorMcpBridge', () => {
   const dirs: string[] = [];
@@ -107,5 +107,85 @@ describe('injectCursorMcpBridge', () => {
     if (!result.ok) throw new Error(result.reason);
     result.cleanup();
     expect(readFileSync(configPath, 'utf8')).toBe(original);
+  });
+});
+
+describe('externalizeBridgeEnv', () => {
+  it('replaces every env value with a placeholder and returns the real values', () => {
+    const { bridge, env } = externalizeBridgeEnv({
+      name: 'claudia-plugins',
+      config: {
+        command: 'node',
+        args: ['bridge.js'],
+        env: {
+          AGENT_TOOL_BRIDGE_TOKEN: 's3cret',
+          AGENT_TOOL_BRIDGE_URL: 'http://127.0.0.1:51234',
+        },
+      },
+    });
+
+    expect((bridge.config as { env: Record<string, string> }).env).toEqual({
+      AGENT_TOOL_BRIDGE_TOKEN: '${ZCLAUDIA_CURSOR_BRIDGE_AGENT_TOOL_BRIDGE_TOKEN}',
+      AGENT_TOOL_BRIDGE_URL: '${ZCLAUDIA_CURSOR_BRIDGE_AGENT_TOOL_BRIDGE_URL}',
+    });
+    expect(env).toEqual({
+      ZCLAUDIA_CURSOR_BRIDGE_AGENT_TOOL_BRIDGE_TOKEN: 's3cret',
+      ZCLAUDIA_CURSOR_BRIDGE_AGENT_TOOL_BRIDGE_URL: 'http://127.0.0.1:51234',
+    });
+  });
+
+  it('never writes a secret value into the config it returns', () => {
+    const { bridge } = externalizeBridgeEnv({
+      name: 'claudia-plugins',
+      config: { command: 'node', env: { AGENT_TOOL_BRIDGE_TOKEN: 'top-secret-token' } },
+    });
+    expect(JSON.stringify(bridge.config)).not.toContain('top-secret-token');
+  });
+
+  it('produces a config that is stable across runs with rotating values', () => {
+    const make = (token: string, port: number) =>
+      externalizeBridgeEnv({
+        name: 'claudia-plugins',
+        config: {
+          command: 'node',
+          env: { AGENT_TOOL_BRIDGE_TOKEN: token, AGENT_TOOL_BRIDGE_URL: `http://127.0.0.1:${port}` },
+        },
+      }).bridge.config;
+    expect(make('a', 1)).toEqual(make('b', 2));
+  });
+
+  it('sanitizes env keys that are not valid variable characters', () => {
+    const { bridge, env } = externalizeBridgeEnv({
+      name: 'b',
+      config: { env: { 'weird.key-name': 'v' } },
+    });
+    expect((bridge.config as { env: Record<string, string> }).env['weird.key-name']).toBe(
+      '${ZCLAUDIA_CURSOR_BRIDGE_WEIRD_KEY_NAME}'
+    );
+    expect(env.ZCLAUDIA_CURSOR_BRIDGE_WEIRD_KEY_NAME).toBe('v');
+  });
+
+  it('passes through configs with no env block untouched', () => {
+    const config = { command: 'node', args: ['bridge.js'] };
+    const { bridge, env } = externalizeBridgeEnv({ name: 'b', config });
+    expect(bridge.config).toEqual(config);
+    expect(env).toEqual({});
+  });
+
+  it('tolerates a non-object config', () => {
+    const { bridge, env } = externalizeBridgeEnv({ name: 'b', config: 'not-an-object' });
+    expect(bridge.config).toBe('not-an-object');
+    expect(env).toEqual({});
+  });
+
+  it('leaves non-string env values in place rather than dropping them', () => {
+    const { bridge, env } = externalizeBridgeEnv({
+      name: 'b',
+      config: { env: { KEEP: 42 as unknown as string, SECRET: 'x' } },
+    });
+    const out = (bridge.config as { env: Record<string, unknown> }).env;
+    expect(out.KEEP).toBe(42);
+    expect(out.SECRET).toBe('${ZCLAUDIA_CURSOR_BRIDGE_SECRET}');
+    expect(env).toEqual({ ZCLAUDIA_CURSOR_BRIDGE_SECRET: 'x' });
   });
 });

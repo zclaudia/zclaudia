@@ -10,6 +10,63 @@ export interface CursorMcpBridge {
   config: unknown;
 }
 
+/** Namespace for the process-env variables the injected config refers to. */
+const BRIDGE_ENV_PREFIX = 'ZCLAUDIA_CURSOR_BRIDGE_';
+
+export interface BridgeEnvExternalization {
+  /** Bridge whose config carries `${VAR}` placeholders instead of live values. */
+  bridge: CursorMcpBridge;
+  /** Real values, to be placed on the cursor-agent process environment. */
+  env: Record<string, string>;
+}
+
+function bridgeEnvVarName(key: string): string {
+  return `${BRIDGE_ENV_PREFIX}${key.replace(/[^A-Za-z0-9_]/g, '_').toUpperCase()}`;
+}
+
+/**
+ * Move the bridge's env values out of the config and behind `${VAR}` references.
+ *
+ * The injected config is written to `<cwd>/.cursor/mcp.json` — a file inside the
+ * user's project that is frequently tracked by git — and the bridge env carries a
+ * per-session capability token. cursor-agent expands `${VAR}` in an MCP server's
+ * env from its own process environment (verified against the CLI; note that it
+ * does NOT otherwise pass its environment down to MCP children, so the
+ * indirection is required, not merely preferred). Writing only variable names
+ * keeps the token off disk, and as a side effect makes the injected entry byte
+ * identical across runs even though the token and port rotate.
+ */
+export function externalizeBridgeEnv(bridge: CursorMcpBridge): BridgeEnvExternalization {
+  const config = bridge.config;
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    return { bridge, env: {} };
+  }
+  const record = config as Record<string, unknown>;
+  const sourceEnv = record.env;
+  if (!sourceEnv || typeof sourceEnv !== 'object' || Array.isArray(sourceEnv)) {
+    return { bridge, env: {} };
+  }
+
+  const placeholders: Record<string, unknown> = {};
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(sourceEnv as Record<string, unknown>)) {
+    if (typeof value !== 'string') {
+      // Not something we can route through the environment; leave it as-is
+      // rather than silently dropping a field the bridge may depend on.
+      placeholders[key] = value;
+      continue;
+    }
+    const varName = bridgeEnvVarName(key);
+    placeholders[key] = `\${${varName}}`;
+    env[varName] = value;
+  }
+
+  return {
+    bridge: { name: bridge.name, config: { ...record, env: placeholders } },
+    env,
+  };
+}
+
 export type InjectResult =
   | { ok: true; cleanup: () => void; injected: boolean; injectedNames: string[] }
   | { ok: false; reason: string };

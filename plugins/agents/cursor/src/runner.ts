@@ -4,6 +4,7 @@ import type { ProviderRuntimeEvent } from '@zclaudia/plugin-sdk/providers';
 import { mapCursorEvent } from './map-events.js';
 import {
   approveCursorMcpServers,
+  externalizeBridgeEnv,
   injectCursorMcpBridge,
   type CursorMcpBridge,
 } from './mcp-inject.js';
@@ -155,9 +156,13 @@ export async function* runCursor(
 
   if (options.abortController?.signal.aborted) return;
 
-  // Inject MCP bridge
+  // Inject MCP bridge. Its env values are routed through the process environment
+  // so the capability token never lands in the project's .cursor/mcp.json.
+  let bridgeEnv: Record<string, string> = {};
   if (options.bridge) {
-    const result = injectCursorMcpBridge(options.cwd, options.bridge);
+    const externalized = externalizeBridgeEnv(options.bridge);
+    bridgeEnv = externalized.env;
+    const result = injectCursorMcpBridge(options.cwd, externalized.bridge);
     if (!result.ok) {
       console.error(`[Cursor SDK] Failed to inject MCP bridge: ${result.reason}`);
     } else if (result.injected) {
@@ -176,7 +181,9 @@ export async function* runCursor(
   try {
     proc = spawn(binary, args, {
       cwd: options.cwd,
-      env: { ...process.env, ...(options.env || {}) },
+      // bridgeEnv last: a caller-supplied env must not shadow the managed
+      // bridge variables the injected mcp.json now depends on.
+      env: { ...process.env, ...(options.env || {}), ...bridgeEnv },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (err) {

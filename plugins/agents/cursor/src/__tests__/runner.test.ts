@@ -4,10 +4,15 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 vi.mock('child_process', () => ({
   spawn: vi.fn(),
+  // Imported by the real mcp-inject module (for `cursor-agent mcp enable`),
+  // which this suite now loads for its env-externalization helper.
+  execFile: vi.fn((_cmd: string, _args: string[], _opts: unknown, cb?: () => void) => cb?.()),
 }));
 
-// Mock mcp-inject so tests do not touch real FS
-vi.mock('../mcp-inject.js', () => ({
+// Mock the FS-touching parts of mcp-inject; keep the real env externalization so
+// tests exercise the actual placeholder transform rather than a stub of it.
+vi.mock('../mcp-inject.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../mcp-inject.js')>()),
   injectCursorMcpBridge: vi.fn(() => ({ ok: true })),
   approveCursorMcpServers: vi.fn(async () => {}),
 }));
@@ -443,6 +448,43 @@ describe('runCursor', () => {
       type: 'error',
       error: 'Failed to start Cursor agent at cursor-agent: invalid executable',
     });
+  });
+
+  it('keeps the bridge token out of mcp.json and passes it through the process env', async () => {
+    spawnMock.mockReturnValueOnce(fakeProc([]));
+    vi.mocked(injectCursorMcpBridge).mockReturnValueOnce({
+      ok: true,
+      injected: true,
+      injectedNames: ['claudia-plugins'],
+      cleanup: () => {},
+    });
+
+    for await (const _ of runCursor('x', {
+      cwd: '/proj',
+      env: { ZCLAUDIA_CURSOR_BRIDGE_AGENT_TOOL_BRIDGE_TOKEN: 'caller-override' },
+      bridge: {
+        name: 'claudia-plugins',
+        config: {
+          command: 'node',
+          env: { AGENT_TOOL_BRIDGE_TOKEN: 'live-token', AGENT_TOOL_BRIDGE_URL: 'http://127.0.0.1:9' },
+        },
+      },
+    })) {
+      // drain
+    }
+
+    // What gets written to the project file carries no live value.
+    const [, injectedBridge] = vi.mocked(injectCursorMcpBridge).mock.calls[0];
+    expect(JSON.stringify(injectedBridge.config)).not.toContain('live-token');
+    expect((injectedBridge.config as { env: Record<string, string> }).env).toEqual({
+      AGENT_TOOL_BRIDGE_TOKEN: '${ZCLAUDIA_CURSOR_BRIDGE_AGENT_TOOL_BRIDGE_TOKEN}',
+      AGENT_TOOL_BRIDGE_URL: '${ZCLAUDIA_CURSOR_BRIDGE_AGENT_TOOL_BRIDGE_URL}',
+    });
+
+    // The live value reaches the CLI through its environment, and a caller-supplied
+    // env cannot shadow it.
+    const spawnEnv = spawnMock.mock.calls[0][2].env;
+    expect(spawnEnv.ZCLAUDIA_CURSOR_BRIDGE_AGENT_TOOL_BRIDGE_TOKEN).toBe('live-token');
   });
 
   it('passes --yolo only for the explicit bypassPermissions mode', async () => {

@@ -24,14 +24,42 @@ export async function waitForConcurrentRelease(cwd) {
   });
 }
 
+/** Resolve `${VAR}` references against this process's environment, as cursor-agent does. */
+function expandEnvPlaceholders(env) {
+  return Object.fromEntries(
+    Object.entries(env ?? {}).map(([key, value]) => [
+      key,
+      typeof value === 'string'
+        ? value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (literal, name) =>
+            process.env[name] === undefined ? literal : process.env[name]
+          )
+        : value,
+    ])
+  );
+}
+
 // Runs the host's actual stdio proxy. No bridge URL, credential, or generated
 // config is copied to the test report.
 export async function exerciseMcp(runtime, args, cwd) {
   let config;
   if (runtime === 'cursor') {
-    config = Object.values(
-      JSON.parse(readFileSync(path.join(cwd, '.cursor/mcp.json'), 'utf8')).mcpServers
-    ).find(server => server.env?.AGENT_TOOL_BRIDGE_SESSION_ID);
+    // cursor-agent expands ${VAR} in an MCP server's env from its own process
+    // environment, so the adapter references the bridge values by variable name
+    // instead of writing them into the user's project file. Mirror that here,
+    // otherwise this fixture sees placeholders where the real CLI sees values.
+    const raw = readFileSync(path.join(cwd, '.cursor/mcp.json'), 'utf8');
+    const injected = Object.values(JSON.parse(raw).mcpServers).find(
+      server => server.env?.AGENT_TOOL_BRIDGE_SESSION_ID
+    );
+    config = injected && { ...injected, env: expandEnvPlaceholders(injected.env) };
+    assert.ok(
+      config?.env?.AGENT_TOOL_BRIDGE_TOKEN,
+      'Adapter must supply the bridge token through the CLI environment'
+    );
+    assert.ok(
+      !raw.includes(config.env.AGENT_TOOL_BRIDGE_TOKEN),
+      'Injected .cursor/mcp.json must reference the bridge token by variable, not by value'
+    );
   } else if (runtime === 'claude') {
     const raw = args[args.indexOf('--mcp-config') + 1];
     config = Object.values(JSON.parse(raw).mcpServers).find(
