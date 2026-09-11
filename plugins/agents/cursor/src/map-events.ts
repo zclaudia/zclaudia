@@ -217,6 +217,8 @@ export function mapCursorEvent(event: Record<string, unknown>): MapCursorEventRe
         | {
             inputTokens?: number;
             outputTokens?: number;
+            cacheReadTokens?: number;
+            cacheWriteTokens?: number;
           }
         | undefined;
 
@@ -227,8 +229,18 @@ export function mapCursorEvent(event: Record<string, unknown>): MapCursorEventRe
         );
         results.push({ type: 'error', error: errMsg });
       } else {
+        // cursor-agent's four counters are disjoint sums over every LLM call the
+        // turn made, not one request: a multi-tool turn reports far more than a
+        // single prompt, and `cacheReadTokens` routinely exceeds `inputTokens`.
+        // Forward them as-is — they are the honest billing/stats numbers — and
+        // deliberately leave `contextUsedTokens` unset, since the final call's
+        // window occupancy is not recoverable from a turn aggregate. The host's
+        // `estimateContextTokensForThreshold` already discards an anchor larger
+        // than the context window and falls back to its structural estimate.
         const input = rawUsage?.inputTokens ?? 0;
         const output = rawUsage?.outputTokens ?? 0;
+        const cacheRead = rawUsage?.cacheReadTokens ?? 0;
+        const cacheWrite = rawUsage?.cacheWriteTokens ?? 0;
         results.push({
           type: 'result',
           isComplete: true,
@@ -236,9 +248,9 @@ export function mapCursorEvent(event: Record<string, unknown>): MapCursorEventRe
             ? {
                 input,
                 output,
-                cacheRead: 0,
-                cacheWrite: 0,
-                totalTokens: input + output,
+                cacheRead,
+                cacheWrite,
+                totalTokens: input + output + cacheRead + cacheWrite,
                 cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
               }
             : undefined,

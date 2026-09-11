@@ -357,6 +357,49 @@ describe('mapCursorEvent', () => {
       });
     });
 
+    it('forwards cursor-agent cache counters instead of discarding them', () => {
+      const { events } = mapCursorEvent({
+        type: 'result',
+        usage: {
+          inputTokens: 6429,
+          outputTokens: 31,
+          cacheReadTokens: 7936,
+          cacheWriteTokens: 128,
+        },
+      });
+      expect(events[0]).toMatchObject({
+        type: 'result',
+        usage: {
+          input: 6429,
+          output: 31,
+          cacheRead: 7936,
+          cacheWrite: 128,
+          totalTokens: 6429 + 31 + 7936 + 128,
+        },
+      });
+    });
+
+    it('keeps a turn aggregate whose cache reads exceed its uncached input', () => {
+      // cursor-agent sums every LLM call in the turn, so this is normal, not a bug.
+      const { events } = mapCursorEvent({
+        type: 'result',
+        usage: { inputTokens: 31816, outputTokens: 476, cacheReadTokens: 56320 },
+      });
+      expect(events[0]).toMatchObject({
+        type: 'result',
+        usage: { input: 31816, cacheRead: 56320, cacheWrite: 0 },
+      });
+    });
+
+    it('leaves contextUsedTokens unset because a turn aggregate cannot yield it', () => {
+      const { events } = mapCursorEvent({
+        type: 'result',
+        usage: { inputTokens: 100, outputTokens: 5, cacheReadTokens: 900 },
+      });
+      const usage = (events[0] as { usage: Record<string, unknown> }).usage;
+      expect(usage.contextUsedTokens).toBeUndefined();
+    });
+
     it('maps error result', () => {
       const { events } = mapCursorEvent({
         type: 'result',
