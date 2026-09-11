@@ -15,17 +15,61 @@ import { agentConfigDirectory } from '@zclaudia/agent-common';
 import type { ProviderToolBridgeEntry } from '@zclaudia/plugin-sdk/providers';
 import { modeTransitionForPlanTool, planToolSemantic } from '@zclaudia/agent-common';
 
-// File-based debug log (stdout may be captured by host runtime)
-export const DEBUG_LOG = '/tmp/codex-app-server-debug.log';
+// ── Debug logging (opt-in, redacted) ─────────────────────────
+//
+// Off unless ZCLAUDIA_CODEX_DEBUG=1. When enabled, lines go to the console
+// and to an owner-only (0600) file inside the zclaudia data directory —
+// never to shared /tmp. Values registered as sensitive (MCP bridge env
+// values, i.e. tokens/API keys passed as `-c mcp_servers.*.env.*` overrides)
+// are scrubbed from every line as defense in depth.
+
+const sensitiveLogValues = new Set<string>();
+
+export function registerSensitiveLogValues(values: Iterable<string>): void {
+  for (const value of values) {
+    if (value) sensitiveLogValues.add(value);
+  }
+}
+
+export function redactSensitiveValues(text: string): string {
+  let result = text;
+  for (const value of sensitiveLogValues) {
+    result = result.split(value).join('[redacted]');
+  }
+  return result;
+}
+
+/** Key names of `-c key=value` override pairs, without any values. */
+export function summarizeConfigArgKeys(args: string[]): string {
+  const keys: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '-c' && i + 1 < args.length) {
+      keys.push(args[i + 1].split('=', 1)[0]);
+      i++;
+    }
+  }
+  return keys.join(', ');
+}
+
+export function isDebugLogEnabled(): boolean {
+  return process.env.ZCLAUDIA_CODEX_DEBUG === '1';
+}
+
+export function debugLogPath(): string {
+  return join(getCodexConfigDir(), 'debug.log');
+}
+
 export function debugLog(msg: string): void {
-  const ts = new Date().toISOString();
-  const line = `[${ts}] ${msg}\n`;
+  if (!isDebugLogEnabled()) return;
+  const redacted = redactSensitiveValues(msg);
+  const line = `[${new Date().toISOString()}] ${redacted}\n`;
   try {
-    appendFileSync(DEBUG_LOG, line);
+    mkdirSync(getCodexConfigDir(), { recursive: true });
+    appendFileSync(debugLogPath(), line, { mode: 0o600 });
   } catch {
     /* ignore */
   }
-  console.log(msg);
+  console.log(redacted);
 }
 
 // ── claudia-plugins MCP tool name normalization ─────────────
@@ -182,6 +226,8 @@ export function buildMcpConfigArgs(bridge: ProviderToolBridgeEntry | null): stri
     for (const [key, value] of Object.entries(cfg.env as Record<string, string>).sort(([a], [b]) =>
       a.localeCompare(b)
     )) {
+      // env values are user-supplied credentials; keep them out of any log
+      registerSensitiveLogValues([String(value), JSON.stringify(value)]);
       args.push('-c', `${prefix}.env.${key}=${JSON.stringify(value)}`);
     }
   }

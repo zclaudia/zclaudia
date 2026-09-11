@@ -1,7 +1,12 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import type { PermissionCallback, ProviderRuntimeEvent } from '@zclaudia/plugin-sdk/providers';
-import { debugLog, type AppServerInputBlock } from './config.js';
+import {
+  debugLog,
+  redactSensitiveValues,
+  summarizeConfigArgKeys,
+  type AppServerInputBlock,
+} from './config.js';
 import { mapCodexNotification } from './map-events.js';
 import { resolveApprovalDecision } from './permissions.js';
 import { resolveCodexCli } from './resolve-cli.js';
@@ -130,7 +135,9 @@ export class CodexAppServerClient {
       // child reports exit. Never let that stale event tear down the new one.
       if (this.process !== child) return;
       debugLog(`[Codex AppServer] Process exited: code=${code}, signal=${signal}`);
-      const stderr = this.stderrTail.trim();
+      // The CLI may echo `-c` override values on config errors; this message
+      // escapes the debug log (it propagates to callers and the UI).
+      const stderr = redactSensitiveValues(this.stderrTail.trim());
       const status = code === null ? `signal=${signal ?? 'unknown'}` : `code=${code}`;
       const exitError = new Error(
         `Codex app-server process exited (${status})${stderr ? `: ${stderr}` : ''}`
@@ -211,7 +218,10 @@ export class CodexAppServerClient {
     const oldStr = JSON.stringify(this.extraArgs);
     const newStr = JSON.stringify(newArgs);
     if (oldStr !== newStr) {
-      debugLog(`[Codex AppServer] ExtraArgs changed, restarting process: ${oldStr} → ${newStr}`);
+      // Args carry `-c mcp_servers.*.env.*=<credential>` overrides — log key names only.
+      debugLog(
+        `[Codex AppServer] ExtraArgs changed, restarting process: keys [${summarizeConfigArgKeys(this.extraArgs)}] → [${summarizeConfigArgKeys(newArgs)}]`
+      );
       this.extraArgs = newArgs;
       this.destroy();
     }

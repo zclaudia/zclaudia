@@ -1,4 +1,7 @@
 import { EventEmitter } from 'events';
+import { mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { Readable, Writable } from 'stream';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
@@ -7,6 +10,7 @@ vi.mock('child_process', () => ({
 }));
 
 import { spawn } from 'child_process';
+import { buildMcpConfigArgs } from '../config.js';
 import {
   MAX_APP_SERVER_INBOUND_LINE_BYTES,
   MAX_APP_SERVER_OUTBOUND_LINE_BYTES,
@@ -673,6 +677,60 @@ describe('CodexAppServerClient', () => {
     await expect(ensurePromise).rejects.toThrow(
       'Codex app-server process exited (code=127): /home/user/.local/bin/zcodex: line 2: exec: codex: not found'
     );
+    client.destroy();
+  });
+
+  it('logs only override key names, never credential values, when extraArgs change', async () => {
+    vi.stubEnv('ZCLAUDIA_CODEX_DEBUG', '1');
+    vi.stubEnv('ZCLAUDIA_DATA_DIR', mkdtempSync(join(tmpdir(), 'codex-client-debug-')));
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const initResponse = JSON.stringify({ id: 1, result: { capabilities: {} } });
+      const { proc } = fakeProc({ lines: [initResponse] });
+      spawnMock.mockReturnValueOnce(proc as never);
+
+      const sensitiveArgs = buildMcpConfigArgs({
+        name: 'claudia-plugins',
+        config: { command: 'node', env: { BRIDGE_TOKEN: 'sk-live-supersecret' } },
+      });
+      const client = new CodexAppServerClient('/bin/codex', {}, sensitiveArgs);
+      await client.ensureRunning();
+
+      client.updateExtraArgs(['-c', 'approval_policy="on-request"', ...sensitiveArgs]);
+
+      const logged = consoleLogSpy.mock.calls.map(call => call.join(' ')).join('\n');
+      expect(logged).toContain('mcp_servers.claudia-plugins.env.BRIDGE_TOKEN');
+      expect(logged).not.toContain('sk-live-supersecret');
+      client.destroy();
+    } finally {
+      consoleLogSpy.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('redacts registered credential values from exit-error stderr', async () => {
+    buildMcpConfigArgs({
+      name: 'claudia-plugins',
+      config: { command: 'node', env: { BRIDGE_TOKEN: 'sk-live-supersecret' } },
+    });
+    const { proc } = fakeProc({
+      stderrLines: ['invalid config override: env.BRIDGE_TOKEN="sk-live-supersecret"'],
+    });
+    spawnMock.mockReturnValueOnce(proc as never);
+
+    const client = new CodexAppServerClient('/bin/codex', {});
+    const ensurePromise = client.ensureRunning();
+
+    process.nextTick(() => {
+      proc.emit('exit', 1, null);
+    });
+
+    const error = await ensurePromise.then(
+      () => new Error('expected rejection'),
+      (err: Error) => err
+    );
+    expect(error.message).toContain('[redacted]');
+    expect(error.message).not.toContain('sk-live-supersecret');
     client.destroy();
   });
 
