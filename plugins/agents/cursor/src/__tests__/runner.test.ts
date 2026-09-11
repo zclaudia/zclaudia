@@ -85,7 +85,7 @@ describe('runCursor', () => {
     vi.mocked(injectCursorMcpBridge).mockClear();
   });
 
-  it('spawns cursor-agent with stream-json, trust, and yolo in default mode', async () => {
+  it('spawns cursor-agent with stream-json, trust, and auto-review in default mode', async () => {
     spawnMock.mockReturnValueOnce(
       fakeProc([
         JSON.stringify({ type: 'system', subtype: 'init', session_id: 's1' }),
@@ -104,8 +104,17 @@ describe('runCursor', () => {
     const [bin, args] = spawnMock.mock.calls[0];
     expect(bin).toBe('cursor-agent');
     expect(args).toEqual(
-      expect.arrayContaining(['-p', 'hi', '--output-format', 'stream-json', '--trust', '--yolo'])
+      expect.arrayContaining([
+        '-p',
+        'hi',
+        '--output-format',
+        'stream-json',
+        '--trust',
+        '--auto-review',
+      ])
     );
+    // Supervised turns must not force-allow destructive shell calls.
+    expect(args).not.toContain('--yolo');
     expect(events.some(e => e.type === 'init' && e.sessionId === 's1')).toBe(true);
     expect(events.some(e => e.type === 'assistant' && e.content === 'hello')).toBe(true);
   });
@@ -121,6 +130,7 @@ describe('runCursor', () => {
     }
     const args = spawnMock.mock.calls[0][1] as string[];
     expect(args).toContain('--mode=plan');
+    expect(args).not.toContain('--auto-review');
     expect(args).toContain('--resume');
     expect(args).toContain('chat-1');
     expect(args).not.toContain('--yolo');
@@ -157,6 +167,7 @@ describe('runCursor', () => {
     const args = spawnMock.mock.calls[0][1] as string[];
     expect(args).toContain('--mode=ask');
     expect(args).not.toContain('--yolo');
+    expect(args).not.toContain('--auto-review');
   });
 
   it('prepends systemPrompt to the -p payload', async () => {
@@ -432,6 +443,16 @@ describe('runCursor', () => {
       type: 'error',
       error: 'Failed to start Cursor agent at cursor-agent: invalid executable',
     });
+  });
+
+  it('passes --yolo only for the explicit bypassPermissions mode', async () => {
+    spawnMock.mockReturnValueOnce(fakeProc([]));
+    for await (const _ of runCursor('x', { cwd: '/proj', mode: 'bypassPermissions' })) {
+      // drain
+    }
+    const args = spawnMock.mock.calls[0][1];
+    expect(args).toContain('--yolo');
+    expect(args).not.toContain('--auto-review');
   });
 
   it('passes --model when model is specified', async () => {

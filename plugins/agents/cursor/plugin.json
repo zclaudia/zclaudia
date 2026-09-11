@@ -113,6 +113,7 @@
           ],
           "permissionModeMap": {
             "supervised": "default",
+            "autonomous": "bypassPermissions",
             "plan_only": "plan"
           }
         },

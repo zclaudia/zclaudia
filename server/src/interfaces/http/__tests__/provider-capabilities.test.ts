@@ -31,7 +31,7 @@ describe('provider capability routes', () => {
     expect(byProfile.body.data.supportsAIReview).toBe(true);
   });
 
-  it('returns cursor runtime capabilities with default/plan/ask modes', async () => {
+  it('returns cursor runtime capabilities with default/plan/ask/bypass modes', async () => {
     const app = makeApp();
     const res = await request(app).get('/api/providers/type/cursor/capabilities');
     expect(res.status).toBe(200);
@@ -42,6 +42,7 @@ describe('provider capability routes', () => {
         expect.objectContaining({ id: 'default' }),
         expect.objectContaining({ id: 'plan' }),
         expect.objectContaining({ id: 'ask' }),
+        expect.objectContaining({ id: 'bypassPermissions' }),
       ])
     );
   });

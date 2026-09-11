@@ -40,6 +40,7 @@ appendFileSync(
     model: value('--model'),
     mode: args.includes('--mode=plan') ? 'plan' : args.includes('--mode=ask') ? 'ask' : 'default',
     yolo: args.includes('--yolo'),
+    autoReview: args.includes('--auto-review'),
     cwd: process.cwd(),
   }) + '\n'
 );

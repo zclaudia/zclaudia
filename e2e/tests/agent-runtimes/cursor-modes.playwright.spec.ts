@@ -32,6 +32,7 @@ test('E06: Cursor exposes supported modes without host per-tool approval control
       runtime: 'cursor',
       mode,
       yolo: false,
+      autoReview: false,
     });
     await expect(page.getByRole('button', { name: 'Allow', exact: true })).toHaveCount(0);
   }
@@ -39,9 +40,27 @@ test('E06: Cursor exposes supported modes without host per-tool approval control
   await page.getByRole('option', { name: /^Default/ }).click();
   await sendCodingMessage(page, 'Fix addition in default mode.');
   await expect(page.getByText('E2E_CURSOR_CODING_COMPLETE', { exact: true })).toBeVisible();
+  // Default is supervised: Cursor's classifier gates tool calls, nothing is force-allowed.
   expect((await app.audit()).filter(event => event.cwd).at(-1)).toMatchObject({
     runtime: 'cursor',
     mode: 'default',
+    yolo: false,
+    autoReview: true,
+  });
+
+  const runsBeforeBypass = (await app.audit()).filter(event => event.cwd).length;
+  await page.getByRole('button', { name: 'Agent mode', exact: true }).click();
+  await page.getByRole('option', { name: /^Bypass/ }).click();
+  await sendCodingMessage(page, 'Fix addition in bypass mode.');
+  // The default-mode turn already printed E2E_CURSOR_CODING_COMPLETE, so that
+  // marker is on screen before this turn even starts — wait on the audit.
+  await expect
+    .poll(async () => (await app.audit()).filter(event => event.cwd).length)
+    .toBe(runsBeforeBypass + 1);
+  // Force-allow is reachable only through the explicit bypass mode.
+  expect((await app.audit()).filter(event => event.cwd).at(-1)).toMatchObject({
+    runtime: 'cursor',
     yolo: true,
+    autoReview: false,
   });
 });

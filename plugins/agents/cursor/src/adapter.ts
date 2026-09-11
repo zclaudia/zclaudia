@@ -6,7 +6,7 @@ import type {
   ProviderRuntimeEvent,
 } from '@zclaudia/plugin-sdk/providers';
 import { AdapterSessionState, type ToolBridgeFactory } from '@zclaudia/agent-common';
-import { runCursor, abortCursorSession } from './runner.js';
+import { runCursor, abortCursorSession, type CursorMode } from './runner.js';
 
 export type { ToolBridgeFactory } from '@zclaudia/agent-common';
 
@@ -35,7 +35,7 @@ export class CursorAgentAdapter implements ExternalAgentAdapter {
         cliPath: context.cliPath,
         env: context.env,
         model: context.model,
-        mode: effectiveMode as 'plan' | 'ask' | undefined,
+        mode: effectiveMode as CursorMode | undefined,
         systemPrompt: context.systemPrompt,
         serverPort: context.serverPort,
         claudiaSessionId: context.claudiaSessionId,

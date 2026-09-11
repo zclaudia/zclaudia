@@ -34,10 +34,15 @@ const CURSOR_CAPABILITIES: ProviderCapabilities = {
     {
       id: 'default',
       label: 'Default',
-      description: 'Cursor executes tools without per-tool approval',
+      description: 'Cursor auto-review: safe tool calls run, destructive ones are declined',
     },
     { id: 'plan', label: 'Plan', description: 'Cursor plan mode' },
     { id: 'ask', label: 'Ask', description: 'Cursor ask (read-oriented) mode' },
+    {
+      id: 'bypassPermissions',
+      label: 'Bypass',
+      description: 'Cursor runs every tool call without review',
+    },
   ],
   modelLabel: 'Model',
   models: [],

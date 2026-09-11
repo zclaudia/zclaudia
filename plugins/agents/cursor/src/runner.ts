@@ -9,13 +9,20 @@ import {
 } from './mcp-inject.js';
 import { resolveCursorCliFromPath } from './resolve-cli.js';
 
+/**
+ * Native cursor-agent mode strings, as produced by the plugin manifest's
+ * `permissionModeMap`. Anything else (including `'default'`) is treated as the
+ * supervised default.
+ */
+export type CursorMode = 'plan' | 'ask' | 'bypassPermissions' | 'default';
+
 export interface CursorRunOptions {
   cwd: string;
   sessionId?: string;
   cliPath?: string;
   env?: Record<string, string>;
   model?: string;
-  mode?: 'plan' | 'ask';
+  mode?: CursorMode;
   systemPrompt?: string;
   serverPort?: number;
   claudiaSessionId?: string;
@@ -124,9 +131,17 @@ export async function* runCursor(
     args.push('--mode=plan');
   } else if (options.mode === 'ask') {
     args.push('--mode=ask');
-  } else {
-    // Default mode: add --yolo so bash commands aren't auto-rejected in non-interactive mode
+  } else if (options.mode === 'bypassPermissions') {
+    // Explicit "run everything" opt-in: force-allow every tool call.
     args.push('--yolo');
+  } else {
+    // Supervised default. cursor-agent has nobody to prompt in a headless run,
+    // so it rejects every shell call unless a permission flag is set — the
+    // choice is not "prompt or not", it is which automatic policy applies.
+    // --auto-review runs Cursor's server-side classifier: safe calls execute,
+    // destructive ones are rejected. --yolo force-allows everything and belongs
+    // only to the explicit bypass mode above.
+    args.push('--auto-review');
   }
 
   if (options.model) {
