@@ -19,7 +19,8 @@ interface PluginData {
   enabled: boolean;
   error?: string;
   path: string;
-  source?: 'managed' | 'development';
+  source?: 'builtin' | 'managed' | 'development';
+  shadowedPaths?: string[];
   installedAt?: string;
   updatedAt?: string;
   activeVersion?: string;
@@ -67,6 +68,7 @@ export async function fetchAndSyncPlugins(options?: RequestInit): Promise<void> 
       installedAt: p.installedAt ?? previous?.installedAt ?? now,
       updatedAt: p.updatedAt ?? previous?.updatedAt ?? now,
       source: p.source ?? 'development',
+      shadowedPaths: p.shadowedPaths ?? [],
       activeVersion: p.activeVersion,
       availableVersions: p.availableVersions ?? [],
       canRollback: p.canRollback ?? false,

@@ -1,0 +1,50 @@
+{
+  "name": "@zclaudia/plugin-cursor",
+  "version": "0.1.0",
+  "description": "Cursor Agent CLI runtime plugin for ZClaudia.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/main.js",
+  "types": "./dist/main.d.ts",
+  "files": [
+    "dist",
+    "plugin.json",
+    "runtime-compatibility.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "import": "./dist/main.js"
+    },
+    "./plugin.json": "./plugin.json",
+    "./runtime-compatibility.json": "./runtime-compatibility.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --emitDeclarationOnly && node ../../../scripts/plugins/build-agent.mjs cursor",
+    "clean": "rm -rf dist coverage",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pack:check": "npm pack --dry-run",
+    "dev": "node ../../../scripts/plugins/build-agent.mjs cursor --watch"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zclaudia/zclaudia.git",
+    "directory": "plugins/agents/cursor"
+  },
+  "dependencies": {
+    "@zclaudia/plugin-sdk": "^0.1.0"
+  },
+  "devDependencies": {
+    "@zclaudia/agent-common": "workspace:*",
+    "typescript": "^5.9.3",
+    "@types/node": "^22.13.10",
+    "vitest": "^4.1.8"
+  },
+  "private": true
+}

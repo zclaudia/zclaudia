@@ -246,6 +246,50 @@ function registerCatalog(
 }
 
 describe('ManagedRuntimeService resolution', () => {
+  it('inherits built-in pins across app versions without modifying historical references', async () => {
+    const root = await temporaryDirectory();
+    const runtimeService = await service({ dataDir: root, path: '' });
+    const pluginPath = await temporaryDirectory();
+    await writeFile(
+      path.join(pluginPath, 'runtime-compatibility.json'),
+      JSON.stringify(descriptor())
+    );
+    const refs = path.join(runtimeService.refsDir, 'com.example.fixture');
+    await mkdir(refs, { recursive: true });
+    const prior = {
+      schemaVersion: 1,
+      pluginId: 'com.example.fixture',
+      pluginVersion: '1.0.0',
+      runtime: 'fixture',
+      platform: 'linux-x64',
+      versions: ['1.2.3', '1.2.4'],
+      selectedVersion: '1.2.3',
+      selectionHistory: ['1.2.4'],
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    };
+    const original = JSON.stringify(prior);
+    await writeFile(path.join(refs, '1.0.0.json'), original);
+    const registration = {
+      pluginId: prior.pluginId,
+      pluginVersion: '2.0.0',
+      pluginPath,
+      runtimes: ['fixture'],
+      preservePreviousReference: true,
+    };
+    await runtimeService.registerPlugin(registration);
+    const migrated = await readFile(path.join(refs, '2.0.0.json'), 'utf8');
+    expect(JSON.parse(migrated)).toEqual({ ...prior, pluginVersion: '2.0.0' });
+    await runtimeService.registerPlugin(registration);
+    expect(await readFile(path.join(refs, '2.0.0.json'), 'utf8')).toBe(migrated);
+    expect(await readFile(path.join(refs, '1.0.0.json'), 'utf8')).toBe(original);
+    await runtimeService.registerPlugin({
+      ...registration,
+      pluginVersion: '3.0.0',
+      preservePreviousReference: false,
+    });
+    await expect(readFile(path.join(refs, '3.0.0.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('keeps JSON-RPC stdin open until initialize returns', async () => {
     const root = await temporaryDirectory();
     const systemDir = path.join(root, 'system');

@@ -5,6 +5,10 @@ import { cp, mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { Mutex } from 'async-mutex';
+import {
+  builtinAgentPluginForRuntime,
+  isBuiltinAgentPluginId,
+} from '@zclaudia/shared/plugins/builtin-agents';
 import { ManagedRuntimeService, managedRuntimeService } from '../managed-runtimes/service.js';
 import {
   validatePluginManifest,
@@ -96,7 +100,7 @@ export interface PluginPackagePreview {
 }
 
 export interface ManagedPluginInfo {
-  source: 'managed' | 'development';
+  source: 'builtin' | 'managed' | 'development';
   installedAt?: string;
   updatedAt?: string;
   activeVersion?: string;
@@ -449,6 +453,7 @@ export class PluginPackageService {
     }
 
     const validated = validateArchiveEntries(entries);
+    this.assertInstallable(validated.manifest);
     const requirements = executableRequirements(validated.manifest);
     const warnings = [...validated.warnings];
     for (const requirement of requirements) {
@@ -537,6 +542,8 @@ export class PluginPackageService {
       }
 
       const id = staged.manifest.id;
+      this.assertInstallable(staged.manifest);
+      this.assertMutable(id);
       const version = staged.manifest.version;
       const existing = this.loader.getPlugin(id);
       if (existing && !this.isManagedPath(id, existing.path)) {
@@ -623,6 +630,7 @@ export class PluginPackageService {
     requestedVersion?: string
   ): Promise<PluginPackageMutationResult> {
     return await this.mutationMutex.runExclusive(async () => {
+      this.assertMutable(id);
       const state = this.requireState(id);
       const candidates = [...state.versions]
         .filter(item => item.version !== state.activeVersion)
@@ -660,8 +668,10 @@ export class PluginPackageService {
 
   async uninstallPlugin(id: string): Promise<PluginPackageMutationResult> {
     return await this.mutationMutex.runExclusive(async () => {
+      this.assertMutable(id);
       const state = this.requireState(id);
-      await this.loader.remove(id);
+      if (!(await this.loader.remove(id)))
+        throw new PluginPackageError(409, 'PLUGIN_BUSY', 'Plugin could not be removed');
       await rm(this.activePluginDir(id), { force: true, recursive: true });
       await rm(path.join(this.storeDir, id), { force: true, recursive: true });
       for (const version of state.versions) {
@@ -671,8 +681,54 @@ export class PluginPackageService {
     });
   }
 
+  private assertInstallable(manifest: PluginManifest): void {
+    if (isBuiltinAgentPluginId(manifest.id)) {
+      throw new PluginPackageError(
+        409,
+        'BUILTIN_PLUGIN',
+        'Built-in agent plugins are updated with the application'
+      );
+    }
+    const reserved = manifest.contributes?.agentRuntimes?.find(runtime =>
+      builtinAgentPluginForRuntime(runtime.type)
+    );
+    if (reserved) {
+      throw new PluginPackageError(
+        409,
+        'BUILTIN_RUNTIME_RESERVED',
+        `The ${reserved.type} runtime is provided by a built-in agent plugin`
+      );
+    }
+  }
+
+  private assertMutable(id: string): void {
+    if (isBuiltinAgentPluginId(id)) {
+      throw new PluginPackageError(
+        409,
+        'BUILTIN_PLUGIN',
+        'Built-in agent plugins are updated with the application'
+      );
+    }
+    if (this.loader.isBusy?.(id)) {
+      throw new PluginPackageError(
+        409,
+        'RUNTIME_BUSY',
+        'Stop active runs before changing this runtime'
+      );
+    }
+  }
+
   describePlugin(manifest: PluginManifest, pluginPath: string): ManagedPluginInfo {
     const requirements = executableRequirements(manifest);
+    if (this.loader.isBuiltin?.(manifest.id)) {
+      return {
+        source: 'builtin',
+        activeVersion: manifest.version,
+        availableVersions: [],
+        canRollback: false,
+        requirements,
+      };
+    }
     const state = this.readState(manifest.id);
     if (!state || !this.isManagedPath(manifest.id, pluginPath)) {
       let installedAt: string | undefined;

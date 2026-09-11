@@ -22,6 +22,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { pathToFileURL } from 'node:url';
+import { randomUUID } from 'node:crypto';
+import {
+  BUILTIN_AGENT_PLUGINS,
+  builtinAgentPluginForRuntime,
+} from '@zclaudia/shared/plugins/builtin-agents';
+import { resolveBuiltinAgentRoot } from './builtin-agents.js';
+import { validateAgentRuntimeContributions } from '@zclaudia/shared/plugins/manifest';
 import type Database from 'better-sqlite3';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type {
@@ -74,6 +82,8 @@ function hasDeactivate(
 }
 
 export interface PluginLoaderOptions {
+  /** Host-owned resource root. Never read from plugin manifests or user plugin directories. */
+  builtinAgentRoot?: string;
   /** Additional plugin directories to scan */
   pluginDirs?: string[];
   /** Whether to auto-activate plugins on load */
@@ -84,7 +94,15 @@ export interface PluginLoaderOptions {
 // Plugin Loader
 // ============================================
 
+export class PluginRuntimeBusyError extends Error {}
+
 export class PluginLoader {
+  private readonly builtinAgentRoot?: string;
+  private readonly builtinIds = new Set<string>();
+  private readonly invalidBuiltins = new Map<string, string>();
+  private readonly lifecycleOperations = new Map<string, Promise<boolean>>();
+  private runtimeBusy: (runtime: string) => boolean = () => false;
+  private readonly shadowed = new Map<string, Set<string>>();
   private plugins = new Map<string, PluginInstance>();
   private pluginDirs: string[];
   private db: Database.Database | null = null;
@@ -100,12 +118,56 @@ export class PluginLoader {
   private pluginSkillDirs: Array<{ pluginId: string; path: string; source: 'plugin' }> = [];
 
   constructor(options: PluginLoaderOptions = {}) {
+    this.builtinAgentRoot = options.builtinAgentRoot;
     // Default plugin directory: $ZCLAUDIA_DATA_DIR/plugins (same base as database).
     // Dev builds (via Tauri appDataDir + '-dev/') automatically get an isolated path.
     const dataDir = process.env.ZCLAUDIA_DATA_DIR
       ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
       : path.join(os.homedir(), '.zclaudia');
     this.pluginDirs = [path.join(dataDir, 'plugins'), ...(options.pluginDirs || [])];
+  }
+
+  isBuiltin(pluginId: string): boolean {
+    return this.builtinIds.has(pluginId);
+  }
+
+  getShadowedPaths(pluginId: string): string[] {
+    return [...(this.shadowed.get(pluginId) ?? [])];
+  }
+
+  setRuntimeBusyChecker(check: (runtime: string) => boolean): void {
+    this.runtimeBusy = check;
+  }
+
+  isBusy(pluginId: string): boolean {
+    return (
+      this.getPlugin(pluginId)?.manifest.contributes?.agentRuntimes?.some(runtime =>
+        this.runtimeBusy(runtime.type)
+      ) ?? false
+    );
+  }
+
+  isBuiltinEnabled(pluginId: string): boolean {
+    if (!this.db) return true;
+    const row = this.db
+      .prepare('SELECT value FROM app_config WHERE key = ?')
+      .get(`builtin_plugin_enabled:${pluginId}`) as { value: string } | undefined;
+    return row?.value !== 'false';
+  }
+
+  setBuiltinEnabled(pluginId: string, enabled: boolean): void {
+    if (!this.isBuiltin(pluginId) || !this.db) return;
+    this.db
+      .prepare(
+        'INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+      )
+      .run(`builtin_plugin_enabled:${pluginId}`, String(enabled));
+  }
+
+  async activateBuiltins(): Promise<void> {
+    for (const id of this.builtinIds) {
+      if (this.isBuiltinEnabled(id)) await this.activate(id);
+    }
   }
 
   /**
@@ -208,6 +270,41 @@ export class PluginLoader {
   async discover(): Promise<PluginManifest[]> {
     const manifests: PluginManifest[] = [];
 
+    // Reserve every identity even when a shipped resource is missing. A broken
+    // installation must not silently execute an older, same-ID external module.
+    if (this.builtinAgentRoot) {
+      for (const builtin of BUILTIN_AGENT_PLUGINS) {
+        if (this.builtinIds.has(builtin.id)) continue;
+        const pluginPath = path.join(this.builtinAgentRoot, builtin.directory);
+        const manifest = await this.loadManifest(pluginPath, { warnMissing: false });
+        this.builtinIds.add(builtin.id);
+        if (
+          manifest?.id === builtin.id &&
+          manifest.contributes?.agentRuntimes?.length === 1 &&
+          manifest.contributes.agentRuntimes[0].type === builtin.runtime &&
+          manifest.main
+        ) {
+          this.addDiscoveredPlugin(manifest, pluginPath, manifests, true);
+        } else {
+          const error = `Built-in runtime resources are missing or invalid: ${pluginPath}`;
+          this.invalidBuiltins.set(builtin.id, error);
+          const placeholder: PluginManifest = {
+            id: builtin.id,
+            name: builtin.name,
+            version: '0.0.0',
+            description: error,
+          };
+          this.plugins.set(builtin.id, {
+            manifest: placeholder,
+            path: pluginPath,
+            isActive: false,
+            error,
+          });
+          manifests.push(placeholder);
+        }
+      }
+    }
+
     for (const dir of this.getPluginDirs()) {
       const directManifest = await this.loadManifest(dir, { warnMissing: false });
       if (directManifest) {
@@ -223,8 +320,24 @@ export class PluginLoader {
   private addDiscoveredPlugin(
     manifest: PluginManifest,
     pluginPath: string,
-    manifests: PluginManifest[]
+    manifests: PluginManifest[],
+    builtin = false
   ): boolean {
+    if (!builtin && this.builtinAgentRoot) {
+      const reservedRuntime = manifest.contributes?.agentRuntimes?.find(runtime =>
+        builtinAgentPluginForRuntime(runtime.type)
+      );
+      const owner = this.builtinIds.has(manifest.id)
+        ? manifest.id
+        : reservedRuntime && builtinAgentPluginForRuntime(reservedRuntime.type)?.id;
+      if (owner) {
+        const paths = this.shadowed.get(owner) ?? new Set<string>();
+        paths.add(pluginPath);
+        this.shadowed.set(owner, paths);
+        console.warn(`[PluginLoader] Built-in ${owner} takes precedence over ${pluginPath}`);
+        return false;
+      }
+    }
     if (this.plugins.has(manifest.id)) {
       console.warn(
         `[PluginLoader] Plugin "${manifest.id}" already discovered, skipping duplicate at ${pluginPath}`
@@ -313,13 +426,19 @@ export class PluginLoader {
       if (manifestPath.endsWith('package.json')) {
         const pkgManifest = rawManifest as Record<string, unknown>;
         if (pkgManifest.claudia) {
-          return {
+          const manifest = {
             ...pkgManifest.claudia,
             id: (pkgManifest.claudia as Record<string, unknown>).id || pkgManifest.name,
             name: (pkgManifest.claudia as Record<string, unknown>).name || pkgManifest.name,
             version:
               (pkgManifest.claudia as Record<string, unknown>).version || pkgManifest.version,
           } as PluginManifest;
+          const validation = this.validateManifest(manifest);
+          if (!validation.valid) {
+            console.error(`[PluginLoader] Invalid manifest in ${pluginPath}:`, validation.errors);
+            return null;
+          }
+          return manifest;
         }
       }
 
@@ -345,6 +464,7 @@ export class PluginLoader {
     }
 
     const m = manifest as Record<string, unknown>;
+    errors.push(...validateAgentRuntimeContributions(m.contributes));
 
     if (!m.id || typeof m.id !== 'string') {
       errors.push('Missing required field: id');
@@ -405,6 +525,25 @@ export class PluginLoader {
    * Activate a plugin by ID.
    */
   async activate(pluginId: string): Promise<boolean> {
+    return this.serializeLifecycle(pluginId, () => this.activateOnce(pluginId));
+  }
+
+  private async serializeLifecycle(
+    pluginId: string,
+    operation: () => Promise<boolean>
+  ): Promise<boolean> {
+    const previous = this.lifecycleOperations.get(pluginId) ?? Promise.resolve(true);
+    const current = previous.catch(() => false).then(operation);
+    this.lifecycleOperations.set(pluginId, current);
+    try {
+      return await current;
+    } finally {
+      if (this.lifecycleOperations.get(pluginId) === current)
+        this.lifecycleOperations.delete(pluginId);
+    }
+  }
+
+  private async activateOnce(pluginId: string): Promise<boolean> {
     const instance = this.plugins.get(pluginId);
     if (!instance) {
       console.error(`[PluginLoader] Plugin not found: ${pluginId}`);
@@ -415,6 +554,10 @@ export class PluginLoader {
       console.warn(`[PluginLoader] Plugin already active: ${pluginId}`);
       return true;
     }
+
+    if (this.invalidBuiltins.has(pluginId)) return false;
+    instance.error = undefined;
+    instance.pendingPermissions = undefined;
 
     try {
       // Check compatibility
@@ -459,7 +602,7 @@ export class PluginLoader {
       // Permissions are enforced lazily via checkPermissions() when plugin
       // tools or commands are actually invoked.
       const requiredPermissions = instance.manifest.permissions || [];
-      if (requiredPermissions.length > 0) {
+      if (!this.isBuiltin(pluginId) && requiredPermissions.length > 0) {
         const hasAll = permissionManager.hasAllPermissions(
           pluginId,
           requiredPermissions as Permission[]
@@ -487,8 +630,42 @@ export class PluginLoader {
         if (instance.manifest.main) {
           await this.loadModule(instance);
         }
+        if (this.isBuiltin(pluginId)) {
+          for (const runtime of instance.manifest.contributes?.agentRuntimes ?? []) {
+            if (!providerRegistry.hasType(runtime.type)) {
+              throw new Error(`Built-in plugin did not register runtime ${runtime.type}`);
+            }
+          }
+          if (this.db) {
+            // Commit profile creation and its journal together. A failed insert
+            // must not leave a partial migration marked complete.
+            const db = this.db;
+            const installed = db.transaction(() => {
+              const count = new PluginAgentProfileService(db).installContributions(
+                pluginId,
+                instance.manifest.contributes?.agentProfiles
+              );
+              db.prepare(
+                'INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value WHERE value <> excluded.value'
+              ).run(
+                `builtin_plugin_migration:${pluginId}`,
+                JSON.stringify({ version: instance.manifest.version, source: 'builtin' })
+              );
+              return count;
+            })();
+            if (installed > 0) this.broadcastFn?.({ type: 'agent_profiles_changed' });
+          }
+        }
       } catch (moduleError) {
         // Rollback: clean up registered contributions on module load failure
+        if (hasDeactivate(instance.module)) {
+          try {
+            await instance.module.deactivate();
+          } catch {
+            /* Preserve activation error. */
+          }
+        }
+        instance.module = undefined;
         this.unregisterContributions(pluginId);
         throw moduleError;
       }
@@ -665,7 +842,14 @@ export class PluginLoader {
   /**
    * Deactivate a plugin by ID.
    */
-  async deactivate(pluginId: string): Promise<boolean> {
+  async deactivate(pluginId: string, options: { force?: boolean } = {}): Promise<boolean> {
+    return this.serializeLifecycle(pluginId, () => this.deactivateOnce(pluginId, options));
+  }
+
+  private async deactivateOnce(
+    pluginId: string,
+    options: { force?: boolean } = {}
+  ): Promise<boolean> {
     const instance = this.plugins.get(pluginId);
     if (!instance) {
       console.error(`[PluginLoader] Plugin not found: ${pluginId}`);
@@ -676,7 +860,16 @@ export class PluginLoader {
       return true;
     }
 
+    if (!options.force && this.isBusy(pluginId)) {
+      throw new PluginRuntimeBusyError(
+        `RUNTIME_BUSY: Stop active runs before disabling ${pluginId}`
+      );
+    }
+
     try {
+      // Withdraw the adapter before awaiting child-process shutdown, so a new
+      // run cannot enter the runtime while it is being torn down.
+      if (this.isBuiltin(pluginId)) providerRegistry.removePluginAdapters(pluginId);
       // Stop Worker if running in worker mode
       if (workerHost.hasWorker(pluginId)) {
         await workerHost.stopPlugin(pluginId);
@@ -701,6 +894,12 @@ export class PluginLoader {
       console.log(`[PluginLoader] Deactivated plugin: ${pluginId}`);
       return true;
     } catch (error) {
+      if (this.isBuiltin(pluginId)) {
+        instance.isActive = false;
+        instance.error = error instanceof Error ? error.message : String(error);
+        this.unregisterContributions(pluginId);
+        await pluginEvents.emit('plugin.error', { pluginId, error: instance.error }, pluginId);
+      }
       console.error(
         `[PluginLoader] Error deactivating plugin ${pluginId}:`,
         error instanceof Error ? error.message : String(error)
@@ -809,13 +1008,14 @@ export class PluginLoader {
         pluginVersion: manifest.version,
         pluginPath: instance.path,
         publisher: manifest.author?.name,
+        preservePreviousReference: this.isBuiltin(manifest.id),
         runtimes: contributes.agentRuntimes.map(runtime => runtime.type),
       });
       const n = registerAgentRuntimeContributions(manifest.id, contributes.agentRuntimes);
       if (n > 0) this.broadcastFn?.({ type: 'agent_runtimes_changed' });
     }
 
-    if (contributes.agentProfiles) {
+    if (contributes.agentProfiles && !this.isBuiltin(manifest.id)) {
       if (this.db) {
         const service = new PluginAgentProfileService(this.db);
         const installed = service.installContributions(manifest.id, contributes.agentProfiles);
@@ -920,7 +1120,7 @@ export class PluginLoader {
     this.broadcastFn?.({ type: 'agent_runtimes_changed' });
 
     // Uninstall plugin-owned agent profiles.
-    if (this.db) {
+    if (this.db && !this.isBuiltin(pluginId)) {
       const removed = new AgentProfileRepository(this.db).deleteByPlugin(pluginId);
       if (removed > 0) this.broadcastFn?.({ type: 'agent_profiles_changed' });
     }
@@ -930,6 +1130,8 @@ export class PluginLoader {
    * Remove a plugin completely (deactivate and clear permissions).
    */
   async remove(pluginId: string): Promise<boolean> {
+    if (this.isBuiltin(pluginId))
+      throw new Error('Built-in plugins are updated with the application');
     const instance = this.plugins.get(pluginId);
     if (!instance) {
       return false;
@@ -937,7 +1139,7 @@ export class PluginLoader {
 
     // Deactivate first
     if (instance.isActive) {
-      await this.deactivate(pluginId);
+      if (!(await this.deactivate(pluginId))) return false;
     }
 
     // Clear permissions
@@ -957,6 +1159,10 @@ export class PluginLoader {
    * This enables hot-reload when plugin files on disk have been updated.
    */
   async reload(pluginId: string): Promise<boolean> {
+    return this.serializeLifecycle(pluginId, () => this.reloadOnce(pluginId));
+  }
+
+  private async reloadOnce(pluginId: string): Promise<boolean> {
     const instance = this.plugins.get(pluginId);
     if (!instance) {
       console.error(`[PluginLoader] Plugin not found: ${pluginId}`);
@@ -969,7 +1175,7 @@ export class PluginLoader {
 
     // 1. Deactivate (unregisters contributions, calls deactivate(), stops worker)
     if (wasActive) {
-      await this.deactivate(pluginId);
+      if (!(await this.deactivateOnce(pluginId))) return false;
     }
 
     // 2. Bust Node.js module cache for plugin files.
@@ -989,10 +1195,21 @@ export class PluginLoader {
 
     // 3. Re-read manifest from disk (it may have changed)
     const manifest = await this.loadManifest(pluginPath);
-    if (!manifest) {
+    const builtin = BUILTIN_AGENT_PLUGINS.find(entry => entry.id === pluginId);
+    if (
+      !manifest ||
+      manifest.id !== pluginId ||
+      (this.isBuiltin(pluginId) &&
+        (!manifest.main ||
+          manifest.contributes?.agentRuntimes?.length !== 1 ||
+          manifest.contributes.agentRuntimes[0].type !== builtin?.runtime))
+    ) {
+      instance.error = `Invalid manifest after reload: ${pluginPath}`;
+      if (this.isBuiltin(pluginId)) this.invalidBuiltins.set(pluginId, instance.error);
       console.error(`[PluginLoader] Failed to load manifest after reload: ${pluginPath}`);
       return false;
     }
+    this.invalidBuiltins.delete(pluginId);
 
     // 4. Update the instance with fresh manifest
     this.plugins.set(pluginId, {
@@ -1004,8 +1221,8 @@ export class PluginLoader {
     });
 
     // 5. Re-activate if it was previously active
-    if (wasActive) {
-      return this.activate(pluginId);
+    if (wasActive || (this.isBuiltin(pluginId) && this.isBuiltinEnabled(pluginId))) {
+      return this.activateOnce(pluginId);
     }
 
     console.log(`[PluginLoader] Plugin ${pluginId} reloaded (not re-activated — was inactive)`);
@@ -1041,7 +1258,7 @@ export class PluginLoader {
       // Dynamic import (main thread)
       // Append cache-busting query param so re-imports after reload get fresh code.
       // Node.js ESM loader caches by full URL including query string.
-      const moduleUrl = `${modulePath}?t=${Date.now()}`;
+      const moduleUrl = `${pathToFileURL(modulePath).href}?t=${randomUUID()}`;
       const module = (await import(moduleUrl)) as Partial<PluginModule>;
       instance.module = module;
 
@@ -1053,6 +1270,7 @@ export class PluginLoader {
           db: this.db,
           broadcast: this.broadcastFn,
           pluginAPIs: this.pluginAPIs,
+          builtinPermissions: this.isBuiltin(manifest.id) ? manifest.permissions : undefined,
         }) as PluginContext;
         await module.activate(context);
       }
@@ -1066,10 +1284,12 @@ export class PluginLoader {
 
   /**
    * Deactivate all plugins.
+   * Pass `{ force: true }` during process shutdown so a lingering busy
+   * runtime cannot abort teardown after cancel/drain.
    */
-  async deactivateAll(): Promise<void> {
+  async deactivateAll(options: { force?: boolean } = {}): Promise<void> {
     for (const [pluginId] of this.plugins) {
-      await this.deactivate(pluginId);
+      await this.deactivate(pluginId, options);
     }
   }
 
@@ -1085,4 +1305,4 @@ export class PluginLoader {
 // Singleton Export
 // ============================================
 
-export const pluginLoader = new PluginLoader();
+export const pluginLoader = new PluginLoader({ builtinAgentRoot: resolveBuiltinAgentRoot() });

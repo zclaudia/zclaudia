@@ -77,6 +77,53 @@ describe('useProviderCapabilities', () => {
     } as any);
   });
 
+  it('selects and caches external runtime metadata independently of an inherited LLM binding', async () => {
+    useProjectStore.setState({
+      sessions: [{ id: 'sess-1', projectId: 'proj-1', agentProfileId: 'cursor-agent' }],
+    } as any);
+    useAgentProfileMetaStore.setState({
+      profiles: {
+        'cursor-agent': { id: 'cursor-agent', runtimeType: 'cursor', llmProfileId: 'legacy-llm' },
+      },
+      loaded: true,
+    } as any);
+    useLlmProfileMetaStore.setState({
+      providersByBackend: { local: [{ id: 'legacy-llm' }] },
+    } as any);
+    const { result } = renderHook(() =>
+      useProviderCapabilities({ sessionId: 'sess-1', isConnected: true })
+    );
+    await waitFor(() =>
+      expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith('cursor', expect.any(Object))
+    );
+    expect(api.getProviderTypeCommands).toHaveBeenCalledWith('cursor', '/test', expect.any(Object));
+    expect(api.getProviderCapabilities).not.toHaveBeenCalled();
+    expect(api.getProviderCommands).not.toHaveBeenCalled();
+    expect(result.current.commandsCacheKey).toBe('local:runtime:cursor');
+  });
+
+  it('does not stall forever when the session agentProfileId is orphaned', async () => {
+    useProjectStore.setState({
+      sessions: [{ id: 'sess-1', projectId: 'proj-1', agentProfileId: 'missing-agent' }],
+    } as any);
+    useAgentProfileMetaStore.setState({
+      profiles: {},
+      loaded: true,
+      loading: false,
+    } as any);
+
+    renderHook(() => useProviderCapabilities({ sessionId: 'sess-1', isConnected: true }));
+
+    await waitFor(() =>
+      expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith('zclaudia', expect.any(Object))
+    );
+    expect(api.getProviderTypeCommands).toHaveBeenCalledWith(
+      'zclaudia',
+      '/test',
+      expect.any(Object)
+    );
+  });
+
   it('loads default provider metadata when no llmProfileId is set', async () => {
     const { result } = renderHook(() =>
       useProviderCapabilities({ sessionId: 'sess-1', isConnected: true })

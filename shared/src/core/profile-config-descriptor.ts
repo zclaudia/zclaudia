@@ -1,4 +1,5 @@
 import type { AgentRuntimeType } from './agent-profile.js';
+import { builtinAgentPluginForRuntime } from '../plugins/builtin-agents.js';
 
 export type ModelConfigKind = 'llm-profile' | 'native' | 'none';
 
@@ -63,5 +64,6 @@ export function enabledRuntimeDescriptors(): ProfileConfigDescriptor[] {
 }
 
 export function runtimeRequiresLlmProfile(runtime: AgentRuntimeType | undefined): boolean {
+  if (runtime && builtinAgentPluginForRuntime(runtime)) return false;
   return getProfileConfigDescriptor(runtime).model.kind === 'llm-profile';
 }

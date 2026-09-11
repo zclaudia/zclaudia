@@ -5,6 +5,7 @@ import { resolveAgentProfileStatus } from '@zclaudia/shared/core/record-status-r
 import { runtimeRequiresLlmProfile } from '../agent-profiles/runtime-type-guard.js';
 import { hasLlmCredential } from './credential.js';
 import { hasUsableModel } from './check.js';
+import { providerRegistry } from '../../infra/providers/registry.js';
 
 /** Per-record status for one agent profile given its (already looked-up) bound LLM. */
 export function resolveAgentProfileRecordStatus(
@@ -12,6 +13,9 @@ export function resolveAgentProfileRecordStatus(
   llm: LlmProfileConfig | null | undefined
 ): RecordStatus {
   const requiresLlm = runtimeRequiresLlmProfile(agent.runtimeType);
+  if (!requiresLlm && !providerRegistry.hasType(agent.runtimeType!)) {
+    return { completeness: 'ready', availability: { usable: false, reason: 'requirement_unmet' } };
+  }
   const hasLlmBinding = Boolean(llm);
   const hasModel = Boolean(agent.model && agent.model.trim());
   const llmUsable = Boolean(llm && hasLlmCredential(llm) && hasUsableModel(agent.model, llm));

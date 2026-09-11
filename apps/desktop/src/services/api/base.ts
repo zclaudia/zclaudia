@@ -10,6 +10,7 @@ import {
   resolveLocalBackendId,
 } from '../../utils/controlPlane';
 import { getBrowserShellBaseUrl } from '../../utils/browserShellRuntime';
+import { fetchWithRuntimeInitializationRetry } from './runtime-initialization-retry';
 
 /** Check if the active server advertises a specific feature. */
 export function activeServerSupports(feature: ServerFeature): boolean {
@@ -61,7 +62,7 @@ export function getBaseUrlForBackend(backendId?: string | null): string {
       return browserShellBaseUrl;
     }
 
-    if (!localPort) throw new Error('No server configured');
+    if (!localPort && !browserShellBaseUrl) throw new Error('No server configured');
 
     // Known local backend → direct connection
     if (!activeId || isLocalBackendId(activeId)) {
@@ -75,11 +76,13 @@ export function getBaseUrlForBackend(backendId?: string | null): string {
     const backend = useFacadeStore.getState().backends.find(b => b.backendId === activeId);
     const isConfirmedRemote = backend && !backend.isThisInstance && backend.channel !== 'local';
     if (isConfirmedRemote) {
-      return resolveGatewayBackendUrl(activeId) || `http://localhost:${localPort}`;
+      return (
+        resolveGatewayBackendUrl(activeId) || browserShellBaseUrl || `http://localhost:${localPort}`
+      );
     }
 
     // Unresolved or unconfirmed → fallback to direct local connection
-    return `http://localhost:${localPort}`;
+    return browserShellBaseUrl || `http://localhost:${localPort}`;
   }
 
   // Gateway-direct mode: delegate to shared gateway proxy resolver
@@ -140,7 +143,7 @@ export async function fetchApiForBackend<T>(
 ): Promise<ApiResponse<T>> {
   const baseUrl = getBaseUrlForBackend(backendId);
   const authHeaders = getAuthHeadersForBackend(backendId);
-  const response = await fetch(`${baseUrl}${path}`, {
+  const response = await fetchWithRuntimeInitializationRetry(`${baseUrl}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -201,7 +204,7 @@ export async function fetchLocalApi<T>(
 ): Promise<ApiResponse<T>> {
   const baseUrl = getLocalBaseUrl();
   const isMultipart = typeof FormData !== 'undefined' && options?.body instanceof FormData;
-  const response = await fetch(`${baseUrl}${path}`, {
+  const response = await fetchWithRuntimeInitializationRetry(`${baseUrl}${path}`, {
     ...options,
     headers: {
       ...(isMultipart ? {} : { 'Content-Type': 'application/json' }),

@@ -22,7 +22,7 @@ export interface PluginCardModel {
   enabled: boolean;
   version?: string;
   description?: string;
-  source?: 'managed' | 'development';
+  source?: 'builtin' | 'managed' | 'development';
   status?: 'active' | 'inactive' | 'error';
   error?: string;
   missingRequirements?: string[];

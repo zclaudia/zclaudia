@@ -65,7 +65,7 @@ describe('AgentToolBridgeHostManager', () => {
     }
   });
 
-  it('reuses one portable host for session-specific entries and closes it', async () => {
+  it('reuses a host within one session and closes every session host', async () => {
     const close = vi.fn(async () => {});
     const createEntry = vi.fn(options => ({
       name: options.name,
@@ -88,18 +88,139 @@ describe('AgentToolBridgeHostManager', () => {
       config: { sessionId: 'session-1' },
     });
     await manager.createEntry({ serverPort: 3100, sessionId: 'session-2' });
+    await manager.createEntry({ serverPort: 3100, sessionId: 'session-2' });
     await manager.close();
 
-    expect(createPortableToolBridgeHost).toHaveBeenCalledTimes(1);
+    expect(createPortableToolBridgeHost).toHaveBeenCalledTimes(2);
     expect(createPortableToolBridgeHost).toHaveBeenCalledWith({
-      catalog,
+      catalog: expect.objectContaining({
+        listTools: expect.any(Function),
+        callTool: expect.any(Function),
+      }),
       requestTimeoutMs: 30_000,
     });
     expect(createEntry).toHaveBeenNthCalledWith(2, {
       name: 'claudia-plugins',
       sessionId: 'session-2',
     });
+    expect(close).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects another session credential and forged session IDs at the real HTTP boundary', async () => {
+    const callTool = vi.fn(async (_name, _args, context) => context.sessionId);
+    const manager = new AgentToolBridgeHostManager({ catalog: { ...catalog, callTool } });
+    try {
+      const a = await manager.createEntry({ sessionId: 'session-a' });
+      const b = await manager.createEntry({ sessionId: 'session-b' });
+      const envA = (a!.config as { env: Record<string, string> }).env;
+      const envB = (b!.config as { env: Record<string, string> }).env;
+      const call = (url: string, token: string, sessionId?: string) =>
+        fetch(`${url}/v1/tools/echo/call`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ arguments: {}, sessionId }),
+        });
+      expect(
+        (await call(envB.AGENT_TOOL_BRIDGE_URL, envA.AGENT_TOOL_BRIDGE_TOKEN, 'session-b')).status
+      ).toBe(401);
+      expect(
+        (await call(envA.AGENT_TOOL_BRIDGE_URL, envA.AGENT_TOOL_BRIDGE_TOKEN, 'session-b')).ok
+      ).toBe(false);
+      expect(callTool).not.toHaveBeenCalled();
+      expect((await call(envA.AGENT_TOOL_BRIDGE_URL, envA.AGENT_TOOL_BRIDGE_TOKEN)).ok).toBe(true);
+      expect(callTool).toHaveBeenCalledWith(
+        'echo',
+        {},
+        expect.objectContaining({ sessionId: 'session-a' })
+      );
+    } finally {
+      await manager.close();
+    }
+  });
+
+  it('expires idle HTTP endpoints, retains overlapping runs, and recreates fresh credentials', async () => {
+    const manager = new AgentToolBridgeHostManager({ catalog, idleTimeoutMs: 100 });
+    const first = manager.retainSession('active');
+    const second = manager.retainSession('active');
+    const peer = manager.retainSession('peer');
+    const env = (entry: any) => entry.config.env as Record<string, string>;
+    const call = (entry: any) =>
+      fetch(`${env(entry).AGENT_TOOL_BRIDGE_URL}/v1/tools/echo/call`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env(entry).AGENT_TOOL_BRIDGE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ arguments: {} }),
+      });
+    try {
+      const a = await manager.createEntry({ sessionId: 'active' });
+      const b = await manager.createEntry({ sessionId: 'peer' });
+      const idle = await manager.createEntry({ sessionId: 'idle' });
+      first();
+      first(); // A second release must not consume the other run's retention.
+      await expect
+        .poll(async () => {
+          try {
+            await call(idle);
+            return false;
+          } catch {
+            return true;
+          }
+        })
+        .toBe(true);
+      expect((await call(a)).ok).toBe(true);
+      expect((await call(b)).ok).toBe(true);
+      second();
+      await expect
+        .poll(async () => {
+          try {
+            await call(a);
+            return false;
+          } catch {
+            return true;
+          }
+        })
+        .toBe(true);
+      expect((await call(b)).ok).toBe(true);
+      const resumed = manager.retainSession('active');
+      try {
+        const fresh = await manager.createEntry({ sessionId: 'active' });
+        expect(env(fresh).AGENT_TOOL_BRIDGE_TOKEN).not.toBe(env(a).AGENT_TOOL_BRIDGE_TOKEN);
+        expect((await call(fresh)).ok).toBe(true);
+      } finally {
+        resumed();
+      }
+    } finally {
+      second();
+      peer();
+      await manager.close();
+    }
+  });
+
+  it('waits for in-flight host creation during shutdown and rejects new entries', async () => {
+    let resolveHost!: (host: any) => void;
+    const close = vi.fn(async () => {});
+    const manager = new AgentToolBridgeHostManager({
+      catalog,
+      loadModule: async () => ({
+        createPortableToolBridgeHost: () =>
+          new Promise(resolve => {
+            resolveHost = resolve;
+          }),
+      }),
+    });
+    const creating = manager.createEntry({ sessionId: 'pending' });
+    const rejected = expect(creating).rejects.toThrow('manager is closed');
+    await vi.waitFor(() => expect(resolveHost).toBeTypeOf('function'));
+    const closing = manager.close();
+    resolveHost({ createEntry: vi.fn(), close });
+    await rejected;
+    await closing;
+    await manager.close();
     expect(close).toHaveBeenCalledTimes(1);
+    expect(() => manager.retainSession('late')).toThrow('manager is closed');
+    await expect(manager.createEntry({ sessionId: 'late' })).rejects.toThrow('manager is closed');
   });
 
   it('falls back once when the public bridge package is unavailable', async () => {

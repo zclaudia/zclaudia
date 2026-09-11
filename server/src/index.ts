@@ -7,6 +7,8 @@ import {
   activeRuns,
   connectedClients,
   cancelRun,
+  stopAcceptingRuns,
+  drainRunRequests,
 } from './server.js';
 import {
   autoDetectProviders,
@@ -109,7 +111,7 @@ async function main() {
   try {
     // Schema recovery (migrate-first, dev-only backup+reset on failure) lives in
     // initDatabase → withDevAutoReset; no pre-flight data-dir wipe here.
-    const serverContext = await createServer();
+    const serverContext = await createServer({ deferAgentRuntimes: true });
     const { server, connectGateway, disconnectGateway } = serverContext;
 
     const gatewayManager = new GatewayManager({
@@ -182,6 +184,11 @@ async function main() {
       const actualPort = (server.address() as import('net').AddressInfo).port;
       serverContext.setServerPort(actualPort);
       gatewayManager.setPort(actualPort);
+      console.log(`SERVER_LISTENING:${actualPort}`);
+      // The port is available for bridges, but readiness is announced only after
+      // shipped adapters have either registered or produced a visible error.
+      await pluginLoader.activateBuiltins();
+      serverContext.markAgentRuntimesReady();
       // Machine-readable line for embedded server port discovery
       console.log(`SERVER_READY:${actualPort}`);
       console.log(`🚀 ZClaudia Server running at http://${HOST}:${actualPort}`);
@@ -234,14 +241,25 @@ async function main() {
     });
 
     // Graceful shutdown
+    let shuttingDown = false;
     const shutdown = async () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
       console.log('\n🛑 Shutting down server...');
 
       // Disconnect from Gateway
+      stopAcceptingRuns();
       gatewayManager.shutdown();
 
-      // Deactivate all plugins (cleanup schedulers, event listeners, etc.)
-      await pluginLoader.deactivateAll();
+      // Stop accepting connections and cancel runs while their adapters and
+      // permission callbacks still exist. Deactivation must retain profiles.
+      server.close();
+      for (const runId of [...activeRuns.keys()]) cancelRun(runId);
+      await drainRunRequests();
+
+      // Deactivate all plugins (cleanup schedulers, event listeners, etc.).
+      // Force past RUNTIME_BUSY so a stuck run cannot hang process exit.
+      await pluginLoader.deactivateAll({ force: true });
       await closeAgentToolBridgeHost();
       skillWatcher.stop();
 
@@ -256,10 +274,8 @@ async function main() {
       // Close all browser sessions (Chromium pages + engine)
       await serverContext.browserManager.dispose().catch(() => {});
 
-      server.close(() => {
-        console.log('✅ Server closed');
-        process.exit(0);
-      });
+      console.log('✅ Server closed');
+      process.exit(0);
     };
 
     process.on('SIGINT', shutdown);

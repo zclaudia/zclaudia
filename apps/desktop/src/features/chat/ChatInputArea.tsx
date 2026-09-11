@@ -355,11 +355,20 @@ export function ChatInputArea({
           lockReason={isForcedPlanSession ? 'Locked by Supervisor planning mode' : undefined}
         />
       )}
-      <PermissionSelector
-        value={permissionOverride}
-        onChange={policy => onSetPermissionOverride(sessionId, policy)}
-        disabled={isLoading}
-      />
+      {capabilities?.supportsPermissionOverrides === false ? (
+        <span
+          className="text-[11px] text-muted-foreground"
+          title="Per-tool approvals are unavailable for this CLI. Use Plan or Ask mode for read-oriented tasks."
+        >
+          CLI permissions
+        </span>
+      ) : (
+        <PermissionSelector
+          value={permissionOverride}
+          onChange={policy => onSetPermissionOverride(sessionId, policy)}
+          disabled={isLoading}
+        />
+      )}
       {currentProject?.id && currentProject?.rootPath && (
         <WorktreeSelector
           projectId={currentProject.id}

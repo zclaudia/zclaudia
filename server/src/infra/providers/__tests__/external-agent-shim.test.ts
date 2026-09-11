@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { toExternalAgentRunContext, wrapExternalAgentAdapter } from '../external-agent-shim.js';
 import type { RunOptions } from '../types.js';
 import type { AgentRuntimeDescriptor, ExternalAgentAdapter } from '@zclaudia/shared/providers';
@@ -64,6 +64,33 @@ describe('toExternalAgentRunContext', () => {
 });
 
 describe('wrapExternalAgentAdapter', () => {
+  it.each(['complete', 'error', 'return'] as const)(
+    'releases the runtime lifecycle on %s',
+    async ending => {
+      const release = vi.fn();
+      const retain = vi.fn(() => release);
+      const ext: ExternalAgentAdapter = {
+        type: 'claude',
+        async *run() {
+          yield { type: 'assistant_delta', content: 'started' };
+          if (ending === 'error') throw new Error('provider failed');
+        },
+      };
+      const adapter = wrapExternalAgentAdapter(ext, descriptor, retain);
+      const options = { ...baseOptions(), claudiaSessionId: 'host-session' };
+      const stream = adapter.run('hi', options, async () => ({ behavior: 'allow' }));
+      await stream.next();
+      expect(retain).toHaveBeenCalledWith(
+        expect.objectContaining({ claudiaSessionId: 'host-session' })
+      );
+      expect(release).not.toHaveBeenCalled();
+      if (ending === 'return') await stream.return();
+      else if (ending === 'error') await expect(stream.next()).rejects.toThrow('provider failed');
+      else expect((await stream.next()).done).toBe(true);
+      expect(release).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('exposes descriptor manifest/policy and forwards run', async () => {
     const ext: ExternalAgentAdapter = {
       type: 'claude',

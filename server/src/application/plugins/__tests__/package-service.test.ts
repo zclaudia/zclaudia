@@ -103,6 +103,60 @@ describe('PluginPackageService', () => {
     return parsed.version;
   }
 
+  it.each(['claude', 'codex', 'cursor'])(
+    'reserves %s package identity and runtime even before discovery',
+    async runtime => {
+      for (const kind of ['same-id', 'same-runtime']) {
+        const candidate = {
+          ...manifest('1.0.0'),
+          id: kind === 'same-id' ? `com.zclaudia.${runtime}` : `external.${runtime}`,
+          ...(kind === 'same-runtime'
+            ? { contributes: { agentRuntimes: [{ type: runtime }] } }
+            : {}),
+        };
+        const archive = path.join(dataDir, `${kind}.zplugin`);
+        await writeFile(
+          archive,
+          buildZip([
+            { name: 'plugin.json', data: JSON.stringify(candidate) },
+            { name: 'dist/main.js', data: 'throw new Error("Must not execute")' },
+          ]).buffer
+        );
+        await expect(service.inspectPackage(archive, `${kind}.zplugin`)).rejects.toMatchObject({
+          status: 409,
+          code: kind === 'same-id' ? 'BUILTIN_PLUGIN' : 'BUILTIN_RUNTIME_RESERVED',
+        });
+      }
+      expect(loader.plugins.size).toBe(0);
+    }
+  );
+
+  it.each(
+    [null, 'codex', { type: 'codex' }, [null], [{ type: 42 }]].map(agentRuntimes => ({
+      agentRuntimes,
+    }))
+  )(
+    'rejects malformed runtime declarations before package preview: %j',
+    async ({ agentRuntimes }) => {
+      const archive = path.join(dataDir, 'malformed.zplugin');
+      await writeFile(
+        archive,
+        buildZip([
+          {
+            name: 'plugin.json',
+            data: JSON.stringify({ ...manifest('1.0.0'), contributes: { agentRuntimes } }),
+          },
+          { name: 'dist/main.js', data: 'throw new Error("Must not execute")' },
+        ]).buffer
+      );
+      await expect(service.inspectPackage(archive, 'malformed.zplugin')).rejects.toMatchObject({
+        status: 400,
+        code: 'INVALID_MANIFEST',
+      });
+      expect(loader.plugins.size).toBe(0);
+    }
+  );
+
   it('previews, installs, updates, rolls back, and uninstalls managed versions', async () => {
     const first = await createPackage('1.0.0');
     const firstPreview = await service.inspectPackage(first, 'plugin-1.0.0.zplugin');

@@ -21,6 +21,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { createHash } from 'crypto';
+import { stageBuiltinAgents } from '../../scripts/plugins/stage-builtin-agents.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const serverRoot = path.resolve(__dirname, '..');
@@ -281,6 +282,11 @@ await esbuild.build({
   },
 });
 
+// Dynamic plugin entrypoints are separate from server.mjs and must be shipped
+// with their runtime assets. Build them even for server-only release jobs.
+execSync('pnpm plugins:build', { cwd: repoRoot, stdio: 'inherit' });
+await stageBuiltinAgents(path.join(outDir, 'builtin-plugins'));
+
 // --- Standalone plugin scripts: not part of the esbuild bundle ---
 // Plugins are excluded from tsc (tsconfig "exclude"), so compile separately.
 {
@@ -321,8 +327,7 @@ await esbuild.build({
 }
 
 // The portable bridge's stdio proxy is launched as a separate child process,
-// so esbuild cannot fold it into server.mjs. Copy it beside the existing
-// standalone plugin scripts when the public package is installed.
+// so it needs its own bundle including the relative framing dependency.
 try {
   const bridgePackageRoot = resolvePackage('@zclaudia/agent-tool-bridge');
   const bridgeProxySource = path.join(bridgePackageRoot, 'dist', 'stdio-bridge.js');
@@ -332,7 +337,14 @@ try {
     'plugins',
     'agent-tool-bridge-stdio.js'
   );
-  copyFile(bridgeProxySource, bridgeProxyDestination);
+  await esbuild.build({
+    entryPoints: [bridgeProxySource],
+    outfile: bridgeProxyDestination,
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    target: 'node22',
+  });
   console.log(`    ${path.relative(outDir, bridgeProxyDestination)}: OK`);
 } catch (error) {
   const serverManifest = JSON.parse(fs.readFileSync(path.join(serverRoot, 'package.json'), 'utf8'));

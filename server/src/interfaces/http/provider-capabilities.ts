@@ -31,13 +31,18 @@ const CURSOR_CAPABILITIES: ProviderCapabilities = {
   modeLabel: 'Mode',
   defaultModeId: 'default',
   modes: [
-    { id: 'default', label: 'Default', description: 'Normal Cursor agent turns (--yolo)' },
+    {
+      id: 'default',
+      label: 'Default',
+      description: 'Cursor executes tools without per-tool approval',
+    },
     { id: 'plan', label: 'Plan', description: 'Cursor plan mode' },
     { id: 'ask', label: 'Ask', description: 'Cursor ask (read-oriented) mode' },
   ],
   modelLabel: 'Model',
   models: [],
   supportsAIReview: false,
+  supportsPermissionOverrides: false,
 };
 
 const CODEX_CAPABILITIES: ProviderCapabilities = {

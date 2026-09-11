@@ -53,6 +53,7 @@ export function PluginsContent() {
   const isMobile = useIsMobile();
 
   const plugins = usePluginStore(s => s.plugins);
+  const operationError = usePluginStore(s => s.error);
   const setError = usePluginStore(s => s.setError);
   const disabledBuiltinPanels = usePluginStore(s => s.disabledBuiltinPanels);
   const toggleBuiltinPanel = usePluginStore(s => s.toggleBuiltinPanel);
@@ -108,13 +109,15 @@ export function PluginsContent() {
 
   const refreshPlugins = useCallback(async () => {
     await fetchAndSyncPlugins();
-  }, []);
+    setError(null);
+  }, [setError]);
 
   const toggleInstalled = useCallback(
     async (pluginId: string) => {
       const plugin = plugins.find(p => p.manifest.id === pluginId);
       if (!plugin) return;
       const action = plugin.status === 'active' ? 'deactivate' : 'activate';
+      setError(null);
       try {
         await setPluginActive(pluginId, action);
         await fetchAndSyncPlugins();
@@ -135,31 +138,40 @@ export function PluginsContent() {
     );
   }
 
-  if (view.tab === 'built-in') {
-    return (
-      <PluginsBrowseView
-        title="Built-in"
-        models={builtinModels}
-        kind="Built-in"
-        onToggle={toggleBuiltinPanel}
-        emptyText="No built-in panels."
-        searchPlaceholder="Search built-in…"
-      />
-    );
-  }
+  const isBuiltinTab = view.tab === 'built-in';
+  const runtimeModels = installedModels.filter(model => model.source === 'builtin');
 
-  // Installed plugins tab.
   return (
     <>
+      {operationError && (
+        <div
+          role="alert"
+          className="mx-4 mt-3 rounded-lg border border-destructive/30 p-3 text-xs text-destructive"
+        >
+          {operationError}
+        </div>
+      )}
       <PluginsBrowseView
-        title="Plugins"
-        models={installedModels}
-        kind="Installed"
-        onToggle={toggleInstalled}
-        emptyText="No plugins installed. Install a .zplugin package to get started."
-        searchPlaceholder="Search plugins…"
-        onAddDirectory={() => setDirsOpen(true)}
-        onInstallPlugin={() => setInstallOpen(true)}
+        title={isBuiltinTab ? 'Built-in' : 'Plugins'}
+        models={
+          isBuiltinTab
+            ? [...runtimeModels, ...builtinModels]
+            : installedModels.filter(model => model.source !== 'builtin')
+        }
+        kind={isBuiltinTab ? 'Built-in' : 'Installed'}
+        onToggle={id => {
+          if (runtimeModels.some(model => model.id === id) || !isBuiltinTab)
+            void toggleInstalled(id);
+          else toggleBuiltinPanel(id);
+        }}
+        emptyText={
+          isBuiltinTab
+            ? 'No built-in plugins.'
+            : 'No plugins installed. Install a .zplugin package to get started.'
+        }
+        searchPlaceholder={isBuiltinTab ? 'Search built-in…' : 'Search plugins…'}
+        onAddDirectory={isBuiltinTab ? undefined : () => setDirsOpen(true)}
+        onInstallPlugin={isBuiltinTab ? undefined : () => setInstallOpen(true)}
       />
       <Modal
         open={dirsOpen}

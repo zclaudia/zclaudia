@@ -24,7 +24,8 @@ export function toExternalAgentRunContext(options: RunOptions): ExternalAgentRun
 
 export function wrapExternalAgentAdapter(
   ext: ExternalAgentAdapter,
-  descriptor: AgentRuntimeDescriptor
+  descriptor: AgentRuntimeDescriptor,
+  onRunStart?: (context: ExternalAgentRunContext) => () => void
 ): ProviderAdapter {
   if (ext.type !== descriptor.type) {
     throw new Error(
@@ -36,7 +37,13 @@ export function wrapExternalAgentAdapter(
     manifest: descriptor.manifest,
     policy: descriptor.policy,
     async *run(input, options, onPermission) {
-      yield* ext.run(input, toExternalAgentRunContext(options), onPermission);
+      const context = toExternalAgentRunContext(options);
+      const release = onRunStart?.(context);
+      try {
+        yield* ext.run(input, context, onPermission);
+      } finally {
+        release?.();
+      }
     },
     abort: ext.abort ? (sessionId, cwd) => ext.abort!(sessionId, cwd) : undefined,
     getRunState: ext.getRunState

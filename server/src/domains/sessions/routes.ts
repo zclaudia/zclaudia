@@ -23,7 +23,7 @@ import { buildContextGraph } from './context-graph-read.js';
 import { sendApiError } from '../../interfaces/http/response.js';
 import { NoAgentAvailableError } from '../agent-profiles/agent-resolver.js';
 import { requestSessionTitleGeneration } from '../../application/conversation/title/request-session-title.js';
-import { resolveAgentReadinessForSession } from '../agent-readiness/check.js';
+import { resolveAgentReadinessForSessionWithRuntimeCheck } from '../agent-readiness/check.js';
 import type { ActiveRun } from '../../application/conversation/transport/types.js';
 
 type ActiveRunsMap = Map<string, ActiveRun>;
@@ -235,13 +235,13 @@ export function createSessionRoutes(
   });
 
   // Create session
-  router.post('/', (req: Request, res: Response) => {
+  router.post('/', async (req: Request, res: Response) => {
     try {
       const requestedType = req.body?.type;
       const sessionType =
         requestedType === 'background' || requestedType === 'agent' ? requestedType : 'regular';
       if (sessionType === 'regular') {
-        const readiness = resolveAgentReadinessForSession(db, {
+        const readiness = await resolveAgentReadinessForSessionWithRuntimeCheck(db, {
           explicitAgentId:
             typeof req.body?.agentProfileId === 'string' ? req.body.agentProfileId : undefined,
           projectId: typeof req.body?.projectId === 'string' ? req.body.projectId : undefined,

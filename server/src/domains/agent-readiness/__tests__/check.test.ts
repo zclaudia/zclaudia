@@ -8,7 +8,7 @@ import { registerClaudeTestRuntime } from '../../../test/claude-runtime-fixture.
 
 // The claude runtime ships as a plugin; simulate it being active so its native
 // (no-llm-profile) readiness path is exercised.
-registerClaudeTestRuntime();
+registerClaudeTestRuntime({ adapter: true });
 
 let db: Database.Database;
 const SAVED: Record<string, string | undefined> = {};

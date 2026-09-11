@@ -25,7 +25,10 @@ import type { CommandHandler as ServerCommandHandler } from '../commands/registr
 import { providerRegistry } from '../../infra/providers/registry.js';
 import { runtimeDescriptorRegistry } from '../../infra/providers/runtime-descriptor-registry.js';
 import { wrapExternalAgentAdapter } from '../../infra/providers/external-agent-shim.js';
-import { createAgentToolBridgeEntry } from './agent-tool-bridge-host.js';
+import {
+  createAgentToolBridgeEntry,
+  retainAgentToolBridgeSession,
+} from './agent-tool-bridge-host.js';
 import { managedRuntimeService } from '../managed-runtimes/service.js';
 
 type PluginDatabase = Database.Database;
@@ -38,6 +41,8 @@ export interface PluginContextOptions {
   db: PluginDatabase | null;
   broadcast: ((msg: ServerMessage) => void) | null;
   pluginAPIs: Map<string, unknown>;
+  /** Granted by the host for a verified built-in module, never persisted by plugin ID. */
+  builtinPermissions?: readonly Permission[];
 }
 
 /**
@@ -49,6 +54,9 @@ export interface PluginContextOptions {
 export function createPluginContext(options: PluginContextOptions): RuntimePluginContext {
   const { pluginId, instance, db, broadcast, pluginAPIs } = options;
   const manifest = instance?.manifest;
+  const hasPermission = (permission: Permission): boolean =>
+    options.builtinPermissions?.includes(permission) === true ||
+    permissionManager.hasPermission(pluginId, permission);
 
   return {
     pluginId,
@@ -164,7 +172,7 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
 
     permissions: {
       hasPermission: (permission: Permission): boolean => {
-        return permissionManager.hasPermission(pluginId, permission);
+        return hasPermission(permission);
       },
       hasAllPermissions: (permissions: Permission[]): boolean => {
         return permissionManager.hasAllPermissions(pluginId, permissions);
@@ -184,17 +192,17 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
 
     // File System API (requires fs.read / fs.write permissions)
     fs: (() => {
-      const hasRead = permissionManager.hasPermission(pluginId, 'fs.read' as Permission);
-      const hasWrite = permissionManager.hasPermission(pluginId, 'fs.write' as Permission);
+      const hasRead = hasPermission('fs.read' as Permission);
+      const hasWrite = hasPermission('fs.write' as Permission);
       if (!hasRead && !hasWrite) return undefined;
       return {
         readFile: async (filePath: string): Promise<string> => {
-          if (!permissionManager.hasPermission(pluginId, 'fs.read' as Permission))
+          if (!hasPermission('fs.read' as Permission))
             throw new Error('Permission denied: fs.read');
           return fs.promises.readFile(filePath, 'utf-8');
         },
         writeFile: async (filePath: string, content: string): Promise<void> => {
-          if (!permissionManager.hasPermission(pluginId, 'fs.write' as Permission))
+          if (!hasPermission('fs.write' as Permission))
             throw new Error('Permission denied: fs.write');
           await fs.promises.writeFile(filePath, content, 'utf-8');
         },
@@ -202,17 +210,17 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
           return fs.existsSync(filePath);
         },
         readdir: async (dirPath: string): Promise<string[]> => {
-          if (!permissionManager.hasPermission(pluginId, 'fs.read' as Permission))
+          if (!hasPermission('fs.read' as Permission))
             throw new Error('Permission denied: fs.read');
           return fs.promises.readdir(dirPath);
         },
         mkdir: async (dirPath: string): Promise<void> => {
-          if (!permissionManager.hasPermission(pluginId, 'fs.write' as Permission))
+          if (!hasPermission('fs.write' as Permission))
             throw new Error('Permission denied: fs.write');
           await fs.promises.mkdir(dirPath, { recursive: true });
         },
         unlink: async (filePath: string): Promise<void> => {
-          if (!permissionManager.hasPermission(pluginId, 'fs.write' as Permission))
+          if (!hasPermission('fs.write' as Permission))
             throw new Error('Permission denied: fs.write');
           await fs.promises.unlink(filePath);
         },
@@ -220,13 +228,13 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
     })(),
 
     // Network API (requires network.fetch permission)
-    network: permissionManager.hasPermission(pluginId, 'network.fetch' as Permission)
+    network: hasPermission('network.fetch' as Permission)
       ? {
           fetch: async (
             url: string,
             options?: Record<string, unknown>
           ): Promise<{ ok: boolean; status: number; body: string }> => {
-            if (!permissionManager.hasPermission(pluginId, 'network.fetch' as Permission))
+            if (!hasPermission('network.fetch' as Permission))
               throw new Error('Permission denied: network.fetch');
             const response = await globalThis.fetch(url, options as RequestInit);
             const body = await response.text();
@@ -236,14 +244,14 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
       : undefined,
 
     // Shell API (requires shell.execute permission)
-    shell: permissionManager.hasPermission(pluginId, 'shell.execute' as Permission)
+    shell: hasPermission('shell.execute' as Permission)
       ? {
           execute: async (
             command: string,
             args?: string[],
             execOptions?: { cwd?: string }
           ): Promise<{ stdout: string; stderr: string; code: number }> => {
-            if (!permissionManager.hasPermission(pluginId, 'shell.execute' as Permission))
+            if (!hasPermission('shell.execute' as Permission))
               throw new Error('Permission denied: shell.execute');
             const { execFile } = await import('child_process');
             return new Promise(resolve => {
@@ -260,14 +268,14 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
       : undefined,
 
     // Notification API (requires notification permission)
-    notification: permissionManager.hasPermission(pluginId, 'notification' as Permission)
+    notification: hasPermission('notification' as Permission)
       ? {
           show: async (
             title: string,
             body: string,
             notificationOptions?: { notchTab?: string }
           ): Promise<void> => {
-            if (!permissionManager.hasPermission(pluginId, 'notification' as Permission))
+            if (!hasPermission('notification' as Permission))
               throw new Error('Permission denied: notification');
             const notchTab = notificationOptions?.notchTab
               ? `${pluginId}/${notificationOptions.notchTab}`
@@ -281,7 +289,7 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
       : undefined,
 
     // Scheduler API (requires timer permission)
-    scheduler: permissionManager.hasPermission(pluginId, 'timer' as Permission)
+    scheduler: hasPermission('timer' as Permission)
       ? {
           register: (
             task: { id: string; name: string; intervalMs: number; immediate?: boolean },
@@ -307,8 +315,8 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
 
     // Clipboard API (requires clipboard.read / clipboard.write permissions)
     clipboard: (() => {
-      const hasRead = permissionManager.hasPermission(pluginId, 'clipboard.read' as Permission);
-      const hasWrite = permissionManager.hasPermission(pluginId, 'clipboard.write' as Permission);
+      const hasRead = hasPermission('clipboard.read' as Permission);
+      const hasWrite = hasPermission('clipboard.write' as Permission);
       if (!hasRead && !hasWrite) return undefined;
       return {
         read: async (): Promise<string> => {
@@ -322,7 +330,7 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
 
     // Session API (requires session.read permission)
     session:
-      permissionManager.hasPermission(pluginId, 'session.read' as Permission) && db
+      hasPermission('session.read' as Permission) && db
         ? {
             getActive: async () => null,
             getById: async (id: string) => {
@@ -346,7 +354,7 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
 
     // Project API (requires project.read permission)
     project:
-      permissionManager.hasPermission(pluginId, 'project.read' as Permission) && db
+      hasPermission('project.read' as Permission) && db
         ? {
             getActive: async () => null,
             getById: async (id: string) => {
@@ -367,13 +375,10 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
         : undefined,
 
     // Provider API (requires provider.call permission)
-    providers:
-      db && permissionManager.hasPermission(pluginId, 'provider.call')
-        ? createProviderAPI(db, pluginId)
-        : undefined,
+    providers: db && hasPermission('provider.call') ? createProviderAPI(db, pluginId) : undefined,
 
     // External-agent runtime registration (requires provider.register permission)
-    agentRuntimes: permissionManager.hasPermission(pluginId, 'provider.register')
+    agentRuntimes: hasPermission('provider.register')
       ? {
           register: (adapter: ExternalAgentAdapter) => {
             const descriptor = runtimeDescriptorRegistry.get(adapter.type);
@@ -384,7 +389,9 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
             }
             providerRegistry.registerPluginAdapter(
               pluginId,
-              wrapExternalAgentAdapter(adapter, descriptor)
+              wrapExternalAgentAdapter(adapter, descriptor, context =>
+                retainAgentToolBridgeSession(context.claudiaSessionId)
+              )
             );
             broadcast?.({ type: 'agent_runtimes_changed' });
           },
@@ -400,7 +407,7 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
 
     // Host-owned managed runtime API. The calling plugin can select only its
     // own statically registered descriptor; it cannot supply a URL or hash.
-    managedRuntimes: permissionManager.hasPermission(pluginId, 'provider.register')
+    managedRuntimes: hasPermission('provider.register')
       ? {
           resolve: async (request: {
             runtime: string;
@@ -418,7 +425,7 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
 
     // MCP API (requires network.fetch permission; operates through server-side manager)
     mcp:
-      permissionManager.hasPermission(pluginId, 'network.fetch') && db
+      hasPermission('network.fetch') && db
         ? {
             listServers: async () => {
               const rows = db

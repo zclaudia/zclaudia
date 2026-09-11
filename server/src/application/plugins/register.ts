@@ -12,6 +12,8 @@ import {
 import type { ActiveRun } from '../../application/conversation/transport/types.js';
 import { pluginEvents } from '../../infra/events/index.js';
 import { permissionManager as pluginPermissionManager } from './permissions.js';
+import { configureRuntimeReadinessInspector } from '../../domains/agent-readiness/check.js';
+import { managedRuntimeService } from '../managed-runtimes/service.js';
 import { isTerminalPhase } from '../conversation/runtime/active-run-phase.js';
 
 type ActiveRunsMap = Map<string, ActiveRun>;
@@ -36,6 +38,19 @@ export function registerPluginsDomain(deps: PluginsDomainDeps): void {
     clients,
     broadcastPluginState,
   } = deps;
+
+  configureRuntimeReadinessInspector(agent =>
+    managedRuntimeService.resolveForRuntime(agent.runtimeType!, {
+      explicitPath: agent.cliPath,
+      allowAutoInstall: false,
+    })
+  );
+
+  pluginLoader.setRuntimeBusyChecker(runtime =>
+    [...activeRuns.values()].some(
+      run => !isTerminalPhase(run.phase) && run.providerType === runtime
+    )
+  );
 
   const toolCatalogDeps = {
     getActiveProfile: (sessionId: string) => {

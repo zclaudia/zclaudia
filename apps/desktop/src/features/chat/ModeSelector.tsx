@@ -55,6 +55,7 @@ export function ModeSelector({
         locked={locked}
         lockReason={lockReason}
         title={title}
+        ariaLabel="Agent mode"
         ariaHasPopup="listbox"
         ariaExpanded={open}
       >

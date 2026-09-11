@@ -1,5 +1,5 @@
 import type { Permission } from '@zclaudia/shared/plugin-types';
-import { pluginLoader } from './loader.js';
+import { pluginLoader, PluginRuntimeBusyError } from './loader.js';
 import { permissionManager } from './permissions.js';
 import { toolRegistry } from './tool-registry.js';
 import { commandRegistry } from '../commands/registry.js';
@@ -85,6 +85,15 @@ export class PluginManagementService {
         path: plugin.path,
         panels,
         ...packageInfo,
+        ...(this.loader.isBuiltin?.(plugin.manifest.id)
+          ? {
+              source: 'builtin' as const,
+              enabled: this.loader.isBuiltinEnabled(plugin.manifest.id),
+              canRollback: false,
+              availableVersions: [],
+              shadowedPaths: this.loader.getShadowedPaths(plugin.manifest.id),
+            }
+          : {}),
       };
     });
   }
@@ -100,18 +109,24 @@ export class PluginManagementService {
         plugin?.error || 'Activation failed'
       );
     }
+    this.loader.setBuiltinEnabled?.(id, true);
     return { activated: true };
   }
 
   async deactivatePlugin(id: string): Promise<{ deactivated: true }> {
     this.assertPluginExists(id);
-    await this.loader.deactivate(id);
+    this.assertNotBusy(id);
+    if (!(await this.runLifecycle(() => this.loader.deactivate(id)))) {
+      throw new PluginManagementError(400, 'DEACTIVATION_FAILED', 'Failed to stop plugin');
+    }
+    this.loader.setBuiltinEnabled?.(id, false);
     return { deactivated: true };
   }
 
   async reloadPlugin(id: string): Promise<{ reloaded: true }> {
     this.assertPluginExists(id);
-    const result = await this.loader.reload(id);
+    this.assertNotBusy(id);
+    const result = await this.runLifecycle(() => this.loader.reload(id));
     if (!result) {
       const plugin = this.loader.getPlugin(id);
       throw new PluginManagementError(400, 'RELOAD_FAILED', plugin?.error || 'Reload failed');
@@ -166,6 +181,8 @@ export class PluginManagementService {
 
   async removePlugin(id: string): Promise<{ removed: true }> {
     this.assertPluginExists(id);
+    this.assertMutable(id);
+    this.assertNotBusy(id);
     const plugin = this.loader.getPlugin(id);
     if (!plugin) {
       throw new PluginManagementError(404, 'NOT_FOUND', `Plugin not found: ${id}`);
@@ -181,6 +198,8 @@ export class PluginManagementService {
 
   async rollbackPlugin(id: string, version?: unknown) {
     this.assertPluginExists(id);
+    this.assertMutable(id);
+    this.assertNotBusy(id);
     if (version !== undefined && typeof version !== 'string') {
       throw new PluginManagementError(400, 'INVALID_INPUT', 'version must be a string');
     }
@@ -191,6 +210,8 @@ export class PluginManagementService {
     const manifests = await this.loader.discover();
     for (const manifest of manifests) {
       const plugin = this.loader.getPlugin(manifest.id);
+      if (this.loader.isBuiltin?.(manifest.id) && !this.loader.isBuiltinEnabled(manifest.id))
+        continue;
       if (plugin && !plugin.isActive) {
         this.loader.activate(manifest.id).catch(() => {});
       }
@@ -201,6 +222,36 @@ export class PluginManagementService {
   private assertPluginExists(id: string): void {
     if (!this.loader.hasPlugin(id)) {
       throw new PluginManagementError(404, 'NOT_FOUND', `Plugin not found: ${id}`);
+    }
+  }
+
+  private assertMutable(id: string): void {
+    if (this.loader.isBuiltin?.(id)) {
+      throw new PluginManagementError(
+        409,
+        'BUILTIN_PLUGIN',
+        'Built-in plugins are updated with the application'
+      );
+    }
+  }
+
+  private async runLifecycle<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (error instanceof PluginRuntimeBusyError)
+        throw new PluginManagementError(409, 'RUNTIME_BUSY', error.message);
+      throw error;
+    }
+  }
+
+  private assertNotBusy(id: string): void {
+    if (this.loader.isBusy?.(id)) {
+      throw new PluginManagementError(
+        409,
+        'RUNTIME_BUSY',
+        'Stop active runs before changing this runtime'
+      );
     }
   }
 

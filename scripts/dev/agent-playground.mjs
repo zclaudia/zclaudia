@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -128,7 +129,7 @@ Options:
   --host-port <port>  Lightweight Dev Host port (default: 4310)
   --ui-port <port>    Playground Vite port (default: 4311)
   --no-build          Skip the initial plugin build
-  --no-watch          Disable plugin TypeScript watch and automatic reload
+  --no-watch          Disable plugin build watch and automatic reload
   --no-open           Do not open the Playground in a browser
   --help, -h          Show this help`);
 }
@@ -202,20 +203,24 @@ try {
   children.push(host);
 
   if (options.watch) {
-    const compiler = spawnChild(
-      'pnpm',
-      [
-        '--dir',
-        options.pluginPath,
-        'exec',
-        'tsc',
-        '-p',
-        'tsconfig.json',
-        '--watch',
-        '--preserveWatchOutput',
-      ],
-      { cwd: options.pluginPath }
+    const manifest = JSON.parse(
+      readFileSync(path.join(options.pluginPath, 'package.json'), 'utf8')
     );
+    // Bundled runtime packages must watch through their bundler so changes in
+    // agent-common are included in the entry the host actually loads.
+    const watchArgs = manifest.scripts?.dev
+      ? ['--dir', options.pluginPath, 'run', 'dev']
+      : [
+          '--dir',
+          options.pluginPath,
+          'exec',
+          'tsc',
+          '-p',
+          'tsconfig.json',
+          '--watch',
+          '--preserveWatchOutput',
+        ];
+    const compiler = spawnChild('pnpm', watchArgs, { cwd: options.pluginPath });
     children.push(compiler);
   }
 

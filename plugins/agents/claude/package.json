@@ -1,0 +1,51 @@
+{
+  "name": "@zclaudia/plugin-claude",
+  "version": "0.1.0",
+  "description": "Claude Agent SDK runtime plugin for ZClaudia.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/main.js",
+  "types": "./dist/main.d.ts",
+  "files": [
+    "dist",
+    "plugin.json",
+    "runtime-compatibility.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "import": "./dist/main.js"
+    },
+    "./plugin.json": "./plugin.json",
+    "./runtime-compatibility.json": "./runtime-compatibility.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --emitDeclarationOnly && node ../../../scripts/plugins/build-agent.mjs claude",
+    "clean": "rm -rf dist coverage",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pack:check": "npm pack --dry-run",
+    "dev": "node ../../../scripts/plugins/build-agent.mjs claude --watch"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zclaudia/zclaudia.git",
+    "directory": "plugins/agents/claude"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.104",
+    "@zclaudia/plugin-sdk": "^0.1.0"
+  },
+  "devDependencies": {
+    "@zclaudia/agent-common": "workspace:*",
+    "typescript": "^5.9.3",
+    "@types/node": "^22.13.10",
+    "vitest": "^4.1.8"
+  },
+  "private": true
+}

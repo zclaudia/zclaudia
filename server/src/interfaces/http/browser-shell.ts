@@ -14,6 +14,8 @@ function defaultRepoRoot(): string {
 }
 
 export function resolveBrowserShellDist(options: BrowserShellOptions = {}): string {
+  const distOverride = (options.env ?? process.env).ZCLAUDIA_BROWSER_DIST;
+  if (distOverride) return path.resolve(distOverride);
   const repoRoot = options.repoRoot ?? defaultRepoRoot();
   return path.join(repoRoot, 'apps/desktop/dist');
 }

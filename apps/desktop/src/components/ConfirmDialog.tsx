@@ -3,6 +3,7 @@
 // from anywhere — including popped-out standalone windows.
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useConfirmDialogStore } from '../stores/confirmDialogStore';
 import { trapTab } from '../utils/focusTrap';
 
@@ -46,9 +47,11 @@ export function ConfirmDialog() {
     }
   };
 
-  return (
+  // Confirmations may be opened from a portalled modal. Render above that
+  // modal, outside the window shell's stacking context, so buttons stay usable.
+  return createPortal(
     <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]"
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-[200]"
       onMouseDown={e => {
         // Backdrop click cancels; ignore clicks that bubble from the panel.
         if (e.target === e.currentTarget) cancel();
@@ -103,6 +106,7 @@ export function ConfirmDialog() {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

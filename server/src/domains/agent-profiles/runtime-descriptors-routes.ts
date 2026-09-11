@@ -2,6 +2,8 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { runtimeDescriptorRegistry } from '../../infra/providers/runtime-descriptor-registry.js';
+import { pluginLoader } from '../../application/plugins/loader.js';
+import { providerRegistry } from '../../infra/providers/registry.js';
 
 export interface AgentRuntimeSummary {
   runtime: string;
@@ -26,10 +28,17 @@ export function createRuntimeDescriptorRoutes(): Router {
 
   router.get('/', (_req: Request, res: Response) => {
     try {
-      const data: AgentRuntimeSummary[] = runtimeDescriptorRegistry.list().map(d => ({
+      const descriptors = new Map(runtimeDescriptorRegistry.list().map(d => [d.type, d]));
+      for (const plugin of pluginLoader.getPlugins()) {
+        if (!pluginLoader.isBuiltin(plugin.manifest.id)) continue;
+        for (const descriptor of plugin.manifest.contributes?.agentRuntimes ?? []) {
+          if (!descriptors.has(descriptor.type)) descriptors.set(descriptor.type, descriptor);
+        }
+      }
+      const data: AgentRuntimeSummary[] = [...descriptors.values()].map(d => ({
         runtime: d.type,
         label: d.label,
-        enabled: true,
+        enabled: providerRegistry.hasType(d.type),
         model: d.model,
         hasCliPath: d.hasCliPath,
         capabilities: d.capabilities,

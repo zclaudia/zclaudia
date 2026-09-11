@@ -35,6 +35,7 @@ import { isLocalhost } from './interfaces/http/middleware/local-only.js';
 import { expressErrorHandler } from './interfaces/http/middleware/express-error.js';
 import { createCorsOriginGuard, isRequestOriginAllowed } from './interfaces/http/trust-boundary.js';
 import { mountBrowserShell } from './interfaces/http/browser-shell.js';
+import { RUNTIME_INITIALIZING_ERROR } from './interfaces/http/middleware/runtime-initialization.js';
 
 // Extracted modules
 import type { ConnectedClient, MessageSender } from './application/conversation/transport/types.js';
@@ -62,6 +63,27 @@ import { serverState } from './server-state.js';
 // Expose activeRuns and connectedClients as module-level references for backward compatibility
 const activeRuns = serverState.activeRuns;
 let connectedClients = serverState.connectedClients;
+let acceptingRuns = true;
+let agentRuntimesReady = true;
+const runningRequests = new Set<Promise<void>>();
+
+export function stopAcceptingRuns(): void {
+  acceptingRuns = false;
+}
+
+export async function drainRunRequests(timeoutMs = 3000): Promise<void> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      Promise.allSettled([...runningRequests]),
+      new Promise<void>(resolve => {
+        timeout = setTimeout(resolve, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
 
 // Re-exports for backward compatibility
 export type { ConnectedClient, MessageSender };
@@ -93,9 +115,14 @@ export interface ServerContext {
   setGatewayDisconnector: (disconnector: () => Promise<void>) => void;
   setServerPort: (port: number) => void;
   setFacadeHub: (hub: FacadeWsHub | null) => void;
+  markAgentRuntimesReady: () => void;
 }
 
-export async function createServer(): Promise<ServerContext> {
+export async function createServer(
+  options: { deferAgentRuntimes?: boolean } = {}
+): Promise<ServerContext> {
+  acceptingRuns = true;
+  agentRuntimesReady = !options.deferAgentRuntimes;
   // Initialize database
   const db = initDatabase();
   serverState.database = db;
@@ -158,6 +185,7 @@ export async function createServer(): Promise<ServerContext> {
     db,
     app,
     router,
+    areAgentRuntimesReady: () => agentRuntimesReady,
     clients,
     activeRuns,
     buildStateHeartbeat: () => serverState.buildStateHeartbeat(),
@@ -215,6 +243,19 @@ export async function createServer(): Promise<ServerContext> {
     }
 
     const url = req.url || '';
+    if (
+      !agentRuntimesReady &&
+      (url === '/ws' ||
+        url.startsWith('/ws?') ||
+        url === '/ws/backend-facade' ||
+        url.startsWith('/ws/backend-facade?'))
+    ) {
+      const body = JSON.stringify({ success: false, error: RUNTIME_INITIALIZING_ERROR });
+      socket.end(
+        `HTTP/1.1 503 Service Unavailable\r\nRetry-After: 1\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(body)}\r\nConnection: close\r\n\r\n${body}`
+      );
+      return;
+    }
     if (url === '/ws' || url.startsWith('/ws?')) {
       wss.handleUpgrade(req, socket, head, ws => {
         wss.emit('connection', ws, req);
@@ -410,6 +451,9 @@ export async function createServer(): Promise<ServerContext> {
 
   return {
     server,
+    markAgentRuntimesReady: () => {
+      agentRuntimesReady = true;
+    },
     db,
     terminalManager,
     browserManager,
@@ -512,7 +556,19 @@ async function handleRunStart(
   recoveryState: { sessionResetRetryCount?: number } = {},
   clients?: Map<string, ConnectedClient>
 ): Promise<void> {
-  return _handleRunStart(
+  if (!acceptingRuns) {
+    sendMessage(client.ws, {
+      type: 'error',
+      code: 'SERVER_SHUTTING_DOWN',
+      message: 'The server is shutting down. Reconnect before starting another run.',
+    });
+    return;
+  }
+  if (!agentRuntimesReady) {
+    sendMessage(client.ws, { type: 'error', ...RUNTIME_INITIALIZING_ERROR });
+    return;
+  }
+  const request = _handleRunStart(
     client,
     message,
     db,
@@ -520,4 +576,10 @@ async function handleRunStart(
     clients,
     serverState.getRunHandlerContext()
   );
+  runningRequests.add(request);
+  try {
+    await request;
+  } finally {
+    runningRequests.delete(request);
+  }
 }

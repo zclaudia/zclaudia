@@ -21,7 +21,7 @@ import {
   buildProjectPatch,
   isProjectValidationError,
 } from './model.js';
-import { resolveAgentReadinessForSession } from '../agent-readiness/check.js';
+import { resolveAgentReadinessForSessionWithRuntimeCheck } from '../agent-readiness/check.js';
 import { sendApiError } from '../../interfaces/http/response.js';
 
 export type ProjectChangeEvent =
@@ -107,10 +107,15 @@ export function createProjectRoutes(
     }
   });
 
-  router.post('/', (req: Request, res: Response) => {
+  router.post('/', async (req: Request, res: Response) => {
     try {
       if (repo.hasAgentReadinessSchema()) {
-        const readiness = resolveAgentReadinessForSession(db, {});
+        const readiness = await resolveAgentReadinessForSessionWithRuntimeCheck(db, {
+          explicitAgentId:
+            typeof req.body?.defaultAgentProfileId === 'string'
+              ? req.body.defaultAgentProfileId
+              : undefined,
+        });
         if (!readiness.usable) {
           sendApiError(
             res,

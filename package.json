@@ -5,7 +5,7 @@
   "description": "A cross-platform shell for a zclaudia-owned coding agent",
   "type": "module",
   "scripts": {
-    "predev": "bash scripts/dev/ensure-deps.sh",
+    "predev": "bash scripts/dev/ensure-deps.sh && pnpm plugins:build",
     "dev": "bash scripts/with-project-node.sh pnpm -r --parallel run dev",
     "start:clean": "bash scripts/dev/start-app-clean.sh",
     "build": "bash scripts/with-project-node.sh pnpm -r run build",
@@ -14,7 +14,7 @@
     "gateway:dev": "pnpm --dir ../zclaudia-gateway run dev",
     "desktop:dev": "bash scripts/with-project-node.sh pnpm --filter @zclaudia/desktop run dev",
     "agent:playground": "bash scripts/with-project-node.sh node scripts/dev/agent-playground.mjs",
-    "browser:build": "bash scripts/with-project-node.sh pnpm --filter @zclaudia/shared run build && bash scripts/with-project-node.sh pnpm --filter @zclaudia/server run build && bash scripts/with-project-node.sh pnpm --filter @zclaudia/desktop run build",
+    "browser:build": "pnpm plugins:build && bash scripts/with-project-node.sh pnpm --filter @zclaudia/shared run build && bash scripts/with-project-node.sh pnpm --filter @zclaudia/server run build && bash scripts/with-project-node.sh pnpm --filter @zclaudia/desktop run build",
     "browser:start": "bash scripts/with-project-node.sh pnpm --filter @zclaudia/server run start",
     "browser:service": "bash scripts/deploy/browser-service.sh",
     "build:macos": "bash scripts/build/macos.sh",
@@ -50,7 +50,22 @@
     "test:utils": "bash scripts/with-project-node.sh node scripts/dev/test-file-by-file.mjs \"apps/desktop/src/utils\"",
     "canary:managed-runtime": "bash scripts/with-project-node.sh pnpm --filter @zclaudia/shared build && bash scripts/with-project-node.sh pnpm --filter @zclaudia/server build && bash scripts/with-project-node.sh node scripts/dev/canary-managed-runtime.mjs",
     "preinstall": "node scripts/hooks/ensure-node-version.mjs",
-    "postinstall": "bash scripts/with-project-node.sh node scripts/hooks/check-native-modules.mjs && node scripts/hooks/install-git-hooks.mjs"
+    "postinstall": "bash scripts/with-project-node.sh node scripts/hooks/check-native-modules.mjs && node scripts/hooks/install-git-hooks.mjs",
+    "plugins:build": "bash scripts/with-project-node.sh pnpm --filter \"@zclaudia/plugin-*\" run build",
+    "plugins:test": "bash scripts/with-project-node.sh pnpm --filter @zclaudia/agent-common --filter \"@zclaudia/plugin-*\" run test",
+    "plugins:compat": "bash scripts/with-project-node.sh node scripts/plugins/test-runtime-compatibility.mjs",
+    "preserver:dev": "pnpm plugins:build",
+    "preserver:dev:isolated": "pnpm plugins:build",
+    "plugins:stage": "bash scripts/with-project-node.sh node scripts/plugins/stage-builtin-agents.mjs",
+    "test:e2e:agent-runtimes": "pnpm browser:build && bash scripts/with-project-node.sh pnpm exec playwright test --config e2e/playwright.agent-runtimes.config.ts",
+    "plugins:check": "bash scripts/with-project-node.sh node scripts/plugins/check-boundaries.mjs",
+    "plugins:verify": "bash scripts/with-project-node.sh node scripts/plugins/verify-builtin-agents.mjs",
+    "test:e2e:agent-runtimes:artifacts": "pnpm browser:build && bash scripts/with-project-node.sh node server/scripts/bundle.mjs && bash scripts/with-project-node.sh pnpm exec playwright test --config e2e/playwright.agent-runtime-artifacts.config.ts",
+    "test:e2e:agent-runtimes:bundle": "bash scripts/with-project-node.sh node scripts/dev/test-builtin-runtime-bundle.mjs",
+    "test:e2e:agent-runtimes:gateway": "pnpm browser:build && bash scripts/with-project-node.sh pnpm exec playwright test --config e2e/playwright.agent-runtime-gateway.config.ts",
+    "test:e2e:agent-runtimes:migration": "pnpm browser:build && bash scripts/with-project-node.sh pnpm exec playwright test --config e2e/playwright.agent-runtimes.config.ts migration",
+    "test:e2e:agent-runtimes:live": "bash scripts/with-project-node.sh node scripts/dev/test-builtin-runtime-live.mjs",
+    "test:e2e:agent-runtimes:live-selftest": "bash scripts/with-project-node.sh node scripts/dev/test-builtin-runtime-live-selftest.mjs"
   },
   "engines": {
     "node": ">=22.19.0",
@@ -73,6 +88,7 @@
     "sharp": "^0.34.5",
     "typescript-eslint": "^8.61.0",
     "vitest": "^4.1.8",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "esbuild": "^0.28.0"
   }
 }

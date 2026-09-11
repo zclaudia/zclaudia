@@ -6,6 +6,7 @@ import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import * as api from '../../services/api';
 import type { ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
 import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../../utils/controlPlane';
+import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useAgentForSession } from '../useAgentForSession';
 
 interface UseProviderCapabilitiesOptions {
@@ -31,14 +32,23 @@ export function useProviderCapabilities({
     ? projects.find(p => p.id === currentSession.projectId)
     : null;
 
-  const { llm } = useAgentForSession(currentSession?.id);
-  const llmProfileId = llm?.id;
-  const isBackendDataReady = dataServerId != null && dataServerId === activeServerId;
+  const agentProfilesLoaded = useAgentProfileMetaStore(s => s.loaded);
+  const { agent, llm } = useAgentForSession(currentSession?.id);
+  const runtimeType = agent?.runtimeType || 'zclaudia';
+  const externalRuntime = runtimeType !== 'zclaudia';
+  const llmProfileId = externalRuntime ? undefined : llm?.id;
+  // Wait for agent profiles only while they are still loading. An orphaned
+  // agentProfileId must not block capabilities forever after load completes.
+  const isBackendDataReady =
+    dataServerId != null &&
+    dataServerId === activeServerId &&
+    (!currentSession?.agentProfileId || agentProfilesLoaded);
   const providerScopeKey =
     resolveCanonicalBackendId(activeServerId ?? LEGACY_LOCAL_SERVER_ID, LEGACY_LOCAL_SERVER_ID) ||
     LEGACY_LOCAL_SERVER_ID;
-  const capsCacheKey = `${providerScopeKey}:${llmProfileId || '_default'}`;
-  const commandsCacheKey = `${providerScopeKey}:${llmProfileId || '_default'}`;
+  const metadataKey = externalRuntime ? `runtime:${runtimeType}` : llmProfileId || '_default';
+  const capsCacheKey = `${providerScopeKey}:${metadataKey}`;
+  const commandsCacheKey = capsCacheKey;
 
   // Fetch commands when provider or project changes (via HTTP)
   useEffect(() => {
@@ -61,7 +71,7 @@ export function useProviderCapabilities({
         });
     } else {
       api
-        .getProviderTypeCommands('zclaudia', projectRoot || undefined, {
+        .getProviderTypeCommands(runtimeType, projectRoot || undefined, {
           signal: controller.signal,
         })
         .then(commands => {
@@ -75,7 +85,7 @@ export function useProviderCapabilities({
 
     return () => controller.abort();
   }, [
-    llm?.id,
+    runtimeType,
     currentProject?.rootPath,
     isConnected,
     isBackendDataReady,
@@ -91,7 +101,7 @@ export function useProviderCapabilities({
 
     const fetchCaps = llmProfileId
       ? api.getProviderCapabilities(llmProfileId, { signal: controller.signal })
-      : api.getProviderTypeCapabilities('zclaudia', { signal: controller.signal });
+      : api.getProviderTypeCapabilities(runtimeType, { signal: controller.signal });
 
     fetchCaps
       .then(caps => {
@@ -104,6 +114,7 @@ export function useProviderCapabilities({
     return () => controller.abort();
   }, [
     capsCacheKey,
+    runtimeType,
     llmProfileId,
     isConnected,
     isBackendDataReady,

@@ -1,0 +1,68 @@
+name: Built-in agent runtimes
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: builtin-agent-runtimes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm plugins:check && pnpm plugins:test
+      - name: Portable production dependency packaging
+        run: node --test scripts/plugins/__tests__/*.test.mjs
+      - run: pnpm check:architecture
+      - run: pnpm browser:build
+      - name: Shared runtime manifest contract
+        run: pnpm --filter @zclaudia/shared exec vitest run src/plugins/manifest.test.ts --retry 0
+      - name: Host runtime lifecycle and migration boundaries
+        run: >-
+          pnpm --filter @zclaudia/server exec vitest run
+          src/application/plugins/__tests__/builtin-agent-lifecycle.test.ts
+          src/application/plugins/__tests__/package-service.test.ts
+          src/application/plugins/__tests__/loader.test.ts
+          src/application/plugins/__tests__/agent-profile-service.test.ts
+          src/application/plugins/__tests__/agent-tool-bridge-host.test.ts
+          src/domains/agent-readiness/__tests__/runtime-readiness.test.ts
+          src/infra/providers/__tests__/external-agent-shim.test.ts
+          src/interfaces/http/middleware/__tests__/runtime-initialization.test.ts
+          --retry 0
+      - run: pnpm exec playwright test --config e2e/playwright.agent-runtimes.config.ts
+      - name: Live driver argument and process cleanup checks (no credentials)
+        run: node --test scripts/dev/__tests__/agent-runtime-live-*.test.mjs
+      - name: Live driver L01-L06 and deadline self-tests (CLI fixtures)
+        run: pnpm test:e2e:agent-runtimes:live-selftest
+      - run: node server/scripts/bundle.mjs
+      - run: pnpm exec playwright test --config e2e/playwright.agent-runtime-artifacts.config.ts
+      - name: Read-only Linux artifact without application source or network
+        run: |
+          case "$(uname -m)" in
+            x86_64) node_target=x86_64-unknown-linux-gnu ;;
+            aarch64|arm64) node_target=aarch64-unknown-linux-gnu ;;
+            *) echo 'Unsupported Linux artifact architecture' >&2; exit 1 ;;
+          esac
+          bash scripts/dev/test-builtin-runtime-container.sh server/bundle \
+            "apps/desktop/src-tauri/binaries/node-$node_target" \
+            "artifacts/agent-runtime-migration/container-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: builtin-agent-e2e
+          path: artifacts/agent-runtime-migration/
+          retention-days: 14

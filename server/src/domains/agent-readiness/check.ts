@@ -2,10 +2,12 @@ import type Database from 'better-sqlite3';
 import type { AgentReadiness } from '@zclaudia/shared/core/agent-readiness';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { ManagedRuntimeResolution } from '@zclaudia/shared/plugins/managed-runtimes';
 import { AgentProfileRepository } from '../agent-profiles/repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import { hasLlmCredential } from './credential.js';
 import { runtimeRequiresLlmProfile } from '../agent-profiles/runtime-type-guard.js';
+import { providerRegistry } from '../../infra/providers/registry.js';
 import {
   findInRegistryCrossProvider,
   tryGetRegistryModel,
@@ -43,12 +45,76 @@ function readinessForResolvedAgent(
   // Native runtimes (e.g. Claude) don't bind an LLM profile. A blank model means
   // the native CLI/SDK resolves its configured default model.
   if (!runtimeRequiresLlmProfile(agent.runtimeType)) {
+    if (!providerRegistry.hasType(agent.runtimeType!)) {
+      return { usable: false, reason: 'runtime_unavailable' };
+    }
     return { usable: true };
   }
   if (!llm) return { usable: false, reason: 'no_llm_profile' };
   if (!hasLlmCredential(llm)) return { usable: false, reason: 'no_credential' };
   if (!hasUsableModel(agent.model, llm)) return { usable: false, reason: 'no_model' };
   return { usable: true };
+}
+
+type RuntimeInspector = (
+  agent: AgentProfileConfig
+) => Promise<ManagedRuntimeResolution | undefined>;
+let inspectRuntime: RuntimeInspector | undefined;
+
+/** Application composition supplies the CLI service without a domain-to-application dependency. */
+export function configureRuntimeReadinessInspector(inspector: RuntimeInspector): void {
+  inspectRuntime = inspector;
+}
+
+export async function resolveAgentExecutionReadiness(
+  agent: AgentProfileConfig,
+  llm: LlmProfileConfig | null | undefined
+): Promise<AgentReadiness> {
+  const structural = readinessForResolvedAgent(agent, llm);
+  if (!structural.usable || runtimeRequiresLlmProfile(agent.runtimeType) || !inspectRuntime)
+    return structural;
+  try {
+    const resolution = await inspectRuntime(agent);
+    if (!resolution) return structural;
+    if (resolution.status === 'auth-required' || resolution.authState === 'auth-required')
+      return { usable: false, reason: 'runtime_auth_required' };
+    if (resolution.status === 'resolved') return { usable: true };
+    if (resolution.compatibilityState === 'probe-failed')
+      return { usable: false, reason: 'runtime_check_failed' };
+    if (['too-old', 'known-incompatible', 'unparseable'].includes(resolution.compatibilityState))
+      return { usable: false, reason: 'runtime_incompatible' };
+    return { usable: false, reason: 'runtime_missing' };
+  } catch {
+    return { usable: false, reason: 'runtime_check_failed' };
+  }
+}
+
+export async function resolveAgentReadinessWithRuntimeCheck(
+  db: Database.Database
+): Promise<AgentReadiness> {
+  const repo = new AgentProfileRepository(db);
+  const agents = repo.findAllOrdered();
+  if (!agents.length) return { usable: false, reason: 'no_agent' };
+  const llms = new LlmProfileRepository(db);
+  const readiness = await Promise.all(
+    agents.map(agent => resolveAgentExecutionReadiness(agent, llms.findById(agent.llmProfileId)))
+  );
+  if (readiness.some(item => item.usable)) return { usable: true };
+  const primary = repo.findDefault() ?? agents[0];
+  return readiness[agents.findIndex(agent => agent.id === primary.id)];
+}
+
+export async function resolveAgentReadinessForSessionWithRuntimeCheck(
+  db: Database.Database,
+  opts: ResolveOptions
+): Promise<AgentReadiness> {
+  try {
+    const { agent, llm } = resolveAgentForSession(db, opts);
+    return await resolveAgentExecutionReadiness(agent, llm);
+  } catch (err) {
+    if (err instanceof NoAgentAvailableError) return { usable: false, reason: 'no_agent' };
+    throw err;
+  }
 }
 
 /**

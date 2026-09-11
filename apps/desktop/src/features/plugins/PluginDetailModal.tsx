@@ -8,6 +8,10 @@ import { rollbackPluginPackage, uninstallPluginPackage } from '../../services/ap
 import { Badge } from '../../components/ui/Badge';
 import { PluginPermissionsPreview } from './ui/PluginPermissionsPreview';
 import { PluginRequirementStatus } from './ui/PluginRequirementStatus';
+import { apiCall } from '../../services/api/unwrap';
+import { BuiltinRuntimeDetails } from './BuiltinRuntimeDetails';
+import { useServerStore } from '../../stores/serverStore';
+import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 
 export function PluginDetailModal({
   plugin,
@@ -32,6 +36,7 @@ export function PluginDetailModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isMobile = useIsMobile();
+  const backendId = useServerStore(state => state.activeServerId);
 
   if (!plugin) return null;
 
@@ -44,6 +49,19 @@ export function PluginDetailModal({
     setError(null);
     setRollbackVersion('');
     onClose();
+  };
+
+  const reload = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiCall(`/api/plugins/${plugin.manifest.id}/reload`, { method: 'POST' });
+      await onChanged();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not reload runtime');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const rollback = async () => {
@@ -105,7 +123,13 @@ export function PluginDetailModal({
             <span className="font-mono text-xs text-muted-foreground">{plugin.manifest.id}</span>
             <Badge label={`v${plugin.manifest.version}`} tone="neutral" />
             <Badge
-              label={plugin.source === 'managed' ? 'Managed package' : 'Development directory'}
+              label={
+                plugin.source === 'builtin'
+                  ? 'Built-in runtime'
+                  : plugin.source === 'managed'
+                    ? 'Managed package'
+                    : 'Development directory'
+              }
               tone={plugin.source === 'managed' ? 'accent' : 'neutral'}
             />
             <Badge
@@ -133,17 +157,62 @@ export function PluginDetailModal({
           </div>
         )}
 
+        {!!plugin.shadowedPaths?.length && (
+          <section className="space-y-2 rounded-lg bg-secondary/50 p-3 text-xs">
+            <h3 className="font-medium">External copies retained</h3>
+            <p>
+              The included runtime takes precedence. These external copies remain on disk and are
+              not loaded.
+            </p>
+            {plugin.shadowedPaths.map(pluginPath => (
+              <p key={pluginPath} className="break-all font-mono text-muted-foreground">
+                {pluginPath}
+              </p>
+            ))}
+          </section>
+        )}
+
         <section className="space-y-2">
           <h3 className="text-xs font-medium text-foreground">Runtime requirements</h3>
           <PluginRequirementStatus requirements={plugin.requirements} />
         </section>
+        {plugin.source === 'builtin' && open && (
+          <BuiltinRuntimeDetails
+            key={`${backendId}:${plugin.manifest.id}`}
+            pluginId={plugin.manifest.id}
+            backendId={backendId}
+            onManageProfiles={() => {
+              close();
+              const view = useTopLevelViewStore.getState();
+              view.setAgentsBackendFilter(backendId ?? 'all');
+              view.openAgents('profiles');
+            }}
+          />
+        )}
 
         <section className="space-y-2">
           <h3 className="text-xs font-medium text-foreground">Requested permissions</h3>
           <PluginPermissionsPreview permissions={(plugin.manifest.permissions ?? []) as string[]} />
         </section>
 
-        {plugin.source === 'managed' ? (
+        {plugin.source === 'builtin' ? (
+          <section className="rounded-xl border border-border/60 p-3">
+            <h3 className="text-xs font-medium text-foreground">Included with ZClaudia</h3>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void reload()}
+              className="mt-2 rounded-lg border border-border px-3 py-1 text-xs disabled:opacity-40"
+            >
+              Reload runtime
+            </button>
+            <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+              This runtime is updated with the application. Disabling it preserves your agent
+              profiles and conversations. Configure its executable path in the agent profile, or
+              install the CLI using the status panel above.
+            </p>
+          </section>
+        ) : plugin.source === 'managed' ? (
           <section className="space-y-3 rounded-xl border border-border/60 p-3">
             <div className="flex items-center justify-between gap-2">
               <div>

@@ -4,6 +4,8 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
 import { DirectoryPickerModal } from './DirectoryPickerModal';
+import { listAgentProfilesForBackend } from '../../services/api/agent-profiles';
+import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 
 interface NewProjectModalProps {
   open: boolean;
@@ -12,7 +14,7 @@ interface NewProjectModalProps {
   onNameChange: (name: string) => void;
   rootPath: string;
   onRootPathChange: (path: string) => void;
-  onCreate: () => void;
+  onCreate: (agentProfileId?: string) => void;
   creatingProject: boolean;
   isConnected: boolean;
   isMobile?: boolean;
@@ -44,16 +46,61 @@ export function NewProjectModal({
 }: NewProjectModalProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
+  const [profiles, setProfiles] = useState<AgentProfileConfig[]>([]);
+  const [agentProfileId, setAgentProfileId] = useState('');
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profilesLoaded, setProfilesLoaded] = useState(false);
 
   const backendId = selectedBackendId ?? backends[0]?.backendId ?? null;
-  const canCreate = !!name.trim() && isConnected && !creatingProject;
+  const available = (profile: AgentProfileConfig) =>
+    !profile.recordStatus || profile.recordStatus.availability.usable;
+  const hasDefaultAgent = profiles.some(profile => profile.isDefault && available(profile));
+  const selectedAvailable = profiles.some(
+    profile => profile.id === agentProfileId && available(profile)
+  );
+  const canCreate =
+    !!name.trim() &&
+    isConnected &&
+    !creatingProject &&
+    profilesLoaded &&
+    !profileError &&
+    (agentProfileId ? selectedAvailable : hasDefaultAgent);
+
+  useEffect(() => {
+    if (!open || !backendId) return;
+    let cancelled = false;
+    setProfiles([]);
+    setAgentProfileId('');
+    setProfileError(null);
+    setProfilesLoaded(false);
+    void listAgentProfilesForBackend(backendId)
+      .then(items => {
+        if (cancelled) return;
+        const active = items.filter(profile => profile.status !== 'readonly');
+        setProfiles(active);
+        setAgentProfileId(
+          active.find(profile => profile.isDefault && available(profile))?.id ?? ''
+        );
+        setProfilesLoaded(true);
+      })
+      .catch(error => {
+        if (!cancelled)
+          setProfileError(error instanceof Error ? error.message : 'Could not load agents');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, backendId]);
 
   useEffect(() => {
     if (open) nameRef.current?.focus();
   }, [open]);
 
   const submit = () => {
-    if (canCreate) onCreate();
+    if (canCreate) {
+      if (agentProfileId) onCreate(agentProfileId);
+      else onCreate();
+    }
   };
 
   const footer = (
@@ -107,6 +154,50 @@ export function NewProjectModal({
               className="h-9 w-full rounded-xl border border-border bg-background px-3 text-[13px] text-foreground placeholder:text-muted-foreground/50 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
             />
           </label>
+          {profiles.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-medium text-muted-foreground">Coding agent</span>
+              <Select
+                ariaLabel="Project coding agent"
+                value={agentProfileId}
+                onChange={setAgentProfileId}
+                block
+                options={[
+                  {
+                    value: '',
+                    label: hasDefaultAgent ? 'Use global default' : 'Choose a coding agent',
+                  },
+                  ...profiles.map(profile => ({
+                    value: profile.id,
+                    label:
+                      profile.name +
+                      (profile.recordStatus && !profile.recordStatus.availability.usable
+                        ? ' (Unavailable)'
+                        : ''),
+                    disabled: profile.recordStatus
+                      ? !profile.recordStatus.availability.usable
+                      : false,
+                  })),
+                ]}
+              />
+            </div>
+          )}
+          {profilesLoaded && profiles.length > 0 && !profiles.some(available) && (
+            <p role="status" className="text-xs text-muted-foreground">
+              No coding agent is ready on this backend. Check the CLI in Built-in plugins or
+              configure an available agent profile.
+            </p>
+          )}
+          {profileError && (
+            <p role="alert" className="text-xs text-destructive">
+              {profileError}
+            </p>
+          )}
+          {profilesLoaded && profiles.length === 0 && (
+            <p role="alert" className="text-xs text-muted-foreground">
+              Enable a coding agent in Extensions or create an agent in Agents.
+            </p>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] font-medium text-muted-foreground">Working directory</span>

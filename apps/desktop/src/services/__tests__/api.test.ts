@@ -109,6 +109,7 @@ import {
   createWorkflowFromTemplate,
 } from '../../features/workflows/api';
 import { useServerStore } from '../../stores/serverStore';
+import { useFacadeStore } from '../../stores/facadeStore';
 import { checkoutGitBranch, createGitBranch, deleteGitBranch } from '../api/git';
 
 let mockControlPlaneMode = 'embedded-local';
@@ -261,6 +262,32 @@ describe('api', () => {
           headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
         })
       );
+    });
+
+    it('routes browser shell remote requests without requiring an embedded desktop port', async () => {
+      mockBrowserShellBaseUrl = 'http://127.0.0.1:3100';
+      mockServerStore.localServerPort = null;
+      mockServerStore.activeServerId = 'gw:backend-1';
+      mockResponse([]);
+      const previous = useFacadeStore.getState().backends;
+      useFacadeStore.setState({
+        backends: [
+          {
+            backendId: 'gw:backend-1',
+            channel: 'prod',
+            isThisInstance: false,
+          } as (typeof previous)[number],
+        ],
+      });
+      try {
+        await getProjects();
+        expect(mockFetch).toHaveBeenCalledWith(
+          'http://gateway/gw:backend-1/api/projects',
+          expect.any(Object)
+        );
+      } finally {
+        useFacadeStore.setState({ backends: previous });
+      }
     });
 
     it('createProject creates and returns project', async () => {

@@ -20,6 +20,7 @@ import type { NotificationSender } from './infra/push/notification-sender.js';
 import { ALL_SERVER_FEATURES } from '@zclaudia/shared/core/server';
 import { isLocalhost } from './interfaces/http/middleware/local-only.js';
 import { createExpressAuthMiddleware } from './interfaces/http/middleware/express-auth.js';
+import { createRuntimeInitializationMiddleware } from './interfaces/http/middleware/runtime-initialization.js';
 import { getPublicKeyPem } from './utils/crypto.js';
 import { getSdkVersionReport } from './utils/sdk-version-check.js';
 import { ProcessMonitor } from './utils/process-monitor.js';
@@ -63,6 +64,7 @@ export interface SetupDependencies {
   getServerPort: () => number | null;
   notificationSender: NotificationSender;
   setProcessMonitor: (pm: ProcessMonitor) => void;
+  areAgentRuntimesReady?: () => boolean;
 }
 
 export interface SetupResult {
@@ -115,7 +117,11 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
 
   // Health check
   app.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', timestamp: Date.now() });
+    res.json({
+      status: 'ok',
+      timestamp: Date.now(),
+      agentRuntimes: deps.areAgentRuntimesReady?.() === false ? 'initializing' : 'ready',
+    });
   });
 
   // Get server info (public - no auth required)
@@ -150,6 +156,7 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
 
     return !!row?.client_id;
   });
+  app.use(createRuntimeInitializationMiddleware(deps.areAgentRuntimesReady ?? (() => true)));
 
   // Gateway state
   const gateway = createGatewayState({ db });

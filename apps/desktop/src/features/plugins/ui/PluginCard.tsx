@@ -28,7 +28,7 @@ export function PluginCard({
         </span>
         <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
           {model.source && (
-            <Badge label={model.source === 'managed' ? 'Managed' : 'Development'} tone="neutral" />
+            <Badge label={model.source === 'builtin' ? 'Included' : model.source === 'managed' ? 'Managed' : 'Development'} tone="neutral" />
           )}
           <Badge label={kind} tone={kind === 'Built-in' ? 'accent' : 'neutral'} />
         </div>

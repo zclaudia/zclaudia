@@ -1,0 +1,31 @@
+{
+  "sourceRepository": "zclaudia-plugins",
+  "sourceCommit": "94535618352b88fd78a29b92bc6bc88fe09faa9a",
+  "hostBaseline": "504b9874dbbd64ba3b1ee3dc7291c0173b09ce0b",
+  "packages": [
+    {
+      "source": "agents/claude",
+      "destination": "plugins/agents/claude",
+      "version": "0.1.0",
+      "licenseFile": "claude/LICENSE"
+    },
+    {
+      "source": "agents/codex",
+      "destination": "plugins/agents/codex",
+      "version": "0.1.0",
+      "licenseFile": "codex/LICENSE"
+    },
+    {
+      "source": "agents/cursor",
+      "destination": "plugins/agents/cursor",
+      "version": "0.1.0",
+      "licenseFile": "cursor/LICENSE"
+    },
+    {
+      "source": "packages/agent-common",
+      "destination": "packages/agent-common",
+      "version": "0.1.0",
+      "licenseFile": "../../packages/agent-common/LICENSE"
+    }
+  ]
+}

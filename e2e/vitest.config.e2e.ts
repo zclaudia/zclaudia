@@ -7,6 +7,7 @@ loadEnv();
 export default defineConfig({
   test: {
     include: ['e2e/tests/**/*.spec.ts'],
+    exclude: ['e2e/tests/**/*.playwright.spec.ts'],
     pool: 'forks',
     fileParallelism: false, // Sequential execution for DB consistency
     testTimeout: 120000, // Increased for AI tests

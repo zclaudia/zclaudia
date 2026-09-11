@@ -166,6 +166,7 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
 
       const virtualClient = deps.createVirtualClient(clientId, {
         send: (msg: ServerMessage) => {
+          if (settled) return;
           try {
             if (msg.type === 'delta') {
               const text = (msg as { content?: string }).content || '';
@@ -183,10 +184,13 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
                 responseText: worktreeNote ? `${fullContent}\n\n[${worktreeNote}]` : fullContent,
                 toolCount,
               });
-            } else if (msg.type === 'run_failed') {
+            } else if (msg.type === 'run_failed' || msg.type === 'error') {
               cleanupVirtualClient();
               const worktreeNote = settleWorktree();
-              const baseError = (msg as { error?: string }).error || 'Task failed';
+              const baseError =
+                msg.type === 'error'
+                  ? msg.message || 'Task could not start'
+                  : (msg as { error?: string }).error || 'Task failed';
               callbacks.onFailed(worktreeNote ? `${baseError} (${worktreeNote})` : baseError);
             }
           } catch (err) {
@@ -217,6 +221,7 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
           clients
         )
         .catch((err: unknown) => {
+          if (settled) return;
           cleanupVirtualClient();
           settleWorktree();
           callbacks.onFailed(err instanceof Error ? err.message : 'Failed to start task');

@@ -61,14 +61,23 @@ import { confirm } from '../../stores/confirmDialogStore';
 /** Keyboard resize step, in px, for the sidebar's resize handle. */
 const RESIZE_KEY_STEP_PX = 16;
 
+const AGENT_READINESS_REASONS = new Set<AgentReadinessReason>([
+  'no_agent',
+  'no_llm_profile',
+  'no_credential',
+  'no_model',
+  'runtime_unavailable',
+  'runtime_missing',
+  'runtime_incompatible',
+  'runtime_auth_required',
+  'runtime_check_failed',
+]);
+
 function agentReadinessReasonFromDetails(details: unknown): AgentReadinessReason | undefined {
   if (!details || typeof details !== 'object') return undefined;
   const reason = (details as { reason?: unknown }).reason;
-  return reason === 'no_agent' ||
-    reason === 'no_llm_profile' ||
-    reason === 'no_credential' ||
-    reason === 'no_model'
-    ? reason
+  return typeof reason === 'string' && AGENT_READINESS_REASONS.has(reason as AgentReadinessReason)
+    ? (reason as AgentReadinessReason)
     : undefined;
 }
 
@@ -666,12 +675,10 @@ export function Sidebar({
                   onActivate={() => selectionCoordinator.selectBackend(backend.backendId)}
                   expanded={expanded}
                   onToggle={() => toggleBackend(backend.backendId)}
-                  onNewProject={() =>
-                    runAfterAgentGate(() => {
-                      setNewProjectBackendId(backend.backendId);
-                      setShowNewProjectForm(true);
-                    })
-                  }
+                  onNewProject={() => {
+                    setNewProjectBackendId(backend.backendId);
+                    setShowNewProjectForm(true);
+                  }}
                   newProjectDisabled={!isConnected}
                 >
                   {backendProjects.length === 0 ? (
@@ -757,11 +764,7 @@ export function Sidebar({
           onNameChange={setNewProjectName}
           rootPath={newProjectRootPath}
           onRootPathChange={setNewProjectRootPath}
-          onCreate={() =>
-            runAfterAgentGate(() => actions.handleCreateProject(newProjectBackendId), {
-              forceRefresh: true,
-            })
-          }
+          onCreate={agentProfileId => actions.handleCreateProject(newProjectBackendId, agentProfileId)}
           creatingProject={creatingProject}
           isConnected={isConnected}
           isMobile={isMobile}

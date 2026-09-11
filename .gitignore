@@ -122,8 +122,9 @@ server/data/
 
 # Top-level runtime plugin installs (anchored to repo root so it does not
 # match source dirs like shared/src/plugins/, server/src/application/plugins/).
-# First-party agent plugins live in the zclaudia-plugins repository.
+# Built-in agent plugin source is tracked; generated output remains ignored.
 /plugins/*
+!/plugins/agents/
 
 # Superpowers plugin generated docs
 docs/superpowers/
@@ -136,3 +137,5 @@ docs/superpowers/
 .codex/
 .zcode/
 .impeccable/
+
+/artifacts/agent-runtime-migration/

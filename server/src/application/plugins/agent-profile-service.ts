@@ -3,7 +3,7 @@ import type { AgentProfileContribution } from '@zclaudia/shared/plugin-types';
 import { defaultToolSelection, resolveToolSelection } from '@zclaudia/shared/core/tools';
 import { AgentProfileRepository } from '../../domains/agent-profiles/repository.js';
 import { LlmProfileRepository } from '../../domains/llm-profiles/repository.js';
-import { isValidRuntimeType } from '../../domains/agent-profiles/runtime-type-guard.js';
+import { isValidRuntimeType, runtimeRequiresLlmProfile } from '../../domains/agent-profiles/runtime-type-guard.js';
 
 export class PluginAgentProfileService {
   constructor(private readonly db: Database.Database) {}
@@ -23,9 +23,13 @@ export class PluginAgentProfileService {
     const existing = agentRepo.findByPluginProfile(pluginId, contribution.id);
     if (existing) return false;
 
+    const requestedRuntime = contribution.runtimeType;
+    const runtimeType =
+      requestedRuntime && isValidRuntimeType(requestedRuntime) ? requestedRuntime : 'zclaudia';
+    const requiresLlm = runtimeRequiresLlmProfile(runtimeType);
     const llmRepo = new LlmProfileRepository(this.db);
     const llmProfile = llmRepo.findDefault() ?? llmRepo.findAllOrdered()[0];
-    if (!llmProfile) {
+    if (requiresLlm && !llmProfile) {
       console.warn(
         `[PluginAgentProfiles] No LLM profile available for ${pluginId}/${contribution.id}`
       );
@@ -35,15 +39,11 @@ export class PluginAgentProfileService {
     const toolSelection = contribution.toolSelection ?? defaultToolSelection;
     const enabledTools = resolveToolSelection(toolSelection).builtinTools;
 
-    const requestedRuntime = contribution.runtimeType;
-    const runtimeType =
-      requestedRuntime && isValidRuntimeType(requestedRuntime) ? requestedRuntime : 'zclaudia';
-
     agentRepo.create({
       name: contribution.name,
       description: contribution.description,
-      llmProfileId: llmProfile.id,
-      model: contribution.model ?? llmProfile.models?.[0]?.modelId ?? 'claude-sonnet-4-6',
+      llmProfileId: requiresLlm ? llmProfile!.id : '',
+      model: contribution.model ?? (requiresLlm ? llmProfile!.models?.[0]?.modelId ?? '' : ''),
       systemPrompt: contribution.systemPrompt ?? '',
       enabledTools,
       toolSelection,

@@ -33,4 +33,6 @@ export interface ProviderCapabilities {
   modelLabel?: string;
   defaultModeId?: string; // Selected by default when no per-session override
   supportsAIReview?: boolean;
+  /** False when the CLI cannot apply host per-tool permission overrides. */
+  supportsPermissionOverrides?: boolean;
 }

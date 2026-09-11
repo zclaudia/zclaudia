@@ -186,7 +186,11 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
   }
 
   return (
-    <div className={`rounded-xl border overflow-hidden ${panelTint}`}>
+    <div
+      role="group"
+      aria-label="Permission request"
+      className={`rounded-xl border overflow-hidden ${panelTint}`}
+    >
       {/* Timeout progress bar (legacy — hidden when workflow manages timeout) */}
       {hasTimeout && (
         <div className="h-0.5 bg-muted">

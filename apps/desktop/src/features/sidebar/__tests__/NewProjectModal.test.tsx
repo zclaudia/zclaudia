@@ -1,6 +1,15 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NewProjectModal } from '../NewProjectModal';
+import { listAgentProfilesForBackend } from '../../../services/api/agent-profiles';
+
+vi.mock('../../../services/api/agent-profiles', () => ({ listAgentProfilesForBackend: vi.fn() }));
+
+beforeEach(() => {
+  vi.mocked(listAgentProfilesForBackend).mockResolvedValue([
+    { id: 'default-agent', name: 'My agent', isDefault: true },
+  ] as never);
+});
 
 const baseProps = {
   open: true,
@@ -58,7 +67,7 @@ describe('NewProjectModal', () => {
     expect(onSelectedBackendIdChange).toHaveBeenCalledWith('remote');
   });
 
-  it('creates on Create click and blocks it while the name is empty', () => {
+  it('creates on Create click and blocks it while the name is empty', async () => {
     const onCreate = vi.fn();
     const { rerender } = render(
       <NewProjectModal
@@ -81,8 +90,31 @@ describe('NewProjectModal', () => {
         onCreate={onCreate}
       />
     );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     expect(onCreate).toHaveBeenCalledTimes(1);
+    expect(onCreate).toHaveBeenCalledWith('default-agent');
+  });
+
+  it('requires an explicit choice when the backend has no default agent', async () => {
+    vi.mocked(listAgentProfilesForBackend).mockResolvedValue([
+      { id: 'codex', name: 'Codex Agent', runtimeType: 'codex' },
+    ] as never);
+    const onCreate = vi.fn();
+    render(
+      <NewProjectModal
+        {...baseProps}
+        backends={backends}
+        selectedBackendId="remote"
+        onCreate={onCreate}
+      />
+    );
+    fireEvent.click(await screen.findByLabelText('Project coding agent'));
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('option', { name: 'Codex Agent' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(listAgentProfilesForBackend).toHaveBeenCalledWith('remote');
+    expect(onCreate).toHaveBeenCalledWith('codex');
   });
 
   it('closes on Cancel', () => {

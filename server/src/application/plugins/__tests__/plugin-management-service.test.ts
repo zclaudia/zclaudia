@@ -7,7 +7,7 @@ describe('PluginManagementService', () => {
     getPlugin: vi.fn(),
     hasPlugin: vi.fn(),
     activate: vi.fn(),
-    deactivate: vi.fn(),
+    deactivate: vi.fn().mockResolvedValue(true),
     reload: vi.fn(),
     discover: vi.fn(),
     remove: vi.fn(),
@@ -70,7 +70,7 @@ describe('PluginManagementService', () => {
     loader.activate.mockResolvedValue(true);
     loader.reload.mockResolvedValue(true);
     loader.remove.mockResolvedValue(undefined);
-    loader.deactivate.mockResolvedValue(undefined);
+    loader.deactivate.mockResolvedValue(true);
     loader.getPlugin.mockReturnValue({
       manifest: {
         id: 'plugin-1',

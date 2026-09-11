@@ -58,6 +58,25 @@ describe('plugin manifest validation', () => {
     );
   });
 
+  it.each(
+    [null, [], 'invalid', { agentRuntimes: false }, { agentRuntimes: [{ type: ' ' }] }].map(
+      contributes => ({ contributes })
+    )
+  )('reports malformed runtime declaration structure: %j', ({ contributes }) => {
+    expect(validatePluginManifest({ ...baseManifest, contributes }).valid).toBe(false);
+  });
+
+  it('accepts omitted, empty and named custom runtime declarations', () => {
+    for (const contributes of [
+      undefined,
+      {},
+      { agentRuntimes: [] },
+      { agentRuntimes: [{ type: 'custom-agent' }] },
+    ]) {
+      expect(validatePluginManifest({ ...baseManifest, contributes }).valid).toBe(true);
+    }
+  });
+
   it('infers desktop platform from UI contributions and frontend entries', () => {
     expect(resolvePluginPlatform({ ...baseManifest })).toBe('universal');
     expect(

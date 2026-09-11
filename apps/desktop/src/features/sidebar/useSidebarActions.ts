@@ -69,7 +69,7 @@ export function useSidebarActions({
   const { selectProject, selectSession } = useSelectionCoordinator();
 
   const handleCreateProject = useCallback(
-    async (backendId?: string | null) => {
+    async (backendId?: string | null, defaultAgentProfileId?: string) => {
       if (!newProjectName.trim() || !isConnected) return;
       setCreatingProject(true);
       try {
@@ -78,6 +78,7 @@ export function useSidebarActions({
             name: newProjectName.trim(),
             type: 'code',
             rootPath: newProjectRootPath.trim() || undefined,
+            ...(defaultAgentProfileId ? { defaultAgentProfileId } : {}),
           },
           backendId ?? null
         );

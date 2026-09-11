@@ -697,14 +697,10 @@ export class SupervisorService {
       }
     };
     process.once('exit', cleanup);
-    process.once('SIGINT', () => {
-      cleanup();
-      process.exit(0);
-    });
-    process.once('SIGTERM', () => {
-      cleanup();
-      process.exit(0);
-    });
+    // The application entry point owns process exit. Exiting inside this
+    // earlier signal listener bypasses run cancellation and plugin teardown.
+    process.once('SIGINT', cleanup);
+    process.once('SIGTERM', cleanup);
     SupervisorService.cleanupHooksInstalled = true;
   }
 }

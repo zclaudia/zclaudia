@@ -19,6 +19,36 @@ export interface ReadinessGuidance {
 /** Maps a readiness reason to user-facing copy and where "Configure →" should navigate. */
 export function readinessGuidance(reason: AgentReadinessReason | undefined): ReadinessGuidance {
   switch (reason) {
+    case 'runtime_missing':
+      return {
+        title: 'CLI not available',
+        body: 'Install this runtime in Built-in plugins, or set an executable path in the agent profile.',
+        destination: { kind: 'agents' },
+      };
+    case 'runtime_incompatible':
+      return {
+        title: 'CLI version incompatible',
+        body: 'Choose a supported CLI version in Built-in plugins, or update the executable path in the agent profile.',
+        destination: { kind: 'agents' },
+      };
+    case 'runtime_auth_required':
+      return {
+        title: 'CLI login required',
+        body: "Complete this CLI's login flow on the connected backend, then retry.",
+        destination: { kind: 'agents' },
+      };
+    case 'runtime_check_failed':
+      return {
+        title: 'CLI could not be checked',
+        body: 'Review the executable path and CLI status in Built-in plugins, then retry.',
+        destination: { kind: 'agents' },
+      };
+    case 'runtime_unavailable':
+      return {
+        title: 'Agent runtime unavailable',
+        body: 'Enable this runtime in Built-in plugins, or choose an available agent.',
+        destination: { kind: 'agents' },
+      };
     case 'no_agent':
       return {
         title: 'No agent available yet',

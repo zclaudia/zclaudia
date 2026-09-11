@@ -1,9 +1,12 @@
 import { runtimeRequiresLlmProfile as staticRuntimeRequiresLlmProfile } from '@zclaudia/shared/core/profile-config-descriptor';
 import { providerRegistry } from '../../infra/providers/registry.js';
 import { runtimeDescriptorRegistry } from '../../infra/providers/runtime-descriptor-registry.js';
+import { builtinAgentPluginForRuntime } from '@zclaudia/shared/plugins/builtin-agents';
 
 /**
- * A runtime type is valid if a live adapter is registered for it (built-in or
+ * Built-in runtime identities remain valid when disabled or unavailable, so
+ * editing a saved Profile cannot silently change its runtime. Other types
+ * are valid if a live adapter is registered for it (built-in or
  * plugin) OR a descriptor is registered for it. The descriptor check matters
  * because during plugin activation the `agentRuntimes` descriptor is
  * registered in `registerContributions` before the plugin's `activate()`
@@ -11,7 +14,11 @@ import { runtimeDescriptorRegistry } from '../../infra/providers/runtime-descrip
  * binds to that runtime must still validate at that point.
  */
 export function isValidRuntimeType(type: string): boolean {
-  return providerRegistry.hasType(type) || runtimeDescriptorRegistry.hasType(type);
+  return (
+    !!builtinAgentPluginForRuntime(type) ||
+    providerRegistry.hasType(type) ||
+    runtimeDescriptorRegistry.hasType(type)
+  );
 }
 
 /**

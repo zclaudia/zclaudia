@@ -9,7 +9,10 @@ import {
   AgentProfileDeletionService,
   AgentProfileNotFoundError,
 } from './agent-profile-deletion-service.js';
-import { resolveAgentReadiness } from '../agent-readiness/check.js';
+import {
+  resolveAgentReadinessWithRuntimeCheck,
+  resolveAgentExecutionReadiness,
+} from '../agent-readiness/check.js';
 import { resolveAgentProfileRecordStatus } from '../agent-readiness/record-status.js';
 import { isValidRuntimeType, runtimeRequiresLlmProfile } from './runtime-type-guard.js';
 import { providerRegistry } from '../../infra/providers/registry.js';
@@ -89,12 +92,23 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
   const llmRepo = new LlmProfileRepository(db);
   const deletionService = new AgentProfileDeletionService(db);
 
-  router.get('/', (_req: Request, res: Response) => {
+  router.get('/', async (_req: Request, res: Response) => {
     try {
-      const data = repo.findAllOrdered().map(agent => ({
-        ...agent,
-        recordStatus: resolveAgentProfileRecordStatus(agent, llmRepo.findById(agent.llmProfileId)),
-      }));
+      const data = await Promise.all(
+        repo.findAllOrdered().map(async agent => {
+          const llm = llmRepo.findById(agent.llmProfileId);
+          const recordStatus = resolveAgentProfileRecordStatus(agent, llm);
+          const readiness = await resolveAgentExecutionReadiness(agent, llm);
+          if (!readiness.usable && readiness.reason?.startsWith('runtime_')) {
+            recordStatus.availability = {
+              usable: false,
+              reason:
+                readiness.reason === 'runtime_auth_required' ? 'needs_auth' : 'requirement_unmet',
+            };
+          }
+          return { ...agent, recordStatus };
+        })
+      );
       res.json({ success: true, data } as ApiResponse<AgentProfileConfig[]>);
     } catch (error) {
       console.error('Error fetching agent profiles:', error);
@@ -105,11 +119,12 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
     }
   });
 
-  router.get('/readiness', (_req: Request, res: Response) => {
+  router.get('/readiness', async (_req: Request, res: Response) => {
     try {
-      res.json({ success: true, data: resolveAgentReadiness(db) } as ApiResponse<
-        ReturnType<typeof resolveAgentReadiness>
-      >);
+      res.json({
+        success: true,
+        data: await resolveAgentReadinessWithRuntimeCheck(db),
+      } as ApiResponse<Awaited<ReturnType<typeof resolveAgentReadinessWithRuntimeCheck>>>);
     } catch (error) {
       console.error('Error checking agent readiness:', error);
       res.status(500).json({

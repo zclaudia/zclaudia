@@ -181,7 +181,7 @@ export class AgentProfileRepository extends BaseRepository<
       id: row.id,
       name: row.name,
       description: row.description ?? undefined,
-      runtimeType: normalizeRuntimeType(row.runtime_type),
+      runtimeType: row.runtime_type || 'zclaudia',
       llmProfileId: row.llm_profile_id ?? '',
       model: row.model,
       cliPath: row.cli_path ?? undefined,

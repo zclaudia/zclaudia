@@ -600,12 +600,21 @@ export class ManagedRuntimeService {
     publisher?: string;
     publisherVerified?: boolean;
     runtimes: string[];
+    /** Host-owned built-ins retain the user's CLI selection across app updates. */
+    preservePreviousReference?: boolean;
   }): Promise<RuntimeCompatibilityDescriptor | undefined> {
     const descriptor = await readRuntimeCompatibilityDescriptor(
       options.pluginPath,
       options.runtimes
     );
     if (!descriptor) return undefined;
+    if (options.preservePreviousReference) {
+      await this.inheritPluginReference(
+        options.pluginId,
+        options.pluginVersion,
+        descriptor.runtime
+      );
+    }
     this.registrations.set(this.registrationKey(options.pluginId, descriptor.runtime), {
       pluginId: options.pluginId,
       pluginVersion: options.pluginVersion,
@@ -712,6 +721,56 @@ export class ManagedRuntimeService {
     assertIdentity(pluginId, 'pluginId');
     if (!VERSION_PATTERN.test(pluginVersion)) throw new Error('Plugin version is invalid');
     return path.join(this.refsDir, pluginId, `${pluginVersion}.json`);
+  }
+
+  private async inheritPluginReference(
+    pluginId: string,
+    pluginVersion: string,
+    runtime: string
+  ): Promise<void> {
+    const destination = this.referencePath(pluginId, pluginVersion);
+    if (existsSync(destination)) return;
+    const directory = path.dirname(destination);
+    let names: string[];
+    try {
+      names = await readdir(directory);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw error;
+    }
+    const candidates: RuntimeReference[] = [];
+    for (const name of names) {
+      if (!name.endsWith('.json') || !VERSION_PATTERN.test(name.slice(0, -5))) continue;
+      const ref = await readJson<RuntimeReference>(path.join(directory, name));
+      if (
+        !ref ||
+        ref.schemaVersion !== 1 ||
+        ref.pluginId !== pluginId ||
+        ref.pluginVersion !== name.slice(0, -5) ||
+        ref.runtime !== runtime ||
+        ref.platform !== this.platformKey() ||
+        !Array.isArray(ref.versions) ||
+        !Array.isArray(ref.selectionHistory) ||
+        !Number.isFinite(Date.parse(ref.updatedAt)) ||
+        ![
+          ...ref.versions,
+          ...ref.selectionHistory,
+          ...(ref.selectedVersion ? [ref.selectedVersion] : []),
+        ].every(version => typeof version === 'string' && VERSION_PATTERN.test(version))
+      )
+        continue;
+      candidates.push(ref);
+    }
+    candidates.sort(
+      (a, b) =>
+        Date.parse(b.updatedAt) - Date.parse(a.updatedAt) ||
+        b.pluginVersion.localeCompare(a.pluginVersion)
+    );
+    const previous = candidates[0];
+    if (!previous) return;
+    // Atomic additive copy; leave historical references for application rollback.
+    // Resolution still validates the selected CLI against the new descriptor.
+    await writeJsonAtomic(destination, { ...previous, pluginVersion });
   }
 
   private async readReference(

@@ -50,6 +50,33 @@ describe('AgentTaskRunner', () => {
     vi.restoreAllMocks();
   });
 
+  it('settles a startup rejection once and releases the virtual client', async () => {
+    const clients = new Map<string, any>();
+    const onFailed = vi.fn();
+    const onCompleted = vi.fn();
+    const runner = createAgentTaskRunner({
+      db,
+      createVirtualClient: (id, ws) => ({ id, ws }),
+      getClients: () => clients,
+      createSession: () => ({ id: 'session-1' }),
+      sessionExists: () => false,
+      handleRunStart: async (client: any) => {
+        client.ws.send({
+          type: 'error',
+          code: 'RUNTIMES_INITIALIZING',
+          message: 'Runtimes are initializing',
+        });
+        client.ws.send({ type: 'run_completed' });
+        throw new Error('Late transport rejection');
+      },
+    });
+    runner.run(makeTask(), { onStarted: vi.fn(), onCompleted, onFailed });
+    await Promise.resolve();
+    expect(onFailed).toHaveBeenCalledExactlyOnceWith('Runtimes are initializing');
+    expect(onCompleted).not.toHaveBeenCalled();
+    expect(clients.size).toBe(0);
+  });
+
   it('starts an agent run and reports stream, tool count, and completion', async () => {
     const clients = new Map<string, any>();
     const onStarted = vi.fn();

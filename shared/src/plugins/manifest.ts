@@ -62,7 +62,21 @@ export interface PluginValidationResult {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object';
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Validate runtime declarations before discovery or package inspection uses them. */
+export function validateAgentRuntimeContributions(contributes: unknown): string[] {
+  if (contributes === undefined) return [];
+  if (!isRecord(contributes)) return ['contributes must be an object'];
+  const runtimes = contributes.agentRuntimes;
+  if (runtimes === undefined) return [];
+  if (!Array.isArray(runtimes)) return ['contributes.agentRuntimes must be an array'];
+  return runtimes.flatMap((runtime, index) =>
+    !isRecord(runtime) || typeof runtime.type !== 'string' || !runtime.type.trim()
+      ? [`contributes.agentRuntimes[${index}] must have a non-empty string type`]
+      : []
+  );
 }
 
 export function validatePluginManifest(manifest: unknown): PluginValidationResult {
@@ -74,6 +88,7 @@ export function validatePluginManifest(manifest: unknown): PluginValidationResul
   }
 
   const m = manifest as Record<string, unknown>;
+  errors.push(...validateAgentRuntimeContributions(m.contributes));
 
   if (!m.id || typeof m.id !== 'string') {
     errors.push('Missing required field: id');

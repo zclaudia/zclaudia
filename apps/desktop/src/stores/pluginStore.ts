@@ -29,7 +29,8 @@ export interface InstalledPlugin {
   enabled: boolean;
   installedAt: string;
   updatedAt: string;
-  source: 'managed' | 'development';
+  source: 'builtin' | 'managed' | 'development';
+  shadowedPaths?: string[];
   activeVersion?: string;
   availableVersions: string[];
   canRollback: boolean;
