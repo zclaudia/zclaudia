@@ -1,4 +1,4 @@
-import type { AgentRuntimeType } from './agent-profile.js';
+import { DEFAULT_AGENT_RUNTIME, PI_AGENT_RUNTIME, normalizeAgentRuntimeType, type AgentRuntimeType } from './agent-profile.js';
 import { builtinAgentPluginForRuntime } from '../plugins/builtin-agents.js';
 
 export type ModelConfigKind = 'llm-profile' | 'native' | 'none';
@@ -60,9 +60,9 @@ export interface EngineModeSummary {
 }
 
 export const PROFILE_CONFIG_DESCRIPTORS: Record<string, ProfileConfigDescriptor> = {
-  zclaudia: {
-    runtime: 'zclaudia',
-    label: 'ZClaudia',
+  [PI_AGENT_RUNTIME]: {
+    runtime: PI_AGENT_RUNTIME,
+    label: 'Pi',
     enabled: true,
     model: { kind: 'llm-profile', multimodalFallback: true, thinkingLevel: 'selectable' },
     hasCliPath: false,
@@ -73,7 +73,7 @@ export const PROFILE_CONFIG_DESCRIPTORS: Record<string, ProfileConfigDescriptor>
 export function getProfileConfigDescriptor(
   runtime: AgentRuntimeType | undefined
 ): ProfileConfigDescriptor {
-  return PROFILE_CONFIG_DESCRIPTORS[runtime ?? 'zclaudia'] ?? PROFILE_CONFIG_DESCRIPTORS.zclaudia;
+  return PROFILE_CONFIG_DESCRIPTORS[normalizeAgentRuntimeType(runtime)] ?? PROFILE_CONFIG_DESCRIPTORS[DEFAULT_AGENT_RUNTIME];
 }
 
 export function enabledRuntimeDescriptors(): ProfileConfigDescriptor[] {

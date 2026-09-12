@@ -13,8 +13,8 @@ vi.mock('../../../services/api', () => ({
 
 const RUNTIME_DESCRIPTORS = [
   {
-    runtime: 'zclaudia',
-    label: 'ZClaudia',
+    runtime: 'pi',
+    label: 'Pi',
     enabled: true,
     model: {
       kind: 'llm-profile' as const,
@@ -99,7 +99,7 @@ describe('NewAgentProfileModal', () => {
         'b1',
         expect.objectContaining({
           name: 'Coding',
-          runtimeType: 'zclaudia',
+          runtimeType: 'pi',
           llmProfileId: 'lp1',
           model: 'deepseek-v4-flash',
         })

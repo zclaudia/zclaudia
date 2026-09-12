@@ -195,6 +195,13 @@ build() {
   (cd "$PROJECT_ROOT/shared" && setup_node && run_pnpm build)
   ok "Shared built"
 
+  # Agent runtimes (claude/codex/cursor) are loaded from each plugin's built
+  # dist/main.js, not from its TypeScript sources. Skipping this leaves the
+  # server silently running the previous bundle after a plugin edit.
+  info "Building agent plugins..."
+  (cd "$PROJECT_ROOT" && setup_node && run_pnpm --filter "@zclaudia/plugin-*" run build)
+  ok "Agent plugins built"
+
   info "Building server..."
   (cd "$PROJECT_ROOT/server" && setup_node && run_pnpm build)
   ok "Server built"

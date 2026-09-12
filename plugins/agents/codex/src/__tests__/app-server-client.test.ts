@@ -15,6 +15,7 @@ import {
   MAX_APP_SERVER_INBOUND_LINE_BYTES,
   MAX_APP_SERVER_OUTBOUND_LINE_BYTES,
   CodexAppServerClient,
+  formatCodexAccount,
 } from '../app-server-client.js';
 
 const spawnMock = vi.mocked(spawn);
@@ -31,6 +32,10 @@ function fakeProc(options: {
   lines?: string[];
   stderrLines?: string[];
   onStdin?: (data: string, stdout: Readable) => void;
+  /** Config returned for the session-info `config/read`; omit for an empty one. */
+  config?: Record<string, unknown>;
+  /** Account returned for the session-info `account/read`. */
+  account?: Record<string, unknown>;
 }): { proc: FakeProc; stdinWrites: string[] } {
   const stdinWrites: string[] = [];
   const stdout = new Readable({ read() {} });
@@ -41,6 +46,29 @@ function fakeProc(options: {
     write(chunk, _enc, cb) {
       const data = chunk.toString();
       stdinWrites.push(data);
+      // Every turn asks for the effective config to build session info; answer
+      // it here so individual tests only script what they care about.
+      for (const line of data.split('\n').filter(Boolean)) {
+        let msg: { id?: number; method?: string };
+        try {
+          msg = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (msg.method === 'config/read') {
+          stdout.push(
+            JSON.stringify({ id: msg.id, result: { config: options.config ?? {} } }) + '\n'
+          );
+        }
+        if (msg.method === 'account/read') {
+          stdout.push(
+            JSON.stringify({
+              id: msg.id,
+              result: options.account ?? { account: null, requiresOpenaiAuth: false },
+            }) + '\n'
+          );
+        }
+      }
       options.onStdin?.(data, stdout);
       cb();
     },
@@ -149,6 +177,144 @@ describe('CodexAppServerClient', () => {
     );
     expect(events.find(e => e.type === 'provider_turn_finished')).toMatchObject({
       usage: { input: 12, output: 5, cacheRead: 3, cacheWrite: 2, totalTokens: 17 },
+    });
+    client.destroy();
+  });
+
+  it('reports the full session info on init: version, model, perms, auth and MCP servers', async () => {
+    const { proc } = fakeProc({
+      lines: [
+        JSON.stringify({
+          id: 1,
+          result: {
+            userAgent: 'zclaudia/0.154.0 (Mac OS 26.6.2; arm64)',
+            codexHome: '/home/.codex',
+          },
+        }),
+      ],
+      config: {
+        model: 'gpt-5.6-sol',
+        mcp_servers: {
+          bridge: { command: 'bridge' },
+          disabled_one: { command: 'nope', enabled: false },
+        },
+      },
+      account: {
+        account: { type: 'chatgpt', email: 'dev@example.com', planType: 'prolite' },
+        requiresOpenaiAuth: true,
+      },
+      onStdin(data, stdout) {
+        for (const line of data.split('\n').filter(Boolean)) {
+          const msg = JSON.parse(line) as { id?: number; method?: string };
+          if (msg.method !== 'turn/start') continue;
+          stdout.push(JSON.stringify({ id: msg.id, result: { turn: { id: 'turn-1' } } }) + '\n');
+          stdout.push(
+            JSON.stringify({
+              method: 'turn/completed',
+              params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } },
+            }) + '\n'
+          );
+        }
+      },
+    });
+    spawnMock.mockReturnValueOnce(proc as never);
+
+    const client = new CodexAppServerClient('/bin/codex', {});
+    const events = [];
+    for await (const event of client.runTurn(
+      'thread-1',
+      [{ type: 'text', text: 'hello', text_elements: [] }],
+      async () => ({ behavior: 'deny' as const }),
+      { cwd: '/tmp/project', mode: 'default' }
+    )) {
+      events.push(event);
+    }
+
+    expect(events.find(e => e.type === 'init')?.systemInfo).toEqual({
+      cwd: '/tmp/project',
+      model: 'gpt-5.6-sol',
+      claudeCodeVersion: '0.154.0',
+      permissionMode: 'default',
+      apiKeySource: 'ChatGPT (prolite)',
+      mcpServers: [{ name: 'bridge', status: 'enabled' }],
+      tools: [],
+    });
+    client.destroy();
+  });
+
+  it('lets the caller override the reported auth (SDK mode binds its own key)', async () => {
+    const { proc } = fakeProc({
+      lines: [JSON.stringify({ id: 1, result: { userAgent: 'zclaudia/0.154.0 (linux)' } })],
+      account: {
+        account: { type: 'chatgpt', email: 'dev@example.com', planType: 'prolite' },
+        requiresOpenaiAuth: true,
+      },
+      onStdin(data, stdout) {
+        for (const line of data.split('\n').filter(Boolean)) {
+          const msg = JSON.parse(line) as { id?: number; method?: string };
+          if (msg.method !== 'turn/start') continue;
+          stdout.push(JSON.stringify({ id: msg.id, result: { turn: { id: 'turn-1' } } }) + '\n');
+          stdout.push(
+            JSON.stringify({
+              method: 'turn/completed',
+              params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } },
+            }) + '\n'
+          );
+        }
+      },
+    });
+    spawnMock.mockReturnValueOnce(proc as never);
+
+    const client = new CodexAppServerClient('/bin/codex', {});
+    const events = [];
+    for await (const event of client.runTurn(
+      'thread-1',
+      [{ type: 'text', text: 'hello', text_elements: [] }],
+      async () => ({ behavior: 'deny' as const }),
+      { cwd: '/tmp/project', apiKeySource: 'ZClaudia LLM profile' }
+    )) {
+      events.push(event);
+    }
+
+    expect(events.find(e => e.type === 'init')?.systemInfo).toMatchObject({
+      apiKeySource: 'ZClaudia LLM profile',
+    });
+    client.destroy();
+  });
+
+  it('prefers the profile-pinned model over the Codex config default', async () => {
+    const { proc } = fakeProc({
+      lines: [JSON.stringify({ id: 1, result: { userAgent: 'zclaudia/0.154.0 (linux)' } })],
+      config: { model: 'gpt-5.6-sol' },
+      onStdin(data, stdout) {
+        for (const line of data.split('\n').filter(Boolean)) {
+          const msg = JSON.parse(line) as { id?: number; method?: string };
+          if (msg.method !== 'turn/start') continue;
+          stdout.push(JSON.stringify({ id: msg.id, result: { turn: { id: 'turn-1' } } }) + '\n');
+          stdout.push(
+            JSON.stringify({
+              method: 'turn/completed',
+              params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } },
+            }) + '\n'
+          );
+        }
+      },
+    });
+    spawnMock.mockReturnValueOnce(proc as never);
+
+    const client = new CodexAppServerClient('/bin/codex', {});
+    const events = [];
+    for await (const event of client.runTurn(
+      'thread-1',
+      [{ type: 'text', text: 'hello', text_elements: [] }],
+      async () => ({ behavior: 'deny' as const }),
+      { cwd: '/tmp/project', model: 'gpt-6-astra' }
+    )) {
+      events.push(event);
+    }
+
+    expect(events.find(e => e.type === 'init')?.systemInfo).toMatchObject({
+      model: 'gpt-6-astra',
     });
     client.destroy();
   });
@@ -755,5 +921,40 @@ describe('CodexAppServerClient', () => {
     await client.ensureRunning();
     expect(spawnMock).toHaveBeenCalledTimes(2);
     client.destroy();
+  });
+});
+
+describe('formatCodexAccount', () => {
+  it('names the ChatGPT plan, the key, and cloud credentials', () => {
+    expect(
+      formatCodexAccount({
+        account: { type: 'chatgpt', email: null, planType: 'pro' },
+        requiresOpenaiAuth: true,
+      })
+    ).toBe('ChatGPT (pro)');
+    expect(
+      formatCodexAccount({
+        account: { type: 'chatgpt', email: null, planType: 'unknown' },
+        requiresOpenaiAuth: true,
+      })
+    ).toBe('ChatGPT account');
+    expect(formatCodexAccount({ account: { type: 'apiKey' }, requiresOpenaiAuth: true })).toBe(
+      'API key'
+    );
+    expect(
+      formatCodexAccount({ account: { type: 'amazonBedrock' }, requiresOpenaiAuth: false })
+    ).toBe('Amazon Bedrock');
+  });
+
+  it('reports an unknown future account type verbatim instead of mislabelling it', () => {
+    expect(formatCodexAccount({ account: { type: 'azure' }, requiresOpenaiAuth: true })).toBe(
+      'azure'
+    );
+  });
+
+  it('omits the row when the answer is unknown, and says so when signed out', () => {
+    expect(formatCodexAccount(null)).toBeUndefined();
+    expect(formatCodexAccount({ account: null, requiresOpenaiAuth: false })).toBeUndefined();
+    expect(formatCodexAccount({ account: null, requiresOpenaiAuth: true })).toBe('Signed out');
   });
 });

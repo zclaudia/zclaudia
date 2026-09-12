@@ -1,3 +1,4 @@
+import { isPiAgentRuntime } from '@zclaudia/shared/core/agent-profile';
 import { cleanupPendingPermissions } from './run-lifecycle.js';
 import {
   persistAssistantTerminalSnapshot,
@@ -90,7 +91,7 @@ export async function handleRunException(
   const overflowRetryCount = recoveryState.overflowRetryCount || 0;
   if (
     error instanceof ContextOverflowError &&
-    activeRun.providerType === 'zclaudia' &&
+    isPiAgentRuntime(activeRun.providerType) &&
     activeRun.agentProfile &&
     activeRun.llmProfile &&
     overflowRetryCount < MAX_OVERFLOW_RETRIES

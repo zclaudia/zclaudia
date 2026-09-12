@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import type Database from 'better-sqlite3';
 import type { AgentReadiness } from '@zclaudia/shared/core/agent-readiness';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
@@ -45,7 +46,7 @@ function readinessForResolvedAgent(
   llm: LlmProfileConfig | null | undefined
 ): AgentReadiness {
   if (!agent) return { usable: false, reason: 'no_agent' };
-  const runtimeType = agent.runtimeType ?? 'zclaudia';
+  const runtimeType = normalizeAgentRuntimeType(agent.runtimeType);
 
   // Layer 1: engine mode validity. An explicitly stored unknown mode fails
   // closed instead of silently executing under another mode.
@@ -111,7 +112,7 @@ export async function resolveAgentExecutionReadiness(
   // an SDK run's engine is the bundled resource (checked structurally), and an
   // external `auth status` probe must never gate it.
   const engineMode = resolveProfileEngineMode({
-    runtimeType: agent.runtimeType ?? 'zclaudia',
+    runtimeType: normalizeAgentRuntimeType(agent.runtimeType),
     engineMode: agent.engineMode ?? null,
   });
   const skipsInspector =

@@ -1,3 +1,4 @@
+import { PI_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -164,7 +165,7 @@ function isLoaded(state: ExternalToolRuntimeState, ref: McpToolRef | PluginToolR
 function safeLoadMcpServers(db?: Database.Database) {
   if (!db) return {};
   try {
-    return loadMcpServersFromDb(db, 'zclaudia');
+    return loadMcpServersFromDb(db, PI_AGENT_RUNTIME);
   } catch {
     return {};
   }
@@ -422,7 +423,7 @@ export function createConcreteMcpTool(
             tool: ref.tool,
           });
         }
-        const servers = db ? loadMcpServersFromDb(db, 'zclaudia') : {};
+        const servers = db ? loadMcpServersFromDb(db, PI_AGENT_RUNTIME) : {};
         const config = servers[ref.server];
         if (!config) {
           return textResult(`MCP server is not configured or disabled: ${ref.server}`, {

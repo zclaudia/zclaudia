@@ -133,12 +133,22 @@ test('service port parser rejects non-integer and out-of-range ports', () => {
   assert.throws(() => parseServicePort('70000'), /invalid port/i);
 });
 
-test('browser service build commands include desktop assets', () => {
+test('browser service build commands include agent plugins and desktop assets', () => {
   assert.deepEqual(requiredBuildCommands(), [
     ['pnpm', '--filter', '@zclaudia/shared', 'run', 'build'],
+    ['pnpm', '--filter', '@zclaudia/plugin-*', 'run', 'build'],
     ['pnpm', '--filter', '@zclaudia/server', 'run', 'build'],
     ['pnpm', '--filter', '@zclaudia/desktop', 'run', 'build'],
   ]);
+});
+
+test('browser service rebuilds agent plugins before the server', () => {
+  const script = browserServiceShell();
+  const pluginBuild = script.indexOf('--filter "@zclaudia/plugin-*" run build');
+  const serverBuild = script.indexOf('--filter @zclaudia/server run build');
+
+  assert.notEqual(pluginBuild, -1, 'build_project must rebuild the agent plugins');
+  assert.ok(pluginBuild < serverBuild, 'plugins must be built before the server starts');
 });
 
 test('systemd unit runs server dist under the repository root', () => {

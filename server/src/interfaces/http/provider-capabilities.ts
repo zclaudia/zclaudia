@@ -1,9 +1,10 @@
+import { normalizeAgentRuntimeType, PI_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
 import { type Router, type Request, type Response } from 'express';
 import type Database from 'better-sqlite3';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
 
-const ZCLAUDIA_CAPABILITIES: ProviderCapabilities = {
+const PI_CAPABILITIES: ProviderCapabilities = {
   modeLabel: 'Mode',
   defaultModeId: 'default',
   modes: [
@@ -65,7 +66,7 @@ const CODEX_CAPABILITIES: ProviderCapabilities = {
 };
 
 const RUNTIME_CAPABILITIES: Record<string, ProviderCapabilities> = {
-  zclaudia: ZCLAUDIA_CAPABILITIES,
+  [PI_AGENT_RUNTIME]: PI_CAPABILITIES,
   claude: CLAUDE_CAPABILITIES,
   cursor: CURSOR_CAPABILITIES,
   codex: CODEX_CAPABILITIES,
@@ -73,7 +74,7 @@ const RUNTIME_CAPABILITIES: Record<string, ProviderCapabilities> = {
 
 export function mountCapabilityRoutes(router: Router, db: Database.Database): void {
   router.get('/type/:type/capabilities', (req: Request, res: Response) => {
-    const capabilities = RUNTIME_CAPABILITIES[req.params.type];
+    const capabilities = RUNTIME_CAPABILITIES[normalizeAgentRuntimeType(req.params.type)];
     if (!capabilities) {
       res.status(404).json({
         success: false,
@@ -98,9 +99,9 @@ export function mountCapabilityRoutes(router: Router, db: Database.Database): vo
       return;
     }
 
-    // LLM-profile capabilities remain zclaudia capabilities until callers ask
+    // LLM-profile capabilities remain Pi capabilities until callers ask
     // by agent profile/runtime type. This route receives an LLM profile id, not
     // an Agent profile id.
-    res.json({ success: true, data: ZCLAUDIA_CAPABILITIES } as ApiResponse<ProviderCapabilities>);
+    res.json({ success: true, data: PI_CAPABILITIES } as ApiResponse<ProviderCapabilities>);
   });
 }

@@ -19,10 +19,10 @@ function makeApp() {
 }
 
 describe('provider capability routes', () => {
-  it('exposes AI review support for runtime type and LLM profile routes', async () => {
+  it.each(['pi', 'zclaudia'])('exposes the same Pi capabilities for %s and LLM profile routes', async runtime => {
     const app = makeApp();
 
-    const byType = await request(app).get('/api/providers/type/zclaudia/capabilities');
+    const byType = await request(app).get(`/api/providers/type/${runtime}/capabilities`);
     const byProfile = await request(app).get('/api/providers/llm-1/capabilities');
 
     expect(byType.status).toBe(200);

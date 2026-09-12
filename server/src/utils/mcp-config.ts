@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import type Database from 'better-sqlite3';
 import type {
   McpOAuthConfig,
@@ -68,7 +69,7 @@ export function loadMcpServersFromDb(
     if (providerType && row.provider_scope) {
       try {
         const scope = JSON.parse(row.provider_scope) as string[];
-        if (!scope.includes(providerType)) continue;
+        if (!scope.some(type => normalizeAgentRuntimeType(type) === normalizeAgentRuntimeType(providerType))) continue;
       } catch {
         // Invalid JSON scope — skip filtering, include the server
       }

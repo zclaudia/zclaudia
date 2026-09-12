@@ -1,3 +1,4 @@
+import { PI_AGENT_RUNTIME, normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 /**
  * Plugin Provider API
  *
@@ -260,9 +261,9 @@ export class PluginProviderAPI implements ProviderAPI {
 
   private getModelsForProvider(type: string): string[] {
     const modelMap: Record<string, string[]> = {
-      zclaudia: ['default'],
+      [PI_AGENT_RUNTIME]: ['default'],
     };
-    return modelMap[type] || [];
+    return modelMap[normalizeAgentRuntimeType(type)] || [];
   }
 
   private getDefaultModel(type: string): string {

@@ -9,8 +9,8 @@ import { useRuntimeDescriptorStore } from '../../../stores/runtimeDescriptorStor
 
 const RUNTIME_DESCRIPTORS = [
   {
-    runtime: 'zclaudia',
-    label: 'ZClaudia',
+    runtime: 'pi',
+    label: 'Pi',
     enabled: true,
     model: {
       kind: 'llm-profile' as const,
@@ -149,7 +149,7 @@ describe('ProfileEditor', () => {
   it('uses an Agent Type dropdown for runtime selection', async () => {
     await renderEditor(makeProfile('p1', 'Coding'));
 
-    expect(screen.getByLabelText('Agent Type')).toHaveTextContent('ZClaudia');
+    expect(screen.getByLabelText('Agent Type')).toHaveTextContent('Pi');
   });
 
   it('shows Claude runtime limitations when Claude is selected', async () => {

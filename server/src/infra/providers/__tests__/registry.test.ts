@@ -23,10 +23,10 @@ function fakeAdapter(type: string): ProviderAdapter {
 
 describe('ProviderRegistry', () => {
   describe('built-in adapters', () => {
-    it('has a zclaudia adapter registered by default', () => {
-      const adapter = providerRegistry.get('zclaudia');
+    it('has a Pi adapter registered by default', () => {
+      const adapter = providerRegistry.get('pi');
       expect(adapter).toBeDefined();
-      expect(adapter!.type).toBe('zclaudia');
+      expect(adapter!.type).toBe('pi');
     });
 
     it('does not register claude as a built-in (it is a plugin runtime)', () => {
@@ -67,9 +67,9 @@ describe('ProviderRegistry', () => {
 
   describe('get', () => {
     it('returns the registered adapter for a known type', () => {
-      const adapter = providerRegistry.get('zclaudia');
+      const adapter = providerRegistry.get('pi');
       expect(adapter).toBeDefined();
-      expect(adapter!.type).toBe('zclaudia');
+      expect(adapter!.type).toBe('pi');
     });
 
     it('returns undefined for an unknown type', () => {
@@ -80,15 +80,15 @@ describe('ProviderRegistry', () => {
 
   describe('getOrDefault', () => {
     it('returns the requested adapter when it exists', () => {
-      const adapter = providerRegistry.getOrDefault('zclaudia');
+      const adapter = providerRegistry.getOrDefault('pi');
       expect(adapter).toBeDefined();
-      expect(adapter.type).toBe('zclaudia');
+      expect(adapter.type).toBe('pi');
     });
 
-    it('falls back to the zclaudia adapter for an unknown type', () => {
+    it('falls back to the Pi adapter for an unknown type', () => {
       const adapter = providerRegistry.getOrDefault('unknown-type-abc');
       expect(adapter).toBeDefined();
-      expect(adapter.type).toBe('zclaudia');
+      expect(adapter.type).toBe('pi');
     });
 
     it('always returns a defined adapter (never undefined)', () => {
@@ -99,16 +99,16 @@ describe('ProviderRegistry', () => {
 
   describe('provider definition', () => {
     it('returns zclaudia policy separately from the PCP capability manifest', () => {
-      const policy = providerRegistry.getPolicy('zclaudia');
-      const definition = providerRegistry.getDefinition('zclaudia');
+      const policy = providerRegistry.getPolicy('pi');
+      const definition = providerRegistry.getDefinition('pi');
 
       expect(policy?.modeSwitchSessionPolicy).toBe('preserve');
-      expect(definition?.capabilityManifest.providerType).toBe('zclaudia');
+      expect(definition?.capabilityManifest.providerType).toBe('pi');
       expect(definition?.policy).toBe(policy);
     });
 
-    it('only registers the built-in zclaudia adapter by default', () => {
-      expect(providerRegistry.get('zclaudia')).toBeDefined();
+    it('only registers the built-in Pi adapter by default', () => {
+      expect(providerRegistry.get('pi')).toBeDefined();
       expect(providerRegistry.get('claude')).toBeUndefined();
       expect(providerRegistry.get('opencode')).toBeUndefined();
       expect(providerRegistry.get('codex')).toBeUndefined();
@@ -121,7 +121,7 @@ describe('ProviderRegistry', () => {
 describe('ProviderRegistry plugin ownership', () => {
   it('registers and lists plugin adapters, then removes them by plugin', () => {
     const reg = new ProviderRegistry();
-    expect(reg.hasType('zclaudia')).toBe(true);
+    expect(reg.hasType('pi')).toBe(true);
     expect(reg.hasType('claude-x')).toBe(false);
 
     reg.registerPluginAdapter('com.test.x', fakeAdapter('claude-x'));
@@ -136,12 +136,12 @@ describe('ProviderRegistry plugin ownership', () => {
     const reg = new ProviderRegistry();
     reg.registerPluginAdapter('com.test.x', fakeAdapter('claude-x'));
     reg.removePluginAdapters('com.test.x');
-    expect(reg.hasType('zclaudia')).toBe(true);
+    expect(reg.hasType('pi')).toBe(true);
   });
 
   it('throws when a plugin adapter type collides with a built-in', () => {
     const reg = new ProviderRegistry();
-    expect(() => reg.registerPluginAdapter('com.test.x', fakeAdapter('zclaudia'))).toThrow(
+    expect(() => reg.registerPluginAdapter('com.test.x', fakeAdapter('pi'))).toThrow(
       /already registered/
     );
   });
@@ -198,11 +198,28 @@ describe('ProviderRegistry plugin ownership', () => {
 
     // Ownership entry is gone, so a later collision with a built-in still throws
     // (i.e. the plugin is no longer treated as the owner of anything).
-    expect(() => reg.registerPluginAdapter('com.test.multi', fakeAdapter('zclaudia'))).toThrow(
+    expect(() => reg.registerPluginAdapter('com.test.multi', fakeAdapter('pi'))).toThrow(
       /already registered/
     );
     // And it can freshly claim a new non-colliding type again.
     expect(() => reg.registerPluginAdapter('com.test.multi', fakeAdapter('a'))).not.toThrow();
     expect(reg.hasType('a')).toBe(true);
+  });
+});
+
+
+describe('legacy Pi registry identity', () => {
+  it('resolves every read API through the same adapter and protects both names', () => {
+    const registry = new ProviderRegistry();
+    expect(registry.get('zclaudia')).toBe(registry.get('pi'));
+    expect(registry.getOrDefault('zclaudia')).toBe(registry.get('pi'));
+    expect(registry.getPolicy('zclaudia')).toBe(registry.getPolicy('pi'));
+    expect(registry.getManifest('zclaudia')).toBe(registry.getManifest('pi'));
+    expect(registry.getDefinition('zclaudia')?.adapter).toBe(registry.get('pi'));
+    expect(registry.listTypes()).toEqual(['pi']);
+    for (const name of ['pi', 'zclaudia']) {
+      expect(registry.hasType(name)).toBe(true);
+      expect(() => registry.registerPluginAdapter('plugin', fakeAdapter(name))).toThrow(/already registered/);
+    }
   });
 });

@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import type { Database } from 'better-sqlite3';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
@@ -109,7 +110,7 @@ export function resolveAgentForSession(db: Database, opts: ResolveOptions): Reso
   //   documented default fallback. External adapters ignore the resolved LLM
   //   profile either way; they authenticate in their own environment.
   const engineMode = resolveProfileEngineMode({
-    runtimeType: agent.runtimeType ?? 'zclaudia',
+    runtimeType: normalizeAgentRuntimeType(agent.runtimeType),
     engineMode: agent.engineMode ?? null,
   });
   const isDualModeSdk =

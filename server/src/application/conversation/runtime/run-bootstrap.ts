@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import { newId } from '../../../utils/uuid.js';
 import { parseMessageInput } from './message-input.js';
 import type { ErrorMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
@@ -232,7 +233,7 @@ export function initializeRunBootstrap(
 
   const sessionType = (session.session_type || 'regular') as 'regular' | 'background' | 'agent';
   const projectId = session.project_id || message.sessionId;
-  const providerTypeForSession = agentProfile.runtimeType ?? 'zclaudia';
+  const providerTypeForSession = normalizeAgentRuntimeType(agentProfile.runtimeType);
   const providerPolicy = providerRegistry.getPolicy(providerTypeForSession);
   trace.setMeta({ provider: providerTypeForSession });
 

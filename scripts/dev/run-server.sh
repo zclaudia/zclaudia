@@ -121,6 +121,10 @@ cmd_run() {
   # Build
   info "Building shared..."
   pnpm --filter @zclaudia/shared run build 2>&1
+  # Agent runtimes ship as built plugin bundles; without this the server keeps
+  # loading the previous dist/main.js after a plugin edit.
+  info "Building agent plugins..."
+  pnpm --filter "@zclaudia/plugin-*" run build 2>&1
   info "Building server..."
   pnpm --filter @zclaudia/server run build 2>&1
   ok "Build complete"

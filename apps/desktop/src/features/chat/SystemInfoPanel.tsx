@@ -64,7 +64,7 @@ export function SystemInfoPanel({ systemInfo }: SystemInfoPanelProps) {
               <InfoBadge icon={Shield} label="Permission" value={systemInfo.permissionMode} />
             )}
             {systemInfo.apiKeySource && (
-              <InfoBadge icon={Key} label="API Key" value={systemInfo.apiKeySource} />
+              <InfoBadge icon={Key} label="Auth" value={systemInfo.apiKeySource} />
             )}
           </div>
 

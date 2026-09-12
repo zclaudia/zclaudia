@@ -99,6 +99,12 @@ info "Building shared..."
 run_clean_env pnpm --filter @zclaudia/shared run build
 ok "Shared built"
 
+# The embedded server loads agent runtimes from each plugin's built
+# dist/main.js, so a plugin edit needs this rebuild to take effect.
+info "Building agent plugins..."
+run_clean_env pnpm --filter "@zclaudia/plugin-*" run build
+ok "Agent plugins built"
+
 if is_vite_ready; then
   ok "Vite already running on ${VITE_URL}, reusing existing dev server"
 elif is_port_in_use; then

@@ -5,14 +5,26 @@ import type { RecordStatus } from './record-status.js';
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
 /** Built-in runtimes always present. Plugins register additional runtime types at runtime. */
-export const BUILTIN_AGENT_RUNTIME_TYPES = ['zclaudia'] as const;
+export const PI_AGENT_RUNTIME = 'pi' as const;
+export const DEFAULT_AGENT_RUNTIME = PI_AGENT_RUNTIME;
+export const BUILTIN_AGENT_RUNTIME_TYPES = [PI_AGENT_RUNTIME] as const;
+
+/** Normalize legacy runtime identities without coercing unknown plugin types. */
+export function normalizeAgentRuntimeType(type?: string | null): string {
+  return type === 'zclaudia' ? PI_AGENT_RUNTIME : type ?? DEFAULT_AGENT_RUNTIME;
+}
+
+/** Pi-specific host behavior; this does not classify other runtimes as CLI/external. */
+export function isPiAgentRuntime(type?: string | null): boolean {
+  return type != null && normalizeAgentRuntimeType(type) === PI_AGENT_RUNTIME;
+}
 /** Known built-in runtime literals, kept for ergonomic narrowing; any string is accepted. */
 export type BuiltinAgentRuntimeType = (typeof BUILTIN_AGENT_RUNTIME_TYPES)[number];
 /** A runtime type is an open string set (plugin-extensible). */
 export type AgentRuntimeType = BuiltinAgentRuntimeType | (string & {});
 
 /** @deprecated use provider registry for validation; kept for legacy imports. */
-export const AGENT_RUNTIME_TYPES = ['zclaudia', 'claude', 'codex', 'cursor'] as const;
+export const AGENT_RUNTIME_TYPES = [PI_AGENT_RUNTIME, 'claude', 'codex', 'cursor'] as const;
 
 export interface MultimodalFallbackConfig {
   llmProfileId: string;

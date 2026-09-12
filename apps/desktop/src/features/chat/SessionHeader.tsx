@@ -115,13 +115,7 @@ export function SessionHeader({
   const runtimeEngine = currentSession?.runtimeEngine;
   const engineBadge = runtimeEngine
     ? runtimeEngine.engineMode === 'sdk'
-      ? [
-          'SDK',
-          runtimeEngine.llmProfileName,
-          runtimeEngine.model,
-        ]
-          .filter(Boolean)
-          .join(' · ')
+      ? ['SDK', runtimeEngine.llmProfileName, runtimeEngine.model].filter(Boolean).join(' · ')
       : 'CLI'
     : null;
   // The pill shows only the agent name to stay compact; the model is redundant
@@ -543,8 +537,10 @@ function SessionInfoRows({
       {systemInfo?.permissionMode && (
         <InfoRow icon={Shield} label="Perms" value={systemInfo.permissionMode} />
       )}
+      {/* "Auth", not "API key": runtimes report a credential *source*, which is
+          often an account login rather than a key. */}
       {systemInfo?.apiKeySource && (
-        <InfoRow icon={Key} label="API key" value={systemInfo.apiKeySource} />
+        <InfoRow icon={Key} label="Auth" value={systemInfo.apiKeySource} />
       )}
       {pathValue && <InfoRow icon={FolderOpen} label="Path" value={pathValue} mono />}
       {contextPercent != null && (

@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType, DEFAULT_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type Database from 'better-sqlite3';
@@ -32,7 +33,7 @@ function validateRuntimeType(input: unknown): string | undefined | null {
   if (typeof input !== 'string' || !isValidRuntimeType(input)) {
     return null;
   }
-  return input;
+  return normalizeAgentRuntimeType(input);
 }
 
 type MultimodalFallbackValidation =
@@ -240,7 +241,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         });
         return;
       }
-      const resolvedRuntimeType = validatedRuntimeType ?? 'zclaudia';
+      const resolvedRuntimeType = validatedRuntimeType ?? DEFAULT_AGENT_RUNTIME;
       if (model !== undefined && model !== null && typeof model !== 'string') {
         res.status(400).json({
           success: false,
@@ -472,7 +473,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
       const mergedRuntimeType =
         validatedRuntimeType !== undefined
           ? validatedRuntimeType
-          : existing.runtimeType ?? 'zclaudia';
+          : normalizeAgentRuntimeType(existing.runtimeType);
       const engineModeInBody = Object.prototype.hasOwnProperty.call(body, 'engineMode');
       const mergedEngineMode = engineModeInBody ? body.engineMode : (existing.engineMode ?? null);
       const mergedLlmProfileId = Object.prototype.hasOwnProperty.call(body, 'llmProfileId')

@@ -56,6 +56,8 @@ describe('McpServerService', () => {
       providerScope: ['zclaudia'],
     });
     expect(created.name).toBe('srv');
+    expect(created.providerScope).toEqual(['pi']);
+    expect(db.prepare('SELECT provider_scope FROM mcp_servers WHERE id = ?').get(created.id)).toEqual({ provider_scope: '[\"pi\"]' });
     expect(service.listServers()).toHaveLength(1);
 
     const updated = service.updateServer(created.id, {
@@ -68,6 +70,14 @@ describe('McpServerService', () => {
 
     const toggled = service.toggleServer(created.id);
     expect(toggled.enabled).toBe(false);
+  });
+
+  it('normalizes legacy scopes on updates and reads', () => {
+    const service = new McpServerService(db);
+    const created = service.createServer({ name: 'scoped', command: 'node' });
+    expect(service.updateServer(created.id, { providerScope: ['zclaudia', 'codex'] }).providerScope).toEqual(['pi', 'codex']);
+    db.prepare('UPDATE mcp_servers SET provider_scope = ? WHERE id = ?').run('["zclaudia"]', created.id);
+    expect(service.listServers()[0].providerScope).toEqual(['pi']);
   });
 
   it('throws structured errors for missing and duplicate servers', () => {

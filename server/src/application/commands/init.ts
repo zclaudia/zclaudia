@@ -1,3 +1,4 @@
+import { DEFAULT_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
 /**
  * Built-in Commands Registration
  *
@@ -87,7 +88,7 @@ const statusHandler = (_args: string[], context?: CommandContext): CommandExecut
       uptime: formatUptime(uptime),
       uptimeSeconds: Math.floor(uptime),
       model: context?.model || 'unknown',
-      provider: context?.provider || 'zclaudia',
+      provider: context?.provider || DEFAULT_AGENT_RUNTIME,
       nodeVersion: process.version,
       platform: process.platform,
       projectPath: context?.projectPath || 'N/A',
@@ -97,7 +98,7 @@ const statusHandler = (_args: string[], context?: CommandContext): CommandExecut
 
 const modelHandler = (_args: string[], context?: CommandContext): CommandExecuteResponse => {
   const model = context?.model || 'default';
-  const provider = context?.provider || 'zclaudia';
+  const provider = context?.provider || DEFAULT_AGENT_RUNTIME;
   let message = '**Model Info:**\n\n';
   message += `- **Model:** ${model}\n`;
   message += `- **Provider:** ${provider}\n`;

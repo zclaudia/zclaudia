@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import {
   defaultEngineModeFor,
   resolveProfileConfigDescriptor,
@@ -110,6 +111,7 @@ export function resolveProfileEngineMode(input: {
   runtimeType: string;
   engineMode?: string | null;
 }): EngineModeResolution {
+  input = { ...input, runtimeType: normalizeAgentRuntimeType(input.runtimeType) };
   const descriptor = getEngineModeSourceDescriptor(input.runtimeType);
   const hasDeclaredModes = !!descriptor?.engineModes?.length;
 
@@ -183,7 +185,7 @@ export function normalizedProfileEngineMode(profile: {
   runtimeType?: string;
   engineMode?: string | null;
 }): string {
-  const runtimeType = profile.runtimeType ?? 'zclaudia';
+  const runtimeType = normalizeAgentRuntimeType(profile.runtimeType);
   const resolution = resolveProfileEngineMode({ runtimeType, engineMode: profile.engineMode });
   if (resolution.ok) return resolution.engineMode;
   // Unknown stored mode: surface the declared default so listing endpoints stay

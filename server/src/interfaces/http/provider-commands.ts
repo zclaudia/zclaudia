@@ -5,6 +5,7 @@ import type { SlashCommand } from '@zclaudia/shared/features/commands';
 import { LOCAL_COMMANDS, CLI_COMMANDS } from '@zclaudia/shared/features/commands';
 import { scanCustomCommands } from '../../utils/command-scanner.js';
 import { createExecutionEnv } from '../../infra/execution-env.js';
+import { isValidRuntimeType } from '../../domains/agent-profiles/runtime-type-guard.js';
 import { commandRegistry } from '../../application/commands/registry.js';
 
 function deduplicateCommands(commands: SlashCommand[]): SlashCommand[] {
@@ -49,12 +50,7 @@ export function mountCommandRoutes(router: Router, db: Database.Database): void 
   });
 
   router.get('/type/:type/commands', async (req: Request, res: Response) => {
-    if (
-      req.params.type !== 'zclaudia' &&
-      req.params.type !== 'claude' &&
-      req.params.type !== 'cursor' &&
-      req.params.type !== 'codex'
-    ) {
+    if (!isValidRuntimeType(req.params.type)) {
       res.status(404).json({
         success: false,
         error: { code: 'NOT_FOUND', message: 'Runtime type not found' },

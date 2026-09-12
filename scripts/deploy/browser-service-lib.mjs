@@ -1,6 +1,8 @@
 export function requiredBuildCommands() {
   return [
     ['pnpm', '--filter', '@zclaudia/shared', 'run', 'build'],
+    // Agent runtimes load from each plugin's built dist/main.js.
+    ['pnpm', '--filter', '@zclaudia/plugin-*', 'run', 'build'],
     ['pnpm', '--filter', '@zclaudia/server', 'run', 'build'],
     ['pnpm', '--filter', '@zclaudia/desktop', 'run', 'build'],
   ];

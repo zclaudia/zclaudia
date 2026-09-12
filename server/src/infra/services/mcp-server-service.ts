@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import type Database from 'better-sqlite3';
 import type {
   McpOAuthConfig,
@@ -102,7 +103,7 @@ function rowToConfig(row: McpServerRow): McpServerConfig {
     enabled: row.enabled === 1,
     description: row.description || undefined,
     source: row.source as McpServerConfig['source'],
-    providerScope: row.provider_scope ? JSON.parse(row.provider_scope) : undefined,
+    providerScope: row.provider_scope ? (JSON.parse(row.provider_scope) as string[]).map(normalizeAgentRuntimeType) : undefined,
     trustPolicy: parseTrustPolicy(row.trust_policy),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -222,7 +223,7 @@ export class McpServerService {
         input.env ? JSON.stringify(input.env) : null,
         input.enabled !== false ? 1 : 0,
         input.description || null,
-        input.providerScope ? JSON.stringify(input.providerScope) : null,
+        input.providerScope ? JSON.stringify(input.providerScope.map(normalizeAgentRuntimeType)) : null,
         stringifyTrustPolicy(input.trustPolicy),
         transport,
         input.url || null,
@@ -284,7 +285,7 @@ export class McpServerService {
         input.description !== undefined ? input.description || null : null,
         input.providerScope !== undefined
           ? input.providerScope
-            ? JSON.stringify(input.providerScope)
+            ? JSON.stringify(input.providerScope.map(normalizeAgentRuntimeType))
             : null
           : null,
         input.trustPolicy !== undefined ? stringifyTrustPolicy(input.trustPolicy) : null,

@@ -4,7 +4,8 @@ A cross-platform desktop and gateway shell for a zclaudia-owned coding agent, bu
 
 ## Features
 
-- **ZClaudia Agent Runtime**: Uses an internal agent runtime boundary, ready for future pi-agent integration
+- **Pi Runtime (Built-in)**: ZClaudia assembles its agent loop, tools and context using Pi
+- **Plugin Runtimes**: Claude, Codex and Cursor integrate complete agent engines; Claude and Codex support CLI and SDK modes
 - **Cross-Platform**: Desktop (macOS/Windows/Linux) and mobile web
 - **Project Management**: Organize conversations by project
 - **Supervision**: AI-powered project orchestration and task management

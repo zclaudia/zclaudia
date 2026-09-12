@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Check } from 'lucide-react';
 import type {
@@ -227,7 +228,7 @@ export function ProfileEditor({
   // Form state — mirror LlmProfileManager `form*` naming convention
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [formRuntimeType, setFormRuntimeType] = useState<RuntimeOption>('zclaudia');
+  const [formRuntimeType, setFormRuntimeType] = useState<RuntimeOption>(normalizeAgentRuntimeType());
   /** Engine mode of the selected runtime ('' when the runtime declares no modes). */
   const [formEngineMode, setFormEngineMode] = useState('');
   const [formLlmProfileId, setFormLlmProfileId] = useState('');
@@ -320,7 +321,7 @@ export function ProfileEditor({
   const populateForm = (agent: AgentProfileConfig) => {
     setFormName(agent.name);
     setFormDescription(agent.description ?? '');
-    setFormRuntimeType(agent.runtimeType ?? 'zclaudia');
+    setFormRuntimeType(normalizeAgentRuntimeType(agent.runtimeType));
     setFormEngineMode(agent.engineMode ?? '');
     setFormLlmProfileId(agent.llmProfileId ?? '');
     setFormModel(agent.model);

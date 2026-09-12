@@ -28,7 +28,7 @@ export function autoDetectProviders(db: Database.Database): void {
       now,
       now
     );
-    console.log('   Registered default ZClaudia agent runtime');
+    console.log('   Registered default LLM profile for the Pi runtime');
     return;
   }
 
@@ -63,7 +63,7 @@ export function autoDetectProviders(db: Database.Database): void {
     UPDATE llm_profiles SET provider_type = ?, base_url = ?, api_key = ?, updated_at = ? WHERE id = ?
   `
   ).run(cred.providerType, cred.baseUrl ?? null, cred.apiKey, now, def.id);
-  console.log('   Backfilled default ZClaudia agent credential from environment');
+  console.log('   Backfilled default LLM profile credential from environment');
 }
 
 export function startTempFileCleanup(): void {

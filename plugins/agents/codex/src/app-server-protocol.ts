@@ -45,6 +45,22 @@ export interface Turn {
   error: TurnError | null;
 }
 
+/**
+ * Who the running Codex is authenticated as. `account/read` is the only
+ * authoritative source — the CLI may sign in with a ChatGPT account, an API
+ * key, or cloud credentials, and nothing in the config or env says which.
+ */
+export type CodexAccount =
+  | { type: 'apiKey' }
+  | { type: 'chatgpt'; email: string | null; planType: string }
+  | { type: 'amazonBedrock'; usesCodexManagedCredentials?: boolean }
+  | { type: string };
+
+export interface GetAccountResponse {
+  account?: CodexAccount | null;
+  requiresOpenaiAuth: boolean;
+}
+
 export interface ModelInfo {
   id: string;
   model: string;
@@ -95,6 +111,10 @@ export interface CodexClientRequestMap {
   'turn/interrupt': {
     params: { threadId: string; turnId: string };
     result: Record<string, never>;
+  };
+  'account/read': {
+    params: Record<string, never>;
+    result: GetAccountResponse;
   };
   'model/list': {
     params: { cursor?: string | null; limit?: number | null; includeHidden?: boolean | null };

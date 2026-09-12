@@ -1,6 +1,6 @@
 /**
  * Runtime descriptor store — the set of agent-runtime descriptors served by the
- * active backend (built-in `zclaudia` plus any active plugin-registered runtimes).
+ * active backend (built-in `pi` plus any active plugin-registered runtimes).
  *
  * Server-authoritative and keyed per backend (like llmProfileMetaStore), because
  * which runtimes exist depends on which plugins are active on the connected server.

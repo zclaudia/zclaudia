@@ -1,3 +1,4 @@
+import { DEFAULT_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
 import type Database from 'better-sqlite3';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import { AgentProfileRepository } from './repository.js';
@@ -30,7 +31,7 @@ export function ensureDefaultAgentProfile(db: Database.Database): void {
     systemPrompt: DEFAULT_AGENT_SYSTEM_PROMPT,
     enabledTools: resolveToolSelection(defaultToolSelection).builtinTools,
     toolSelection: defaultToolSelection,
-    runtimeType: 'zclaudia',
+    runtimeType: DEFAULT_AGENT_RUNTIME,
     isDefault: true,
   });
 

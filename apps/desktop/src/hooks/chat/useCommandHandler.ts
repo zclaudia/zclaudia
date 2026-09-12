@@ -1,3 +1,4 @@
+import { DEFAULT_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
 import { useCallback } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
@@ -191,7 +192,7 @@ export function useCommandHandler({
           // Re-fetch commands from server (cache already cleared server-side)
           (llmProfileId
             ? api.getProviderCommands(llmProfileId, currentProject?.rootPath || undefined)
-            : api.getProviderTypeCommands('zclaudia', currentProject?.rootPath || undefined)
+            : api.getProviderTypeCommands(DEFAULT_AGENT_RUNTIME, currentProject?.rootPath || undefined)
           )
             .then(cmds => {
               useLlmProfileMetaStore.getState().setProviderCommands(commandsCacheKey, cmds);
@@ -749,13 +750,13 @@ export function useCommandHandler({
 
       // Build context for command execution. `llmProfileId` is already resolved
       // upstream via useProviderCapabilities (which itself goes through
-      // useAgentForSession). Fall back to the provider type `zclaudia` for the
+      // useAgentForSession). Fall back to the runtime type `pi` for the
       // local default agent.
       const context = {
         projectPath: currentProject?.rootPath,
         projectName: currentProject?.name,
         sessionId,
-        provider: llmProfileId || 'zclaudia',
+        provider: llmProfileId || DEFAULT_AGENT_RUNTIME,
         model: 'default',
       };
 

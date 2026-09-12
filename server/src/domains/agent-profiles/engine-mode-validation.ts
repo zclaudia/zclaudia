@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileRepository } from '../llm-profiles/repository.js';
 import {
@@ -63,7 +64,7 @@ function validateImpl(input: EngineModeConfigValidationInput): EngineModeConfigV
 
   const engineMode = modeResolution.engineMode;
   // Only runtimes that declare engine modes get SDK connection admission;
-  // classic llm-profile runtimes (zclaudia) keep their original semantics.
+  // classic llm-profile runtimes (Pi) keep their original semantics.
   const isDualMode = modeResolution.declaredModes !== null;
   const requiresLlm = modeResolution.projected.model.kind === 'llm-profile';
 
@@ -139,13 +140,13 @@ function validateImpl(input: EngineModeConfigValidationInput): EngineModeConfigV
 /** Normalized engine mode for API responses (declared default when unset). */
 export function engineModeForResponse(profile: AgentProfileConfig): string | undefined {
   const resolution = resolveProfileEngineMode({
-    runtimeType: profile.runtimeType ?? 'zclaudia',
+    runtimeType: normalizeAgentRuntimeType(profile.runtimeType),
     engineMode: profile.engineMode ?? null,
   });
   if (resolution.ok) return resolution.engineMode || undefined;
   // Unknown stored mode: report the descriptor default; strict validation on
   // write/run paths still rejects it.
-  const descriptor = getEngineModeSourceDescriptor(profile.runtimeType ?? 'zclaudia');
+  const descriptor = getEngineModeSourceDescriptor(normalizeAgentRuntimeType(profile.runtimeType));
   if (descriptor?.engineModes?.length) {
     return descriptor.defaultEngineMode ?? descriptor.engineModes[0]!.id;
   }

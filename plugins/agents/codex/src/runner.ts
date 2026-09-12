@@ -41,6 +41,15 @@ export interface CodexRunOptions {
   modelConnection?: RuntimeModelConnection;
 }
 
+// ── Session-info auth label ──────────────────────────────────
+
+/**
+ * SDK mode authenticates with the host-bound LLM profile key, not with the
+ * user's Codex login, so the session info must say so explicitly. CLI mode
+ * passes no label: the client reports the CLI's own signed-in account.
+ */
+const SDK_API_KEY_SOURCE = 'ZClaudia LLM profile';
+
 // ── Client cache ─────────────────────────────────────────────
 
 const appServerClients = new Map<string, CodexAppServerClient>();
@@ -211,9 +220,11 @@ export async function* runCodexSdkTurn(
   // trust is NOT written to the user's global Codex config in SDK mode; trust
   // entries (if any) stay inside this session directory.
   mkdirSync(codexHome, { recursive: true, mode: 0o700 });
-  const mcpToml = options.bridge ? mcpServersToToml({ [options.bridge.name]: options.bridge.config }) : '';
-  const configToml = buildSdkConfigToml({ connection, model }) +
-    (mcpToml ? '\n' + mcpToml + '\n' : '');
+  const mcpToml = options.bridge
+    ? mcpServersToToml({ [options.bridge.name]: options.bridge.config })
+    : '';
+  const configToml =
+    buildSdkConfigToml({ connection, model }) + (mcpToml ? '\n' + mcpToml + '\n' : '');
   writeSdkConfig(codexHome, configToml);
 
   const env = buildCodexSdkEnvironment({
@@ -243,7 +254,9 @@ export async function* runCodexSdkTurn(
     // Config changed between runs. The previous turn already finished (runs
     // are serialized per session), so shut the old process down cleanly and
     // respawn from the same state directory — never destroy a live writer.
-    debugLog(`[Codex AppServer] SDK fingerprint changed for session ${sessionKey}; restarting process`);
+    debugLog(
+      `[Codex AppServer] SDK fingerprint changed for session ${sessionKey}; restarting process`
+    );
     await client.shutdown();
     client = undefined;
   }
@@ -297,6 +310,7 @@ export async function* runCodexSdkTurn(
       cwd: options.cwd,
       model,
       mode: options.mode,
+      apiKeySource: SDK_API_KEY_SOURCE,
     })) {
       if (streamingMode) {
         yield msg;

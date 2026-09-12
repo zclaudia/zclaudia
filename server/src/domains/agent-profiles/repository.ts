@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType, DEFAULT_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type {
@@ -44,7 +45,7 @@ type AgentProfileUpdate = Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 
 };
 
 function normalizeRuntimeType(raw: unknown): string {
-  return typeof raw === 'string' && isValidRuntimeType(raw) ? raw : 'zclaudia';
+  return typeof raw === 'string' && isValidRuntimeType(raw) ? normalizeAgentRuntimeType(raw) : DEFAULT_AGENT_RUNTIME;
 }
 
 function normalizeEnabledTools(tools: string[]): string[] {
@@ -181,7 +182,7 @@ export class AgentProfileRepository extends BaseRepository<
       id: row.id,
       name: row.name,
       description: row.description ?? undefined,
-      runtimeType: row.runtime_type || 'zclaudia',
+      runtimeType: normalizeAgentRuntimeType(row.runtime_type),
       engineMode: row.engine_mode ?? undefined,
       // DB NULL is canonical for "no binding"; legacy empty strings were
       // normalized to NULL at write boundaries (never re-emitted).

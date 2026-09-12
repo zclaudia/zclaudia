@@ -1,3 +1,4 @@
+import { PI_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
 /**
  * Backend-scoped MCP server editor
  *
@@ -53,7 +54,7 @@ import type {
   McpServerTrustPolicy,
 } from '@zclaudia/shared/core/mcp';
 
-const PROVIDER_OPTIONS = [{ value: 'zclaudia', label: 'ZClaudia' }];
+const PROVIDER_OPTIONS = [{ value: PI_AGENT_RUNTIME, label: 'Pi' }];
 
 const RISK_ACTION_OPTIONS: Array<{ value: McpRiskAction | ''; label: string }> = [
   { value: '', label: 'Use default' },

@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType, DEFAULT_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
 import type Database from 'better-sqlite3';
 import type { AgentProfileContribution } from '@zclaudia/shared/plugin-types';
 import { defaultToolSelection, resolveToolSelection } from '@zclaudia/shared/core/tools';
@@ -26,7 +27,7 @@ export class PluginAgentProfileService {
 
     const requestedRuntime = contribution.runtimeType;
     const runtimeType =
-      requestedRuntime && isValidRuntimeType(requestedRuntime) ? requestedRuntime : 'zclaudia';
+      requestedRuntime && isValidRuntimeType(requestedRuntime) ? normalizeAgentRuntimeType(requestedRuntime) : DEFAULT_AGENT_RUNTIME;
     const requiresLlm = runtimeRequiresLlmProfile(runtimeType);
     const llmRepo = new LlmProfileRepository(this.db);
     const llmProfile = llmRepo.findDefault() ?? llmRepo.findAllOrdered()[0];

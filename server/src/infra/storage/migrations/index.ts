@@ -43,6 +43,8 @@ import { migration as m_039_session_message_version } from './039_session_messag
 import { migration as m_040_session_log } from './040_session_log.js';
 import { migration as m_041_runtime_engine_modes_and_session_bindings } from './041_runtime_engine_modes_and_session_bindings.js';
 
+import { migration as m_042_pi_runtime_identity } from './042_pi_runtime_identity.js';
+
 export type { Migration };
 
 export const migrations: Migration[] = [
@@ -87,6 +89,7 @@ export const migrations: Migration[] = [
   m_039_session_message_version,
   m_040_session_log,
   m_041_runtime_engine_modes_and_session_bindings,
+  m_042_pi_runtime_identity,
 ];
 
 /**

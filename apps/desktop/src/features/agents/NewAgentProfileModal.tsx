@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentProfileConfig, LlmProfileConfig } from '@zclaudia/shared';
 import { Button } from '../../components/ui/Button';
@@ -33,7 +34,7 @@ export function NewAgentProfileModal({
   const nameRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
 
-  const selectedRuntime = runtimeType || enabled[0]?.runtime || 'zclaudia';
+  const selectedRuntime = normalizeAgentRuntimeType(runtimeType || enabled[0]?.runtime);
   const descriptor = enabled.find(d => d.runtime === selectedRuntime);
 
   useEffect(() => {

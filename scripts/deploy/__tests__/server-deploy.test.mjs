@@ -21,3 +21,13 @@ test('server deploy defaults to localhost binding', () => {
   assert.match(script, /SERVER_HOST=127\.0\.0\.1/);
   assert.doesNotMatch(script, /SERVER_HOST=0\.0\.0\.0/);
 });
+
+test('server deploy builds the agent plugins before the server', () => {
+  // The server loads agent runtimes from plugins/agents/*/dist/main.js; a
+  // deployed checkout that never builds them has no working agents.
+  const pluginBuild = script.indexOf('--filter "@zclaudia/plugin-*" run build');
+  const serverBuild = script.indexOf('--filter @zclaudia/server run build');
+
+  assert.notEqual(pluginBuild, -1);
+  assert.ok(pluginBuild < serverBuild);
+});

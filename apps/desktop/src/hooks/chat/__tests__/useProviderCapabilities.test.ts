@@ -77,13 +77,13 @@ describe('useProviderCapabilities', () => {
     } as any);
   });
 
-  it('selects and caches external runtime metadata independently of an inherited LLM binding', async () => {
+  it.each(['cursor', 'claude', 'codex'])('selects %s plugin metadata even with an LLM binding', async runtime => {
     useProjectStore.setState({
       sessions: [{ id: 'sess-1', projectId: 'proj-1', agentProfileId: 'cursor-agent' }],
     } as any);
     useAgentProfileMetaStore.setState({
       profiles: {
-        'cursor-agent': { id: 'cursor-agent', runtimeType: 'cursor', llmProfileId: 'legacy-llm' },
+        'cursor-agent': { id: 'cursor-agent', runtimeType: runtime, engineMode: runtime === 'cursor' ? undefined : 'sdk', llmProfileId: 'legacy-llm' },
       },
       loaded: true,
     } as any);
@@ -94,12 +94,12 @@ describe('useProviderCapabilities', () => {
       useProviderCapabilities({ sessionId: 'sess-1', isConnected: true })
     );
     await waitFor(() =>
-      expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith('cursor', expect.any(Object))
+      expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith(runtime, expect.any(Object))
     );
-    expect(api.getProviderTypeCommands).toHaveBeenCalledWith('cursor', '/test', expect.any(Object));
+    expect(api.getProviderTypeCommands).toHaveBeenCalledWith(runtime, '/test', expect.any(Object));
     expect(api.getProviderCapabilities).not.toHaveBeenCalled();
     expect(api.getProviderCommands).not.toHaveBeenCalled();
-    expect(result.current.commandsCacheKey).toBe('local:runtime:cursor');
+    expect(result.current.commandsCacheKey).toBe(`local:runtime:${runtime}`);
   });
 
   it('does not stall forever when the session agentProfileId is orphaned', async () => {
@@ -115,10 +115,10 @@ describe('useProviderCapabilities', () => {
     renderHook(() => useProviderCapabilities({ sessionId: 'sess-1', isConnected: true }));
 
     await waitFor(() =>
-      expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith('zclaudia', expect.any(Object))
+      expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith('pi', expect.any(Object))
     );
     expect(api.getProviderTypeCommands).toHaveBeenCalledWith(
-      'zclaudia',
+      'pi',
       '/test',
       expect.any(Object)
     );
@@ -131,11 +131,11 @@ describe('useProviderCapabilities', () => {
 
     await waitFor(() => {
       expect(api.getProviderTypeCommands).toHaveBeenCalledWith(
-        'zclaudia',
+        'pi',
         '/test',
         expect.any(Object)
       );
-      expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith('zclaudia', expect.any(Object));
+      expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith('pi', expect.any(Object));
     });
 
     expect(result.current.llmProfileId).toBeUndefined();

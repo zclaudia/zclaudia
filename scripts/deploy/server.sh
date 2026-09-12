@@ -89,6 +89,10 @@ ok "Dependencies installed"
 # ── 2. Build ──────────────────────────────────────────────────
 info "Building shared..."
 corepack pnpm --filter @zclaudia/shared run build
+# Agent runtimes are loaded from each plugin's built dist/main.js. A checkout
+# that never builds them has no working agents at all.
+info "Building agent plugins..."
+corepack pnpm --filter "@zclaudia/plugin-*" run build
 info "Building server..."
 corepack pnpm --filter @zclaudia/server run build
 ok "Build complete"

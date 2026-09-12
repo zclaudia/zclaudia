@@ -13,7 +13,7 @@
 #   status      Show service status
 #   logs        Tail service logs
 #   env         Print the service environment file path
-#   rebuild     Rebuild shared, server, and desktop assets
+#   rebuild     Rebuild shared, agent plugins, server, and desktop assets
 #   uninstall   Remove the installed service
 #
 set -euo pipefail
@@ -140,10 +140,13 @@ prepare_corepack() {
 }
 
 build_project() {
-  info "Building shared, server, and desktop packages..."
+  info "Building shared, agent plugins, server, and desktop packages..."
   cd "$PROJECT_ROOT"
   prepare_corepack
   corepack pnpm --filter @zclaudia/shared run build
+  # Agent runtimes are loaded from each plugin's built dist/main.js; without
+  # this the service runs whatever bundle happens to be on disk.
+  corepack pnpm --filter "@zclaudia/plugin-*" run build
   corepack pnpm --filter @zclaudia/server run build
   corepack pnpm --filter @zclaudia/desktop run build
   ok "Build complete"

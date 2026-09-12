@@ -1,3 +1,4 @@
+import { PI_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import { Session, buildSessionContext} from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
@@ -43,11 +44,11 @@ import { resolveImageAttachments } from '../../../application/conversation/runti
 import { getFileStore } from '../../storage/fileStore.js';
 
 const manifest: PCPProviderManifest = {
-  id: 'zclaudia',
-  name: 'ZClaudia Agent',
+  id: PI_AGENT_RUNTIME,
+  name: 'Pi Agent',
   version: '0.1.0',
   apiVersion: 'pcp/v1',
-  providerType: 'zclaudia',
+  providerType: PI_AGENT_RUNTIME,
   runtime: 'sdk',
   permissionModeMap: {
     supervised: 'default',
@@ -75,7 +76,7 @@ const manifest: PCPProviderManifest = {
 const policy: ProviderPolicy = {
   modeSwitchSessionPolicy: 'preserve',
   sessionCwdPolicy: 'requested',
-  emptyResultFallback: 'ZClaudia agent completed without additional output.',
+  emptyResultFallback: 'Pi agent completed without additional output.',
   escalateAlwaysTools: [
     SANDBOX_NETWORK_ACCESS_COMPAT_TOOL,
     SANDBOX_CAPABILITY_ACCESS_TOOL,
@@ -94,7 +95,7 @@ export const __testables = {
 };
 
 export class PiAgentProviderAdapter implements ProviderAdapter {
-  readonly type = 'zclaudia';
+  readonly type = PI_AGENT_RUNTIME;
   readonly manifest = manifest;
   readonly policy = policy;
 
@@ -103,7 +104,7 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
     options: RunOptions,
     onPermission?: PermissionCallback
   ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
-    const sessionId = options.sessionId || `zclaudia-${Date.now()}`;
+    const sessionId = options.sessionId || `pi-${Date.now()}`;
     // ctx.model surfaces in init.systemInfo (the UI's "Model:" badge) and in the
     // captured context snapshot. Resolution mirrors buildModel: the agent
     // profile's model (the canonical surface the editor writes), else the shared
@@ -147,7 +148,7 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
           cwd: options.cwd,
           permissionMode: ctx.permissionMode || 'default',
           tools: [],
-          agents: ['zclaudia'],
+          agents: [PI_AGENT_RUNTIME],
         },
       };
       yield {
@@ -207,7 +208,7 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
         cwd: options.cwd,
         permissionMode: ctx.permissionMode || 'default',
         tools: toolBundle.visibleToolNames,
-        agents: ['zclaudia'],
+        agents: [PI_AGENT_RUNTIME],
       },
     };
 

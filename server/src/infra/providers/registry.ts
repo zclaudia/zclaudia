@@ -1,3 +1,4 @@
+import { DEFAULT_AGENT_RUNTIME, normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ProviderDefinition } from './definitions.js';
@@ -16,7 +17,7 @@ export interface ProviderRegistryPort {
 
 export class ProviderRegistry implements ProviderRegistryPort {
   private adapters = new Map<string, ProviderAdapter>();
-  private defaultType = 'zclaudia';
+  private defaultType = DEFAULT_AGENT_RUNTIME;
   private pluginAdapterTypes = new Map<string, Set<string>>(); // pluginId -> types
   private builtinsRegistered = false;
 
@@ -42,7 +43,7 @@ export class ProviderRegistry implements ProviderRegistryPort {
   registerPluginAdapter(pluginId: string, adapter: ProviderAdapter): void {
     this.ensureBuiltinsRegistered();
     const ownedByPlugin = this.pluginAdapterTypes.get(pluginId)?.has(adapter.type) ?? false;
-    if (this.adapters.has(adapter.type) && !ownedByPlugin) {
+    if (this.adapters.has(normalizeAgentRuntimeType(adapter.type)) && !ownedByPlugin) {
       throw new Error(
         `Runtime type "${adapter.type}" is already registered (built-in or another plugin); plugin ${pluginId} cannot claim it`
       );
@@ -71,7 +72,7 @@ export class ProviderRegistry implements ProviderRegistryPort {
 
   hasType(type: string): boolean {
     this.ensureBuiltinsRegistered();
-    return this.adapters.has(type);
+    return this.adapters.has(normalizeAgentRuntimeType(type));
   }
 
   listTypes(): string[] {
@@ -81,30 +82,30 @@ export class ProviderRegistry implements ProviderRegistryPort {
 
   get(type: string): ProviderAdapter | undefined {
     this.ensureBuiltinsRegistered();
-    return this.adapters.get(type);
+    return this.adapters.get(normalizeAgentRuntimeType(type));
   }
 
   getOrDefault(type: string): ProviderAdapter {
     this.ensureBuiltinsRegistered();
-    return this.adapters.get(type) || this.adapters.get(this.defaultType)!;
+    return this.adapters.get(normalizeAgentRuntimeType(type)) || this.adapters.get(this.defaultType)!;
   }
 
   /** Get PCP manifest for a provider */
   getManifest(type: string): PCPProviderManifest | undefined {
     this.ensureBuiltinsRegistered();
-    return this.adapters.get(type)?.manifest;
+    return this.adapters.get(normalizeAgentRuntimeType(type))?.manifest;
   }
 
   /** Get ZClaudia runtime policy for a provider */
   getPolicy(type: string): ProviderPolicy | undefined {
     this.ensureBuiltinsRegistered();
-    return this.adapters.get(type)?.policy;
+    return this.adapters.get(normalizeAgentRuntimeType(type))?.policy;
   }
 
   /** Get the composed provider definition used by the runtime. */
   getDefinition(type: string): ProviderDefinition | undefined {
     this.ensureBuiltinsRegistered();
-    const adapter = this.adapters.get(type);
+    const adapter = this.adapters.get(normalizeAgentRuntimeType(type));
     if (!adapter?.manifest) return undefined;
     return {
       adapter,

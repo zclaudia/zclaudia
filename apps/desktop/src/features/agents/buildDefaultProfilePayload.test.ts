@@ -4,8 +4,8 @@ import type { ProfileConfigDescriptor } from '@zclaudia/shared/core/profile-conf
 import { buildDefaultProfilePayload } from './buildDefaultProfilePayload';
 
 const llmDescriptor: ProfileConfigDescriptor = {
-  runtime: 'zclaudia',
-  label: 'ZClaudia',
+  runtime: 'pi',
+  label: 'Pi',
   enabled: true,
   model: { kind: 'llm-profile', multimodalFallback: true, thinkingLevel: 'selectable' },
   hasCliPath: false,
@@ -36,7 +36,7 @@ describe('buildDefaultProfilePayload', () => {
   it('builds a valid payload for an llm-profile runtime using the default profile and its first model', () => {
     const result = buildDefaultProfilePayload({
       name: '  Coding  ',
-      runtimeType: 'zclaudia',
+      runtimeType: 'pi',
       descriptor: llmDescriptor,
       llmProfiles: [
         llm({ id: 'lp1', isDefault: true, models: [{ modelId: 'deepseek-v4-flash' }] }),
@@ -45,7 +45,7 @@ describe('buildDefaultProfilePayload', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.payload.name).toBe('Coding');
-    expect(result.payload.runtimeType).toBe('zclaudia');
+    expect(result.payload.runtimeType).toBe('pi');
     expect(result.payload.llmProfileId).toBe('lp1');
     expect(result.payload.model).toBe('deepseek-v4-flash');
     expect(result.payload.systemPrompt).toBe('');
@@ -56,7 +56,7 @@ describe('buildDefaultProfilePayload', () => {
   it('prefers the isDefault profile over the first one', () => {
     const result = buildDefaultProfilePayload({
       name: 'x',
-      runtimeType: 'zclaudia',
+      runtimeType: 'pi',
       descriptor: llmDescriptor,
       llmProfiles: [
         llm({ id: 'lp1', isDefault: false, models: [{ modelId: 'a' }] }),
@@ -72,7 +72,7 @@ describe('buildDefaultProfilePayload', () => {
   it('fails with no-llm-profile when the runtime needs one but none exist', () => {
     const result = buildDefaultProfilePayload({
       name: 'x',
-      runtimeType: 'zclaudia',
+      runtimeType: 'pi',
       descriptor: llmDescriptor,
       llmProfiles: [],
     });
@@ -82,7 +82,7 @@ describe('buildDefaultProfilePayload', () => {
   it('fails with no-model when the default profile has no declared models', () => {
     const result = buildDefaultProfilePayload({
       name: 'x',
-      runtimeType: 'zclaudia',
+      runtimeType: 'pi',
       descriptor: llmDescriptor,
       llmProfiles: [llm({ id: 'lp1', isDefault: true, models: [] })],
     });

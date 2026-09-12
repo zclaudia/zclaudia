@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import type Database from 'better-sqlite3';
 
 /**
@@ -71,7 +72,7 @@ function mapRow(row: BindingRow): SessionRuntimeBinding {
   return {
     sessionId: row.session_id,
     llmProfileId: row.llm_profile_id,
-    runtimeType: row.runtime_type,
+    runtimeType: normalizeAgentRuntimeType(row.runtime_type),
     engineMode: row.engine_mode,
     model: row.model,
     connectionIdentityHash: row.connection_identity_hash,
@@ -115,7 +116,7 @@ export class SessionRuntimeBindingRepository {
       .run(
         binding.sessionId,
         binding.llmProfileId,
-        binding.runtimeType,
+        normalizeAgentRuntimeType(binding.runtimeType),
         binding.engineMode,
         binding.model,
         binding.connectionIdentityHash,

@@ -20,9 +20,9 @@ const otherDesc: AgentRuntimeDescriptor = {
 };
 
 describe('RuntimeDescriptorRegistry', () => {
-  it('seeds zclaudia and lists it', () => {
+  it('seeds Pi and lists it', () => {
     const reg = new RuntimeDescriptorRegistry();
-    expect(reg.list().some(d => d.type === 'zclaudia')).toBe(true);
+    expect(reg.list().some(d => d.type === 'pi')).toBe(true);
   });
 
   it('does not seed claude; a plugin can register it', () => {
@@ -43,7 +43,7 @@ describe('RuntimeDescriptorRegistry', () => {
 
   it('throws when a descriptor type collides with the seeded zclaudia', () => {
     const reg = new RuntimeDescriptorRegistry();
-    const collide: AgentRuntimeDescriptor = { ...otherDesc, type: 'zclaudia' };
+    const collide: AgentRuntimeDescriptor = { ...otherDesc, type: 'pi' };
     expect(() => reg.registerForPlugin('com.zclaudia.other', collide)).toThrow(
       /already registered/
     );
@@ -60,4 +60,13 @@ describe('RuntimeDescriptorRegistry', () => {
     reg.registerForPlugin('com.plugin.a', otherDesc);
     expect(() => reg.registerForPlugin('com.plugin.a', otherDesc)).not.toThrow();
   });
+});
+
+
+it('resolves the legacy descriptor without exposing or allowing a duplicate runtime', () => {
+  const registry = new RuntimeDescriptorRegistry();
+  expect(registry.get('zclaudia')).toBe(registry.get('pi'));
+  expect(registry.hasType('zclaudia')).toBe(true);
+  expect(registry.list().map(d => d.type)).toEqual(['pi']);
+  expect(() => registry.registerForPlugin('plugin', { ...otherDesc, type: 'zclaudia' })).toThrow(/already registered/);
 });

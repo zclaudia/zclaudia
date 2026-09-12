@@ -1,6 +1,10 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
-import type { PermissionCallback, ProviderRuntimeEvent } from '@zclaudia/plugin-sdk/providers';
+import type {
+  PermissionCallback,
+  ProviderRuntimeEvent,
+  SystemInfo,
+} from '@zclaudia/plugin-sdk/providers';
 import {
   debugLog,
   redactSensitiveValues,
@@ -14,6 +18,8 @@ import {
   type ClientRequestParams,
   type ClientRequestResult,
   type CodexClientRequestMethod,
+  type GetAccountResponse,
+  type InitializeResponse,
   type JsonRpcError,
   type RequestId,
   type TokenUsageBreakdown,
@@ -35,6 +41,58 @@ const MAX_STDERR_TAIL_LENGTH = 4096;
 // line (readline only reports the line after allocating it in full).
 export const MAX_APP_SERVER_INBOUND_LINE_BYTES = 16 * 1024 * 1024;
 export const MAX_APP_SERVER_OUTBOUND_LINE_BYTES = 8 * 1024 * 1024;
+/** Session info is decoration; never let its config read delay a turn. */
+const SESSION_INFO_CONFIG_TIMEOUT_MS = 500;
+
+/**
+ * The handshake reports `<client>/<codex version> (<os>; <arch>) …`, so the
+ * Codex CLI version is the first path segment's tail.
+ */
+export function parseCodexVersion(userAgent: string | undefined): string | undefined {
+  const version = userAgent?.match(/^[^/\s]+\/(\S+)/)?.[1];
+  return version || undefined;
+}
+
+/**
+ * MCP servers that are actually available to the turn. Entries the config
+ * disables are dropped rather than listed as if they were connected.
+ */
+/**
+ * How the running Codex authenticates, phrased the way the user set it up.
+ * Returns undefined when the answer is unknown so the row is simply omitted
+ * rather than filled with a guess.
+ */
+export function formatCodexAccount(response: GetAccountResponse | null): string | undefined {
+  if (!response) return undefined;
+  const account = response.account;
+  if (!account) return response.requiresOpenaiAuth ? 'Signed out' : undefined;
+  switch (account.type) {
+    case 'chatgpt': {
+      const plan = (account as { planType?: string }).planType;
+      return plan && plan !== 'unknown' ? `ChatGPT (${plan})` : 'ChatGPT account';
+    }
+    // Just "API key": the account type says the credentials are a key, not
+    // which vendor issued it, so naming one would be an unverified claim.
+    case 'apiKey':
+      return 'API key';
+    case 'amazonBedrock':
+      return 'Amazon Bedrock';
+    // A newer CLI may add account types; report what it said rather than
+    // dropping the row or mislabelling it.
+    default:
+      return account.type;
+  }
+}
+
+export function enabledMcpServers(
+  config: Record<string, unknown> | null
+): { name: string; status: string }[] {
+  const servers = config?.mcp_servers;
+  if (!isRecord(servers)) return [];
+  return Object.entries(servers)
+    .filter(([, value]) => !(isRecord(value) && value.enabled === false))
+    .map(([name]) => ({ name, status: 'enabled' }));
+}
 
 export class CodexAppServerClient {
   private process: ChildProcess | null = null;
@@ -50,6 +108,12 @@ export class CodexAppServerClient {
   >();
   private emitter = new EventEmitter();
   private initialized = false;
+  /** `initialize` handshake result — carries the running Codex CLI version. */
+  private initializeResult: InitializeResponse | null = null;
+  /** Effective app-server config, cached per process for the session-info event. */
+  private configSnapshot: Record<string, unknown> | null = null;
+  /** Authenticated account, cached per process alongside the config. */
+  private accountSnapshot: GetAccountResponse | null = null;
   private initializationPromise: Promise<void> | null = null;
   private cliPath: string;
   private env: Record<string, string>;
@@ -164,6 +228,7 @@ export class CodexAppServerClient {
         spawnErrorPromise,
       ]);
       this.initialized = true;
+      this.initializeResult = isRecord(initResult) ? (initResult as InitializeResponse) : null;
       debugLog(`[Codex AppServer] Initialized: ${JSON.stringify(initResult).slice(0, 200)}`);
     } catch (err) {
       debugLog(`[Codex AppServer] Initialize failed: ${err}`);
@@ -206,6 +271,9 @@ export class CodexAppServerClient {
     this.process = null;
     this.stdoutBuffer = Buffer.alloc(0);
     this.initialized = false;
+    this.initializeResult = null;
+    this.configSnapshot = null;
+    this.accountSnapshot = null;
     for (const [id, { reject }] of this.pendingRequests) {
       reject(error);
       this.pendingRequests.delete(id);
@@ -452,6 +520,92 @@ export class CodexAppServerClient {
     return (await this.sendRequest('config/read', { cwd, includeLayers: false })).config;
   }
 
+  /**
+   * Effective config for the session-info surface. Cached per app-server
+   * process (the process is spawned with its config args and CODEX_HOME, so
+   * the answer cannot change underneath us) and bounded by a short timeout —
+   * session info is decoration, it must never hold up a turn.
+   */
+  private async configForSessionInfo(cwd: string): Promise<Record<string, unknown> | null> {
+    if (this.configSnapshot) return this.configSnapshot;
+    try {
+      const config = await Promise.race([
+        this.readConfig(cwd),
+        new Promise<null>(resolve =>
+          setTimeout(() => resolve(null), SESSION_INFO_CONFIG_TIMEOUT_MS)
+        ),
+      ]);
+      if (!config) {
+        debugLog('[Codex AppServer] WARN: config/read timed out for session info');
+        return null;
+      }
+      this.configSnapshot = config;
+      return config;
+    } catch (error) {
+      debugLog(`[Codex AppServer] WARN: config/read failed for session info: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Who this app-server is signed in as. Same caching and timeout discipline as
+   * the config read: informational only, never allowed to delay a turn.
+   */
+  private async accountForSessionInfo(): Promise<GetAccountResponse | null> {
+    if (this.accountSnapshot) return this.accountSnapshot;
+    try {
+      const account = await Promise.race([
+        this.sendRequest('account/read', {}),
+        new Promise<null>(resolve =>
+          setTimeout(() => resolve(null), SESSION_INFO_CONFIG_TIMEOUT_MS)
+        ),
+      ]);
+      if (!account) {
+        debugLog('[Codex AppServer] WARN: account/read timed out for session info');
+        return null;
+      }
+      this.accountSnapshot = account;
+      return account;
+    } catch (error) {
+      debugLog(`[Codex AppServer] WARN: account/read failed for session info: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Session-info payload for the `init` event — the same row set the Claude
+   * runtime reports, so both agents render an equally complete header popover.
+   * Every field is read from the live app-server (handshake + effective
+   * config); nothing is inferred, and anything unavailable is simply omitted.
+   */
+  private async describeSession(options: {
+    cwd: string;
+    model?: string;
+    mode?: string;
+    apiKeySource?: string;
+  }): Promise<SystemInfo> {
+    const config = await this.configForSessionInfo(options.cwd);
+    const configModel = config && typeof config.model === 'string' ? config.model : undefined;
+    const version = parseCodexVersion(this.initializeResult?.userAgent);
+    // SDK mode authenticates with the host-bound profile key, so the caller
+    // states it; CLI mode inherits the user's own Codex login, which only
+    // `account/read` can answer.
+    const auth = options.apiKeySource ?? formatCodexAccount(await this.accountForSessionInfo());
+    return {
+      cwd: options.cwd,
+      // The agent profile pins the model when the user chose one; otherwise the
+      // effective model is whatever the Codex config resolves to.
+      model: options.model || configModel || '',
+      ...(version ? { claudeCodeVersion: version } : {}),
+      ...(options.mode ? { permissionMode: options.mode } : {}),
+      ...(auth ? { apiKeySource: auth } : {}),
+      mcpServers: enabledMcpServers(config),
+      // Codex does not expose its built-in tool list over app-server, and it
+      // has no slash-command or subagent registry to report.
+      tools: [],
+    };
+  }
+
   async startThread(
     cwd: string,
     options?: { model?: string; modelProvider?: string; developerInstructions?: string }
@@ -514,7 +668,18 @@ export class CodexAppServerClient {
     threadId: string,
     input: AppServerInputBlock[],
     onPermission: PermissionCallback,
-    options?: { cwd?: string; model?: string; mode?: string; systemPrompt?: string }
+    options?: {
+      cwd?: string;
+      model?: string;
+      mode?: string;
+      systemPrompt?: string;
+      /**
+       * Authentication label supplied by the caller (SDK mode, where the host
+       * binds the credentials). Omit it to report the CLI's own signed-in
+       * account instead.
+       */
+      apiKeySource?: string;
+    }
   ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
     if (this.activeTurnContexts.has(threadId)) {
       throw new Error(`A Codex turn is already active for thread ${threadId}`);
@@ -532,13 +697,12 @@ export class CodexAppServerClient {
       yield {
         type: 'init',
         sessionId: threadId,
-        systemInfo: {
+        systemInfo: await this.describeSession({
           cwd: options?.cwd || '',
-          apiKeySource: 'codex-app-server',
-          model: options?.model || '',
-          mcpServers: [],
-          tools: [],
-        },
+          model: options?.model,
+          mode: activeTurnContext.mode,
+          apiKeySource: options?.apiKeySource,
+        }),
       };
 
       const turnParams: ClientRequestParams<'turn/start'> = {

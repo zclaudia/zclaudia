@@ -70,8 +70,16 @@ try {
   // actual binding/resume semantics are validated by real-engine probes, so
   // only property existence is asserted here (required-ness varies by build).
   for (const [file, context, expectedProps] of [
-    ['v2/ThreadStartParams.json', 'thread/start params', ['cwd', 'model', 'modelProvider', 'developerInstructions']],
-    ['v2/ThreadResumeParams.json', 'thread/resume params', ['threadId', 'cwd', 'model', 'modelProvider', 'developerInstructions']],
+    [
+      'v2/ThreadStartParams.json',
+      'thread/start params',
+      ['cwd', 'model', 'modelProvider', 'developerInstructions'],
+    ],
+    [
+      'v2/ThreadResumeParams.json',
+      'thread/resume params',
+      ['threadId', 'cwd', 'model', 'modelProvider', 'developerInstructions'],
+    ],
   ]) {
     let params;
     try {
@@ -100,6 +108,16 @@ try {
     'cacheWriteInputTokens',
     'outputTokens',
   ]);
+
+  // Session info reports the signed-in account; `account/read` is the only
+  // place the CLI states whether it authenticates with ChatGPT or a key.
+  const account = schema('v2/GetAccountResponse.json');
+  requiredFields(account, 'account/read response', ['requiresOpenaiAuth']);
+  properties(account, 'account/read response', ['account']);
+  const accountVariants = account.definitions?.Account || {};
+  variant(accountVariants, 'chatgpt', 'Account');
+  variant(accountVariants, 'apiKey', 'Account');
+  properties(variant(accountVariants, 'chatgpt', 'Account'), 'chatgpt Account', ['planType']);
 
   const modelList = schema('v2/ModelListResponse.json');
   requiredFields(modelList, 'model/list response', ['data']);

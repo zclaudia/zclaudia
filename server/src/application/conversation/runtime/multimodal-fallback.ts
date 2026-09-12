@@ -1,3 +1,4 @@
+import { DEFAULT_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
 import type Database from 'better-sqlite3';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
@@ -32,7 +33,7 @@ export function resolveMultimodalFallbackForRun(input: {
     agentProfile,
     llmProfile: primaryLlmProfile,
     llmProfileId: primaryLlmProfile?.id ?? agentProfile.llmProfileId ?? '',
-    providerType: primaryLlmProfile?.providerType ?? 'zclaudia',
+    providerType: primaryLlmProfile?.providerType ?? DEFAULT_AGENT_RUNTIME,
     applied: false,
   };
 

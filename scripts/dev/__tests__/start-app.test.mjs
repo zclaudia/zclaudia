@@ -35,6 +35,16 @@ test('start-app uses the shared native module checker before server startup', ()
   assert.doesNotMatch(script, /require\('better-sqlite3'\)/);
 });
 
+test('start-app rebuilds agent plugins before starting the server', () => {
+  // Agent runtimes are loaded from plugins/agents/*/dist/main.js, so a dev run
+  // that skips this silently serves the previously built plugin bundle.
+  assert.match(script, /--filter "@zclaudia\/plugin-\*" run build/);
+
+  const buildFn = script.match(/^build\(\) \{[\s\S]*?\n\}/m)?.[0] ?? '';
+  assert.notEqual(buildFn, '', 'build() must exist');
+  assert.match(buildFn, /--filter "@zclaudia\/plugin-\*" run build/);
+});
+
 test('start-app runs pnpm through corepack', () => {
   assert.match(script, /run_pnpm\(\)/);
   assert.doesNotMatch(script, /[^a-zA-Z_]pnpm (install|build|dev|exec)/);

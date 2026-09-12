@@ -28,7 +28,7 @@ export type {
   SystemInfo,
 } from './message-types.js';
 
-/** Options for starting a zclaudia agent runtime run. */
+/** Options for starting an agent runtime run. */
 export interface RunOptions {
   cwd: string;
   sessionId?: string;

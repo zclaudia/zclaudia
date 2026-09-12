@@ -1,3 +1,4 @@
+import { isPiAgentRuntime } from '@zclaudia/shared/core/agent-profile';
 import { negotiateProfile } from '../../../infra/providers/pcp-negotiator.js';
 import type { ProviderAdapter, ProviderRuntimeEvent } from '../../../infra/providers/types.js';
 import type Database from 'better-sqlite3';
@@ -131,7 +132,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     providerType,
   };
   const multimodalFallback =
-    providerType === 'zclaudia'
+    isPiAgentRuntime(providerType)
       ? resolveMultimodalFallbackForRun({
           db: db as Database.Database,
           agentProfile,
@@ -456,7 +457,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   // preempt an overflow that the very first request would trigger. Non-fatal: on
   // any failure the request still goes out and handleRunException's
   // overflow-recovery retry remains the net.
-  if (effectiveProviderType === 'zclaudia' && effectiveProviderConfig) {
+  if (isPiAgentRuntime(effectiveProviderType) && effectiveProviderConfig) {
     try {
       const preflight = await maybeCompact({
         db: db as Database.Database,

@@ -1,3 +1,4 @@
+import { normalizeAgentRuntimeType, isPiAgentRuntime } from '@zclaudia/shared/core/agent-profile';
 import { useEffect, useMemo } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
@@ -34,9 +35,9 @@ export function useProviderCapabilities({
 
   const agentProfilesLoaded = useAgentProfileMetaStore(s => s.loaded);
   const { agent, llm } = useAgentForSession(currentSession?.id);
-  const runtimeType = agent?.runtimeType || 'zclaudia';
-  const externalRuntime = runtimeType !== 'zclaudia';
-  const llmProfileId = externalRuntime ? undefined : llm?.id;
+  const runtimeType = normalizeAgentRuntimeType(agent?.runtimeType);
+  const usesPiMetadata = isPiAgentRuntime(runtimeType);
+  const llmProfileId = usesPiMetadata ? llm?.id : undefined;
   // Wait for agent profiles only while they are still loading. An orphaned
   // agentProfileId must not block capabilities forever after load completes.
   const isBackendDataReady =
@@ -46,7 +47,7 @@ export function useProviderCapabilities({
   const providerScopeKey =
     resolveCanonicalBackendId(activeServerId ?? LEGACY_LOCAL_SERVER_ID, LEGACY_LOCAL_SERVER_ID) ||
     LEGACY_LOCAL_SERVER_ID;
-  const metadataKey = externalRuntime ? `runtime:${runtimeType}` : llmProfileId || '_default';
+  const metadataKey = usesPiMetadata ? llmProfileId || '_default' : `runtime:${runtimeType}`;
   const capsCacheKey = `${providerScopeKey}:${metadataKey}`;
   const commandsCacheKey = capsCacheKey;
 

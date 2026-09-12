@@ -13,7 +13,7 @@ function baseInput(overrides: Record<string, unknown> = {}) {
     input: {
       activeRun: {
         sessionId: 's1',
-        providerType: 'zclaudia',
+        providerType: 'pi',
         agentProfile: { model: 'm' },
         llmProfile: { apiKey: 'k' },
         saveInterval: undefined,
@@ -88,7 +88,7 @@ describe('handleRunException — overflow recovery', () => {
     expect(result.handedOffToRetry).toBe(false);
   });
 
-  it('does not run zclaudia overflow compaction for non-zclaudia runtimes', async () => {
+  it('does not run Pi overflow compaction for non-Pi runtimes', async () => {
     compactForOverflow.mockResolvedValue({ outcome: 'compacted', compacted: true });
     const { input, handleRetry } = baseInput({
       activeRun: {

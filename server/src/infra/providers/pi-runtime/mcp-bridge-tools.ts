@@ -1,3 +1,4 @@
+import { PI_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 
@@ -33,7 +34,7 @@ function normalizeMcpToolContent(
 
 function getMcpServer(db: Database.Database | undefined, serverName: string) {
   if (!db) throw new Error('MCP tools require a database-backed run context');
-  const servers = loadMcpServersFromDb(db, 'zclaudia');
+  const servers = loadMcpServersFromDb(db, PI_AGENT_RUNTIME);
   const config = servers[serverName];
   if (!config) throw new Error(`MCP server not configured or enabled: ${serverName}`);
   return config;
@@ -179,7 +180,7 @@ export function createToolSearchTool(db?: Database.Database): AgentTool {
         .toLowerCase();
       const maxResults = Math.max(1, Math.min(Number(args.max_results ?? 20) || 20, 100));
       const includeSchema = args.include_schema === true;
-      const servers = loadMcpServersFromDb(db, 'zclaudia');
+      const servers = loadMcpServersFromDb(db, PI_AGENT_RUNTIME);
       const requested = args.server ? [String(args.server)] : Object.keys(servers);
       const results: Array<Record<string, unknown>> = [];
       const errors: Array<{ server: string; error: string }> = [];
@@ -253,7 +254,7 @@ export function createListMcpResourcesTool(db?: Database.Database): AgentTool {
           'missing_db_context',
           'MCP resources require a database-backed run context'
         );
-      const servers = loadMcpServersFromDb(db, 'zclaudia');
+      const servers = loadMcpServersFromDb(db, PI_AGENT_RUNTIME);
       const requested = args.server ? [String(args.server)] : Object.keys(servers);
       const resources = [];
       for (const server of requested) {

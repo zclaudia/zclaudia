@@ -115,3 +115,11 @@ describe('provider command routes', () => {
     expect(res.status).toBe(404);
   });
 });
+
+
+it.each(['pi', 'zclaudia'])('serves Pi commands through %s', async runtime => {
+  scanCustomCommandsMock.mockResolvedValueOnce([]);
+  const response = await request(makeApp()).get(`/api/providers/type/${runtime}/commands`);
+  expect(response.status).toBe(200);
+  expect(Array.isArray(response.body.data)).toBe(true);
+});
