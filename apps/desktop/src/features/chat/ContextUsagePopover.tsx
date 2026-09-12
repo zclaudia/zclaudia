@@ -228,7 +228,7 @@ function PopoverBody({
       }}
       // Opaque floating surface so chat content behind it can't bleed through.
       // Width is clamped to the viewport so it fits small phone screens (375px).
-      className="z-50 w-[min(92vw,20rem)] overflow-hidden rounded-lg border border-border bg-popover shadow-lg"
+      className="z-50 w-[min(92vw,20rem)] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
     >
       {state?.status === 'available' && (
         <>

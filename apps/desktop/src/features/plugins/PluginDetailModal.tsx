@@ -241,7 +241,7 @@ export function PluginDetailModal({
                   value={selectedRollbackVersion}
                   onChange={event => setRollbackVersion(event.target.value)}
                   aria-label="Rollback version"
-                  className="h-8 flex-1 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-primary"
+                  className="h-8 flex-1 rounded-md border border-border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-primary"
                 >
                   {rollbackVersions.map(version => (
                     <option key={version} value={version}>

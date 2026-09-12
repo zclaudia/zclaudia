@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Project } from '@zclaudia/shared';
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
 import type { SidebarAgent } from './types';
@@ -81,7 +82,7 @@ export function NewSessionModal({
               }}
               block
               size="md"
-              triggerClassName="!h-9 !rounded-xl !text-[13px]"
+              triggerClassName="!h-9 !text-[13px]"
               options={[
                 { value: '', label: 'Choose a project…' },
                 ...projects.map(p => ({ value: p.id, label: p.name })),
@@ -92,7 +93,7 @@ export function NewSessionModal({
 
         <label className="flex flex-col gap-1.5">
           <span className="text-[11px] font-medium text-muted-foreground">Name</span>
-          <input
+          <Input
             ref={nameRef}
             type="text"
             value={name}
@@ -101,7 +102,7 @@ export function NewSessionModal({
               if (e.key === 'Enter' && project) onCreate();
             }}
             placeholder="Session name (optional)"
-            className="h-9 w-full rounded-xl border border-border bg-background px-3 text-[13px] text-foreground placeholder:text-muted-foreground/50 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className="h-9 !px-3 !text-[13px]"
           />
         </label>
 
@@ -112,7 +113,7 @@ export function NewSessionModal({
             onChange={onAgentProfileIdChange}
             block
             size="md"
-            triggerClassName="!h-9 !rounded-xl !text-[13px]"
+            triggerClassName="!h-9 !text-[13px]"
             options={[
               { value: '', label: 'Default (from project)' },
               ...agents.map(a => ({

@@ -87,7 +87,7 @@ export function JsonSchemaConfigForm({ schema, config, onChange }: JsonSchemaCon
                 onChange={e =>
                   updateField(key, e.target.value ? Number(e.target.value) : undefined)
                 }
-                className="w-full px-2.5 py-1.5 text-sm rounded-full border border-border bg-background focus:outline-none focus:border-primary"
+                className="w-full px-2.5 py-1.5 text-sm rounded-md border border-border bg-background focus:outline-none focus:border-primary"
               />
               {description && (
                 <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>

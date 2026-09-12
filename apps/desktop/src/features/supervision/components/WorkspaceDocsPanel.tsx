@@ -200,7 +200,7 @@ export function WorkspaceDocsPanel({
                 value={draftDocContent}
                 onChange={event => onDraftContentChange(event.target.value)}
                 rows={20}
-                className="w-full rounded-lg border border-border bg-background p-3 text-xs leading-5 text-foreground resize-y"
+                className="w-full rounded-md border border-border bg-background p-3 text-xs leading-5 text-foreground resize-y"
               />
             ) : (
               <pre className="whitespace-pre-wrap rounded-lg bg-secondary/40 p-3 text-xs leading-5 text-foreground/90">

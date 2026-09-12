@@ -145,7 +145,6 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
               ]}
               size="md"
               block
-              triggerClassName="rounded-md"
             />
           </div>
           <div>
@@ -431,7 +430,7 @@ export function StepConfigForm({ step, onChange, onDelete }: StepConfigFormProps
             max={10}
             value={step.retryCount ?? 1}
             onChange={e => onChange({ ...step, retryCount: parseInt(e.target.value) || 1 })}
-            className="w-20 px-2.5 py-1.5 text-sm rounded-full border border-border bg-background"
+            className="w-20 px-2.5 py-1.5 text-sm rounded-md border border-border bg-background"
           />
         </div>
       )}
@@ -445,7 +444,7 @@ export function StepConfigForm({ step, onChange, onDelete }: StepConfigFormProps
           min={5}
           value={Math.floor((step.timeoutMs ?? 600000) / 1000)}
           onChange={e => onChange({ ...step, timeoutMs: (parseInt(e.target.value) || 600) * 1000 })}
-          className="w-24 px-2.5 py-1.5 text-sm rounded-full border border-border bg-background"
+          className="w-24 px-2.5 py-1.5 text-sm rounded-md border border-border bg-background"
         />
       </div>
     </div>

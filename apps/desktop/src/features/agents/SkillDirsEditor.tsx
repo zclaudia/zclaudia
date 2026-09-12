@@ -128,7 +128,7 @@ export function SkillDirsEditor({ backendId, dirs, diagnostics, onSaved }: Skill
           value={newDirPath}
           onChange={e => setNewDirPath(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleAddDir()}
-          className="flex-1 px-3 py-1.5 text-sm font-mono bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+          className="flex-1 px-3 py-1.5 text-sm font-mono bg-secondary/50 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
         />
         <button
           onClick={handleAddDir}

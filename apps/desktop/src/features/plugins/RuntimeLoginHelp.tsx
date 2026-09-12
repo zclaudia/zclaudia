@@ -46,7 +46,7 @@ export function RuntimeLoginHelp({
                 setCopied(false);
                 setCopyError(false);
               }}
-              className="rounded border border-border bg-background px-2 py-1"
+              className="rounded-md border border-border bg-background px-2 py-1"
             >
               <option value="posix">Bash / Zsh / sh</option>
               <option value="powershell">PowerShell</option>

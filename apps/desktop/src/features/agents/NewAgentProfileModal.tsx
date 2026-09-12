@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentProfileConfig, LlmProfileConfig } from '@zclaudia/shared';
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { Select } from '../../components/ui/Select';
@@ -111,7 +112,7 @@ export function NewAgentProfileModal({
       <div className="flex flex-col gap-4 px-4 py-4">
         <label className="flex flex-col gap-1.5">
           <span className="text-[11px] font-medium text-muted-foreground">Name</span>
-          <input
+          <Input
             ref={nameRef}
             type="text"
             aria-label="Name"
@@ -121,7 +122,7 @@ export function NewAgentProfileModal({
               if (e.key === 'Enter' && canCreate) void handleCreate();
             }}
             placeholder="e.g., Default Coding Agent"
-            className="h-9 w-full rounded-xl border border-border bg-background px-3 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className="h-9 !px-3 !text-[13px]"
           />
         </label>
 
@@ -134,7 +135,7 @@ export function NewAgentProfileModal({
             size="md"
             ariaLabel="Agent Type"
             panelPosition="fixed"
-            triggerClassName="!h-9 !rounded-xl !text-[13px]"
+            triggerClassName="!h-9 !text-[13px]"
             options={enabled.map(d => ({ value: d.runtime, label: d.label }))}
           />
         </div>

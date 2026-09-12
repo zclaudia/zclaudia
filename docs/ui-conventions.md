@@ -92,3 +92,31 @@ hand-rolling their recipes:
   9px tier and no fractional sizes.
 - The default WebView context menu is suppressed in production builds
   (see `src/main.tsx`); editable fields and real selections keep it.
+
+## 9. Radius tiers
+(live, real-CSS showcase: `docs/radius-tiers.html`)
+
+Radius is assigned by **role**, never by size or local taste:
+
+| Tier | Value | Applies to |
+| --- | --- | --- |
+| Control | `rounded-md` (10px) | Every bordered data-entry or action control: inputs, textareas, native selects, `Select` triggers, buttons, checkboxes |
+| Panel | `rounded-xl` (16px) | Floating surfaces: `Select`/`DropdownMenu` panels, popovers |
+| Chrome | `rounded-2xl` | Modals, the chat composer container |
+| Inline token | `var(--radius-inline-token)` (5px) | Chips embedded in the text flow: prose inline code, `@file` reference chips (`FileLineReference`, `FileReference`). At ~20px line height, the control-tier 10px reads as a half-pill — inline tokens stay small. In TSX use `rounded-[var(--radius-inline-token)]`; in CSS use the var directly |
+
+One more consistency rule: sibling controls in the same form share a height
+tier (dialog fields are `h-9`). The same radius on a shorter control looks
+rounder — a 10px corner on a 24px-tall trigger occupies 40% of the edge and
+reads as a pill.
+
+`rounded-full` is **decorative only**: Toggle switches, status dots, chips and
+badges. It must never appear on a bordered field — a pill-shaped input is a
+bug. Rules:
+
+- Get the control radius from the primitives (`FIELD_CLASS` / `FIELD_CLASS_LG`
+  in `ui/Input.tsx`, `Select`, `Button`). Don't hand-roll field class strings,
+  don't copy `FIELD_CLASS` into a feature file, and don't override radius via
+  `triggerClassName` / `!rounded-*`.
+- `pnpm --filter @zclaudia/desktop run check:radius` (also part of `lint`)
+  enforces this; `radius-conventions.test.tsx` pins the primitives.

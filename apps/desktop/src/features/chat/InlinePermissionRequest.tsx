@@ -189,7 +189,7 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
     <div
       role="group"
       aria-label="Permission request"
-      className={`rounded-xl border overflow-hidden ${panelTint}`}
+      className={`rounded-lg border overflow-hidden ${panelTint}`}
     >
       {/* Timeout progress bar (legacy — hidden when workflow manages timeout) */}
       {hasTimeout && (
@@ -291,7 +291,7 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
             <button
               type="button"
               onClick={handleOpenReviewLogs}
-              className="text-[11px] flex items-center gap-1 px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+              className="text-[11px] flex items-center gap-1 px-2 py-0.5 rounded-md border border-border text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
               title="Open AI review logs in a new window"
             >
               <FileText size={11} />
@@ -335,7 +335,7 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
           {/* Action buttons */}
           <button
             onClick={handleDeny}
-            className="px-3 py-2.5 md:py-1.5 bg-secondary hover:bg-secondary/80 active:bg-secondary/70 text-secondary-foreground rounded-full text-xs font-medium transition-colors"
+            className="px-3 py-2.5 md:py-1.5 bg-secondary hover:bg-secondary/80 active:bg-secondary/70 text-secondary-foreground rounded-md text-xs font-medium transition-colors"
           >
             Deny
           </button>
@@ -343,7 +343,7 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
             <button
               onClick={handleDenyWithFeedback}
               disabled={!feedback.trim()}
-              className="px-3 py-2.5 md:py-1.5 bg-secondary hover:bg-secondary/80 active:bg-secondary/70 text-secondary-foreground rounded-full text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2.5 md:py-1.5 bg-secondary hover:bg-secondary/80 active:bg-secondary/70 text-secondary-foreground rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Deny + Comment
             </button>
@@ -351,7 +351,7 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
           <button
             onClick={handleAllow}
             disabled={isCredential && !credential}
-            className="px-3 py-2.5 md:py-1.5 bg-success hover:bg-success/80 active:bg-success/70 text-success-foreground rounded-full text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-2.5 md:py-1.5 bg-success hover:bg-success/80 active:bg-success/70 text-success-foreground rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Allow
           </button>

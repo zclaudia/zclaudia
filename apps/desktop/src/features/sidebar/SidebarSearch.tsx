@@ -159,7 +159,7 @@ export function SidebarSearch({ search, isMobile, sessions, onResultSelect }: Si
             autoCorrect="off"
             autoCapitalize="off"
             autoComplete="off"
-            className="flex-1 px-2.5 py-1.5 bg-muted/60 border-0 rounded-lg text-sm shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className="flex-1 px-2.5 py-1.5 bg-muted/60 border-0 rounded-md text-sm shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
           />
           <button
             onClick={() => setShowFilters(!showFilters)}

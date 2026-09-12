@@ -293,7 +293,7 @@ function PromptRenderer({ interaction }: { interaction: InteractionPromptMessage
 
   if (submitted) {
     return (
-      <div className="flex flex-col gap-1 px-3 py-2 rounded-md bg-success/10 border border-success/30">
+      <div className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-success/10 border border-success/30">
         <div className="flex items-center gap-2 text-xs font-medium text-success">
           <Check size={12} />
           <span>
@@ -305,7 +305,7 @@ function PromptRenderer({ interaction }: { interaction: InteractionPromptMessage
   }
 
   return (
-    <div className="flex flex-col gap-2 px-3 py-2 rounded-md bg-muted/40 border border-primary/30">
+    <div className="flex flex-col gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-primary/30">
       <div className="flex items-center gap-2 text-xs font-medium text-foreground">
         <FileQuestion size={12} className="text-primary" />
         <span>{interaction.title}</span>
@@ -400,7 +400,7 @@ function ApprovalRenderer({ interaction }: { interaction: ApprovalInteractionMes
   if (decision) {
     return (
       <div
-        className={`flex flex-col gap-1 px-3 py-2 rounded-md border ${decision === 'approved' ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'}`}
+        className={`flex flex-col gap-1 px-3 py-2 rounded-lg border ${decision === 'approved' ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'}`}
       >
         <div
           className={`flex items-center gap-2 text-xs font-medium ${decision === 'approved' ? 'text-success' : 'text-destructive'}`}
@@ -415,7 +415,7 @@ function ApprovalRenderer({ interaction }: { interaction: ApprovalInteractionMes
   }
 
   return (
-    <div className="flex flex-col gap-2 px-3 py-2 rounded-md bg-warning/5 border border-warning/30">
+    <div className="flex flex-col gap-2 px-3 py-2 rounded-lg bg-warning/5 border border-warning/30">
       <div className="flex items-center gap-2 text-xs font-medium text-foreground">
         <ShieldAlert size={12} className="text-warning" />
         <span>{interaction.title}</span>
@@ -574,7 +574,7 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
         ? 'bg-muted/60 border-primary/30 text-primary'
         : 'bg-destructive/10 border-destructive/30 text-destructive';
     return (
-      <div className={`flex flex-col gap-1 px-3 py-2 rounded-md border ${tone}`}>
+      <div className={`flex flex-col gap-1 px-3 py-2 rounded-lg border ${tone}`}>
         <div className="flex items-center gap-2 text-xs font-medium">
           {isApproved ? (
             <ThumbsUp size={12} />
@@ -596,7 +596,7 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
   }
 
   return (
-    <div className="flex flex-col gap-2 px-3 py-2 rounded-md bg-muted/40 border border-primary/30">
+    <div className="flex flex-col gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-primary/30">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-medium text-foreground">
           <ClipboardCheck size={12} className="text-primary" />
@@ -742,7 +742,7 @@ const EXPIRED_DETAILS: Record<string, string> = {
 function ExpiredInteractionNotice({ interaction }: { interaction: InteractionMessage }) {
   const reason = useInteractionStore(s => s.expiredReasons[interaction.interactionId]);
   return (
-    <div className="flex flex-col gap-1 px-3 py-2 rounded-md border bg-muted/40 border-border/50 text-muted-foreground">
+    <div className="flex flex-col gap-1 px-3 py-2 rounded-lg border bg-muted/40 border-border/50 text-muted-foreground">
       <div className="flex items-center gap-2 text-xs font-medium">
         <Clock size={12} />
         <span>{EXPIRED_LABELS[interaction.type]} Expired</span>
@@ -766,7 +766,7 @@ function InteractionItemInner({ interaction }: InteractionItemProps) {
 
   if (interaction.type === 'interaction_todo_update') {
     return (
-      <div className="flex flex-col gap-1 px-3 py-2 rounded-md bg-muted/30 border border-border/50">
+      <div className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-muted/30 border border-border/50">
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           <ListTodo size={12} />
           <span>Task List</span>

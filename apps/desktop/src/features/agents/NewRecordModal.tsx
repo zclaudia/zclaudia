@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 
@@ -79,7 +80,7 @@ export function NewRecordModal({
       <div className="flex flex-col gap-4 px-4 py-4">
         <label className="flex flex-col gap-1.5">
           <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
-          <input
+          <Input
             ref={inputRef}
             type="text"
             aria-label={label}
@@ -92,7 +93,7 @@ export function NewRecordModal({
               if (e.key === 'Enter' && canCreate) void handleCreate();
             }}
             placeholder={placeholder}
-            className={`h-9 w-full rounded-xl border border-border bg-background px-3 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50 ${mono ? 'font-mono' : ''}`.trim()}
+            className={`h-9 !px-3 !text-[13px] ${mono ? 'font-mono' : ''}`.trim()}
           />
         </label>
         {error && <p className="text-[11px] text-destructive">{error}</p>}

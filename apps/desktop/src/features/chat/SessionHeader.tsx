@@ -200,7 +200,7 @@ export function SessionHeader({
             if (e.key === 'Escape') onRenameCancel();
           }}
           onBlur={onRenameConfirm}
-          className="w-full min-w-0 max-w-[min(56vw,880px)] px-2 py-0 text-[13px] font-semibold leading-none bg-muted/60 border-0 rounded-lg shadow-apple-sm focus:ring-1 focus:ring-primary/50 focus:outline-none text-foreground"
+          className="w-full min-w-0 max-w-[min(56vw,880px)] px-2 py-0 text-[13px] font-semibold leading-none bg-muted/60 border-0 rounded-md shadow-apple-sm focus:ring-1 focus:ring-primary/50 focus:outline-none text-foreground"
         />
       ) : (
         <div className="flex min-w-0 max-w-[520px] items-center self-stretch">
@@ -319,7 +319,7 @@ export function SessionHeader({
                   <div className="fixed inset-0 z-[70]" onClick={onToggleSessionMenu} />
                   <div
                     role="menu"
-                    className="absolute right-0 top-full z-[80] mt-1 min-w-44 overflow-hidden rounded-md border border-border bg-popover py-1 shadow-md"
+                    className="absolute right-0 top-full z-[80] mt-1 min-w-44 overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-md"
                   >
                     <button
                       role="menuitem"
@@ -391,7 +391,7 @@ export function SessionHeader({
                 {showSessionMenu && (
                   <>
                     <div className="fixed inset-0 z-[70]" onClick={onToggleSessionMenu} />
-                    <div className="fixed right-3 top-[calc(env(safe-area-inset-top,0px)+42px)] z-[80] min-w-[180px] overflow-hidden rounded-lg border border-border bg-popover py-1 shadow-md">
+                    <div className="fixed right-3 top-[calc(env(safe-area-inset-top,0px)+42px)] z-[80] min-w-[180px] overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-md">
                       <button
                         onClick={() => {
                           setShowMobileInfo(true);

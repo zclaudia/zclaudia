@@ -187,7 +187,7 @@ export function GitStatusView({ projectId, worktreePath, refreshNonce }: GitStat
           onChange={e => setMessage(e.target.value)}
           placeholder="Commit message…"
           rows={2}
-          className="w-full text-xs px-2 py-1.5 rounded-lg bg-background border border-border focus:border-primary outline-none resize-none"
+          className="w-full text-xs px-2 py-1.5 rounded-md bg-background border border-border focus:border-primary outline-none resize-none"
         />
         <button
           type="button"

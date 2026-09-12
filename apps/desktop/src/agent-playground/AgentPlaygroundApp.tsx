@@ -34,7 +34,7 @@ import {
 import { agentPlaygroundApi, connectAgentPlayground } from './transport';
 
 const FIELD =
-  'w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary';
+  'w-full rounded-md border border-border bg-background px-2.5 py-2 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary';
 type PlaygroundThinkingLevel = NonNullable<AgentPlaygroundRunRequest['thinkingLevel']>;
 
 function JsonValue({ value }: { value: unknown }) {

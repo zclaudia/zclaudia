@@ -131,7 +131,7 @@ export function PluginDirsManager({ embedded = false }: { embedded?: boolean } =
               value={newDir}
               onChange={e => setNewDir(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleAdd()}
-              className="flex-1 px-3 py-2 bg-input border border-border rounded-lg text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="flex-1 px-3 py-2 bg-input border border-border rounded-md text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             />
             <button
               onClick={handleAdd}

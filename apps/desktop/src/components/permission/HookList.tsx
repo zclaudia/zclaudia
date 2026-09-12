@@ -83,7 +83,7 @@ export function HookList({ hooks, onChange, readOnly = false }: HookListProps) {
             value={hook.event}
             onChange={e => update(i, { event: e.target.value as UserHookDefinition['event'] })}
             aria-label="hook event"
-            className="px-2 py-1 bg-background border border-border rounded text-sm"
+            className="px-2 py-1 bg-background border border-border rounded-md text-sm"
           >
             <option value="PreToolUse">PreToolUse</option>
             <option value="PostToolUse">PostToolUse</option>

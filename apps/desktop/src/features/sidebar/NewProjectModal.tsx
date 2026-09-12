@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FolderOpen } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
 import { DirectoryPickerModal } from './DirectoryPickerModal';
@@ -134,7 +135,7 @@ export function NewProjectModal({
                 onChange={onSelectedBackendIdChange}
                 block
                 size="md"
-                triggerClassName="!h-9 !rounded-xl !text-[13px]"
+                triggerClassName="!h-9 !text-[13px]"
                 options={backends.map(b => ({ value: b.backendId, label: b.name }))}
               />
             </div>
@@ -142,7 +143,7 @@ export function NewProjectModal({
 
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-medium text-muted-foreground">Name</span>
-            <input
+            <Input
               ref={nameRef}
               type="text"
               value={name}
@@ -151,7 +152,7 @@ export function NewProjectModal({
                 if (e.key === 'Enter') submit();
               }}
               placeholder="Project name"
-              className="h-9 w-full rounded-xl border border-border bg-background px-3 text-[13px] text-foreground placeholder:text-muted-foreground/50 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
+              className="h-9 !px-3 !text-[13px]"
             />
           </label>
           {profiles.length > 0 && (
@@ -162,6 +163,8 @@ export function NewProjectModal({
                 value={agentProfileId}
                 onChange={setAgentProfileId}
                 block
+                size="md"
+                triggerClassName="!h-9 !text-[13px]"
                 options={[
                   {
                     value: '',
@@ -201,7 +204,7 @@ export function NewProjectModal({
 
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] font-medium text-muted-foreground">Working directory</span>
-            <div className="flex h-9 items-center overflow-hidden rounded-xl border border-border bg-background transition-colors focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50">
+            <div className="flex h-9 items-center overflow-hidden rounded-md border border-input bg-background/70 transition-colors focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
               <input
                 type="text"
                 aria-label="Working directory"

@@ -25,6 +25,7 @@
 
 import { useState, useEffect, useRef, useMemo, useId } from 'react';
 import { ChevronDown, Check, AlertTriangle } from 'lucide-react';
+import { FIELD_CLASS_LG } from '../../components/ui/Input';
 import type {
   LlmProfileConfig,
   LlmProfileCompat,
@@ -61,9 +62,9 @@ import {
 
 const RESERVED_HEADER_KEYS = new Set(['authorization', 'content-type', 'host']);
 
-/** Field styling shared with the agent profile editor (ProfileEditor). */
-const FIELD_CLASS =
-  'w-full rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
+/** Field styling shared with the agent profile editor (ProfileEditor).
+ *  Comfortable-density variant of the app's single field grammar (ui/Input). */
+const FIELD_CLASS = FIELD_CLASS_LG;
 const MONO_FIELD_CLASS = `${FIELD_CLASS} font-mono`;
 /** Compact variant for the dense model-row grid; append a border-color class. */
 const MODEL_FIELD_BASE =

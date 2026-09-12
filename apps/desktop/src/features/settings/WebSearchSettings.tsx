@@ -146,7 +146,7 @@ export function WebSearchSettings({ readOnly = false }: WebSearchSettingsProps) 
             placeholder={config?.braveApiKey ? 'Configured; enter a new key to replace' : 'brv-...'}
             disabled={readOnly || saving}
             autoComplete="off"
-            className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono disabled:opacity-60"
+            className="w-full px-3 py-2 bg-secondary border border-border rounded-md text-sm focus:outline-none focus:border-primary font-mono disabled:opacity-60"
           />
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
@@ -179,7 +179,7 @@ export function WebSearchSettings({ readOnly = false }: WebSearchSettingsProps) 
             onChange={event => setSearxngBaseUrl(event.target.value)}
             placeholder="https://search.example.com"
             disabled={readOnly || saving}
-            className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono disabled:opacity-60"
+            className="w-full px-3 py-2 bg-secondary border border-border rounded-md text-sm focus:outline-none focus:border-primary font-mono disabled:opacity-60"
           />
           <p className="text-xs text-muted-foreground">
             Environment fallback: ZCLAUDIA_SEARXNG_BASE_URL or SEARXNG_BASE_URL.

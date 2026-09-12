@@ -104,7 +104,7 @@ export function GitSidebarPanel({
             <select
               value={effectivePath}
               onChange={e => setOverride(e.target.value)}
-              className="w-full appearance-none bg-background border border-border rounded-lg pl-2 pr-7 py-1 text-xs cursor-pointer outline-none transition-colors hover:bg-secondary focus:border-primary"
+              className="w-full appearance-none bg-background border border-border rounded-md pl-2 pr-7 py-1 text-xs cursor-pointer outline-none transition-colors hover:bg-secondary focus:border-primary"
             >
               {worktrees.map(w => (
                 <option key={w.path} value={w.path}>

@@ -72,7 +72,7 @@ export function MobileGatewayConfig() {
             setDirty(true);
           }}
           placeholder="http://gateway.example.com:3200"
-          className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
+          className="w-full px-3 py-2.5 bg-secondary border border-border rounded-md text-sm focus:outline-none focus:border-primary"
         />
       </div>
 
@@ -87,7 +87,7 @@ export function MobileGatewayConfig() {
             setDirty(true);
           }}
           placeholder="Enter gateway secret"
-          className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
+          className="w-full px-3 py-2.5 bg-secondary border border-border rounded-md text-sm focus:outline-none focus:border-primary"
         />
       </div>
 

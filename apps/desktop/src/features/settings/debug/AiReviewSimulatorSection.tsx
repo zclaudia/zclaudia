@@ -106,7 +106,7 @@ export function AiReviewSimulatorSection() {
                     ? 'Command (e.g. rm -rf /tmp/test)'
                     : 'File path or content'
                 }
-                className="flex-1 min-w-0 px-2 py-1 text-xs bg-background border border-border rounded-lg"
+                className="flex-1 min-w-0 px-2 py-1 text-xs bg-background border border-border rounded-md"
               />
             </div>
 
@@ -116,7 +116,7 @@ export function AiReviewSimulatorSection() {
               value={simCwd}
               onChange={e => setSimCwd(e.target.value)}
               placeholder="Working directory (cwd)"
-              className="w-full px-2 py-1 text-xs bg-background border border-border rounded-lg"
+              className="w-full px-2 py-1 text-xs bg-background border border-border rounded-md"
             />
 
             {/* Row 3: Provider + Threshold + Mode in a grid */}
@@ -144,7 +144,7 @@ export function AiReviewSimulatorSection() {
                 max={1}
                 step={0.1}
                 title="Confidence threshold"
-                className="w-14 px-1 py-1 text-xs bg-background border border-border rounded-full text-center"
+                className="w-14 px-1 py-1 text-xs bg-background border border-border rounded-md text-center"
               />
 
               <Select<'quick' | 'full' | 'runtime' | 'workflow'>

@@ -602,7 +602,7 @@ export function PermissionSettings() {
                           })
                         }
                         disabled={saving}
-                        className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
+                        className="h-6 w-16 rounded-md border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
                       />
                     }
                   />
@@ -625,7 +625,7 @@ export function PermissionSettings() {
                           })
                         }
                         disabled={saving}
-                        className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
+                        className="h-6 w-16 rounded-md border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
                       />
                     }
                   />
@@ -645,7 +645,7 @@ export function PermissionSettings() {
                           })
                         }
                         disabled={saving}
-                        className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
+                        className="h-6 w-16 rounded-md border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary max-md:h-9 max-md:w-20 max-md:text-xs"
                       />
                     }
                   />

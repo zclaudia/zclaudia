@@ -48,7 +48,7 @@ export function PluginsBrowseView({
         </h1>
         <span className="text-[11px] text-muted-foreground">{models.length}</span>
         <div className="ml-auto flex items-center gap-2">
-          <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-secondary/30 px-3 py-1.5 text-xs text-muted-foreground focus-within:ring-1 focus-within:ring-ring">
+          <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-secondary/30 px-3 py-1.5 text-xs text-muted-foreground focus-within:ring-1 focus-within:ring-ring">
             <Search className="h-3.5 w-3.5" strokeWidth={1.75} />
             <input
               value={query}

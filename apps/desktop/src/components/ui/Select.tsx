@@ -335,7 +335,7 @@ export function Select<T extends string = string>({
         className={`
           flex items-center justify-between w-full
           ${sizing.trigger}
-          rounded-full bg-background border border-border
+          rounded-md bg-background border border-border
           font-medium
           focus:outline-none focus:ring-1 focus:ring-primary
           transition-colors

@@ -158,7 +158,7 @@ export function FileLineReference({ text, projectRoot, backendId }: Props) {
     <button
       type="button"
       onClick={handleClick}
-      className="bg-secondary px-1.5 py-0.5 rounded-md text-primary break-all font-mono cursor-pointer hover:bg-secondary/70 hover:underline"
+      className="bg-secondary px-1.5 py-0.5 rounded-[var(--radius-inline-token)] text-primary break-all font-mono cursor-pointer hover:bg-secondary/70 hover:underline"
       title={`Open ${text}`}
     >
       <FileSymbol name={basename} className="mr-1 h-[1em] w-[1em] align-middle" />

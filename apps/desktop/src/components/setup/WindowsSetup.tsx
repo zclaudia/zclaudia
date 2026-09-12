@@ -533,7 +533,7 @@ export function WindowsSetup() {
                 onChange={e => setGatewayUrl(e.target.value)}
                 placeholder="http://gateway.example.com:3200"
                 disabled={gatewayConnecting}
-                className="w-full px-4 py-3 border border-border rounded-xl bg-input text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                className="w-full px-4 py-3 border border-border rounded-md bg-input text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
               />
             </div>
 
@@ -547,7 +547,7 @@ export function WindowsSetup() {
                 onChange={e => setGatewaySecret(e.target.value)}
                 placeholder="Enter gateway secret"
                 disabled={gatewayConnecting}
-                className="w-full px-4 py-3 border border-border rounded-xl bg-input text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+                className="w-full px-4 py-3 border border-border rounded-md bg-input text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
               />
             </div>
           </div>
@@ -614,7 +614,7 @@ export function WindowsSetup() {
               onChange={e => setManualAddress(e.target.value)}
               placeholder="localhost:3100 or 192.168.1.100:3100"
               disabled={connecting}
-              className="w-full px-4 py-3 border border-border rounded-xl bg-input text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
+              className="w-full px-4 py-3 border border-border rounded-md bg-input text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
             />
           </div>
 

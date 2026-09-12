@@ -212,7 +212,7 @@ export function PermissionModal({ request, queueSize = 0, onDecision }: Permissi
                   }}
                   placeholder={`Your ${credentialLabel}`}
                   autoComplete="off"
-                  className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                 />
                 <p className="text-[10px] text-muted-foreground mt-1">
                   Encrypted end-to-end — only the server can decrypt
@@ -293,7 +293,7 @@ export function PermissionModal({ request, queueSize = 0, onDecision }: Permissi
                   type="text"
                   value={promoteRuleText}
                   onChange={e => setPromoteRuleText(e.target.value)}
-                  className={`w-full px-3 py-1.5 bg-input border rounded-lg text-sm font-mono text-foreground focus:outline-none focus:ring-1 ${
+                  className={`w-full px-3 py-1.5 bg-input border rounded-md text-sm font-mono text-foreground focus:outline-none focus:ring-1 ${
                     promoteRuleError
                       ? 'border-destructive focus:border-destructive focus:ring-destructive'
                       : 'border-border focus:border-primary focus:ring-primary'

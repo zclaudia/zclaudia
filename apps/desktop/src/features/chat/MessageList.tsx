@@ -477,7 +477,7 @@ function AttachmentDisplay({ attachment }: { attachment: MessageAttachment }) {
   if (attachment.type === 'image') {
     if (imageData) {
       return (
-        <div className="rounded-md overflow-hidden bg-black/20 inline-block max-w-full">
+        <div className="rounded-lg overflow-hidden bg-black/20 inline-block max-w-full">
           <img
             src={imageData}
             alt={attachment.name}
@@ -491,7 +491,7 @@ function AttachmentDisplay({ attachment }: { attachment: MessageAttachment }) {
 
     if (loading) {
       return (
-        <div className="border border-border rounded-md p-4 bg-secondary/50 text-center text-sm text-muted-foreground">
+        <div className="border border-border rounded-lg p-4 bg-secondary/50 text-center text-sm text-muted-foreground">
           Loading image...
         </div>
       );
@@ -500,7 +500,7 @@ function AttachmentDisplay({ attachment }: { attachment: MessageAttachment }) {
     // Default: show clickable placeholder
     return (
       <div
-        className="border border-border rounded-md overflow-hidden bg-secondary/30 cursor-pointer hover:bg-secondary/50 transition-colors"
+        className="border border-border rounded-lg overflow-hidden bg-secondary/30 cursor-pointer hover:bg-secondary/50 transition-colors"
         onClick={loadImage}
       >
         <div className="flex items-center justify-center h-24 text-muted-foreground">
@@ -717,7 +717,7 @@ function MessageActionsMenu({
 
       {open && (
         <div
-          className={`absolute ${anchor === 'left' ? 'left-0' : 'right-0'} bottom-7 z-50 min-w-[200px] rounded-lg border border-border bg-popover shadow-md py-1 text-sm`}
+          className={`absolute ${anchor === 'left' ? 'left-0' : 'right-0'} bottom-7 z-50 min-w-[200px] rounded-xl border border-border bg-popover shadow-md py-1 text-sm`}
         >
           <button
             className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/60 transition-colors"
@@ -967,7 +967,7 @@ const MessageItem = memo(function MessageItem({
           <button
             onClick={onResend}
             disabled={resendDisabled}
-            className="text-xs px-2 py-1 rounded-full border border-border text-muted-foreground hover:text-foreground hover:bg-secondary/60 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-xs px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-secondary/60 disabled:opacity-50 disabled:cursor-not-allowed"
             title={
               resendDisabled ? 'This message cannot be resent as plain text' : 'Resend this message'
             }
@@ -1019,7 +1019,7 @@ const AssistantContent = memo(function AssistantContent({ content }: { content: 
                 }
                 return (
                   <code
-                    className="bg-secondary px-1.5 py-0.5 rounded-md text-primary break-all"
+                    className="bg-secondary px-1.5 py-0.5 rounded-[var(--radius-inline-token)] text-primary break-all"
                     {...props}
                   >
                     {hasInlineMarkdownIcon(codeText) ? (

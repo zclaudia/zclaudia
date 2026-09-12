@@ -42,6 +42,7 @@ import type { ActionsMenuAction } from './ui/ActionsMenu';
 import { useIsMounted } from '../../hooks/useIsMounted';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { Checkbox } from '../../components/ui/Checkbox';
+import { FIELD_CLASS_LG } from '../../components/ui/Input';
 
 /** First few tool names of a set, as a one-line hint under/next to its label. */
 function toolSetPreview(tools: readonly string[]): string {
@@ -86,8 +87,8 @@ function unavailableDescriptor(runtime: string): ProfileConfigDescriptor {
   };
 }
 
-const FIELD_CLASS =
-  'w-full rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
+/** Comfortable-density variant of the app's single field grammar (ui/Input). */
+const FIELD_CLASS = FIELD_CLASS_LG;
 const MONO_FIELD_CLASS = `${FIELD_CLASS} font-mono`;
 /**
  * Dropdown surface for the custom selectors below.
@@ -1436,7 +1437,7 @@ export function ProfileEditor({
                                           event.target.value as 'default' | 'include' | 'exclude'
                                         )
                                       }
-                                      className="rounded border border-border bg-secondary px-1 py-0.5 text-[10px] max-md:flex-1 max-md:py-1.5 max-md:text-xs"
+                                      className="rounded-md border border-border bg-secondary px-1 py-0.5 text-[10px] max-md:flex-1 max-md:py-1.5 max-md:text-xs"
                                     >
                                       <option value="default">Default</option>
                                       <option value="include">Include</option>
@@ -1475,7 +1476,7 @@ export function ProfileEditor({
                                           event.target.value as SkillDefaultModeOption
                                         )
                                       }
-                                      className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px] max-md:py-1.5 max-md:text-xs"
+                                      className="w-full rounded-md border border-border bg-secondary px-1 py-0.5 text-[10px] max-md:py-1.5 max-md:text-xs"
                                     >
                                       <option value="default">Default</option>
                                       <option value="inline">Inline</option>
@@ -1493,7 +1494,7 @@ export function ProfileEditor({
                                           event.target.value as SkillForkToolPolicyOption
                                         )
                                       }
-                                      className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px] max-md:py-1.5 max-md:text-xs"
+                                      className="w-full rounded-md border border-border bg-secondary px-1 py-0.5 text-[10px] max-md:py-1.5 max-md:text-xs"
                                     >
                                       <option value="default">Default</option>
                                       <option value="read-only">Read-only</option>

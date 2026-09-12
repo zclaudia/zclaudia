@@ -135,7 +135,7 @@ export const SlashMenu = forwardRef<HTMLDivElement, SlashMenuProps>(function Sla
   return (
     <div
       ref={ref}
-      className="absolute bottom-full left-0 right-0 mb-1 bg-popover border border-border rounded-lg shadow-apple-md overflow-y-auto max-h-64 z-10"
+      className="absolute bottom-full left-0 right-0 mb-1 bg-popover border border-border rounded-xl shadow-apple-md overflow-y-auto max-h-64 z-10"
     >
       {groups.map(group => (
         <div key={group.key} className="py-1">

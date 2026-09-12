@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>圆角四层体系 · 交互规范</title>
+<!--
+  圆角四层体系的可交互规范页。
+  使用 dev 服务器真实编译的 Tailwind CSS（tailwind-real.css，随本页一起更新）。
+  规范正文见 docs/ui-conventions.md §9；守卫：pnpm --filter @zclaudia/desktop run check:radius
+-->
+<link rel="stylesheet" href="./tailwind-real.css" />
+<style>
+  body { background: hsl(var(--background)); color: hsl(var(--foreground)); padding: 40px 32px; max-width: 1080px; margin: 0 auto; }
+  .tier-card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; }
+  .tier-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .tier-name { font-size: 15px; font-weight: 700; }
+  .tier-val { font-size: 12px; color: hsl(var(--muted-foreground)); font-family: var(--font-mono); }
+  .tier-desc { font-size: 12px; color: hsl(var(--muted-foreground)); margin-bottom: 16px; }
+  .demo-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .label { font-size: 11px; color: hsl(var(--muted-foreground)); margin-bottom: 6px; }
+  .box { display: flex; flex-direction: column; }
+  .bad { outline: 2px solid hsl(var(--destructive)); outline-offset: 2px; }
+  .tag { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+  .tag-bad { background: hsl(var(--destructive) / 0.12); color: hsl(var(--destructive)); }
+  .tag-ok { background: hsl(var(--success) / 0.15); color: hsl(var(--success)); }
+  .prose-line { font-size: 14px; line-height: 2; }
+  .prose-line code { font-family: var(--font-mono); padding: 0.1em 0.4em; border-radius: var(--radius-inline-token); background: hsl(var(--muted)); border: 0.5px solid hsl(var(--border)); }
+  h1 { font-size: 20px; font-weight: 700; }
+  .sub { color: hsl(var(--muted-foreground)); font-size: 13px; margin: 8px 0 28px; }
+  .chev { width: 12px; height: 12px; }
+</style>
+</head>
+<body>
+  <h1>圆角四层体系 · 交互规范</h1>
+  <div class="sub">圆角按<b>角色</b>分配，不按尺寸或局部喜好。本页所有示例均使用 app 真实编译的 CSS 渲染。</div>
+
+  <!-- ① 控件层 -->
+  <div class="tier-card">
+    <div class="tier-head">
+      <span class="tier-name">① 控件层</span>
+      <span class="tier-val">rounded-md = 10px</span>
+    </div>
+    <div class="tier-desc">所有带边框的录入/操作控件：输入框、文本域、原生 select、Select 触发器、按钮、复选框。</div>
+    <div class="demo-row">
+      <div class="box">
+        <div class="label">输入框（Input / FIELD_CLASS）</div>
+        <input class="h-9 w-56 rounded-md border border-input bg-background/70 px-3 text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-ring" placeholder="Project name" />
+      </div>
+      <div class="box">
+        <div class="label">Select 触发器</div>
+        <button type="button" class="h-9 w-56 flex items-center justify-between px-3 text-[13px] rounded-md bg-background border border-border font-medium">
+          <span class="text-muted-foreground">Choose a coding agent</span>
+          <svg class="chev text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+      <div class="box">
+        <div class="label">按钮（Button）</div>
+        <div style="display:flex;gap:8px">
+          <button class="rounded-md px-3 py-1.5 text-sm border border-border">Cancel</button>
+          <button class="rounded-md px-3 py-1.5 text-sm" style="background:hsl(var(--primary));color:hsl(var(--primary-foreground))">Create</button>
+        </div>
+      </div>
+      <div class="box">
+        <div class="label">复选框</div>
+        <input type="checkbox" checked class="h-4 w-4 rounded-md border-border" />
+      </div>
+    </div>
+  </div>
+
+  <!-- ② 卡片层 -->
+  <div class="tier-card">
+    <div class="tier-head">
+      <span class="tier-name">② 卡片层</span>
+      <span class="tier-val">rounded-lg = 12px</span>
+    </div>
+    <div class="tier-desc">消息流与面板里的内容卡片：状态卡、附件卡、终端输出、通知条。</div>
+    <div class="demo-row">
+      <div class="flex flex-col gap-1 px-3 py-2 rounded-lg bg-success/10 border border-success/30" style="font-size:12px;min-width:220px">
+        <span style="font-weight:600">✓ Approved</span>
+        <span class="text-muted-foreground">权限请求已通过（状态卡）</span>
+      </div>
+      <div class="rounded-lg border border-border/60 bg-secondary/30 text-xs" style="padding:10px 14px;min-width:220px">
+        <span style="font-weight:600">⤓ Context usage</span>
+        <div class="text-muted-foreground" style="margin-top:2px">消息流内的信息卡片</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ 浮层 / 容器层 -->
+  <div class="tier-card">
+    <div class="tier-head">
+      <span class="tier-name">③ 浮层 / 容器层</span>
+      <span class="tier-val">rounded-xl / rounded-2xl = 16px</span>
+    </div>
+    <div class="tier-desc">下拉展开面板、菜单、popover（rounded-xl）；弹窗、聊天气泡、输入容器（rounded-2xl）。</div>
+    <div class="demo-row" style="align-items:flex-start">
+      <div class="box">
+        <div class="label">下拉面板（Select panel / DropdownMenu）</div>
+        <div class="rounded-xl border border-border/50 bg-popover/95 shadow-apple-xl py-1" style="width:220px">
+          <div class="bg-muted/60 text-primary" style="padding:7px 12px;font-size:13px;font-weight:500">✓ Kimi (default)</div>
+          <div style="padding:7px 12px;font-size:13px">Claude Code</div>
+          <div style="padding:7px 12px;font-size:13px">Codex</div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="label">消息气泡（rounded-2xl）</div>
+        <div class="rounded-2xl bg-muted/60 shadow-apple-sm" style="padding:8px 16px;font-size:14px;max-width:260px">
+          帮我看一下这个文件的圆角是不是统一了？
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ④ 行内 token -->
+  <div class="tier-card">
+    <div class="tier-head">
+      <span class="tier-name">④ 行内 token</span>
+      <span class="tier-val">var(--radius-inline-token) = 5px</span>
+    </div>
+    <div class="tier-desc">嵌在文字流里的小 chip：行内代码、@文件引用。20px 行高上用 10px 会变成半个胶囊，所以单列一档。</div>
+    <div class="prose-line">
+      核心入口在 <code>src/main.tsx</code>，配置见
+      <button class="bg-secondary px-1.5 py-0.5 rounded-[var(--radius-inline-token)] text-primary font-mono" style="font-size:13px">M+ docs/architecture.md</button>
+      ，构建产物在 <code>dist/</code> 目录。
+    </div>
+  </div>
+
+  <!-- ⑤ 胶囊例外 -->
+  <div class="tier-card">
+    <div class="tier-head">
+      <span class="tier-name">⑤ 胶囊（仅装饰）</span>
+      <span class="tier-val">rounded-full</span>
+    </div>
+    <div class="tier-desc">开关、状态点、徽章 chip、进度条、圆形图标按钮。<b>禁止</b>出现在带边框的录入控件上。</div>
+    <div class="demo-row">
+      <div class="box">
+        <div class="label">开关（Toggle）</div>
+        <div class="rounded-full" style="width:36px;height:20px;background:hsl(var(--primary));position:relative">
+          <div style="position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:999px;background:#fff"></div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="label">徽章</div>
+        <span class="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Goal</span>
+      </div>
+      <div class="box">
+        <div class="label">状态点</div>
+        <span class="rounded-full bg-success" style="width:8px;height:8px;display:inline-block"></span>
+      </div>
+      <div class="box">
+        <div class="label">进度条</div>
+        <div class="rounded-full bg-muted" style="width:120px;height:6px;overflow:hidden">
+          <div class="rounded-full bg-primary" style="width:60%;height:100%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Do / Don't -->
+  <div class="tier-card">
+    <div class="tier-head"><span class="tier-name">Do / Don't</span></div>
+    <div class="demo-row" style="margin-top:12px;align-items:flex-end">
+      <div class="box">
+        <div class="label">✅ 控件用 10px</div>
+        <input class="h-9 w-52 rounded-md border border-input bg-background/70 px-3 text-[13px] outline-none" placeholder="Project name" />
+      </div>
+      <div class="box">
+        <div class="label">❌ 胶囊输入框<span class="tag tag-bad">check:radius 会拦截</span></div>
+        <input class="h-9 w-52 rounded-full border border-input bg-background/70 px-3 text-[13px] outline-none" placeholder="Project name" />
+      </div>
+      <div class="box">
+        <div class="label">❌ 同表单里高矮不一</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="h-9 w-28 rounded-md border border-input bg-background/70 px-3 text-[13px] outline-none" placeholder="h-9" />
+          <button type="button" class="h-6 w-28 flex items-center justify-between px-2 rounded-md bg-background border border-border text-[11px]"><span>h-6</span></button>
+        </div>
+      </div>
+      <div class="box">
+        <div class="label">✅ 同表单同高度档位<span class="tag tag-ok">推荐</span></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="h-9 w-28 rounded-md border border-input bg-background/70 px-3 text-[13px] outline-none" placeholder="h-9" />
+          <button type="button" class="h-9 w-28 flex items-center justify-between px-3 rounded-md bg-background border border-border text-[13px]"><span>h-9</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="font-size:12px;color:hsl(var(--muted-foreground));margin-top:8px">
+    规范正文：<code style="font-family:var(--font-mono)">docs/ui-conventions.md §9</code> ·
+    守卫：<code style="font-family:var(--font-mono)">pnpm --filter @zclaudia/desktop run check:radius</code>（已并入 lint）·
+    获取控件样式请用 <code style="font-family:var(--font-mono)">FIELD_CLASS / FIELD_CLASS_LG / Select / Button</code>，不要手写或复制。
+  </div>
+</body>
+</html>
