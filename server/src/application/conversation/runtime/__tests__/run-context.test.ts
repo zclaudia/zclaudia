@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { BuildRunContextInput } from '../run-context.js';
 
-const assembleSystemPromptMock = vi.fn(async () => '## 项目上下文\n\nproject CLAUDE.md content');
+const assembleSystemPromptMock = vi.fn(async () => '## Project Context\n\nproject CLAUDE.md content');
 const buildSkillDirectoryHintMock = vi.fn(() => '<available_skills>hint</available_skills>');
 const toolRegistryGetAllMock = vi.fn(() => [] as Array<{ id: string; source: string }>);
 
@@ -64,7 +64,7 @@ function createInput(overrides: Partial<BuildRunContextInput> = {}): BuildRunCon
 describe('buildRunContext — workspace prompt merge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    assembleSystemPromptMock.mockResolvedValue('## 项目上下文\n\nproject CLAUDE.md content');
+    assembleSystemPromptMock.mockResolvedValue('## Project Context\n\nproject CLAUDE.md content');
     buildSkillDirectoryHintMock.mockReturnValue('<available_skills>hint</available_skills>');
     toolRegistryGetAllMock.mockReturnValue([]);
   });

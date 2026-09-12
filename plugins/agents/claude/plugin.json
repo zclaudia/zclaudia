@@ -35,12 +35,12 @@
         "engineModes": [
           {
             "id": "cli",
-            "label": "CLI（外部环境）",
+            "label": "CLI (external)",
             "connection": { "kind": "external", "modelSelection": "optional" },
             "executable": "external-cli",
             "modelOptions": { "multimodalFallback": false, "thinkingLevel": "auto" },
             "capabilities": { "tools": "native-readonly", "skills": "external" },
-            "authNote": "使用已安装的 Claude Code CLI；模型 ID 由外部 CLI 解释，留空使用其默认模型。"
+            "authNote": "Uses your installed Claude Code CLI. Model IDs are interpreted by the external CLI; leave empty for its default model."
           },
           {
             "id": "sdk",
@@ -52,7 +52,7 @@
             "executable": "bundled-sdk",
             "modelOptions": { "multimodalFallback": false, "thinkingLevel": "auto" },
             "capabilities": { "tools": "native-readonly", "skills": "external" },
-            "authNote": "连接由当前后端管理：不读取个人 Claude 登录，不自动加载 CLAUDE.md，仅使用 ZClaudia 注入的项目指令。"
+            "authNote": "Managed by this backend: no personal Claude login and no automatic CLAUDE.md loading — only project instructions injected by ZClaudia."
           }
         ],
         "manifest": {

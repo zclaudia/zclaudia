@@ -39,8 +39,8 @@ describe('normalizeFromToolUse', () => {
       toolName: 'updateTodos',
       toolInput: {
         todos: [
-          { content: '扫描 orchestration 代码', status: 'completed' },
-          { content: '执行 review', status: 'in_progress' },
+          { content: 'Scan the orchestration code', status: 'completed' },
+          { content: 'Run the review', status: 'in_progress' },
         ],
       },
     });
@@ -52,8 +52,8 @@ describe('normalizeFromToolUse', () => {
       runId: 'run-1',
       provider: 'cursor',
       todos: [
-        { content: '扫描 orchestration 代码', status: 'completed' },
-        { content: '执行 review', status: 'in_progress' },
+        { content: 'Scan the orchestration code', status: 'completed' },
+        { content: 'Run the review', status: 'in_progress' },
       ],
     });
   });

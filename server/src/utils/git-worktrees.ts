@@ -2,15 +2,15 @@ import { execSync } from 'child_process';
 import * as path from 'path';
 
 export interface GitWorktree {
-  path: string; // 绝对路径
-  branch: string; // 分支名，如 'main' 或 'feat/foo'
-  isMain: boolean; // 是否是主 worktree（第一个）
-  commit?: string; // HEAD commit hash（短）
+  path: string; // absolute path
+  branch: string; // branch name, e.g. 'main' or 'feat/foo'
+  isMain: boolean; // whether this is the main worktree (the first one)
+  commit?: string; // short HEAD commit hash
 }
 
 /**
- * 列出 git repo 的所有 worktrees。
- * 如果不是 git repo 或 git 不可用，返回空数组。
+ * List all worktrees of a git repository.
+ * Returns an empty array when the directory is not a git repo or git is unavailable.
  */
 export function listGitWorktrees(repoPath: string): GitWorktree[] {
   try {
@@ -28,13 +28,13 @@ export function listGitWorktrees(repoPath: string): GitWorktree[] {
 }
 
 /**
- * 解析 `git worktree list --porcelain` 的输出。
+ * Parses `git worktree list --porcelain` output.
  *
- * 输出格式（每个 worktree 一组，空行分隔）：
+ * Output format (one block per worktree, blocks separated by blank lines):
  *   worktree /absolute/path
  *   HEAD abc1234
  *   branch refs/heads/main
- *   (或 "detached" 替代 branch 行)
+ *   (or a "detached" line instead of branch)
  */
 function parseWorktreeOutput(output: string): GitWorktree[] {
   const blocks = output.trim().split(/\n\n+/);
@@ -79,12 +79,12 @@ function parseWorktreeOutput(output: string): GitWorktree[] {
 }
 
 /**
- * 创建一个新的 git worktree。
- * - 如果 branch 已存在：`git worktree add <worktreePath> <branch>`
- * - 如果 branch 不存在：`git worktree add -b <branch> <worktreePath>`
+ * Create a new git worktree.
+ * - If the branch exists: `git worktree add <worktreePath> <branch>`
+ * - If the branch does not exist: `git worktree add -b <branch> <worktreePath>`
  *
- * @returns 创建后的 GitWorktree 对象
- * @throws 如果 git 命令失败
+ * @returns the created GitWorktree
+ * @throws when the git command fails
  */
 export function createGitWorktree(
   repoPath: string,
@@ -95,7 +95,7 @@ export function createGitWorktree(
     ? worktreePath
     : path.resolve(repoPath, worktreePath);
 
-  // 检查分支是否已存在
+  // Check whether the branch already exists
   let branchExists = false;
   try {
     execSync(`git rev-parse --verify refs/heads/${branch}`, {

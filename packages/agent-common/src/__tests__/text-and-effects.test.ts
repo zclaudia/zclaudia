@@ -4,7 +4,7 @@ import { cleanEffectPath, makeFileChangeEffect, makeShellEffect } from '../tool-
 
 describe('shared event normalization helpers', () => {
   it('truncates on UTF-8 boundaries and keeps both ends', () => {
-    const result = truncateUtf8(`start-${'你'.repeat(100)}-end`, 64);
+    const result = truncateUtf8(`start-${'é'.repeat(100)}-end`, 64);
     expect(Buffer.byteLength(result, 'utf8')).toBeLessThanOrEqual(64);
     expect(result).toContain('[truncated]');
     expect(result.endsWith('-end')).toBe(true);

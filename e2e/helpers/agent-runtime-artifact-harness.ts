@@ -11,7 +11,7 @@ export const test = base.extend<{ artifactApp: AgentRuntimeHarness; bundle: stri
     if (process.env.ZCLAUDIA_E2E_SANDBOX_PROFILE)
       throw new Error('Mutable artifact tests must run separately from immutable bundle tests');
     const app = new AgentRuntimeHarness();
-    app.directory = await realpath(await mkdtemp(path.join(tmpdir(), 'zclaudia artifact 中文 ')));
+    app.directory = await realpath(await mkdtemp(path.join(tmpdir(), 'zclaudia-artifact-')));
     const source = path.resolve(process.env.ZCLAUDIA_E2E_MUTABLE_ARTIFACT_DIR ?? 'server/bundle');
     const bundle = path.join(app.directory, 'resources');
     const verifyOriginal = () =>

@@ -13,7 +13,7 @@ const REQUIRED_SECTIONS = ['goal', 'scope', 'steps', 'verification'];
 const OPTIONAL_SECTIONS = ['risks', 'assumptions'];
 
 function normalizeHeading(raw: string): string {
-  // Handle both trailing colons and colons in the middle (e.g., "Goal：目标")
+  // Handle both trailing colons and colons in the middle (e.g., a full-width "：" after "Goal")
   // Extract just the heading name before any colon
   return raw.trim().toLowerCase().split(/[：:]/)[0].trim();
 }

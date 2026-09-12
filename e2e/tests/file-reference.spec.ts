@@ -75,7 +75,7 @@ describe('File Reference (@) - Traditional Playwright', () => {
   }
 
   // ─────────────────────────────────────────────
-  // D1: 输入 `@` 显示目录浏览器
+  // D1: typing `@` opens the directory browser
   // ─────────────────────────────────────────────
   test('D1: typing @ shows directory browser', async () => {
     console.log('Test D1: Typing @ shows directory browser');
@@ -108,7 +108,7 @@ describe('File Reference (@) - Traditional Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // D2: 点击目录进入子目录
+  // D2: clicking a directory enters it
   // ─────────────────────────────────────────────
   test('D2: clicking directory enters subdirectory', async () => {
     console.log('Test D2: Clicking directory enters subdirectory');
@@ -147,7 +147,7 @@ describe('File Reference (@) - Traditional Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // D3: 选择文件插入路径到消息
+  // D3: selecting a file inserts its path into the message
   // ─────────────────────────────────────────────
   test('D3: selecting file inserts path into message', async () => {
     console.log('Test D3: Selecting file inserts path');
@@ -190,7 +190,7 @@ describe('File Reference (@) - Traditional Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // D4: 输入路径片段模糊过滤
+  // D4: typing a path fragment fuzzy-filters entries
   // ─────────────────────────────────────────────
   test('D4: typing path fragment filters results', async () => {
     console.log('Test D4: Typing path fragment filters results');
@@ -219,7 +219,7 @@ describe('File Reference (@) - Traditional Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // D5: 无工作目录时不显示 @ 浏览器
+  // D5: the @ browser is hidden without a working directory
   // ─────────────────────────────────────────────
   test.skip('D5: @ browser not shown without working directory', async () => {
     // Skipped: Requires specific test setup for project without working directory
@@ -228,7 +228,7 @@ describe('File Reference (@) - Traditional Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // D6: 目录列表排序（文件夹优先）
+  // D6: directory listing ordering (folders first)
   // ─────────────────────────────────────────────
   test('D6: directory list sorted with folders first', async () => {
     console.log('Test D6: Directory list sorted with folders first');
@@ -282,7 +282,7 @@ describe('File Reference (@) - Traditional Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // D7: 隐藏文件和 node_modules 不显示
+  // D7: hidden files and node_modules are not shown
   // ─────────────────────────────────────────────
   test('D7: hidden files and node_modules not shown', async () => {
     console.log('Test D7: Hidden files and node_modules not shown');

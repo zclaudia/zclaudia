@@ -117,13 +117,13 @@ describe('buildSummaryPrompt', () => {
       {
         id: 'u1',
         role: 'user',
-        content: JSON.stringify({ text: '帮我重构这段代码', attachments: [] }),
+        content: JSON.stringify({ text: 'Refactor this code for me', attachments: [] }),
         metadata: null,
         offset: 1,
         createdAt: 100,
       },
     ]);
-    expect(prompt).toContain('帮我重构这段代码');
+    expect(prompt).toContain('Refactor this code for me');
     expect(prompt).not.toContain('{"text"'); // raw JSON should not leak through
   });
 

@@ -1,44 +1,44 @@
 /* global confirm, location */
 // localStorage is a Node 22+ global so the no-redeclare check sees it as
 // already-defined; the rest are browser-only and stay declared here.
-// 在浏览器控制台中运行此脚本，快速添加 Gateway 服务器配置
-// 使用方法：
-//   1. 打开 http://localhost:1420
-//   2. 打开开发者工具 Console
-//   3. 复制粘贴此脚本并回车
+// Run this script in the browser console to quickly add a gateway server config.
+// Usage:
+//   1. Open http://localhost:1420
+//   2. Open the developer tools console
+//   3. Paste this script and press enter
 
 (function addGatewayServer() {
   const STORAGE_KEY = 'zclaudia-servers';
 
-  // Gateway 配置
+  // Gateway configuration
   const GATEWAY_CONFIG = {
     name: 'Gateway Test',
     address: 'localhost:3200',
     gatewayUrl: 'ws://localhost:3200',
     gatewaySecret: 'test-secret-zclaudia-2026',
-    // backendId: 'your-backend-id',  // 如果知道后端 ID，取消注释并填入
-    // apiKey: 'your-api-key'         // 如果需要后端认证，取消注释并填入
+    // backendId: 'your-backend-id',  // uncomment and fill in if you know the backend id
+    // apiKey: 'your-api-key'         // uncomment and fill in if the backend requires auth
   };
 
   try {
-    // 读取当前配置
+    // Read the current config
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
-      console.error('❌ 未找到服务器配置');
+      console.error('❌ Server config not found');
       return;
     }
 
     const data = JSON.parse(stored);
 
-    // 检查是否已存在同名服务器
+    // Check for an existing server with the same name
     const exists = data.state.servers.find(s => s.name === GATEWAY_CONFIG.name);
     if (exists) {
-      console.log(`⚠️  服务器 "${GATEWAY_CONFIG.name}" 已存在`);
-      console.log('   如需重新添加，请先删除旧配置或修改名称');
+      console.log(`⚠️  Server "${GATEWAY_CONFIG.name}" already exists`);
+      console.log('   Remove the old entry or rename it to re-add');
       return;
     }
 
-    // 创建新服务器配置
+    // Build the new server config
     const newServer = {
       id: `gateway-${Date.now()}`,
       name: GATEWAY_CONFIG.name,
@@ -51,7 +51,7 @@
       createdAt: Date.now(),
     };
 
-    // 添加可选字段
+    // Optional fields
     if (GATEWAY_CONFIG.backendId) {
       newServer.backendId = GATEWAY_CONFIG.backendId;
     }
@@ -59,27 +59,27 @@
       newServer.apiKey = GATEWAY_CONFIG.apiKey;
     }
 
-    // 添加到服务器列表
+    // Append to the server list
     data.state.servers.push(newServer);
 
-    // 保存
+    // Save
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 
-    console.log('✅ Gateway 服务器已添加！');
-    console.log('📋 服务器配置:');
-    console.log('   名称:', newServer.name);
-    console.log('   地址:', newServer.address);
+    console.log('✅ Gateway server added!');
+    console.log('📋 Server config:');
+    console.log('   Name:', newServer.name);
+    console.log('   Address:', newServer.address);
     console.log('   Gateway URL:', newServer.gatewayUrl);
-    console.log('   连接模式:', newServer.connectionMode);
+    console.log('   Connection mode:', newServer.connectionMode);
     console.log('');
-    console.log('🔄 请刷新页面以应用配置');
+    console.log('🔄 Reload the page to apply the config');
     console.log('');
 
-    // 询问是否立即刷新
-    if (confirm('是否立即刷新页面以应用新配置？')) {
+    // Offer an immediate reload
+    if (confirm('Reload the page now to apply the new config?')) {
       location.reload();
     }
   } catch (error) {
-    console.error('❌ 添加服务器失败:', error);
+    console.error('❌ Failed to add the server:', error);
   }
 })();

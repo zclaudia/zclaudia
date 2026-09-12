@@ -1376,7 +1376,7 @@ describe('ToolCallItem', () => {
         fields: [
           {
             id: 'question_0',
-            label: '是否立刻开工？',
+            label: 'Start implementation now?',
             type: 'select',
             options: [{ value: 'yes', label: 'Yes' }],
             allowCustomValue: true,
@@ -1392,8 +1392,8 @@ describe('ToolCallItem', () => {
             toolInput: {
               questions: [
                 {
-                  header: '推进 Phase 2',
-                  question: '只读旧卡片',
+                  header: 'Phase 2 kickoff',
+                  question: 'Read the old card only',
                   options: [{ label: 'A' }],
                 },
               ],
@@ -1404,8 +1404,8 @@ describe('ToolCallItem', () => {
       );
 
       expect(screen.getByText('Question')).toBeInTheDocument();
-      expect(screen.getByText('是否立刻开工？')).toBeInTheDocument();
-      expect(screen.queryByText('只读旧卡片')).not.toBeInTheDocument();
+      expect(screen.getByText('Start implementation now?')).toBeInTheDocument();
+      expect(screen.queryByText('Read the old card only')).not.toBeInTheDocument();
     });
 
     it('does not render a session prompt inside an unrelated AskUserQuestion tool call', () => {
@@ -1423,7 +1423,7 @@ describe('ToolCallItem', () => {
         fields: [
           {
             id: 'question_0',
-            label: '是否立刻开工？',
+            label: 'Start implementation now?',
             type: 'select',
             options: [{ value: 'yes', label: 'Yes' }],
             allowCustomValue: true,
@@ -1439,8 +1439,8 @@ describe('ToolCallItem', () => {
             toolInput: {
               questions: [
                 {
-                  header: '推进 Phase 2',
-                  question: '只读旧卡片',
+                  header: 'Phase 2 kickoff',
+                  question: 'Read the old card only',
                   options: [{ label: 'A' }],
                 },
               ],
@@ -1451,7 +1451,7 @@ describe('ToolCallItem', () => {
       );
 
       expect(screen.getByTestId('tool-use')).toBeInTheDocument();
-      expect(screen.queryByText('是否立刻开工？')).not.toBeInTheDocument();
+      expect(screen.queryByText('Start implementation now?')).not.toBeInTheDocument();
     });
 
     it('falls back to a prompt interaction when the request is pending but interaction store is missing', () => {
@@ -1471,9 +1471,9 @@ describe('ToolCallItem', () => {
             toolInput: {
               questions: [
                 {
-                  header: '实现细节',
-                  question: '移动端是否应该允许直接回复？',
-                  options: [{ label: '允许', description: '跨端一致' }],
+                  header: 'Implementation details',
+                  question: 'Should mobile allow direct replies?',
+                  options: [{ label: 'Allow', description: 'Consistent across platforms' }],
                 },
               ],
             },
@@ -1483,9 +1483,9 @@ describe('ToolCallItem', () => {
       );
 
       expect(screen.getByText('Question')).toBeInTheDocument();
-      expect(screen.getByText('移动端是否应该允许直接回复？')).toBeInTheDocument();
+      expect(screen.getByText('Should mobile allow direct replies?')).toBeInTheDocument();
       expect(screen.getByText('Submit')).toBeInTheDocument();
-      expect(screen.queryByText('实现细节')).not.toBeNull();
+      expect(screen.queryByText('Implementation details')).not.toBeNull();
     });
 
     it('sends optional feedback when approving a plan review', () => {
@@ -1797,7 +1797,7 @@ describe('ToolCallList', () => {
         makeTc('tc-2', {
           toolName: 'AskUserQuestion',
           toolInput: {
-            questions: [{ header: '范围', question: 'Choose scope', options: [] }],
+            questions: [{ header: 'Scope', question: 'Choose scope', options: [] }],
           },
           status: 'error',
           isError: true,
@@ -1815,7 +1815,7 @@ describe('ToolCallList', () => {
       const countRow = screen.getByText('3 tool calls').parentElement!;
       expect(countRow).toHaveTextContent(/3 tool calls\s*2\s*1\s*Click to expand/);
 
-      expect(screen.getByText('范围').parentElement).toHaveClass(
+      expect(screen.getByText('Scope').parentElement).toHaveClass(
         'bg-secondary',
         'text-muted-foreground'
       );

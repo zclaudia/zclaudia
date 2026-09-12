@@ -148,7 +148,7 @@ describe('SessionHeader', () => {
             id: 'msg-1',
             sessionId: 'sess-1',
             role: 'user',
-            content: '帮我修一下 Windows 下的编码问题',
+            content: 'Help me fix the Windows encoding issue',
             createdAt: 1,
           },
           { id: 'msg-2', sessionId: 'sess-1', role: 'assistant', content: 'Sure!', createdAt: 2 },
@@ -159,7 +159,7 @@ describe('SessionHeader', () => {
     render(<SessionHeader {...baseProps} />);
 
     // The chip text should be present (may be truncated to 40 chars, but the content fits)
-    expect(screen.getByText(/帮我修一下 Windows/)).toBeTruthy();
+    expect(screen.getByText(/Help me fix the Windows/)).toBeTruthy();
   });
 
   it('does not show topic chip when there are no messages', () => {
@@ -169,7 +169,7 @@ describe('SessionHeader', () => {
     // We verify by asserting the first user text is absent
     const spans = container.querySelectorAll('span[title]');
     // None of the titled spans should contain the test content
-    const chipSpan = Array.from(spans).find(s => s.getAttribute('title')?.includes('帮我'));
+    const chipSpan = Array.from(spans).find(s => s.getAttribute('title')?.includes('Help me'));
     expect(chipSpan).toBeUndefined();
   });
 
@@ -182,7 +182,7 @@ describe('SessionHeader', () => {
             id: 'msg-1',
             sessionId: 'sess-1',
             role: 'user',
-            content: '帮我修一下 Windows 下的编码问题',
+            content: 'Help me fix the Windows encoding issue',
             createdAt: 1,
           },
         ],
@@ -191,7 +191,7 @@ describe('SessionHeader', () => {
 
     render(<SessionHeader {...baseProps} currentSession={bgSession} />);
     // Background sessions should not show the chip
-    expect(screen.queryByText(/帮我修一下 Windows/)).toBeNull();
+    expect(screen.queryByText(/Help me fix the Windows/)).toBeNull();
   });
 
   it('truncates topic text to 40 chars', () => {

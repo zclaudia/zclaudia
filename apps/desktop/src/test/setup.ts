@@ -22,7 +22,7 @@ class MockWebSocket {
   onerror: ((event: Event) => void) | null = null;
 
   constructor(public url: string) {
-    // 优化：使用 queueMicrotask 替代 setTimeout，更快执行
+    // Prefer queueMicrotask over setTimeout — it drains faster.
     queueMicrotask(() => {
       this.onopen?.(new Event('open'));
     });
@@ -90,7 +90,7 @@ if (typeof window !== 'undefined') {
 }
 
 // Mock IndexedDB for agentStorage tests
-// 优化：使用同步/微任务替代 setTimeout，减少等待时间
+// Prefer synchronous/microtask behavior over setTimeout to cut wait time.
 class MockIDBDatabase {
   name: string;
   version: number;
@@ -122,7 +122,7 @@ class MockIDBDatabase {
         onsuccess: null as ((ev: Event) => void) | null,
         onerror: null as ((ev: Event) => void) | null,
       };
-      // 优化：使用 queueMicrotask 替代 setTimeout(..., 0)
+      // Prefer queueMicrotask over setTimeout(..., 0)
       queueMicrotask(() => {
         if (req.onsuccess) (req.onsuccess as (ev: Event) => void)(new Event('success'));
         if (tx.oncomplete) (tx.oncomplete as (ev: Event) => void)(new Event('complete'));
@@ -161,7 +161,7 @@ class MockIDBOpenDBRequest extends MockIDBRequest<IDBDatabase> {
 const mockIndexedDB = {
   open: vi.fn((name: string, version?: number) => {
     const request = new MockIDBOpenDBRequest();
-    // 优化：使用 queueMicrotask 替代 setTimeout(..., 0)
+    // Prefer queueMicrotask over setTimeout(..., 0)
     queueMicrotask(() => {
       request.result = new MockIDBDatabase(name) as unknown as IDBDatabase;
       request.onsuccess?.call(request as unknown as IDBOpenDBRequest, new Event('success'));

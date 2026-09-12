@@ -26,7 +26,7 @@ describe('Project & Session Management', () => {
   });
 
   // ─────────────────────────────────────────────
-  // A1: 创建项目（填写名称和工作目录）
+  // A1: create a project (name + working directory)
   // ─────────────────────────────────────────────
   test('A1: create project with name and working directory', async () => {
     console.log('Test A1: Create project');
@@ -56,7 +56,7 @@ describe('Project & Session Management', () => {
   });
 
   // ─────────────────────────────────────────────
-  // A2: 创建项目后自动展开并选中
+  // A2: after creation the project auto-expands and is selected
   // ─────────────────────────────────────────────
   test('A2: project auto-expands and selects after creation', async () => {
     console.log('Test A2: Project auto-expands');
@@ -75,7 +75,7 @@ describe('Project & Session Management', () => {
   });
 
   // ─────────────────────────────────────────────
-  // A3: 创建项目时名称为空应禁用按钮
+  // A3: empty name disables the create button
   // ─────────────────────────────────────────────
   test('A3: create button disabled when name is empty', async () => {
     console.log('Test A3: Create button disabled when empty');
@@ -93,7 +93,7 @@ describe('Project & Session Management', () => {
   });
 
   // ─────────────────────────────────────────────
-  // A4: 取消创建项目应清空表单
+  // A4: cancelling clears the create form
   // ─────────────────────────────────────────────
   test('A4: cancel project creation clears form', async () => {
     console.log('Test A4: Cancel clears form');
@@ -127,7 +127,7 @@ describe('Project & Session Management', () => {
   });
 
   // ─────────────────────────────────────────────
-  // A5: 删除项目（含确认流程）
+  // A5: delete a project (with confirmation flow)
   // ─────────────────────────────────────────────
   test('A5: delete project with confirmation', async () => {
     console.log('Test A5: Delete project');
@@ -187,7 +187,7 @@ describe('Project & Session Management', () => {
   });
 
   // ─────────────────────────────────────────────
-  // A6: 删除项目后关联会话也被删除
+  // A6: deleting a project deletes its sessions
   // ─────────────────────────────────────────────
   test('A6: deleting project also deletes associated sessions', async () => {
     console.log('Test A6: Delete project deletes sessions');
@@ -245,7 +245,7 @@ describe('Project & Session Management', () => {
   });
 
   // ─────────────────────────────────────────────
-  // A7: 创建会话（可选名称）
+  // A7: create a session (optional name)
   // ─────────────────────────────────────────────
   test('A7: create session with optional name', async () => {
     console.log('Test A7: Create session with name');
@@ -286,7 +286,7 @@ describe('Project & Session Management', () => {
   });
 
   // ─────────────────────────────────────────────
-  // A8: 删除会话
+  // A8: delete a session
   // ─────────────────────────────────────────────
   test('A8: delete session', async () => {
     console.log('Test A8: Delete session');
@@ -342,7 +342,7 @@ describe('Project & Session Management', () => {
   });
 
   // ─────────────────────────────────────────────
-  // A9: 切换会话加载对应消息历史
+  // A9: switching sessions loads the matching message history
   // ─────────────────────────────────────────────
   test('A9: switching sessions loads correct message history', async () => {
     console.log('Test A9: Session switching loads history');
@@ -413,7 +413,7 @@ describe('Project & Session Management', () => {
   });
 
   // ─────────────────────────────────────────────
-  // A10: 侧边栏折叠与展开
+  // A10: sidebar collapse and expand
   // ─────────────────────────────────────────────
   test('A10: sidebar collapse and expand', async () => {
     console.log('Test A10: Sidebar collapse/expand');
@@ -461,7 +461,7 @@ describe('Project & Session Management', () => {
   });
 
   // ─────────────────────────────────────────────
-  // A11: 多项目之间数据隔离
+  // A11: data isolation between projects
   // ─────────────────────────────────────────────
   test('A11: data isolation between projects', async () => {
     console.log('Test A11: Data isolation');

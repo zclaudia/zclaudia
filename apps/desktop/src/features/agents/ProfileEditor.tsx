@@ -873,7 +873,7 @@ export function ProfileEditor({
                       return (
                         <EditorRow
                           title="Run Mode"
-                          description="用于新会话；已开始的会话保留原连接绑定"
+                          description="Applies to new sessions; started sessions keep their original connection binding"
                           control={
                             <div className="flex flex-col gap-1.5">
                               {modes.map(mode => (

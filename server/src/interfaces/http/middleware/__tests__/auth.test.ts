@@ -42,8 +42,8 @@ describe('authMiddleware', () => {
     };
   });
 
-  describe('本地客户端认证', () => {
-    it('允许本地客户端无需认证访问', async () => {
+  describe('local client authentication', () => {
+    it('lets local clients through without authentication', async () => {
       mockCtx.client.isLocal = true;
       mockCtx.client.authenticated = false;
 
@@ -53,7 +53,7 @@ describe('authMiddleware', () => {
       expect(result).toBe('next-result');
     });
 
-    it('本地客户端跳过认证检查', async () => {
+    it('skips the auth check for local clients', async () => {
       mockCtx.client.isLocal = true;
       mockCtx.client.authenticated = false;
 
@@ -63,8 +63,8 @@ describe('authMiddleware', () => {
     });
   });
 
-  describe('远程客户端认证', () => {
-    it('允许已认证的远程客户端', async () => {
+  describe('remote client authentication', () => {
+    it('allows authenticated remote clients', async () => {
       mockCtx.client.isLocal = false;
       mockCtx.client.authenticated = true;
 
@@ -74,7 +74,7 @@ describe('authMiddleware', () => {
       expect(result).toBe('next-result');
     });
 
-    it('拒绝未认证的远程客户端', async () => {
+    it('rejects unauthenticated remote clients', async () => {
       mockCtx.client.isLocal = false;
       mockCtx.client.authenticated = false;
 
@@ -90,7 +90,7 @@ describe('authMiddleware', () => {
       expect(result).toEqual(createMockErrorResponse());
     });
 
-    it('返回正确的错误消息', async () => {
+    it('returns the correct error message', async () => {
       mockCtx.client.isLocal = false;
       mockCtx.client.authenticated = false;
 
@@ -102,7 +102,7 @@ describe('authMiddleware', () => {
       expect(errorMessage).toContain('API key');
     });
 
-    it('未认证客户端不调用 next', async () => {
+    it('does not call next for unauthenticated clients', async () => {
       mockCtx.client.isLocal = false;
       mockCtx.client.authenticated = false;
 
@@ -114,8 +114,8 @@ describe('authMiddleware', () => {
     });
   });
 
-  describe('边界情况', () => {
-    it('处理缺失的 client 对象', async () => {
+  describe('edge cases', () => {
+    it('handles a missing client object', async () => {
       mockCtx.client = undefined as any;
       vi.mocked(errorResponse).mockReturnValue(createMockErrorResponse());
 
@@ -130,7 +130,7 @@ describe('authMiddleware', () => {
       expect(result).toEqual(createMockErrorResponse());
     });
 
-    it('处理 undefined authenticated 标志', async () => {
+    it('handles an undefined authenticated flag', async () => {
       mockCtx.client.isLocal = false;
       mockCtx.client.authenticated = undefined as any;
 
@@ -138,12 +138,12 @@ describe('authMiddleware', () => {
 
       const result = await authMiddleware(mockCtx, mockNext);
 
-      // undefined 应被视为 falsy，因此应拒绝
+      // undefined is treated as falsy, so the request is rejected
       expect(errorResponse).toHaveBeenCalled();
       expect(result).toEqual(createMockErrorResponse());
     });
 
-    it('处理 null authenticated 标志', async () => {
+    it('handles a null authenticated flag', async () => {
       mockCtx.client.isLocal = false;
       mockCtx.client.authenticated = null as any;
 
@@ -151,7 +151,7 @@ describe('authMiddleware', () => {
 
       const result = await authMiddleware(mockCtx, mockNext);
 
-      // null 应被视为 falsy，因此应拒绝
+      // null is treated as falsy, so the request is rejected
       expect(errorResponse).toHaveBeenCalled();
       expect(result).toEqual(createMockErrorResponse());
     });
@@ -175,7 +175,7 @@ describe('optionalAuthMiddleware', () => {
     };
   });
 
-  it('总是允许请求继续', async () => {
+  it('always lets the request continue', async () => {
     mockCtx.client.isLocal = false;
     mockCtx.client.authenticated = false;
 
@@ -185,22 +185,22 @@ describe('optionalAuthMiddleware', () => {
     expect(result).toBe('next-result');
   });
 
-  it('无论认证状态都调用 next', async () => {
-    // 测试未认证
+  it('calls next regardless of auth status', async () => {
+    // unauthenticated
     mockCtx.client.authenticated = false;
     await optionalAuthMiddleware(mockCtx, mockNext);
     expect(mockNext).toHaveBeenCalled();
 
-    // 重置
+    // reset
     mockNext.mockClear();
 
-    // 测试已认证
+    // authenticated
     mockCtx.client.authenticated = true;
     await optionalAuthMiddleware(mockCtx, mockNext);
     expect(mockNext).toHaveBeenCalled();
   });
 
-  it('允许本地客户端继续', async () => {
+  it('lets local clients continue', async () => {
     mockCtx.client.isLocal = true;
     mockCtx.client.authenticated = false;
 
@@ -210,7 +210,7 @@ describe('optionalAuthMiddleware', () => {
     expect(result).toBe('next-result');
   });
 
-  it('允许远程已认证客户端继续', async () => {
+  it('lets authenticated remote clients continue', async () => {
     mockCtx.client.isLocal = false;
     mockCtx.client.authenticated = true;
 
@@ -220,7 +220,7 @@ describe('optionalAuthMiddleware', () => {
     expect(result).toBe('next-result');
   });
 
-  it('不调用 errorResponse', async () => {
+  it('does not call errorResponse', async () => {
     await optionalAuthMiddleware(mockCtx, mockNext);
 
     expect(errorResponse).not.toHaveBeenCalled();

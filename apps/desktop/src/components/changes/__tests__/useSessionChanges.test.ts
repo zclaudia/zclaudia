@@ -497,7 +497,7 @@ describe('aggregateSessionChanges', () => {
     const messages: MessageWithToolCalls[] = [
       userMsg(
         'u1',
-        JSON.stringify({ text: '你是否可以帮我清理这些无用的代码', attachments: [] }),
+        JSON.stringify({ text: 'Could you help me clean up this dead code', attachments: [] }),
         100
       ),
       assistantMsg(
@@ -518,7 +518,7 @@ describe('aggregateSessionChanges', () => {
       projectRoot: PROJECT_ROOT,
     });
     expect(r.modified[0].groups[0].sinceUserMessagePreview).toBe(
-      '你是否可以帮我清理这些无用的代码'
+      'Could you help me clean up this dead code'
     );
     expect(r.modified[0].groups[1].sinceUserMessagePreview).toBe('follow up');
   });
@@ -787,9 +787,9 @@ describe('aggregateSessionChanges', () => {
     it('handles Chinese punctuation when splitting the first sentence', () => {
       const { title } = buildIssueFromSummary({
         ...args,
-        openIssues: '存在 2 个失败的工具调用。需要查看日志确认具体原因。',
+        openIssues: '2 tool calls failed. Check the logs for details.',
       });
-      expect(title).toBe('存在 2 个失败的工具调用');
+      expect(title).toBe('2 tool calls failed');
     });
   });
 

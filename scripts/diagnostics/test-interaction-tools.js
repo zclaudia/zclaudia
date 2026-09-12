@@ -53,7 +53,7 @@ const TEST_SCENARIOS = [
     id: 'todo_list',
     name: 'update_todo_list',
     prompt:
-      '请帮我规划以下任务并用 todo list 跟踪：1. 检查代码风格 2. 运行测试 3. 构建项目。只需要创建 todo list，不需要真的执行这些任务。',
+      'Please plan the following tasks and track them with the todo list: 1. Check code style 2. Run tests 3. Build the project. Only create the todo list — do not actually execute these tasks.',
     expectEvent: 'interaction_todo_update',
     // No response needed (fire-and-forget)
     transactional: false,
@@ -62,7 +62,7 @@ const TEST_SCENARIOS = [
     id: 'ask_form',
     name: 'ask_user_form',
     prompt:
-      '我想配置一个新的部署环境，请用表单询问我以下信息：环境名称（dev/staging/prod）、目标服务器地址、是否启用 HTTPS。请使用 ask_user_form 工具。',
+      'I want to configure a new deployment environment. Ask me for the following via a form: environment name (dev/staging/prod), target server address, and whether HTTPS is enabled. Use the ask_user_form tool.',
     expectEvent: 'interaction_ask_user_form',
     transactional: true,
     autoResponse: msg => {
@@ -84,7 +84,7 @@ const TEST_SCENARIOS = [
     id: 'approval',
     name: 'request_approval',
     prompt:
-      '我现在要执行一个危险操作：删除所有临时文件。请先用 request_approval 工具请求我的批准，不要直接执行。',
+      'I am about to run a dangerous operation: delete all temporary files. Use the request_approval tool to ask for my approval first — do not run it directly.',
     expectEvent: 'interaction_approval',
     transactional: true,
     autoResponse: () => ({ approved: true }),

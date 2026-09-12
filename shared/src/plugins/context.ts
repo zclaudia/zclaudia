@@ -43,7 +43,7 @@ export interface PluginContext {
 
   storage: StorageAPI;
 
-  // 基础 API（按权限提供）
+  // Core API (permission-gated)
   fs?: FileSystemAPI;
   network?: NetworkAPI;
   notification?: NotificationAPI;
@@ -51,12 +51,12 @@ export interface PluginContext {
   shell?: ShellAPI;
   scheduler?: PluginSchedulerAPI;
 
-  // 应用 API
+  // App API
   session?: SessionAPI;
   project?: ProjectAPI;
   ui?: UIAPI;
 
-  // AI Provider API（按权限提供）
+  // AI provider API (permission-gated)
   providers?: ProviderAPI;
 
   // External-agent runtime registration (requires provider.register permission)
@@ -65,12 +65,12 @@ export interface PluginContext {
   // Host-owned Agent CLI resolution. Plugins never download or execute installers.
   managedRuntimes?: ManagedRuntimesAPI;
 
-  // MCP API（按 network.fetch 权限提供）
+  // MCP API (requires the network.fetch permission)
   mcp?: McpAPI;
 
   capabilities?: CapabilityNegotiationResult;
 
-  // 插件间通信
+  // Inter-plugin communication
   exports<T>(api: T): void;
   getPluginAPI<T>(pluginId: string): T | undefined;
 

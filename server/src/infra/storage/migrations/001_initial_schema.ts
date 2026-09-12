@@ -230,7 +230,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(
         );
 
 CREATE TABLE IF NOT EXISTS gateway_config (
-          id INTEGER PRIMARY KEY CHECK(id = 1), -- 单例配置
+          id INTEGER PRIMARY KEY CHECK(id = 1), -- singleton config row
           enabled INTEGER NOT NULL DEFAULT 0,
           gateway_url TEXT,
           gateway_secret TEXT,

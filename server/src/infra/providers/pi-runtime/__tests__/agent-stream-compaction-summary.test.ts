@@ -54,7 +54,7 @@ describe('runPiAgentStream — compaction summary delivery', () => {
     const { fn, captured } = captureStreamFn();
 
     const gen = runPiAgentStream({
-      userInput: '如果不用 docker 是不是就能解决这个问题了',
+      userInput: 'If we skip docker, does that already solve it?',
 
       options: { claudiaSessionId: 's1' } as any,
       sessionId: 's1',

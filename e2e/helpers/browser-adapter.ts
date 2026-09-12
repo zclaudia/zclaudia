@@ -41,7 +41,7 @@ export class BrowserAdapter {
   }
 
   private parseModelConfigs(): ModelConfig[] {
-    // 你要走 new-api：请确保 OPENAI_BASE_URL 形如 http://127.0.0.1:3000/v1
+    // When routing through new-api, OPENAI_BASE_URL must look like http://127.0.0.1:3000/v1
     const apiKey = process.env.OPENAI_API_KEY;
     const baseURL = process.env.OPENAI_BASE_URL;
 
@@ -56,14 +56,14 @@ export class BrowserAdapter {
   }
 
   private async recreateStagehandAndConnect(options: BrowserAdapterOptions) {
-    // 先关闭旧实例（容错）
+    // Close the previous instance first (best effort).
     await this.safeClose();
 
     const cfg = this.modelConfigs[this.currentModelIndex];
     console.log(`[BrowserAdapter] Launch with model=${cfg.modelName}, baseURL=${cfg.baseURL}`);
 
-    // ✅ 使用 CleanJsonOpenAIClient 支持 OpenAI 兼容的 API（如 new-api）
-    // 自动清理 markdown 代码块包裹的 JSON 响应
+    // ✅ Use CleanJsonOpenAIClient for OpenAI-compatible APIs (e.g. new-api);
+    // it strips markdown fences around JSON responses automatically.
     const openai = new OpenAI({
       baseURL: cfg.baseURL,
       apiKey: cfg.apiKey,
@@ -90,7 +90,7 @@ export class BrowserAdapter {
     const wsEndpoint = this.stagehand.connectURL();
     this.playwrightBrowser = await chromium.connectOverCDP(wsEndpoint);
 
-    // ✅ 兜底：context/page 可能为空
+    // ✅ Fallback: context/page may be empty.
     let context = this.playwrightBrowser.contexts()[0];
     if (!context) context = await this.playwrightBrowser.newContext();
 
@@ -125,7 +125,7 @@ export class BrowserAdapter {
           );
           this.currentModelIndex++;
 
-          // ✅ 切模型：重建 Stagehand（否则大概率不会真的换 provider / API 形态）
+          // ✅ Model switch: rebuild Stagehand (otherwise the provider/API shape likely never changes).
           await this.recreateStagehandAndConnect(DEFAULT_OPTIONS);
           continue;
         }
@@ -170,7 +170,7 @@ export class BrowserAdapter {
     this._page = null;
   }
 
-  // Playwright 辅助方法
+  // Playwright helpers
   locator(selector: string) {
     return this.page.locator(selector);
   }
@@ -188,7 +188,7 @@ export class BrowserAdapter {
   }
 }
 
-// 工厂函数
+// Factory
 export async function createBrowser(opts?: BrowserAdapterOptions): Promise<BrowserAdapter> {
   const browser = new BrowserAdapter();
   await browser.launch(opts);

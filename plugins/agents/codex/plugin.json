@@ -35,12 +35,12 @@
         "engineModes": [
           {
             "id": "cli",
-            "label": "CLI（外部环境）",
+            "label": "CLI (external)",
             "connection": { "kind": "external", "modelSelection": "optional" },
             "executable": "external-cli",
             "modelOptions": { "multimodalFallback": false, "thinkingLevel": "auto" },
             "capabilities": { "tools": "native-readonly", "skills": "external" },
-            "authNote": "使用已安装的 codex CLI 及其登录态；模型 ID 由外部 CLI 解释，留空使用其默认模型。"
+            "authNote": "Uses your installed codex CLI and its login state. Model IDs are interpreted by the external CLI; leave empty for its default model."
           },
           {
             "id": "sdk",
@@ -52,7 +52,7 @@
             "executable": "bundled-engine",
             "modelOptions": { "multimodalFallback": false, "thinkingLevel": "auto" },
             "capabilities": { "tools": "native-readonly", "skills": "external" },
-            "authNote": "使用应用内置 Codex 引擎与 Responses LLM Profile；独立配置目录，不继承个人 Codex 登录和全局配置。"
+            "authNote": "Uses the app-bundled Codex engine with a Responses LLM Profile. Isolated config directory — personal Codex logins and global config are not inherited."
           }
         ],
         "manifest": {

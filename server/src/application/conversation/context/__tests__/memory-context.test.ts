@@ -22,10 +22,10 @@ describe('buildMemoryContext', () => {
   });
 
   it('wraps the index with guidance when present', () => {
-    fs.writeFileSync(path.join(memoryDir, 'MEMORY.md'), '- [布局决定](layout.md) — shared 先构建');
+    fs.writeFileSync(path.join(memoryDir, 'MEMORY.md'), '- [Layout decision](layout.md) — shared builds first');
     const result = buildMemoryContext(memoryDir)!;
     expect(result).toContain('/memories');
-    expect(result).toContain('布局决定');
+    expect(result).toContain('Layout decision');
   });
 
   it('truncates oversized indexes by lines and bytes with a marker', () => {
@@ -40,8 +40,8 @@ describe('buildMemoryContext', () => {
     const cjkLines = Array.from(
       { length: 90 },
       (_, i) =>
-        `- 记忆与缓存${i}：` +
-        '构建顺序与缓存稳定性的踩坑教训记录设计模式权限规则钩子订阅事件流'.repeat(3)
+        `- Memory and caching ${i}: ` +
+        'Lessons learned about build order and cache stability. Design patterns, permission rules, hooks, subscriptions, event streams. '.repeat(3)
     ).join('\n');
     fs.writeFileSync(path.join(memoryDir, 'MEMORY.md'), cjkLines);
     const byBytes = buildMemoryContext(memoryDir)!;

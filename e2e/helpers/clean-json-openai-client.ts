@@ -2,8 +2,8 @@ import type { OpenAI } from 'openai';
 import { LLMClient } from '@browserbasehq/stagehand';
 
 /**
- * 自定义 OpenAI Client，处理模型返回 markdown 包裹的 JSON
- * 解决 MiniMax、GLM 等模型返回 ```json ... ``` 格式的问题
+ * Custom OpenAI client that handles model responses wrapping JSON in markdown.
+ * Solves the ```json ... ``` fencing that MiniMax/GLM-class models emit.
  */
 export class CleanJsonOpenAIClient extends LLMClient {
   type = 'openai' as const;
@@ -17,15 +17,15 @@ export class CleanJsonOpenAIClient extends LLMClient {
   }
 
   /**
-   * 清理 markdown 代码块标记
-   * 输入: ```json\n{...}\n```
-   * 输出: {...}
+   * Strip markdown code fences.
+   * Input: ```json\n{...}\n```
+   * Output: {...}
    */
   private cleanMarkdownJson(content: string): string {
-    // 移除 markdown 代码块标记
+    // Strip markdown code fences.
     let cleaned = content.trim();
 
-    // 匹配 ```json ... ``` 或 ``` ... ```
+    // Match ```json ... ``` or bare ``` ... ```
     const codeBlockRegex = /^```(?:json)?\s*([\s\S]*?)\s*```$/;
     const match = cleaned.match(codeBlockRegex);
 
@@ -33,7 +33,7 @@ export class CleanJsonOpenAIClient extends LLMClient {
       cleaned = match[1].trim();
     }
 
-    // 移除前后的额外空白
+    // Trim stray whitespace.
     return cleaned.trim();
   }
 
@@ -42,10 +42,10 @@ export class CleanJsonOpenAIClient extends LLMClient {
       options: { messages, temperature, top_p, frequency_penalty, presence_penalty },
     } = options;
 
-    // 增强 system prompt，明确要求 JSON 格式
+    // Harden the system prompt to demand JSON output.
     const enhancedMessages = messages.map((msg: any, index: number) => {
       if (index === 0 && msg.role === 'system') {
-        // 在系统提示中添加明确的 JSON 格式要求
+        // Append an explicit JSON-format requirement to the system prompt.
         return {
           role: msg.role,
           content: `${msg.content}
@@ -68,43 +68,43 @@ Required JSON format:
       };
     });
 
-    // 构建请求参数
+    // Build the request parameters.
     const requestOptions: any = {
       model: this.modelName,
       messages: enhancedMessages,
-      // 强制使用更高的 temperature，让模型输出更稳定
-      // 0.1 太低会导致模型输出不稳定或返回空值
+      // Force a higher temperature for more stable output;
+      // 0.1 makes some models unstable or return empty content.
       temperature: Math.max(temperature ?? 0.7, 0.7),
       top_p: top_p ?? 1,
       frequency_penalty: frequency_penalty ?? 0,
       presence_penalty: presence_penalty ?? 0,
     };
 
-    // 尝试不使用 response_format，让模型更自然地返回
-    // response_format 可能导致某些模型返回空对象
+    // Try without response_format so models respond more naturally;
+    // response_format makes some models return empty objects.
     // try {
     //   requestOptions.response_format = { type: "json_object" };
     // } catch (e) {
     //   console.warn("[CleanJsonOpenAIClient] response_format not supported, continuing...");
     // }
 
-    // 简化日志输出（生产模式）
+    // Reduced logging (production mode).
     if (process.env.DEBUG_AI === 'true') {
       console.log('[CleanJsonOpenAIClient] Model:', this.modelName);
       console.log('[CleanJsonOpenAIClient] Messages:', messages.length);
       console.log('[CleanJsonOpenAIClient] Temperature:', requestOptions.temperature);
     }
 
-    // 调用 OpenAI API
+    // Call the OpenAI API.
     const response = await this.client.chat.completions.create(requestOptions);
 
-    // 获取原始内容
+    // Read the raw content.
     const rawContent = response.choices[0]?.message?.content || '';
 
-    // 清理 markdown 代码块
+    // Strip markdown fences.
     const cleanedContent = this.cleanMarkdownJson(rawContent);
 
-    // 尝试解析 JSON
+    // Attempt to parse JSON.
     let parsedContent;
     try {
       parsedContent = JSON.parse(cleanedContent);
@@ -116,7 +116,7 @@ Required JSON format:
       parsedContent = {};
     }
 
-    // Stagehand 期望返回 { data, usage } 格式
+    // Stagehand expects a { data, usage } shape.
     const result = {
       data: parsedContent,
       usage: {

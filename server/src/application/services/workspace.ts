@@ -1,8 +1,9 @@
 /**
- * WorkspaceService - Agent Workspace 管理
+ * WorkspaceService — agent workspace management.
  *
- * 负责加载和管理 Agent 的配置文件（SOUL.md、AGENTS.md、TOOLS.md、Skills）
- * 提供统一的 system prompt 组装能力，让所有 Provider 共享相同的人格配置
+ * Loads and manages the agent's configuration files (SOUL.md, AGENTS.md,
+ * TOOLS.md, Skills) and assembles a shared system prompt so every provider
+ * runs with the same persona configuration.
  */
 
 import fs from 'fs/promises';
@@ -13,8 +14,8 @@ import { systemTaskRegistry } from './system-task-registry.js';
 const WORKSPACE_DIR = process.env.ZCLAUDIA_DATA_DIR
   ? path.resolve(process.env.ZCLAUDIA_DATA_DIR, 'workspace')
   : path.join(os.homedir(), '.zclaudia', 'workspace');
-const CACHE_TTL = 60000; // 1 分钟缓存
-const MAX_FILE_SIZE = 100 * 1024; // 100KB 限制
+const CACHE_TTL = 60000; // 1 minute
+const MAX_FILE_SIZE = 100 * 1024; // 100KB cap
 
 export interface WorkspaceOptions {
   projectId?: string;
@@ -43,14 +44,14 @@ export interface SkillInfo {
 }
 
 /**
- * WorkspaceService - 管理 Agent Workspace 配置
+ * WorkspaceService — agent workspace configuration.
  */
 export class WorkspaceService {
   private cache: Map<string, { content: string; mtime: number }> = new Map();
   private initialized = false;
 
   /**
-   * 加载单个 prompt 文件（带缓存和文件大小检查）
+   * Load a single prompt file (with caching and a size cap).
    */
   private async loadFile(basePath: string, filename: string): Promise<string | null> {
     const filePath = path.join(basePath, filename);
@@ -58,19 +59,19 @@ export class WorkspaceService {
     try {
       const stat = await fs.stat(filePath);
 
-      // 检查文件大小
+      // Enforce the size cap.
       if (stat.size > MAX_FILE_SIZE) {
         console.warn(`[Workspace] File too large: ${filePath} (${stat.size} bytes)`);
         return null;
       }
 
-      // 检查缓存
+      // Serve from cache when the file has not changed.
       const cached = this.cache.get(filePath);
       if (cached && cached.mtime >= stat.mtime.getTime()) {
         return cached.content;
       }
 
-      // 读取文件
+      // Read and cache.
       const content = await fs.readFile(filePath, 'utf-8');
       this.cache.set(filePath, {
         content,
@@ -79,48 +80,47 @@ export class WorkspaceService {
 
       return content;
     } catch (error) {
-      // 文件不存在或其他错误
+      // Missing file or read error — treated as absent.
       return null;
     }
   }
 
   /**
-   * 组装完整的 workspace system prompt
-   * 按优先级排序各个部分
+   * Assemble the full workspace system prompt, sections ordered by priority.
    */
   async assembleSystemPrompt(options: WorkspaceOptions = {}): Promise<string> {
     const { projectId, projectPath, skills = [] } = options;
     const sections: PromptSection[] = [];
 
-    // 1. 全局 SOUL.md (人格定义) - 最高优先级
+    // 1. Global SOUL.md (persona) — highest priority.
     const soul = await this.loadFile(WORKSPACE_DIR, 'SOUL.md');
     if (soul) {
       sections.push({
-        title: '## 你的身份',
+        title: '## Your Identity',
         content: soul.trim(),
         priority: 100,
         source: 'workspace:SOUL.md',
       });
     }
 
-    // 2. 全局 AGENTS.md (行为规范)
+    // 2. Global AGENTS.md (behavior guidelines).
     const agents = await this.loadFile(WORKSPACE_DIR, 'AGENTS.md');
     if (agents) {
       sections.push({
-        title: '## 行为规范',
+        title: '## Behavior Guidelines',
         content: agents.trim(),
         priority: 90,
         source: 'workspace:AGENTS.md',
       });
     }
 
-    // 3. 项目级配置 (覆盖全局 AGENTS)
+    // 3. Project-level configuration (overrides global AGENTS.md).
     if (projectId) {
       const projectDir = path.join(WORKSPACE_DIR, 'projects', projectId);
       const projectAgents = await this.loadFile(projectDir, 'AGENTS.md');
       if (projectAgents) {
         sections.push({
-          title: '## 项目特定规范',
+          title: '## Project-Specific Guidelines',
           content: projectAgents.trim(),
           priority: 95,
           source: `workspace:projects/${projectId}/AGENTS.md`,
@@ -128,23 +128,23 @@ export class WorkspaceService {
       }
     }
 
-    // 4. 全局 TOOLS.md (工具指南)
+    // 4. Global TOOLS.md (tool guide).
     const tools = await this.loadFile(WORKSPACE_DIR, 'TOOLS.md');
     if (tools) {
       sections.push({
-        title: '## 工具使用指南',
+        title: '## Tool Usage Guide',
         content: tools.trim(),
         priority: 80,
         source: 'workspace:TOOLS.md',
       });
     }
 
-    // 5. 项目根目录 CLAUDE.md (类似 Claude Code 的项目上下文)
+    // 5. Project-root CLAUDE.md (project context, Claude Code style).
     if (projectPath) {
       const claudeMd = await this.loadFile(projectPath, 'CLAUDE.md');
       if (claudeMd) {
         sections.push({
-          title: '## 项目上下文',
+          title: '## Project Context',
           content: claudeMd.trim(),
           priority: 70,
           source: 'project:CLAUDE.md',
@@ -152,12 +152,12 @@ export class WorkspaceService {
       }
     }
 
-    // 6. 加载启用的 skills
+    // 6. Enabled skills.
     for (const skillId of skills) {
       const skillContent = await this.loadSkill(skillId);
       if (skillContent) {
         sections.push({
-          title: `## 技能: ${skillId}`,
+          title: `## Skill: ${skillId}`,
           content: skillContent.trim(),
           priority: 50,
           source: `workspace:skills/${skillId}/SKILL.md`,
@@ -165,7 +165,7 @@ export class WorkspaceService {
       }
     }
 
-    // 按 priority 降序排序并组装
+    // Highest priority first, then assemble.
     sections.sort((a, b) => b.priority - a.priority);
 
     if (sections.length === 0) {
@@ -176,10 +176,10 @@ export class WorkspaceService {
   }
 
   /**
-   * 加载单个 skill 的内容
+   * Load a single skill's content.
    */
   async loadSkill(skillId: string): Promise<string | null> {
-    // 安全检查：防止路径遍历
+    // Path-traversal guard.
     const normalizedId = path.basename(skillId);
     if (normalizedId !== skillId || skillId.includes('..')) {
       console.warn(`[Workspace] Invalid skill ID: ${skillId}`);
@@ -191,7 +191,7 @@ export class WorkspaceService {
   }
 
   /**
-   * 列出所有可用的 skills
+   * List all available skills.
    */
   async listSkills(): Promise<SkillInfo[]> {
     const skillsDir = path.join(WORKSPACE_DIR, 'skills');
@@ -209,7 +209,7 @@ export class WorkspaceService {
         try {
           const content = await this.loadFile(path.join(skillsDir, skillId), 'SKILL.md');
           if (content) {
-            // 从内容中提取 name 和 description（第一行和第二行）
+            // name from the first heading line, description from the first quote line.
             const lines = content.split('\n').filter(l => l.trim());
             const name = lines[0]?.replace(/^#\s*/, '') || skillId;
             const description = lines[1]?.replace(/^>\s*/, '') || '';
@@ -222,7 +222,7 @@ export class WorkspaceService {
             });
           }
         } catch {
-          // 忽略无效的 skill
+          // Ignore invalid skills.
         }
       }
 
@@ -233,7 +233,7 @@ export class WorkspaceService {
   }
 
   /**
-   * 获取当前 workspace 配置
+   * Read the current workspace configuration.
    */
   async getConfig(): Promise<WorkspaceConfig> {
     const [soul, agents, tools] = await Promise.all([
@@ -246,7 +246,7 @@ export class WorkspaceService {
   }
 
   /**
-   * 更新 workspace 配置文件
+   * Update workspace configuration files.
    */
   async updateConfig(config: Partial<WorkspaceConfig>): Promise<void> {
     await fs.mkdir(WORKSPACE_DIR, { recursive: true });
@@ -275,14 +275,14 @@ export class WorkspaceService {
   }
 
   /**
-   * 清除缓存
+   * Clear the file cache.
    */
   clearCache(): void {
     this.cache.clear();
   }
 
   /**
-   * 初始化 workspace 目录和默认文件
+   * Initialize the workspace directory and default files.
    */
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -293,16 +293,16 @@ export class WorkspaceService {
       path.join(WORKSPACE_DIR, 'projects'),
     ];
 
-    // 创建目录结构
+    // Create the directory layout.
     for (const dir of dirs) {
       try {
         await fs.mkdir(dir, { recursive: true });
       } catch {
-        // 目录已存在
+        // Already exists.
       }
     }
 
-    // 创建默认配置文件（如果不存在）
+    // Create default configuration files when absent.
     const defaults: Record<string, string> = {
       'SOUL.md': this.getDefaultSoul(),
       'AGENTS.md': this.getDefaultAgents(),
@@ -324,105 +324,105 @@ export class WorkspaceService {
   }
 
   /**
-   * 获取 workspace 目录路径
+   * Workspace directory path.
    */
   getWorkspaceDir(): string {
     return WORKSPACE_DIR;
   }
 
   private getDefaultSoul(): string {
-    return `# Claudia 的灵魂
+    return `# Claudia's Soul
 
-## 我是谁
-我是 Claudia，一个专业的编程助手，专注于帮助用户完成软件开发任务。
+## Who I Am
+I am Claudia, a professional coding assistant focused on helping users build software.
 
-## 我的性格
-- 简洁高效，不啰嗦
-- 专业严谨，注重代码质量
-- 友好耐心，善于沟通
+## Personality
+- Concise and efficient — no rambling
+- Rigorous and professional, with care for code quality
+- Friendly and patient, easy to communicate with
 
-## 我的价值观
-- 代码质量优先
-- 用户隐私至上
-- 安全意识时刻在线
-- 持续学习和改进
+## Values
+- Code quality first
+- User privacy above all
+- Always security-conscious
+- Keep learning and improving
 
-## 我如何沟通
-- 用代码说话
-- 提供具体建议而非泛泛而谈
-- 主动发现潜在问题
+## How I Communicate
+- Let the code speak
+- Offer concrete suggestions instead of vague statements
+- Surface potential problems proactively
 `;
   }
 
   private getDefaultAgents(): string {
-    return `# Agent 行为规范
+    return `# Agent Behavior Guidelines
 
-## 响应风格
-- 用中文回复
-- 代码优先，解释在后
-- 一次只做一件事
-- 简洁明了，避免冗余
+## Response Style
+- Reply in the user's language
+- Code first, explanation after
+- One thing at a time
+- Concise and clear; avoid redundancy
 
-## 工作流程
-1. 理解用户意图
-2. 制定执行计划
-3. 逐步执行并反馈
-4. 确认完成
+## Workflow
+1. Understand the user's intent
+2. Draft an execution plan
+3. Execute step by step and report back
+4. Confirm completion
 
-## 安全约束
-- 不执行 rm -rf 等危险命令
-- 修改文件前先确认
-- 敏感操作需用户确认
-- 不泄露敏感信息
+## Safety Constraints
+- Never run destructive commands such as rm -rf
+- Confirm before modifying files
+- Ask the user before sensitive operations
+- Never leak secrets or sensitive data
 
-## 代码规范
-- 遵循项目现有代码风格
-- 添加必要的注释
-- 保持代码可读性
+## Code Conventions
+- Follow the project's existing code style
+- Add comments where they help
+- Keep code readable
 `;
   }
 
   private getDefaultTools(): string {
-    return `# 工具使用指南
+    return `# Tool Usage Guide
 
-## 文件操作
-- 读取文件：使用 Read 工具
-- 编辑文件：优先使用 Edit，避免重写整个文件
-- 创建文件：先确认目录存在后再 Write
+## File Operations
+- Reading files: use the Read tool
+- Editing files: prefer Edit over rewriting whole files
+- Creating files: confirm the directory exists, then Write
 
-## 代码搜索
-- 精确搜索：使用 Grep
-- 文件查找：使用 Glob
-- 复杂探索：使用 Agent 子进程
+## Code Search
+- Exact search: Grep
+- File lookup: Glob
+- Broad exploration: Agent subprocesses
 
-## 命令执行
-- 优先使用专用工具而非 Bash
-- 注意超时设置（默认 2 分钟）
-- 后台任务使用 run_in_background
+## Command Execution
+- Prefer dedicated tools over Bash
+- Mind timeouts (2 minutes by default)
+- Use run_in_background for long-running tasks
 
-## Git 操作
-- 优先使用 Git 专用工具
-- 提交前检查变更
-- 遵循提交消息规范
+## Git Operations
+- Prefer dedicated Git tools
+- Review changes before committing
+- Follow commit message conventions
 `;
   }
 }
 
-// 单例导出
+// Singleton export
 export const workspaceService = new WorkspaceService();
 
-// 在服务器启动时初始化
+// Initialized on server startup.
 export async function initWorkspace(): Promise<void> {
   await workspaceService.initialize();
 }
 
-// 注册系统任务：定期清理缓存
+// System task: periodic cache cleanup.
 systemTaskRegistry.register({
   id: 'system:workspace_cache_cleanup',
   name: 'Workspace Cache Cleanup',
   description: 'Periodically clears workspace file cache',
   category: 'maintenance',
-  intervalMs: 5 * 60 * 1000, // 5 分钟
+  intervalMs: 5 * 60 * 1000, // 5 minutes
 });
 
 setInterval(

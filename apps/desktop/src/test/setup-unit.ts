@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 
-// 轻量级 setup 文件，用于纯逻辑测试（stores/utils/hooks）
-// 使用 node 环境运行，但保留必要的浏览器 API mock
+// Lightweight setup file for pure-logic tests (stores/utils/hooks).
+// Runs in the node environment but keeps the necessary browser API mocks.
 
 // Mock WebSocket
 class MockWebSocket {
@@ -31,7 +31,7 @@ class MockWebSocket {
   send = vi.fn();
   close = vi.fn(() => {
     this.readyState = MockWebSocket.CLOSED;
-    // 在 node 环境中模拟 CloseEvent
+    // Polyfill CloseEvent for the node environment.
     const closeEvent = { type: 'close', wasClean: true, code: 1000, reason: '' } as CloseEvent;
     this.onclose?.(closeEvent);
   });
@@ -100,7 +100,7 @@ vi.stubGlobal('__resetUuidCounter__', () => {
   uuidCounter = 0;
 });
 
-// 简化版的 defineProperty helper
+// Minimal defineProperty helper.
 function defineProperty(obj: any, prop: string, value: any) {
   try {
     Object.defineProperty(obj, prop, {
@@ -109,7 +109,7 @@ function defineProperty(obj: any, prop: string, value: any) {
       writable: true,
     });
   } catch {
-    // 忽略只读属性错误
+    // Ignore failures on read-only properties.
   }
 }
 

@@ -1,19 +1,19 @@
 export type Permission =
-  // 安全级别
+  // Elevated-risk level
   | 'session.read'
   | 'project.read'
   | 'storage'
-  // 中等级别
+  // Medium-risk level
   | 'fs.read'
   | 'network.fetch'
   | 'timer'
   | 'provider.call'
-  // 敏感级别
+  // Sensitive level
   | 'fs.write'
   | 'session.write'
   | 'notification'
   | 'clipboard.read'
   | 'clipboard.write'
-  // 危险级别
+  // Dangerous level
   | 'shell.execute'
   | 'provider.register';

@@ -46,11 +46,11 @@ export interface WorktreeConfig {
 }
 
 export interface GitWorktree {
-  path: string; // 绝对路径
-  branch: string; // 分支名
-  isMain: boolean; // 是否是主 worktree
-  commit?: string; // HEAD commit hash（短）
-  managedBy?: 'supervisor'; // supervisor v2 worktree pool 管理的 slot
+  path: string; // absolute path
+  branch: string; // branch name
+  isMain: boolean; // whether this is the main worktree
+  commit?: string; // short HEAD commit hash
+  managedBy?: 'supervisor'; // slot managed by the supervisor v2 worktree pool
 }
 
 export interface GitWorktreeStatus {

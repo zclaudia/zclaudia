@@ -36,7 +36,7 @@ const nodePath =
     'apps/desktop/src-tauri/binaries',
     `node-${triples[`${process.platform}-${process.arch}`]}`
   );
-const temporary = await mkdtemp(path.join(tmpdir(), 'zclaudia bundle 中文 '));
+const temporary = await mkdtemp(path.join(tmpdir(), 'zclaudia-bundle-'));
 const artifact = path.join(temporary, 'resources');
 const browserDist = path.join(temporary, 'browser-shell');
 const copiedNode = path.join(temporary, 'node');

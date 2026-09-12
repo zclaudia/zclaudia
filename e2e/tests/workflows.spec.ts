@@ -26,7 +26,7 @@ describe('Cross-Feature Workflows - Traditional Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // M1: 完整工作流：创建项目→创建会话→发送消息→查看响应
+  // M1: full flow — create project → create session → send message → see response
   // ─────────────────────────────────────────────
   test('M1: complete workflow - create project, session, send message', async () => {
     console.log('Test M1: Complete workflow');
@@ -83,7 +83,7 @@ describe('Cross-Feature Workflows - Traditional Playwright', () => {
   }, 60000);
 
   // ─────────────────────────────────────────────
-  // M3: 多项目切换并验证数据隔离
+  // M3: switching projects and verifying data isolation
   // ─────────────────────────────────────────────
   test('M3: multi-project switching and data isolation', async () => {
     console.log('Test M3: Multi-project data isolation');
@@ -190,7 +190,7 @@ describe('Cross-Feature Workflows - Traditional Playwright', () => {
   }, 90000);
 
   // ─────────────────────────────────────────────
-  // M7: 页面刷新后数据持久化
+  // M7: data survives a page reload
   // ─────────────────────────────────────────────
   test('M7: data persistence after page refresh', async () => {
     console.log('Test M7: Data persistence');

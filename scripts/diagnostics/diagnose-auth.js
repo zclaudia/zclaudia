@@ -1,36 +1,36 @@
 #!/usr/bin/env node
 
-// 诊断认证和数据加载问题
+// Diagnose authentication and data-loading problems.
 
-console.log('=== ZClaudia 诊断工具 ===\n');
+console.log('=== ZClaudia diagnostics ===\n');
 
 async function diagnose() {
   const baseUrl = 'http://localhost:3100';
 
-  // 1. 检查 Server Info
-  console.log('1. 检查 Server Info...');
+  // 1. Check server info
+  console.log('1. Checking server info...');
   try {
     const infoRes = await fetch(`${baseUrl}/api/server/info`);
     const info = await infoRes.json();
     console.log('   ✅ Server Info:', JSON.stringify(info.data, null, 2));
   } catch (err) {
-    console.log('   ❌ Server Info 失败:', err.message);
+    console.log('   ❌ Server info check failed:', err.message);
     return;
   }
 
-  // 2. 检查 API Key
-  console.log('\n2. 检查 API Key...');
+  // 2. Check API key
+  console.log('\n2. Checking API key...');
   try {
     const keyRes = await fetch(`${baseUrl}/api/auth/key`);
     const keyData = await keyRes.json();
     if (keyData.success) {
       console.log('   ✅ API Key:', keyData.data.maskedKey);
-      console.log('   完整 Key:', keyData.data.fullKey);
+      console.log('   Full key:', keyData.data.fullKey);
 
       const apiKey = keyData.data.fullKey;
 
-      // 3. 验证 API Key
-      console.log('\n3. 验证 API Key...');
+      // 3. Verify the API key
+      console.log('\n3. Verifying API key...');
       const verifyRes = await fetch(`${baseUrl}/api/auth/verify`, {
         method: 'POST',
         headers: {
@@ -39,14 +39,14 @@ async function diagnose() {
         },
       });
       if (verifyRes.ok) {
-        console.log('   ✅ API Key 验证成功');
+        console.log('   ✅ API key verified');
       } else {
-        console.log('   ❌ API Key 验证失败:', verifyRes.status);
+        console.log('   ❌ API key verification failed:', verifyRes.status);
         return;
       }
 
-      // 4. 测试 Projects API
-      console.log('\n4. 测试 Projects API...');
+      // 4. Test the projects API
+      console.log('\n4. Testing projects API...');
       const projectsRes = await fetch(`${baseUrl}/api/projects`, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -55,16 +55,16 @@ async function diagnose() {
       });
       const projectsData = await projectsRes.json();
       if (projectsData.success) {
-        console.log(`   ✅ Projects: ${projectsData.data.length} 个`);
+        console.log(`   ✅ Projects: ${projectsData.data.length}`);
         projectsData.data.forEach(p => {
           console.log(`      - ${p.name} (${p.type})`);
         });
       } else {
-        console.log('   ❌ Projects 失败:', projectsData.error);
+        console.log('   ❌ Projects check failed:', projectsData.error);
       }
 
-      // 5. 测试 Providers API
-      console.log('\n5. 测试 Providers API...');
+      // 5. Test the providers API
+      console.log('\n5. Testing providers API...');
       const providersRes = await fetch(`${baseUrl}/api/providers`, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -73,26 +73,26 @@ async function diagnose() {
       });
       const providersData = await providersRes.json();
       if (providersData.success) {
-        console.log(`   ✅ Providers: ${providersData.data.length} 个`);
+        console.log(`   ✅ Providers: ${providersData.data.length}`);
         providersData.data.forEach(p => {
-          console.log(`      - ${p.name} (${p.type})${p.isDefault ? ' [默认]' : ''}`);
+          console.log(`      - ${p.name} (${p.type})${p.isDefault ? ' [default]' : ''}`);
         });
       } else {
-        console.log('   ❌ Providers 失败:', providersData.error);
+        console.log('   ❌ Providers check failed:', providersData.error);
       }
     } else {
-      console.log('   ❌ 无法获取 API Key:', keyData.error);
+      console.log('   ❌ Could not fetch the API key:', keyData.error);
     }
   } catch (err) {
-    console.log('   ❌ API Key 检查失败:', err.message);
+    console.log('   ❌ API key check failed:', err.message);
   }
 
-  console.log('\n=== 诊断完成 ===');
-  console.log('\n建议：');
-  console.log('1. 在浏览器访问 http://localhost:1420');
-  console.log('2. 打开开发者工具 Console 标签');
-  console.log('3. 检查是否有认证相关的错误');
-  console.log('4. 如果看到 API Key，在 Console 中执行：');
+  console.log('\n=== Diagnostics complete ===');
+  console.log('\nSuggestions:');
+  console.log('1. Open http://localhost:1420 in a browser');
+  console.log('2. Open the developer tools console tab');
+  console.log('3. Look for authentication-related errors');
+  console.log('4. If an API key is shown, run the following in the console:');
   console.log(
     '   localStorage.setItem("zclaudia-servers", JSON.stringify({...JSON.parse(localStorage.getItem("zclaudia-servers")), state: {...JSON.parse(localStorage.getItem("zclaudia-servers")).state, servers: JSON.parse(localStorage.getItem("zclaudia-servers")).state.servers.map(s => s.name === "Local Server" ? {...s, apiKey: "<API_KEY>"} : s)}}))'
   );

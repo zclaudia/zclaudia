@@ -18,7 +18,7 @@ describe('git-worktrees', () => {
   });
 
   describe('listGitWorktrees', () => {
-    it('应该正确解析单个 worktree', () => {
+    it('parses a single worktree', () => {
       const mockOutput = `worktree /Users/test/my-project
 HEAD abc1234
 branch refs/heads/main`;
@@ -36,7 +36,7 @@ branch refs/heads/main`;
       });
     });
 
-    it('应该正确解析多个 worktrees', () => {
+    it('parses multiple worktrees', () => {
       const mockOutput = `worktree /Users/test/my-project
 HEAD abc1234
 branch refs/heads/main
@@ -56,7 +56,7 @@ branch refs/heads/feat/new-feature`;
       expect(result[1].branch).toBe('feat/new-feature');
     });
 
-    it('应该正确处理 detached HEAD', () => {
+    it('handles detached HEAD', () => {
       const mockOutput = `worktree /Users/test/my-project
 HEAD abc1234
 detached`;
@@ -69,7 +69,7 @@ detached`;
       expect(result[0].branch).toBe('detached@abc1234');
     });
 
-    it('应该正确处理分支名中的斜杠', () => {
+    it('handles slashes in branch names', () => {
       const mockOutput = `worktree /Users/test/my-project
 HEAD abc1234
 branch refs/heads/feature/user-auth/login`;
@@ -81,7 +81,7 @@ branch refs/heads/feature/user-auth/login`;
       expect(result[0].branch).toBe('feature/user-auth/login');
     });
 
-    it('应该在 git 命令失败时返回空数组', () => {
+    it('returns an empty array when git fails', () => {
       vi.mocked(execSync).mockImplementation(() => {
         throw new Error('Not a git repository');
       });
@@ -91,7 +91,7 @@ branch refs/heads/feature/user-auth/login`;
       expect(result).toEqual([]);
     });
 
-    it('应该在超时时返回空数组', () => {
+    it('returns an empty array on timeout', () => {
       vi.mocked(execSync).mockImplementation(() => {
         const error = new Error('Command timeout') as any;
         error.killed = true;
@@ -103,7 +103,7 @@ branch refs/heads/feature/user-auth/login`;
       expect(result).toEqual([]);
     });
 
-    it('应该正确处理空输出', () => {
+    it('handles empty output', () => {
       vi.mocked(execSync).mockReturnValue('');
 
       const result = listGitWorktrees('/repo');
@@ -111,7 +111,7 @@ branch refs/heads/feature/user-auth/login`;
       expect(result).toEqual([]);
     });
 
-    it('应该正确处理只有空白字符的输出', () => {
+    it('handles whitespace-only output', () => {
       vi.mocked(execSync).mockReturnValue('   \n\n  ');
 
       const result = listGitWorktrees('/repo');
@@ -119,7 +119,7 @@ branch refs/heads/feature/user-auth/login`;
       expect(result).toEqual([]);
     });
 
-    it('应该截取 commit hash 为 7 个字符', () => {
+    it('truncates the commit hash to 7 characters', () => {
       const mockOutput = `worktree /Users/test/my-project
 HEAD abcdefghijklmnop
 branch refs/heads/main`;
@@ -131,7 +131,7 @@ branch refs/heads/main`;
       expect(result[0].commit).toBe('abcdefg');
     });
 
-    it('应该正确处理路径规范化', () => {
+    it('normalizes paths', () => {
       const mockOutput = `worktree /Users/test/../test/./my-project
 HEAD abc1234
 branch refs/heads/main`;
@@ -146,7 +146,7 @@ branch refs/heads/main`;
   });
 
   describe('createGitWorktree', () => {
-    it('应该为新分支创建 worktree', () => {
+    it('creates a worktree for a new branch', () => {
       // Mock branch existence check (branch doesn't exist)
       vi.mocked(execSync)
         .mockImplementationOnce(() => {
@@ -172,7 +172,7 @@ branch refs/heads/main`;
       expect(result.isMain).toBe(false);
     });
 
-    it('应该为已存在的分支创建 worktree', () => {
+    it('creates a worktree for an existing branch', () => {
       // Mock branch existence check (branch exists)
       vi.mocked(execSync)
         .mockReturnValueOnce('')
@@ -200,7 +200,7 @@ branch refs/heads/main`;
       );
     });
 
-    it('应该正确处理相对路径', () => {
+    it('handles relative paths', () => {
       vi.mocked(execSync)
         .mockImplementationOnce(() => {
           throw new Error('Branch not found');
@@ -217,7 +217,7 @@ branch refs/heads/main`;
       expect(result.path).toBe(path.normalize('/Users/test/my-project-feat'));
     });
 
-    it('应该在 worktree 创建失败时抛出错误', () => {
+    it('throws when worktree creation fails', () => {
       vi.mocked(execSync)
         .mockImplementationOnce(() => {
           throw new Error('Branch not found');
@@ -235,7 +235,7 @@ branch refs/heads/main`;
       }).toThrow('Worktree creation failed');
     });
 
-    it('应该在分支检查超时时处理错误', () => {
+    it('handles errors when the branch check times out', () => {
       vi.mocked(execSync).mockImplementation(() => {
         const error = new Error('Command timeout') as any;
         error.killed = true;
@@ -252,7 +252,7 @@ branch refs/heads/main`;
       }).toThrow();
     });
 
-    it('应该正确处理包含特殊字符的分支名', () => {
+    it('handles special characters in branch names', () => {
       vi.mocked(execSync)
         .mockImplementationOnce(() => {
           throw new Error('Branch not found');
@@ -272,7 +272,7 @@ branch refs/heads/main`;
       );
     });
 
-    it('应该正���处理包含空格的路径', () => {
+    it('handles paths with spaces', () => {
       vi.mocked(execSync)
         .mockImplementationOnce(() => {
           throw new Error('Branch not found');
@@ -293,8 +293,8 @@ branch refs/heads/main`;
     });
   });
 
-  describe('边界情况', () => {
-    it('应该处理非常长的分支名', () => {
+  describe('edge cases', () => {
+    it('handles very long branch names', () => {
       const longBranch = 'feature/'.repeat(10) + 'new-feature';
       const mockOutput = `worktree /Users/test/my-project
 HEAD abc1234
@@ -307,7 +307,7 @@ branch refs/heads/${longBranch}`;
       expect(result[0].branch).toBe(longBranch);
     });
 
-    it('应该处理路径中包含 Unicode 字符', () => {
+    it('handles unicode characters in paths', () => {
       const mockOutput = `worktree /Users/测试/my-project-功能
 HEAD abc1234
 branch refs/heads/main`;
@@ -320,7 +320,7 @@ branch refs/heads/main`;
       expect(result[0].path).toContain('功能');
     });
 
-    it('应该处理多个连续的空行', () => {
+    it('handles multiple consecutive blank lines', () => {
       const mockOutput = `worktree /Users/test/my-project
 HEAD abc1234
 branch refs/heads/main

@@ -24,7 +24,7 @@ test(`${options.coveredCases.join('/')}: ${options.runtime} real application ${o
   context,
 }) => {
   const app = new AgentRuntimeHarness();
-  app.directory = await realpath(await mkdtemp(path.join(tmpdir(), 'zclaudia live 中文 ')));
+  app.directory = await realpath(await mkdtemp(path.join(tmpdir(), 'zclaudia-live-')));
   const accountRoot = options.selfTest
     ? path.join(app.directory, 'test-account')
     : options.accountRoot;

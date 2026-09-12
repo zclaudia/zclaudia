@@ -11,7 +11,7 @@ describe('SavePlanAsIssueDialog', () => {
     expect(input.value).toBe('Refactor auth');
   });
 
-  it('calls onSave with the (possibly edited) title when 保存 is clicked', () => {
+  it('calls onSave with the (possibly edited) title when Save is clicked', () => {
     const onSave = vi.fn();
     render(
       <SavePlanAsIssueDialog defaultTitle="Refactor auth" onSave={onSave} onCancel={vi.fn()} />

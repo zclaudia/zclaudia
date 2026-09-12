@@ -11,7 +11,7 @@ async function fixture(t) {
   const directory = await mkdtemp(path.join(tmpdir(), 'portable-dependencies-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const source = path.join(directory, 'source');
-  const output = path.join(directory, 'relocated 中文 app');
+  const output = path.join(directory, 'relocated app');
   await mkdir(source);
   async function pkg(name, manifest, code = 'module.exports = {};') {
     const dir = path.join(source, name);

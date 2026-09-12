@@ -37,22 +37,22 @@ export interface PluginManifest {
 
   contributes?: PluginContributes;
 
-  // 平台作用域 — 未声明时根据 contributes 自动推断
+  // Platform scope — inferred from contributions when omitted
   platform?: PluginPlatform;
 
-  // 执行模式
+  // Execution mode
   executionMode?: ExecutionMode;
 
-  // 激活事件
+  // Activation events
   activationEvents?: string[];
 
-  // 兼容性声明
+  // Compatibility declaration
   engines?: PluginEngines;
 
-  // 插件依赖
+  // Plugin dependencies
   dependencies?: Record<string, string>; // pluginId → semver range
 
-  // 外部能力需求声明
+  // External capability requirements
   requires?: PluginRequirements;
 }
 

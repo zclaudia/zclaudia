@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * 逐个文件运行测试并汇总结果
- * 用法: node test-file-by-file.mjs [--allow-external] <path-or-glob>
- * 示例: node test-file-by-file.mjs "apps/desktop/src/stores"
+ * Run test files one by one and summarize the results.
+ * Usage: node test-file-by-file.mjs [--allow-external] <path-or-glob>
+ * Example: node test-file-by-file.mjs "apps/desktop/src/stores"
  */
 
 import { spawnSync } from 'node:child_process';
@@ -16,8 +16,8 @@ const repoRoot = path.resolve(__dirname, '../..');
 const cwd = process.cwd();
 
 function printUsage() {
-  console.log('用法: node test-file-by-file.mjs [--allow-external] <test-directory-or-glob>');
-  console.log('示例:');
+  console.log('Usage: node test-file-by-file.mjs [--allow-external] <test-directory-or-glob>');
+  console.log('Example:');
   console.log('  node test-file-by-file.mjs "apps/desktop/src/stores"');
   console.log('  node test-file-by-file.mjs "apps/desktop/src/services"');
   console.log('  node test-file-by-file.mjs "server/src/routes"');
@@ -25,7 +25,7 @@ function printUsage() {
 }
 
 function fail(message) {
-  console.log(`错误: ${message}`);
+  console.log(`Error: ${message}`);
   process.exit(1);
 }
 
@@ -35,7 +35,7 @@ const unknownFlags = args.filter(arg => arg.startsWith('--') && arg !== '--allow
 const positional = args.filter(arg => !arg.startsWith('--'));
 
 if (unknownFlags.length > 0) {
-  fail(`未知参数: ${unknownFlags.join(', ')}`);
+  fail(`Unknown flags: ${unknownFlags.join(', ')}`);
 }
 
 if (positional.length !== 1) {
@@ -145,12 +145,12 @@ function detectModule(inputPath) {
 
   if (isInsidePath(inputPath, gatewayRoot)) {
     if (!allowExternal) {
-      fail('外部仓库测试需要显式传入 --allow-external');
+      fail('Out-of-repo tests require the --allow-external flag');
     }
     return { moduleDir: gatewayRoot, moduleName: 'gateway' };
   }
 
-  fail('无法识别模块路径。支持的模块: apps/desktop, server。外部仓库需使用 --allow-external。');
+  fail('Cannot resolve module path. Supported modules: apps/desktop, server. Use --allow-external for out-of-repo paths.');
 }
 
 function selectDesktopConfig(relativePath) {
@@ -210,16 +210,16 @@ const moduleInfo = detectModule(absoluteInputPath);
 const moduleDirDisplay = toPosix(path.relative(cwd, moduleInfo.moduleDir) || '.');
 const files = findTestFiles(testPath).filter(file => isInsidePath(file, moduleInfo.moduleDir));
 
-console.log(`模块: ${moduleInfo.moduleName}`);
-console.log(`路径: ${testPath}`);
+console.log(`Module: ${moduleInfo.moduleName}`);
+console.log(`Path: ${testPath}`);
 console.log('');
 
 if (files.length === 0) {
-  console.log('未找到测试文件');
+  console.log('No test files found');
   process.exit(1);
 }
 
-console.log(`共找到 ${files.length} 个测试文件\n`);
+console.log(`Found ${files.length} test files\n`);
 
 const results = {
   passed: [],
@@ -258,7 +258,7 @@ for (let i = 0; i < files.length; i++) {
 }
 
 console.log('\n' + '='.repeat(75));
-console.log('📊 测试结果汇总');
+console.log('📊 Test summary');
 console.log('='.repeat(75));
 
 const totalTests = results.passed.reduce((sum, r) => sum + r.testCount, 0);
@@ -269,23 +269,23 @@ const passRate = ((totalPassed / totalFiles) * 100).toFixed(1);
 
 console.log(`
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  模块: ${moduleInfo.moduleName.padEnd(65)}│
-│  路径: ${testPath.padEnd(65)}│
-│  运行目录: ${moduleDirDisplay.padEnd(57)}│
+│  Module: ${moduleInfo.moduleName.padEnd(65)}│
+│  Path: ${testPath.padEnd(65)}│
+│  Workdir: ${moduleDirDisplay.padEnd(57)}│
 ├──────────────────────────────────────────────────────────────────────────┤
-│  总文件数: ${String(totalFiles).padEnd(61)}│
-│  ✅ 通过:   ${String(totalPassed).padEnd(61)}│
-│  ❌ 失败:   ${String(results.failed.length).padEnd(61)}│
-│  ⚠️  跳过:  ${String(results.skipped.length).padEnd(61)}│
+│  Files: ${String(totalFiles).padEnd(61)}│
+│  ✅ Passed: ${String(totalPassed).padEnd(61)}│
+│  ❌ Failed: ${String(results.failed.length).padEnd(61)}│
+│  ⚠️  Skipped: ${String(results.skipped.length).padEnd(61)}│
 ├──────────────────────────────────────────────────────────────────────────┤
-│  通过测试数: ${String(totalTests).padEnd(59)}│
-│  失败测试数: ${String(totalFailed).padEnd(59)}│
-│  文件成功率: ${String(passRate + '%').padEnd(59)}│
+│  Tests passed: ${String(totalTests).padEnd(59)}│
+│  Tests failed: ${String(totalFailed).padEnd(59)}│
+│  File pass rate: ${String(passRate + '%').padEnd(59)}│
 └──────────────────────────────────────────────────────────────────────────┘
 `);
 
 if (results.failed.length > 0) {
-  console.log('❌ 失败的文件:');
+  console.log('❌ Failed files:');
   console.log('-'.repeat(75));
   results.failed.forEach(({ file, failedCount, testCount }, idx) => {
     console.log(`  ${idx + 1}. ${toPosix(path.relative(cwd, file))}`);
@@ -295,7 +295,7 @@ if (results.failed.length > 0) {
 }
 
 if (results.skipped.length > 0) {
-  console.log('⚠️  跳过的文件:');
+  console.log('⚠️  Skipped files:');
   console.log('-'.repeat(75));
   results.skipped.forEach(({ file, reason }, idx) => {
     console.log(`  ${idx + 1}. ${toPosix(path.relative(cwd, file))} (${reason})`);
@@ -304,7 +304,7 @@ if (results.skipped.length > 0) {
 }
 
 console.log('='.repeat(75));
-console.log('✅ 通过的文件列表 (按测试数排序):');
+console.log('✅ Passed files (sorted by test count):');
 console.log('='.repeat(75));
 
 results.passed

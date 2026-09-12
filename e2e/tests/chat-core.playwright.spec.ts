@@ -70,7 +70,7 @@ test.describe('Chat Core Functionality - Standard Playwright', () => {
   }
 
   // ─────────────────────────────────────────────
-  // B1: 发送文本消息并收到响应
+  // B1: sending a text message receives a response
   // ─────────────────────────────────────────────
   test('B1: send text message and receive response', async ({ page }) => {
     console.log('Test B1: Send text message');
@@ -93,7 +93,7 @@ test.describe('Chat Core Functionality - Standard Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // B2: 空消息不应发送
+  // B2: empty messages are not sent
   // ─────────────────────────────────────────────
   test('B2: empty message should not send', async ({ page }) => {
     console.log('Test B2: Empty message validation');
@@ -122,7 +122,7 @@ test.describe('Chat Core Functionality - Standard Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // B3: 流式响应实时显示
+  // B3: streaming responses render live
   // ─────────────────────────────────────────────
   test('B3: streaming response shows in real-time', async ({ page }) => {
     console.log('Test B3: Streaming response');
@@ -166,7 +166,7 @@ test.describe('Chat Core Functionality - Standard Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // B4: 消息分页：滚动到顶部加载更多
+  // B4: message pagination — scrolling to top loads more
   // ─────────────────────────────────────────────
   test('B4: scroll to top loads more messages', async ({ page }) => {
     console.log('Test B4: Message pagination');
@@ -198,7 +198,7 @@ test.describe('Chat Core Functionality - Standard Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // B5: 工具调用展示（工具名称和结果）
+  // B5: tool call rendering (tool name and result)
   // ─────────────────────────────────────────────
   test('B5: tool call display shows name and result', async ({ page }) => {
     console.log('Test B5: Tool call display');
@@ -239,7 +239,7 @@ test.describe('Chat Core Functionality - Standard Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // B6: 取消正在进行的运行
+  // B6: cancelling an in-flight run
   // ─────────────────────────────────────────────
   test('B6: cancel running operation', async ({ page }) => {
     console.log('Test B6: Cancel operation');
@@ -274,7 +274,7 @@ test.describe('Chat Core Functionality - Standard Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // B7: 消息中的 Markdown 正确渲染
+  // B7: markdown in messages renders correctly
   // ─────────────────────────────────────────────
   test('B7: markdown renders correctly in messages', async ({ page }) => {
     console.log('Test B7: Markdown rendering');
@@ -317,7 +317,7 @@ test.describe('Chat Core Functionality - Standard Playwright', () => {
   });
 
   // ─────────────────────────────────────────────
-  // B8: 发送消息后自动滚动到底部
+  // B8: auto-scroll to bottom after sending a message
   // ─────────────────────────────────────────────
   test('B8: auto-scroll to bottom after sending message', async ({ page }) => {
     console.log('Test B8: Auto-scroll to bottom');

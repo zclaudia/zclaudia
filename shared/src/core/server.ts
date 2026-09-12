@@ -2,10 +2,10 @@
 
 export interface BackendServer {
   id: string;
-  name: string; // "家里的 Mac"、"公司 Mac"
-  address: string; // "192.168.1.100:3100" 或 "mac-home.local:3100"
+  name: string; // e.g. "Home Mac", "Office Mac"
+  address: string; // e.g. "192.168.1.100:3100" or "mac-home.local:3100"
   isDefault: boolean;
-  lastConnected?: number; // 上次连接时间
+  lastConnected?: number; // last connection time
   createdAt: number;
   clientId?: string; // Optional client ID for multi-backend direct connections
   // Legacy fields (kept for backward compatibility with existing DB entries)
