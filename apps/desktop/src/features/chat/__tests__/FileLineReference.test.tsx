@@ -27,8 +27,10 @@ vi.mock('../../../stores/toastStore', () => ({
 }));
 
 const mockListDirectory = vi.fn();
+const mockGetFileStat = vi.fn();
 vi.mock('../../../services/api', () => ({
   listDirectory: (...args: unknown[]) => mockListDirectory(...args),
+  getFileStat: (...args: unknown[]) => mockGetFileStat(...args),
 }));
 
 describe('parseFileLineRef', () => {
@@ -94,6 +96,7 @@ describe('INLINE_FILE_REF_REGEX', () => {
 describe('FileLineReference', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetFileStat.mockReset().mockRejectedValue(new Error('File not found'));
   });
 
   afterEach(() => {
@@ -106,35 +109,26 @@ describe('FileLineReference', () => {
     expect(button.textContent).toBe('foo.ts:42');
   });
 
-  it('resolves an exact relative path via search', async () => {
-    mockListDirectory.mockResolvedValueOnce({
-      entries: [{ name: 'foo.ts', path: 'src/foo.ts', type: 'file' }],
-      currentPath: '',
-      hasMore: false,
-    });
+  it('opens an existing relative path without searching the project', async () => {
+    mockGetFileStat.mockResolvedValueOnce({ path: 'src/foo.ts', mtimeMs: 1000, size: 11 });
 
-    render(<FileLineReference text="src/foo.ts:42" projectRoot="/repo" />);
+    render(<FileLineReference text="src/foo.ts:42" projectRoot="/repo" backendId="b1" />);
     fireEvent.click(screen.getByRole('button'));
 
     await waitFor(() => {
       expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'src/foo.ts', 42, undefined);
     });
     expect(mockActivatePanel).toHaveBeenCalledWith('file-viewer');
-    // searches by basename, not full path
-    expect(mockListDirectory).toHaveBeenCalledWith({
+    expect(mockListDirectory).not.toHaveBeenCalled();
+    expect(mockGetFileStat).toHaveBeenCalledWith({
       projectRoot: '/repo',
-      backendId: undefined,
-      query: 'foo.ts',
-      maxResults: 20,
+      backendId: 'b1',
+      relativePath: 'src/foo.ts',
     });
   });
 
   it('forwards a line range when present', async () => {
-    mockListDirectory.mockResolvedValueOnce({
-      entries: [{ name: 'foo.ts', path: 'src/foo.ts', type: 'file' }],
-      currentPath: '',
-      hasMore: false,
-    });
+    mockGetFileStat.mockResolvedValueOnce({ path: 'src/foo.ts', mtimeMs: 1000, size: 11 });
 
     render(<FileLineReference text="src/foo.ts:5-12" projectRoot="/repo" />);
     fireEvent.click(screen.getByRole('button'));
@@ -144,12 +138,24 @@ describe('FileLineReference', () => {
     });
   });
 
-  it('resolves a relative file path without a line target', async () => {
-    mockListDirectory.mockResolvedValueOnce({
-      entries: [{ name: 'foo.ts', path: 'src/foo.ts', type: 'file' }],
-      currentPath: '',
-      hasMore: false,
+  it('normalizes an explicitly project-relative path before opening it', async () => {
+    mockGetFileStat.mockResolvedValueOnce({ path: 'src/foo.ts', mtimeMs: 1000, size: 11 });
+    render(<FileLineReference text="./src/foo.ts:5" projectRoot="/repo" />);
+    fireEvent.click(screen.getByRole('button'));
+
+    await waitFor(() => {
+      expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'src/foo.ts', 5, undefined);
     });
+    expect(mockGetFileStat).toHaveBeenCalledWith({
+      projectRoot: '/repo',
+      relativePath: 'src/foo.ts',
+      backendId: undefined,
+    });
+    expect(mockListDirectory).not.toHaveBeenCalled();
+  });
+
+  it('resolves a relative file path without a line target', async () => {
+    mockGetFileStat.mockResolvedValueOnce({ path: 'src/foo.ts', mtimeMs: 1000, size: 11 });
 
     render(<FileLineReference text="src/foo.ts" projectRoot="/repo" />);
     fireEvent.click(screen.getByRole('button'));
@@ -158,6 +164,7 @@ describe('FileLineReference', () => {
       expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'src/foo.ts', undefined, undefined);
     });
     expect(mockActivatePanel).toHaveBeenCalledWith('file-viewer');
+    expect(mockListDirectory).not.toHaveBeenCalled();
   });
 
   it('matches a partial path by suffix (app/Foo.tsx → apps/desktop/src/app/Foo.tsx)', async () => {
@@ -189,6 +196,11 @@ describe('FileLineReference', () => {
       backendId: undefined,
       query: 'MobileOverlays.tsx',
       maxResults: 20,
+    });
+    expect(mockGetFileStat).toHaveBeenCalledWith({
+      projectRoot: '/repo',
+      relativePath: 'app/MobileOverlays.tsx',
+      backendId: undefined,
     });
   });
 
@@ -239,6 +251,7 @@ describe('FileLineReference', () => {
       query: 'foo.ts',
       maxResults: 20,
     });
+    expect(mockGetFileStat).not.toHaveBeenCalled();
   });
 
   it('looks up a bare basename without a line target', async () => {
@@ -283,14 +296,14 @@ describe('FileLineReference', () => {
     );
   });
 
-  it('shows a toast when no matches are found', async () => {
+  it.each(['missing.ts:1', 'src/missing.ts:1'])('shows a toast when %s cannot be resolved', async text => {
     mockListDirectory.mockResolvedValueOnce({
       entries: [],
       currentPath: '',
       hasMore: false,
     });
 
-    render(<FileLineReference text="missing.ts:1" projectRoot="/repo" />);
+    render(<FileLineReference text={text} projectRoot="/repo" />);
     fireEvent.click(screen.getByRole('button'));
 
     await waitFor(() => {

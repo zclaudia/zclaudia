@@ -59,8 +59,9 @@ interface Props {
  * Renders an inline file/line reference badge — clicking it opens the file in
  * the bottom file-viewer panel and scrolls to the referenced line.
  *
- * Path resolution: search by basename across the project, then pick the best
- * match — preferring an exact path, then a path-suffix match (so a partial
+ * Path resolution: check an explicit relative path directly first. Otherwise
+ * search by basename across the project, preferring an exact path, then a
+ * path-suffix match (so a partial
  * path like "app/Foo.tsx" matches "apps/desktop/src/app/Foo.tsx"), then the
  * first basename hit.
  */
@@ -89,6 +90,27 @@ export function FileLineReference({ text, projectRoot, backendId }: Props) {
     const basename = pathOrName.split('/').pop() ?? pathOrName;
 
     try {
+      // Most references already contain the project-relative path. A direct
+      // stat avoids recursively scanning the project just to find that file.
+      if (
+        pathOrName.includes('/') &&
+        !pathOrName.startsWith('/') &&
+        !pathOrName.split('/').includes('..')
+      ) {
+        const relativePath = pathOrName.replace(/^(?:\.\/)+/, '');
+        try {
+          await api.getFileStat({
+            projectRoot,
+            relativePath,
+            backendId: backendId ?? undefined,
+          });
+          openResolved(relativePath);
+          return;
+        } catch {
+          // It may be a partial path; preserve the basename/suffix fallback.
+        }
+      }
+
       const result = await api.listDirectory({
         projectRoot,
         backendId: backendId ?? undefined,

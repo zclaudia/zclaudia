@@ -552,9 +552,6 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
     markdownSourceView,
   } = store;
   const treeResizeCleanupRef = useRef<(() => void) | null>(null);
-  // Guards an in-flight stat/content poll so overlapping setInterval ticks do
-  // not issue duplicate network requests (e.g. when a fetch outlasts the tick).
-  const pollInFlightRef = useRef(false);
   // Guard: when the store still holds state pointing at a different project
   // (e.g. user just switched session/project), treat the viewer as if no file
   // is selected. SessionChatLayout's effect will close()/reset the store
@@ -588,12 +585,15 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
     if (!filePath || !projectRoot) return;
 
     let cancelled = false;
+    // Scope the guard to this target/effect. A cancelled request must not block
+    // the immediate load after a file switch or StrictMode effect restart.
+    let pollInFlight = false;
 
     const checkOnce = async () => {
-      if (cancelled || pollInFlightRef.current) return;
+      if (cancelled || pollInFlight) return;
       // Skip work while the whole window is hidden (background tab).
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      pollInFlightRef.current = true;
+      pollInFlight = true;
       try {
         const st = useFileViewerStore.getState();
         // Bail if the user has since switched to a different file. (A project
@@ -636,7 +636,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
           setError(e instanceof Error ? e.message : 'Failed to load file');
         }
       } finally {
-        pollInFlightRef.current = false;
+        pollInFlight = false;
       }
     };
 

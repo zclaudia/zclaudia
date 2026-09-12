@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as api from '../../../services/api';
 import { FileViewerPanel, FileViewerActions } from '../FileViewerPanel';
 
@@ -141,6 +142,7 @@ beforeEach(() => {
   mockFileViewerState.showTree = true;
   mockFileViewerState.treeWidthPx = 256;
   mockFileViewerState.projectRoot = null;
+  mockFileViewerState.knownMtimeMs = null;
 });
 
 describe('FileViewerPanel', () => {
@@ -212,6 +214,88 @@ describe('FileViewerPanel', () => {
       });
       expect(mockFileViewerState.setContent).toHaveBeenCalledWith('file content', 1000);
     });
+  });
+
+  it('loads immediately in StrictMode without waiting for the polling interval', async () => {
+    vi.useFakeTimers();
+    mockFileViewerState.filePath = 'src/app.tsx';
+    const view = render(
+      <StrictMode>
+        <FileViewerPanel projectRoot="/project" />
+      </StrictMode>
+    );
+    try {
+      await act(async () => {});
+      expect(mockFileViewerState.setContent).toHaveBeenCalledWith('file content', 1000);
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(['stat', 'content'] as const)(
+    'loads a new file immediately while the previous %s request is pending',
+    async pendingStage => {
+      let finishOldRequest!: () => void;
+      if (pendingStage === 'stat') {
+        vi.mocked(api.getFileStat).mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              finishOldRequest = () => resolve({ path: 'src/old.ts', mtimeMs: 500, size: 3 });
+            })
+        );
+      } else {
+        vi.mocked(api.getFileContent).mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              finishOldRequest = () => resolve({ path: 'src/old.ts', content: 'old', size: 3 });
+            })
+        );
+      }
+      mockFileViewerState.filePath = 'src/old.ts';
+      const view = render(<FileViewerPanel projectRoot="/project" />);
+      await act(async () => {});
+
+      mockFileViewerState.filePath = 'src/new.ts';
+      view.rerender(<FileViewerPanel projectRoot="/project" />);
+      await act(async () => {});
+      expect(api.getFileContent).toHaveBeenCalledWith(
+        expect.objectContaining({ relativePath: 'src/new.ts' })
+      );
+      expect(mockFileViewerState.setContent).toHaveBeenCalledExactlyOnceWith('file content', 1000);
+
+      await act(async () => {
+        finishOldRequest();
+      });
+      expect(mockFileViewerState.setContent).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('does not overlap polling requests while content is still loading', async () => {
+    vi.useFakeTimers();
+    let finishContent!: () => void;
+    vi.mocked(api.getFileContent).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          finishContent = () => resolve({ path: 'src/app.tsx', content: 'loaded', size: 6 });
+        })
+    );
+    mockFileViewerState.filePath = 'src/app.tsx';
+    const view = render(<FileViewerPanel projectRoot="/project" />);
+    try {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10000);
+      });
+      expect(api.getFileStat).toHaveBeenCalledTimes(1);
+      expect(api.getFileContent).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        finishContent();
+      });
+      expect(mockFileViewerState.setContent).toHaveBeenCalledWith('loaded', 1000);
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
   });
 
   it('refetches content when the polled mtime advances past the known mtime', async () => {

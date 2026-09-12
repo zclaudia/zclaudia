@@ -93,8 +93,6 @@ export function FileViewerWindow({
   }, [content]);
   // mtime of the currently displayed content; null until the first successful load.
   const knownMtimeRef = useRef<number | null>(null);
-  // Prevents overlapping poll ticks from issuing duplicate requests.
-  const pollInFlightRef = useRef(false);
 
   // Build request headers/query helpers for the active transport (direct
   // serverUrl fetch vs. the api layer backed by ConnectionProvider).
@@ -138,11 +136,14 @@ export function FileViewerWindow({
   // window is open.
   useEffect(() => {
     let cancelled = false;
+    // Keep overlapping ticks out without letting a cancelled target's request
+    // block the initial load for a new target or StrictMode effect restart.
+    let pollInFlight = false;
 
     const checkOnce = async () => {
-      if (cancelled || pollInFlightRef.current) return;
+      if (cancelled || pollInFlight) return;
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      pollInFlightRef.current = true;
+      pollInFlight = true;
       try {
         const hasContent = contentRef.current != null;
 
@@ -171,7 +172,7 @@ export function FileViewerWindow({
           setLoading(false);
         }
       } finally {
-        pollInFlightRef.current = false;
+        pollInFlight = false;
       }
     };
 

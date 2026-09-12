@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import * as api from '../../../services/api';
 import { FileViewerWindow } from '../FileViewerWindow';
 
 vi.mock('../../../contexts/ThemeContext', () => ({
@@ -65,6 +67,49 @@ describe('FileViewerWindow', () => {
     expect(screen.queryByTestId('syntax-highlighter')).not.toBeInTheDocument();
   });
 
+  it('loads immediately in StrictMode without waiting for the polling interval', async () => {
+    vi.useFakeTimers();
+    const view = render(
+      <StrictMode>
+        <FileViewerWindow filePath="src/app.ts" projectRoot="/project" />
+      </StrictMode>
+    );
+    try {
+      await act(async () => {});
+      expect(screen.getByText('mock file content')).toBeInTheDocument();
+      expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it('loads a new file immediately and ignores the previous pending content response', async () => {
+    let finishOldRequest!: () => void;
+    vi.mocked(api.getFileContent).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          finishOldRequest = () =>
+            resolve({ path: 'src/old.ts', content: 'old content', size: 11 });
+        })
+    );
+    const view = render(<FileViewerWindow filePath="src/old.ts" projectRoot="/project" />);
+    await act(async () => {});
+    view.rerender(<FileViewerWindow filePath="src/new.ts" projectRoot="/project" />);
+    await act(async () => {});
+    expect(screen.getByText('mock file content')).toBeInTheDocument();
+    expect(api.getFileContent).toHaveBeenCalledWith({
+      projectRoot: '/project',
+      relativePath: 'src/new.ts',
+    });
+
+    await act(async () => {
+      finishOldRequest();
+    });
+    expect(screen.queryByText('old content')).not.toBeInTheDocument();
+    expect(screen.getByText('mock file content')).toBeInTheDocument();
+  });
+
   it('toggles between markdown preview and source via the header button', async () => {
     render(<FileViewerWindow filePath="docs/readme.md" projectRoot="/project" />);
     await waitFor(() => {
@@ -89,9 +134,7 @@ describe('FileViewerWindow', () => {
     await waitFor(() => {
       expect(screen.getByTestId('syntax-highlighter')).toBeInTheDocument();
     });
-    expect(
-      screen.queryByRole('button', { name: 'Show markdown source' })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show markdown source' })).not.toBeInTheDocument();
   });
 
   it('renders close button when onClose is provided', async () => {
