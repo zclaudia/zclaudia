@@ -6,7 +6,13 @@ import path from 'node:path';
  * Resolve before copying, retain exact installed versions and peer contexts,
  * and use nested packages when two edges resolve to different instances.
  */
-export async function copyPortableDependencies(source, destination, allowedRoot) {
+export async function copyPortableDependencies(
+  source,
+  destination,
+  allowedRoot,
+  { includeOptional = [] } = {}
+) {
+  const includeOptionalNames = new Set(includeOptional);
   const boundary = await realpath(allowedRoot);
   const graph = new Map();
   const inside = filename => filename === boundary || filename.startsWith(boundary + path.sep);
@@ -38,11 +44,21 @@ export async function copyPortableDependencies(source, destination, allowedRoot)
     const names = new Set([
       ...Object.keys(manifest.dependencies ?? {}),
       ...Object.keys(manifest.peerDependencies ?? {}),
+      // Optional dependencies are excluded by default (same policy as the
+      // former deploy --prod --no-optional); only explicitly included names —
+      // e.g. the SDK engine package for the current target platform — enter
+      // the graph.
+      ...Object.keys(manifest.optionalDependencies ?? {}).filter(name =>
+        includeOptionalNames.has(name)
+      ),
     ]);
     for (const name of [...names].sort()) {
-      // Same policy as the former deploy --prod --no-optional. The SDK receives
-      // an explicit CLI path; its optional platform CLI packages aren't shipped.
-      if (Object.hasOwn(manifest.optionalDependencies ?? {}, name)) continue;
+      if (
+        Object.hasOwn(manifest.optionalDependencies ?? {}, name) &&
+        !includeOptionalNames.has(name)
+      ) {
+        continue;
+      }
       const optional =
         !Object.hasOwn(manifest.dependencies ?? {}, name) &&
         manifest.peerDependenciesMeta?.[name]?.optional === true;

@@ -1,6 +1,7 @@
 import type { Permission } from './permissions.js';
 import type { PluginContributes } from './contributions.js';
 import type { PluginRequirements } from './capabilities.js';
+import { validateEngineModeDeclarations } from '@zclaudia/plugin-sdk/providers';
 
 export interface PluginAuthor {
   name: string;
@@ -72,11 +73,13 @@ export function validateAgentRuntimeContributions(contributes: unknown): string[
   const runtimes = contributes.agentRuntimes;
   if (runtimes === undefined) return [];
   if (!Array.isArray(runtimes)) return ['contributes.agentRuntimes must be an array'];
-  return runtimes.flatMap((runtime, index) =>
-    !isRecord(runtime) || typeof runtime.type !== 'string' || !runtime.type.trim()
-      ? [`contributes.agentRuntimes[${index}] must have a non-empty string type`]
-      : []
-  );
+  return runtimes.flatMap((runtime, index) => {
+    if (!isRecord(runtime) || typeof runtime.type !== 'string' || !runtime.type.trim()) {
+      return [`contributes.agentRuntimes[${index}] must have a non-empty string type`];
+    }
+    // Dual-mode declarations: same structural contract the plugin SDK enforces.
+    return validateEngineModeDeclarations(runtime).map(error => `contributes.agentRuntimes[${index}]: ${error}`);
+  });
 }
 
 export function validatePluginManifest(manifest: unknown): PluginValidationResult {

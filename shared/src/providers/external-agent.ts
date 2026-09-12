@@ -6,4 +6,6 @@ export type {
   ExternalAgentRunState,
   ProviderToolBridgeEntry,
   ProviderToolBridgeRequest,
+  EngineExecutionContext,
+  RuntimeModelConnection,
 } from '@zclaudia/plugin-sdk/providers';

@@ -90,5 +90,10 @@
     "vitest": "^4.1.8",
     "zod": "^4.4.3",
     "esbuild": "^0.28.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@zclaudia/plugin-sdk": "0.2.0"
+    }
   }
 }

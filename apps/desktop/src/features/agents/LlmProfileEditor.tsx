@@ -32,6 +32,7 @@ import type {
   LlmModelDialect,
 } from '@zclaudia/shared';
 import { LLM_PROVIDER_TYPES, LLM_MODEL_DIALECTS } from '@zclaudia/shared';
+import { resolveLlmProfileProtocols } from '@zclaudia/shared/core/llm-profile';
 import {
   createLlmProfileForBackend,
   updateLlmProfileForBackend,
@@ -108,6 +109,7 @@ export function LlmProfileEditor({
     profile?.providerType ?? 'anthropic'
   );
   const [formBaseUrl, setFormBaseUrl] = useState(profile?.baseUrl || '');
+  const [formProtocols, setFormProtocols] = useState(profile?.supportedProtocols ?? null);
   const [formApiKey, setFormApiKey] = useState(profile?.apiKey || '');
   const [formCompat, setFormCompat] = useState(
     initialHasCompat ? JSON.stringify(profile?.compat, null, 2) : ''
@@ -256,6 +258,7 @@ export function LlmProfileEditor({
       JSON.stringify({
         name: formName,
         providerType: formProviderType,
+        supportedProtocols: formProtocols,
         baseUrl: formBaseUrl,
         apiKey: formApiKey,
         compat: formCompat,
@@ -271,6 +274,7 @@ export function LlmProfileEditor({
     [
       formName,
       formProviderType,
+      formProtocols,
       formBaseUrl,
       formApiKey,
       formCompat,
@@ -400,6 +404,7 @@ export function LlmProfileEditor({
       const baseData = {
         name: formName.trim(),
         providerType: formProviderType,
+        supportedProtocols: formProtocols,
         baseUrl: isCodexProvider ? null : formBaseUrl.trim() || undefined,
         apiKey: isCodexProvider ? null : formApiKey.trim() || undefined,
         compat: isCodexProvider ? null : (compatOut as LlmProfileCompat | undefined),
@@ -628,7 +633,10 @@ export function LlmProfileEditor({
               <ProviderTypeSelector
                 hideLabel
                 value={formProviderType}
-                onChange={setFormProviderType}
+                onChange={value => {
+                  setFormProviderType(value);
+                  setFormProtocols(null);
+                }}
               />
             </div>
           }
@@ -728,6 +736,31 @@ export function LlmProfileEditor({
                     </div>
 
                     <div>
+                      {formProviderType === 'openai' && (
+                        <label className="mb-4 flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={resolveLlmProfileProtocols({
+                              providerType: formProviderType,
+                              baseUrl: formBaseUrl,
+                              supportedProtocols: formProtocols,
+                            }).protocols.includes('openai-responses')}
+                            onChange={event => {
+                              const protocols = resolveLlmProfileProtocols({
+                                providerType: formProviderType,
+                                baseUrl: formBaseUrl,
+                                supportedProtocols: formProtocols,
+                              }).protocols;
+                              setFormProtocols(
+                                event.target.checked
+                                  ? [...new Set([...protocols, 'openai-responses' as const])]
+                                  : protocols.filter(p => p !== 'openai-responses')
+                              );
+                            }}
+                          />
+                          Endpoint supports Responses (required for Codex SDK)
+                        </label>
+                      )}
                       <FormField label="API Key (optional)">
                         {f => (
                           <Input

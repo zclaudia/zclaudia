@@ -139,3 +139,6 @@ docs/superpowers/
 .impeccable/
 
 /artifacts/agent-runtime-migration/
+
+.cache/runtime-artifacts/
+plugins/agents/codex/engine/

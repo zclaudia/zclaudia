@@ -25,7 +25,7 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { Session, Project, SystemInfo } from '@zclaudia/shared';
+import type { Session, Project, SystemInfo, SessionRuntimeEngine } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
@@ -108,6 +108,22 @@ export function SessionHeader({
   );
   const { agent } = useAgentForSession(currentSession?.id);
   const modelValue = systemInfo?.model || agent?.model || null;
+  // Dual-mode run badge: the session keeps the engine mode (and connection
+  // identity) it was bound to at first run — from session_runtime_bindings —
+  // even if the agent profile has since switched modes. Sessions that never
+  // ran have no binding and show no badge.
+  const runtimeEngine = currentSession?.runtimeEngine;
+  const engineBadge = runtimeEngine
+    ? runtimeEngine.engineMode === 'sdk'
+      ? [
+          'SDK',
+          runtimeEngine.llmProfileName,
+          runtimeEngine.model,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : 'CLI'
+    : null;
   // The pill shows only the agent name to stay compact; the model is redundant
   // here since it's spelled out in the details popover. Fall back to a generic
   // placeholder during the brief first-render window before the store hydrates.
@@ -223,6 +239,14 @@ export function SessionHeader({
             {/* leading-tight (not the pill's leading-none) so truncate's
                 overflow:hidden doesn't clip descenders like the "g" in "Coding" */}
             <span className="truncate leading-tight">{agentLabel}</span>
+            {engineBadge && (
+              <span
+                className="max-w-[140px] shrink-0 truncate rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-muted-foreground"
+                title={`Session run mode: ${engineBadge}`}
+              >
+                {engineBadge}
+              </span>
+            )}
             {agent?.status === 'readonly' && (
               <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-muted-foreground">
                 read-only
@@ -449,6 +473,7 @@ export function SessionHeader({
                     <SessionInfoRows
                       agentName={agent?.name ?? DEFAULT_AGENT_LABEL}
                       modelValue={modelValue}
+                      runtimeEngine={engineBadge ? runtimeEngine : undefined}
                       systemInfo={systemInfo}
                       pathValue={pathValue}
                       contextPercent={contextPercent}
@@ -486,19 +511,31 @@ export function SessionHeader({
 function SessionInfoRows({
   agentName,
   modelValue,
+  runtimeEngine,
   systemInfo,
   pathValue,
   contextPercent,
 }: {
   agentName: string;
   modelValue: string | null;
+  runtimeEngine?: SessionRuntimeEngine;
   systemInfo: SystemInfo | null;
   pathValue: string | null;
   contextPercent: number | null;
 }) {
+  const engineModeValue = runtimeEngine
+    ? [
+        runtimeEngine.engineMode === 'sdk' ? 'SDK' : runtimeEngine.engineMode.toUpperCase(),
+        runtimeEngine.llmProfileName,
+        runtimeEngine.model,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null;
   return (
     <div className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto px-3 pb-3 text-xs">
       <InfoRow icon={Bot} label="Agent" value={agentName} />
+      {engineModeValue && <InfoRow icon={Package} label="Run mode" value={engineModeValue} />}
       {modelValue && <InfoRow icon={Cpu} label="Model" value={modelValue} />}
       {systemInfo?.claudeCodeVersion && (
         <InfoRow icon={Package} label="Version" value={systemInfo.claudeCodeVersion} />

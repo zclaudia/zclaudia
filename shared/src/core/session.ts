@@ -39,6 +39,21 @@ export interface Session {
   forkedFromSessionId?: string;
   /** The source tree entry id this session was forked at (SP-A). */
   forkEntryId?: string;
+  /**
+   * Resolved run identity of a dual-mode session, read from
+   * session_runtime_bindings. Present once the session has been bound to an
+   * engine mode; absent for sessions that never started a run.
+   */
+  runtimeEngine?: SessionRuntimeEngine;
+}
+
+export interface SessionRuntimeEngine {
+  /** Engine mode of the bound runtime (e.g. 'cli' | 'sdk'). */
+  engineMode: string;
+  /** Model the session is bound to (CLI default-model sessions may be empty). */
+  model?: string;
+  /** Display name of the bound LLM profile (SDK modes). */
+  llmProfileName?: string;
 }
 
 // Session Draft Types

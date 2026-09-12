@@ -38,6 +38,25 @@ import { projectRunDomainEventToWireMessages } from './wire-projector.js';
 import { registerPluginDomainEventListener } from './plugin-domain-event-listener.js';
 import { resolveMultimodalFallbackForRun } from './multimodal-fallback.js';
 import { resolveAgentProfileRuntime } from './run-managed-runtime.js';
+import { resolveProfileEngineMode } from '../../../domains/agent-profiles/engine-mode.js';
+import { prepareSdkEngineRun } from './sdk-engine-run.js';
+import { RunLaunchError } from './run-launch-error.js';
+import { SessionRuntimeBindingRepository } from '../../../domains/sessions/runtime-binding-repository.js';
+import type { EngineExecutionContext, RuntimeModelConnection } from '@zclaudia/shared/providers';
+import type { ManagedRuntimeSource } from '@zclaudia/shared/plugins/managed-runtimes';
+
+function executableSourceFromManagedSource(
+  source: ManagedRuntimeSource
+): EngineExecutionContext['executableSource'] {
+  switch (source) {
+    case 'explicit':
+      return 'explicit';
+    case 'system':
+      return 'system';
+    case 'managed':
+      return 'managed-cli';
+  }
+}
 
 registerPluginDomainEventListener();
 
@@ -108,7 +127,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     applied: false,
     agentProfile,
     llmProfile: providerConfig,
-    llmProfileId: input.llmProfileId ?? providerConfig?.id ?? agentProfile.llmProfileId,
+    llmProfileId: input.llmProfileId ?? providerConfig?.id ?? agentProfile.llmProfileId ?? '',
     providerType,
   };
   const multimodalFallback =
@@ -140,30 +159,127 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     );
   }
 
-  // CLI-backed plugin runtimes are resolved by the trusted host immediately
-  // before launch. Legacy plugins without runtime-compatibility.json keep the
-  // previous behavior and receive their original optional cliPath unchanged.
-  const managedRuntime = await resolveAgentProfileRuntime(
-    effectiveProviderType,
-    effectiveAgentProfile
-  );
-  const runtimeResolution = managedRuntime.resolution;
-  if (runtimeResolution) {
-    effectiveAgentProfile = managedRuntime.agentProfile;
+  // Dual-mode engine resolution (design: Claude §5, Codex §5). The session's
+  // engine mode decides the execution branch BEFORE any context is built, so a
+  // bound session never silently picks up the agent's latest configuration.
+  const engineModeResolution = resolveProfileEngineMode({
+    runtimeType: effectiveProviderType,
+    engineMode: effectiveAgentProfile.engineMode ?? null,
+  });
+  if (!engineModeResolution.ok) {
+    throw new RunLaunchError(engineModeResolution.code, engineModeResolution.message);
+  }
+  const isSdkEngineMode =
+    engineModeResolution.declaredModes !== null &&
+    engineModeResolution.projected.model.kind === 'llm-profile';
+
+  let engineExecution: EngineExecutionContext | undefined;
+  let modelConnection: RuntimeModelConnection | undefined;
+
+  if (isSdkEngineMode) {
+    // SDK modes skip the external CLI resolution chain entirely: no managed
+    // install, no system PATH, no external login probe. The engine executable
+    // is the app-bundled resource; the model connection is the bound profile.
+    const sdk = await prepareSdkEngineRun({
+      db: db as Database.Database,
+      runtimeType: effectiveProviderType,
+      claudiaSessionId: message.sessionId,
+      cwd,
+      agentModel: effectiveAgentProfile.model,
+      resolvedLlmProfile: effectiveProviderConfig,
+      resolvedLlmProfileId: effectiveLlmProfileId ?? null,
+    });
+    effectiveAgentProfile = {
+      ...effectiveAgentProfile,
+      model: sdk.model,
+      // The plugin receives the verified bundled absolute path; it must never
+      // resolve its own executable from PATH in SDK mode.
+      cliPath: sdk.executablePath,
+    };
     activeRun.agentProfile = effectiveAgentProfile;
+    engineExecution = {
+      engineMode: 'sdk',
+      executableSource: sdk.executableSource,
+      configDirectory: sdk.configDirectory,
+    };
+    modelConnection = sdk.connection;
     trace.log(
       'server_norm',
-      'managed_runtime_resolved',
+      'sdk_engine_resolved',
       {
         runtime: effectiveProviderType,
-        source: runtimeResolution.source,
-        version: runtimeResolution.version,
-        compatibilityState: runtimeResolution.compatibilityState,
-        authState: runtimeResolution.authState,
-        executablePath: runtimeResolution.executablePath,
+        engineMode: 'sdk',
+        executableSource: sdk.executableSource,
+        protocol: sdk.protocol,
+        profileId: sdk.profileId,
+        model: sdk.model,
+        bindingCreated: sdk.bindingCreated,
       },
-      runtimeResolution.warning ?? `CLI resolved from ${runtimeResolution.source}`
+      `SDK engine resolved from bound profile ${sdk.profileId}`
     );
+  } else {
+    const bindings =
+      engineModeResolution.declaredModes !== null
+        ? new SessionRuntimeBindingRepository(db as Database.Database)
+        : undefined;
+    const binding = bindings?.findBySessionId(message.sessionId);
+    if (
+      binding &&
+      (binding.runtimeType !== effectiveProviderType ||
+        binding.engineMode !== engineModeResolution.engineMode)
+    ) {
+      throw new RunLaunchError(
+        'SESSION_CONNECTION_CHANGED',
+        'Runtime does not match the existing session binding'
+      );
+    }
+    const configuredCliPath = effectiveAgentProfile.cliPath ?? null;
+    // CLI-backed plugin runtimes are resolved by the trusted host immediately
+    // before launch. Legacy plugins without runtime-compatibility.json keep the
+    // previous behavior and receive their original optional cliPath unchanged.
+    const managedRuntime = await resolveAgentProfileRuntime(
+      effectiveProviderType,
+      effectiveAgentProfile
+    );
+    const runtimeResolution = managedRuntime.resolution;
+    if (runtimeResolution) {
+      effectiveAgentProfile = managedRuntime.agentProfile;
+      activeRun.agentProfile = effectiveAgentProfile;
+      trace.log(
+        'server_norm',
+        'managed_runtime_resolved',
+        {
+          runtime: effectiveProviderType,
+          source: runtimeResolution.source,
+          version: runtimeResolution.version,
+          compatibilityState: runtimeResolution.compatibilityState,
+          authState: runtimeResolution.authState,
+          executablePath: runtimeResolution.executablePath,
+        },
+        runtimeResolution.warning ?? `CLI resolved from ${runtimeResolution.source}`
+      );
+    }
+    if (engineModeResolution.declaredModes !== null) {
+      if (!binding) {
+        bindings!.upsert({
+          sessionId: message.sessionId,
+          runtimeType: effectiveProviderType,
+          engineMode: engineModeResolution.engineMode,
+          model: effectiveAgentProfile.model || null,
+          llmProfileId: null,
+          connectionIdentityHash: null,
+          configuredCliPath,
+          configNamespace: null,
+          runtimeDetails: { schemaVersion: 1, cwd },
+        });
+      }
+      engineExecution = {
+        engineMode: engineModeResolution.engineMode,
+        executableSource: runtimeResolution?.source
+          ? executableSourceFromManagedSource(runtimeResolution.source)
+          : 'explicit',
+      };
+    }
   }
 
   if (adapter.manifest) {
@@ -297,6 +413,12 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   runOptions.images = images.length > 0 ? images : undefined;
   runOptions.userHooks = userHooks && userHooks.length > 0 ? userHooks : undefined;
   runOptions.toolExecutionObserver = createSkillActivationObserver();
+  // Dual-mode run contract: only the selected connection is handed to the
+  // adapter — never the whole profile store or unrelated credentials. The shim
+  // forwards these onto ExternalAgentRunContext; they must not enter traces,
+  // persisted run parameters, or tool inputs.
+  runOptions.engineExecution = engineExecution;
+  runOptions.modelConnection = modelConnection;
 
   // Wire mid-run steering callbacks. The closure captures `activeRun` directly
   // (not via activeRuns map) so registration is robust even if the run is

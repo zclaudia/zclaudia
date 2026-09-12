@@ -182,7 +182,10 @@ export class AgentProfileRepository extends BaseRepository<
       name: row.name,
       description: row.description ?? undefined,
       runtimeType: row.runtime_type || 'zclaudia',
-      llmProfileId: row.llm_profile_id ?? '',
+      engineMode: row.engine_mode ?? undefined,
+      // DB NULL is canonical for "no binding"; legacy empty strings were
+      // normalized to NULL at write boundaries (never re-emitted).
+      llmProfileId: row.llm_profile_id ?? null,
       model: row.model,
       cliPath: row.cli_path ?? undefined,
       systemPrompt: row.system_prompt,
@@ -312,14 +315,15 @@ export class AgentProfileRepository extends BaseRepository<
     const enabledTools = resolveToolSelection(toolSelection).builtinTools;
     return {
       sql: `
-        INSERT INTO agent_profiles (id, name, description, runtime_type, llm_profile_id, model, cli_path, system_prompt, enabled_tools, tool_selection, skill_selection, skill_execution, multimodal_fallback, thinking_level, is_default, status, source, plugin_id, plugin_profile_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO agent_profiles (id, name, description, runtime_type, engine_mode, llm_profile_id, model, cli_path, system_prompt, enabled_tools, tool_selection, skill_selection, skill_execution, multimodal_fallback, thinking_level, is_default, status, source, plugin_id, plugin_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
         data.name,
         data.description ?? null,
         normalizeRuntimeType(data.runtimeType),
+        data.engineMode ?? null,
         data.llmProfileId ? data.llmProfileId : null,
         data.model,
         data.cliPath || null,
@@ -356,6 +360,10 @@ export class AgentProfileRepository extends BaseRepository<
     if (data.runtimeType !== undefined) {
       updates.push('runtime_type = ?');
       params.push(normalizeRuntimeType(data.runtimeType));
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'engineMode')) {
+      updates.push('engine_mode = ?');
+      params.push(data.engineMode ?? null);
     }
     if (data.llmProfileId !== undefined) {
       updates.push('llm_profile_id = ?');

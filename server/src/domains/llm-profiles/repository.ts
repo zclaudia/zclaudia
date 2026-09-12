@@ -9,6 +9,7 @@ import type {
 import { resolveLlmProfileStatus } from '@zclaudia/shared/core/record-status-resolvers';
 import { newId } from '../../utils/uuid.js';
 import { hasLlmCredential } from '../agent-readiness/credential.js';
+import { validateLlmProtocols } from '@zclaudia/shared/core/llm-profile';
 
 export class LlmProfileRepository extends BaseRepository<
   LlmProfileConfig,
@@ -24,6 +25,10 @@ export class LlmProfileRepository extends BaseRepository<
       id: row.id,
       name: row.name,
       providerType: row.provider_type,
+      supportedProtocols:
+        row.supported_protocols == null
+          ? undefined
+          : validateLlmProtocols(JSON.parse(row.supported_protocols)),
       baseUrl: row.base_url ?? undefined,
       apiKey: row.api_key ?? undefined,
       compat: row.compat ? this.parseCompat(row.compat) : undefined,
@@ -101,8 +106,8 @@ export class LlmProfileRepository extends BaseRepository<
 
     return {
       sql: `
-        INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, request_headers, models, oauth_credentials, cache_retention, is_default, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, request_headers, models, oauth_credentials, cache_retention, is_default, created_at, updated_at, supported_protocols)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
@@ -118,6 +123,9 @@ export class LlmProfileRepository extends BaseRepository<
         data.isDefault ? 1 : 0,
         now,
         now,
+        data.supportedProtocols == null
+          ? null
+          : JSON.stringify(validateLlmProtocols(data.supportedProtocols)),
       ],
     };
   }
@@ -128,6 +136,15 @@ export class LlmProfileRepository extends BaseRepository<
   ): { sql: string; params: any[] } {
     const updates: string[] = [];
     const params: any[] = [];
+
+    if (data.supportedProtocols !== undefined) {
+      updates.push('supported_protocols = ?');
+      params.push(
+        data.supportedProtocols === null
+          ? null
+          : JSON.stringify(validateLlmProtocols(data.supportedProtocols))
+      );
+    }
 
     if (data.name !== undefined) {
       updates.push('name = ?');

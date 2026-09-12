@@ -39,7 +39,7 @@
     "directory": "plugins/agents/codex"
   },
   "dependencies": {
-    "@zclaudia/plugin-sdk": "^0.1.0"
+    "@zclaudia/plugin-sdk": "0.2.0"
   },
   "devDependencies": {
     "@zclaudia/agent-common": "workspace:*",

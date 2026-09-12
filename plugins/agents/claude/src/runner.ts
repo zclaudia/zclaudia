@@ -6,7 +6,13 @@ import type {
   PermissionMode,
   SdkPluginConfig,
 } from '@anthropic-ai/claude-agent-sdk';
-import type { ProviderRuntimeEvent, SystemInfo } from '@zclaudia/plugin-sdk/providers';
+import type {
+  EngineExecutionContext,
+  ProviderRuntimeEvent,
+  RuntimeModelConnection,
+  SystemInfo,
+} from '@zclaudia/plugin-sdk/providers';
+import { RuntimeContractError } from '@zclaudia/plugin-sdk/providers';
 import {
   boundedToolInput,
   boundedValue,
@@ -18,6 +24,8 @@ import {
   truncateUtf8,
 } from '@zclaudia/agent-common';
 import { inspectClaudeCli, resolveClaudeCliFromPath } from './resolve-cli.js';
+import { buildClaudeSdkEnvironment } from './sdk-environment.js';
+import { toClaudeModelConnectionEnv } from './model-connection.js';
 
 export interface ClaudeAgentRunOptions {
   cwd: string;
@@ -34,12 +42,29 @@ export interface ClaudeAgentRunOptions {
   mcpServers?: Record<string, McpServerConfig>;
   plugins?: SdkPluginConfig[];
   onSessionId?: (sessionId: string) => void;
+  /** Dual-mode contract: engine-mode execution identity from the host. */
+  engineExecution?: EngineExecutionContext;
+  /** Dual-mode contract: explicit model connection (SDK mode requires it). */
+  modelConnection?: RuntimeModelConnection;
 }
+
+/**
+ * Transcript retention inside the session-scoped CLAUDE_CONFIG_DIR. The engine
+ * sweeps local transcripts after this many days (default 30), so the host
+ * pins a long retention window explicitly; archive/backup behaviour is the
+ * host's responsibility beyond what the engine guarantees.
+ */
+const SDK_CLEANUP_PERIOD_DAYS = 36_500;
 
 export async function* runClaudeAgent(
   input: string,
   options: ClaudeAgentRunOptions
 ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
+  if (options.engineExecution?.engineMode === 'sdk') {
+    yield* runClaudeSdkAgent(input, options);
+    return;
+  }
+
   const abortController = options.abortController ?? new AbortController();
   const sdkOptions: Partial<Options> = {
     cwd: options.cwd,
@@ -79,6 +104,94 @@ export async function* runClaudeAgent(
   }
 
   const stream = query({ prompt: input, options: sdkOptions });
+  yield* pumpClaudeStream(stream, options);
+}
+
+/**
+ * SDK engine mode: connection, executable and configuration all come from the
+ * host contract. The user's environment, login state and settings files are
+ * NOT inherited — a run either executes against the explicitly bound
+ * connection or fails before any request leaves the process.
+ */
+async function* runClaudeSdkAgent(
+  input: string,
+  options: ClaudeAgentRunOptions
+): AsyncGenerator<ProviderRuntimeEvent, void, void> {
+  const engine = options.engineExecution!;
+  const connection = options.modelConnection;
+  if (!connection) {
+    throw new RuntimeContractError(
+      'SDK_ENGINE_UNAVAILABLE',
+      'SDK mode requires the host model-connection contract; this host is too old to run it. Upgrade ZClaudia or switch the agent to CLI mode.'
+    );
+  }
+  // Protocol admission is re-verified here: an adapter must not accept a
+  // connection combination its runtime did not declare.
+  toClaudeModelConnectionEnv(connection);
+  if (!engine.configDirectory) {
+    throw new RuntimeContractError(
+      'SDK_ENGINE_UNAVAILABLE',
+      'SDK mode requires a host-managed config directory for this session'
+    );
+  }
+  const cliPath = options.cliPath?.trim();
+  if (!cliPath) {
+    throw new RuntimeContractError(
+      'SDK_ENGINE_UNAVAILABLE',
+      'SDK mode requires the app-bundled engine path from the host; PATH lookup is intentionally not performed'
+    );
+  }
+
+  const env = buildClaudeSdkEnvironment({
+    connection,
+    configDirectory: engine.configDirectory,
+    model: options.model,
+    baseEnv: options.env,
+  });
+
+  const abortController = options.abortController ?? new AbortController();
+  const sdkOptions: Partial<Options> = {
+    cwd: options.cwd,
+    abortController,
+    // Isolation mode: no user/project/local settings files, hence no CLAUDE.md
+    // auto-loading and no settings-file credentials. Only host-injected
+    // context (systemPrompt) reaches the model.
+    settingSources: [],
+    // Keep transcripts on disk so provider sessions can be resumed later.
+    persistSession: true,
+    settings: { cleanupPeriodDays: SDK_CLEANUP_PERIOD_DAYS },
+    pathToClaudeCodeExecutable: cliPath,
+    env,
+  };
+  if (options.sessionId) sdkOptions.resume = options.sessionId;
+  if (options.permissionMode) sdkOptions.permissionMode = options.permissionMode;
+  if (options.model) sdkOptions.model = options.model;
+  if (options.thinking) sdkOptions.thinking = options.thinking;
+  if (options.effort) sdkOptions.effort = options.effort;
+  if (options.systemPrompt) {
+    sdkOptions.systemPrompt = {
+      type: 'preset',
+      preset: 'claude_code',
+      append: options.systemPrompt,
+    };
+  }
+  if (options.canUseTool) sdkOptions.canUseTool = options.canUseTool;
+  if (options.mcpServers && Object.keys(options.mcpServers).length > 0) {
+    sdkOptions.mcpServers = options.mcpServers;
+  }
+  if (options.plugins && options.plugins.length > 0) {
+    sdkOptions.plugins = options.plugins;
+  }
+
+  const stream = query({ prompt: input, options: sdkOptions });
+  yield* pumpClaudeStream(stream, options);
+}
+
+/** Shared SDK message pump: maps events, reports the provider session id, emits plan transitions. */
+async function* pumpClaudeStream(
+  stream: AsyncIterable<unknown> & { close(): void },
+  options: ClaudeAgentRunOptions
+): AsyncGenerator<ProviderRuntimeEvent, void, void> {
   const planModeTools = new Map<string, 'EnterPlanMode' | 'ExitPlanMode'>();
   try {
     for await (const message of stream) {

@@ -208,7 +208,7 @@ export function initializeRunBootstrap(
   // agent_profile_id is canonical; project default only matters at session-create time.
   const { agent: agentProfile, llm: providerConfig } = resolveAgentForSession(
     db as unknown as import('better-sqlite3').Database,
-    { explicitAgentId: session.agent_profile_id ?? undefined }
+    { explicitAgentId: session.agent_profile_id ?? undefined, sessionId: session.id }
   );
   // A readonly agent freezes new turns on its sessions. Existing conversations keep
   // their history, but the user must start a new session with an active agent to

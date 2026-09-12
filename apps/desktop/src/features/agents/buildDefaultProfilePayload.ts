@@ -4,7 +4,10 @@ import {
   defaultToolSelection,
   defaultSkillSelection,
 } from '@zclaudia/shared';
-import type { ProfileConfigDescriptor } from '@zclaudia/shared/core/profile-config-descriptor';
+import {
+  defaultEngineModeFor,
+  type ProfileConfigDescriptor,
+} from '@zclaudia/shared/core/profile-config-descriptor';
 import type { AgentProfileWriteInput } from '../../services/api/agent-profiles';
 
 export type BuildDefaultProfileResult =
@@ -42,6 +45,9 @@ export function buildDefaultProfilePayload(params: {
     name: name.trim(),
     description: undefined,
     runtimeType,
+    // Dual-mode runtimes (claude/codex) always start in their declared default
+    // (CLI) mode; SDK is an explicit user decision made in the editor.
+    engineMode: defaultEngineModeFor(descriptor) ?? undefined,
     llmProfileId,
     model,
     systemPrompt: '',

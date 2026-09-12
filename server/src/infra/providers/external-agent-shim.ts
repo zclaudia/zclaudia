@@ -19,6 +19,10 @@ export function toExternalAgentRunContext(options: RunOptions): ExternalAgentRun
     model: options.agentProfile?.model?.trim() || undefined,
     cliPath: options.agentProfile?.cliPath?.trim() || options.cliPath,
     abortController: options.abortController,
+    // Dual-mode run contract. modelConnection carries the run's API key and is
+    // in-memory only: it must never be logged, traced, or persisted downstream.
+    engineExecution: options.engineExecution,
+    modelConnection: options.modelConnection,
   };
 }
 

@@ -4,17 +4,47 @@ import { hasForegroundActiveRunForSession } from '../../utils/run-state.js';
 
 type ActiveRunsMap = Map<string, unknown>;
 
-const SESSION_SELECT = `id, project_id as projectId, name, agent_profile_id as agentProfileId,
-               sdk_session_id as sdkSessionId, type, parent_session_id as parentSessionId,
-               working_directory as workingDirectory,
-               archived_at as archivedAt,
-               project_role as projectRole, task_id as taskId,
-               plan_status as planStatus,
-               last_run_status as lastRunStatus,
-               CASE WHEN is_read_only = 1 THEN 1 ELSE NULL END as isReadOnly,
-               sort_order as sortOrder,
-               created_at as createdAt, updated_at as updatedAt,
-               message_version as messageVersion`;
+const SESSION_SELECT = `sessions.id, sessions.project_id as projectId, sessions.name,
+               sessions.agent_profile_id as agentProfileId,
+               sessions.sdk_session_id as sdkSessionId, sessions.type,
+               sessions.parent_session_id as parentSessionId,
+               sessions.working_directory as workingDirectory,
+               sessions.archived_at as archivedAt,
+               sessions.project_role as projectRole, sessions.task_id as taskId,
+               sessions.plan_status as planStatus,
+               sessions.last_run_status as lastRunStatus,
+               CASE WHEN sessions.is_read_only = 1 THEN 1 ELSE NULL END as isReadOnly,
+               sessions.sort_order as sortOrder,
+               sessions.created_at as createdAt, sessions.updated_at as updatedAt,
+               sessions.message_version as messageVersion,
+               b.engine_mode as runtimeEngineMode,
+               b.model as runtimeEngineModel,
+               lp.name as runtimeEngineProfileName`;
+
+const SESSION_FROM = `sessions
+               LEFT JOIN session_runtime_bindings b ON b.session_id = sessions.id
+               LEFT JOIN llm_profiles lp ON lp.id = b.llm_profile_id`;
+
+/**
+ * Fold the flat binding columns into the nested `runtimeEngine` view. Sessions
+ * without a binding (never ran) simply omit the field.
+ */
+function mapSessionRow(row: unknown): Session {
+  const { runtimeEngineMode, runtimeEngineModel, runtimeEngineProfileName, ...rest } =
+    row as Record<string, unknown>;
+  const session = rest as unknown as Session;
+  if (typeof runtimeEngineMode === 'string' && runtimeEngineMode) {
+    session.runtimeEngine = {
+      engineMode: runtimeEngineMode,
+      model: typeof runtimeEngineModel === 'string' && runtimeEngineModel ? runtimeEngineModel : undefined,
+      llmProfileName:
+        typeof runtimeEngineProfileName === 'string' && runtimeEngineProfileName
+          ? runtimeEngineProfileName
+          : undefined,
+    };
+  }
+  return session;
+}
 
 export interface SyncedSessionSummary {
   id: string;
@@ -54,66 +84,81 @@ export class SessionQueryService {
 
   listSessions(projectId?: string, includeArchived = false): Session[] {
     if (projectId && includeArchived) {
-      return this.db
-        .prepare(
-          `
+      return (
+        this.db
+          .prepare(
+            `
         SELECT ${SESSION_SELECT}
-        FROM sessions
-        WHERE project_id = ?
-        ORDER BY sort_order ASC, updated_at DESC
+        FROM ${SESSION_FROM}
+        WHERE sessions.project_id = ?
+        ORDER BY sessions.sort_order ASC, sessions.updated_at DESC
       `
-        )
-        .all(projectId) as Session[];
+          )
+          .all(projectId)
+          .map(mapSessionRow) as Session[]
+      );
     }
 
     if (projectId) {
-      return this.db
-        .prepare(
-          `
+      return (
+        this.db
+          .prepare(
+            `
         SELECT ${SESSION_SELECT}
-        FROM sessions
-        WHERE project_id = ? AND archived_at IS NULL
-        ORDER BY sort_order ASC, updated_at DESC
+        FROM ${SESSION_FROM}
+        WHERE sessions.project_id = ? AND sessions.archived_at IS NULL
+        ORDER BY sessions.sort_order ASC, sessions.updated_at DESC
       `
-        )
-        .all(projectId) as Session[];
+          )
+          .all(projectId)
+          .map(mapSessionRow) as Session[]
+      );
     }
 
     if (includeArchived) {
-      return this.db
-        .prepare(
-          `
+      return (
+        this.db
+          .prepare(
+            `
         SELECT ${SESSION_SELECT}
-        FROM sessions
-        ORDER BY sort_order ASC, updated_at DESC
+        FROM ${SESSION_FROM}
+        ORDER BY sessions.sort_order ASC, sessions.updated_at DESC
       `
-        )
-        .all() as Session[];
+          )
+          .all()
+          .map(mapSessionRow) as Session[]
+      );
     }
 
-    return this.db
-      .prepare(
-        `
+    return (
+      this.db
+        .prepare(
+          `
       SELECT ${SESSION_SELECT}
-      FROM sessions
-      WHERE archived_at IS NULL
-      ORDER BY sort_order ASC, updated_at DESC
+      FROM ${SESSION_FROM}
+      WHERE sessions.archived_at IS NULL
+      ORDER BY sessions.sort_order ASC, sessions.updated_at DESC
     `
-      )
-      .all() as Session[];
+        )
+        .all()
+        .map(mapSessionRow) as Session[]
+    );
   }
 
   listArchivedSessions(): Session[] {
-    return this.db
-      .prepare(
-        `
+    return (
+      this.db
+        .prepare(
+          `
       SELECT ${SESSION_SELECT}
-      FROM sessions
-      WHERE archived_at IS NOT NULL
-      ORDER BY archived_at DESC
+      FROM ${SESSION_FROM}
+      WHERE sessions.archived_at IS NOT NULL
+      ORDER BY sessions.archived_at DESC
     `
-      )
-      .all() as Session[];
+        )
+        .all()
+        .map(mapSessionRow) as Session[]
+    );
   }
 
   syncSessions(since: string | undefined): SessionSyncResult {

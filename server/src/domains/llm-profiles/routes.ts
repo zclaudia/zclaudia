@@ -1,6 +1,10 @@
 import { Router, type Request, type Response } from 'express';
 import type Database from 'better-sqlite3';
-import { LLM_MODEL_DIALECTS, LLM_PROVIDER_TYPES } from '@zclaudia/shared/core/llm-profile';
+import {
+  LLM_MODEL_DIALECTS,
+  LLM_PROVIDER_TYPES,
+  validateLlmProtocols,
+} from '@zclaudia/shared/core/llm-profile';
 import type {
   LlmModelDialect,
   LlmProfileConfig,
@@ -209,6 +213,23 @@ function buildPreviewProfile(
 
 export function createLlmProfileRoutes(db: Database.Database): Router {
   const router = Router();
+  // Validate all write/preview entrances before any database mutation.
+  router.use((req, res, next) => {
+    if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'supportedProtocols')) {
+      try {
+        req.body.supportedProtocols = validateLlmProtocols(req.body.supportedProtocols);
+      } catch (error) {
+        res
+          .status(400)
+          .json({
+            success: false,
+            error: { code: 'VALIDATION_ERROR', message: (error as Error).message },
+          });
+        return;
+      }
+    }
+    next();
+  });
   const repo = new LlmProfileRepository(db);
   const deletionService = new LlmProfileDeletionService(db);
 
@@ -456,6 +477,7 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
         models: validatedModels,
         isDefault: Boolean(isDefault),
         cacheRetention: cacheRetention ?? undefined,
+        supportedProtocols: req.body.supportedProtocols,
       });
 
       res.status(201).json({ success: true, data: profile } as ApiResponse<LlmProfileConfig>);
@@ -499,6 +521,9 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       }
 
       const patch: Partial<LlmProfileConfig> = {};
+      if (Object.prototype.hasOwnProperty.call(body, 'supportedProtocols')) {
+        patch.supportedProtocols = body.supportedProtocols;
+      }
       if (Object.prototype.hasOwnProperty.call(body, 'name')) patch.name = body.name ?? null;
       if (Object.prototype.hasOwnProperty.call(body, 'providerType'))
         patch.providerType = body.providerType ?? null;
@@ -586,6 +611,7 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
             code: 'IN_USE',
             message: error.message,
             agentCount: error.agentCount,
+            sessionBindingCount: error.sessionBindingCount,
           },
         });
         return;

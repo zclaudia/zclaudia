@@ -41,6 +41,7 @@ import { migration as m_037_agent_profile_cli_path } from './037_agent_profile_c
 import { migration as m_038_agent_profile_status } from './038_agent_profile_status.js';
 import { migration as m_039_session_message_version } from './039_session_message_version.js';
 import { migration as m_040_session_log } from './040_session_log.js';
+import { migration as m_041_runtime_engine_modes_and_session_bindings } from './041_runtime_engine_modes_and_session_bindings.js';
 
 export type { Migration };
 
@@ -85,6 +86,7 @@ export const migrations: Migration[] = [
   m_038_agent_profile_status,
   m_039_session_message_version,
   m_040_session_log,
+  m_041_runtime_engine_modes_and_session_bindings,
 ];
 
 /**

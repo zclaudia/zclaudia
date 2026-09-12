@@ -14,6 +14,109 @@ export const LLM_PROVIDER_TYPES = ['anthropic', 'openai', 'openai-codex'] as con
 export type LlmProviderType = (typeof LLM_PROVIDER_TYPES)[number] | string;
 
 /**
+ * Wire protocols an LLM endpoint can speak. This describes endpoint *capability*
+ * — it does not change how the built-in pi transport picks a protocol for the
+ * existing runtimes.
+ */
+export const LLM_WIRE_PROTOCOLS = [
+  'anthropic-messages',
+  'openai-completions',
+  'openai-responses',
+] as const;
+
+export type LlmWireProtocol = (typeof LLM_WIRE_PROTOCOLS)[number];
+
+/** Wire null restores inference; [] is an explicit declaration of no protocols. */
+export function validateLlmProtocols(value: unknown): LlmWireProtocol[] | null {
+  if (value === null) return null;
+  if (!Array.isArray(value) || value.some(p => !LLM_WIRE_PROTOCOLS.includes(p))) {
+    throw new Error('supportedProtocols must be an array of known wire protocols or null');
+  }
+  return [...new Set(value)] as LlmWireProtocol[];
+}
+
+/** Official OpenAI API base URL — the only endpoint where Responses support may be inferred. */
+export const OFFICIAL_OPENAI_BASE_URL = 'https://api.openai.com/v1';
+
+/** Minimal URL shape used for strict endpoint checks (global `URL` in Node and browsers). */
+declare const URL: new (url: string) => {
+  protocol: string;
+  host: string;
+  pathname: string;
+  search: string;
+  hash: string;
+};
+
+/** Parsed URL projection for endpoint allowlist checks. */
+interface ParsedEndpointUrl {
+  protocol: string;
+  host: string;
+  pathname: string;
+  search: string;
+  hash: string;
+}
+
+/**
+ * Strictly decide whether `baseUrl` is the official OpenAI API endpoint.
+ * Uses URL parsing + an exact-host allowlist; never substring or model-name matching.
+ */
+export function isOfficialOpenaiBaseUrl(baseUrl: string | undefined | null): boolean {
+  if (baseUrl === undefined || baseUrl === null || baseUrl.trim() === '') return true;
+  let parsed: ParsedEndpointUrl;
+  try {
+    parsed = new URL(baseUrl.trim());
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'https:' || parsed.host !== 'api.openai.com') return false;
+  const pathname = parsed.pathname.replace(/\/+$/, '');
+  return parsed.search === '' && parsed.hash === '' && pathname === '/v1';
+}
+
+/**
+ * Protocols inferred from providerType/baseUrl when a profile does not declare
+ * `supportedProtocols`. Never used for `openai-codex` (OAuth semantics are not
+ * an API-key Responses capability) or unknown provider types.
+ */
+export function inferLlmWireProtocols(
+  providerType: string,
+  baseUrl?: string | null
+): LlmWireProtocol[] {
+  if (providerType === 'anthropic') return ['anthropic-messages'];
+  if (providerType === 'openai') {
+    return isOfficialOpenaiBaseUrl(baseUrl)
+      ? ['openai-completions', 'openai-responses']
+      : ['openai-completions'];
+  }
+  return [];
+}
+
+/**
+ * Resolve the protocols a profile supports. An explicit `supportedProtocols`
+ * array is a complete declaration (after dedupe) — an empty array means the
+ * endpoint declares no usable protocol and inference must not be re-applied.
+ */
+export function resolveLlmProfileProtocols(profile: {
+  providerType: string;
+  baseUrl?: string | null;
+  supportedProtocols?: LlmWireProtocol[] | null;
+}): { source: 'declared' | 'inferred'; protocols: LlmWireProtocol[] } {
+  if (profile.supportedProtocols != null) {
+    const protocols: LlmWireProtocol[] = [];
+    for (const protocol of profile.supportedProtocols) {
+      if (LLM_WIRE_PROTOCOLS.includes(protocol) && !protocols.includes(protocol)) {
+        protocols.push(protocol);
+      }
+    }
+    return { source: 'declared', protocols };
+  }
+  return {
+    source: 'inferred',
+    protocols: inferLlmWireProtocols(profile.providerType, profile.baseUrl),
+  };
+}
+
+/**
  * Per-model upstream dialect presets. Values align with pi-ai provider ids so
  * a dialect maps 1:1 onto pi-ai's compat auto-detection. 'openai' means
  * "force plain OpenAI behavior, no quirks" (escape hatch for normalizing
@@ -98,6 +201,13 @@ export interface LlmProfileConfig {
    */
   models?: LlmProfileModelEntry[];
   oauthCredentials?: CodexOAuthCredentials;
+  /**
+   * Explicit endpoint protocol capabilities. When present this is a complete
+   * declaration (an empty array means no usable protocol — inference is not
+   * re-applied); when absent, protocols are inferred from providerType/baseUrl.
+   * Does not change how the built-in pi transport picks its protocol.
+   */
+  supportedProtocols?: LlmWireProtocol[] | null;
   /**
    * Prompt cache retention preference. Absent ⇒ pi-ai default ('short',
    * 5-minute TTL). 'long' = 1h TTL (higher cache-write cost); 'none' =

@@ -26,6 +26,25 @@ function createTestDb(): Database.Database {
       , message_version INTEGER NOT NULL DEFAULT 0
     );
 
+    CREATE TABLE llm_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL
+    );
+
+    CREATE TABLE session_runtime_bindings (
+      session_id TEXT PRIMARY KEY REFERENCES sessions(id),
+      llm_profile_id TEXT REFERENCES llm_profiles(id),
+      runtime_type TEXT NOT NULL,
+      engine_mode TEXT NOT NULL,
+      model TEXT,
+      connection_identity_hash TEXT,
+      configured_cli_path TEXT,
+      config_namespace TEXT,
+      runtime_details TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE TABLE messages (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
@@ -91,6 +110,51 @@ describe('SessionQueryService', () => {
     const sessions = service.listSessions('project-1');
     expect(sessions).toHaveLength(1);
     expect(sessions[0].id).toBe('s1');
+  });
+
+  it('surfaces the bound runtime engine (mode/model/profile) on listed sessions', () => {
+    const now = Date.now();
+    db.prepare(
+      `INSERT INTO sessions (id, project_id, name, created_at, updated_at)
+       VALUES ('s-sdk', 'project-1', 'SDK session', ?, ?)`
+    ).run(now, now);
+    db.prepare(
+      `INSERT INTO sessions (id, project_id, name, created_at, updated_at)
+       VALUES ('s-cli', 'project-1', 'CLI session', ?, ?)`
+    ).run(now, now);
+    db.prepare(
+      `INSERT INTO sessions (id, project_id, name, created_at, updated_at)
+       VALUES ('s-new', 'project-1', 'Unbound session', ?, ?)`
+    ).run(now, now);
+    db.prepare(`INSERT INTO llm_profiles (id, name) VALUES ('prof-1', 'My Anthropic')`).run();
+    db.prepare(
+      `INSERT INTO session_runtime_bindings (
+         session_id, llm_profile_id, runtime_type, engine_mode, model,
+         connection_identity_hash, configured_cli_path, config_namespace,
+         runtime_details, created_at, updated_at
+       ) VALUES ('s-sdk', 'prof-1', 'claude', 'sdk', 'claude-opus-4-8', NULL, NULL, NULL, NULL, 0, 0)`
+    ).run();
+    db.prepare(
+      `INSERT INTO session_runtime_bindings (
+         session_id, llm_profile_id, runtime_type, engine_mode, model,
+         connection_identity_hash, configured_cli_path, config_namespace,
+         runtime_details, created_at, updated_at
+       ) VALUES ('s-cli', NULL, 'claude', 'cli', NULL, NULL, NULL, NULL, NULL, 0, 0)`
+    ).run();
+
+    const service = new SessionQueryService(db, new Map());
+    const sessions = service.listSessions('project-1');
+    const byId = Object.fromEntries(sessions.map(session => [session.id, session]));
+
+    expect(byId['s-sdk']?.runtimeEngine).toEqual({
+      engineMode: 'sdk',
+      model: 'claude-opus-4-8',
+      llmProfileName: 'My Anthropic',
+    });
+    // CLI bindings carry no profile; the badge degrades to the mode alone.
+    expect(byId['s-cli']?.runtimeEngine).toEqual({ engineMode: 'cli' });
+    // Sessions that never ran have no binding and no badge data.
+    expect(byId['s-new']?.runtimeEngine).toBeUndefined();
   });
 
   it('returns sync payload with active state and last offset', () => {

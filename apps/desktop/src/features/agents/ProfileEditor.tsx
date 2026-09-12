@@ -25,7 +25,11 @@ import {
   defaultSkillSelection,
   skillRefKey,
 } from '@zclaudia/shared';
-import type { ProfileConfigDescriptor } from '@zclaudia/shared/core/profile-config-descriptor';
+import {
+  defaultEngineModeFor,
+  resolveProfileConfigDescriptor,
+  type ProfileConfigDescriptor,
+} from '@zclaudia/shared/core/profile-config-descriptor';
 import * as api from '../../services/api';
 import { useRuntimeDescriptorStore } from '../../stores/runtimeDescriptorStore';
 import { EditorSection, EditorRow, FieldLabel } from './ui/EditorSection';
@@ -223,6 +227,8 @@ export function ProfileEditor({
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formRuntimeType, setFormRuntimeType] = useState<RuntimeOption>('zclaudia');
+  /** Engine mode of the selected runtime ('' when the runtime declares no modes). */
+  const [formEngineMode, setFormEngineMode] = useState('');
   const [formLlmProfileId, setFormLlmProfileId] = useState('');
   const [formModel, setFormModel] = useState('');
   const [formCliPath, setFormCliPath] = useState('');
@@ -314,7 +320,8 @@ export function ProfileEditor({
     setFormName(agent.name);
     setFormDescription(agent.description ?? '');
     setFormRuntimeType(agent.runtimeType ?? 'zclaudia');
-    setFormLlmProfileId(agent.llmProfileId);
+    setFormEngineMode(agent.engineMode ?? '');
+    setFormLlmProfileId(agent.llmProfileId ?? '');
     setFormModel(agent.model);
     setFormCliPath(agent.cliPath ?? '');
     setFormFallbackLlmProfileId(agent.multimodalFallback?.llmProfileId ?? '');
@@ -575,9 +582,27 @@ export function ProfileEditor({
     [descriptorFor]
   );
 
+  // Dual-mode runtimes: the effective editor descriptor is the projection of
+  // the selected engine mode; the raw payload still carries mode + binding so
+  // the backend validates the whole configuration atomically.
+  const activeDescriptor = useMemo(() => {
+    const base = descriptorFor(formRuntimeType);
+    if (!base.engineModes?.length) return base;
+    const resolved = resolveProfileConfigDescriptor(
+      base,
+      formRuntimeType,
+      formEngineMode || base.defaultEngineMode || null
+    );
+    return resolved.ok ? resolved.descriptor : base;
+  }, [descriptorFor, formRuntimeType, formEngineMode]);
+  const activeEngineModeDeclared = Boolean(
+    descriptorFor(formRuntimeType).engineModes?.length
+  );
+
   const buildPayload = useCallback(() => {
     const resolvedTools = resolveToolSelection(formToolSelection).builtinTools;
-    const descriptor = descriptorFor(formRuntimeType);
+    const baseDescriptor = descriptorFor(formRuntimeType);
+    const descriptor = activeDescriptor;
     const trimmedFallbackModel = formFallbackModel.trim();
     const trimmedCliPath = formCliPath.trim();
     const multimodalFallback = !descriptor.model.multimodalFallback
@@ -589,6 +614,9 @@ export function ProfileEditor({
         : hadFallbackAtMount.current
           ? null
           : undefined;
+    // SDK modes reject a CLI path (FIELD_NOT_APPLICABLE), so a draft path is
+    // cleared atomically with the mode switch — not left for the backend to
+    // reject. Legacy single-mode behaviour is preserved.
     const cliPath = descriptor.hasCliPath
       ? trimmedCliPath || (hadCliPathAtMount.current ? null : undefined)
       : hadCliPathAtMount.current
@@ -598,7 +626,11 @@ export function ProfileEditor({
       name: formName.trim(),
       description: formDescription.trim() || undefined,
       runtimeType: formRuntimeType,
-      llmProfileId: formLlmProfileId,
+      // Engine mode + binding + model travel as one atomic configuration.
+      engineMode: activeEngineModeDeclared
+        ? formEngineMode || baseDescriptor.defaultEngineMode || 'cli'
+        : undefined,
+      llmProfileId: formLlmProfileId || '',
       model: descriptor.model.kind === 'none' ? '' : formModel.trim(),
       cliPath,
       multimodalFallback,
@@ -617,6 +649,9 @@ export function ProfileEditor({
     formName,
     formDescription,
     formRuntimeType,
+    formEngineMode,
+    activeEngineModeDeclared,
+    activeDescriptor,
     formLlmProfileId,
     formModel,
     formCliPath,
@@ -631,7 +666,6 @@ export function ProfileEditor({
     descriptorFor,
   ]);
 
-  const activeDescriptor = descriptorFor(formRuntimeType);
   const modelRequired = activeDescriptor.model.kind === 'llm-profile';
 
   const fallbackVisionValid =
@@ -644,8 +678,7 @@ export function ProfileEditor({
 
   const formValid = Boolean(
     formName.trim() &&
-    (requiresLlmProfile(formRuntimeType) ? formLlmProfileId : true) &&
-    (modelRequired ? formModel.trim() : true) &&
+    (modelRequired ? formLlmProfileId && formModel.trim() : true) &&
     fallbackVisionValid
   );
 
@@ -665,11 +698,14 @@ export function ProfileEditor({
   });
 
   const handleRuntimeChange = (next: RuntimeOption) => {
+    const nextBase = descriptorFor(next);
     setFormRuntimeType(next);
+    // Engine mode resets to the runtime's declared default.
+    setFormEngineMode(defaultEngineModeFor(nextBase) ?? '');
     // Model ids are not interchangeable across runtimes → clear and let the form
     // sit in `pending` until a model is chosen for the new runtime.
     setFormModel('');
-    if (descriptorFor(next).model.thinkingLevel !== 'selectable') {
+    if (nextBase.model.thinkingLevel !== 'selectable') {
       setFormThinkingLevel('');
     }
     if (!requiresLlmProfile(next)) {
@@ -678,6 +714,19 @@ export function ProfileEditor({
       setFormFallbackLlmProfileId('');
       setFormFallbackModel('');
       setFormFallbackOpen(false);
+    }
+  };
+
+  /**
+   * Switching engine modes keeps the other drafts in the editor but enforces
+   * the target mode's rules atomically: entering SDK clears the CLI path
+   * draft, and autosave stays `pending` until the whole configuration is
+   * valid — the backend never sees a transient "sdk without a profile".
+   */
+  const handleEngineModeChange = (next: string) => {
+    setFormEngineMode(next);
+    if (next === 'sdk') {
+      setFormCliPath('');
     }
   };
 
@@ -816,6 +865,41 @@ export function ProfileEditor({
                       </div>
                     }
                   />
+
+                  {activeEngineModeDeclared &&
+                    (() => {
+                      const base = descriptorFor(formRuntimeType);
+                      const modes = base.engineModes ?? [];
+                      return (
+                        <EditorRow
+                          title="Run Mode"
+                          description="用于新会话；已开始的会话保留原连接绑定"
+                          control={
+                            <div className="flex flex-col gap-1.5">
+                              {modes.map(mode => (
+                                <label
+                                  key={mode.id}
+                                  className="flex cursor-pointer items-start gap-2"
+                                >
+                                  <input
+                                    type="radio"
+                                    name="engine-mode"
+                                    className="mt-1"
+                                    checked={
+                                      (formEngineMode || base.defaultEngineMode || 'cli') ===
+                                      mode.id
+                                    }
+                                    onChange={() => handleEngineModeChange(mode.id)}
+                                    disabled={isReadonly}
+                                  />
+                                  <span className="text-sm">{mode.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          }
+                        />
+                      );
+                    })()}
 
                   {activeDescriptor.model.kind === 'llm-profile' && (
                     <>

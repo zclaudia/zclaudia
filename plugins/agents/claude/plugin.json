@@ -20,7 +20,7 @@
         "type": "claude",
         "label": "Claude",
         "model": {
-          "kind": "none",
+          "kind": "native",
           "multimodalFallback": false,
           "thinkingLevel": "auto"
         },
@@ -31,6 +31,30 @@
           "skills": "external"
         },
         "authNote": "Claude uses the Claude Agent SDK runtime. MCP servers and skills come from ~/.claude; built-in tool sets are not injected.",
+        "defaultEngineMode": "cli",
+        "engineModes": [
+          {
+            "id": "cli",
+            "label": "CLI（外部环境）",
+            "connection": { "kind": "external", "modelSelection": "optional" },
+            "executable": "external-cli",
+            "modelOptions": { "multimodalFallback": false, "thinkingLevel": "auto" },
+            "capabilities": { "tools": "native-readonly", "skills": "external" },
+            "authNote": "使用已安装的 Claude Code CLI；模型 ID 由外部 CLI 解释，留空使用其默认模型。"
+          },
+          {
+            "id": "sdk",
+            "label": "SDK + LLM Profile",
+            "connection": {
+              "kind": "llm-profile",
+              "acceptedModelProtocols": ["anthropic-messages"]
+            },
+            "executable": "bundled-sdk",
+            "modelOptions": { "multimodalFallback": false, "thinkingLevel": "auto" },
+            "capabilities": { "tools": "native-readonly", "skills": "external" },
+            "authNote": "连接由当前后端管理：不读取个人 Claude 登录，不自动加载 CLAUDE.md，仅使用 ZClaudia 注入的项目指令。"
+          }
+        ],
         "manifest": {
           "id": "claude",
           "name": "Claude",

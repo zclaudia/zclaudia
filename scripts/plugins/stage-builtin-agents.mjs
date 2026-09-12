@@ -1,7 +1,9 @@
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { inventoryPlugin } from './artifact-integrity.mjs';
 import { copyPortableDependencies } from './portable-dependencies.mjs';
+import { prepareBundledCodexEngine } from './bundled-codex-engine.mjs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -9,8 +11,77 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const runtimes = ['claude', 'codex', 'cursor'];
 
+/**
+ * Target platform for SDK engine resources, e.g. `--target-platform darwin-arm64`
+ * (defaults to the building host). The dual-mode SDK engines are only staged for
+ * this exact platform — a macOS build must never ship a Linux engine payload.
+ */
+function currentTargetPlatform() {
+  const index = process.argv.indexOf('--target-platform');
+  if (index !== -1 && process.argv[index + 1]) return process.argv[index + 1];
+  return `${process.platform}-${process.arch}`;
+}
+
+function stageClaudeSdkEngine(source, destination, targetPlatform) {
+  // Claude: the engine binary ships inside the SDK's platform optional
+  // package. Only the requested platform is pulled into the bundle; every
+  // other platform package stays excluded (no blanket optional re-inclusion).
+  const platformPackage = `@anthropic-ai/claude-agent-sdk-${targetPlatform}`;
+  return copyPortableDependencies(source, path.join(destination, 'node_modules'), repoRoot, {
+    includeOptional: [platformPackage],
+  });
+}
+
+function findStagedClaudeEngine(destination, targetPlatform) {
+  const binary = targetPlatform.startsWith('win32') ? 'claude.exe' : 'claude';
+  const candidates = [
+    path.join(
+      destination,
+      'node_modules',
+      '@anthropic-ai',
+      `claude-agent-sdk-${targetPlatform}`,
+      binary
+    ),
+    path.join(
+      destination,
+      'node_modules',
+      '@anthropic-ai',
+      'claude-agent-sdk',
+      'node_modules',
+      '@anthropic-ai',
+      `claude-agent-sdk-${targetPlatform}`,
+      binary
+    ),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return path.relative(destination, candidate);
+  }
+  return null;
+}
+
+async function stageCodexEngine(source, destination, targetPlatform) {
+  // Codex: the release pipeline stages the official runtime payload for the
+  // target platform under <plugin>/engine/<platform>/. A pinned archive is
+  // downloaded (or verified from cache) at build time. Missing resources or
+  // verification failures fail the build; startup never fetches a replacement.
+  const engineDestination = path.join(destination, 'engine', targetPlatform);
+  const manifest = await prepareBundledCodexEngine(source, engineDestination, targetPlatform);
+  // Digest over the full payload tree so the catalog can pin the artifact.
+  const { inventoryPlugin } = await import('./artifact-integrity.mjs');
+  const inventory = await inventoryPlugin(engineDestination);
+  return {
+    version: manifest.version,
+    platform: targetPlatform,
+    directory: path.relative(destination, engineDestination),
+    treeSha256: inventory.treeSha256,
+  };
+}
+
 /** Stage complete runtime modules beside server.mjs, never into a user's plugin store. */
-export async function stageBuiltinAgents(outputRoot) {
+export async function stageBuiltinAgents(
+  outputRoot,
+  { targetPlatform = currentTargetPlatform() } = {}
+) {
   const output = path.resolve(outputRoot);
   const records = [];
   await mkdir(output, { recursive: true });
@@ -30,10 +101,29 @@ export async function stageBuiltinAgents(outputRoot) {
     ]) {
       await cp(path.join(source, filename), path.join(destination, filename));
     }
+    let runtimeEngines;
     if (runtime === 'claude') {
       // Use exact installed dependencies, without re-resolving version ranges.
       // Ship ordinary directories: Tauri omits pnpm directory symlinks.
+      await stageClaudeSdkEngine(source, destination, targetPlatform);
+      const engineExecutable = findStagedClaudeEngine(destination, targetPlatform);
+      if (!engineExecutable) throw new Error(`Missing Claude SDK engine for ${targetPlatform}`);
+      runtimeEngines = {
+        sdk: {
+          platform: targetPlatform,
+          sdkPackage: packageJson.dependencies?.['@anthropic-ai/claude-agent-sdk'],
+          enginePackage: `@anthropic-ai/claude-agent-sdk-${targetPlatform}`,
+          // Relative to the staged plugin dir; null when the platform package
+          // was not installed at build time (SDK capability not deliverable).
+          executable: engineExecutable,
+        },
+      };
+    } else if (runtime === 'codex') {
+      // The SDK-mode path throws the shared RuntimeContractError class, so the
+      // plugin-sdk is a genuine runtime dependency of the bundle.
       await copyPortableDependencies(source, path.join(destination, 'node_modules'), repoRoot);
+      const engine = await stageCodexEngine(source, destination, targetPlatform);
+      if (engine) runtimeEngines = { engine };
     }
     await writeFile(
       path.join(destination, 'package.json'),
@@ -66,6 +156,7 @@ export async function stageBuiltinAgents(outputRoot) {
       runtime,
       directory: runtime,
       version: manifest.version,
+      ...(runtimeEngines ? { runtimeEngines } : {}),
       ...(await inventoryPlugin(destination)),
     });
   }
@@ -86,7 +177,9 @@ export async function stageBuiltinAgents(outputRoot) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (!process.argv[2] || process.argv.includes('--help')) {
-    console.log('Usage: node scripts/plugins/stage-builtin-agents.mjs <output-directory>');
+    console.log(
+      'Usage: node scripts/plugins/stage-builtin-agents.mjs <output-directory> [--target-platform <platform-arch>]'
+    );
     process.exit(process.argv.includes('--help') ? 0 : 2);
   }
   console.log(

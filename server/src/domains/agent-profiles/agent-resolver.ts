@@ -4,6 +4,9 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { AgentProfileRepository } from './repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import { ProjectRepository } from '../projects/repository.js';
+import { resolveProfileEngineMode } from './engine-mode.js';
+import { runtimeRequiresLlmProfile } from './runtime-type-guard.js';
+import { SessionRuntimeBindingRepository } from '../sessions/runtime-binding-repository.js';
 
 export class NoAgentAvailableError extends Error {
   constructor() {
@@ -12,7 +15,21 @@ export class NoAgentAvailableError extends Error {
   }
 }
 
+/** An SDK-mode agent whose required LLM binding is missing or was deleted. */
+export class LlmProfileRequiredError extends Error {
+  readonly code = 'LLM_PROFILE_REQUIRED';
+
+  constructor(agentId: string) {
+    super(
+      `Agent ${agentId} runs in SDK mode and requires a bound LLM profile. Bind one in Settings — no default profile is substituted.`
+    );
+    this.name = 'LlmProfileRequiredError';
+  }
+}
+
 export interface ResolveOptions {
+  /** Existing session identity must be applied before selecting runtime/LLM. */
+  sessionId?: string;
   /** Explicit agent_profile_id from request body / session record (takes precedence). */
   explicitAgentId?: string;
   /** Project id; used to look up project.defaultAgentProfileId as second-tier fallback. */
@@ -69,16 +86,52 @@ export function resolveAgentForSession(db: Database, opts: ResolveOptions): Reso
     throw new NoAgentAvailableError();
   }
 
+  const binding = opts.sessionId
+    ? new SessionRuntimeBindingRepository(db).findBySessionId(opts.sessionId)
+    : null;
+  if (binding) {
+    agent = {
+      ...agent,
+      runtimeType: binding.runtimeType,
+      engineMode: binding.engineMode,
+      model: binding.model ?? '',
+      llmProfileId: binding.llmProfileId,
+      cliPath: binding.configuredCliPath ?? undefined,
+    };
+  }
+
+  // LLM binding resolution.
+  // - Dual-mode agents in SDK mode (declared engine modes + llm-profile
+  //   connection): the binding is mandatory. A missing or deleted profile is an
+  //   error — a default profile must never be substituted, since its
+  //   credentials would send the conversation somewhere the user never bound.
+  // - Everything else (classic llm-profile runtimes, external CLIs): keep the
+  //   documented default fallback. External adapters ignore the resolved LLM
+  //   profile either way; they authenticate in their own environment.
+  const engineMode = resolveProfileEngineMode({
+    runtimeType: agent.runtimeType ?? 'zclaudia',
+    engineMode: agent.engineMode ?? null,
+  });
+  const isDualModeSdk =
+    engineMode.ok &&
+    engineMode.declaredModes !== null &&
+    engineMode.projected.model.kind === 'llm-profile';
+
   let llm: LlmProfileConfig | undefined;
   if (agent.llmProfileId) {
     llm = llmRepo.findById(agent.llmProfileId) ?? undefined;
     if (!llm) {
+      if (isDualModeSdk) {
+        throw new LlmProfileRequiredError(agent.id);
+      }
       console.warn(
         `[agent-resolver] agent.llm_profile_id ${agent.llmProfileId} not found, falling back to default LLM profile`
       );
       llm = llmRepo.findDefault() ?? undefined;
     }
-  } else {
+  } else if (isDualModeSdk) {
+    throw new LlmProfileRequiredError(agent.id);
+  } else if (runtimeRequiresLlmProfile(agent.runtimeType)) {
     // Agent has no llm_profile_id (legacy seed or test fixture); fall through to default.
     llm = llmRepo.findDefault() ?? undefined;
   }

@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@zclaudia/plugin-sdk': 0.2.0
+
 importers:
 
   .:
@@ -205,8 +208,8 @@ importers:
   packages/agent-common:
     dependencies:
       '@zclaudia/plugin-sdk':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: 0.2.0
+        version: 0.2.0
     devDependencies:
       '@types/node':
         specifier: ^22.13.10
@@ -221,11 +224,11 @@ importers:
   plugins/agents/claude:
     dependencies:
       '@anthropic-ai/claude-agent-sdk':
-        specifier: ^0.2.104
+        specifier: 0.2.141
         version: 0.2.141(@cfworker/json-schema@4.1.1)(zod@4.4.3)
       '@zclaudia/plugin-sdk':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: 0.2.0
+        version: 0.2.0
     devDependencies:
       '@types/node':
         specifier: ^22.13.10
@@ -243,8 +246,8 @@ importers:
   plugins/agents/codex:
     dependencies:
       '@zclaudia/plugin-sdk':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: 0.2.0
+        version: 0.2.0
     devDependencies:
       '@types/node':
         specifier: ^22.13.10
@@ -262,8 +265,8 @@ importers:
   plugins/agents/cursor:
     dependencies:
       '@zclaudia/plugin-sdk':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: 0.2.0
+        version: 0.2.0
     devDependencies:
       '@types/node':
         specifier: ^22.13.10
@@ -435,8 +438,8 @@ importers:
         specifier: ^0.84.1
         version: 0.84.1(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)
       '@zclaudia/plugin-sdk':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: 0.2.0
+        version: 0.2.0
       '@zclaudia/protocol':
         specifier: ^0.2.0
         version: 0.2.0
@@ -2500,8 +2503,8 @@ packages:
   '@zclaudia/gateway-protocol@0.1.0':
     resolution: {integrity: sha512-2DZ/TOxOXDDcz7WOumGoqV+nDQ60E3p+DpBlc+puCVWHE/d2T0lLyEd3gBdSiYu20sL9b7bG1lzQZRgHJDSAKQ==}
 
-  '@zclaudia/plugin-sdk@0.1.0':
-    resolution: {integrity: sha512-Njpk7b02nENaoJhyE3WsgBfoRRUzHPxsL+1Kr5zCOst0HfxM3unkOhJ5HIU5lTpPF1F3fJcEzZvrWliXqWnkig==}
+  '@zclaudia/plugin-sdk@0.2.0':
+    resolution: {integrity: sha512-J9K1RQaZypYiOPP653ZW/ZbzJxcKcYUXh8haWnViEgSIc+6W/4nw6kSzO3iEEgxrCqVP0P5OJchXHBZy7chz5Q==}
     engines: {node: '>=22.19.0'}
 
   '@zclaudia/protocol@0.2.0':
@@ -7581,7 +7584,7 @@ snapshots:
 
   '@zclaudia/agent-tool-bridge@0.1.0':
     dependencies:
-      '@zclaudia/plugin-sdk': 0.1.0
+      '@zclaudia/plugin-sdk': 0.2.0
 
   '@zclaudia/agent-transcript-kit@0.7.0(react@19.2.7)':
     optionalDependencies:
@@ -7589,7 +7592,7 @@ snapshots:
 
   '@zclaudia/gateway-protocol@0.1.0': {}
 
-  '@zclaudia/plugin-sdk@0.1.0': {}
+  '@zclaudia/plugin-sdk@0.2.0': {}
 
   '@zclaudia/protocol@0.2.0': {}
 

@@ -65,6 +65,26 @@ try {
     'path',
   ]);
 
+  // Thread lifecycle params: the SDK mode binds cwd at creation and re-locks
+  // provider/model on start AND resume. Field presence only proves structure —
+  // actual binding/resume semantics are validated by real-engine probes, so
+  // only property existence is asserted here (required-ness varies by build).
+  for (const [file, context, expectedProps] of [
+    ['v2/ThreadStartParams.json', 'thread/start params', ['cwd', 'model', 'modelProvider', 'developerInstructions']],
+    ['v2/ThreadResumeParams.json', 'thread/resume params', ['threadId', 'cwd', 'model', 'modelProvider', 'developerInstructions']],
+  ]) {
+    let params;
+    try {
+      params = schema(file);
+    } catch (error) {
+      fail(`${context} schema file ${file} could not be read (${error.message})`);
+    }
+    properties(params, context, expectedProps);
+  }
+  const threadStartResponse = schema('v2/ThreadStartResponse.json');
+  requiredFields(threadStartResponse, 'thread/start response', ['thread']);
+  properties(threadStartResponse.definitions?.Thread || {}, 'Thread', ['id', 'cwd']);
+
   const turnStartResponse = schema('v2/TurnStartResponse.json');
   requiredFields(turnStartResponse, 'turn/start response', ['turn']);
   const turn = turnStartResponse.definitions?.Turn || {};

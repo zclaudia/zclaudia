@@ -78,7 +78,7 @@ export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntime
     try {
       const { agent, llm } = resolveAgentForSession(this.db, { projectId: request.projectId });
       return {
-        llmProfileId: llm?.id ?? agent.llmProfileId,
+        llmProfileId: llm?.id ?? agent.llmProfileId ?? undefined,
         model: agent.model,
         systemPrompt: agent.systemPrompt,
         providerType: llm?.providerType,

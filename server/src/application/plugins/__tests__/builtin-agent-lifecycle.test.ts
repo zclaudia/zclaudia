@@ -118,7 +118,7 @@ describe('host-owned built-in agent lifecycle', () => {
         plugin.id,
         `${plugin.runtime}-default`
       );
-      expect(profile).toMatchObject({ runtimeType: plugin.runtime, llmProfileId: '', model: '' });
+      expect(profile).toMatchObject({ runtimeType: plugin.runtime, llmProfileId: null, model: '' });
     }
   });
 

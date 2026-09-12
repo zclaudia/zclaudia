@@ -12,7 +12,19 @@ export type AgentReadinessReason =
   | 'runtime_missing'
   | 'runtime_incompatible'
   | 'runtime_auth_required'
-  | 'runtime_check_failed';
+  | 'runtime_check_failed'
+  // Dual-mode (engineMode) readiness layers — mirror the canonical
+  // RUNTIME_ERROR_CODES taxonomy so hosts and plugins surface one set of codes:
+  | 'engine_mode_unsupported'
+  | 'llm_protocol_unsupported'
+  | 'llm_option_unsupported'
+  | 'sdk_engine_unavailable'
+  | 'bundled_engine_unavailable'
+  | 'runtime_binding_key_unavailable'
+  | 'session_connection_changed'
+  | 'session_workspace_changed'
+  | 'session_resume_unavailable'
+  | 'llm_profile_required';
 
 /**
  * Result of the server-side readiness check, including CLI detection for external runtimes. `usable` is true iff at

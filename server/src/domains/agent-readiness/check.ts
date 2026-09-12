@@ -7,6 +7,9 @@ import { AgentProfileRepository } from '../agent-profiles/repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import { hasLlmCredential } from './credential.js';
 import { runtimeRequiresLlmProfile } from '../agent-profiles/runtime-type-guard.js';
+import { resolveProfileEngineMode } from '../agent-profiles/engine-mode.js';
+import { resolveRuntimeModelConnection } from '../agent-profiles/runtime-model-connection.js';
+import { resolveBundledRuntimeResource } from '../../infra/agents/bundled-runtime-resources.js';
 import { providerRegistry } from '../../infra/providers/registry.js';
 import {
   findInRegistryCrossProvider,
@@ -42,10 +45,43 @@ function readinessForResolvedAgent(
   llm: LlmProfileConfig | null | undefined
 ): AgentReadiness {
   if (!agent) return { usable: false, reason: 'no_agent' };
-  // Native runtimes (e.g. Claude) don't bind an LLM profile. A blank model means
-  // the native CLI/SDK resolves its configured default model.
-  if (!runtimeRequiresLlmProfile(agent.runtimeType)) {
-    if (!providerRegistry.hasType(agent.runtimeType!)) {
+  const runtimeType = agent.runtimeType ?? 'zclaudia';
+
+  // Layer 1: engine mode validity. An explicitly stored unknown mode fails
+  // closed instead of silently executing under another mode.
+  const engineMode = resolveProfileEngineMode({ runtimeType, engineMode: agent.engineMode ?? null });
+  if (!engineMode.ok) return { usable: false, reason: 'engine_mode_unsupported' };
+  // Only runtimes that DECLARE engine modes route through the SDK checks;
+  // classic llm-profile runtimes (zclaudia) keep their original semantics.
+  const modeRequiresLlm =
+    engineMode.declaredModes !== null && engineMode.projected.model.kind === 'llm-profile';
+
+  if (modeRequiresLlm) {
+    // Layer 2 (SDK mode): the bound profile is mandatory — no default fallback,
+    // credential required, protocol must be admitted for this runtime, model
+    // must be structurally usable, and the bundled engine resource must exist.
+    if (!providerRegistry.hasType(runtimeType)) {
+      return { usable: false, reason: 'runtime_unavailable' };
+    }
+    if (!llm) return { usable: false, reason: 'no_llm_profile' };
+    if (!hasLlmCredential(llm)) return { usable: false, reason: 'no_credential' };
+    const connection = resolveRuntimeModelConnection({ runtimeType, profile: llm, model: agent.model });
+    if (!connection.ok) {
+      if (connection.code === 'LLM_PROFILE_FIELD_UNSUPPORTED' || connection.code === 'LLM_OPTION_UNSUPPORTED') {
+        return { usable: false, reason: 'llm_option_unsupported' };
+      }
+      return { usable: false, reason: 'llm_protocol_unsupported' };
+    }
+    if (!hasUsableModel(agent.model, llm)) return { usable: false, reason: 'no_model' };
+    const resource = resolveBundledRuntimeResource(runtimeType);
+    if (resource && !resource.available) return { usable: false, reason: 'sdk_engine_unavailable' };
+    return { usable: true };
+  }
+
+  // Layer 2 (CLI / external mode): native runtimes don't bind an LLM profile.
+  // A blank model means the native CLI/SDK resolves its configured default model.
+  if (!runtimeRequiresLlmProfile(runtimeType)) {
+    if (!providerRegistry.hasType(runtimeType)) {
       return { usable: false, reason: 'runtime_unavailable' };
     }
     return { usable: true };
@@ -71,8 +107,17 @@ export async function resolveAgentExecutionReadiness(
   llm: LlmProfileConfig | null | undefined
 ): Promise<AgentReadiness> {
   const structural = readinessForResolvedAgent(agent, llm);
-  if (!structural.usable || runtimeRequiresLlmProfile(agent.runtimeType) || !inspectRuntime)
-    return structural;
+  // LLM-bound runtimes and SDK engine modes skip the CLI inspector entirely:
+  // an SDK run's engine is the bundled resource (checked structurally), and an
+  // external `auth status` probe must never gate it.
+  const engineMode = resolveProfileEngineMode({
+    runtimeType: agent.runtimeType ?? 'zclaudia',
+    engineMode: agent.engineMode ?? null,
+  });
+  const skipsInspector =
+    (engineMode.ok && engineMode.projected.model.kind === 'llm-profile') ||
+    runtimeRequiresLlmProfile(agent.runtimeType);
+  if (!structural.usable || skipsInspector || !inspectRuntime) return structural;
   try {
     const resolution = await inspectRuntime(agent);
     if (!resolution) return structural;
@@ -97,7 +142,7 @@ export async function resolveAgentReadinessWithRuntimeCheck(
   if (!agents.length) return { usable: false, reason: 'no_agent' };
   const llms = new LlmProfileRepository(db);
   const readiness = await Promise.all(
-    agents.map(agent => resolveAgentExecutionReadiness(agent, llms.findById(agent.llmProfileId)))
+    agents.map(agent => resolveAgentExecutionReadiness(agent, agent.llmProfileId ? llms.findById(agent.llmProfileId) : undefined))
   );
   if (readiness.some(item => item.usable)) return { usable: true };
   const primary = repo.findDefault() ?? agents[0];
@@ -129,12 +174,12 @@ export function resolveAgentReadiness(db: Database.Database): AgentReadiness {
 
   const llmRepo = new LlmProfileRepository(db);
   for (const agent of agents) {
-    const llm = llmRepo.findById(agent.llmProfileId);
+    const llm = agent.llmProfileId ? llmRepo.findById(agent.llmProfileId) : undefined;
     if (readinessForResolvedAgent(agent, llm).usable) return { usable: true };
   }
 
   const primary = agentRepo.findDefault() ?? agents[0];
-  const llm = llmRepo.findById(primary.llmProfileId);
+  const llm = primary.llmProfileId ? llmRepo.findById(primary.llmProfileId) : undefined;
   return readinessForResolvedAgent(primary, llm);
 }
 

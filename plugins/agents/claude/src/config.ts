@@ -30,12 +30,19 @@ export interface ClaudeAgentConfig {
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
-let cachedConfig: ClaudeAgentConfig | null = null;
-let cachedAt = 0;
+// The cache is keyed by the discovery source directory. SDK-mode runs resolve
+// their state under a session-scoped CLAUDE_CONFIG_DIR while discovery always
+// reads the real user directory — a single-slot cache could serve one
+// backend's/test's directory contents to another after ZCLAUDIA_AGENT_CONFIG_ROOT
+// changes between runs.
+interface ConfigCacheEntry {
+  config: ClaudeAgentConfig;
+  cachedAt: number;
+}
+const configCache = new Map<string, ConfigCacheEntry>();
 
 export function clearClaudeAgentConfigCache(): void {
-  cachedConfig = null;
-  cachedAt = 0;
+  configCache.clear();
 }
 
 function claudeHome(): string {
@@ -86,14 +93,16 @@ function loadPlugins(): SdkPluginConfig[] {
 }
 
 export function loadClaudeAgentConfig(): ClaudeAgentConfig {
-  if (cachedConfig && Date.now() - cachedAt < CACHE_TTL_MS) {
-    return cachedConfig;
+  const sourceDir = claudeHome();
+  const cached = configCache.get(sourceDir);
+  if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
+    return cached.config;
   }
 
-  cachedConfig = {
+  const config: ClaudeAgentConfig = {
     mcpServers: loadMcpServers(),
     plugins: loadPlugins(),
   };
-  cachedAt = Date.now();
-  return cachedConfig;
+  configCache.set(sourceDir, { config, cachedAt: Date.now() });
+  return config;
 }

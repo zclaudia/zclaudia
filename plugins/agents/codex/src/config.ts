@@ -1,6 +1,7 @@
 import {
   appendFileSync,
   writeFileSync,
+  renameSync,
   mkdirSync,
   existsSync,
   unlinkSync,
@@ -350,4 +351,220 @@ export function buildEnv(options: {
     mergedEnv.ZCLAUDIA_SESSION_ID = options.claudiaSessionId;
   }
   return mergedEnv;
+}
+
+// ── SDK engine mode (design: codex dual-mode §6) ─────────────
+//
+// SDK mode runs the app-bundled Codex engine with a per-session CODEX_HOME and
+// an explicit OpenAI-Responses connection from a bound LLM profile. The user's
+// Codex installation, login and global config must not participate: the final
+// process environment is built from an allowlist (never merged with
+// process.env), and the connection is locked through a dedicated TOML
+// provider plus highest-priority `-c` overrides.
+
+import type { RuntimeModelConnection } from '@zclaudia/plugin-sdk/providers';
+import { RuntimeContractError } from '@zclaudia/plugin-sdk/providers';
+
+/** Dedicated TOML provider id — never overrides the official built-in `openai`. */
+export const CODEX_SDK_PROVIDER_ID = 'zclaudia_profile';
+
+/** Env var that carries the profile API key into the engine process only. */
+export const CODEX_SDK_API_KEY_ENV = 'ZCLAUDIA_CODEX_API_KEY';
+
+/** Keys an SDK run keeps from the host process: shell execution, locale, proxy/cert handling. */
+const CODEX_SDK_ENVIRONMENT_ALLOWLIST = [
+  'PATH',
+  'HOME',
+  'SystemRoot',
+  'ComSpec',
+  'PATHEXT',
+  'USERPROFILE',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'WINDIR',
+  'SHELL',
+  'USER',
+  'LOGNAME',
+  'TMPDIR',
+  'TEMP',
+  'TMP',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'TZ',
+  'TERM',
+  'COLORTERM',
+  'NO_COLOR',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'no_proxy',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'NODE_EXTRA_CA_CERTS',
+  'REQUESTS_CA_BUNDLE',
+  'ZCLAUDIA_API_URL',
+  'ZCLAUDIA_SESSION_ID',
+] as const;
+
+function headerEnvVarName(name: string): string {
+  const normalized = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_');
+  if (!/^[A-Z][A-Z0-9_]*$/.test(normalized)) {
+    throw new RuntimeContractError(
+      'LLM_OPTION_UNSUPPORTED',
+      `requestHeaders name "${name}" cannot be mapped to an environment variable`
+    );
+  }
+  return `ZCLAUDIA_CODEX_HEADER_${normalized}`;
+}
+
+export interface CodexSdkEnvironmentInput {
+  connection: RuntimeModelConnection;
+  /** Session-scoped CODEX_HOME prepared by the host/plugin. */
+  codexHome: string;
+  claudiaSessionId?: string;
+  /** Host-provided run env (bridge/file-push values). */
+  baseEnv?: Record<string, string>;
+}
+
+/**
+ * Build the complete environment for an SDK engine process. Throws on a
+ * non-Responses connection: the Codex SDK mode accepts nothing else.
+ */
+export function buildCodexSdkEnvironment(input: CodexSdkEnvironmentInput): Record<string, string> {
+  if (input.connection.protocol !== 'openai-responses') {
+    throw new RuntimeContractError(
+      'RUNTIME_PROTOCOL_UNSUPPORTED',
+      `Codex SDK accepts only the openai-responses protocol (got "${input.connection.protocol}")`
+    );
+  }
+  if (!input.connection.apiKey?.trim()) {
+    throw new RuntimeContractError('LLM_AUTH_UNSUPPORTED', 'The model connection has no API key');
+  }
+
+  const env: Record<string, string> = {};
+  for (const key of CODEX_SDK_ENVIRONMENT_ALLOWLIST) {
+    const value = input.baseEnv?.[key] ?? process.env[key];
+    if (value !== undefined && value !== '') env[key] = value;
+  }
+
+  env.CODEX_HOME = input.codexHome;
+  // Auth material lives only in the child process environment — never in TOML,
+  // argv, or auth.json. Header values ride dedicated env vars referenced from
+  // TOML via env_http_headers (variable names only, values never serialized).
+  env[CODEX_SDK_API_KEY_ENV] = input.connection.apiKey;
+  for (const [name, value] of Object.entries(input.connection.requestHeaders ?? {})) {
+    env[headerEnvVarName(name)] = value;
+  }
+
+  if (input.claudiaSessionId) {
+    env.CLAUDIA_SESSION_ID = input.claudiaSessionId;
+    env.ZCLAUDIA_SESSION_ID = input.claudiaSessionId;
+  }
+  return env;
+}
+
+/** Header variable names referenced by env_http_headers (names only, no values). */
+export function sdkHeaderEnvVarNames(connection: RuntimeModelConnection): string[] {
+  return Object.keys(connection.requestHeaders ?? {}).map(headerEnvVarName);
+}
+
+function tomlString(value: string): string {
+  // Basic TOML string: escape backslashes and quotes; control characters are
+  // rejected upstream by the host header validation.
+  return JSON.stringify(value);
+}
+
+function sdkHeaderTable(connection: RuntimeModelConnection): string {
+  const entries = Object.keys(connection.requestHeaders ?? {}).map(
+    name => `${tomlString(name)} = ${tomlString(headerEnvVarName(name))}`
+  );
+  return `{ ${entries.join(', ')} }`;
+}
+
+export interface CodexSdkConfigInput {
+  connection: RuntimeModelConnection;
+  model: string;
+}
+
+/**
+ * The config.toml written into the session CODEX_HOME. It selects the
+ * dedicated provider and pins the model; the same values are ALSO passed as
+ * `-c` overrides (higher priority than file layers) so project-level config
+ * cannot re-route the connection. API keys are never written here.
+ */
+export function buildSdkConfigToml(input: CodexSdkConfigInput): string {
+  const lines = [
+    '# Generated by the ZClaudia Codex plugin for a single SDK session.',
+    '# Connection credentials are provided via process environment only.',
+    `model = ${tomlString(input.model)}`,
+    `model_provider = ${tomlString(CODEX_SDK_PROVIDER_ID)}`,
+    '',
+    `[model_providers.${CODEX_SDK_PROVIDER_ID}]`,
+    `name = ${tomlString('ZClaudia LLM Profile')}`,
+    `base_url = ${tomlString(input.connection.baseUrl)}`,
+    'wire_api = "responses"',
+    `env_key = ${tomlString(CODEX_SDK_API_KEY_ENV)}`,
+    'requires_openai_auth = false',
+    'supports_websockets = false',
+  ];
+  lines.push(`env_http_headers = ${sdkHeaderTable(input.connection)}`);
+  return lines.join('\n') + '\n';
+}
+
+/**
+ * Highest-priority `-c` overrides locking provider, model and transport for
+ * both thread/start and thread/resume. Values are TOML-serialized.
+ */
+export function buildSdkConfigArgs(input: CodexSdkConfigInput): string[] {
+  const args: string[] = [];
+  args.push('-c', `model_provider=${tomlString(CODEX_SDK_PROVIDER_ID)}`);
+  args.push('-c', `model=${tomlString(input.model)}`);
+  const providerPrefix = `model_providers.${CODEX_SDK_PROVIDER_ID}`;
+  // P0 finding (codex 0.154.0): `-c` provider overrides must carry EVERY
+  // required field — the engine validates the merged provider table and a
+  // partial table (e.g. missing `name`) fails config load outright.
+  args.push('-c', `${providerPrefix}.name=${tomlString('ZClaudia LLM Profile')}`);
+  args.push('-c', `${providerPrefix}.base_url=${tomlString(input.connection.baseUrl)}`);
+  args.push('-c', `${providerPrefix}.wire_api="responses"`);
+  args.push('-c', `${providerPrefix}.env_key=${tomlString(CODEX_SDK_API_KEY_ENV)}`);
+  args.push('-c', `${providerPrefix}.requires_openai_auth=false`);
+  args.push('-c', `${providerPrefix}.supports_websockets=false`);
+  args.push('-c', `${providerPrefix}.env_http_headers=${sdkHeaderTable(input.connection)}`);
+  return args;
+}
+
+interface SdkWriteCacheEntry {
+  toml: string;
+}
+const sdkConfigWriteCache = new Map<string, SdkWriteCacheEntry>();
+
+/**
+ * Write config.toml into the session CODEX_HOME with atomic replace. The
+ * cache key includes the target directory — unlike the legacy shared-config
+ * lastWrittenConfig, one backend's directory can never satisfy another's.
+ */
+export function writeSdkConfig(codexHome: string, toml: string): void {
+  if (
+    sdkConfigWriteCache.get(codexHome)?.toml === toml &&
+    existsSync(join(codexHome, 'config.toml'))
+  )
+    return;
+  const codexDir = codexHome;
+  mkdirSync(codexDir, { recursive: true, mode: 0o700 });
+  const configPath = join(codexDir, 'config.toml');
+  const tempPath = `${configPath}.tmp-${process.pid}-${Date.now()}`;
+  writeFileSync(tempPath, toml, { mode: 0o600 });
+  // Atomic replace: a crash mid-write never leaves a truncated config behind.
+  renameSync(tempPath, configPath);
+  sdkConfigWriteCache.set(codexHome, { toml });
+}
+
+export function resetSdkConfigWriteCacheForTests(): void {
+  sdkConfigWriteCache.clear();
 }

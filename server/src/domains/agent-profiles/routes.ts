@@ -15,6 +15,7 @@ import {
 } from '../agent-readiness/check.js';
 import { resolveAgentProfileRecordStatus } from '../agent-readiness/record-status.js';
 import { isValidRuntimeType, runtimeRequiresLlmProfile } from './runtime-type-guard.js';
+import { validateEngineModeConfiguration, engineModeForResponse } from './engine-mode-validation.js';
 import { providerRegistry } from '../../infra/providers/registry.js';
 
 const VALID_THINKING_LEVELS: readonly ThinkingLevel[] = [
@@ -96,7 +97,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
     try {
       const data = await Promise.all(
         repo.findAllOrdered().map(async agent => {
-          const llm = llmRepo.findById(agent.llmProfileId);
+          const llm = agent.llmProfileId ? llmRepo.findById(agent.llmProfileId) : undefined;
           const recordStatus = resolveAgentProfileRecordStatus(agent, llm);
           const readiness = await resolveAgentExecutionReadiness(agent, llm);
           if (!readiness.usable && readiness.reason?.startsWith('runtime_')) {
@@ -106,7 +107,14 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
                 readiness.reason === 'runtime_auth_required' ? 'needs_auth' : 'requirement_unmet',
             };
           }
-          return { ...agent, recordStatus };
+          // API responses expose the normalized engine mode (declared default
+          // when the column is NULL) and null (never '') for "no binding".
+          return {
+            ...agent,
+            engineMode: engineModeForResponse(agent),
+            llmProfileId: agent.llmProfileId ?? null,
+            recordStatus,
+          };
         })
       );
       res.json({ success: true, data } as ApiResponse<AgentProfileConfig[]>);
@@ -146,9 +154,11 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
       }
       const withStatus = {
         ...profile,
+        engineMode: engineModeForResponse(profile),
+        llmProfileId: profile.llmProfileId ?? null,
         recordStatus: resolveAgentProfileRecordStatus(
           profile,
-          llmRepo.findById(profile.llmProfileId)
+          profile.llmProfileId ? llmRepo.findById(profile.llmProfileId) : undefined
         ),
       };
       res.json({ success: true, data: withStatus } as ApiResponse<AgentProfileConfig>);
@@ -176,6 +186,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         multimodalFallback,
         thinkingLevel,
         runtimeType,
+        engineMode,
         cliPath,
         isDefault,
       } = req.body ?? {};
@@ -208,6 +219,13 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
             code: 'VALIDATION_ERROR',
             message: `Invalid thinkingLevel. Must be one of: ${VALID_THINKING_LEVELS.join(', ')}`,
           },
+        });
+        return;
+      }
+      if (engineMode !== undefined && engineMode !== null && typeof engineMode !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'engineMode must be a string' },
         });
         return;
       }
@@ -247,8 +265,12 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
       }
       const normalizedCliPath = typeof cliPath === 'string' ? cliPath.trim() : undefined;
 
+      // Legacy payloads may pass llmProfileId: '' — normalize to "no binding".
+      const requestedLlmProfileId =
+        typeof llmProfileId === 'string' && llmProfileId.trim() ? llmProfileId.trim() : null;
+
       const requiresLlmProfile = runtimeRequiresLlmProfile(resolvedRuntimeType);
-      if (requiresLlmProfile && (!llmProfileId || typeof llmProfileId !== 'string')) {
+      if (requiresLlmProfile && !requestedLlmProfileId) {
         res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: 'llmProfileId is required' },
@@ -256,10 +278,29 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         return;
       }
 
-      if (llmProfileId && !llmRepo.findById(llmProfileId)) {
+      if (requestedLlmProfileId && !llmRepo.findById(requestedLlmProfileId)) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: `llmProfileId not found: ${llmProfileId}` },
+          error: { code: 'VALIDATION_ERROR', message: `llmProfileId not found: ${requestedLlmProfileId}` },
+        });
+        return;
+      }
+
+      // Engine-mode rules validate the whole configuration (mode + binding +
+      // model + cli path + protocol admission) as one atomic unit.
+      const engineModeValidation = validateEngineModeConfiguration({
+        runtimeType: resolvedRuntimeType,
+        requestedEngineMode: typeof engineMode === 'string' ? engineMode : null,
+        engineModeExplicit: engineMode !== undefined && engineMode !== null,
+        mergedLlmProfileId: requestedLlmProfileId,
+        mergedModel: normalizedModel,
+        mergedCliPath: normalizedCliPath ?? null,
+        llmRepo,
+      });
+      if (!engineModeValidation.ok) {
+        res.status(engineModeValidation.status).json({
+          success: false,
+          error: { code: engineModeValidation.code, message: engineModeValidation.message },
         });
         return;
       }
@@ -278,7 +319,8 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
       const profile = repo.createWithDefaultHandling({
         name,
         description,
-        llmProfileId: typeof llmProfileId === 'string' ? llmProfileId : '',
+        engineMode: engineModeValidation.engineMode || undefined,
+        llmProfileId: engineModeValidation.llmProfileId ?? (requiresLlmProfile ? requestedLlmProfileId : null),
         model: normalizedModel,
         cliPath: normalizedCliPath,
         systemPrompt: typeof systemPrompt === 'string' ? systemPrompt : '',
@@ -292,7 +334,14 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         isDefault: Boolean(isDefault),
       });
 
-      res.status(201).json({ success: true, data: profile } as ApiResponse<AgentProfileConfig>);
+      res.status(201).json({
+        success: true,
+        data: {
+          ...profile,
+          engineMode: engineModeForResponse(profile),
+          llmProfileId: profile.llmProfileId ?? null,
+        },
+      } as ApiResponse<AgentProfileConfig>);
     } catch (error) {
       console.error('Error creating agent profile:', error);
       res.status(500).json({
@@ -317,6 +366,18 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
             code: 'VALIDATION_ERROR',
             message: `Invalid thinkingLevel. Must be one of: ${VALID_THINKING_LEVELS.join(', ')}`,
           },
+        });
+        return;
+      }
+
+      if (
+        Object.prototype.hasOwnProperty.call(body, 'engineMode') &&
+        body.engineMode !== null &&
+        typeof body.engineMode !== 'string'
+      ) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'engineMode must be a string' },
         });
         return;
       }
@@ -404,14 +465,71 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         return;
       }
 
+      // Merge the patch onto the stored profile first: engine-mode rules
+      // validate the resulting configuration as a whole, so a partial update
+      // (e.g. an old editor clearing the model) cannot produce an SDK profile
+      // without its required binding, and omitted fields keep their values.
+      const mergedRuntimeType =
+        validatedRuntimeType !== undefined
+          ? validatedRuntimeType
+          : existing.runtimeType ?? 'zclaudia';
+      const engineModeInBody = Object.prototype.hasOwnProperty.call(body, 'engineMode');
+      const mergedEngineMode = engineModeInBody ? body.engineMode : (existing.engineMode ?? null);
+      const mergedLlmProfileId = Object.prototype.hasOwnProperty.call(body, 'llmProfileId')
+        ? typeof body.llmProfileId === 'string' && body.llmProfileId.trim()
+          ? body.llmProfileId.trim()
+          : null
+        : existing.llmProfileId ?? null;
+      const mergedModel = Object.prototype.hasOwnProperty.call(body, 'model')
+        ? typeof body.model === 'string'
+          ? body.model.trim()
+          : ''
+        : existing.model;
+      const mergedCliPath = Object.prototype.hasOwnProperty.call(body, 'cliPath')
+        ? typeof body.cliPath === 'string'
+          ? body.cliPath.trim()
+          : null
+        : existing.cliPath ?? null;
+
+      const engineModeValidation = validateEngineModeConfiguration({
+        runtimeType: mergedRuntimeType,
+        requestedEngineMode: typeof mergedEngineMode === 'string' ? mergedEngineMode : null,
+        engineModeExplicit: engineModeInBody,
+        mergedLlmProfileId,
+        mergedModel,
+        mergedCliPath,
+        llmRepo,
+      });
+      if (!engineModeValidation.ok) {
+        res.status(engineModeValidation.status).json({
+          success: false,
+          error: { code: engineModeValidation.code, message: engineModeValidation.message },
+        });
+        return;
+      }
+
       const patch: Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>> & {
         cliPath?: string | null;
       } = {};
       if (Object.prototype.hasOwnProperty.call(body, 'name')) patch.name = body.name;
       if (Object.prototype.hasOwnProperty.call(body, 'description'))
         patch.description = body.description ?? undefined;
-      if (Object.prototype.hasOwnProperty.call(body, 'llmProfileId'))
-        patch.llmProfileId = body.llmProfileId;
+      if (engineModeValidation.engineMode) {
+        patch.engineMode = engineModeValidation.engineMode;
+      } else if (engineModeInBody) {
+        // Runtimes without declared modes only accept an unset engine mode.
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'ENGINE_MODE_UNSUPPORTED',
+            message: `Runtime "${mergedRuntimeType}" does not support engine modes`,
+          },
+        });
+        return;
+      }
+      if (engineModeInBody || engineModeValidation.llmProfileIdForced || Object.prototype.hasOwnProperty.call(body, 'llmProfileId')) {
+        patch.llmProfileId = engineModeValidation.llmProfileId;
+      }
       if (Object.prototype.hasOwnProperty.call(body, 'model'))
         patch.model = typeof body.model === 'string' ? body.model.trim() : '';
       if (Object.prototype.hasOwnProperty.call(body, 'cliPath'))
@@ -436,7 +554,14 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         patch.isDefault = Boolean(body.isDefault);
 
       const updated = repo.updateWithDefaultHandling(req.params.id, patch);
-      res.json({ success: true, data: updated } as ApiResponse<AgentProfileConfig>);
+      res.json({
+        success: true,
+        data: {
+          ...updated,
+          engineMode: engineModeForResponse(updated),
+          llmProfileId: updated.llmProfileId ?? null,
+        },
+      } as ApiResponse<AgentProfileConfig>);
     } catch (error) {
       console.error('Error updating agent profile:', error);
       res.status(500).json({

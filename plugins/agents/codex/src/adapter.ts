@@ -4,9 +4,10 @@ import type {
   ExternalAgentRunState,
   PermissionCallback,
   ProviderRuntimeEvent,
+  ProviderToolBridgeEntry,
 } from '@zclaudia/plugin-sdk/providers';
 import { AdapterSessionState, type ToolBridgeFactory } from '@zclaudia/agent-common';
-import { runCodexAppServer, abortCodexSession } from './runner.js';
+import { runCodexAppServer, runCodexSdkTurn, abortCodexSession, type CodexRunOptions } from './runner.js';
 
 export type { ToolBridgeFactory } from '@zclaudia/agent-common';
 
@@ -23,25 +24,34 @@ export class CodexAgentAdapter implements ExternalAgentAdapter {
   ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
     const session = this.sessions.begin(context);
     const effectiveMode = this.sessions.effectiveMode(context);
+    let bridge: ProviderToolBridgeEntry | null = null;
+    const runOptions: CodexRunOptions = {
+      cwd: context.cwd,
+      sessionId: context.sessionId,
+      cliPath: context.cliPath,
+      env: context.env,
+      model: context.model,
+      mode: effectiveMode,
+      systemPrompt: context.systemPrompt,
+      claudiaSessionId: context.claudiaSessionId,
+      bridge,
+      engineExecution: context.engineExecution,
+      modelConnection: context.modelConnection,
+    };
 
     try {
-      const bridge = await this.createToolBridge({
+      bridge = await this.createToolBridge({
         serverPort: context.serverPort,
         sessionId: context.claudiaSessionId,
       });
-      for await (const event of runCodexAppServer(
+      runOptions.bridge = bridge;
+      // SDK mode runs a session-owned process against the host-provided
+      // connection; CLI mode keeps the shared-process pool semantics.
+      const turn =
+        context.engineExecution?.engineMode === 'sdk' ? runCodexSdkTurn : runCodexAppServer;
+      for await (const event of turn(
         input,
-        {
-          cwd: context.cwd,
-          sessionId: context.sessionId,
-          cliPath: context.cliPath,
-          env: context.env,
-          model: context.model,
-          mode: effectiveMode,
-          systemPrompt: context.systemPrompt,
-          claudiaSessionId: context.claudiaSessionId,
-          bridge,
-        },
+        runOptions,
         onPermission ?? (async () => ({ behavior: 'deny' }))
       )) {
         this.sessions.observe(session, event);

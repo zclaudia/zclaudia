@@ -55,16 +55,33 @@ export interface ModelInfo {
 }
 
 export interface CodexClientRequestMap {
+  'config/read': {
+    params: { cwd?: string; includeLayers?: boolean };
+    result: { config: Record<string, unknown> };
+  };
   initialize: {
     params: InitializeParams;
     result: InitializeResponse;
   };
   'thread/start': {
-    params: { cwd?: string | null; model?: string | null };
+    params: {
+      cwd?: string | null;
+      model?: string | null;
+      /** SDK mode: lock the provider (e.g. `zclaudia_profile`) at thread creation. */
+      modelProvider?: string | null;
+      /** SDK mode: host-injected project instructions (replaces the [System Context] text prefix). */
+      developerInstructions?: string | null;
+    };
     result: { thread: { id: string; [key: string]: unknown } };
   };
   'thread/resume': {
-    params: { threadId: string; cwd?: string | null; model?: string | null };
+    params: {
+      threadId: string;
+      cwd?: string | null;
+      model?: string | null;
+      modelProvider?: string | null;
+      developerInstructions?: string | null;
+    };
     result: { thread: { id: string; cwd?: string; [key: string]: unknown }; cwd?: string };
   };
   'thread/loaded/list': {

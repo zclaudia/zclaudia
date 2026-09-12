@@ -105,7 +105,7 @@ describe('agent-profiles routes', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.runtimeType).toBe('claude');
-    expect(res.body.data.llmProfileId).toBe('');
+    expect(res.body.data.llmProfileId).toBeNull();
     expect(res.body.data.model).toBe('');
     expect(res.body.data.cliPath).toBe('/opt/homebrew/bin/claude');
   });
@@ -122,7 +122,7 @@ describe('agent-profiles routes', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.runtimeType).toBe('claude');
-    expect(res.body.data.llmProfileId).toBe('');
+    expect(res.body.data.llmProfileId).toBeNull();
     expect(res.body.data.model).toBe('');
   });
 
@@ -237,7 +237,7 @@ describe('agent-profiles routes', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.runtimeType).toBe('claude');
-    expect(res.body.data.llmProfileId).toBe('');
+    expect(res.body.data.llmProfileId).toBeNull();
   });
 
   it('PATCH clears a multimodal fallback with null', async () => {
@@ -489,7 +489,7 @@ describe('agent-profiles routes', () => {
     });
     expect(res.status).toBe(201);
     expect(res.body.data.runtimeType).toBe('claude');
-    expect(res.body.data.llmProfileId).toBe(''); // API surfaces '' for "no profile"
+    expect(res.body.data.llmProfileId).toBeNull(); // API surfaces '' for "no profile"
 
     const row = db
       .prepare('SELECT llm_profile_id FROM agent_profiles WHERE id = ?')

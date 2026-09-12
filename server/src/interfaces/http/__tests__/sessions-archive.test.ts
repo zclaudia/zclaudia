@@ -45,6 +45,25 @@ function createTestDb(): Database.Database {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS llm_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS session_runtime_bindings (
+      session_id TEXT PRIMARY KEY REFERENCES sessions(id),
+      llm_profile_id TEXT REFERENCES llm_profiles(id),
+      runtime_type TEXT NOT NULL,
+      engine_mode TEXT NOT NULL,
+      model TEXT,
+      connection_identity_hash TEXT,
+      configured_cli_path TEXT,
+      config_namespace TEXT,
+      runtime_details TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS messages (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,

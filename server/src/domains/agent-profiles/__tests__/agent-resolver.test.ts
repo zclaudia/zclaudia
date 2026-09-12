@@ -5,6 +5,7 @@ import { resolveAgentForSession, NoAgentAvailableError } from '../agent-resolver
 import { AgentProfileRepository } from '../repository.js';
 import { LlmProfileRepository } from '../../llm-profiles/repository.js';
 import { ProjectRepository } from '../../projects/repository.js';
+import { SessionRuntimeBindingRepository } from '../../sessions/runtime-binding-repository.js';
 
 describe('resolveAgentForSession', () => {
   let db: Database.Database;
@@ -71,6 +72,38 @@ describe('resolveAgentForSession', () => {
     expect(agent.id).toBe(explicitAgentId);
     expect(llm?.id).toBe(llmId);
   });
+
+  it.each(['cli', 'sdk'])(
+    'resolves the original %s binding before the edited agent configuration',
+    engineMode => {
+      db.prepare(
+        `INSERT INTO sessions (id, project_id, agent_profile_id, type, created_at, updated_at) VALUES ('bound-session', ?, ?, 'regular', 0, 0)`
+      ).run(projectWithDefault, explicitAgentId);
+      new SessionRuntimeBindingRepository(db).upsert({
+        sessionId: 'bound-session',
+        runtimeType: 'claude',
+        engineMode,
+        model: 'original-model',
+        llmProfileId: engineMode === 'sdk' ? llmId : null,
+        configuredCliPath: engineMode === 'cli' ? '/original/claude' : null,
+        connectionIdentityHash: null,
+        configNamespace: null,
+        runtimeDetails: null,
+      });
+      db.prepare(
+        "UPDATE agent_profiles SET runtime_type = 'codex', engine_mode = ?, model = 'new-model', llm_profile_id = NULL, cli_path = '/new/codex' WHERE id = ?"
+      ).run(engineMode === 'sdk' ? 'cli' : 'sdk', explicitAgentId);
+      const result = resolveAgentForSession(db, { explicitAgentId, sessionId: 'bound-session' });
+      expect(result.agent).toMatchObject({
+        runtimeType: 'claude',
+        engineMode,
+        model: 'original-model',
+        llmProfileId: engineMode === 'sdk' ? llmId : null,
+      });
+      expect(result.agent.cliPath).toBe(engineMode === 'cli' ? '/original/claude' : undefined);
+      expect(result.llm?.id).toBe(engineMode === 'sdk' ? llmId : undefined);
+    }
+  );
 
   it('falls back to project default when no explicit', () => {
     const { agent } = resolveAgentForSession(db, { projectId: projectWithDefault });

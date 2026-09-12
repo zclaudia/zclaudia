@@ -35,6 +35,41 @@ describe('llm-profiles routes', () => {
     expect(res.status).toBe(200);
   });
 
+  it('persists Responses declarations, preserves omitted updates, and distinguishes [] from null', async () => {
+    const created = await request(app)
+      .post('/api/llm-profiles')
+      .send({
+        name: 'proxy',
+        providerType: 'openai',
+        baseUrl: 'http://localhost:1234/v1',
+        apiKey: 'synthetic',
+        supportedProtocols: ['openai-responses', 'openai-responses'],
+      });
+    expect(created.status).toBe(201);
+    const url = `/api/llm-profiles/${created.body.data.id}`;
+    expect((await request(app).get(url)).body.data.supportedProtocols).toEqual([
+      'openai-responses',
+    ]);
+    expect(
+      (await request(app).put(url).send({ name: 'renamed' })).body.data.supportedProtocols
+    ).toEqual(['openai-responses']);
+    expect(
+      (await request(app).put(url).send({ supportedProtocols: [] })).body.data.supportedProtocols
+    ).toEqual([]);
+    const cleared = await request(app).put(url).send({ supportedProtocols: null });
+    expect(cleared.body.data.supportedProtocols).toBeUndefined();
+  });
+
+  it.each([['unknown'], 'openai-responses', {}])(
+    'rejects invalid protocol declarations: %j',
+    async supportedProtocols => {
+      const response = await request(app)
+        .post('/api/llm-profiles')
+        .send({ name: 'invalid', supportedProtocols });
+      expect(response.status).toBe(400);
+    }
+  );
+
   it('DELETE returns 404 for an unknown id', async () => {
     const res = await request(app).delete('/api/llm-profiles/does-not-exist');
     expect(res.status).toBe(404);

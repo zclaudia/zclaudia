@@ -447,9 +447,22 @@ export class CodexAppServerClient {
     return this.activeTurnContexts.size === 1;
   }
 
-  async startThread(cwd: string): Promise<string> {
+  async readConfig(cwd: string): Promise<Record<string, unknown>> {
     await this.ensureRunning();
-    const result = await this.sendRequest('thread/start', { cwd });
+    return (await this.sendRequest('config/read', { cwd, includeLayers: false })).config;
+  }
+
+  async startThread(
+    cwd: string,
+    options?: { model?: string; modelProvider?: string; developerInstructions?: string }
+  ): Promise<string> {
+    await this.ensureRunning();
+    const params: ClientRequestParams<'thread/start'> = { cwd };
+    if (options?.model) params.model = options.model;
+    if (options?.modelProvider) params.modelProvider = options.modelProvider;
+    if (options?.developerInstructions)
+      params.developerInstructions = options.developerInstructions;
+    const result = await this.sendRequest('thread/start', params);
     const threadId = result.thread?.id;
     if (!threadId) {
       throw new Error(`thread/start did not return a threadId: ${JSON.stringify(result)}`);
@@ -458,9 +471,17 @@ export class CodexAppServerClient {
     return threadId;
   }
 
-  async resumeThread(threadId: string): Promise<void> {
+  async resumeThread(
+    threadId: string,
+    options?: { model?: string; modelProvider?: string; developerInstructions?: string }
+  ): Promise<void> {
     await this.ensureRunning();
-    await this.sendRequest('thread/resume', { threadId });
+    const params: ClientRequestParams<'thread/resume'> = { threadId };
+    if (options?.model) params.model = options.model;
+    if (options?.modelProvider) params.modelProvider = options.modelProvider;
+    if (options?.developerInstructions)
+      params.developerInstructions = options.developerInstructions;
+    await this.sendRequest('thread/resume', params);
     debugLog(`[Codex AppServer] Thread resumed: ${threadId}`);
   }
 

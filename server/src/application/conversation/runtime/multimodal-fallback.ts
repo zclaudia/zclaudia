@@ -31,7 +31,7 @@ export function resolveMultimodalFallbackForRun(input: {
   const primary: MultimodalFallbackResolution = {
     agentProfile,
     llmProfile: primaryLlmProfile,
-    llmProfileId: primaryLlmProfile?.id ?? agentProfile.llmProfileId,
+    llmProfileId: primaryLlmProfile?.id ?? agentProfile.llmProfileId ?? '',
     providerType: primaryLlmProfile?.providerType ?? 'zclaudia',
     applied: false,
   };

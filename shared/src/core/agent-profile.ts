@@ -37,7 +37,18 @@ export interface AgentProfileConfig {
   name: string;
   description?: string;
   runtimeType?: AgentRuntimeType;
-  llmProfileId: string;
+  /**
+   * Engine mode selected on the runtime (e.g. 'cli' | 'sdk' for Claude/Codex).
+   * Valid values are owned by the runtime descriptor (`engineModes`); missing
+   * values normalize to the descriptor's default mode. Distinct from the
+   * permission `mode` and from the frontend permission store's runtime modes.
+   */
+  engineMode?: string;
+  /**
+   * Bound LLM profile. `null`/omitted means "no binding" — legacy payloads
+   * using an empty string are normalized to null at API boundaries.
+   */
+  llmProfileId?: string | null;
   model: string;
   /** Optional runtime executable path for native CLI-backed agents such as Claude. */
   cliPath?: string;

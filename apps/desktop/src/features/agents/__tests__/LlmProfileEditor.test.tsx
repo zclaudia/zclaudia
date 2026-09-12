@@ -106,6 +106,7 @@ describe('LlmProfileEditor', () => {
       expect(api.createLlmProfileForBackend).toHaveBeenCalledWith('b1', {
         name: 'My Provider',
         providerType: 'anthropic',
+        supportedProtocols: null,
         baseUrl: undefined,
         apiKey: undefined,
         compat: undefined,
@@ -114,6 +115,26 @@ describe('LlmProfileEditor', () => {
         isDefault: false,
       });
       expect(onSaved).toHaveBeenCalledWith('created-1');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('saves an explicit Responses capability for a custom endpoint', async () => {
+    vi.useFakeTimers();
+    try {
+      renderEditor(makeProfile({ providerType: 'openai', baseUrl: 'https://proxy.example/v1' }));
+      const checkbox = screen.getByRole('checkbox', { name: /Endpoint supports Responses/ });
+      expect((checkbox as HTMLInputElement).checked).toBe(false);
+      fireEvent.click(checkbox);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+      expect(api.updateLlmProfileForBackend).toHaveBeenCalledWith(
+        'b1',
+        'p1',
+        expect.objectContaining({ supportedProtocols: ['openai-completions', 'openai-responses'] })
+      );
     } finally {
       vi.useRealTimers();
     }

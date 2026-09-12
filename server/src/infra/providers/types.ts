@@ -73,6 +73,10 @@ export interface RunOptions {
   memoryDir?: string;
   /** Application policy hook invoked by pi-runtime after a built-in tool succeeds. */
   toolExecutionObserver?: ToolExecutionObserver;
+  /** Engine-mode execution identity for dual-mode runtimes (absent for legacy single-mode runs). */
+  engineExecution?: import('@zclaudia/shared/providers').EngineExecutionContext;
+  /** Explicit model connection for SDK engine modes; in-memory for this run only. */
+  modelConnection?: import('@zclaudia/shared/providers').RuntimeModelConnection;
 }
 
 /** Agent runtime adapter interface. */

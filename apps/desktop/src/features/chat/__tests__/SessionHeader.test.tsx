@@ -113,6 +113,33 @@ describe('SessionHeader', () => {
     expect(screen.getByText('Test Session')).toBeTruthy();
   });
 
+  it('shows no run-mode badge for sessions without a runtime binding', () => {
+    render(<SessionHeader {...baseProps} />);
+    expect(screen.queryByText('CLI')).toBeNull();
+  });
+
+  it('shows a CLI run-mode badge for a session bound to cli mode', () => {
+    const session = {
+      ...baseSession,
+      runtimeEngine: { engineMode: 'cli', model: '' },
+    } as unknown as Session;
+    render(<SessionHeader {...baseProps} currentSession={session} />);
+    expect(screen.getByText('CLI')).toBeTruthy();
+  });
+
+  it('shows an SDK badge with profile and model for a session bound to sdk mode', () => {
+    const session = {
+      ...baseSession,
+      runtimeEngine: {
+        engineMode: 'sdk',
+        model: 'claude-opus-4-8',
+        llmProfileName: 'My Anthropic',
+      },
+    } as unknown as Session;
+    render(<SessionHeader {...baseProps} currentSession={session} />);
+    expect(screen.getByText('SDK · My Anthropic · claude-opus-4-8')).toBeTruthy();
+  });
+
   it('shows topic anchor chip with first user message text', () => {
     setupStores({
       messages: {

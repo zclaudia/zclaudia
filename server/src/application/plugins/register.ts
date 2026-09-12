@@ -14,6 +14,8 @@ import { pluginEvents } from '../../infra/events/index.js';
 import { permissionManager as pluginPermissionManager } from './permissions.js';
 import { configureRuntimeReadinessInspector } from '../../domains/agent-readiness/check.js';
 import { managedRuntimeService } from '../managed-runtimes/service.js';
+import { configureBundledRuntimeResolver } from '../../infra/agents/bundled-runtime-resources.js';
+import { builtinAgentPluginForRuntime } from '@zclaudia/shared/plugins/builtin-agents';
 import { isTerminalPhase } from '../conversation/runtime/active-run-phase.js';
 
 type ActiveRunsMap = Map<string, ActiveRun>;
@@ -45,6 +47,14 @@ export function registerPluginsDomain(deps: PluginsDomainDeps): void {
       allowAutoInstall: false,
     })
   );
+
+  // Bundled engine resources are resolved relative to the installed plugin
+  // directory (dev node_modules or staged portable bundle alike).
+  configureBundledRuntimeResolver(runtimeType => {
+    const builtin = builtinAgentPluginForRuntime(runtimeType);
+    if (!builtin) return undefined;
+    return pluginLoader.getPlugin(builtin.id)?.path;
+  });
 
   pluginLoader.setRuntimeBusyChecker(runtime =>
     [...activeRuns.values()].some(

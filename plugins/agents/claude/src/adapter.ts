@@ -77,6 +77,8 @@ export class ClaudeAgentAdapter implements ExternalAgentAdapter {
         canUseTool: buildClaudeCanUseTool(onPermission),
         mcpServers,
         plugins: claudeConfig.plugins,
+        engineExecution: context.engineExecution,
+        modelConnection: context.modelConnection,
         onSessionId: sessionId => {
           this.sessions.registerProviderSession(session, sessionId);
         },

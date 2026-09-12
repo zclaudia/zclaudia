@@ -20,7 +20,7 @@
         "type": "codex",
         "label": "Codex",
         "model": {
-          "kind": "none",
+          "kind": "native",
           "multimodalFallback": false,
           "thinkingLevel": "auto"
         },
@@ -31,6 +31,30 @@
           "skills": "external"
         },
         "authNote": "Codex uses the local codex CLI (codex app-server). Sign in via codex CLI; MCP bridge tools are injected into the stable codex-config dir.",
+        "defaultEngineMode": "cli",
+        "engineModes": [
+          {
+            "id": "cli",
+            "label": "CLI（外部环境）",
+            "connection": { "kind": "external", "modelSelection": "optional" },
+            "executable": "external-cli",
+            "modelOptions": { "multimodalFallback": false, "thinkingLevel": "auto" },
+            "capabilities": { "tools": "native-readonly", "skills": "external" },
+            "authNote": "使用已安装的 codex CLI 及其登录态；模型 ID 由外部 CLI 解释，留空使用其默认模型。"
+          },
+          {
+            "id": "sdk",
+            "label": "SDK + LLM Profile",
+            "connection": {
+              "kind": "llm-profile",
+              "acceptedModelProtocols": ["openai-responses"]
+            },
+            "executable": "bundled-engine",
+            "modelOptions": { "multimodalFallback": false, "thinkingLevel": "auto" },
+            "capabilities": { "tools": "native-readonly", "skills": "external" },
+            "authNote": "使用应用内置 Codex 引擎与 Responses LLM Profile；独立配置目录，不继承个人 Codex 登录和全局配置。"
+          }
+        ],
         "manifest": {
           "id": "codex",
           "name": "Codex",

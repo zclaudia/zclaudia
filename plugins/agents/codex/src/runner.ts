@@ -1,16 +1,28 @@
 import { createHash } from 'node:crypto';
-import { realpathSync } from 'node:fs';
+import { mkdirSync, realpathSync } from 'node:fs';
 import path from 'node:path';
-import type { PermissionCallback, ProviderRuntimeEvent } from '@zclaudia/plugin-sdk/providers';
-import type { ProviderToolBridgeEntry } from '@zclaudia/plugin-sdk/providers';
+import type {
+  EngineExecutionContext,
+  PermissionCallback,
+  ProviderRuntimeEvent,
+  ProviderToolBridgeEntry,
+  RuntimeModelConnection,
+} from '@zclaudia/plugin-sdk/providers';
+import { RuntimeContractError } from '@zclaudia/plugin-sdk/providers';
 import { CodexAppServerClient } from './app-server-client.js';
 import {
+  buildCodexSdkEnvironment,
   buildEnv,
   buildMcpConfigArgs,
+  buildSdkConfigArgs,
+  buildSdkConfigToml,
+  CODEX_SDK_PROVIDER_ID,
   debugLog,
   mapModeToConfigArgs,
+  mcpServersToToml,
   prepareAppServerInput,
   writeMcpConfig,
+  writeSdkConfig,
 } from './config.js';
 
 export interface CodexRunOptions {
@@ -23,6 +35,10 @@ export interface CodexRunOptions {
   systemPrompt?: string;
   claudiaSessionId?: string;
   bridge?: ProviderToolBridgeEntry | null;
+  /** Dual-mode contract: engine-mode execution identity from the host. */
+  engineExecution?: EngineExecutionContext;
+  /** Dual-mode contract: explicit model connection (SDK mode requires it). */
+  modelConnection?: RuntimeModelConnection;
 }
 
 // ── Client cache ─────────────────────────────────────────────
@@ -94,6 +110,218 @@ export function getOrCreateAppServerClient(options: CodexRunOptions): CodexAppSe
   }
   client.currentMode = options.mode;
   return client;
+}
+
+// ── SDK engine mode ──────────────────────────────────────────
+//
+// SDK mode gives each ZClaudia session its own app-server process and its own
+// CODEX_HOME, running the app-bundled engine against the explicitly bound
+// OpenAI-Responses connection. Resume is strict: a lost or broken thread is a
+// structured error, never a silently fresh thread under the same session id.
+
+interface CodexSdkSessionEntry {
+  client: CodexAppServerClient;
+  fingerprint: string;
+}
+
+/** Per-host-session process pool, deliberately separate from the CLI pool. */
+const sdkSessionClients = new Map<string, CodexSdkSessionEntry>();
+
+/**
+ * Launch fingerprint for an SDK session process: executable, isolated config
+ * directory, connection identity, model, mode and bridge configuration. The
+ * API key participates only as a salted in-memory digest (a credential
+ * revision identity) — raw secrets never enter fingerprints or logs.
+ */
+function sdkLaunchFingerprint(input: {
+  cliPath: string;
+  codexHome: string;
+  connection: RuntimeModelConnection;
+  model: string;
+  mode?: string;
+  mcpSignature: string;
+}): string {
+  const credentialRevision = createHash('sha256')
+    .update(`sdk-key\u0000${input.connection.apiKey}`)
+    .digest('hex');
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        cliPath: input.cliPath,
+        codexHome: input.codexHome,
+        protocol: input.connection.protocol,
+        baseUrl: input.connection.baseUrl,
+        headerNames: Object.keys(input.connection.requestHeaders ?? {}).sort(),
+        credentialRevision,
+        model: input.model,
+        mode: input.mode ?? '',
+        mcpSignature: input.mcpSignature,
+      })
+    )
+    .digest('hex');
+}
+
+export async function* runCodexSdkTurn(
+  input: string,
+  options: CodexRunOptions,
+  onPermission: PermissionCallback
+): AsyncGenerator<ProviderRuntimeEvent, void, void> {
+  const engine = options.engineExecution;
+  const connection = options.modelConnection;
+  if (!engine || engine.engineMode !== 'sdk') {
+    throw new RuntimeContractError(
+      'SDK_ENGINE_UNAVAILABLE',
+      'SDK mode requires the host engine-execution contract; this host is too old to run it. Upgrade ZClaudia or switch the agent to CLI mode.'
+    );
+  }
+  if (!connection) {
+    throw new RuntimeContractError(
+      'SDK_ENGINE_UNAVAILABLE',
+      'SDK mode requires an explicit model connection from the host'
+    );
+  }
+  if (connection.protocol !== 'openai-responses') {
+    throw new RuntimeContractError(
+      'RUNTIME_PROTOCOL_UNSUPPORTED',
+      `Codex SDK accepts only the openai-responses protocol (got "${connection.protocol}")`
+    );
+  }
+  const cliPath = options.cliPath?.trim();
+  if (!cliPath) {
+    throw new RuntimeContractError(
+      'SDK_ENGINE_UNAVAILABLE',
+      'SDK mode requires the app-bundled engine path from the host; PATH lookup is intentionally not performed'
+    );
+  }
+  const codexHome = engine.configDirectory?.trim();
+  if (!codexHome) {
+    throw new RuntimeContractError(
+      'SDK_ENGINE_UNAVAILABLE',
+      'SDK mode requires a host-managed CODEX_HOME for this session'
+    );
+  }
+  const model = options.model?.trim();
+  if (!model) {
+    throw new RuntimeContractError('LLM_OPTION_UNSUPPORTED', 'SDK mode requires an explicit model');
+  }
+
+  const sessionKey = options.claudiaSessionId ?? options.sessionId ?? options.cwd;
+
+  // Prepare the isolated config directory and session config.toml. Project
+  // trust is NOT written to the user's global Codex config in SDK mode; trust
+  // entries (if any) stay inside this session directory.
+  mkdirSync(codexHome, { recursive: true, mode: 0o700 });
+  const mcpToml = options.bridge ? mcpServersToToml({ [options.bridge.name]: options.bridge.config }) : '';
+  const configToml = buildSdkConfigToml({ connection, model }) +
+    (mcpToml ? '\n' + mcpToml + '\n' : '');
+  writeSdkConfig(codexHome, configToml);
+
+  const env = buildCodexSdkEnvironment({
+    connection,
+    codexHome,
+    claudiaSessionId: options.claudiaSessionId,
+    baseEnv: options.env,
+  });
+  // The same connection values are re-locked at the highest config priority so
+  // project-level config.toml layers cannot re-route provider or model.
+  const extraArgs = [
+    ...mapModeToConfigArgs(options.mode),
+    ...buildSdkConfigArgs({ connection, model }),
+  ];
+
+  const fingerprint = sdkLaunchFingerprint({
+    cliPath,
+    codexHome,
+    connection,
+    model,
+    mode: options.mode,
+    mcpSignature: mcpToml,
+  });
+
+  let client = sdkSessionClients.get(sessionKey)?.client;
+  if (client && sdkSessionClients.get(sessionKey)!.fingerprint !== fingerprint) {
+    // Config changed between runs. The previous turn already finished (runs
+    // are serialized per session), so shut the old process down cleanly and
+    // respawn from the same state directory — never destroy a live writer.
+    debugLog(`[Codex AppServer] SDK fingerprint changed for session ${sessionKey}; restarting process`);
+    await client.shutdown();
+    client = undefined;
+  }
+  if (!client) {
+    client = new CodexAppServerClient(cliPath, env, extraArgs, { processCwd: codexHome });
+    sdkSessionClients.set(sessionKey, { client, fingerprint });
+  }
+  client.currentMode = options.mode;
+
+  const threadOptions = {
+    model,
+    modelProvider: CODEX_SDK_PROVIDER_ID,
+    // Host instructions map onto the engine's developer instructions instead
+    // of being concatenated into the first user message.
+    developerInstructions: options.systemPrompt,
+  };
+
+  let threadId: string;
+  let isResumed = false;
+  if (options.sessionId) {
+    try {
+      debugLog(`[Codex AppServer] SDK strict resume: ${options.sessionId}`);
+      await client.resumeThread(options.sessionId, threadOptions);
+      threadId = options.sessionId;
+      isResumed = true;
+    } catch (err) {
+      // A failed resume must surface as a structured error and keep the old
+      // thread id — silently starting a fresh thread would lose the
+      // conversation while appearing to "continue" it.
+      const message = err instanceof Error ? err.message : String(err);
+      debugLog(`[Codex AppServer] SDK resume failed: ${message}`);
+      yield {
+        type: 'error',
+        errorCode: 'SESSION_RESUME_UNAVAILABLE',
+        error: `Could not resume the Codex thread for this session (${message}). Restore the session state or explicitly start a new session.`,
+      };
+      return;
+    }
+  } else {
+    threadId = await client.startThread(options.cwd, threadOptions);
+  }
+  debugLog(`[Codex AppServer] SDK threadId: ${threadId}`);
+  activeThreadIds.set(threadId, { client, threadId });
+
+  try {
+    const inputBlocks = prepareAppServerInput(input);
+    const buffered: ProviderRuntimeEvent[] = [];
+    let streamingMode = !isResumed;
+
+    for await (const msg of client.runTurn(threadId, inputBlocks, onPermission, {
+      cwd: options.cwd,
+      model,
+      mode: options.mode,
+    })) {
+      if (streamingMode) {
+        yield msg;
+        if (isTurnComplete(msg)) {
+          return;
+        }
+      } else {
+        buffered.push(msg);
+        if (isContentMessage(msg) || isTurnComplete(msg)) {
+          streamingMode = true;
+          for (const m of buffered) yield m;
+          buffered.length = 0;
+          if (isTurnComplete(msg)) {
+            return;
+          }
+        }
+      }
+    }
+
+    if (buffered.length > 0) {
+      for (const m of buffered) yield m;
+    }
+  } finally {
+    activeThreadIds.delete(threadId);
+  }
 }
 
 // ── Main run function ────────────────────────────────────────
@@ -280,6 +508,16 @@ export function runIdleCleanup(now = Date.now()): void {
       appServerClients.delete(key);
     }
   }
+  for (const [key, entry] of sdkSessionClients) {
+    if (entry.client.activeTurns > 0) continue;
+    if (now - entry.client.lastActivity > IDLE_TIMEOUT_MS) {
+      // Idle recycle only stops the process; the transcript/state directory
+      // stays untouched so the session can resume later.
+      debugLog(`[Codex AppServer] SDK idle recycle: ${key}`);
+      entry.client.destroy();
+      sdkSessionClients.delete(key);
+    }
+  }
 }
 
 const cleanupTimer = setInterval(() => {
@@ -293,7 +531,12 @@ export async function destroyAllCodexClients(): Promise<void> {
     debugLog(`[Codex AppServer] Shutdown cleanup: ${key}`);
     stopping.push(client.shutdown());
   }
+  for (const [key, entry] of sdkSessionClients) {
+    debugLog(`[Codex AppServer] SDK shutdown cleanup: ${key}`);
+    stopping.push(entry.client.shutdown());
+  }
   appServerClients.clear();
+  sdkSessionClients.clear();
   threadCwds.clear();
   activeThreadIds.clear();
   clearInterval(cleanupTimer);
@@ -302,6 +545,7 @@ export async function destroyAllCodexClients(): Promise<void> {
 
 export function resetCodexRunnerForTests(): void {
   appServerClients.clear();
+  sdkSessionClients.clear();
   threadCwds.clear();
   activeThreadIds.clear();
 }
