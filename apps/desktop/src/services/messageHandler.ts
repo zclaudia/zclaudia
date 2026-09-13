@@ -32,6 +32,7 @@ import { handleInteractionMessage } from './message-handlers/interaction-message
 import { handleBackgroundTaskMessage } from './message-handlers/background-task-messages';
 import { handleSessionMessage } from './message-handlers/session-messages';
 import { handleFilePushMessage } from './message-handlers/file-push-messages';
+import { handleInvocationMessage } from './message-handlers/invocation-messages';
 import { handleErrorMessage } from './message-handlers/error-messages';
 import { handleRunMessage } from './message-handlers/run-messages';
 import { handleGoalMessage } from './message-handlers/goal-messages';
@@ -199,6 +200,10 @@ const messageDispatcher = createMessageDispatcher<ServerMessage, MessageDispatch
   {
     types: ['file_push'],
     handle: handleFilePushMessage,
+  },
+  {
+    types: ['invocation_result', 'invocable_catalog_changed'],
+    handle: handleInvocationMessage,
   },
   {
     types: ['error'],

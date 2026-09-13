@@ -88,6 +88,19 @@ interface ChatInputAreaProps {
   onSendMessage: (content: string, attachments?: Attachment[]) => void;
   onCancelRun: () => void;
   onCommand: (command: string, args: string) => Promise<void>;
+  /** URIP catalog matches for the composer text (canonical invocables). */
+  invocableSuggestions?: (
+    typedText: string
+  ) => import('@zclaudia/shared/providers').InvocableDescriptor[];
+  /** Submit a canonical invocation for the selected catalog item. */
+  onCanonicalInvocation?: (
+    descriptor: import('@zclaudia/shared/providers').InvocableDescriptor,
+    args: string,
+    attachments?: Attachment[]
+  ) => Promise<boolean> | boolean;
+  /** "Send literally" escape (§16.3): preserve reserved-namespace bytes. */
+  onSendLiterally?: (text: string, attachments?: Attachment[]) => Promise<boolean> | boolean;
+  reservedRuntimeType?: string;
   /** Steer a queued item into the active run immediately, then remove it. */
   onSteerQueueItem: (item: QueueItem) => void;
   /** When true, the composer is vertically centered in the viewport (empty session). */
@@ -119,6 +132,10 @@ export function ChatInputArea({
   onSendMessage,
   onCancelRun,
   onCommand,
+  invocableSuggestions,
+  onCanonicalInvocation,
+  onSendLiterally,
+  reservedRuntimeType,
   onSteerQueueItem,
   centered = false,
 }: ChatInputAreaProps) {
@@ -464,6 +481,10 @@ export function ChatInputArea({
           onSend={onSendMessage}
           onCancel={onCancelRun}
           onCommand={onCommand}
+          invocableSuggestions={invocableSuggestions}
+          onCanonicalInvocation={onCanonicalInvocation}
+          onSendLiterally={onSendLiterally}
+          reservedRuntimeType={reservedRuntimeType}
           commands={commands}
           projectRoot={fileReferenceRoot}
           backendId={fileReferenceBackendId}

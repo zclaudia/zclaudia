@@ -51,6 +51,26 @@ interface ReconcileStaleRunParams {
   clearSessionActive: (sessionId: string) => void;
 }
 
+/** Upload composer attachments once and reuse the wire attachment contract. */
+export async function uploadMessageAttachments(
+  attachments?: Attachment[]
+): Promise<MessageAttachment[]> {
+  if (!attachments?.length) return [];
+  const uploadedAttachments: MessageAttachment[] = [];
+  for (const attachment of attachments) {
+    const blob = await (await fetch(attachment.data)).blob();
+    const file = new File([blob], attachment.name, { type: attachment.mimeType });
+    const uploaded = await uploadFile(file);
+    uploadedAttachments.push({
+      fileId: uploaded.fileId,
+      name: uploaded.name,
+      mimeType: uploaded.mimeType,
+      type: attachment.type,
+    });
+  }
+  return uploadedAttachments;
+}
+
 export async function reconcileStaleLoadingRun({
   sessionId,
   sessionRunId,
@@ -152,21 +172,10 @@ export function useSendMessage({
       setRestoreMessage(null);
       setUploadError(null);
 
-      const uploadedAttachments: MessageAttachment[] = [];
-
-      if (attachments && attachments.length > 0) {
+      let uploadedAttachments: MessageAttachment[] = [];
+      if (attachments?.length) {
         try {
-          for (const attachment of attachments) {
-            const blob = await (await fetch(attachment.data)).blob();
-            const file = new File([blob], attachment.name, { type: attachment.mimeType });
-            const uploaded = await uploadFile(file);
-            uploadedAttachments.push({
-              fileId: uploaded.fileId,
-              name: uploaded.name,
-              mimeType: uploaded.mimeType,
-              type: attachment.type,
-            });
-          }
+          uploadedAttachments = await uploadMessageAttachments(attachments);
         } catch (error) {
           console.error('Failed to upload attachments:', error);
           setUploadError(error instanceof Error ? error.message : 'Failed to upload file');

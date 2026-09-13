@@ -21,22 +21,29 @@ import { useDraftEditorStore } from '../../stores/draftEditorStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useChatSession } from '../../hooks/chat/useChatSession';
-import { useSendMessage } from '../../hooks/chat/useSendMessage';
+import { uploadMessageAttachments, useSendMessage } from '../../hooks/chat/useSendMessage';
 import { useSendQueueConsumer } from '../../hooks/chat/useSendQueueConsumer';
 import { useSendQueueStore, type QueueItem } from '../../stores/sendQueueStore';
 import { useCommandHandler } from '../../hooks/chat/useCommandHandler';
+import { useInvocableCatalog } from '../../hooks/chat/useInvocableCatalog';
+import {
+  buildCanonicalInvocationSubmission,
+  buildRawMessageSubmission,
+} from '../../hooks/chat/useInvocationHandler';
+import { hasClientAction } from './clientActions';
 import { useMessagePagination } from '../../hooks/chat/useMessagePagination';
 import { useSessionActions } from '../../hooks/chat/useSessionActions';
 import { usePlanStatus } from '../../hooks/chat/usePlanStatus';
 import { useKeyboardShortcuts } from '../../hooks/chat/useKeyboardShortcuts';
 import { useMobileViewport } from '../../hooks/chat/useMobileViewport';
 import { useSessionRoute } from '../../hooks/chat/useSessionRoute';
-import type { ClientMessage } from '@zclaudia/shared';
+import type { ClientMessage, MessageAttachment } from '@zclaudia/shared';
 import { useProjectStore } from '../../stores/projectStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { promptText } from '../../stores/confirmDialogStore';
 import * as api from '../../services/api';
+import type { Attachment } from './MessageInput';
 
 interface ChatInterfaceProps {
   sessionId: string;
@@ -217,21 +224,161 @@ export function ChatInterface({
   }, [isForcedPlanSession, effectiveMode, sessionId, setMode]);
 
   // Command handler
-  const { handleCommand, handleResetProviderSession, handleWorktreeChange } = useCommandHandler({
+  const { handleCommand, handleResetProviderSession, handleWorktreeChange, dispatchHostAction } =
+    useCommandHandler({
+      sessionId,
+      commands,
+      currentSession,
+      currentProject,
+      isForcedPlanSession,
+      mode: effectiveMode,
+      addMessage,
+      clearMessages,
+      scrollToBottom,
+      startRun,
+      llmProfileId,
+      commandsCacheKey,
+      setDrawerOpen,
+    });
+
+  // ── URIP session invocable catalog (§16) ──
+  // Fetched from the backend that executes this session's runs; a catalog
+  // failure never disables message submission (raw text stays available).
+  const invocableCatalog = useInvocableCatalog({
+    backendId: fileReferenceBackendId,
     sessionId,
-    commands,
-    currentSession,
-    currentProject,
-    isForcedPlanSession,
-    mode: effectiveMode,
-    addMessage,
-    clearMessages,
-    scrollToBottom,
-    startRun,
-    llmProfileId,
-    commandsCacheKey,
-    setDrawerOpen,
+    contextToken: currentSession?.workingDirectory ?? '',
   });
+
+  // Canonical submission (§16.3): host actions dispatch locally through the
+  // client action registry; everything else goes out as a run_start V2
+  // invocation carrying the canonical ID, revision, and context fingerprint.
+  const handleCanonicalInvocation = useCallback(
+    async (
+      descriptor: import('@zclaudia/shared/providers').InvocableDescriptor,
+      args: string,
+      attachments?: Attachment[]
+    ): Promise<boolean> => {
+      if (descriptor.kind === 'host.action' && hasClientAction(`zc.${descriptor.name}`)) {
+        if (attachments?.length) {
+          useToastStore.getState().add({
+            title: 'Attachments not supported',
+            message: 'Remove attachments before running a ZClaudia action.',
+            type: 'error',
+            sessionId,
+          });
+          return false;
+        }
+        await dispatchHostAction(descriptor.name, args);
+        return true;
+      }
+      const snapshot = invocableCatalog.snapshot;
+      if (!snapshot) {
+        useToastStore.getState().add({
+          title: 'Catalog unavailable',
+          message: 'Refresh the command catalog and select the item again.',
+          type: 'error',
+          sessionId,
+        });
+        return false;
+      }
+      let uploadedAttachments: MessageAttachment[];
+      try {
+        uploadedAttachments = await uploadMessageAttachments(attachments);
+      } catch (error) {
+        useToastStore.getState().add({
+          title: 'Upload failed',
+          message: error instanceof Error ? error.message : 'Failed to upload attachment.',
+          type: 'error',
+          sessionId,
+        });
+        return false;
+      }
+      const optimisticId = crypto.randomUUID();
+      addMessage(sessionId, {
+        id: optimisticId,
+        clientMessageId: optimisticId,
+        sessionId,
+        role: 'user',
+        content: args ? `${descriptor.displayTrigger} ${args}` : descriptor.displayTrigger,
+        createdAt: Date.now(),
+      });
+      wsSendMessage(
+        buildCanonicalInvocationSubmission(
+          sessionId,
+          {
+            descriptor,
+            typedTrigger: descriptor.displayTrigger,
+            arguments: { type: 'raw', value: args },
+          },
+          snapshot,
+          {
+            attachments: uploadedAttachments,
+            permissionOverride: permissionOverride ?? undefined,
+          }
+        ) as unknown as Parameters<typeof wsSendMessage>[0]
+      );
+      setTimeout(() => scrollToBottom(), 100);
+      return true;
+    },
+    [
+      addMessage,
+      dispatchHostAction,
+      invocableCatalog.snapshot,
+      permissionOverride,
+      scrollToBottom,
+      sessionId,
+      wsSendMessage,
+    ]
+  );
+
+  // "Send literally" escape (§16.3): preserve reserved-namespace bytes for the
+  // runtime instead of resolving them server-side.
+  const handleSendLiterally = useCallback(
+    async (text: string, attachments?: Attachment[]): Promise<boolean> => {
+      let uploadedAttachments: MessageAttachment[];
+      try {
+        uploadedAttachments = await uploadMessageAttachments(attachments);
+      } catch (error) {
+        useToastStore.getState().add({
+          title: 'Upload failed',
+          message: error instanceof Error ? error.message : 'Failed to upload attachment.',
+          type: 'error',
+          sessionId,
+        });
+        return false;
+      }
+      const optimisticId = crypto.randomUUID();
+      addMessage(sessionId, {
+        id: optimisticId,
+        clientMessageId: optimisticId,
+        sessionId,
+        role: 'user',
+        content: text,
+        createdAt: Date.now(),
+      });
+      wsSendMessage(
+        buildRawMessageSubmission(sessionId, text, {
+          sendLiterally: true,
+          attachments: uploadedAttachments,
+          mode: effectiveMode || undefined,
+          permissionOverride: permissionOverride ?? undefined,
+          workingDirectory: currentSession?.workingDirectory || undefined,
+        }) as unknown as Parameters<typeof wsSendMessage>[0]
+      );
+      setTimeout(() => scrollToBottom(), 100);
+      return true;
+    },
+    [
+      addMessage,
+      currentSession?.workingDirectory,
+      effectiveMode,
+      permissionOverride,
+      scrollToBottom,
+      sessionId,
+      wsSendMessage,
+    ]
+  );
 
   // Plan status
   const {
@@ -546,6 +693,13 @@ export function ChatInterface({
                 onSendMessage={handleSendMessage}
                 onCancelRun={handleCancelRun}
                 onCommand={handleCommand}
+                invocableSuggestions={invocableCatalog.autocomplete}
+                onCanonicalInvocation={handleCanonicalInvocation}
+                onSendLiterally={handleSendLiterally}
+                reservedRuntimeType={
+                  invocableCatalog.snapshot?.invocables.find(item => item.runtimeType !== 'host')
+                    ?.runtimeType
+                }
                 onSteerQueueItem={handleSteerQueueItem}
                 centered={isEmptySession}
               />

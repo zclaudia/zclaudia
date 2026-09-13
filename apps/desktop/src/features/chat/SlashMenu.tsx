@@ -1,6 +1,7 @@
 import { forwardRef, useMemo } from 'react';
-import { Pin, PinOff, Sparkles, Terminal, Bookmark } from 'lucide-react';
+import { Pin, PinOff, Sparkles, Terminal, Bookmark, Zap } from 'lucide-react';
 import type { SkillRef } from '@zclaudia/shared';
+import type { InvocableDescriptor } from '@zclaudia/shared/providers';
 import { SECTION_LABEL } from '../../components/ui/typography';
 
 /**
@@ -16,7 +17,7 @@ import { SECTION_LABEL } from '../../components/ui/typography';
 
 export interface SlashSuggestion {
   index: number;
-  type: 'command' | 'skill';
+  type: 'command' | 'skill' | 'invocable';
   value: string;
   description: string;
   // skill-only fields
@@ -26,6 +27,8 @@ export interface SlashSuggestion {
   mode?: string;
   pinned?: boolean;
   skillRef?: SkillRef;
+  /** URIP catalog item — selecting it submits the canonical invocation. */
+  invocable?: InvocableDescriptor;
 }
 
 export interface SlashMenuProps {
@@ -48,16 +51,21 @@ interface Group {
  * has already ordered the list: pinned skills → skills → commands.
  */
 function groupSuggestions(suggestions: SlashSuggestion[]): Group[] {
+  const invocables: SlashSuggestion[] = [];
   const pinned: SlashSuggestion[] = [];
   const skills: SlashSuggestion[] = [];
   const commands: SlashSuggestion[] = [];
   for (const s of suggestions) {
-    if (s.type === 'command') commands.push(s);
+    if (s.type === 'invocable') invocables.push(s);
+    else if (s.type === 'command') commands.push(s);
     else if (s.pinned) pinned.push(s);
     else skills.push(s);
   }
 
   const groups: Group[] = [];
+  if (invocables.length) {
+    groups.push({ key: 'invocables', label: 'Commands', icon: Zap, items: invocables });
+  }
   if (pinned.length) {
     groups.push({ key: 'pinned', label: 'Pinned', icon: Bookmark, items: pinned });
   }
@@ -146,9 +154,14 @@ export const SlashMenu = forwardRef<HTMLDivElement, SlashMenuProps>(function Sla
           {group.items.map(suggestion => {
             const selected = suggestion.index === selectedIndex;
             const isSkill = suggestion.type === 'skill';
+            const isInvocable = suggestion.type === 'invocable';
             return (
               <button
-                key={`${suggestion.type}:${suggestion.value}`}
+                key={
+                  suggestion.type === 'invocable' && suggestion.invocable
+                    ? suggestion.invocable.id
+                    : `${suggestion.type}:${suggestion.value}`
+                }
                 data-index={suggestion.index}
                 onClick={() => onSelect(suggestion)}
                 className={`group relative w-full pl-3 pr-2 py-1.5 text-left flex items-center gap-2.5 transition-colors ${
@@ -172,6 +185,16 @@ export const SlashMenu = forwardRef<HTMLDivElement, SlashMenuProps>(function Sla
                   {suggestion.description}
                 </span>
                 <div className="flex items-center gap-1.5 shrink-0">
+                  {isInvocable && suggestion.invocable && (
+                    <span
+                      data-testid="invocable-source-badge"
+                      className="text-[10px] uppercase tracking-wide text-muted-foreground bg-secondary px-1.5 py-0.5 rounded"
+                    >
+                      {suggestion.invocable.kind === 'host.action'
+                        ? 'ZClaudia'
+                        : suggestion.invocable.runtimeType}
+                    </span>
+                  )}
                   {isSkill ? <SkillBadges suggestion={suggestion} /> : null}
                   {(() => {
                     const ref = suggestion.skillRef;

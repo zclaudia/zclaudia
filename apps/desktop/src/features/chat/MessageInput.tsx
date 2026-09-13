@@ -22,6 +22,7 @@ import { useAgentForSession } from '../../hooks/useAgentForSession';
 import type { WorkspaceSkillInfo } from '../../services/api/workspace-skills';
 import { downscaleImageFile } from '../attachments/downscale-image';
 import { SlashMenu, type SlashSuggestion } from './SlashMenu';
+import type { InvocableDescriptor } from '@zclaudia/shared/providers';
 import { PinnedSkillChips } from './PinnedSkillChips';
 import { RichTextarea, type RichTextareaHandle } from 'rich-textarea';
 import { renderSkillTokens, deleteTokenAt, type TokenInteraction } from './SkillTokenRenderer';
@@ -39,6 +40,18 @@ interface MessageInputProps {
   onSend: (message: string, attachments?: Attachment[]) => void;
   onCancel?: () => void;
   onCommand?: (command: string, args: string) => void;
+  /** URIP catalog matches for the text being typed (canonical invocables). */
+  invocableSuggestions?: (typedText: string) => InvocableDescriptor[];
+  /** Submit a canonical invocation for the selected catalog item. */
+  onCanonicalInvocation?: (
+    descriptor: InvocableDescriptor,
+    args: string,
+    attachments?: Attachment[]
+  ) => Promise<boolean> | boolean;
+  /** "Send literally" escape (§16.3): preserve reserved-namespace bytes. */
+  onSendLiterally?: (text: string, attachments?: Attachment[]) => Promise<boolean> | boolean;
+  /** Runtime namespace advertised by the session-scoped catalog. */
+  reservedRuntimeType?: string;
   commands?: SlashCommand[]; // Commands from provider
   projectRoot?: string; // Project root for @ file mentions
   backendId?: string | null; // Backend ID for routing file listing API calls
@@ -103,6 +116,10 @@ export function MessageInput({
   onSend,
   onCancel,
   onCommand,
+  invocableSuggestions,
+  onCanonicalInvocation,
+  onSendLiterally,
+  reservedRuntimeType,
   commands = [],
   projectRoot,
   backendId,
@@ -127,6 +144,10 @@ export function MessageInput({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [showCommands, setShowCommands] = useState(false);
+  // Canonical invocation selection (URIP §16.2): the descriptor picked from the
+  // catalog list. Validated against the typed text at send time; cleared when
+  // editing moves away from its trigger.
+  const selectedInvocableRef = useRef<InvocableDescriptor | undefined>(undefined);
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const [workspaceSkills, setWorkspaceSkills] = useState<WorkspaceSkillInfo[]>([]);
   const [mentionState, setMentionState] = useState<MentionState>(initialMentionState);
@@ -352,10 +373,23 @@ export function MessageInput({
           description: cmd.description,
         })
       );
-    // Order: pinned skills first, then remaining skills by usage desc, then
-    // commands. Reassign contiguous indices so keyboard-nav + scroll-into-view
-    // stay aligned across the visual groups rendered by SlashMenu.
-    return [...skillSuggestions, ...commandSuggestions]
+    // URIP catalog items (§16.2): canonical entries from the session's
+    // invocable catalog, matched by display trigger or alias. Selecting one
+    // records the canonical ID while the composer keeps the editable text.
+    const invocableSuggestionsList: SlashSuggestion[] = (invocableSuggestions?.(value) ?? []).map(
+      (descriptor): SlashSuggestion => ({
+        index: 0,
+        type: 'invocable',
+        value: descriptor.displayTrigger,
+        description: descriptor.description || descriptor.label,
+        argumentHint: descriptor.argumentHint,
+        invocable: descriptor,
+      })
+    );
+    // Order: catalog invocables, then pinned skills, then remaining skills by
+    // usage desc, then commands. Reassign contiguous indices so keyboard-nav +
+    // scroll-into-view stay aligned across the visual groups rendered by SlashMenu.
+    return [...invocableSuggestionsList, ...skillSuggestions, ...commandSuggestions]
       .sort((a, b) => {
         const pa = a.type === 'skill' && a.pinned ? 1 : 0;
         const pb = b.type === 'skill' && b.pinned ? 1 : 0;
@@ -366,7 +400,7 @@ export function MessageInput({
         return ub - ua;
       })
       .map((s, index) => ({ ...s, index }));
-  }, [value, commands, workspaceSkills, pinnedKeys]);
+  }, [value, commands, workspaceSkills, pinnedKeys, invocableSuggestions]);
 
   // Detect @ mention in text
   const detectMention = useCallback(
@@ -815,7 +849,7 @@ export function MessageInput({
     });
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (disabled) return;
 
     const trimmedValue = value.trim();
@@ -835,6 +869,40 @@ export function MessageInput({
       return;
     }
 
+    // ── Canonical invocation submission (URIP §16.3) ──
+    // A catalog row picked from the menu records its canonical descriptor; the
+    // submission stays canonical only while the text still matches the trigger
+    // (editing the trigger clears the hidden selection). Otherwise the raw
+    // text flows through the normal paths below.
+    const selected = selectedInvocableRef.current;
+    if (selected && onCanonicalInvocation && trimmedValue.startsWith('/')) {
+      const trigger = selected.displayTrigger;
+      if (trimmedValue === trigger || trimmedValue.startsWith(`${trigger} `)) {
+        const invokeArgs =
+          trimmedValue === trigger ? '' : trimmedValue.slice(trigger.length + 1).trim();
+        lastSubmissionRef.current = { key: submissionKey, at: Date.now() };
+        const sent = await onCanonicalInvocation(
+          selected,
+          invokeArgs,
+          attachments.length > 0 ? attachments : undefined
+        );
+        if (!sent) {
+          lastSubmissionRef.current = null;
+          return;
+        }
+        selectedInvocableRef.current = undefined;
+        clearDraftPersistence();
+        setValue('');
+        clearDraft(sessionId);
+        setAttachments([]);
+        setAttachmentError(null);
+        pendingDraftAttachmentsRef.current = [];
+        return;
+      }
+      // Edited away from the trigger: the selection no longer matches.
+      selectedInvocableRef.current = undefined;
+    }
+
     // Handle slash commands
     if (trimmedValue.startsWith('/')) {
       const spaceIndex = trimmedValue.indexOf(' ');
@@ -843,7 +911,14 @@ export function MessageInput({
 
       // Only treat as command if it's a known command or a plugin command (contains ':')
       const isKnownCommand = commands.some(c => c.command === command);
-      const isPluginCommand = command.includes(':');
+      const namespace = command.slice(1).split(':', 1)[0];
+      const isReservedNamespace =
+        command.includes(':') &&
+        (namespace === 'zc' ||
+          namespace === 'skill' ||
+          namespace === reservedRuntimeType ||
+          namespace === agent?.runtimeType);
+      const isPluginCommand = command.includes(':') && !!agent && !isReservedNamespace;
 
       if (onCommand && (isKnownCommand || isPluginCommand)) {
         lastSubmissionRef.current = { key: submissionKey, at: Date.now() };
@@ -872,6 +947,16 @@ export function MessageInput({
   };
 
   const selectSlashSuggestion = (suggestion: SlashSuggestion) => {
+    if (suggestion.type === 'invocable' && suggestion.invocable) {
+      // Canonical selection (§16.2): record the descriptor; the composer keeps
+      // the editable trigger text. The selection is validated against the text
+      // at send time — editing away from the trigger clears it.
+      selectedInvocableRef.current = suggestion.invocable;
+      updateValue(suggestion.value + ' ');
+      setShowCommands(false);
+      textareaRef.current?.focus();
+      return;
+    }
     updateValue(suggestion.value + ' ');
     setShowCommands(false);
     textareaRef.current?.focus();
@@ -915,6 +1000,11 @@ export function MessageInput({
     [updateValue]
   );
 
+  // Reserved namespaces typed as raw text are resolved server-side (§12.2);
+  // the pill offers the explicit "send literally" escape for this exact text.
+  const showLiteralEscape =
+    !!onSendLiterally && value.startsWith('/') && /^\/[A-Za-z][A-Za-z0-9_-]*:[^\s]*/.test(value);
+
   return (
     <div className="relative">
       {/* Cursor-style command/skill dropdown */}
@@ -927,6 +1017,30 @@ export function MessageInput({
           onSelect={selectSlashSuggestion}
           onTogglePin={handleTogglePin}
         />
+      )}
+
+      {/* "Send literally" escape (§16.3): submit reserved-namespace text
+          byte-for-byte instead of letting the server resolve it. */}
+      {showLiteralEscape && (
+        <button
+          type="button"
+          data-testid="send-literally"
+          onClick={async () => {
+            const sent = await onSendLiterally?.(
+              value.trim(),
+              attachments.length > 0 ? attachments : undefined
+            );
+            if (!sent) return;
+            setValue('');
+            clearDraft(sessionId);
+            setAttachments([]);
+            setAttachmentError(null);
+            pendingDraftAttachmentsRef.current = [];
+          }}
+          className="absolute bottom-full left-0 mb-1 z-10 rounded-full border border-border bg-popover px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
+        >
+          Send literally — keep "/…" as plain text
+        </button>
       )}
 
       {/* Resident pinned-skill chips (renders nothing when empty) */}

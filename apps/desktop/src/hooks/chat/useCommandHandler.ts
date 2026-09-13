@@ -1,15 +1,19 @@
 import { DEFAULT_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
+import {
+  dispatchClientAction,
+  hasClientAction,
+  legacyAliasToHostActionName,
+  setClientActionContextFactory,
+  type ClientActionContext,
+} from '../../features/chat/clientActions';
+import '../../features/chat/clientActionDefinitions';
 import { useCallback } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
-import { useSupervisionStore } from '../../stores/supervisionStore';
 import { useRunStore } from '../../stores/runStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
-import { useGoalStore } from '../../stores/goalStore';
 import { activatePanel } from '../../utils/openPanel';
 import * as api from '../../services/api';
-import { activateGoal } from '../../services/goalActions';
-import { pauseGoal, resumeGoal, clearGoal } from '../../services/api/goals';
 import { finalizeRunLifecycle } from '../../services/message-handlers/run-finalization';
 import type {
   CommandExecuteResponse,
@@ -192,7 +196,10 @@ export function useCommandHandler({
           // Re-fetch commands from server (cache already cleared server-side)
           (llmProfileId
             ? api.getProviderCommands(llmProfileId, currentProject?.rootPath || undefined)
-            : api.getProviderTypeCommands(DEFAULT_AGENT_RUNTIME, currentProject?.rootPath || undefined)
+            : api.getProviderTypeCommands(
+                DEFAULT_AGENT_RUNTIME,
+                currentProject?.rootPath || undefined
+              )
           )
             .then(cmds => {
               useLlmProfileMetaStore.getState().setProviderCommands(commandsCacheKey, cmds);
@@ -310,411 +317,51 @@ export function useCommandHandler({
 
   const handleCommand = useCallback(
     async (command: string, args: string) => {
-      // Find the command definition to check its source
+      // ── URIP §12.4/§17.3: host actions are registered client actions. ──
+      // Canonical `/zc:<name>` triggers and the legacy unqualified aliases
+      // (/help, /context, /worktree, /goal, /pause, /resume, …) both dispatch
+      // through the desktop client action registry; the hard-coded branches
+      // are gone. Supervisor-scoped actions fall back to the legacy builtin
+      // command flow outside supervisor main sessions, preserving /status.
       const commandDef = commands.find(c => c.command === command);
-
-      // Handle /help locally with dynamic command list
-      if (command === '/help') {
-        const grouped: Record<string, typeof commands> = {};
-        for (const cmd of commands) {
-          const label =
-            cmd.source === 'local'
-              ? 'Built-in Commands'
-              : cmd.source === 'provider'
-                ? 'Provider Commands'
-                : cmd.source === 'custom'
-                  ? 'Custom Commands'
-                  : cmd.source === 'plugin'
-                    ? 'Plugin Commands'
-                    : 'Other Commands';
-          (grouped[label] ||= []).push(cmd);
-        }
-        const sections = Object.entries(grouped)
-          .map(
-            ([label, cmds]) =>
-              `**${label}:**\n\n${cmds.map(c => `- \`${c.command}\` — ${c.description}`).join('\n')}`
-          )
-          .join('\n\n');
-        addMessage(sessionId, {
-          id: crypto.randomUUID(),
+      let hostActionName = command.startsWith('/zc:')
+        ? command.slice(4).toLowerCase()
+        : legacyAliasToHostActionName(command);
+      if (hostActionName && !hasClientAction(`zc.${hostActionName}`)) {
+        hostActionName = undefined;
+      }
+      const isSupervisorSession = currentSession?.projectRole === 'main' && !!currentProject?.id;
+      const SUPERVISOR_ONLY = new Set(['create-task', 'status', 'pause', 'resume']);
+      if (hostActionName && SUPERVISOR_ONLY.has(hostActionName) && !isSupervisorSession) {
+        hostActionName = undefined;
+      }
+      if (hostActionName) {
+        // MessageInput splits the trigger and argument suffix before calling;
+        // both canonical and legacy paths receive the raw args here.
+        const actionArgs = args;
+        const ctx: ClientActionContext = {
           sessionId,
-          role: 'system',
-          content: sections,
-          createdAt: Date.now(),
-        });
-        return;
-      }
-
-      // Handle /context locally — fetch the server-side context snapshot and
-      // render it as a ContextUsageCard via a synthetic system message.
-      if (command === '/context') {
-        try {
-          const result = await api.getSessionContextUsage(sessionId);
-          if (!result.available) {
+          args: actionArgs,
+          addSystemMessage: (content, metadata) => {
             addMessage(sessionId, {
               id: crypto.randomUUID(),
               sessionId,
               role: 'system',
-              content: 'No context data yet — send a message first, then try /context again.',
-              createdAt: Date.now(),
-            });
-          } else {
-            const { available: _available, ...contextUsage } = result;
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              // Fallback text for clients that don't know the metadata sentinel.
-              content: 'Context window usage',
-              metadata: { contextUsage },
-              createdAt: Date.now(),
-            });
-          }
-        } catch (err) {
-          addMessage(sessionId, {
-            id: crypto.randomUUID(),
-            sessionId,
-            role: 'system',
-            content: `Failed to get context usage: ${(err as Error).message}`,
-            createdAt: Date.now(),
-          });
-        }
-        setTimeout(() => scrollToBottom(), 100);
-        return;
-      }
-
-      // Handle /worktree locally — view or switch
-      if (command === '/worktree') {
-        if (isForcedPlanSession) {
-          addMessage(sessionId, {
-            id: crypto.randomUUID(),
-            sessionId,
-            role: 'system',
-            content: 'Worktree is locked during Supervisor planning mode.',
-            createdAt: Date.now(),
-          });
-          setTimeout(() => scrollToBottom(), 100);
-          return;
-        }
-        const trimmedArgs = args.trim();
-        if (!trimmedArgs) {
-          const current =
-            currentSession?.workingDirectory || currentProject?.rootPath || '(unknown)';
-          addMessage(sessionId, {
-            id: crypto.randomUUID(),
-            sessionId,
-            role: 'system',
-            content: `Current worktree: \`${current}\`\n\n**Usage:**\n- \`/worktree <path>\` — switch to an existing worktree path\n- \`/worktree reset\` — reset to project root\n- \`/create-worktree [branch] [path]\` — create a new worktree`,
-            createdAt: Date.now(),
-          });
-        } else if (trimmedArgs === 'reset') {
-          await handleWorktreeChange('');
-          addMessage(sessionId, {
-            id: crypto.randomUUID(),
-            sessionId,
-            role: 'system',
-            content: 'Worktree reset to project root.',
-            createdAt: Date.now(),
-          });
-        } else {
-          try {
-            await handleWorktreeChange(trimmedArgs);
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              content: `Worktree set to: \`${trimmedArgs}\``,
-              createdAt: Date.now(),
-            });
-          } catch (err) {
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              content: `Failed to set worktree: ${(err as Error).message}`,
-              createdAt: Date.now(),
-            });
-          }
-        }
-        setTimeout(() => scrollToBottom(), 100);
-        return;
-      }
-
-      // Handle /new-cli-session (alias /reset-cli-session) locally.
-      if (command === '/new-cli-session' || command === '/reset-cli-session') {
-        try {
-          await api.resetSessionSdkSession(sessionId);
-          useSessionConfigStore.getState().clearSessionUsage(sessionId);
-          addMessage(sessionId, {
-            id: crypto.randomUUID(),
-            sessionId,
-            role: 'system',
-            content:
-              'Underlying CLI session reset. The next message will start a new provider-side session.',
-            createdAt: Date.now(),
-          });
-        } catch (err) {
-          addMessage(sessionId, {
-            id: crypto.randomUUID(),
-            sessionId,
-            role: 'system',
-            content: `Failed to reset CLI session: ${(err as Error).message}`,
-            createdAt: Date.now(),
-          });
-        }
-        setTimeout(() => scrollToBottom(), 100);
-        return;
-      }
-
-      // ── Supervisor commands (only in main supervisor session) ──
-      if (currentSession?.projectRole === 'main' && currentProject?.id) {
-        if (command === '/create-task') {
-          const title = args.trim();
-          if (!title) {
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              content: 'Usage: `/create-task <title>` — create a new supervision task',
+              content,
+              metadata,
               createdAt: Date.now(),
             });
             setTimeout(() => scrollToBottom(), 100);
-            return;
-          }
-          try {
-            const task = await api.createSupervisionTask(currentProject.id, {
-              title,
-              description: '',
-            });
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              content: `Task created: **${task.title}** (${task.status})`,
-              createdAt: Date.now(),
-            });
-            // Refresh task list in the card strip (no session created yet)
-            useSupervisionStore.getState().upsertTask(currentProject.id, task);
-          } catch (err) {
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              content: `Failed to create task: ${(err as Error).message}`,
-              createdAt: Date.now(),
-            });
-          }
-          setTimeout(() => scrollToBottom(), 100);
-          return;
-        }
-
-        if (command === '/status') {
-          try {
-            const tasks = await api.getSupervisionTasks(currentProject.id);
-            const agentData = await api.getSupervisionAgent(currentProject.id);
-            const lines: string[] = [];
-            lines.push(
-              `**Agent**: ${agentData?.phase ?? 'unknown'} | Trust: ${agentData?.config.trustLevel ?? '?'} | Concurrent: ${agentData?.config.maxConcurrentTasks ?? '?'}`
-            );
-            if (tasks.length === 0) {
-              lines.push('\nNo tasks yet. Use `/create-task <title>` to add one.');
-            } else {
-              const grouped: Record<string, typeof tasks> = {};
-              for (const t of tasks) {
-                (grouped[t.status] ??= []).push(t);
-              }
-              for (const [status, items] of Object.entries(grouped)) {
-                lines.push(`\n**${status}** (${items.length})`);
-                for (const t of items) {
-                  lines.push(`- ${t.title}${t.priority > 0 ? ` [P${t.priority}]` : ''}`);
-                }
-              }
-            }
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              content: lines.join('\n'),
-              createdAt: Date.now(),
-            });
-          } catch (err) {
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              content: `Failed to get status: ${(err as Error).message}`,
-              createdAt: Date.now(),
-            });
-          }
-          setTimeout(() => scrollToBottom(), 100);
-          return;
-        }
-
-        if (command === '/pause') {
-          try {
-            await api.updateSupervisionAgentAction(currentProject.id, 'pause');
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              content: 'Supervision agent paused.',
-              createdAt: Date.now(),
-            });
-          } catch (err) {
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              content: `Failed to pause: ${(err as Error).message}`,
-              createdAt: Date.now(),
-            });
-          }
-          setTimeout(() => scrollToBottom(), 100);
-          return;
-        }
-
-        if (command === '/resume') {
-          try {
-            await api.updateSupervisionAgentAction(currentProject.id, 'resume');
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              content: 'Supervision agent resumed.',
-              createdAt: Date.now(),
-            });
-          } catch (err) {
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              content: `Failed to resume: ${(err as Error).message}`,
-              createdAt: Date.now(),
-            });
-          }
-          setTimeout(() => scrollToBottom(), 100);
-          return;
-        }
-      }
-
-      // Handle /create-worktree locally — create a new worktree and switch to it
-      if (command === '/create-worktree') {
-        if (isForcedPlanSession) {
-          addMessage(sessionId, {
-            id: crypto.randomUUID(),
-            sessionId,
-            role: 'system',
-            content: 'Worktree is locked during Supervisor planning mode.',
-            createdAt: Date.now(),
-          });
-          setTimeout(() => scrollToBottom(), 100);
-          return;
-        }
-        if (!currentProject?.id) {
-          addMessage(sessionId, {
-            id: crypto.randomUUID(),
-            sessionId,
-            role: 'system',
-            content: 'No project associated with this session.',
-            createdAt: Date.now(),
-          });
-          setTimeout(() => scrollToBottom(), 100);
-          return;
-        }
-        const parts = args.trim().split(/\s+/).filter(Boolean);
-        const branch = parts[0]; // optional — auto-generated if omitted
-        const wtPath = parts[1]; // optional
-        try {
-          const wt = await api.createProjectWorktree(currentProject.id, branch || '', wtPath);
-          await handleWorktreeChange(wt.path);
-          addMessage(sessionId, {
-            id: crypto.randomUUID(),
-            sessionId,
-            role: 'system',
-            content: `Worktree created and activated:\n- **Branch:** \`${wt.branch}\`\n- **Path:** \`${wt.path}\``,
-            createdAt: Date.now(),
-          });
-        } catch (err) {
-          addMessage(sessionId, {
-            id: crypto.randomUUID(),
-            sessionId,
-            role: 'system',
-            content: `Failed to create worktree: ${(err as Error).message}`,
-            createdAt: Date.now(),
-          });
-        }
-        setTimeout(() => scrollToBottom(), 100);
-        return;
-      }
-
-      // Handle /goal locally — set / inspect / control an autonomous goal.
-      if (command === '/goal') {
-        const objective = args.trim();
-        const sub = objective.toLowerCase();
-        const store = useGoalStore.getState();
-        const current = store.bySession[sessionId]?.goal ?? null;
-        const live = !!current && (current.status === 'active' || current.status === 'paused');
-
-        if (!objective) {
-          addMessage(sessionId, {
-            id: crypto.randomUUID(),
-            sessionId,
-            role: 'system',
-            content:
-              'Usage: /goal <objective> — set an autonomous goal. Control it with `/goal pause`, `/goal resume`, or `/goal clear`.',
-            createdAt: Date.now(),
-          });
-          setTimeout(() => scrollToBottom(), 100);
-          return;
-        }
-
-        if (live && (sub === 'pause' || sub === 'resume' || sub === 'clear')) {
-          try {
-            if (sub === 'clear') {
-              await clearGoal(sessionId);
-              store.setGoal(sessionId, null);
-            } else {
-              const next =
-                sub === 'pause' ? await pauseGoal(sessionId) : await resumeGoal(sessionId);
-              store.setGoal(sessionId, next);
-            }
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              content:
-                sub === 'pause'
-                  ? 'Goal paused.'
-                  : sub === 'resume'
-                    ? 'Goal resumed.'
-                    : 'Goal cleared.',
-              createdAt: Date.now(),
-            });
-          } catch (err) {
-            addMessage(sessionId, {
-              id: crypto.randomUUID(),
-              sessionId,
-              role: 'system',
-              content: `Failed to ${sub} goal: ${(err as Error).message}`,
-              createdAt: Date.now(),
-            });
-          }
-          setTimeout(() => scrollToBottom(), 100);
-          return;
-        }
-
-        try {
-          await activateGoal(sessionId, { objective });
-        } catch (err) {
-          addMessage(sessionId, {
-            id: crypto.randomUUID(),
-            sessionId,
-            role: 'system',
-            content: `Failed to set goal: ${(err as Error).message}`,
-            createdAt: Date.now(),
-          });
-        }
-        setTimeout(() => scrollToBottom(), 100);
+          },
+          services: {
+            commands,
+            currentSession,
+            currentProject,
+            isForcedPlanSession,
+            switchWorktree: handleWorktreeChange,
+          },
+        };
+        await dispatchClientAction(`zc.${hostActionName}`, ctx);
         return;
       }
 
@@ -822,10 +469,77 @@ export function useCommandHandler({
     ]
   );
 
+  // Dispatch a host action by canonical name (used by the composer's
+  // canonical invocation path for host.action catalog items, §16.3).
+  const dispatchHostAction = useCallback(
+    async (name: string, actionArgs: string) => {
+      if (!hasClientAction(`zc.${name}`)) return;
+      const ctx: ClientActionContext = {
+        sessionId,
+        args: actionArgs,
+        addSystemMessage: (content, metadata) => {
+          addMessage(sessionId, {
+            id: crypto.randomUUID(),
+            sessionId,
+            role: 'system',
+            content,
+            metadata,
+            createdAt: Date.now(),
+          });
+          setTimeout(() => scrollToBottom(), 100);
+        },
+        services: {
+          commands,
+          currentSession,
+          currentProject,
+          isForcedPlanSession,
+          switchWorktree: handleWorktreeChange,
+        },
+      };
+      await dispatchClientAction(`zc.${name}`, ctx);
+    },
+    [
+      sessionId,
+      addMessage,
+      scrollToBottom,
+      commands,
+      currentSession,
+      currentProject,
+      isForcedPlanSession,
+      handleWorktreeChange,
+    ]
+  );
+
+  // Live context for server-dispatched client actions (invocation_result).
+  // Assigned during render: the hook is mounted per open chat session, so the
+  // factory always closes over the session that is currently wired.
+  setClientActionContextFactory((wireSessionId, wireArgs) => ({
+    sessionId: wireSessionId,
+    args: wireArgs,
+    addSystemMessage: (content, metadata) => {
+      addMessage(wireSessionId, {
+        id: crypto.randomUUID(),
+        sessionId: wireSessionId,
+        role: 'system',
+        content,
+        metadata,
+        createdAt: Date.now(),
+      });
+    },
+    services: {
+      commands,
+      currentSession,
+      currentProject,
+      isForcedPlanSession,
+      switchWorktree: handleWorktreeChange,
+    },
+  }));
+
   return {
     handleCommand,
     handleBuiltInCommand,
     handleResetProviderSession,
     handleWorktreeChange,
+    dispatchHostAction,
   };
 }
