@@ -74,3 +74,27 @@ export function resolveAcpModeId(
   if (target === currentModeId) return {}; // Already there.
   return { modeId: target };
 }
+
+/**
+ * Context window encoded in a parameterized Cursor `modelId` bracket, e.g.
+ * `claude-opus-5[thinking=true,context=300k,effort=high,fast=false]` → 300000.
+ * Probed formats (fixtures/auth-session.json, `--list-models`): `context=300k`,
+ * `context=272k`, `context=1m`; a bare number is taken as tokens. Returns
+ * undefined when the id carries no parseable `context=` parameter — callers
+ * must then leave `SystemInfo.contextWindow` unset rather than guess.
+ */
+export function parseCursorContextWindow(modelId: string | undefined): number | undefined {
+  if (!modelId) return undefined;
+  const bracket = modelId.match(/\[([^\]]*)\]/);
+  if (!bracket) return undefined;
+  for (const part of bracket[1].split(',')) {
+    const match = part.trim().match(/^context=(\d+(?:\.\d+)?)([km]?)$/i);
+    if (!match) continue;
+    const value = Number(match[1]);
+    if (!Number.isFinite(value) || value <= 0) return undefined;
+    const unit = match[2].toLowerCase();
+    const multiplier = unit === 'm' ? 1_000_000 : unit === 'k' ? 1_000 : 1;
+    return Math.round(value * multiplier);
+  }
+  return undefined;
+}

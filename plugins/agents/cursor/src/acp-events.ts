@@ -1,5 +1,5 @@
 import type { ProviderRuntimeEvent, SystemInfo } from '@zclaudia/plugin-sdk/providers';
-import type { ToolEffect } from '@zclaudia/plugin-sdk/types';
+import type { ContextWindowSource, ToolEffect } from '@zclaudia/plugin-sdk/types';
 import type {
   SessionUpdate,
   ToolCallUpdate,
@@ -15,6 +15,7 @@ import {
   truncateUtf8,
 } from '@zclaudia/agent-common';
 import type { CursorModelInfo } from './cursor-acp-extensions.js';
+import { parseCursorContextWindow } from './acp-models.js';
 import type { LocalToolDecision } from './acp-permissions.js';
 import { makeShellEffect } from './tool-effects.js';
 
@@ -412,9 +413,18 @@ export class AcpEventMapper {
     cwd: string;
     permissionMode: string | undefined;
   }): SystemInfo {
+    // The parameterized modelId encodes the window (`context=300k`); surfacing
+    // it lets the composer ring show a percentage even though the per-turn
+    // counters stay turn-aggregates (see map-events.ts result mapping).
+    const contextWindow = parseCursorContextWindow(input.effectiveModelId);
     return {
       model: input.displayName,
       ...(input.effectiveModelId ? { modelId: input.effectiveModelId } : {}),
+      ...(contextWindow
+        ? // plugin-sdk 0.3.0's ContextWindowSource lags the wire vocabulary,
+          // which has `'runtime'`; drop the cast when the SDK catches up.
+          { contextWindow, contextWindowSource: 'runtime' as unknown as ContextWindowSource }
+        : {}),
       cwd: input.cwd,
       ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
       ...(this.slashCommands.length > 0 ? { slashCommands: [...this.slashCommands] } : {}),

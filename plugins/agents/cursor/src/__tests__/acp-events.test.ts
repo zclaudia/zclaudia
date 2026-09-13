@@ -371,3 +371,33 @@ describe('AcpEventMapper', () => {
     expect(events[0].modeTransition?.mode).toBe('plan');
   });
 });
+
+describe('AcpEventMapper.buildSystemInfo', () => {
+  const base = {
+    models: undefined,
+    displayName: 'claude-opus-5',
+    cwd: '/repo',
+    permissionMode: 'default',
+  };
+
+  it('reports the window encoded in the parameterized modelId', () => {
+    const { mapper } = makeMapper();
+    expect(
+      mapper.buildSystemInfo({
+        ...base,
+        effectiveModelId: 'claude-opus-5[thinking=true,context=300k,effort=high,fast=false]',
+      })
+    ).toMatchObject({
+      model: 'claude-opus-5',
+      contextWindow: 300_000,
+      contextWindowSource: 'runtime',
+    });
+  });
+
+  it('leaves the window unset when the modelId encodes none', () => {
+    const { mapper } = makeMapper();
+    const info = mapper.buildSystemInfo({ ...base, effectiveModelId: 'default[]' });
+    expect(info.contextWindow).toBeUndefined();
+    expect(info.contextWindowSource).toBeUndefined();
+  });
+});
