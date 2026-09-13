@@ -234,3 +234,46 @@ describe('pumpClaudeStream context reporting', () => {
     expect(none.filter(e => e.type === 'init')).toHaveLength(1);
   });
 });
+
+describe('probed SDK payload (claude-agent-sdk 0.2.141)', () => {
+  // Captured from a real one-turn run. The first turn of a session writes the
+  // whole prompt to the cache, so input_tokens is tiny while
+  // cache_creation_input_tokens holds the actual occupancy — summing only
+  // input + cacheRead (pi's convention) would report 6 tokens instead of
+  // 16,656 and leave the ring reading ~0%.
+  const ASSISTANT = {
+    type: 'assistant',
+    parent_tool_use_id: null,
+    message: {
+      usage: {
+        input_tokens: 6,
+        cache_creation_input_tokens: 16_650,
+        cache_read_input_tokens: 0,
+        output_tokens: 1,
+      },
+    },
+  };
+
+  const RESULT = {
+    type: 'result',
+    subtype: 'success',
+    modelUsage: {
+      'claude-opus-4-7[1m]': {
+        inputTokens: 6,
+        outputTokens: 6,
+        cacheReadInputTokens: 0,
+        cacheCreationInputTokens: 16_650,
+        contextWindow: 1_000_000,
+        maxOutputTokens: 64_000,
+      },
+    },
+  };
+
+  it('counts cache creation as occupied window', () => {
+    expect(extractClaudeCallContextTokens(ASSISTANT)).toBe(16_656);
+  });
+
+  it('reads the window off the beta-suffixed model key', () => {
+    expect(extractClaudeContextWindow(RESULT)).toBe(1_000_000);
+  });
+});
