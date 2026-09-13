@@ -347,6 +347,21 @@ export function transformClaudeSdkMessage(
           'Claude execution failed',
       };
     }
+    // SDK result usage is per-turn (snake_case wire shape); `input_tokens`
+    // excludes cache reads, which arrive separately in `cache_read_input_tokens`.
+    const rawUsage = msg.usage as
+      | {
+          input_tokens?: number;
+          output_tokens?: number;
+          cache_read_input_tokens?: number;
+          cache_creation_input_tokens?: number;
+        }
+      | undefined;
+    const input = rawUsage?.input_tokens ?? 0;
+    const output = rawUsage?.output_tokens ?? 0;
+    const cacheRead = rawUsage?.cache_read_input_tokens ?? 0;
+    const cacheWrite = rawUsage?.cache_creation_input_tokens ?? 0;
+    const totalCost = typeof msg.total_cost_usd === 'number' ? msg.total_cost_usd : 0;
     return {
       type: 'result',
       content:
@@ -354,6 +369,17 @@ export function transformClaudeSdkMessage(
           ? truncateUtf8(msg.result, DEFAULT_TOOL_RESULT_BYTES)
           : undefined,
       isComplete: true,
+      usage: rawUsage
+        ? {
+            input,
+            output,
+            cacheRead,
+            cacheWrite,
+            totalTokens: input + output + cacheRead + cacheWrite,
+            // The SDK reports only the aggregate turn cost, not a per-bucket split.
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: totalCost },
+          }
+        : undefined,
     };
   }
 
