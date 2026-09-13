@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { Express, RequestHandler } from 'express';
 import type Database from 'better-sqlite3';
+import { isPiAgentRuntime } from '@zclaudia/shared/core/agent-profile';
 import { mountCapabilityRoutes } from '../../interfaces/http/provider-capabilities.js';
 import { mountCommandRoutes } from '../../interfaces/http/provider-commands.js';
 import { createDeferredDiagnosticsRoutes } from './pi-runtime/deferred-diagnostics-routes.js';
@@ -30,7 +31,26 @@ export function registerRuntimeRoutes(deps: RuntimeRoutesDeps): void {
   mountCommandRoutes(router, db);
   router.use(createDeferredDiagnosticsRoutes());
   router.use(createFileHistoryRoutes());
-  router.use(createContextUsageRoutes());
+  router.use(
+    createContextUsageRoutes({
+      // Only the built-in Pi runtime captures context snapshots; resolve the
+      // session's agent profile so the client can tell "no run yet" apart from
+      // "this runtime never reports a breakdown".
+      supportsContextBreakdown: sessionId => {
+        const row = db
+          .prepare(
+            `SELECT ap.runtime_type AS runtimeType
+             FROM sessions s
+             LEFT JOIN agent_profiles ap ON ap.id = s.agent_profile_id
+             WHERE s.id = ?`
+          )
+          .get(sessionId) as { runtimeType?: string | null } | undefined;
+        // Unknown session or missing profile: keep the generic "no data yet" copy.
+        if (!row || row.runtimeType == null) return true;
+        return isPiAgentRuntime(row.runtimeType);
+      },
+    })
+  );
 
   router.get('/plugin-tools', (_req: Request, res: Response) => {
     try {

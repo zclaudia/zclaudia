@@ -81,7 +81,18 @@ describe('ContextUsagePopover', () => {
     const { container } = renderPopover();
     fireEvent.mouseEnter(container.firstChild as HTMLElement);
 
-    await screen.findByTestId('context-usage-popover-empty');
+    const empty = await screen.findByTestId('context-usage-popover-empty');
+    expect(empty.textContent).toMatch(/send a message first/i);
+    expect(screen.queryByTestId('context-usage-card')).toBeNull();
+  });
+
+  it('renders the runtime-unsupported copy when the server reports supported:false', async () => {
+    mockFetch.mockResolvedValue({ available: false, supported: false });
+    const { container } = renderPopover();
+    fireEvent.mouseEnter(container.firstChild as HTMLElement);
+
+    const empty = await screen.findByTestId('context-usage-popover-empty');
+    expect(empty.textContent).toMatch(/isn't available for this runtime/i);
     expect(screen.queryByTestId('context-usage-card')).toBeNull();
   });
 

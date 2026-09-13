@@ -8,9 +8,9 @@ import {
   recordContextUsage,
 } from '../context-snapshot.js';
 
-function makeApp() {
+function makeApp(deps?: Parameters<typeof createContextUsageRoutes>[0]) {
   const app = express();
-  app.use('/api/providers', createContextUsageRoutes());
+  app.use('/api/providers', createContextUsageRoutes(deps));
   return app;
 }
 
@@ -19,10 +19,24 @@ describe('context usage routes', () => {
     clearContextSnapshots();
   });
 
-  it('returns available:false when the session has no snapshot', async () => {
+  it('returns available:false (supported by default) when the session has no snapshot', async () => {
     const res = await request(makeApp()).get('/api/providers/sessions/unknown/context-usage');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ success: true, data: { available: false } });
+    expect(res.body).toEqual({ success: true, data: { available: false, supported: true } });
+  });
+
+  it('reports supported:false when the resolver says the runtime never captures snapshots', async () => {
+    const app = makeApp({ supportsContextBreakdown: () => false });
+    const res = await request(app).get('/api/providers/sessions/ext1/context-usage');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: { available: false, supported: false } });
+  });
+
+  it('keeps supported:true for a pi session that simply has no run yet', async () => {
+    const app = makeApp({ supportsContextBreakdown: () => true });
+    const res = await request(app).get('/api/providers/sessions/pi1/context-usage');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: { available: false, supported: true } });
   });
 
   it('returns the computed payload for a snapshot with real usage', async () => {

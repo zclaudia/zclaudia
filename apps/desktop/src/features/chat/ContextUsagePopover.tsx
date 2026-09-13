@@ -31,7 +31,8 @@ const MARGIN = 8;
 type FetchState =
   | { status: 'loading' }
   | { status: 'available'; usage: ContextUsagePayload }
-  | { status: 'unavailable' }
+  /** `supported: false` — the runtime never reports a breakdown (external CLIs). */
+  | { status: 'unavailable'; supported: boolean }
   | { status: 'error' };
 
 /**
@@ -65,7 +66,7 @@ export function ContextUsagePopover({ sessionId, children, latestCacheRead }: Pr
       // Drop the result if we unmounted or switched sessions mid-flight.
       if (!isMounted() || sid !== sessionIdRef.current) return;
       if (!res.available) {
-        setState({ status: 'unavailable' });
+        setState({ status: 'unavailable', supported: res.supported !== false });
         return;
       }
       const { available: _available, ...usage } = res;
@@ -252,7 +253,9 @@ function PopoverBody({
           data-testid="context-usage-popover-empty"
           className="px-3 py-2.5 text-xs text-muted-foreground"
         >
-          No context data yet — send a message first.
+          {state.supported
+            ? 'No context data yet — send a message first.'
+            : "Context breakdown isn't available for this runtime."}
         </div>
       )}
       {state?.status === 'error' && (
