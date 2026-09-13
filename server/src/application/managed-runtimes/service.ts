@@ -307,6 +307,20 @@ async function runCompatibilityProbe(
       timeoutMs: probe.timeoutMs ?? 10_000,
     });
   }
+  // ACP (Agent Client Protocol) initialize: a full handshake with
+  // protocolVersion + clientCapabilities, requiring the agent to negotiate
+  // protocol version 1 (Cursor ACP design doc §6.2).
+  const acpInitializeParams =
+    probe.kind === 'acp'
+      ? {
+          protocolVersion: 1,
+          clientCapabilities: {
+            fs: { readTextFile: false, writeTextFile: false },
+            terminal: false,
+          },
+          clientInfo: { name: 'zclaudia-managed-runtime', version: '1' },
+        }
+      : undefined;
   return await new Promise(resolve => {
     let stdout = '';
     let stderr = '';
@@ -350,11 +364,25 @@ async function runCompatibilityProbe(
         try {
           const message = JSON.parse(line) as {
             id?: unknown;
-            result?: unknown;
+            result?: { protocolVersion?: unknown } | unknown;
             error?: { message?: string };
           };
           if (message.id !== 1) continue;
           if (Object.prototype.hasOwnProperty.call(message, 'result')) {
+            if (
+              acpInitializeParams &&
+              (message.result as { protocolVersion?: unknown })?.protocolVersion !== 1
+            ) {
+              finish({
+                code: 1,
+                signal: 'SIGTERM',
+                error: `Agent negotiated unsupported ACP protocol version ${
+                  (message.result as { protocolVersion?: unknown })?.protocolVersion
+                }.`,
+                timedOut: false,
+              });
+              return;
+            }
             finish({ code: 0, signal: 'SIGTERM', timedOut: false });
             return;
           }
@@ -362,7 +390,9 @@ async function runCompatibilityProbe(
             finish({
               code: 1,
               signal: 'SIGTERM',
-              error: `JSON-RPC initialize failed: ${message.error.message ?? 'unknown error'}.`,
+              error: `${
+                acpInitializeParams ? 'ACP' : 'JSON-RPC'
+              } initialize failed: ${message.error.message ?? 'unknown error'}.`,
               timedOut: false,
             });
             return;
@@ -387,14 +417,19 @@ async function runCompatibilityProbe(
       finish({
         code,
         signal,
-        error: 'Process exited before JSON-RPC initialize returned a result.',
+        error: `Process exited before ${
+          acpInitializeParams ? 'ACP' : 'JSON-RPC'
+        } initialize returned a result.`,
         timedOut: false,
       });
     });
     const request = `${JSON.stringify({
+      jsonrpc: acpInitializeParams ? '2.0' : undefined,
       id: 1,
       method: 'initialize',
-      params: { clientInfo: { name: 'zclaudia-managed-runtime', version: '1' } },
+      params: acpInitializeParams ?? {
+        clientInfo: { name: 'zclaudia-managed-runtime', version: '1' },
+      },
     })}\n`;
     child.stdin?.write(request, error => {
       if (!error) return;

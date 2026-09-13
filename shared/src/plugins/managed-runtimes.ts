@@ -32,7 +32,8 @@ export interface RuntimeVersionPolicy {
 }
 
 export interface RuntimeProbeDescriptor {
-  kind: 'command' | 'json-rpc';
+  /** `acp` sends a full ACP v1 initialize handshake (Cursor ACP §6.2). */
+  kind: 'command' | 'json-rpc' | 'acp';
   args: string[];
   timeoutMs?: number;
 }

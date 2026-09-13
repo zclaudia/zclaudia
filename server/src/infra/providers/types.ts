@@ -32,6 +32,12 @@ export type {
 export interface RunOptions {
   cwd: string;
   sessionId?: string;
+  /**
+   * Persisted transport of the provider session being resumed
+   * (e.g. `cursor-acp-v1` / `cursor-stream-json-v1`). Null for new sessions;
+   * resumes must honor the binding instead of guessing (Cursor ACP §14).
+   */
+  providerTransport?: string | null;
   cliPath?: string;
   env?: Record<string, string>;
   /** User-selected mode id (matches one of `ProviderCapabilities.modes`).
@@ -98,6 +104,21 @@ export interface ProviderAdapter {
     options: RunOptions,
     onPermission: PermissionCallback
   ): AsyncGenerator<ProviderRuntimeEvent, void, void>;
+
+  /**
+   * URIP V2 turn entry (design doc §9/§15): receives the typed turn input —
+   * message, runtime invocation, or portable skill — for adapters that opted
+   * in. When absent, only legacy string runs are possible and typed
+   * invocations fail with INVOCATION_UNSUPPORTED before any provider turn.
+   */
+  startTurn?(
+    input: import('@zclaudia/shared/providers').RuntimeTurnInput,
+    options: RunOptions,
+    onPermission: PermissionCallback
+  ): AsyncGenerator<ProviderRuntimeEvent, void, void>;
+
+  /** URIP runtime catalog source owned by the active adapter (§9.1). */
+  invocations?: import('@zclaudia/shared/providers').RuntimeInvocationProvider;
 
   /** Abort an active session */
   abort?(sessionId: string, cwd: string): Promise<void>;

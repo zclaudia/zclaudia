@@ -1,0 +1,17 @@
+{
+  "probe": "session-load",
+  "recorded": "2026-09-13 / cursor-agent 2026.09.10-fd3934a (design doc §2.4 baseline)",
+  "crossProcessLoad": {
+    "ok": true,
+    "stopReason": "end_turn",
+    "replayedUpdateTypes": ["user_message_chunk", "agent_thought_chunk", "agent_message_chunk"],
+    "sawUserChunkOnReplay": true,
+    "contextContinuous": true,
+    "note": "session/load replays history BEFORE its response returns; all updates before the response are protocol-state rebuild only, never new conversation content. user_message_chunk appears only in replay and is an extra replay tell."
+  },
+  "legacyIdLoad": {
+    "ok": false,
+    "error": "JSON-RPC -32602: Invalid params / Session \"<id>\" not found",
+    "note": "A fully-completed stream-json session id cannot be loaded by ACP. Transport binding (§14) is therefore mandatory; do not waste a round-trip loading legacy sessions."
+  }
+}

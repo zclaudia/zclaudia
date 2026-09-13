@@ -36,6 +36,7 @@ import {
   appendMessagesToTree,
   buildUserMessage,
 } from '../../../infra/providers/pi-runtime/session-tree/write-path.js';
+import type { RuntimeTurnInput } from '@zclaudia/shared/providers';
 
 export interface RunStartMessage extends Record<string, unknown> {
   type: 'run_start';
@@ -54,6 +55,8 @@ export interface RunStartMessage extends Record<string, unknown> {
   resend?: boolean;
   /** Arbitrary metadata to attach to the persisted user message (e.g. `{source: "goal-auto", goalId}`). */
   userMessageMetadata?: unknown;
+  /** Server-resolved URIP input. Private locators and skill bodies remain in-memory only. */
+  runtimeTurnInput?: RuntimeTurnInput;
 }
 
 export interface RunSessionRecord {
@@ -61,6 +64,7 @@ export interface RunSessionRecord {
   project_id: string;
   name: string | null;
   sdk_session_id: string | null;
+  provider_transport: string | null;
   session_type: 'regular' | 'background' | 'agent' | null;
   working_directory: string | null;
   project_role: string | null;
@@ -99,6 +103,8 @@ export interface RunBootstrapResult {
   projectId: string;
   providerConfig?: LlmProfileConfig;
   providerType: string;
+  /** Persisted provider transport binding of this session (§14), if any. */
+  providerTransport: string | null;
   providerEventState: RunProviderEventState;
   llmProfileId: string | null;
   requestedCwd: string;
@@ -155,7 +161,8 @@ export function initializeRunBootstrap(
   const session = db
     .prepare(
       `
-    SELECT s.id, s.project_id, s.name, s.sdk_session_id, s.type as session_type,
+    SELECT s.id, s.project_id, s.name, s.sdk_session_id, s.provider_transport,
+           s.type as session_type,
            s.working_directory, s.project_role, s.plan_status, s.task_id,
            s.agent_profile_id,
            p.root_path
@@ -236,6 +243,22 @@ export function initializeRunBootstrap(
   const providerTypeForSession = normalizeAgentRuntimeType(agentProfile.runtimeType);
   const providerPolicy = providerRegistry.getPolicy(providerTypeForSession);
   trace.setMeta({ provider: providerTypeForSession });
+
+  // Upgrade compatibility (Cursor ACP §14.2): a cursor session that has run but
+  // carries no transport binding predates the column — normalize it to the
+  // legacy transport, persist the fix, and warn. Never guess it into ACP.
+  let providerTransport = session.provider_transport;
+  if (providerTypeForSession === 'cursor' && session.sdk_session_id && !providerTransport) {
+    providerTransport = 'cursor-stream-json-v1';
+    db.prepare(`UPDATE sessions SET provider_transport = ?, updated_at = ? WHERE id = ?`).run(
+      providerTransport,
+      Date.now(),
+      session.id
+    );
+    console.warn(
+      `[Transport] session=${session.id} has a provider session id but no transport binding; normalized to cursor-stream-json-v1`
+    );
+  }
 
   // Some providers ignore a new non-default mode when resuming an existing
   // provider session. Keep the previous behavior by default, and let providers
@@ -443,6 +466,7 @@ export function initializeRunBootstrap(
     projectId,
     providerConfig,
     providerType: providerTypeForSession,
+    providerTransport,
     providerEventState,
     llmProfileId,
     requestedCwd,

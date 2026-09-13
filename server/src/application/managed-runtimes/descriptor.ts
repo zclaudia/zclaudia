@@ -248,8 +248,8 @@ export function validateRuntimeCompatibilityDescriptor(
   }
   assertDescriptor(isRecord(value.probe), 'probe must be an object');
   assertDescriptor(
-    value.probe.kind === 'command' || value.probe.kind === 'json-rpc',
-    'probe.kind must be command or json-rpc'
+    value.probe.kind === 'command' || value.probe.kind === 'json-rpc' || value.probe.kind === 'acp',
+    'probe.kind must be command, json-rpc, or acp'
   );
   assertDescriptor(isStringArray(value.probe.args), 'probe.args must be a non-empty string array');
   if (value.probe.timeoutMs !== undefined) {

@@ -1,7 +1,7 @@
 {
   "id": "com.zclaudia.cursor",
   "name": "Cursor Agent",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Run Cursor Agent CLI (cursor-agent) as a zclaudia agent runtime.",
   "main": "dist/main.js",
   "executionMode": "main",
@@ -9,11 +9,7 @@
   "engines": {
     "claudia": "*"
   },
-  "permissions": [
-    "provider.register",
-    "provider.call",
-    "network.fetch"
-  ],
+  "permissions": ["provider.register", "provider.call", "network.fetch"],
   "contributes": {
     "agentRuntimes": [
       {
@@ -30,11 +26,11 @@
           "providers": "external",
           "skills": "external"
         },
-        "authNote": "Cursor uses the local cursor-agent CLI. MCP bridge tools are injected into .cursor/mcp.json for this project; Cursor-native MCP and skills stay outside zclaudia profile tools.",
+        "authNote": "Cursor uses the local cursor-agent CLI. ZClaudia bridge tools attach to the ACP session inline (never written to project files); Cursor-native MCP and skills stay outside zclaudia profile tools. Default mode shows an approval prompt for every tool call; bypass mode auto-approves.",
         "manifest": {
           "id": "cursor",
           "name": "Cursor",
-          "version": "1.0.0",
+          "version": "2.0.0",
           "apiVersion": "pcp/v1",
           "providerType": "cursor",
           "runtime": "cli",
@@ -43,20 +39,22 @@
               "id": "chat.stream",
               "supported": true,
               "mode": "native",
-              "reliability": "best_effort"
+              "reliability": "strict",
+              "notes": "ACP text chunks are forwarded in arrival order; terminal events are single-shot."
             },
             {
               "id": "tool.call",
               "supported": true,
               "mode": "native",
-              "reliability": "best_effort"
+              "reliability": "strict",
+              "notes": "Tool terminal status follows the local permission decision, not the agent's reported status."
             },
             {
               "id": "tool.inject",
               "supported": true,
               "mode": "bridged",
-              "reliability": "best_effort",
-              "notes": "Via .cursor/mcp.json injection"
+              "reliability": "strict",
+              "notes": "Bridge tools attach inline via the ACP session's mcpServers parameter; the project's .cursor/mcp.json is never touched."
             },
             {
               "id": "interaction.form",
@@ -65,8 +63,10 @@
             },
             {
               "id": "interaction.approval",
-              "supported": false,
-              "degradation": "fallback_to_text"
+              "supported": true,
+              "mode": "native",
+              "reliability": "strict",
+              "notes": "ACP session/request_permission surfaces every tool call to the host; abnormal paths fail closed."
             },
             {
               "id": "interaction.todo",
@@ -92,7 +92,8 @@
               "id": "permission.mode",
               "supported": true,
               "mode": "native",
-              "reliability": "strict"
+              "reliability": "best_effort",
+              "notes": "plan/ask cancel mutating tools detected executing without permission; detection is not a read-only security boundary."
             },
             {
               "id": "session.abort",

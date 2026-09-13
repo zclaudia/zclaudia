@@ -1,0 +1,35 @@
+{
+  "probe": "inline-mcp",
+  "recorded": "2026-09-13 / cursor-agent 2026.09.10-fd3934a (design doc §2.5 baseline)",
+  "canary": "probe-mcp-canary-0451",
+  "toolEventSequence": [
+    {
+      "kind": "tool_call",
+      "title": "MCP: tool",
+      "status": null,
+      "rawInputKeys": [],
+      "note": "placeholder; no usable identity"
+    },
+    {
+      "kind": "tool_call_update",
+      "title": "zclaudia-probe: probe_ping",
+      "status": null,
+      "rawInputKeys": ["providerIdentifier", "toolName", "args"],
+      "note": "real server/tool/args live here"
+    },
+    { "kind": "tool_call_update", "title": null, "status": "in_progress", "rawInputKeys": [] },
+    {
+      "kind": "tool_call_update",
+      "title": null,
+      "status": "completed",
+      "rawInputKeys": [],
+      "note": "rawOutput { success: true } follows the permission round-trip"
+    }
+  ],
+  "canaryInTranscript": true,
+  "permissionRequested": true,
+  "notes": [
+    "Inline stdio mcpServers works end-to-end; env passes as [{name,value}] without ${VAR} indirection.",
+    "MCP tool calls trigger session/request_permission — ZClaudia bridge tools must go through normal host approval (§8.2)."
+  ]
+}

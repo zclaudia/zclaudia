@@ -257,7 +257,10 @@ export function validateRuntimeCompatibility(config, expectedRuntime) {
 
   const probe = config.probe;
   assert(probe && typeof probe === 'object', 'probe must be an object.');
-  assert(['command', 'json-rpc'].includes(probe.kind), 'probe.kind must be command or json-rpc.');
+  assert(
+    ['command', 'json-rpc', 'acp'].includes(probe.kind),
+    'probe.kind must be command, json-rpc, or acp.'
+  );
   assert(isNonEmptyStringArray(probe.args), 'probe.args must be a non-empty string array.');
 
   const policy = config.versionPolicy;
@@ -307,12 +310,18 @@ export function validateRuntimeCompatibility(config, expectedRuntime) {
   const live = config.live;
   assert(live && typeof live === 'object', 'live must be an object.');
   assert(
-    ['stream-json', 'json-rpc-turn'].includes(live.kind),
-    'live.kind must be stream-json or json-rpc-turn.'
+    ['stream-json', 'json-rpc-turn', 'acp-turn'].includes(live.kind),
+    'live.kind must be stream-json, json-rpc-turn, or acp-turn.'
   );
   if (live.kind === 'stream-json') {
     assert(isStringArray(live.args), 'live.args must be a string array for stream-json.');
     assert(isStringArray(live.completionTypes), 'live.completionTypes must be a string array.');
+  } else if (live.kind === 'acp-turn') {
+    assert(isStringArray(live.args), 'live.args must be a string array for acp-turn.');
+    assert(
+      typeof live.prompt === 'string' && live.prompt.length > 0,
+      'live.prompt must be a string for acp-turn.'
+    );
   } else {
     assert(isStringArray(live.args), 'live.args must be a string array for json-rpc-turn.');
     assert(
@@ -711,10 +720,263 @@ async function runLiveProbe(executable, live, timeoutMs) {
   try {
     if (live.kind === 'stream-json')
       return await runStreamJsonLive(executable, live, timeoutMs, directory);
+    if (live.kind === 'acp-turn')
+      return await runAcpLiveTurn(executable, live, timeoutMs, directory);
     return await runJsonRpcLiveTurn(executable, live, timeoutMs, directory);
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
+}
+
+/**
+ * Full ACP v1 initialize probe (Cursor ACP design doc §6.2). Unlike the Codex
+ * `json-rpc` probe (Codex-style initialize), this sends the ACP handshake with
+ * `jsonrpc: "2.0"`, `protocolVersion`, `clientCapabilities`, and `clientInfo`,
+ * and requires the agent to negotiate protocol version 1.
+ */
+function probeAcp(executable, args, timeoutMs) {
+  return new Promise(resolve => {
+    const stderr = boundedCollector();
+    let child;
+    let done = false;
+    let timer;
+    const finish = result => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      child?.kill('SIGTERM');
+      resolve({ ...result, stderr: stderr.value() });
+    };
+    try {
+      child = spawn(executable, args, { stdio: ['pipe', 'pipe', 'pipe'], env: process.env });
+      let remainder = '';
+      child.stdout?.on('data', chunk => {
+        remainder += chunk.toString();
+        const lines = remainder.split(/\r?\n/);
+        remainder = lines.pop() ?? '';
+        for (const line of lines) {
+          let message;
+          try {
+            message = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (message.id !== 1) continue;
+          if (message.error) {
+            return finish({
+              ok: false,
+              message: `ACP initialize failed: ${message.error.message ?? 'unknown error'}.`,
+            });
+          }
+          if (message.result?.protocolVersion !== 1) {
+            return finish({
+              ok: false,
+              message: `Agent negotiated unsupported ACP protocol version ${message.result?.protocolVersion}.`,
+            });
+          }
+          if (
+            !message.result?.agentCapabilities ||
+            typeof message.result.agentCapabilities !== 'object'
+          ) {
+            return finish({ ok: false, message: 'ACP initialize returned no agentCapabilities.' });
+          }
+          return finish({ ok: true, message: 'ACP v1 initialize completed.' });
+        }
+      });
+      child.stderr?.on('data', stderr.append);
+      child.once('error', error => finish({ ok: false, message: error.message }));
+      child.once('close', (exitCode, signal) =>
+        finish({
+          ok: false,
+          message: `Process exited before ACP initialize (code=${exitCode}, signal=${signal}).`,
+        })
+      );
+      child.stdin?.write(
+        `${JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: 1,
+            clientCapabilities: {
+              fs: { readTextFile: false, writeTextFile: false },
+              terminal: false,
+            },
+            clientInfo: { name: 'zclaudia-runtime-compat', version: '1' },
+          },
+        })}\n`
+      );
+      timer = setTimeout(
+        () => finish({ ok: false, message: `ACP initialize timed out after ${timeoutMs}ms.` }),
+        timeoutMs
+      );
+    } catch (error) {
+      finish({ ok: false, message: error instanceof Error ? error.message : String(error) });
+    }
+  });
+}
+
+/**
+ * ACP live turn: initialize → authenticate → session/new → session/prompt,
+ * judged by the PromptResponse stop reason (design doc §6.2). Permission
+ * requests are auto-rejected — the canonical prompt asks for no tools, and a
+ * rejection keeps the turn converging.
+ */
+function runAcpLiveTurn(executable, live, timeoutMs, cwd) {
+  return new Promise(resolve => {
+    const stderr = boundedCollector();
+    let child;
+    let done = false;
+    let timer;
+    let requestId = 0;
+    const finish = result => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      child?.kill('SIGTERM');
+      resolve(result);
+    };
+    const send = (method, params) => {
+      const id = ++requestId;
+      child.stdin?.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+      return id;
+    };
+    try {
+      child = spawn(executable, live.args, {
+        cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: process.env,
+      });
+      let remainder = '';
+      let initializeId;
+      let authId;
+      let newSessionId;
+      let promptId;
+      child.stdout?.on('data', chunk => {
+        remainder += chunk.toString();
+        const lines = remainder.split(/\r?\n/);
+        remainder = lines.pop() ?? '';
+        for (const line of lines) {
+          let message;
+          try {
+            message = JSON.parse(line);
+          } catch {
+            continue;
+          }
+
+          if (message.id !== undefined && message.method === undefined) {
+            if (message.id === initializeId) {
+              if (message.error)
+                return finish(
+                  testResult(
+                    'live.turn',
+                    'failed',
+                    `ACP initialize failed: ${message.error.message ?? 'unknown error'}.`
+                  )
+                );
+              const authMethod = message.result?.authMethods?.find(m => m.id === 'cursor_login');
+              if (authMethod) authId = send('authenticate', { methodId: authMethod.id });
+              if (!authMethod) newSessionId = send('session/new', { cwd, mcpServers: [] });
+            } else if (message.id === authId) {
+              if (message.error)
+                return finish(
+                  testResult(
+                    'live.turn',
+                    'failed',
+                    `authenticate failed: ${message.error.message ?? 'unknown error'}.`
+                  )
+                );
+              newSessionId = send('session/new', { cwd, mcpServers: [] });
+            } else if (message.id === newSessionId) {
+              if (message.error)
+                return finish(
+                  testResult(
+                    'live.turn',
+                    'failed',
+                    `session/new failed: ${message.error.message ?? 'unknown error'}.`
+                  )
+                );
+              if (!message.result?.sessionId)
+                return finish(
+                  testResult('live.turn', 'failed', 'session/new returned no session id.')
+                );
+              promptId = send('session/prompt', {
+                sessionId: message.result.sessionId,
+                prompt: [{ type: 'text', text: live.prompt }],
+              });
+            } else if (message.id === promptId) {
+              if (message.error)
+                return finish(
+                  testResult(
+                    'live.turn',
+                    'failed',
+                    `session/prompt failed: ${message.error.message ?? 'unknown error'}.`
+                  )
+                );
+              const stopReason = message.result?.stopReason;
+              if (stopReason === 'end_turn')
+                return finish(testResult('live.turn', 'passed', 'Live ACP turn completed.'));
+              return finish(
+                testResult(
+                  'live.turn',
+                  'failed',
+                  `Live ACP turn ended with stopReason ${stopReason ?? 'unknown'}.`
+                )
+              );
+            }
+            continue;
+          }
+
+          if (message.method === 'session/request_permission') {
+            const options = message.params?.options ?? [];
+            const reject = options.find(
+              o => o.kind === 'reject_once' || o.kind === 'reject_always'
+            );
+            child.stdin?.write(
+              `${JSON.stringify({
+                jsonrpc: '2.0',
+                id: message.id,
+                result: reject
+                  ? { outcome: { outcome: 'selected', optionId: reject.optionId } }
+                  : { outcome: { outcome: 'cancelled' } },
+              })}\n`
+            );
+          }
+        }
+      });
+      child.stderr?.on('data', stderr.append);
+      child.once('error', error => finish(testResult('live.turn', 'failed', error.message)));
+      child.once('close', (exitCode, signal) =>
+        finish(
+          testResult(
+            'live.turn',
+            'failed',
+            `Process exited before ACP turn completion (code=${exitCode}, signal=${signal}).`,
+            { stderr: stderr.value() }
+          )
+        )
+      );
+      initializeId = send('initialize', {
+        protocolVersion: 1,
+        clientCapabilities: {
+          fs: { readTextFile: false, writeTextFile: false },
+          terminal: false,
+        },
+        clientInfo: { name: 'zclaudia-runtime-compat', version: '1' },
+      });
+      timer = setTimeout(
+        () =>
+          finish(
+            testResult('live.turn', 'failed', `Live ACP turn timed out after ${timeoutMs}ms.`)
+          ),
+        timeoutMs
+      );
+    } catch (error) {
+      finish(
+        testResult('live.turn', 'failed', error instanceof Error ? error.message : String(error))
+      );
+    }
+  });
 }
 
 export async function testRuntimeCompatibility(
@@ -785,6 +1047,16 @@ export async function testRuntimeCompatibility(
     } else {
       results.push(testResult('cli.launch', 'passed', 'CLI launch probe completed.'));
     }
+  } else if (compatibility.probe.kind === 'acp') {
+    const probe = await probeAcp(executable, compatibility.probe.args, timeoutMs);
+    results.push(
+      testResult(
+        'cli.protocol',
+        probe.ok ? 'passed' : 'failed',
+        probe.message,
+        probe.ok ? {} : { stderr: probe.stderr }
+      )
+    );
   } else {
     const probe = await probeJsonRpc(executable, compatibility.probe.args, timeoutMs);
     results.push(

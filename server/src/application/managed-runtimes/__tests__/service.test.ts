@@ -59,6 +59,47 @@ if (args.includes('--version')) {
       }
     }
   });
+} else if (args.includes('--acp-probe')) {
+  let input = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', chunk => {
+    input += chunk;
+    const lines = input.split(/\\r?\\n/);
+    input = lines.pop() ?? '';
+    for (const line of lines) {
+      const message = JSON.parse(line);
+      if (message.method === 'initialize') {
+        const response = JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: { protocolVersion: 1, agentCapabilities: {} },
+        }) + '\\n';
+        process.stdout.write(response.slice(0, 17));
+        setTimeout(() => process.stdout.write(response.slice(17)), 5);
+      }
+    }
+  });
+} else if (args.includes('--acp-probe')) {
+  let input = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', chunk => {
+    input += chunk;
+    const lines = input.split(/\\r?\\n/);
+    input = lines.pop() ?? '';
+    for (const line of lines) {
+      const message = JSON.parse(line);
+      if (message.method === 'initialize') {
+        const response = JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: { protocolVersion: 1, agentCapabilities: {} },
+        }) + '\\n';
+        const midpoint = Math.floor(response.length / 2);
+        process.stdout.write(response.slice(0, midpoint));
+        setTimeout(() => process.stdout.write(response.slice(midpoint)), 5);
+      }
+    }
+  });
 } else if (args[0] === 'auth' && args[1] === 'status') {
   if (process.env.OFFICIAL_FAKE_TOKEN === 'preserved' && process.env.HOME === '/host/home') {
     console.log('AUTH_OK');
@@ -297,6 +338,44 @@ describe('ManagedRuntimeService resolution', () => {
     const runtimeService = await service({ path: systemDir });
     const config = descriptor();
     config.probe = { kind: 'json-rpc', args: ['--json-rpc-probe'] };
+    registerCatalog(runtimeService, config);
+
+    await expect(
+      runtimeService.resolveForPlugin('com.example.fixture', 'fixture', { headless: true })
+    ).resolves.toMatchObject({
+      status: 'resolved',
+      source: 'system',
+      executablePath: systemPath,
+      compatibilityState: 'compatible',
+    });
+  });
+
+  it('parses a split ACP initialize response exactly once', async () => {
+    const root = await temporaryDirectory();
+    const systemDir = path.join(root, 'system');
+    const systemPath = await executable(systemDir, 'fixture', '1.2.3');
+    const runtimeService = await service({ path: systemDir });
+    const config = descriptor();
+    config.probe = { kind: 'acp', args: ['--acp-probe'] };
+    registerCatalog(runtimeService, config);
+
+    await expect(
+      runtimeService.resolveForPlugin('com.example.fixture', 'fixture', { headless: true })
+    ).resolves.toMatchObject({
+      status: 'resolved',
+      source: 'system',
+      executablePath: systemPath,
+      compatibilityState: 'compatible',
+    });
+  });
+
+  it('parses a chunked ACP initialize response exactly once', async () => {
+    const root = await temporaryDirectory();
+    const systemDir = path.join(root, 'system');
+    const systemPath = await executable(systemDir, 'fixture', '1.2.3');
+    const runtimeService = await service({ path: systemDir });
+    const config = descriptor();
+    config.probe = { kind: 'acp', args: ['--acp-probe'] };
     registerCatalog(runtimeService, config);
 
     await expect(

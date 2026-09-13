@@ -1,0 +1,32 @@
+{
+  "probe": "initialize",
+  "result": {
+    "protocolVersion": 1,
+    "agentCapabilities": {
+      "loadSession": true,
+      "mcpCapabilities": {
+        "http": true,
+        "sse": true
+      },
+      "promptCapabilities": {
+        "audio": false,
+        "embeddedContext": false,
+        "image": true
+      },
+      "sessionCapabilities": {
+        "list": {}
+      }
+    },
+    "authMethods": [
+      {
+        "id": "cursor_login",
+        "name": "Cursor Login",
+        "description": "Authenticate using existing Cursor login credentials. Run 'agent login' first if not logged in."
+      }
+    ]
+  },
+  "notes": [
+    "mcpCapabilities declares only http/sse; stdio is baseline and still works (§2.5).",
+    "acp is absent from `cursor-agent --help` Commands; availability must be probed by handshake, not help output."
+  ]
+}

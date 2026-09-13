@@ -17,6 +17,7 @@ apps/desktop/src/components/filesymbols/generated/
 # 测试报告
 playwright-report/
 test-results/
+**/.record/
 
 # 缓存
 .cache/

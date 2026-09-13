@@ -56,6 +56,8 @@ export interface BuildRunContextInput {
   modeValue: string;
   providerConfig?: LlmProfileConfig;
   providerType: string;
+  /** Persisted provider transport binding of this session (Cursor ACP §14). */
+  providerTransport?: string | null;
   runId: string;
   agentTaskExecutor?: TaskExecutor;
   sdkSessionId?: string;
@@ -79,6 +81,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     modeValue,
     providerConfig,
     providerType,
+    providerTransport,
     runId,
     agentTaskExecutor,
     sdkSessionId,
@@ -158,6 +161,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     runOptions: {
       cwd,
       sessionId: sdkSessionId,
+      providerTransport: providerTransport ?? null,
       env: filePushEnv,
       mode: nativeMode,
       systemPrompt,

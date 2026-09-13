@@ -124,6 +124,12 @@ export async function stageBuiltinAgents(
       await copyPortableDependencies(source, path.join(destination, 'node_modules'), repoRoot);
       const engine = await stageCodexEngine(source, destination, targetPlatform);
       if (engine) runtimeEngines = { engine };
+    } else if (runtime === 'cursor') {
+      // The ACP transport imports @agentclientprotocol/sdk at runtime and the
+      // bundler externalizes production dependencies — vendor the installed
+      // graph so a clean install never depends on hoisted node_modules
+      // (Cursor ACP design doc §6.3).
+      await copyPortableDependencies(source, path.join(destination, 'node_modules'), repoRoot);
     }
     await writeFile(
       path.join(destination, 'package.json'),

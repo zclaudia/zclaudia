@@ -1,0 +1,15 @@
+{
+  "probe": "plan-mode",
+  "recorded": "2026-09-13 / cursor-agent 2026.09.10-fd3934a (design doc §2.7 baseline)",
+  "availableModes": ["agent", "plan", "ask"],
+  "stopReason": "end_turn",
+  "extensionRequests": ["cursor/create_plan"],
+  "workspaceUntouched": true,
+  "createPlanSeen": true,
+  "notes": [
+    "Plan mode produced no workspace side effects; the plan still lands in ~/.cursor/plans/ (provider-owned state).",
+    "cursor/create_plan carried toolCallId/name/overview/plan(Markdown). This is the only Cursor extension that is mandatory in v1 (§10.1).",
+    "A -32601 reply does not crash the session; the turn still ends end_turn.",
+    "Read-only tools (search etc.) executed without permission requests."
+  ]
+}

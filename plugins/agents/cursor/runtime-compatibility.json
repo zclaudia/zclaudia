@@ -6,24 +6,20 @@
     "versionArgs": ["--version"],
     "versionPattern": "(?:^|\\s)(\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?)(?=\\s|$)"
   },
+  "versionPolicy": {
+    "testedMaximum": "2026.09.10-fd3934a"
+  },
   "probe": {
-    "kind": "command",
-    "args": ["--help"]
+    "kind": "acp",
+    "args": ["acp"]
   },
   "live": {
-    "kind": "stream-json",
-    "args": [
-      "--print",
-      "--output-format",
-      "stream-json",
-      "--mode",
-      "ask",
-      "--trust",
-      "Reply exactly ZCLAUDIA_RUNTIME_COMPAT_OK. Do not use tools, files, shell commands, or MCP."
-    ],
-    "completionTypes": ["result"]
+    "kind": "acp-turn",
+    "args": ["acp"],
+    "prompt": "Reply exactly ZCLAUDIA_RUNTIME_COMPAT_OK. Do not use tools, files, shell commands, or MCP."
   },
   "distribution": {
-    "vendorDependencies": false
+    "vendorDependencies": true,
+    "requiredRuntimePackages": ["@agentclientprotocol/sdk"]
   }
 }

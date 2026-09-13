@@ -1,0 +1,21 @@
+{
+  "recordedAt": "2026-09-13",
+  "cli": { "binary": "cursor-agent", "version": "2026.09.10-fd3934a" },
+  "os": { "platform": "darwin", "release": "25.6.0", "arch": "arm64" },
+  "probeHarness": "bare JSON-RPC over NDJSON stdio (probes/lib/jsonrpc.mjs), no SDK",
+  "verifiedNow": [
+    {
+      "probe": "probe-initialize.mjs",
+      "result": "matches design doc §2.1 exactly (protocolVersion 1, loadSession true, mcpCapabilities http+sse, cursor_login auth method)"
+    }
+  ],
+  "requiresLoggedInCli": [
+    "probe-auth-session.mjs (§2.2/§2.3)",
+    "probe-session-load.mjs (§2.4)",
+    "probe-inline-mcp.mjs (§2.5)",
+    "probe-permissions.mjs (§2.6)",
+    "probe-plan-mode.mjs (§2.7)",
+    "probe-cancel.mjs (§2.8)"
+  ],
+  "policy": "Re-run every probe after each Cursor CLI upgrade and write the results back to docs/plans/2026-09-12-cursor-acp-migration.md §2 before changing ACP behavior."
+}

@@ -5,17 +5,28 @@ const runCursorMock = vi.fn(async function* () {
   yield { type: 'init', sessionId: 'prov-1' } as const;
 });
 const abortCursorSessionMock = vi.fn(async () => {});
+const runCursorAcpMock = vi.fn(async function* () {
+  yield { type: 'init', sessionId: 'acp-prov-1', providerTransport: 'cursor-acp-v1' } as const;
+});
 
 vi.mock('../runner.js', () => ({
   runCursor: (...args: unknown[]) => runCursorMock(...args),
   abortCursorSession: (...args: unknown[]) => abortCursorSessionMock(...args),
 }));
 
-import { CursorAgentAdapter } from '../adapter.js';
+vi.mock('../acp-runner.js', () => ({
+  CURSOR_ACP_TRANSPORT: 'cursor-acp-v1',
+  runCursorAcp: (...args: unknown[]) => runCursorAcpMock(...args),
+}));
+
+import { CURSOR_STREAM_JSON_TRANSPORT, CursorAgentAdapter } from '../adapter.js';
+
+const LEGACY_ENV = { ZCLAUDIA_CURSOR_TRANSPORT: 'stream-json' };
 
 describe('CursorAgentAdapter', () => {
   beforeEach(() => {
     runCursorMock.mockClear();
+    runCursorAcpMock.mockClear();
     abortCursorSessionMock.mockClear();
   });
 
@@ -32,7 +43,12 @@ describe('CursorAgentAdapter', () => {
     const suite = await runAdapterConformanceSuite({
       adapter: new CursorAgentAdapter(async () => null),
       input: 'hello',
-      context: { cwd: '/tmp/project', claudiaSessionId: 'session-1', serverPort: 3100 },
+      context: {
+        cwd: '/tmp/project',
+        claudiaSessionId: 'session-1',
+        serverPort: 3100,
+        env: LEGACY_ENV,
+      },
       onPermission: vi.fn(),
     });
     expect(suite.passed).toBe(true);
@@ -44,7 +60,13 @@ describe('CursorAgentAdapter', () => {
     const adapter = new CursorAgentAdapter(createToolBridge);
     for await (const _ of adapter.run(
       'hi',
-      { cwd: '/p', claudiaSessionId: 'sess', serverPort: 3100, mode: 'default' },
+      {
+        cwd: '/p',
+        claudiaSessionId: 'sess',
+        serverPort: 3100,
+        mode: 'default',
+        env: LEGACY_ENV,
+      },
       vi.fn()
     )) {
       /* drain */
@@ -64,7 +86,12 @@ describe('CursorAgentAdapter', () => {
 
     for await (const _ of adapter.run(
       'continue',
-      { cwd: '/p', sessionId: 'provider-existing', claudiaSessionId: 'client-session' },
+      {
+        cwd: '/p',
+        sessionId: 'provider-existing',
+        providerTransport: CURSOR_STREAM_JSON_TRANSPORT,
+        claudiaSessionId: 'client-session',
+      },
       vi.fn()
     )) {
       // drain
@@ -81,7 +108,7 @@ describe('CursorAgentAdapter', () => {
     adapter.setSessionMode('sess', 'plan');
     for await (const _ of adapter.run(
       'hi',
-      { cwd: '/p', claudiaSessionId: 'sess', mode: 'default' },
+      { cwd: '/p', claudiaSessionId: 'sess', mode: 'default', env: LEGACY_ENV },
       vi.fn()
     )) {
       /* drain */
@@ -100,7 +127,7 @@ describe('CursorAgentAdapter', () => {
     const adapter = new CursorAgentAdapter(async () => null);
     for await (const _ of adapter.run(
       'plan it',
-      { cwd: '/p', claudiaSessionId: 'sess', mode: 'default' },
+      { cwd: '/p', claudiaSessionId: 'sess', mode: 'default', env: LEGACY_ENV },
       vi.fn()
     )) {
       /* drain */
@@ -108,7 +135,13 @@ describe('CursorAgentAdapter', () => {
     runCursorMock.mockClear();
     for await (const _ of adapter.run(
       'continue',
-      { cwd: '/p', sessionId: 'provider-1', claudiaSessionId: 'sess', mode: 'default' },
+      {
+        cwd: '/p',
+        sessionId: 'provider-1',
+        providerTransport: CURSOR_STREAM_JSON_TRANSPORT,
+        claudiaSessionId: 'sess',
+        mode: 'default',
+      },
       vi.fn()
     )) {
       /* drain */
@@ -127,7 +160,7 @@ describe('CursorAgentAdapter', () => {
     // next run should not force ask
     for await (const _ of adapter.run(
       'hi',
-      { cwd: '/p', claudiaSessionId: 'sess', mode: 'default' },
+      { cwd: '/p', claudiaSessionId: 'sess', mode: 'default', env: LEGACY_ENV },
       vi.fn()
     )) {
       /* drain */
@@ -151,7 +184,12 @@ describe('CursorAgentAdapter', () => {
     const runTask = (async () => {
       for await (const ev of adapter.run(
         'hi',
-        { cwd: '/p', claudiaSessionId: 'claudia-sess', mode: 'default' },
+        {
+          cwd: '/p',
+          claudiaSessionId: 'claudia-sess',
+          mode: 'default',
+          env: LEGACY_ENV,
+        },
         vi.fn()
       )) {
         collected.push(ev);
@@ -165,7 +203,12 @@ describe('CursorAgentAdapter', () => {
     runCursorMock.mockClear();
     for await (const _ of adapter.run(
       'hi',
-      { cwd: '/p', claudiaSessionId: 'claudia-sess', mode: 'default' },
+      {
+        cwd: '/p',
+        claudiaSessionId: 'claudia-sess',
+        mode: 'default',
+        env: LEGACY_ENV,
+      },
       vi.fn()
     )) {
       /* drain */
@@ -182,7 +225,12 @@ describe('CursorAgentAdapter', () => {
     adapter.setSessionMode('claudia-sess', 'plan');
     for await (const _ of adapter.run(
       'hi',
-      { cwd: '/p', claudiaSessionId: 'claudia-sess', mode: 'default' },
+      {
+        cwd: '/p',
+        claudiaSessionId: 'claudia-sess',
+        mode: 'default',
+        env: LEGACY_ENV,
+      },
       vi.fn()
     )) {
       /* drain */
@@ -192,7 +240,12 @@ describe('CursorAgentAdapter', () => {
     runCursorMock.mockClear();
     for await (const _ of adapter.run(
       'hi',
-      { cwd: '/p', claudiaSessionId: 'claudia-sess', mode: 'default' },
+      {
+        cwd: '/p',
+        claudiaSessionId: 'claudia-sess',
+        mode: 'default',
+        env: LEGACY_ENV,
+      },
       vi.fn()
     )) {
       /* drain */
@@ -206,10 +259,85 @@ describe('CursorAgentAdapter', () => {
       yield { type: 'init', sessionId: 'prov-9' };
     });
     const adapter = new CursorAgentAdapter(async () => null);
-    const context = { cwd: '/p', claudiaSessionId: 'sess' };
+    const context = { cwd: '/p', claudiaSessionId: 'sess', env: LEGACY_ENV };
     for await (const _ of adapter.run('hi', context, vi.fn())) {
       /* drain */
     }
     expect(adapter.getRunState(context).providerSessionId).toBe('prov-9');
+  });
+
+  it('uses ACP by default for a new session', async () => {
+    const adapter = new CursorAgentAdapter(async () => null);
+    for await (const _ of adapter.run('hi', { cwd: '/p', claudiaSessionId: 'sess' }, vi.fn())) {
+      /* drain */
+    }
+    expect(runCursorAcpMock).toHaveBeenCalledOnce();
+    expect(runCursorMock).not.toHaveBeenCalled();
+  });
+
+  it('resumes an ACP-bound session with the persisted transport', async () => {
+    const adapter = new CursorAgentAdapter(async () => null);
+    for await (const _ of adapter.run(
+      'continue',
+      {
+        cwd: '/p',
+        sessionId: 'provider-acp',
+        providerTransport: 'cursor-acp-v1',
+        claudiaSessionId: 'sess',
+        env: LEGACY_ENV,
+      },
+      vi.fn()
+    )) {
+      /* drain */
+    }
+    expect(runCursorAcpMock).toHaveBeenCalledWith(
+      'continue',
+      expect.objectContaining({
+        sessionId: 'provider-acp',
+        providerTransport: 'cursor-acp-v1',
+      })
+    );
+    expect(runCursorMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on an unknown new-session transport setting', async () => {
+    const adapter = new CursorAgentAdapter(async () => null);
+    const drain = async () => {
+      for await (const _ of adapter.run(
+        'hi',
+        {
+          cwd: '/p',
+          claudiaSessionId: 'sess',
+          env: { ZCLAUDIA_CURSOR_TRANSPORT: 'typo' },
+        },
+        vi.fn()
+      )) {
+        /* drain */
+      }
+    };
+    await expect(drain()).rejects.toThrow('Unsupported ZCLAUDIA_CURSOR_TRANSPORT value');
+    expect(runCursorAcpMock).not.toHaveBeenCalled();
+    expect(runCursorMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown persisted transport instead of guessing', async () => {
+    const adapter = new CursorAgentAdapter(async () => null);
+    const drain = async () => {
+      for await (const _ of adapter.run(
+        'continue',
+        {
+          cwd: '/p',
+          sessionId: 'provider-unknown',
+          providerTransport: 'cursor-unknown-v1',
+          claudiaSessionId: 'sess',
+        },
+        vi.fn()
+      )) {
+        /* drain */
+      }
+    };
+    await expect(drain()).rejects.toThrow('Unsupported persisted Cursor transport');
+    expect(runCursorAcpMock).not.toHaveBeenCalled();
+    expect(runCursorMock).not.toHaveBeenCalled();
   });
 });

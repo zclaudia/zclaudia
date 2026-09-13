@@ -1,0 +1,28 @@
+{
+  "probe": "permissions",
+  "recorded": "2026-09-13 / cursor-agent 2026.09.10-fd3934a (design doc §2.6 baseline)",
+  "firstOptions": [
+    { "optionId": "allow-once", "kind": "allow_once" },
+    { "optionId": "allow-always", "kind": "allow_always" },
+    { "optionId": "reject-once", "kind": "reject_once" }
+  ],
+  "toolCallKind": "execute",
+  "reasonContent": "Not in allowlist: echo",
+  "rejectedPermissionRequests": 3,
+  "stopReason": "end_turn",
+  "toolStatusSequence": [
+    "in_progress",
+    "completed",
+    "in_progress",
+    "completed",
+    "in_progress",
+    "completed"
+  ],
+  "finalToolStatus": "completed",
+  "notes": [
+    "Every rejected call still ends status 'completed' — mappers MUST override tool_finished with the local permission decision (§9.2 hard rule).",
+    "Permission request arrives after tool_call_update{status:'in_progress'}, not after 'pending'.",
+    "No reject_always option exists in this build; match options by kind and tolerate extra/missing entries.",
+    "toolCall.content carries a displayable reason string suitable as approval-dialog detail."
+  ]
+}

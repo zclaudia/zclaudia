@@ -1,0 +1,13 @@
+{
+  "probe": "cancel",
+  "recorded": "2026-09-13 / cursor-agent 2026.09.10-fd3934a (design doc §2.8 baseline)",
+  "cancelToTerminalMs": 6,
+  "stopReason": "cancelled",
+  "exitedWithoutSignal": true,
+  "exitCode": 0,
+  "sigtermUsed": false,
+  "notes": [
+    "session/cancel (notification) converged the pending session/prompt within single-digit ms; closing stdin then ended the process cleanly with no SIGTERM/SIGKILL.",
+    "Runner design: 2s cancel grace is generous; SIGTERM→1s→SIGKILL ladder stays as fallback only (§12.1)."
+  ]
+}

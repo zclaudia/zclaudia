@@ -72,6 +72,8 @@ export type ContextWindowSource =
 // Provider system info from runtime init message
 export interface SystemInfo {
   model?: string;
+  /** Provider-native model identifier when it differs from the display name. */
+  modelId?: string;
   /** Effective context window in tokens, resolved from agent profile / LLM
    *  profile / pi-ai registry. UI uses this for the X/Y display. */
   contextWindow?: number;

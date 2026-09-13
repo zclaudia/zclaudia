@@ -1,0 +1,30 @@
+{
+  "probe": "auth-session",
+  "recorded": "2026-09-13 / cursor-agent 2026.09.10-fd3934a (design doc §2.2–§2.3 baseline)",
+  "authMethod": "cursor_login",
+  "authenticate": {},
+  "authenticateOk": true,
+  "modes": {
+    "currentModeId": "agent",
+    "availableModes": [
+      { "id": "agent", "name": "Agent" },
+      { "id": "plan", "name": "Plan" },
+      { "id": "ask", "name": "Ask" }
+    ]
+  },
+  "models": {
+    "currentModelId": "default[]",
+    "availableModels": [
+      { "modelId": "default[]", "name": "Auto" },
+      {
+        "modelId": "claude-opus-5[thinking=true,context=300k,effort=high,fast=false]",
+        "name": "claude-opus-5"
+      },
+      { "modelId": "gpt-5.6-sol[context=272k,reasoning=medium,fast=false]", "name": "gpt-5.6-sol" }
+    ],
+    "note": "modelId carries bracket parameters; name is the bare model name. Never interchange them (§7.4)."
+  },
+  "sessionShape": { "hasSessionId": true, "hasModes": true, "hasModels": true },
+  "setMode": {},
+  "setModel": {}
+}
