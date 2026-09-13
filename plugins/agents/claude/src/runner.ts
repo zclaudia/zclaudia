@@ -12,6 +12,7 @@ import type {
   RuntimeModelConnection,
   SystemInfo,
 } from '@zclaudia/plugin-sdk/providers';
+import type { ContextWindowSource } from '@zclaudia/plugin-sdk/types';
 import { RuntimeContractError } from '@zclaudia/plugin-sdk/providers';
 import {
   boundedToolInput,
@@ -187,19 +188,117 @@ async function* runClaudeSdkAgent(
   yield* pumpClaudeStream(stream, options);
 }
 
-/** Shared SDK message pump: maps events, reports the provider session id, emits plan transitions. */
-async function* pumpClaudeStream(
+/**
+ * The plugin-sdk contract (0.3.0) doesn't carry these two context fields yet,
+ * but the host does: the server forwards `usage` verbatim as wire `UsageInfo`
+ * (which has `contextUsedTokens`), and the wire `ContextWindowSource`
+ * vocabulary includes `'runtime'`. Drop the casts once the SDK catches up.
+ */
+const RUNTIME_REPORTED = 'runtime' as unknown as ContextWindowSource;
+
+/**
+ * Context occupancy of one API call, read off a top-level SDK `assistant`
+ * message. On a single call the prompt is `input_tokens` (uncached) +
+ * `cache_read_input_tokens` (cached prefix) + `cache_creation_input_tokens`
+ * (newly cached suffix) — all three occupy the window. Sub-agent calls
+ * (`parent_tool_use_id` set) run in their own windows and are skipped.
+ */
+export function extractClaudeCallContextTokens(message: unknown): number | undefined {
+  const msg = message as {
+    type?: unknown;
+    parent_tool_use_id?: unknown;
+    message?: {
+      usage?: {
+        input_tokens?: unknown;
+        cache_read_input_tokens?: unknown;
+        cache_creation_input_tokens?: unknown;
+      };
+    };
+  };
+  if (msg?.type !== 'assistant' || msg.parent_tool_use_id != null) return undefined;
+  const usage = msg.message?.usage;
+  if (!usage) return undefined;
+  const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  const total =
+    num(usage.input_tokens) +
+    num(usage.cache_read_input_tokens) +
+    num(usage.cache_creation_input_tokens);
+  return total > 0 ? total : undefined;
+}
+
+/**
+ * Context window from an SDK `result` message's per-model usage record. A turn
+ * can touch several models (main loop + haiku helpers); the main model is the
+ * one whose calls carried the most context, so take the window of the entry
+ * with the largest input-side token sum.
+ */
+export function extractClaudeContextWindow(message: unknown): number | undefined {
+  const msg = message as { type?: unknown; modelUsage?: Record<string, unknown> };
+  if (msg?.type !== 'result' || !msg.modelUsage || typeof msg.modelUsage !== 'object') {
+    return undefined;
+  }
+  let bestWindow: number | undefined;
+  let bestOccupancy = -1;
+  for (const entry of Object.values(msg.modelUsage)) {
+    const m = entry as {
+      inputTokens?: unknown;
+      cacheReadInputTokens?: unknown;
+      cacheCreationInputTokens?: unknown;
+      contextWindow?: unknown;
+    };
+    if (typeof m?.contextWindow !== 'number' || m.contextWindow <= 0) continue;
+    const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+    const occupancy =
+      num(m.inputTokens) + num(m.cacheReadInputTokens) + num(m.cacheCreationInputTokens);
+    if (occupancy > bestOccupancy) {
+      bestOccupancy = occupancy;
+      bestWindow = m.contextWindow;
+    }
+  }
+  return bestWindow;
+}
+
+/** Shared SDK message pump: maps events, reports the provider session id, emits plan transitions. Exported for tests. */
+export async function* pumpClaudeStream(
   stream: AsyncIterable<unknown> & { close(): void },
   options: ClaudeAgentRunOptions
 ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
   const planModeTools = new Map<string, 'EnterPlanMode' | 'ExitPlanMode'>();
+  let initSystemInfo: SystemInfo | undefined;
+  let lastCallContextTokens: number | undefined;
   try {
     for await (const message of stream) {
+      lastCallContextTokens = extractClaudeCallContextTokens(message) ?? lastCallContextTokens;
       const transformed = transformClaudeSdkMessage(message);
       const events = Array.isArray(transformed) ? transformed : [transformed];
       for (const event of events) {
         if (event.type === 'init' && event.sessionId) {
           options.onSessionId?.(event.sessionId);
+        }
+        if (event.type === 'init' && event.systemInfo) {
+          initSystemInfo = event.systemInfo;
+        }
+        if (event.type === 'result') {
+          if (event.usage && lastCallContextTokens != null) {
+            const withContext: NonNullable<ProviderRuntimeEvent['usage']> & {
+              contextUsedTokens?: number;
+            } = { ...event.usage, contextUsedTokens: lastCallContextTokens };
+            event.usage = withContext;
+          }
+          // The SDK only reveals the model's real context window at result
+          // time (modelUsage). Re-announce systemInfo so the composer's ring
+          // gets a denominator; the server treats a sessionId-less init as a
+          // pure systemInfo update. Gated on the original init having arrived
+          // so the merged info keeps its cwd (the server re-persists it).
+          const contextWindow = extractClaudeContextWindow(message);
+          if (contextWindow && initSystemInfo && contextWindow !== initSystemInfo.contextWindow) {
+            initSystemInfo = {
+              ...initSystemInfo,
+              contextWindow,
+              contextWindowSource: RUNTIME_REPORTED,
+            };
+            yield { type: 'init', systemInfo: initSystemInfo };
+          }
         }
         if ((event.type === 'tool_use' || event.type === 'tool_started') && event.toolUseId) {
           const planTool = canonicalClaudePlanTool(event.toolName);

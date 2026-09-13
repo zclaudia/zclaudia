@@ -24,6 +24,7 @@ const SOURCE_LABELS: Record<string, string> = {
   pi_ai_registry: 'context window from model registry',
   openai_compat_default: 'context window assumed (openai-compat default)',
   fallback: 'context window unknown — fallback estimate',
+  runtime: 'context window reported by runtime',
 };
 
 const SOURCE_HINTS: Record<string, string> = {

@@ -62,12 +62,18 @@ export type RunHealthStatus = 'healthy' | 'idle' | 'loop';
  *                             registry hit.
  * - `fallback`              — last-resort 100k safety net; signals "we don't
  *                             actually know" so UI can show a warning.
+ * - `runtime`               — reported by the agent runtime itself (e.g. the
+ *                             Claude Agent SDK's per-model `contextWindow`, or
+ *                             Cursor's `context=300k` modelId parameter).
+ *                             External runtimes emit this; the pi resolution
+ *                             chain never does.
  */
 export type ContextWindowSource =
   | 'profile_entry'
   | 'pi_ai_registry'
   | 'openai_compat_default'
-  | 'fallback';
+  | 'fallback'
+  | 'runtime';
 
 // Provider system info from runtime init message
 export interface SystemInfo {
