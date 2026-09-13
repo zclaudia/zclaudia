@@ -7,6 +7,7 @@ import type { SessionType } from '../../core/session.js';
 import type { ContentBlock, ToolEffect, UsageInfo } from '../../core/message.js';
 import type { PCPEffectiveProfile } from '../../core/pcp.js';
 import type { UnifiedPermissionPolicy } from '../../interaction/permissions.js';
+import type { InvocationRequest, RuntimeAttachment } from '@zclaudia/plugin-sdk/invocations';
 
 export interface RunStartMessage {
   type: 'run_start';
@@ -23,6 +24,98 @@ export interface RunStartMessage {
   systemContext?: string;
   workingDirectory?: string;
   resend?: boolean;
+}
+
+/**
+ * Typed turn input for the versioned run_start (URIP design doc §15.2).
+ *
+ * `message` carries text plus first-class attachments; `reservedNamespaceMode`
+ * defaults to `resolve` (the server resolves `/zc:`/`/skill:`/runtime
+ * namespaces), and `literal` is set only by an explicit "send literally" UI
+ * action. `invocation` submits a canonical catalog selection; its context is
+ * derived from the referenced session snapshot, so `mode`/`workingDirectory`
+ * must not accompany it.
+ */
+export type RunTurnInput =
+  | {
+      type: 'message';
+      text: string;
+      attachments?: RuntimeAttachment[];
+      reservedNamespaceMode?: 'resolve' | 'literal';
+    }
+  | {
+      type: 'invocation';
+      request: InvocationRequest;
+      attachments?: RuntimeAttachment[];
+    };
+
+/**
+ * Versioned run_start. V2 clients send `turnInput`; legacy clients keep sending
+ * the plain `input` string (which may JSON-encode `{ text, attachments }` —
+ * the server normalizes both). A V2 invocation cannot override mode or working
+ * directory: the server rejects the combination.
+ */
+export interface RunStartMessageV2 {
+  type: 'run_start';
+  protocolVersion: 2;
+  clientRequestId: string;
+  sessionId: string;
+  turnInput: RunTurnInput;
+  llmProfileId?: string;
+  /** Message-branch only: user-selected mode id. */
+  mode?: string;
+  permissionOverride?: Partial<UnifiedPermissionPolicy>;
+  systemContext?: string;
+  /** Message-branch only: never rebinds a selected invocation. */
+  workingDirectory?: string;
+  resend?: boolean;
+}
+
+/**
+ * Normalize a legacy `run_start.input` string. The desktop client JSON-encodes
+ * `{ text, attachments }` into the string channel today; a naive
+ * `{ type: 'message', text: input }` mapping would silently drop attachments.
+ */
+export function normalizeLegacyRunInput(input: string): {
+  text: string;
+  attachments?: RuntimeAttachment[];
+} {
+  if (input.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(input) as unknown;
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed) &&
+        typeof (parsed as { text?: unknown }).text === 'string'
+      ) {
+        const record = parsed as { text: string; attachments?: RuntimeAttachment[] };
+        return {
+          text: record.text,
+          ...(Array.isArray(record.attachments) ? { attachments: record.attachments } : {}),
+        };
+      }
+    } catch {
+      // Plain text that happens to start with '{'.
+    }
+  }
+  return { text: input };
+}
+
+/** Server → client notification that the session's invocable catalog changed. */
+export interface InvocableCatalogChangedMessage {
+  type: 'invocable_catalog_changed';
+  sessionId: string;
+  revision: string;
+  reason:
+    | 'filesystem'
+    | 'runtime-event'
+    | 'runtime-initialized'
+    | 'session-reset'
+    | 'engine-mode'
+    | 'cwd'
+    | 'plugin-reload'
+    | 'manual';
 }
 
 export interface RunCancelMessage {
@@ -337,6 +430,7 @@ export interface TaskStatusNotificationMessage {
 
 export type RunClientMessage =
   | RunStartMessage
+  | RunStartMessageV2
   | RunCancelMessage
   | RunSteerMessage
   | KillLeakedProcessesMessage
@@ -347,6 +441,8 @@ export type RunClientMessage =
 
 export type RunServerMessage =
   | RunStartedMessage
+  | InvocableCatalogChangedMessage
+  | InvocationResultMessage
   | SessionCreatedMessage
   | DeltaMessage
   | ToolUseMessage
@@ -365,3 +461,64 @@ export type RunServerMessage =
   | TaskProgressMessage
   | TaskStatusNotificationMessage
   | ProcessCleanupResultMessage;
+
+/**
+ * Normalize a V2 run_start into the internal run start shape (URIP §15.2).
+ *
+ * - The message branch becomes the legacy string channel (attachments ride the
+ *   existing `{ text, attachments }` envelope when present).
+ * - The invocation branch returns the canonical `InvocationRequest` for the
+ *   server-side router; mode and workingDirectory never accompany it.
+ * - A V2 invocation may not carry mode or workingDirectory: the server rejects
+ *   the combination instead of silently rebinding context.
+ */
+export type NormalizedRunStart =
+  | { kind: 'message'; runStart: RunStartMessage }
+  | { kind: 'invocation'; runStart: RunStartMessage; request: InvocationRequest };
+
+export function normalizeRunStartV2(message: RunStartMessageV2): NormalizedRunStart {
+  const { turnInput, protocolVersion, ...rest } = message;
+  void protocolVersion;
+  if (turnInput.type === 'invocation') {
+    if (message.mode !== undefined || message.workingDirectory !== undefined) {
+      throw new Error(
+        'INVOCATION_CONTEXT_CHANGED: a selected invocation cannot override mode or working directory'
+      );
+    }
+    return {
+      kind: 'invocation',
+      runStart: { ...rest, input: '' },
+      request: turnInput.request,
+    };
+  }
+  const hasAttachments = Array.isArray(turnInput.attachments) && turnInput.attachments.length > 0;
+  return {
+    kind: 'message',
+    runStart: {
+      ...rest,
+      input: hasAttachments
+        ? JSON.stringify({ text: turnInput.text, attachments: turnInput.attachments })
+        : turnInput.text,
+    },
+  };
+}
+
+/**
+ * Result of a server-resolved invocation (URIP design doc §12.4).
+ *
+ * Emitted when a submitted invocation (canonical selection or reserved
+ * namespace typed as raw text) completes without a provider turn:
+ * - `completed` / `text`: the server executed the body and the desktop renders
+ *   the outcome into the transcript.
+ * - `client-action`: the action body lives on the desktop; the server sends
+ *   only the registered action ID plus typed payload — never instructions.
+ */
+export interface InvocationResultMessage {
+  type: 'invocation_result';
+  clientRequestId: string;
+  sessionId: string;
+  result:
+    | { type: 'completed'; message?: string }
+    | { type: 'text'; content: string }
+    | { type: 'client-action'; actionId: string; payload?: Record<string, unknown> };
+}

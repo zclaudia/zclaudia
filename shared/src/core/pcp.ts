@@ -23,7 +23,13 @@ export type PCPCapabilityId =
   // Session
   | 'session.abort'
   | 'session.steer'
-  | 'session.background_task';
+  | 'session.background_task'
+  // URIP — unified runtime invocation protocol (additive)
+  | 'invocation.catalog'
+  | 'invocation.execute'
+  | 'invocation.refresh'
+  | 'invocation.structured-input'
+  | 'skill.portable';
 
 // === Capability Metadata ===
 

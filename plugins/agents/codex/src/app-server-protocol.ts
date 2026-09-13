@@ -31,7 +31,26 @@ export interface InitializeResponse {
 
 export type AppServerInputBlock =
   | { type: 'text'; text: string; text_elements: [] }
-  | { type: 'localImage'; path: string; detail?: 'auto' | 'low' | 'high' };
+  | { type: 'localImage'; path: string; detail?: 'auto' | 'low' | 'high' }
+  /**
+   * Structured skill reference (SkillUserInput in the app-server schema,
+   * `codex app-server generate-json-schema --experimental`, pinned 0.154.0):
+   * `name` + `path` come from `skills/list`, never from user input.
+   */
+  | { type: 'skill'; name: string; path: string };
+
+/** One entry of the cwd-scoped `skills/list` response (SkillsListResponse). */
+export interface SkillsListEntry {
+  name: string;
+  description?: string | null;
+  /** Absolute path of SKILL.md; doubles as the structured input reference. */
+  path: string;
+  scope?: string | null;
+  enabled?: boolean | null;
+  pluginId?: string | null;
+  interface?: { displayName?: string | null; [key: string]: unknown } | null;
+  [key: string]: unknown;
+}
 
 export interface TurnError {
   message: string;
@@ -119,6 +138,10 @@ export interface CodexClientRequestMap {
   'model/list': {
     params: { cursor?: string | null; limit?: number | null; includeHidden?: boolean | null };
     result: { data: ModelInfo[]; nextCursor?: string | null };
+  };
+  'skills/list': {
+    params: { cwd?: string | null };
+    result: { data: Array<{ cwd?: string; skills: SkillsListEntry[] }>; [key: string]: unknown };
   };
 }
 

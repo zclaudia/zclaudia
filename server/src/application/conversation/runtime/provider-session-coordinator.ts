@@ -1,6 +1,7 @@
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { ActiveRun } from '../transport/types.js';
 import type { ProviderRuntimeEvent, SystemInfo } from '../../../infra/providers/types.js';
+import { sessionInvocableCatalogService } from '../../invocations/session-catalog.js';
 
 export interface ProviderSessionState {
   sdkSessionId?: string;
@@ -39,6 +40,7 @@ export function handleProviderInit(input: HandleProviderInitInput): void {
       runId,
       systemInfo: {
         model: msg.systemInfo.model,
+        modelId: msg.systemInfo.modelId,
         contextWindow: msg.systemInfo.contextWindow,
         contextWindowSource: msg.systemInfo.contextWindowSource,
         contextWindowMatchedProvider: msg.systemInfo.contextWindowMatchedProvider,
@@ -56,11 +58,24 @@ export function handleProviderInit(input: HandleProviderInitInput): void {
 
   if (msg.sessionId && msg.sessionId !== state.sdkSessionId) {
     state.sdkSessionId = msg.sessionId;
-    db.prepare(
-      `
+    // Atomic binding (§14.3): the provider session id and its transport are
+    // committed together, before this run's adapter resumes (which is when
+    // the first prompt is submitted). A resume with a different transport is
+    // never attempted.
+    const transport = (msg as { providerTransport?: string }).providerTransport;
+    if (transport) {
+      db.prepare(
+        `
+          UPDATE sessions SET sdk_session_id = ?, provider_transport = ?, updated_at = ? WHERE id = ?
+        `
+      ).run(state.sdkSessionId, transport, Date.now(), sessionId);
+    } else {
+      db.prepare(
+        `
           UPDATE sessions SET sdk_session_id = ?, updated_at = ? WHERE id = ?
         `
-    ).run(state.sdkSessionId, Date.now(), sessionId);
+      ).run(state.sdkSessionId, Date.now(), sessionId);
+    }
 
     activeRun.providerSessionId = state.sdkSessionId;
 
@@ -68,6 +83,13 @@ export function handleProviderInit(input: HandleProviderInitInput): void {
       type: 'session_created',
       sessionId,
       sdkSessionId: msg.sessionId,
+    });
+    sessionInvocableCatalogService.invalidateSession(sessionId);
+    sendRunEvent({
+      type: 'invocable_catalog_changed',
+      sessionId,
+      revision: 'pending-refresh',
+      reason: 'runtime-initialized',
     });
   }
 }

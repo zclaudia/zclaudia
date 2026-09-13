@@ -16,6 +16,15 @@ import type { NotificationService } from '../../../domains/notification-feed/ind
 import type { TaskCoordinationPort } from '../../../application/conversation/task-coordination-port.js';
 import type { ProviderRegistryPort } from '../../../infra/providers/registry.js';
 import { sendMessage } from './broadcast.js';
+import { resolveReservedInvocation } from '../../invocations/gateway.js';
+import {
+  getSessionInvocableSnapshot,
+  resolveSessionInvocation,
+} from '../../invocations/session-catalog.js';
+import { hostActionRegistry } from '../../invocations/host-actions.js';
+import { providerRegistry as defaultProviderRegistry } from '../../../infra/providers/registry.js';
+import { InvocationError, type RuntimeAttachment } from '@zclaudia/shared/providers';
+import { normalizeLegacyRunInput, normalizeRunStartV2 } from '@zclaudia/shared/wire/messages';
 import { isTerminalPhase } from '../runtime/active-run-phase.js';
 
 // Domain handlers
@@ -130,9 +139,67 @@ export async function handleClientMessage(
       break;
 
     // ── Run lifecycle ──
-    case 'run_start':
-      await ctx.handleRunStart(client, message, db, {}, clients);
+    case 'run_start': {
+      const registry = ctx.providerRegistry ?? defaultProviderRegistry;
+      try {
+        if ((message as { protocolVersion?: unknown }).protocolVersion === 2) {
+          const normalized = normalizeRunStartV2(message as never);
+          const turnInput = (message as import('@zclaudia/shared/wire/messages').RunStartMessageV2)
+            .turnInput;
+          if (normalized.kind === 'invocation') {
+            await dispatchCanonicalInvocation({
+              client,
+              clients,
+              ctx,
+              db,
+              registry,
+              runStart: normalized.runStart as InternalRunStart,
+              request: normalized.request,
+              attachments: turnInput.attachments as RuntimeAttachment[] | undefined,
+            });
+            break;
+          }
+          const handled = await dispatchReservedMessage({
+            client,
+            clients,
+            ctx,
+            db,
+            registry,
+            runStart: normalized.runStart as InternalRunStart,
+            text: turnInput.type === 'message' ? turnInput.text : normalized.runStart.input,
+            attachments: turnInput.attachments as RuntimeAttachment[] | undefined,
+            reservedNamespaceMode:
+              turnInput.type === 'message' ? turnInput.reservedNamespaceMode : undefined,
+          });
+          if (!handled) await ctx.handleRunStart(client, normalized.runStart, db, {}, clients);
+          break;
+        }
+
+        // Legacy desktop sends a string (or the established JSON attachment
+        // envelope). Reserved namespaces must pass through the same gateway so
+        // `/skill:` and `/<runtime>:` cannot bypass canonical routing.
+        const legacyMessage = message as import('@zclaudia/shared/wire/messages').RunStartMessage;
+        const legacy = normalizeLegacyRunInput(legacyMessage.input);
+        const handled = await dispatchReservedMessage({
+          client,
+          clients,
+          ctx,
+          db,
+          registry,
+          runStart: legacyMessage as InternalRunStart,
+          text: legacy.text,
+          attachments: legacy.attachments as RuntimeAttachment[] | undefined,
+        });
+        if (!handled) await ctx.handleRunStart(client, message, db, {}, clients);
+      } catch (error) {
+        sendMessage(client.ws, {
+          type: 'error',
+          code: error instanceof InvocationError ? error.code : 'INVOCATION_PREPARE_FAILED',
+          message: error instanceof Error ? error.message : String(error),
+        } as ErrorMessage);
+      }
       break;
+    }
 
     case 'agent_start':
       await ctx.handleRunStart(
@@ -379,4 +446,185 @@ export async function handleClientMessage(
         message: `Unknown message type: ${(message as { type: string }).type}`,
       } as ErrorMessage);
   }
+}
+
+// ── URIP invocation gateway helpers (§12.2/§12.4) ────────────────────────────
+
+type SubmittedRequest = import('@zclaudia/shared/providers').InvocationRequest;
+type InternalRunStart = import('../runtime/run-bootstrap.js').RunStartMessage;
+
+interface InvocationDispatchBase {
+  client: ConnectedClient;
+  clients: Map<string, ConnectedClient>;
+  ctx: MessageHandlerContext;
+  db: ReturnType<typeof initDatabase>;
+  registry: ProviderRegistryPort;
+  runStart: InternalRunStart;
+  attachments?: RuntimeAttachment[];
+}
+
+async function dispatchReservedMessage(
+  input: InvocationDispatchBase & {
+    text: string;
+    reservedNamespaceMode?: 'resolve' | 'literal';
+  }
+): Promise<boolean> {
+  const runtimeType = runtimeTypeForSession(input.db, input.runStart.sessionId);
+  let disposition = resolveReservedInvocation({
+    text: input.text,
+    runtimeType,
+    reservedNamespaceMode: input.reservedNamespaceMode,
+  });
+  if (disposition.kind === 'passthrough') return false;
+
+  if (disposition.kind === 'unresolved' && disposition.namespace !== 'zc') {
+    const snapshot = await getSessionInvocableSnapshot(
+      input.db,
+      input.runStart.sessionId,
+      input.registry
+    );
+    if (!snapshot) throw new InvocationError('INVOCATION_NOT_FOUND', 'Session not found.');
+    disposition = resolveReservedInvocation({
+      text: input.text,
+      runtimeType,
+      snapshot,
+      reservedNamespaceMode: input.reservedNamespaceMode,
+    });
+    if (disposition.kind === 'catalog-invocation') {
+      await dispatchCanonicalInvocation({
+        ...input,
+        request: {
+          invocableId: disposition.descriptor.id,
+          catalogRevision: snapshot.revision,
+          contextFingerprint: snapshot.contextFingerprint,
+          arguments: { type: 'raw', value: disposition.rawArguments },
+        },
+      });
+      return true;
+    }
+  }
+
+  if (disposition.kind === 'host-action') {
+    const definition = hostActionRegistry.get(disposition.name);
+    if (!definition) {
+      throw new InvocationError(
+        'INVOCATION_NOT_FOUND',
+        'The selected host action no longer exists.'
+      );
+    }
+    const request: SubmittedRequest = {
+      invocableId: `host:${disposition.name}`,
+      catalogRevision: 'reserved-namespace',
+      contextFingerprint: 'reserved-namespace',
+      arguments: { type: 'raw', value: disposition.rawArguments },
+    };
+    const result = await hostActionRegistry.execute(disposition.name, request, {
+      sessionId: input.runStart.sessionId,
+      arguments: request.arguments,
+    });
+    sendInvocationResolution(
+      input.client,
+      input.runStart.clientRequestId,
+      input.runStart.sessionId,
+      result
+    );
+    return true;
+  }
+
+  if (disposition.kind === 'unresolved') {
+    throw new InvocationError(
+      disposition.code,
+      `No invocable matches /${disposition.namespace}:${extractReservedName(input.text)}.`
+    );
+  }
+  return disposition.kind !== 'passthrough';
+}
+
+async function dispatchCanonicalInvocation(
+  input: InvocationDispatchBase & { request: SubmittedRequest }
+): Promise<void> {
+  const resolution = await resolveSessionInvocation(
+    input.db,
+    input.runStart.sessionId,
+    input.registry,
+    input.request,
+    input.attachments
+  );
+  if (resolution.hostAction) {
+    if (resolution.hostAction.locus === 'client') {
+      sendInvocationResolution(
+        input.client,
+        input.runStart.clientRequestId,
+        input.runStart.sessionId,
+        { type: 'client-action', actionId: resolution.hostAction.clientActionId }
+      );
+      return;
+    }
+    const result = await hostActionRegistry.execute(resolution.hostAction.name, input.request, {
+      sessionId: input.runStart.sessionId,
+      arguments: input.request.arguments,
+    });
+    sendInvocationResolution(
+      input.client,
+      input.runStart.clientRequestId,
+      input.runStart.sessionId,
+      result
+    );
+    return;
+  }
+  if (!resolution.turnInput) {
+    throw new InvocationError('INVOCATION_UNSUPPORTED', 'Invocation produced no runtime turn.');
+  }
+
+  const previousMetadata = input.runStart.userMessageMetadata;
+  const metadata =
+    previousMetadata && typeof previousMetadata === 'object' && !Array.isArray(previousMetadata)
+      ? (previousMetadata as Record<string, unknown>)
+      : {};
+  await input.ctx.handleRunStart(
+    input.client,
+    {
+      ...input.runStart,
+      input:
+        input.attachments && input.attachments.length > 0
+          ? JSON.stringify({ text: resolution.transcriptText, attachments: input.attachments })
+          : resolution.transcriptText,
+      userMessageMetadata: { ...metadata, invocation: resolution.metadata },
+      runtimeTurnInput: resolution.turnInput,
+    } satisfies InternalRunStart,
+    input.db,
+    {},
+    input.clients
+  );
+}
+
+function runtimeTypeForSession(db: import('better-sqlite3').Database, sessionId: string): string {
+  const row = db
+    .prepare(
+      `SELECT COALESCE(srb.runtime_type, ap.runtime_type) AS rt FROM sessions s
+       JOIN agent_profiles ap ON ap.id = s.agent_profile_id
+       LEFT JOIN session_runtime_bindings srb ON srb.session_id = s.id
+       WHERE s.id = ?`
+    )
+    .get(sessionId) as { rt?: string } | undefined;
+  return row?.rt ?? 'pi';
+}
+
+function extractReservedName(text: string): string {
+  const token = text.split(/\s/, 1)[0] ?? text;
+  return token.includes(':') ? token.slice(token.indexOf(':') + 1) : token;
+}
+
+function sendInvocationResolution(
+  client: ConnectedClient,
+  clientRequestId: string,
+  sessionId: string,
+  result: import('@zclaudia/shared/wire/messages').InvocationResultMessage['result']
+): void {
+  sendMessage(client.ws, {
+    type: 'invocation_result',
+    clientRequestId,
+    sessionId,
+    result,
+  } as never);
 }

@@ -131,15 +131,14 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     llmProfileId: input.llmProfileId ?? providerConfig?.id ?? agentProfile.llmProfileId ?? '',
     providerType,
   };
-  const multimodalFallback =
-    isPiAgentRuntime(providerType)
-      ? resolveMultimodalFallbackForRun({
-          db: db as Database.Database,
-          agentProfile,
-          llmProfile: providerConfig,
-          images,
-        })
-      : baseMultimodalFallback;
+  const multimodalFallback = isPiAgentRuntime(providerType)
+    ? resolveMultimodalFallbackForRun({
+        db: db as Database.Database,
+        agentProfile,
+        llmProfile: providerConfig,
+        images,
+      })
+    : baseMultimodalFallback;
   let effectiveAgentProfile = multimodalFallback.agentProfile;
   const effectiveProviderConfig = multimodalFallback.llmProfile;
   const effectiveLlmProfileId = multimodalFallback.llmProfileId;
@@ -335,59 +334,68 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   await waitForPendingCompaction(message.sessionId);
 
   let effectiveInput = processedInput;
-  const directSkill = await prepareDirectSkillInvocation(activeRun.skillState, processedInput, {
-    agentProfile: effectiveAgentProfile,
-  });
-  if (directSkill.matched) {
-    if (!directSkill.ok) {
-      return completeRunLocally({
-        activeRun,
-        content: directSkill.message,
-        message,
-        runId,
-        sendRunEvent,
-      });
-    }
-    if (directSkill.mode === 'fork') {
-      if (!activeRun.skillState) {
+  // Direct /skill invocations are a Pi-runtime feature: the skill body is
+  // loaded into the Pi skill runtime state. External runtimes (Claude, Codex,
+  // Cursor) never receive skillState — intercepting their input here would
+  // replace the user's text with a "Use the X skill." placeholder that carries
+  // no skill body at all. Unqualified /name input therefore passes to external
+  // runtimes byte-for-byte (URIP design doc Phase 0 / §17.2: raw unqualified
+  // slash input belongs to the active runtime).
+  if (!message.runtimeTurnInput && isPiAgentRuntime(effectiveProviderType)) {
+    const directSkill = await prepareDirectSkillInvocation(activeRun.skillState, processedInput, {
+      agentProfile: effectiveAgentProfile,
+    });
+    if (directSkill.matched) {
+      if (!directSkill.ok) {
         return completeRunLocally({
           activeRun,
-          content: 'Skill runtime state is unavailable for direct skill invocation.',
+          content: directSkill.message,
           message,
           runId,
           sendRunEvent,
         });
       }
-      const forkResult = await executePreparedDirectSkillInvocation(
-        activeRun.skillState,
-        directSkill,
-        {
-          cwd,
-          db: db as Database.Database,
-          enabledTools,
-          llmProfileConfig: effectiveProviderConfig,
-          agentProfile: effectiveAgentProfile,
-          permissionCallback,
+      if (directSkill.mode === 'fork') {
+        if (!activeRun.skillState) {
+          return completeRunLocally({
+            activeRun,
+            content: 'Skill runtime state is unavailable for direct skill invocation.',
+            message,
+            runId,
+            sendRunEvent,
+          });
         }
+        const forkResult = await executePreparedDirectSkillInvocation(
+          activeRun.skillState,
+          directSkill,
+          {
+            cwd,
+            db: db as Database.Database,
+            enabledTools,
+            llmProfileConfig: effectiveProviderConfig,
+            agentProfile: effectiveAgentProfile,
+            permissionCallback,
+          }
+        );
+        return completeRunLocally({
+          activeRun,
+          content: forkResult.ok ? forkResult.result : forkResult.message,
+          message,
+          runId,
+          sendRunEvent,
+        });
+      }
+      effectiveInput = directSkill.processedInput;
+      trace.log(
+        'server_norm',
+        'direct_skill_invoked',
+        {
+          skillId: directSkill.ref.id,
+          skillSource: directSkill.ref.source,
+        },
+        directSkill.message
       );
-      return completeRunLocally({
-        activeRun,
-        content: forkResult.ok ? forkResult.result : forkResult.message,
-        message,
-        runId,
-        sendRunEvent,
-      });
     }
-    effectiveInput = directSkill.processedInput;
-    trace.log(
-      'server_norm',
-      'direct_skill_invoked',
-      {
-        skillId: directSkill.ref.id,
-        skillSource: directSkill.ref.source,
-      },
-      directSkill.message
-    );
   }
 
   const { runOptions } = await buildRunContext({
@@ -401,6 +409,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     modeValue,
     providerConfig: effectiveProviderConfig,
     providerType: effectiveProviderType,
+    providerTransport: session.provider_transport,
     runId,
     agentTaskExecutor,
     sdkSessionId,
@@ -499,7 +508,16 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     }
   }
 
-  const providerRunner = adapter.run(effectiveInput, runOptions, permissionCallback);
+  const providerRunner = message.runtimeTurnInput
+    ? adapter.startTurn
+      ? adapter.startTurn(message.runtimeTurnInput, runOptions, permissionCallback)
+      : (() => {
+          throw new RunLaunchError(
+            'INVOCATION_UNSUPPORTED',
+            `Runtime "${effectiveProviderType}" does not implement typed invocation execution.`
+          );
+        })()
+    : adapter.run(effectiveInput, runOptions, permissionCallback);
 
   activeRun.providerType = effectiveProviderType;
   const runState = adapter.getRunState?.(runOptions) || {};

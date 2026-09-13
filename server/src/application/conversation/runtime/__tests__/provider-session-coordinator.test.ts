@@ -22,6 +22,7 @@ describe('provider session coordinator', () => {
         sessionId: 'sdk-1',
         systemInfo: {
           model: 'sonnet',
+          modelId: 'sonnet[thinking=true]',
           cwd: '/repo',
           contextWindow: 200000,
           contextWindowSource: 'profile',
@@ -54,6 +55,7 @@ describe('provider session coordinator', () => {
         runId: 'run-1',
         systemInfo: expect.objectContaining({
           model: 'sonnet',
+          modelId: 'sonnet[thinking=true]',
           cwd: '/repo',
           contextWindow: 200000,
         }),
@@ -64,6 +66,38 @@ describe('provider session coordinator', () => {
       sessionId: 'session-1',
       sdkSessionId: 'sdk-1',
     });
+  });
+
+  it('persists transport together with the provider session id in one UPDATE (§14.3)', async () => {
+    const runSql = vi.fn();
+    const sendRunEvent = vi.fn();
+    const prepare = vi.fn(() => ({ run: runSql }));
+    const { handleProviderInit } = await import('../provider-session-coordinator.js');
+
+    handleProviderInit({
+      activeRun: { sessionId: 'session-1' } as any,
+      db: { prepare } as any,
+      msg: {
+        type: 'init',
+        sessionId: 'acp-session-1',
+        providerTransport: 'cursor-acp-v1',
+      } as any,
+      persistSessionWorkingDirectory: vi.fn(),
+      runId: 'run-1',
+      sendRunEvent,
+      sessionId: 'session-1',
+      state: {},
+    });
+
+    // One statement, one call: id + transport + timestamp + session key.
+    expect(runSql).toHaveBeenCalledTimes(1);
+    expect(runSql).toHaveBeenCalledWith(
+      'acp-session-1',
+      'cursor-acp-v1',
+      expect.any(Number),
+      'session-1'
+    );
+    expect(prepare.mock.calls[0][0]).toContain('provider_transport = ?');
   });
 
   it('does not re-emit session_created when sdk session id is unchanged', async () => {

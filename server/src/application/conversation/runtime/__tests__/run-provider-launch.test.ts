@@ -885,4 +885,184 @@ describe('ws/run-provider-launch', () => {
     );
     expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun, { indexMetadata: true });
   });
+
+  it('does not intercept slash input for external runtimes: raw text reaches the adapter byte-for-byte (URIP Phase 0)', async () => {
+    prepareDirectSkillInvocationMock.mockResolvedValueOnce({
+      matched: true,
+      ok: true,
+      ref: { source: 'workspace', id: 'release-notes' },
+      processedInput: 'Use the release-notes skill.',
+      message: 'Loaded skill /release-notes for this turn.',
+    });
+    const { launchProviderRun } = await import('../run-provider-launch.js');
+    const adapter = {
+      run: vi.fn(() => providerStream()),
+      getRunState: vi.fn(() => ({})),
+    } as any;
+    const activeRun = {
+      assistantMessageId: 'assistant-1',
+      pendingSteers: [],
+      skillState: {
+        discoverableSkills: [],
+        pinnedSkills: [],
+        loadedSkills: [],
+        loadedSkillContents: {},
+      },
+    } as any;
+
+    await launchProviderRun({
+      activeRun,
+      adapter,
+      agentProfile: {
+        id: 'agent-1',
+        name: 'Agent',
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: [],
+      } as any,
+      broadcastSessionCatalogUpdate: vi.fn(),
+      client: { ws: {} as any } as any,
+      cwd: '/tmp/project',
+      db: { prepare: vi.fn(() => ({ run: vi.fn(), get: vi.fn(), all: vi.fn(() => []) })) } as any,
+      enabledTools: [],
+      forcedPlanBySession: false,
+      images: [],
+      message: {
+        type: 'run_start',
+        sessionId: 'session-1',
+        clientRequestId: 'req-1',
+        input: '/release-notes ZOOM-1 Great feature',
+      },
+      modeValue: 'default',
+      permissionCallback: vi.fn(),
+      processedInput: '/release-notes ZOOM-1 Great feature',
+      providerConfig: { id: 'provider-1', providerType: 'cursor' } as any,
+      llmProfileId: 'provider-1',
+      providerType: 'cursor',
+      runId: 'run-1',
+      sendRunEvent: vi.fn(),
+      serverPort: 3100,
+      session: {
+        id: 'session-1',
+        project_id: 'project-1',
+        name: 'Test Session',
+        root_path: '/tmp/project',
+        sdk_session_id: null,
+        session_type: 'regular',
+        working_directory: '/tmp/project',
+        project_role: null,
+        plan_status: null,
+        task_id: null,
+        llm_profile_id: 'provider-1',
+        system_prompt: null,
+      },
+      sessionType: 'regular',
+      trace: { log: vi.fn(), setMeta: vi.fn() } as any,
+    });
+
+    // The interception never runs for external runtimes — without this gate a
+    // Claude/Codex/Cursor run would receive a rewritten placeholder sentence
+    // while the loaded skill body silently never reaches the adapter.
+    expect(prepareDirectSkillInvocationMock).not.toHaveBeenCalled();
+    expect(executePreparedDirectSkillInvocationMock).not.toHaveBeenCalled();
+    expect(adapter.run).toHaveBeenCalledWith(
+      '/release-notes ZOOM-1 Great feature',
+      expect.any(Object),
+      expect.any(Function)
+    );
+  });
+
+  it('dispatches a server-resolved canonical invocation through adapter.startTurn', async () => {
+    const { launchProviderRun } = await import('../run-provider-launch.js');
+    const runtimeTurnInput = {
+      type: 'runtime-invocation' as const,
+      descriptor: {
+        id: 'inv1:review',
+        kind: 'runtime.command' as const,
+        runtimeType: 'cursor',
+        name: 'review',
+        label: 'Review',
+        displayTrigger: '/review',
+        origin: { owner: 'runtime' as const, scope: 'session' as const },
+        execution: {
+          mode: 'native-structured' as const,
+          fidelity: 'exact' as const,
+          arguments: {
+            accepted: ['raw' as const],
+            preferred: 'raw' as const,
+            transcript: { raw: 'verbatim' as const },
+          },
+        },
+        availability: { available: true as const },
+      },
+      nativeLocator: { commandId: 'review' },
+      arguments: { type: 'raw' as const, value: 'auth' },
+    };
+    const adapter = {
+      run: vi.fn(() => providerStream()),
+      startTurn: vi.fn(() => providerStream()),
+      getRunState: vi.fn(() => ({})),
+    } as any;
+    const activeRun = { assistantMessageId: 'assistant-1', pendingSteers: [] } as any;
+    const permissionCallback = vi.fn();
+
+    await launchProviderRun({
+      activeRun,
+      adapter,
+      agentProfile: {
+        id: 'agent-1',
+        name: 'Agent',
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: [],
+      } as any,
+      broadcastSessionCatalogUpdate: vi.fn(),
+      client: { ws: {} as any } as any,
+      cwd: '/tmp/project',
+      db: stubDb(),
+      enabledTools: [],
+      forcedPlanBySession: false,
+      images: [],
+      message: {
+        type: 'run_start',
+        sessionId: 'session-1',
+        clientRequestId: 'req-1',
+        input: '/review auth',
+        runtimeTurnInput,
+      },
+      modeValue: 'default',
+      permissionCallback,
+      processedInput: '/review auth',
+      providerConfig: { id: 'provider-1', providerType: 'cursor' } as any,
+      llmProfileId: 'provider-1',
+      providerType: 'cursor',
+      runId: 'run-1',
+      sendRunEvent: vi.fn(),
+      serverPort: 3100,
+      session: {
+        id: 'session-1',
+        project_id: 'project-1',
+        name: 'Test Session',
+        root_path: '/tmp/project',
+        sdk_session_id: null,
+        provider_transport: null,
+        session_type: 'regular',
+        working_directory: '/tmp/project',
+        project_role: null,
+        plan_status: null,
+        task_id: null,
+        agent_profile_id: 'agent-1',
+      },
+      sessionType: 'regular',
+      trace: { log: vi.fn(), setMeta: vi.fn() } as any,
+    });
+
+    expect(adapter.startTurn).toHaveBeenCalledWith(
+      runtimeTurnInput,
+      expect.objectContaining({ cwd: '/tmp/project' }),
+      permissionCallback
+    );
+    expect(adapter.run).not.toHaveBeenCalled();
+    expect(prepareDirectSkillInvocationMock).not.toHaveBeenCalled();
+  });
 });

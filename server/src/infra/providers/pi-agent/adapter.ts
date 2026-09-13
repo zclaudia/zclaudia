@@ -1,6 +1,6 @@
 import { PI_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { Session, buildSessionContext} from '@earendil-works/pi-agent-core';
+import { Session, buildSessionContext } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import { ALL_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
@@ -24,6 +24,9 @@ import {
   type BuiltModel,
   type TranslateContext,
 } from '../pi-runtime/index.js';
+import { createPiInvocations, preparePortableSkillTurn } from '../pi-runtime/invocations.js';
+import type { RuntimeTurnInput } from '@zclaudia/shared/providers';
+import { InvocationError } from '@zclaudia/shared/providers';
 import { resolveEnvModel } from '../pi-runtime/env-model.js';
 import { isSandboxAvailable } from '../pi-runtime/sandbox.js';
 import {
@@ -98,6 +101,46 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
   readonly type = PI_AGENT_RUNTIME;
   readonly manifest = manifest;
   readonly policy = policy;
+  /** URIP runtime catalog (§14.4): ZClaudia portable skills under /skill:. */
+  readonly invocations = createPiInvocations();
+
+  async *startTurn(
+    input: RuntimeTurnInput,
+    options: RunOptions,
+    onPermission?: PermissionCallback
+  ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
+    switch (input.type) {
+      case 'message':
+        // Plain text passes through byte-for-byte; attachments ride RunOptions.
+        yield* this.run(input.text, options, onPermission);
+        return;
+      case 'portable-skill': {
+        // §14.4: Pi keeps its progressive skill-state implementation; the host
+        // boundary is the typed payload carrying the materialized body.
+        if (input.skill.resources) {
+          throw new InvocationError(
+            'PORTABLE_SKILL_RESOURCE_UNAVAILABLE',
+            'Resource-bearing portable skills are not wired into the Pi context channel yet.'
+          );
+        }
+        const assessment = input.assessment;
+        if (!assessment.supported) {
+          throw new InvocationError('PORTABLE_SKILL_UNSUPPORTED', assessment.reason);
+        }
+        const prepared = preparePortableSkillTurn(input, options.skillState);
+        options.skillState = prepared.state;
+        yield* this.run(prepared.text, options, onPermission);
+        return;
+      }
+      case 'runtime-invocation':
+        // Pi publishes no runtime-native command catalog; unqualified slash
+        // input belongs to it as plain text (§17.2).
+        throw new InvocationError(
+          'INVOCATION_UNSUPPORTED',
+          'Pi has no runtime-native invocable catalog; use portable skills or plain text.'
+        );
+    }
+  }
 
   async *run(
     input: string,

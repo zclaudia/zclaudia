@@ -26,6 +26,7 @@ import {
   isRecord,
   requireRecord,
   requireString,
+  SkillsListEntry,
 } from './app-server-protocol.js';
 
 interface ActiveTurnContext {
@@ -518,6 +519,16 @@ export class CodexAppServerClient {
   async readConfig(cwd: string): Promise<Record<string, unknown>> {
     await this.ensureRunning();
     return (await this.sendRequest('config/read', { cwd, includeLayers: false })).config;
+  }
+
+  /**
+   * cwd-scoped skill catalog (URIP design doc §14.2, probed against pinned
+   * 0.154.0). Grouped by cwd; callers usually want the flat union.
+   */
+  async listSkills(cwd: string): Promise<SkillsListEntry[]> {
+    await this.ensureRunning();
+    const response = await this.sendRequest('skills/list', { cwd });
+    return (response.data ?? []).flatMap(group => group.skills ?? []);
   }
 
   /**

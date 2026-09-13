@@ -10,6 +10,7 @@ import type {
 } from '@zclaudia/plugin-sdk/providers';
 import { RuntimeContractError } from '@zclaudia/plugin-sdk/providers';
 import { CodexAppServerClient } from './app-server-client.js';
+import type { AppServerInputBlock } from './app-server-protocol.js';
 import {
   buildCodexSdkEnvironment,
   buildEnv,
@@ -28,6 +29,12 @@ import {
 export interface CodexRunOptions {
   cwd: string;
   sessionId?: string;
+  /**
+   * Prebuilt app-server input blocks (URIP §14.2 structured skill turns): when
+   * present they replace `prepareAppServerInput(input)`; the caller guarantees
+   * the blocks already carry the exact user text.
+   */
+  inputBlocks?: AppServerInputBlock[];
   cliPath?: string;
   env?: Record<string, string>;
   model?: string;
@@ -302,7 +309,7 @@ export async function* runCodexSdkTurn(
   activeThreadIds.set(threadId, { client, threadId });
 
   try {
-    const inputBlocks = prepareAppServerInput(input);
+    const inputBlocks = options.inputBlocks ?? prepareAppServerInput(input);
     const buffered: ProviderRuntimeEvent[] = [];
     let streamingMode = !isResumed;
 
@@ -419,7 +426,7 @@ export async function* runCodexAppServer(
   activeThreadIds.set(threadId, { client, threadId });
 
   try {
-    let inputBlocks = prepareAppServerInput(input);
+    let inputBlocks = options.inputBlocks ?? prepareAppServerInput(input);
 
     if (options.systemPrompt && !options.sessionId) {
       const systemContext = `[System Context]\n${options.systemPrompt}`;
@@ -484,7 +491,7 @@ export async function* runCodexAppServer(
       threadId = freshThreadId;
       activeThreadIds.set(threadId, { client, threadId });
 
-      inputBlocks = prepareAppServerInput(input);
+      inputBlocks = options.inputBlocks ?? prepareAppServerInput(input);
 
       yield* client.runTurn(freshThreadId, inputBlocks, onPermission, {
         cwd: options.cwd,
