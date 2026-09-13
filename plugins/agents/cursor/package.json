@@ -1,6 +1,6 @@
 {
   "name": "@zclaudia/plugin-cursor",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Cursor Agent CLI runtime plugin for ZClaudia.",
   "license": "MIT",
   "type": "module",
@@ -38,7 +38,8 @@
     "directory": "plugins/agents/cursor"
   },
   "dependencies": {
-    "@zclaudia/plugin-sdk": "0.2.0"
+    "@agentclientprotocol/sdk": "1.4.0",
+    "@zclaudia/plugin-sdk": "0.3.0"
   },
   "devDependencies": {
     "@zclaudia/agent-common": "workspace:*",
