@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@zclaudia/plugin-sdk': 0.4.0
+
 importers:
 
   .:
@@ -111,11 +114,11 @@ importers:
         specifier: ^0.7.0
         version: 0.7.0(react@19.2.7)
       '@zclaudia/gateway-protocol':
-        specifier: ^0.1.0
-        version: 0.1.0
-      '@zclaudia/protocol':
         specifier: ^0.2.0
         version: 0.2.0
+      '@zclaudia/protocol':
+        specifier: ^0.2.1
+        version: 0.2.1
       '@zclaudia/shared':
         specifier: workspace:*
         version: link:../../shared
@@ -311,11 +314,11 @@ importers:
         specifier: ^0.1.0
         version: 0.1.0
       '@zclaudia/gateway-protocol':
-        specifier: ^0.1.0
-        version: 0.1.0
-      '@zclaudia/protocol':
         specifier: ^0.2.0
         version: 0.2.0
+      '@zclaudia/protocol':
+        specifier: ^0.2.1
+        version: 0.2.1
       '@zclaudia/shared':
         specifier: workspace:*
         version: link:../shared
@@ -443,12 +446,15 @@ importers:
       '@earendil-works/pi-ai':
         specifier: ^0.84.1
         version: 0.84.1(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.0(bufferutil@4.1.0))(zod@4.4.3)
+      '@zclaudia/gateway-protocol':
+        specifier: ^0.2.0
+        version: 0.2.0
       '@zclaudia/plugin-sdk':
         specifier: 0.4.0
         version: 0.4.0
       '@zclaudia/protocol':
         specifier: ^0.2.0
-        version: 0.2.0
+        version: 0.2.1
     devDependencies:
       typescript:
         specifier: ^5.9.3
@@ -2511,19 +2517,15 @@ packages:
       react:
         optional: true
 
-  '@zclaudia/gateway-protocol@0.1.0':
-    resolution: {integrity: sha512-2DZ/TOxOXDDcz7WOumGoqV+nDQ60E3p+DpBlc+puCVWHE/d2T0lLyEd3gBdSiYu20sL9b7bG1lzQZRgHJDSAKQ==}
-
-  '@zclaudia/plugin-sdk@0.1.0':
-    resolution: {integrity: sha512-Njpk7b02nENaoJhyE3WsgBfoRRUzHPxsL+1Kr5zCOst0HfxM3unkOhJ5HIU5lTpPF1F3fJcEzZvrWliXqWnkig==}
-    engines: {node: '>=22.19.0'}
+  '@zclaudia/gateway-protocol@0.2.0':
+    resolution: {integrity: sha512-WhiDUXLr4K/DEzFrkz5BVRPv1mqvvole5rHjRnYOIRLeyFcPVVyvmnu5s57vxgdfZF9IfWudkUjyIqIN3qQHuQ==}
 
   '@zclaudia/plugin-sdk@0.4.0':
     resolution: {integrity: sha512-UAeb7j4R9zd4RW22pKAQka7nj1V7X7uPKsT8eXAZ6BArw+J0UnEt7PJbl/+6RhertP+3f3IXvBm3iLcvAYDEkA==}
     engines: {node: '>=22.19.0'}
 
-  '@zclaudia/protocol@0.2.0':
-    resolution: {integrity: sha512-bvtUtTXhSS9+gaJdu+wwj8DU44Mb1v3Ow/4DCBBKQ/71uBIxWbyFhJ+/Ol9VWFkaM3AlTUMQO5yoIfTXcmxWQg==}
+  '@zclaudia/protocol@0.2.1':
+    resolution: {integrity: sha512-+jwG2edFyhRJeJOfur8zr6nCok2OHI29qNCBEuyTVERX+A1nRM9m0ED7OnUQkveapgv7bF6swdcIyrykhSrUKw==}
 
   abort-controller@3.0.0:
     resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
@@ -7603,19 +7605,17 @@ snapshots:
 
   '@zclaudia/agent-tool-bridge@0.1.0':
     dependencies:
-      '@zclaudia/plugin-sdk': 0.1.0
+      '@zclaudia/plugin-sdk': 0.4.0
 
   '@zclaudia/agent-transcript-kit@0.7.0(react@19.2.7)':
     optionalDependencies:
       react: 19.2.7
 
-  '@zclaudia/gateway-protocol@0.1.0': {}
-
-  '@zclaudia/plugin-sdk@0.1.0': {}
+  '@zclaudia/gateway-protocol@0.2.0': {}
 
   '@zclaudia/plugin-sdk@0.4.0': {}
 
-  '@zclaudia/protocol@0.2.0': {}
+  '@zclaudia/protocol@0.2.1': {}
 
   abort-controller@3.0.0:
     dependencies:
