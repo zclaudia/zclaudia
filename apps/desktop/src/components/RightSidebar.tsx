@@ -220,7 +220,7 @@ export function RightSidebar({
   return (
     <div
       ref={rootRef}
-      className="flex flex-col flex-shrink-0 relative"
+      className="flex flex-col flex-shrink-0 relative bg-[hsl(var(--sidebar))]"
       style={{
         width: `${widthFraction * 100}%`,
         minWidth: `${RIGHT_SIDEBAR_LIMITS.MIN_WIDTH_PX}px`,
@@ -259,7 +259,7 @@ export function RightSidebar({
             workingDirectory={workingDirectory}
           />
         ) : (
-          <div className="absolute inset-0 flex min-w-0 min-h-0 p-1.5">
+          <div className="absolute inset-0 flex min-w-0 min-h-0 p-2">
             <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden rounded-lg border border-border/50 bg-card shadow-sm">
               <RightSidebarEmptyState
                 sessionId={sessionId}

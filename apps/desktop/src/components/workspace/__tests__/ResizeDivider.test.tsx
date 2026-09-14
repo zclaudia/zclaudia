@@ -78,7 +78,7 @@ describe('ResizeDivider', () => {
       <ResizeDivider dir="row" containerSize={1000} onDrag={() => {}} />
     );
     const divider = container.firstElementChild as HTMLElement;
-    expect(divider.className).toContain('w-1'); // gutter width
+    expect(divider.className).toContain('w-2'); // gutter width, matches the tray padding
     expect(divider.querySelector('div')).not.toBeNull(); // handle pill
   });
 
@@ -87,6 +87,6 @@ describe('ResizeDivider', () => {
       <ResizeDivider dir="col" containerSize={1000} onDrag={() => {}} />
     );
     const divider = container.firstElementChild as HTMLElement;
-    expect(divider.className).toContain('h-1');
+    expect(divider.className).toContain('h-2');
   });
 });
