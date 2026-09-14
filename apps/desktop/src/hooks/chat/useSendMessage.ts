@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type {
   UnifiedPermissionPolicy,
   ClientMessage,
@@ -15,6 +15,16 @@ import { uploadFile } from '../../services/fileUpload';
 import * as api from '../../services/api';
 
 const ATTACHMENT_PLACEHOLDER = '[Attachments]';
+
+/**
+ * A dispatched `run_start` only becomes visible run state once the server
+ * answers with `run_started`. In that gap the session still reads idle while
+ * the optimistic user message is already the trailing one — exactly the shape
+ * the resend affordance looks for, which made "Resend" flash on every message
+ * the user sent. Suppress it until the run registers, with this fallback so a
+ * run_start that silently never goes active still surfaces the escape hatch.
+ */
+const RUN_START_GRACE_MS = 10_000;
 
 interface RunStartMessage {
   type: 'run_start';
@@ -118,14 +128,45 @@ export function useSendMessage({
   } | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [resendChecking, setResendChecking] = useState(false);
+  // True between dispatching a run_start and the run registering as active.
+  const [awaitingRunStart, setAwaitingRunStart] = useState(false);
+  const runStartGraceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearRunStartGrace = useCallback(() => {
+    if (runStartGraceTimerRef.current !== null) {
+      clearTimeout(runStartGraceTimerRef.current);
+      runStartGraceTimerRef.current = null;
+    }
+    setAwaitingRunStart(false);
+  }, []);
+
+  // The run we dispatched went active (or another one did) — drop the grace.
+  useEffect(() => {
+    if (isSessionRunning) clearRunStartGrace();
+  }, [isSessionRunning, clearRunStartGrace]);
+
+  // Never leave a timer behind on unmount/session switch.
+  useEffect(() => {
+    return () => {
+      if (runStartGraceTimerRef.current !== null) {
+        clearTimeout(runStartGraceTimerRef.current);
+        runStartGraceTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // ── Resend logic ──
   const resendTargetMessage = useMemo(() => {
-    if (!lastSessionMessage || lastSessionMessage.role !== 'user' || isSessionRunning) {
+    if (
+      !lastSessionMessage ||
+      lastSessionMessage.role !== 'user' ||
+      isSessionRunning ||
+      awaitingRunStart
+    ) {
       return null;
     }
     return lastSessionMessage;
-  }, [lastSessionMessage, isSessionRunning]);
+  }, [lastSessionMessage, isSessionRunning, awaitingRunStart]);
 
   const resendText = useMemo(() => {
     if (!resendTargetMessage) return null;
@@ -157,6 +198,12 @@ export function useSendMessage({
   const startRun = useCallback(
     async (runStartMsg: RunStartMessage) => {
       await clearInterruptedStatus();
+      if (runStartGraceTimerRef.current !== null) clearTimeout(runStartGraceTimerRef.current);
+      setAwaitingRunStart(true);
+      runStartGraceTimerRef.current = setTimeout(() => {
+        runStartGraceTimerRef.current = null;
+        setAwaitingRunStart(false);
+      }, RUN_START_GRACE_MS);
       wsSendMessage(runStartMsg);
     },
     [clearInterruptedStatus, wsSendMessage]
@@ -360,7 +407,8 @@ export function useSendMessage({
     setRestoreMessage(null);
     setUploadError(null);
     setResendChecking(false);
-  }, []);
+    clearRunStartGrace();
+  }, [clearRunStartGrace]);
 
   return {
     handleSendMessage,
@@ -373,6 +421,7 @@ export function useSendMessage({
     // State
     restoreMessage,
     uploadError,
+    awaitingRunStart,
     resendTargetMessage,
     resendText,
     resendChecking,

@@ -171,6 +171,7 @@ export function ChatInterface({
     clearInterruptedStatus,
     restoreMessage,
     uploadError,
+    awaitingRunStart,
     resendTargetMessage,
     resendText,
     resendChecking,
@@ -621,7 +622,10 @@ export function ChatInterface({
               sessionToolCalls={sessionToolCalls}
               sessionHealth={sessionHealth}
               sessionRetryStatus={sessionRetryStatus}
-              isLoading={isLoading}
+              // Cover the dispatch gap too: the run isn't active yet, but the
+              // message is already on screen and something is happening, so the
+              // thinking indicator should be up rather than a silent pause.
+              isLoading={isLoading || awaitingRunStart}
               resendTargetMessageId={resendTargetMessage?.id}
               resendDisabled={!resendText || resendChecking}
               onResendTarget={handleResendLastMessage}
