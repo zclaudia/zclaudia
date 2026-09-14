@@ -15,7 +15,6 @@ import type {
   FacadeAdapterQueries,
   FacadeRuntimeGatewayAdapter,
 } from '@zclaudia/shared';
-import type { ServerMessage } from '@zclaudia/shared';
 import { GatewayTransport } from '../hooks/transport/GatewayTransport';
 import type { GatewayTransportConfig } from '../hooks/transport/GatewayTransport';
 
@@ -37,7 +36,6 @@ export class DirectGatewayAdapter implements FacadeRuntimeGatewayAdapter {
     | 'onBackendSubscribed'
     | 'onBackendUnsubscribed'
     | 'onBackendServerMessage'
-    | 'onRunStreamEvent'
     | 'onContentPatch'
     | 'onContentPatchError'
     | 'onBackendsRemoved'
@@ -123,14 +121,6 @@ export class DirectGatewayAdapter implements FacadeRuntimeGatewayAdapter {
             } else {
               this.emit({ type: 'backend_message_received', backendId, message });
             }
-          },
-          onRunStreamEvent: (backendId, sessionId, event) => {
-            this.emit({
-              type: 'run_event_received',
-              backendId,
-              sessionId,
-              event: event as unknown as ServerMessage,
-            });
           },
           onContentPatch: (backendId, sessionId, messages, latestOffset) => {
             this.emit({

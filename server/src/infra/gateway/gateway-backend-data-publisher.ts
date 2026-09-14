@@ -1,7 +1,8 @@
 import type {
   BackendResourceEventMessage,
   BackendResourceSnapshotMessage,
-} from '@zclaudia/protocol/gateway';
+} from '@zclaudia/protocol/sync';
+import { RESOURCES_TOPIC } from '@zclaudia/protocol/transport';
 import type { ProjectItem, SessionItem } from '@zclaudia/protocol/zclaudia';
 import type { Database as BetterDatabase } from 'better-sqlite3';
 import type { ActiveRun } from '../../application/conversation/transport/types.js';
@@ -22,9 +23,6 @@ export interface GatewayBackendDataPublisherOptions {
   namespace?: string;
   logger?: Pick<Console, 'log' | 'error'>;
 }
-
-/** Topic carrying backend_resource_snapshot / backend_resource_event payloads. */
-export const RESOURCES_TOPIC = 'resources';
 
 export interface GatewaySessionRecord {
   id: string;

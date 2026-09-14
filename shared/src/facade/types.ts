@@ -4,7 +4,8 @@
  * UI-facing types for the unified backend capability surface.
  */
 
-import type { BackendPresence, BackendResourceEventMessage } from '@zclaudia/protocol/gateway';
+import type { BackendPresenceV4 as BackendPresence } from '@zclaudia/gateway-protocol';
+import type { BackendResourceEventMessage } from '@zclaudia/protocol/sync';
 import type { SessionItem, ProjectItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
 import type { ClientMessage, ServerMessage } from '../wire/messages.js';
 

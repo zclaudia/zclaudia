@@ -63,7 +63,6 @@ describe('GatewayTransport', () => {
       onBackendSubscribed: vi.fn(),
       onBackendUnsubscribed: vi.fn(),
       onBackendServerMessage: vi.fn(),
-      onRunStreamEvent: vi.fn(),
       onContentPatch: vi.fn(),
       onContentPatchError: vi.fn(),
       onBackendsRemoved: vi.fn(),

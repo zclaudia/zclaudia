@@ -7,7 +7,8 @@
  *
  */
 
-import type { BackendPresence, BackendResourceEventMessage } from '@zclaudia/protocol/gateway';
+import type { BackendPresenceV4 as BackendPresence } from '@zclaudia/gateway-protocol';
+import type { BackendResourceEventMessage } from '@zclaudia/protocol/sync';
 import type { SessionItem, ProjectItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
 import type { ClientMessage, ServerMessage } from '../wire/messages.js';
 import type { BackendFacadeMode } from './types.js';
@@ -26,6 +27,10 @@ export type FacadeAdapterConnectionState =
 
 // ============================================================================
 // Adapter Events
+//
+// Process-local facade events. `backend_subscribed` / `backend_unsubscribed`
+// reuse historical wire names but are in-process contracts only — no wire
+// message of these names is expected in the v4 data plane.
 // ============================================================================
 
 export type FacadeAdapterEvent =

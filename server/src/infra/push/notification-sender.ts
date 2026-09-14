@@ -10,7 +10,6 @@ export interface NotifyEvent {
     | 'process_leak';
   title: string;
   body: string;
-  priority?: 'urgent' | 'high' | 'default' | 'low' | 'min';
   tags?: string[];
   clickUrl?: string;
 }

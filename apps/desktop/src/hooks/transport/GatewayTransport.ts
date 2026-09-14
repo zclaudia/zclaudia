@@ -11,33 +11,33 @@
 
 import type { ClientMessage, ServerMessage } from '@zclaudia/shared';
 import type {
-  BackendPresence,
-  RegistrySyncPayload,
-  RegistrySnapshotMessage,
-  PeerHelloMessage,
-  PeerReadyMessage,
-  BackendResourceSnapshotMessage,
-  BackendResourceEventMessage,
+  BackendPresenceV4 as BackendPresence,
   BackendServerMessage,
-  GatewayStreamEvent,
-  CatchUpContentMessage,
-  ContentPatchMessage,
-  ContentPatchErrorMessage,
-  GatewayErrorMessage,
-} from '@zclaudia/protocol/gateway';
-import type { ProjectItem, SessionItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
-import type {
   ChannelClosedMessage,
   ChannelReadyMessage,
+  GatewayErrorV4 as GatewayErrorMessage,
+  PeerHelloV4 as PeerHelloMessage,
+  PeerReadyV4 as PeerReadyMessage,
+  RegistrySnapshotV4 as RegistrySnapshotMessage,
   TopicMessage,
   TopicSubscribedMessage,
   TopicUnsubscribedMessage,
 } from '@zclaudia/gateway-protocol';
+import { GATEWAY_PROTOCOL_V4 } from '@zclaudia/gateway-protocol';
+import type {
+  BackendResourceEventMessage,
+  BackendResourceSnapshotMessage,
+  CatchUpContentMessage,
+  ContentPatchErrorMessage,
+  ContentPatchMessage,
+} from '@zclaudia/protocol/sync';
+import {
+  MESSAGE_CHANNEL_KIND,
+  RESOURCES_TOPIC,
+  ZCLAUDIA_NAMESPACE,
+} from '@zclaudia/protocol/transport';
+import type { ProjectItem, SessionItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
 
-/** Channel kind carrying zclaudia business messages (server: MESSAGE_CHANNEL_KIND). */
-const MESSAGE_CHANNEL_KIND = 'zclaudia';
-/** Topic carrying resource snapshots/events (server: RESOURCES_TOPIC). */
-const RESOURCES_TOPIC = 'resources';
 /** Max frames queued per backend while its message channel (re)opens. */
 const MAX_PENDING_CHANNEL_FRAMES = 100;
 
@@ -64,7 +64,6 @@ export interface GatewayTransportConfig {
   onBackendSubscribed: (backendId: string, epoch: number, capabilities: string[]) => void;
   onBackendUnsubscribed: (backendId: string, reason: string) => void;
   onBackendServerMessage: (backendId: string, message: ServerMessage) => void;
-  onRunStreamEvent: (backendId: string, sessionId: string, event: GatewayStreamEvent) => void;
   onContentPatch: (
     backendId: string,
     sessionId: string,
@@ -356,8 +355,8 @@ export class GatewayTransport {
   private sendPeerHello(): void {
     const msg: PeerHelloMessage = {
       type: 'peer_hello',
-      protocolVersion: 4,
-      namespace: 'zclaudia',
+      protocolVersion: GATEWAY_PROTOCOL_V4,
+      namespace: ZCLAUDIA_NAMESPACE,
       clientProtocolVersion: 1,
       peerType: 'client-only',
       gatewaySecret: this.config.gatewaySecret,
@@ -420,7 +419,7 @@ export class GatewayTransport {
   }
 
   // --- Registry ---
-  private applyRegistrySync(sync: RegistrySyncPayload): void {
+  private applyRegistrySync(sync: PeerReadyMessage['registrySync']): void {
     this.applyRegistryItems(sync.items);
   }
 
@@ -527,10 +526,7 @@ export class GatewayTransport {
   // --- Protocol v4 message channels ---
 
   private isV4Backend(backendId: string): boolean {
-    const presence = this.registryItems.get(backendId) as
-      | (BackendPresence & { gatewayProtocolVersion?: number })
-      | undefined;
-    return presence?.gatewayProtocolVersion === 4;
+    return this.registryItems.get(backendId)?.gatewayProtocolVersion === 4;
   }
 
   private maybeOpenMessageChannel(backendId: string): void {

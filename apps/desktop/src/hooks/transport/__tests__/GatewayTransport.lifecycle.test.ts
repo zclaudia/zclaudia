@@ -49,7 +49,6 @@ describe('GatewayTransport lifecycle', () => {
       onBackendSubscribed: vi.fn(),
       onBackendUnsubscribed: vi.fn(),
       onBackendServerMessage: vi.fn(),
-      onRunStreamEvent: vi.fn(),
       onContentPatch: vi.fn(),
       onContentPatchError: vi.fn(),
     });
@@ -77,7 +76,6 @@ describe('GatewayTransport lifecycle', () => {
       onBackendSubscribed: vi.fn(),
       onBackendUnsubscribed: vi.fn(),
       onBackendServerMessage: vi.fn(),
-      onRunStreamEvent: vi.fn(),
       onContentPatch: vi.fn(),
       onContentPatchError: vi.fn(),
     });
@@ -108,7 +106,6 @@ describe('GatewayTransport lifecycle', () => {
       onBackendSubscribed: vi.fn(),
       onBackendUnsubscribed: vi.fn(),
       onBackendServerMessage: vi.fn(),
-      onRunStreamEvent: vi.fn(),
       onContentPatch: vi.fn(),
       onContentPatchError: vi.fn(),
     });
@@ -140,7 +137,6 @@ describe('GatewayTransport lifecycle', () => {
       onBackendSubscribed: vi.fn(),
       onBackendUnsubscribed: vi.fn(),
       onBackendServerMessage: vi.fn(),
-      onRunStreamEvent: vi.fn(),
       onContentPatch: vi.fn(),
       onContentPatchError: vi.fn(),
     });

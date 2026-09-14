@@ -6,7 +6,7 @@
  *
  */
 
-import type { BackendPresence } from '@zclaudia/protocol/gateway';
+import type { BackendPresenceV4 as BackendPresence } from '@zclaudia/gateway-protocol';
 import type { FacadeAdapterBootstrapState } from './adapter.js';
 import type {
   BackendRuntimeRecord,

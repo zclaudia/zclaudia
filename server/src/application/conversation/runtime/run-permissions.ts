@@ -582,7 +582,6 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
             type: 'background_permission',
             title: 'Background task needs attention',
             body: `${formatSessionBackendContext(db, message.sessionId)}: ${request.toolName}: ${request.detail.slice(0, 200)}`,
-            priority: 'urgent',
             tags: ['rotating_light'],
             clickUrl: buildAppSelectionClickUrl(db, { sessionId: message.sessionId }),
           });
@@ -722,7 +721,6 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
               type: 'interaction_prompt',
               title: 'Agent has a question',
               body: `${formatSessionBackendContext(db, message.sessionId)}: ${firstQuestion?.question?.slice(0, 200) || 'Interactive question'}`,
-              priority: 'high',
               tags: ['question'],
               clickUrl: buildAppSelectionClickUrl(db, { sessionId: message.sessionId }),
             });
@@ -746,7 +744,6 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
               type: 'permission_request',
               title: 'Permission Required',
               body: `${formatSessionBackendContext(db, message.sessionId)}: ${matchedRule ? `[${matchedRule}] ` : ''}${request.toolName}: ${request.detail.slice(0, 200)}`,
-              priority: 'urgent',
               tags: ['warning'],
               clickUrl: buildAppSelectionClickUrl(db, { sessionId: message.sessionId }),
             });

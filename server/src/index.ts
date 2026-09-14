@@ -70,7 +70,10 @@ process.on('unhandledRejection', reason => {
 const PORT = parseInt(process.env.PORT || '3100', 10);
 const HOST = defaultServerHost();
 
-// Gateway configuration from environment (legacy support)
+// Gateway configuration from environment (legacy support).
+// GATEWAY_SECRET carries a gateway-issued peer credential (zgd_/zgb_/zga_);
+// the variable keeps its historical name for config compatibility. Shared
+// secrets and the gateway admin token are not valid here.
 const GATEWAY_URL = process.env.GATEWAY_URL;
 const GATEWAY_SECRET = process.env.GATEWAY_SECRET;
 const GATEWAY_NAME = process.env.GATEWAY_NAME || `Backend on ${os.hostname()}`;

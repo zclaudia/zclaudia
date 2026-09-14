@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { BackendResourceSnapshotMessage } from '@zclaudia/protocol/gateway';
+import type { BackendResourceSnapshotMessage } from '@zclaudia/protocol/sync';
+import { RESOURCES_TOPIC } from '@zclaudia/protocol/transport';
 import type { Database as BetterDatabase } from 'better-sqlite3';
-import { GatewayBackendDataPublisher, RESOURCES_TOPIC } from '../gateway-backend-data-publisher.js';
+import { GatewayBackendDataPublisher } from '../gateway-backend-data-publisher.js';
 
 describe('GatewayBackendDataPublisher', () => {
   it('publishes session snapshot even when projects cannot be queried', () => {

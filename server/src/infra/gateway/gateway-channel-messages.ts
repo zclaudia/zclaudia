@@ -8,9 +8,9 @@
 import WebSocket from 'ws';
 import type { SocksProxyAgent } from 'socks-proxy-agent';
 import type { ChannelOfferMessage, ChannelReadyMessage } from '@zclaudia/gateway-protocol';
+import { MESSAGE_CHANNEL_KIND } from '@zclaudia/protocol/transport';
 
-/** Channel kind carrying zclaudia business messages. */
-export const MESSAGE_CHANNEL_KIND = 'zclaudia';
+export { MESSAGE_CHANNEL_KIND };
 
 export interface MessageChannelDeps {
   /** ws(s)://host base of the gateway (no path). */

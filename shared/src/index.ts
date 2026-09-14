@@ -13,10 +13,11 @@
 //   ui-facade:              Frontend-only facade runtime & types
 //     facade/*
 //
-// Neutral relay/wire contracts (gateway sync, notification wire, agent run,
-// zclaudia resource shapes) live in the published `@zclaudia/protocol` package
-// and are imported directly from there — `shared` does NOT re-export them, so
-// each concept has exactly one import source.
+// Cross-boundary contracts are imported directly from their published
+// packages, never re-exported here, so each concept has exactly one import
+// source: gateway transport frames from `@zclaudia/gateway-protocol`;
+// business resources, sync payloads, and notification semantics from
+// `@zclaudia/protocol`.
 //
 // No physical split required yet — sub-path imports already enforce boundaries.
 // ──────────────────────────────────────────────────────────────────────

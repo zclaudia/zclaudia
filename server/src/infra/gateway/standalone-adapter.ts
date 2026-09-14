@@ -17,7 +17,7 @@ import type {
   FacadeAdapterQueries,
   FacadeRuntimeGatewayAdapter,
 } from '@zclaudia/shared/facade/index';
-import type { BackendPresence } from '@zclaudia/protocol/gateway';
+import type { BackendPresenceV4 as BackendPresence } from '@zclaudia/gateway-protocol';
 import type { ClientMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { LocalBackendHandler } from './embedded-adapter.js';
 

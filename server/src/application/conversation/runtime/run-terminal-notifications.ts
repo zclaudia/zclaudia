@@ -99,7 +99,6 @@ export function postRunCompletedNotification(input: TerminalRunNotificationInput
     type: 'run_completed',
     title: 'Run completed',
     body: `${formatSessionBackendContext(db, sessionId)} completed.`,
-    priority: 'default',
     tags: ['white_check_mark'],
     clickUrl: buildAppSelectionClickUrl(db, { sessionId }),
   });
@@ -133,7 +132,6 @@ export function postRunFailedNotification(
     type: 'run_failed',
     title: 'Run failed',
     body: `${formatSessionBackendContext(db, sessionId)} failed: ${error.slice(0, 200)}`,
-    priority: 'high',
     tags: ['x'],
     clickUrl: buildAppSelectionClickUrl(db, { sessionId }),
   });

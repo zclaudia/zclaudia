@@ -212,7 +212,6 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
         type: 'process_leak',
         title: 'Leaked processes detected',
         body: `${report.leakedProcesses.length} orphaned process(es) found on backend ${backendName}: ${pids}`,
-        priority: 'high',
         tags: ['warning'],
         clickUrl: buildAppSelectionClickUrl(db, { backendId: getBackendRouteId(db) }),
       });

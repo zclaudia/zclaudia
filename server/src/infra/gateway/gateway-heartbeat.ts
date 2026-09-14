@@ -1,6 +1,6 @@
 // Periodic backend heartbeat for the gateway client. Extracted from GatewayClient so the
 // timer lifecycle is a cohesive, independently testable unit (QA-0027).
-import type { BackendHeartbeatMessage } from '@zclaudia/protocol/gateway';
+import type { BackendHeartbeatMessage } from '@zclaudia/gateway-protocol';
 
 export interface HeartbeatDeps {
   /** Interval between heartbeats, in milliseconds. */

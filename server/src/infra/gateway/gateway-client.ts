@@ -2,39 +2,44 @@
  * Gateway Client — Backend Peer
  *
  * Connects to a gateway as a client+backend peer.
- * Implements handshake, heartbeat, catalog, stream demand, and stream event protocols.
+ * Implements handshake, heartbeat, registry, resources topic, message
+ * channels, and content catch-up. Transport frame types come from
+ * @zclaudia/gateway-protocol; business sync payloads from
+ * @zclaudia/protocol/sync.
  */
 
 import type { SocksProxyAgent } from 'socks-proxy-agent';
 import * as crypto from 'crypto';
 import type {
-  PeerHelloMessage,
-  PeerReadyMessage,
-  RegistrySyncPayload,
-  BackendPresence,
-  RegistrySnapshotMessage,
+  BackendPresenceV4 as BackendPresence,
+  BackendServerMessage,
+  ChannelOfferMessage,
+  GatewayErrorV4,
+  PeerHelloV4 as PeerHelloMessage,
+  PeerReadyV4 as PeerReadyMessage,
+  RegistrySnapshotV4 as RegistrySnapshotMessage,
+} from '@zclaudia/gateway-protocol';
+import { GATEWAY_PROTOCOL_V4 } from '@zclaudia/gateway-protocol';
+import type { PushNotificationRequestMessage } from '@zclaudia/gateway-protocol/notifications';
+import type {
   BackendResourceSnapshotMessage,
   BackendResourceEventMessage,
-  BackendStreamEvent,
-  ContentPatchMessage,
-  ContentPatchErrorMessage,
-  BackendServerMessage,
   CatchUpContentMessage,
-} from '@zclaudia/protocol/gateway';
+  ContentPatchErrorMessage,
+  ContentPatchMessage,
+} from '@zclaudia/protocol/sync';
+import { MESSAGE_CHANNEL_KIND, RESOURCES_TOPIC, ZCLAUDIA_NAMESPACE } from '@zclaudia/protocol/transport';
 import type { ProjectItem, SessionItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
 import type { GatewayBackendInfo } from '@zclaudia/shared/core/server';
 import type { ClientMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import { GatewayBackendDataPublisher } from './gateway-backend-data-publisher.js';
 import { getOrCreateDeviceId } from './gateway-device-id.js';
 import { GatewayHeartbeat } from './gateway-heartbeat.js';
-import type { ChannelOfferMessage } from '@zclaudia/gateway-protocol';
 import { handleHttpChannelOffer } from './gateway-channel-http.js';
 import {
   GatewayMessageChannels,
   GatewayOutgoingChannels,
-  MESSAGE_CHANNEL_KIND,
 } from './gateway-channel-messages.js';
-import { RESOURCES_TOPIC } from './gateway-backend-data-publisher.js';
 import { createSocksProxyAgent } from './gateway-proxy-agent.js';
 import { GatewayTransport } from './gateway-transport.js';
 
@@ -66,7 +71,6 @@ type BackendMessageHandler = (backendId: string, message: ClientMessage) => Prom
 type BackendClosedHandler = (backendId: string) => void;
 type GenericEventHandler = (...args: unknown[]) => void;
 type BackendDataEventMessage = BackendResourceEventMessage;
-type RunStreamEventType = string;
 
 // ============================================================================
 // Outgoing Subscription Types (facade client role)
@@ -171,14 +175,6 @@ export interface GatewayClientCommands {
     ): void;
   };
   stream: {
-    /** Emit a run stream event (backend-peer role). */
-    emitRunEvent(
-      sessionId: string,
-      runId: string,
-      eventType: RunStreamEventType,
-      seq: number,
-      payload: unknown
-    ): void;
     /** Request content catch-up on a subscribed backend stream (facade client role). */
     catchUpOutgoing(backendId: string, sessionId: string, afterOffset: number): void;
   };
@@ -193,7 +189,6 @@ export interface GatewayClientQueries {
   };
   connection: {
     isConnected(): boolean;
-    getStreamDemandActive(): boolean;
     getGatewayUrl(): string;
     getGatewaySecret(): string;
     createHttpAgent(): SocksProxyAgent | undefined;
@@ -246,10 +241,6 @@ export class GatewayClient {
     send: msg => this.transport.send(msg),
   });
 
-  /** Always false since the v4 data plane: retained topics replaced the
-   *  demand-gated periodic snapshot push. Kept for the queries interface. */
-  private readonly streamDemandActive = false;
-
   private registryItems = new Map<string, BackendPresence>();
 
   private backendDataPublisher: GatewayBackendDataPublisher;
@@ -291,8 +282,8 @@ export class GatewayClient {
         this.transport.send({ type: 'topic_publish', topic, payload, retain: options?.retain });
       },
     });
-    // v4 message channels feed the same virtual-client machinery as v3
-    // backend_client_message, keyed by channelId instead of peerSessionId.
+    // v4 message channels are the targeted data plane: one channel per
+    // remote client session, keyed by channelId.
     this.messageChannels = new GatewayMessageChannels({
       resolveWsBase: () => this.config.gatewayUrl.replace(/^http/, 'ws'),
       createAgent: () => this.createHttpAgent(),
@@ -352,7 +343,6 @@ export class GatewayClient {
         broadcastProjectEvent: (t, p) => this.broadcastProjectEvent(t, p),
       },
       stream: {
-        emitRunEvent: (sid, rid, et, seq, p) => this.emitRunStreamEvent(sid, rid, et, seq, p),
         catchUpOutgoing: (bid, sid, off) => this.catchUpOutgoingStream(bid, sid, off),
       },
     };
@@ -366,7 +356,6 @@ export class GatewayClient {
       },
       connection: {
         isConnected: () => this.isGatewayConnected(),
-        getStreamDemandActive: () => this.getStreamDemandActive(),
         getGatewayUrl: () => this.getGatewayUrl(),
         getGatewaySecret: () => this.getGatewaySecret(),
         createHttpAgent: () => this.createHttpAgent(),
@@ -412,9 +401,6 @@ export class GatewayClient {
   getDeviceId(): string {
     return this.deviceId;
   }
-  getStreamDemandActive(): boolean {
-    return this.streamDemandActive;
-  }
   getGatewayUrl(): string {
     // Consumers use this as an HTTP base (gateway /api/proxy and gateway-direct
     // REST). GATEWAY_URL is commonly configured as ws(s):// for the socket, so
@@ -459,7 +445,7 @@ export class GatewayClient {
   }
 
   /** Send a message to a subscribing client. Prefers the client's v4 message
-   *  channel; falls back to v3 backend_server_message over the control plane. */
+   *  channel; falls back to the backend_server_message directed fallback. */
   sendToChannel(targetPeerSessionId: string, message: ServerMessage): void {
     if (this.messageChannels.send(targetPeerSessionId, message)) return;
     const backendId = this.backendId || targetPeerSessionId;
@@ -506,10 +492,7 @@ export class GatewayClient {
 
   /** Whether a remote backend registered with gateway protocol v4. */
   private isV4Backend(backendId: string): boolean {
-    const presence = this.registryItems.get(backendId) as
-      | (BackendPresence & { gatewayProtocolVersion?: number })
-      | undefined;
-    return presence?.gatewayProtocolVersion === 4;
+    return this.registryItems.get(backendId)?.gatewayProtocolVersion === 4;
   }
 
   subscribeBackend(targetBackendId: string): void {
@@ -613,25 +596,6 @@ export class GatewayClient {
     this.backendDataPublisher.broadcastProjectEvent(eventType, project);
   }
 
-  emitRunStreamEvent(
-    sessionId: string,
-    runId: string,
-    eventType: RunStreamEventType,
-    seq: number,
-    payload: unknown
-  ): void {
-    if (!this.transport.hasSocket() || !this.isConnected || !this.streamDemandActive) return;
-    const msg: BackendStreamEvent = {
-      type: 'backend_stream_event',
-      streamId: runId,
-      eventName: `zclaudia.${eventType}`,
-      channel: sessionId,
-      seq,
-      payload,
-    };
-    this.transport.send(msg);
-  }
-
   sendPushNotificationRequest(event: {
     type?: string;
     name?: string;
@@ -642,7 +606,7 @@ export class GatewayClient {
     clickUrl?: string;
   }): void {
     if (!this.transport.hasSocket() || !this.isConnected) return;
-    this.transport.send({
+    const request: PushNotificationRequestMessage = {
       type: 'push_notification_request',
       event: {
         name:
@@ -654,7 +618,8 @@ export class GatewayClient {
         tags: event.tags,
         clickUrl: event.clickUrl,
       },
-    });
+    };
+    this.transport.send(request);
   }
 
   // ==========================================================================
@@ -664,8 +629,8 @@ export class GatewayClient {
   private sendPeerHello(): void {
     const msg: PeerHelloMessage = {
       type: 'peer_hello',
-      protocolVersion: 4,
-      namespace: this.config.namespace ?? 'zclaudia',
+      protocolVersion: GATEWAY_PROTOCOL_V4,
+      namespace: this.config.namespace ?? ZCLAUDIA_NAMESPACE,
       clientProtocolVersion: this.config.clientProtocolVersion ?? 1,
       peerType: 'client+backend',
       gatewaySecret: this.config.gatewaySecret,
@@ -781,7 +746,7 @@ export class GatewayClient {
   // Internal — Registry
   // ==========================================================================
 
-  private applyRegistrySync(sync: RegistrySyncPayload): void {
+  private applyRegistrySync(sync: PeerReadyMessage['registrySync']): void {
     this.registryItems.clear();
     for (const item of sync.items) this.registryItems.set(item.backendId, item);
     this.outgoingEvents.onRegistrySnapshotChanged?.(sync.items);
@@ -887,7 +852,7 @@ export class GatewayClient {
       type: 'backend_server_message',
       backendId,
       message: frame,
-    } as unknown as BackendServerMessage);
+    } satisfies BackendServerMessage);
   }
 
   private handleOutgoingBackendDataSnapshot(msg: BackendResourceSnapshotMessage): void {
