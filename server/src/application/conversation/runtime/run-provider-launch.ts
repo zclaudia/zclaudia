@@ -1,3 +1,4 @@
+import { resolveAgentForSession } from '../../../domains/agent-profiles/agent-resolver.js';
 import { isPiAgentRuntime } from '@zclaudia/shared/core/agent-profile';
 import { negotiateProfile } from '../../../infra/providers/pcp-negotiator.js';
 import type { ProviderAdapter, ProviderRuntimeEvent } from '../../../infra/providers/types.js';
@@ -186,6 +187,11 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
       claudiaSessionId: message.sessionId,
       cwd,
       agentModel: effectiveAgentProfile.model,
+      inheritedModel: resolveAgentForSession(db, {
+        explicitAgentId: effectiveAgentProfile.id,
+        sessionId: message.sessionId,
+        ignoreModelSelection: true,
+      }).agent.model,
       resolvedLlmProfile: effectiveProviderConfig,
       resolvedLlmProfileId: effectiveLlmProfileId ?? null,
     });
@@ -265,7 +271,12 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
           sessionId: message.sessionId,
           runtimeType: effectiveProviderType,
           engineMode: engineModeResolution.engineMode,
-          model: effectiveAgentProfile.model || null,
+          model:
+            resolveAgentForSession(db, {
+              explicitAgentId: effectiveAgentProfile.id,
+              sessionId: message.sessionId,
+              ignoreModelSelection: true,
+            }).agent.model || null,
           llmProfileId: null,
           connectionIdentityHash: null,
           configuredCliPath,

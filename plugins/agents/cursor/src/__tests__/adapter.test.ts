@@ -22,8 +22,21 @@ vi.mock('../acp-runner.js', () => ({
 import { CURSOR_STREAM_JSON_TRANSPORT, CursorAgentAdapter } from '../adapter.js';
 
 const LEGACY_ENV = { ZCLAUDIA_CURSOR_TRANSPORT: 'stream-json' };
+const { discoverCliModelsMock } = vi.hoisted(() => ({ discoverCliModelsMock: vi.fn() }));
+vi.mock('../model-discovery.js', () => ({ discoverCliModels: discoverCliModelsMock }));
 
 describe('CursorAgentAdapter', () => {
+  it('discovers legacy models through the CLI without launching a turn', async () => {
+    const catalog = { models: [{ id: 'composer', label: 'Composer', thinkingLevels: [] }] };
+    discoverCliModelsMock.mockResolvedValueOnce(catalog);
+    const adapter = new CursorAgentAdapter(async () => null);
+    const context = { cwd: '/p', providerTransport: CURSOR_STREAM_JSON_TRANSPORT };
+    const signal = new AbortController().signal;
+    expect(await adapter.discoverModels(context, signal)).toEqual(catalog);
+    expect(discoverCliModelsMock).toHaveBeenCalledWith(context, signal);
+    expect(runCursorMock).not.toHaveBeenCalled();
+    expect(runCursorAcpMock).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     runCursorMock.mockClear();
     runCursorAcpMock.mockClear();

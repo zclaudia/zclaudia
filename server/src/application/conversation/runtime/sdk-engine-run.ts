@@ -5,6 +5,7 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { RuntimeModelConnection } from '@zclaudia/shared/providers';
 import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
 import { resolveRuntimeModelConnection } from '../../../domains/agent-profiles/runtime-model-connection.js';
+import { readSessionModelSelection } from '../../../domains/sessions/model-settings-repository.js';
 import { SessionRuntimeBindingRepository } from '../../../domains/sessions/runtime-binding-repository.js';
 import {
   computeConnectionIdentityHash,
@@ -34,6 +35,8 @@ export interface PrepareSdkEngineRunInput {
   cwd: string;
   /** Model the (possibly binding-adjusted) agent resolves to before this override. */
   agentModel: string;
+  /** Default before applying session overrides, retained for Reset to default. */
+  inheritedModel?: string;
   /** LLM profile resolved from the agent's current configuration by run-bootstrap. */
   resolvedLlmProfile: LlmProfileConfig | undefined;
   resolvedLlmProfileId: string | null;
@@ -83,7 +86,10 @@ export async function prepareSdkEngineRun(
   const boundProfileId = binding
     ? binding.llmProfileId
     : (input.resolvedLlmProfileId ?? input.resolvedLlmProfile?.id ?? null);
-  const model = (binding?.model ?? input.agentModel ?? '').trim();
+  // The resolver already applied the session's explicit model selection.
+  // Connection identity remains pinned independently of model selection.
+  const selection = readSessionModelSelection(db, claudiaSessionId);
+  const model = (selection.model ?? binding?.model ?? input.agentModel ?? '').trim();
 
   let profile: LlmProfileConfig | undefined = input.resolvedLlmProfile;
   if (binding) {
@@ -157,7 +163,7 @@ export async function prepareSdkEngineRun(
       sessionId: claudiaSessionId,
       runtimeType,
       engineMode: 'sdk',
-      model: model || null,
+      model: input.inheritedModel ?? (model || null),
       llmProfileId: boundProfileId,
       connectionIdentityHash: identityHash,
       configuredCliPath: null,

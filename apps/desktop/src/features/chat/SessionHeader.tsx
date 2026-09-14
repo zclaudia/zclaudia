@@ -1,3 +1,4 @@
+import { SessionSettingsDialog } from './SessionSettingsDialog';
 import { useState } from 'react';
 import {
   RotateCcw,
@@ -97,6 +98,7 @@ export function SessionHeader({
   contextPercent = null,
   systemInfo = null,
 }: SessionHeaderProps) {
+  const [showSettings, setShowSettings] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showMobileInfo, setShowMobileInfo] = useState(false);
   // Hardware back closes the session-info overlay before any lower-priority
@@ -292,6 +294,14 @@ export function SessionHeader({
           <span className="hidden sm:inline">Unstable</span>
         </div>
       )}
+      {showSettings && (
+        <SessionSettingsDialog
+          sessionId={currentSession.id}
+          disabled={isLoading || currentSession.isReadOnly}
+          isMobile={isMobile}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
       {/* Actions (hidden for background sessions) */}
       {currentSession.type !== 'background' && (
         <>
@@ -315,6 +325,17 @@ export function SessionHeader({
                     role="menu"
                     className="absolute right-0 top-full z-[80] mt-1 min-w-44 overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-md"
                   >
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setShowSettings(true);
+                        onToggleSessionMenu();
+                      }}
+                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
+                    >
+                      <Shield size={13} />
+                      Session settings
+                    </button>
                     <button
                       role="menuitem"
                       onClick={() => {
@@ -395,6 +416,16 @@ export function SessionHeader({
                       >
                         <Info size={14} />
                         Session info
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowSettings(true);
+                          onToggleSessionMenu();
+                        }}
+                        className="w-full text-left px-3 py-2 min-h-[44px] text-sm flex items-center gap-2 text-foreground hover:bg-muted"
+                      >
+                        <Shield size={14} />
+                        Session settings
                       </button>
                       <div className="my-1 h-px bg-border" />
                       <button

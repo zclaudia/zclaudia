@@ -95,6 +95,41 @@ export class CursorAgentAdapter implements ExternalAgentAdapter {
     },
   });
 
+  async discoverModels(context: ExternalAgentRunContext, signal: AbortSignal) {
+    if (context.providerTransport === CURSOR_STREAM_JSON_TRANSPORT) {
+      const { discoverCliModels } = await import('./model-discovery.js');
+      return discoverCliModels(context, signal);
+    }
+    const { AcpClient } = await import('./acp-client.js');
+    const { AcpPermissionBridge } = await import('./acp-permissions.js');
+    const { readSessionModels } = await import('./cursor-acp-extensions.js');
+    const client = new AcpClient();
+    try {
+      await client.connect({
+        cwd: context.cwd,
+        cliPath: context.cliPath,
+        env: context.env,
+        bridge: null,
+        permissionBridge: new AcpPermissionBridge({ supervised: true, onPermission: undefined }),
+        extensionHooks: { onPermission: undefined },
+        abortSignal: signal,
+      });
+      const response = await client.agent.newSession({ cwd: context.cwd, mcpServers: [] });
+      const state = readSessionModels(response);
+      if (!state) throw new Error('Cursor did not return a model catalog');
+      return {
+        currentModel: state.currentModelId,
+        models: state.availableModels.map(m => ({
+          id: m.modelId,
+          label: m.name,
+          thinkingLevels: [],
+        })),
+      };
+    } finally {
+      await client.close();
+    }
+  }
+
   async *startTurn(
     input: RuntimeTurnInput,
     context: ExternalAgentRunContext,

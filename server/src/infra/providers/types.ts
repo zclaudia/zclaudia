@@ -87,6 +87,10 @@ export interface RunOptions {
 
 /** Agent runtime adapter interface. */
 export interface ProviderAdapter {
+  discoverModels?: (
+    context: import('@zclaudia/shared/providers').ExternalAgentRunContext,
+    signal: AbortSignal
+  ) => Promise<import('@zclaudia/shared/core/runtime-capabilities').RuntimeModelCatalog>;
   readonly type: string;
 
   /** PCP manifest — static capability declaration */

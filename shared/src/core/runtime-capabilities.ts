@@ -2,9 +2,8 @@
 //
 // User-facing mode dropdown is back, driven by ProviderCapabilities.modes,
 // so adding new modes in the future only needs a capabilities entry — no
-// wire schema or store changes. permissionOverride (UnifiedPermissionPolicy)
-// stays the right place for permission-style overrides (acceptEdits /
-// bypassPermissions live as PermissionSelector presets, not modes).
+// wire schema or store changes. Host approval overrides are separate from
+// native execution modes and cannot replace an engine sandbox.
 //
 // The runtime-internal "mode_change" event carries the same string values
 // ('plan' | 'default') the user mode selector emits, so phase transitions
@@ -35,4 +34,38 @@ export interface ProviderCapabilities {
   supportsAIReview?: boolean;
   /** False when the CLI cannot apply host per-tool permission overrides. */
   supportsPermissionOverrides?: boolean;
+}
+
+/** Session-owned model selection. Null inherits the session/agent default. */
+export interface SessionModelSelection {
+  model: string | null;
+  thinkingLevel: import('./agent-profile.js').ThinkingLevel | null;
+  revision: number;
+}
+
+export interface RuntimeModelOption {
+  id: string;
+  label: string;
+  /** Only levels explicitly advertised by this model/connection. */
+  thinkingLevels?: string[];
+}
+
+/** Optional built-in adapter extension; absence means discovery is unavailable. */
+export interface RuntimeModelCatalog {
+  models: RuntimeModelOption[];
+  currentModel?: string;
+}
+
+export interface SessionModelSettings {
+  selection: SessionModelSelection;
+  runtimeType: string;
+  engineMode: string;
+  inheritedModel: string;
+  inheritedThinkingLevel?: import('./agent-profile.js').ThinkingLevel;
+  defaultModel?: string;
+  models: RuntimeModelOption[];
+  allowManualModel: boolean;
+  supportsPermissionOverrides: boolean;
+  permissionNote: string;
+  discoveryError?: string;
 }

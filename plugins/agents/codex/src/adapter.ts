@@ -192,6 +192,42 @@ export class CodexAgentAdapter implements ExternalAgentAdapter {
     }
   }
 
+  async discoverModels(context: ExternalAgentRunContext, signal: AbortSignal) {
+    const { CodexAppServerClient } = await import('./app-server-client.js');
+    const { buildEnv } = await import('./config.js');
+    const client = new CodexAppServerClient(context.cliPath, buildEnv(context), [], {
+      processCwd: context.cwd,
+    });
+    const stop = () => client.destroy();
+    signal.throwIfAborted();
+    signal.addEventListener('abort', stop, { once: true });
+    try {
+      const entries = await client.listModels();
+      const config = await client.readConfig(context.cwd);
+      return {
+        currentModel:
+          typeof config?.model === 'string' && config.model
+            ? config.model
+            : entries.find(m => m.isDefault)?.model,
+        models: entries
+          .filter(m => !m.hidden)
+          .map(m => ({
+            id: m.model || m.id,
+            label: m.displayName || m.model || m.id,
+            thinkingLevels: Array.isArray(m.supportedReasoningEfforts)
+              ? m.supportedReasoningEfforts.flatMap((e: unknown) => {
+                  const level = (e as { reasoningEffort?: unknown })?.reasoningEffort;
+                  return typeof level === 'string' ? [level] : [];
+                })
+              : [],
+          })),
+      };
+    } finally {
+      signal.removeEventListener('abort', stop);
+      client.destroy();
+    }
+  }
+
   private buildRunOptions(
     context: ExternalAgentRunContext,
     effectiveMode: string | undefined
@@ -202,6 +238,7 @@ export class CodexAgentAdapter implements ExternalAgentAdapter {
       cliPath: context.cliPath,
       env: context.env,
       model: context.model,
+      thinkingLevel: context.thinkingLevel,
       mode: effectiveMode,
       systemPrompt: context.systemPrompt,
       claudiaSessionId: context.claudiaSessionId,

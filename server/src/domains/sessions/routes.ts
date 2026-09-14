@@ -3,6 +3,9 @@ import type Database from 'better-sqlite3';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { Message } from '@zclaudia/shared/core/message';
 import type { Session } from '@zclaudia/shared/core/session';
+import { SessionModelSettingsService, ModelSettingsError } from './model-settings-service.js';
+import { capabilitiesForSession } from '../../interfaces/http/provider-capabilities.js';
+import { providerRegistry } from '../../infra/providers/registry.js';
 import { SessionRepository } from './repository.js';
 import { getCompactionById } from './compaction-tree-read.js';
 import { mountSearchRoutes } from './search-routes.js';
@@ -43,6 +46,48 @@ export function createSessionRoutes(
   });
   const exportService = new SessionExportService(db);
   const queryService = new SessionQueryService(db, activeRuns);
+
+  const modelSettings = new SessionModelSettingsService(db, providerRegistry, sessionId =>
+    hasAnyActiveRunForSession(activeRuns, sessionId)
+  );
+  router.get('/:id/capabilities', async (req, res) => {
+    try {
+      const settings = await modelSettings.read(req.params.id);
+      res.json({
+        success: true,
+        data: capabilitiesForSession(settings.runtimeType, settings.supportsPermissionOverrides),
+      });
+    } catch (error) {
+      if (error instanceof ModelSettingsError)
+        sendApiError(res, error.status, error.code, error.message);
+      else sendApiError(res, 500, 'CAPABILITIES_FAILED', 'Could not load session capabilities');
+    }
+  });
+  router.get('/:id/model-settings', async (req, res) => {
+    try {
+      res.json({
+        success: true,
+        data: await modelSettings.read(
+          req.params.id,
+          req.query.discover === 'true' || req.query.discover === 'refresh',
+          req.query.discover === 'refresh'
+        ),
+      });
+    } catch (error) {
+      if (error instanceof ModelSettingsError)
+        sendApiError(res, error.status, error.code, error.message);
+      else sendApiError(res, 500, 'MODEL_SETTINGS_FAILED', 'Could not load session model settings');
+    }
+  });
+  router.put('/:id/model-settings', async (req, res) => {
+    try {
+      res.json({ success: true, data: await modelSettings.save(req.params.id, req.body) });
+    } catch (error) {
+      if (error instanceof ModelSettingsError)
+        sendApiError(res, error.status, error.code, error.message);
+      else sendApiError(res, 500, 'MODEL_SETTINGS_FAILED', 'Could not save session model settings');
+    }
+  });
 
   // Get all sessions (optionally filtered by project, excludes archived by default)
   router.get('/', (req: Request, res: Response) => {

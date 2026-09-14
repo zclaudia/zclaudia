@@ -11,8 +11,8 @@ vi.mock('../MessageInput', () => ({
   ),
 }));
 
-vi.mock('../PermissionSelector', () => ({
-  PermissionSelector: () => <div data-testid="permission-selector" />,
+vi.mock('../SessionModelSelector', () => ({
+  SessionModelSelector: () => <div data-testid="model-selector" />,
 }));
 
 vi.mock('../ModeSelector', () => ({
@@ -335,7 +335,7 @@ describe('ChatInputArea mobile selectors', () => {
     cleanup();
   });
 
-  it('shows mode selector + permission selector + worktree + terminal tool on mobile', () => {
+  it('shows mode selector + model selector + worktree + terminal tool on mobile', () => {
     serverStoreState.activeServerSupports.mockImplementation(
       (feature: string) => feature === 'remoteTerminal'
     );
@@ -343,7 +343,7 @@ describe('ChatInputArea mobile selectors', () => {
     render(<ChatInputArea {...baseProps} />);
 
     expect(screen.getByTestId('mode-selector')).toBeTruthy();
-    expect(screen.getByTestId('permission-selector')).toBeTruthy();
+    expect(screen.getByTestId('model-selector')).toBeTruthy();
     expect(screen.getByTestId('worktree-selector')).toBeTruthy();
 
     fireEvent.click(screen.getByTitle('More tools'));

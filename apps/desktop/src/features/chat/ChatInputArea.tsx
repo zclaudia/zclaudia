@@ -6,7 +6,7 @@ import { GoalDialog } from '../../components/GoalDialog';
 import { getGoal, pauseGoal, resumeGoal, clearGoal } from '../../services/api/goals';
 import { activateGoal } from '../../services/goalActions';
 import { ModeSelector } from './ModeSelector';
-import { PermissionSelector } from './PermissionSelector';
+import { SessionModelSelector } from './SessionModelSelector';
 import { WorktreeSelector } from './WorktreeSelector';
 import { TokenUsageDisplay } from './TokenUsageDisplay';
 import { ContextUsagePopover } from './ContextUsagePopover';
@@ -117,7 +117,6 @@ export function ChatInputArea({
   isForcedPlanSession,
   mode,
   capabilities,
-  permissionOverride,
   commands,
   fileReferenceRoot,
   fileReferenceBackendId,
@@ -127,7 +126,6 @@ export function ChatInputArea({
   initialDraft,
   draftExists,
   onSetMode,
-  onSetPermissionOverride,
   onWorktreeChange,
   onSendMessage,
   onCancelRun,
@@ -372,20 +370,11 @@ export function ChatInputArea({
           lockReason={isForcedPlanSession ? 'Locked by Supervisor planning mode' : undefined}
         />
       )}
-      {capabilities?.supportsPermissionOverrides === false ? (
-        <span
-          className="text-[11px] text-muted-foreground"
-          title="Per-tool approvals are unavailable for this CLI. Use Plan or Ask mode for read-oriented tasks."
-        >
-          CLI permissions
-        </span>
-      ) : (
-        <PermissionSelector
-          value={permissionOverride}
-          onChange={policy => onSetPermissionOverride(sessionId, policy)}
-          disabled={isLoading}
-        />
-      )}
+      <SessionModelSelector
+        key={sessionId}
+        sessionId={sessionId}
+        disabled={isLoading || !isConnected || currentSession.isReadOnly}
+      />
       {currentProject?.id && currentProject?.rootPath && (
         <WorktreeSelector
           projectId={currentProject.id}

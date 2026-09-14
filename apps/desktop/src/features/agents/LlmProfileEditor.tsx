@@ -1255,6 +1255,30 @@ function ModelRow({
                   </option>
                 ))}
               </select>
+              <fieldset className="space-y-1 mt-2">
+                <legend className="text-xs text-muted-foreground">Supported thinking levels</legend>
+                <p className="text-[11px] text-muted-foreground">
+                  Select only levels supported by this model connection. Leave empty if unknown.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const).map(level => (
+                    <label key={level} className="flex items-center gap-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={row.thinkingLevels?.includes(level) ?? false}
+                        onChange={e =>
+                          onChange({
+                            thinkingLevels: e.target.checked
+                              ? [...(row.thinkingLevels ?? []), level]
+                              : (row.thinkingLevels ?? []).filter(x => x !== level),
+                          })
+                        }
+                      />
+                      {level}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
               {row.dialect && (
                 <span className="flex-shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
                   forced

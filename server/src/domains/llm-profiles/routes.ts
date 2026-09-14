@@ -96,6 +96,18 @@ export function validateModels(input: unknown): LlmProfileModelEntry[] | undefin
     }
     seen.add(id);
     const normalized: LlmProfileModelEntry = { modelId: id };
+    if (entry.thinkingLevels !== undefined) {
+      const levels = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'];
+      if (
+        !Array.isArray(entry.thinkingLevels) ||
+        entry.thinkingLevels.some(x => typeof x !== 'string' || !levels.includes(x))
+      ) {
+        throw new Error(`models[${i}].thinkingLevels contains an unsupported level`);
+      }
+      normalized.thinkingLevels = [
+        ...new Set(entry.thinkingLevels),
+      ] as LlmProfileModelEntry['thinkingLevels'];
+    }
     if (entry.displayName !== undefined && entry.displayName !== null) {
       if (typeof entry.displayName !== 'string') {
         throw new Error(`models[${i}].displayName must be a string`);
@@ -219,12 +231,10 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       try {
         req.body.supportedProtocols = validateLlmProtocols(req.body.supportedProtocols);
       } catch (error) {
-        res
-          .status(400)
-          .json({
-            success: false,
-            error: { code: 'VALIDATION_ERROR', message: (error as Error).message },
-          });
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: (error as Error).message },
+        });
         return;
       }
     }

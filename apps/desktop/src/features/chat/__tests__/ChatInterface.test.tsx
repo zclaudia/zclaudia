@@ -143,17 +143,9 @@ vi.mock('../ModeSelector', () => ({
     </button>
   ),
 }));
-vi.mock('../PermissionSelector', () => ({
-  PermissionSelector: (props: any) => (
-    <div
-      data-testid="permission-selector"
-      data-value={props.value || ''}
-      data-disabled={props.disabled}
-    >
-      <button data-testid="perm-change" onClick={() => props.onChange?.('auto-approve')}>
-        change perm
-      </button>
-    </div>
+vi.mock('../SessionModelSelector', () => ({
+  SessionModelSelector: (props: any) => (
+    <div data-testid="model-selector" data-disabled={props.disabled} />
   ),
 }));
 vi.mock('../WorktreeSelector', () => ({
@@ -584,7 +576,7 @@ describe('ChatInterface', () => {
   it('renders toolbar selectors (mode selector, permission)', () => {
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     expect(container.querySelector('[data-testid="mode-selector"]')).toBeTruthy();
-    expect(container.querySelector('[data-testid="permission-selector"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="model-selector"]')).toBeTruthy();
   });
 
   it('renders token usage display in footer', () => {
@@ -1380,7 +1372,7 @@ describe('ChatInterface', () => {
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     const sel = container.querySelector('[data-testid="mode-selector"]');
-    const permSelector = container.querySelector('[data-testid="permission-selector"]');
+    const permSelector = container.querySelector('[data-testid="model-selector"]');
     expect(sel?.getAttribute('data-disabled')).toBe('true');
     expect(permSelector?.getAttribute('data-disabled')).toBe('true');
   });
@@ -1775,7 +1767,7 @@ describe('ChatInterface', () => {
     const footer = container.querySelector('[data-testid="composer-footer"]');
     expect(footer).not.toBeNull();
     expect(footer!.querySelector('[data-testid="mode-selector"]')).not.toBeNull();
-    expect(footer!.querySelector('[data-testid="permission-selector"]')).not.toBeNull();
+    expect(footer!.querySelector('[data-testid="model-selector"]')).not.toBeNull();
   });
 
   // ─── Worktree selector locked in planning mode ────────────────────────

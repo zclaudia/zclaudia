@@ -7,6 +7,10 @@ import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import { ProjectRepository } from '../projects/repository.js';
 import { resolveProfileEngineMode } from './engine-mode.js';
 import { runtimeRequiresLlmProfile } from './runtime-type-guard.js';
+import {
+  applySessionModelSelection,
+  readSessionModelSelection,
+} from '../sessions/model-settings-repository.js';
 import { SessionRuntimeBindingRepository } from '../sessions/runtime-binding-repository.js';
 
 export class NoAgentAvailableError extends Error {
@@ -31,6 +35,8 @@ export class LlmProfileRequiredError extends Error {
 export interface ResolveOptions {
   /** Existing session identity must be applied before selecting runtime/LLM. */
   sessionId?: string;
+  /** Read the original bound default for the session settings editor. */
+  ignoreModelSelection?: boolean;
   /** Explicit agent_profile_id from request body / session record (takes precedence). */
   explicitAgentId?: string;
   /** Project id; used to look up project.defaultAgentProfileId as second-tier fallback. */
@@ -137,5 +143,8 @@ export function resolveAgentForSession(db: Database, opts: ResolveOptions): Reso
     llm = llmRepo.findDefault() ?? undefined;
   }
 
+  if (opts.sessionId && !opts.ignoreModelSelection) {
+    agent = applySessionModelSelection(agent, readSessionModelSelection(db, opts.sessionId));
+  }
   return { agent, llm };
 }

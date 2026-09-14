@@ -5,6 +5,7 @@ import type {
   ProviderRuntimeEvent,
   SystemInfo,
 } from '@zclaudia/plugin-sdk/providers';
+import type { ContextWindowSource, ProviderUsage } from '@zclaudia/plugin-sdk/types';
 import {
   debugLog,
   redactSensitiveValues,
@@ -44,6 +45,34 @@ export const MAX_APP_SERVER_INBOUND_LINE_BYTES = 16 * 1024 * 1024;
 export const MAX_APP_SERVER_OUTBOUND_LINE_BYTES = 8 * 1024 * 1024;
 /** Session info is decoration; never let its config read delay a turn. */
 const SESSION_INFO_CONFIG_TIMEOUT_MS = 500;
+
+/**
+ * Map one Codex `TokenUsageBreakdown` onto the host's provider-neutral usage.
+ *
+ * Codex follows the OpenAI convention: `cachedInputTokens` is a SUBSET of
+ * `inputTokens` (probed against 0.154.0 — `totalTokens === inputTokens +
+ * outputTokens` even when `cachedInputTokens` is two thirds of the input).
+ * The host contract is the opposite: `input` and `cacheRead` are disjoint, and
+ * occupancy is their sum. So the cached share is subtracted out of `input`
+ * rather than reported twice.
+ *
+ * Fed the `last` breakdown, `inputTokens` IS the final call's window
+ * occupancy, which is exactly what `contextUsedTokens` means.
+ */
+export function toProviderUsage(last: TokenUsageBreakdown): ProviderUsage {
+  const inputTotal = last.inputTokens || 0;
+  const cacheRead = Math.min(last.cachedInputTokens || 0, inputTotal);
+  const usage: ProviderUsage & { contextUsedTokens?: number } = {
+    input: inputTotal - cacheRead,
+    output: last.outputTokens || 0,
+    cacheRead,
+    cacheWrite: last.cacheWriteInputTokens || 0,
+    totalTokens: last.totalTokens || 0,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  };
+  if (inputTotal > 0) usage.contextUsedTokens = inputTotal;
+  return usage;
+}
 
 /**
  * The handshake reports `<client>/<codex version> (<os>; <arch>) …`, so the
@@ -516,6 +545,25 @@ export class CodexAppServerClient {
     return this.activeTurnContexts.size === 1;
   }
 
+  async listModels(): Promise<import('./app-server-protocol.js').ModelInfo[]> {
+    await this.ensureRunning();
+    const models: import('./app-server-protocol.js').ModelInfo[] = [];
+    let cursor: string | undefined;
+    const seen = new Set<string>();
+    do {
+      const page = await this.sendRequest('model/list', {
+        cursor,
+        limit: 100,
+        includeHidden: false,
+      });
+      models.push(...page.data);
+      cursor = page.nextCursor ?? undefined;
+      if (cursor && seen.has(cursor)) throw new Error('Repeated model catalog cursor');
+      if (cursor) seen.add(cursor);
+    } while (cursor && models.length < 1000);
+    return models;
+  }
+
   async readConfig(cwd: string): Promise<Record<string, unknown>> {
     await this.ensureRunning();
     return (await this.sendRequest('config/read', { cwd, includeLayers: false })).config;
@@ -682,6 +730,7 @@ export class CodexAppServerClient {
     options?: {
       cwd?: string;
       model?: string;
+      thinkingLevel?: import('@zclaudia/plugin-sdk/providers').ExternalAgentRunContext['thinkingLevel'];
       mode?: string;
       systemPrompt?: string;
       /**
@@ -705,24 +754,28 @@ export class CodexAppServerClient {
     this.activeTurnContexts.set(threadId, activeTurnContext);
 
     try {
-      yield {
-        type: 'init',
-        sessionId: threadId,
-        systemInfo: await this.describeSession({
-          cwd: options?.cwd || '',
-          model: options?.model,
-          mode: activeTurnContext.mode,
-          apiKeySource: options?.apiKeySource,
-        }),
-      };
-
+      const systemInfo = await this.describeSession({
+        cwd: options?.cwd || '',
+        model: options?.model,
+        mode: activeTurnContext.mode,
+        apiKeySource: options?.apiKeySource,
+      });
+      // Reapply the configured default too: omitting model after an override
+      // would retain the last model on this loaded Codex thread.
+      let model = options?.model || systemInfo.model;
+      if (!model) {
+        const defaults = await this.listModels();
+        model = defaults.find(m => m.isDefault)?.model;
+        if (!model)
+          throw new Error('Codex did not report a default model. Select a model explicitly.');
+      }
+      yield { type: 'init', sessionId: threadId, systemInfo: { ...systemInfo, model } };
       const turnParams: ClientRequestParams<'turn/start'> = {
         threadId,
         input,
+        effort: options?.thinkingLevel ?? null,
+        ...(model ? { model } : {}),
       };
-      if (options?.model) {
-        turnParams.model = options.model;
-      }
 
       type QueueItem =
         | { type: 'msg'; msg: ProviderRuntimeEvent }
@@ -747,6 +800,7 @@ export class CodexAppServerClient {
       };
 
       let lastUsage: TokenUsageBreakdown | undefined;
+      let modelContextWindow: number | undefined;
       const onNotification = (method: string, params: Record<string, unknown>) => {
         if (!this.notificationBelongsToThread(threadId, params)) return;
         const notificationTurnId =
@@ -778,6 +832,35 @@ export class CodexAppServerClient {
               totalTokens: number('totalTokens'),
               reasoningOutputTokens: number('reasoningOutputTokens'),
             };
+          }
+          // `modelContextWindow` is optional and nullable in the app-server
+          // schema (pinned 0.154.0), so absence is normal, not an error.
+          if (
+            tokenUsage &&
+            typeof tokenUsage.modelContextWindow === 'number' &&
+            Number.isFinite(tokenUsage.modelContextWindow) &&
+            tokenUsage.modelContextWindow > 0 &&
+            tokenUsage.modelContextWindow !== modelContextWindow
+          ) {
+            modelContextWindow = tokenUsage.modelContextWindow;
+            // Codex only reveals the window once a turn has burned tokens, so
+            // re-announce systemInfo instead of blocking the initial init on it.
+            // No sessionId: this is a systemInfo update, not a new binding.
+            enqueue({
+              type: 'msg',
+              msg: {
+                type: 'init',
+                systemInfo: {
+                  ...systemInfo,
+                  model,
+                  contextWindow: modelContextWindow,
+                  // plugin-sdk 0.3.0's ContextWindowSource lags the wire
+                  // vocabulary, which has `'runtime'`; drop the cast when the
+                  // SDK catches up.
+                  contextWindowSource: 'runtime' as unknown as ContextWindowSource,
+                },
+              },
+            });
           }
           return;
         }
@@ -824,16 +907,7 @@ export class CodexAppServerClient {
               msg: {
                 type: 'provider_turn_finished',
                 isComplete: true,
-                usage: lastUsage
-                  ? {
-                      input: lastUsage.inputTokens || 0,
-                      output: lastUsage.outputTokens || 0,
-                      cacheRead: lastUsage.cachedInputTokens || 0,
-                      cacheWrite: lastUsage.cacheWriteInputTokens || 0,
-                      totalTokens: lastUsage.totalTokens || 0,
-                      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-                    }
-                  : undefined,
+                usage: lastUsage ? toProviderUsage(lastUsage) : undefined,
               },
             });
             enqueue({ type: 'done' });

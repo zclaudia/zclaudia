@@ -6,6 +6,7 @@ import type { LlmModelDialect, LlmProfileModelEntry } from '@zclaudia/shared';
  * "0/non-numeric (validation error)" without lossy coercion on every keystroke.
  */
 export interface ModelRowDraft {
+  thinkingLevels?: LlmProfileModelEntry['thinkingLevels'];
   /**
    * Stable per-row identifier independent of array index. Used as the key for
    * the testStatus auto-clear timer Map so reordering / row deletion above the
@@ -38,6 +39,7 @@ export function entryToDraft(entry: LlmProfileModelEntry): ModelRowDraft {
   return {
     rowUid: generateRowUid(),
     modelId: entry.modelId,
+    thinkingLevels: entry.thinkingLevels,
     displayName: entry.displayName ?? '',
     contextWindowStr: entry.contextWindow != null ? String(entry.contextWindow) : '',
     maxTokensStr: entry.maxTokens != null ? String(entry.maxTokens) : '',
@@ -102,6 +104,7 @@ export function draftsToEntries(drafts: ModelRowDraft[]): LlmProfileModelEntry[]
     if (d.supportsImage) entry.inputModalities = ['text', 'image'];
     else if (d.inputModalitiesTouched) entry.inputModalities = ['text'];
     if (d.dialect) entry.dialect = d.dialect;
+    if (d.thinkingLevels !== undefined) entry.thinkingLevels = d.thinkingLevels;
     out.push(entry);
   }
   return out;

@@ -12,6 +12,7 @@ vi.mock('../../../services/api', () => ({
   getProviderCommands: vi.fn(),
   getProviderTypeCommands: vi.fn(),
   getProviderCapabilities: vi.fn(),
+  getSessionCapabilities: vi.fn(),
   getProviderTypeCapabilities: vi.fn(),
 }));
 
@@ -71,36 +72,56 @@ describe('useProviderCapabilities', () => {
       supportsImages: true,
       defaultModeId: 'plan',
     } as any);
+    vi.mocked(api.getSessionCapabilities).mockResolvedValue({
+      defaultModeId: 'plan',
+      modes: [],
+      models: [],
+    });
     vi.mocked(api.getProviderCapabilities).mockResolvedValue({
       supportsImages: true,
       defaultModeId: 'code',
     } as any);
   });
 
-  it.each(['cursor', 'claude', 'codex'])('selects %s plugin metadata even with an LLM binding', async runtime => {
-    useProjectStore.setState({
-      sessions: [{ id: 'sess-1', projectId: 'proj-1', agentProfileId: 'cursor-agent' }],
-    } as any);
-    useAgentProfileMetaStore.setState({
-      profiles: {
-        'cursor-agent': { id: 'cursor-agent', runtimeType: runtime, engineMode: runtime === 'cursor' ? undefined : 'sdk', llmProfileId: 'legacy-llm' },
-      },
-      loaded: true,
-    } as any);
-    useLlmProfileMetaStore.setState({
-      providersByBackend: { local: [{ id: 'legacy-llm' }] },
-    } as any);
-    const { result } = renderHook(() =>
-      useProviderCapabilities({ sessionId: 'sess-1', isConnected: true })
-    );
-    await waitFor(() =>
-      expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith(runtime, expect.any(Object))
-    );
-    expect(api.getProviderTypeCommands).toHaveBeenCalledWith(runtime, '/test', expect.any(Object));
-    expect(api.getProviderCapabilities).not.toHaveBeenCalled();
-    expect(api.getProviderCommands).not.toHaveBeenCalled();
-    expect(result.current.commandsCacheKey).toBe(`local:runtime:${runtime}`);
-  });
+  it.each(['cursor', 'claude', 'codex'])(
+    'selects %s plugin metadata even with an LLM binding',
+    async runtime => {
+      useProjectStore.setState({
+        sessions: [{ id: 'sess-1', projectId: 'proj-1', agentProfileId: 'cursor-agent' }],
+      } as any);
+      useAgentProfileMetaStore.setState({
+        profiles: {
+          'cursor-agent': {
+            id: 'cursor-agent',
+            runtimeType: runtime,
+            engineMode: runtime === 'cursor' ? undefined : 'sdk',
+            llmProfileId: 'legacy-llm',
+          },
+        },
+        loaded: true,
+      } as any);
+      useLlmProfileMetaStore.setState({
+        providersByBackend: { local: [{ id: 'legacy-llm' }] },
+      } as any);
+      const { result } = renderHook(() =>
+        useProviderCapabilities({ sessionId: 'sess-1', isConnected: true })
+      );
+      await waitFor(() => {
+        if (runtime === 'cursor')
+          expect(api.getSessionCapabilities).toHaveBeenCalledWith('sess-1', expect.any(Object));
+        else
+          expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith(runtime, expect.any(Object));
+      });
+      expect(api.getProviderTypeCommands).toHaveBeenCalledWith(
+        runtime,
+        '/test',
+        expect.any(Object)
+      );
+      expect(api.getProviderCapabilities).not.toHaveBeenCalled();
+      expect(api.getProviderCommands).not.toHaveBeenCalled();
+      expect(result.current.commandsCacheKey).toBe(`local:runtime:${runtime}`);
+    }
+  );
 
   it('does not stall forever when the session agentProfileId is orphaned', async () => {
     useProjectStore.setState({
@@ -117,11 +138,7 @@ describe('useProviderCapabilities', () => {
     await waitFor(() =>
       expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith('pi', expect.any(Object))
     );
-    expect(api.getProviderTypeCommands).toHaveBeenCalledWith(
-      'pi',
-      '/test',
-      expect.any(Object)
-    );
+    expect(api.getProviderTypeCommands).toHaveBeenCalledWith('pi', '/test', expect.any(Object));
   });
 
   it('loads default provider metadata when no llmProfileId is set', async () => {
@@ -130,11 +147,7 @@ describe('useProviderCapabilities', () => {
     );
 
     await waitFor(() => {
-      expect(api.getProviderTypeCommands).toHaveBeenCalledWith(
-        'pi',
-        '/test',
-        expect.any(Object)
-      );
+      expect(api.getProviderTypeCommands).toHaveBeenCalledWith('pi', '/test', expect.any(Object));
       expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith('pi', expect.any(Object));
     });
 

@@ -16,6 +16,7 @@ import {
   MAX_APP_SERVER_OUTBOUND_LINE_BYTES,
   CodexAppServerClient,
   formatCodexAccount,
+  toProviderUsage,
 } from '../app-server-client.js';
 
 const spawnMock = vi.mocked(spawn);
@@ -54,6 +55,24 @@ function fakeProc(options: {
           msg = JSON.parse(line);
         } catch {
           continue;
+        }
+        if (msg.method === 'model/list') {
+          stdout.push(
+            JSON.stringify({
+              id: msg.id,
+              result: {
+                data: [
+                  {
+                    id: 'default-model',
+                    model: 'default-model',
+                    displayName: 'Default',
+                    isDefault: true,
+                  },
+                ],
+                nextCursor: null,
+              },
+            }) + '\n'
+          );
         }
         if (msg.method === 'config/read') {
           stdout.push(
@@ -96,6 +115,99 @@ function fakeProc(options: {
 describe('CodexAppServerClient', () => {
   beforeEach(() => {
     spawnMock.mockReset();
+  });
+
+  it('sends effort and restores configured defaults on a subsequent turn', async () => {
+    const { proc, stdinWrites } = fakeProc({
+      lines: [JSON.stringify({ id: 1, result: { capabilities: {} } })],
+      config: { model: 'configured-default' },
+      onStdin(data, stdout) {
+        for (const line of data.split('\n').filter(Boolean)) {
+          const msg = JSON.parse(line);
+          if (msg.method !== 'turn/start') continue;
+          stdout.push(JSON.stringify({ id: msg.id, result: { turn: { id: 't' } } }) + '\n');
+          stdout.push(
+            JSON.stringify({
+              method: 'turn/completed',
+              params: { threadId: 's', turn: { id: 't', status: 'completed' } },
+            }) + '\n'
+          );
+        }
+      },
+    });
+    spawnMock.mockReturnValueOnce(proc as never);
+    const client = new CodexAppServerClient('/bin/codex', {});
+    await client.ensureRunning();
+    for await (const _event of client.runTurn('s', [], async () => ({ behavior: 'deny' }), {
+      model: 'chosen',
+      thinkingLevel: 'high',
+    })) {
+      /* drain */
+    }
+    for await (const _event of client.runTurn('s', [], async () => ({ behavior: 'deny' }), {})) {
+      /* drain */
+    }
+    const starts = stdinWrites
+      .flatMap(s =>
+        s
+          .split('\n')
+          .filter(Boolean)
+          .map(x => JSON.parse(x))
+      )
+      .filter(x => x.method === 'turn/start');
+    expect(starts.map(x => x.params)).toEqual([
+      { threadId: 's', input: [], model: 'chosen', effort: 'high' },
+      { threadId: 's', input: [], model: 'configured-default', effort: null },
+    ]);
+    client.destroy();
+  });
+
+  it('re-announces systemInfo with the runtime-reported context window', async () => {
+    const tokenUsage = (modelContextWindow: number | null) => ({
+      method: 'thread/tokenUsage/updated',
+      params: {
+        threadId: 's',
+        turnId: 't',
+        tokenUsage: { total: {}, last: { inputTokens: 10, outputTokens: 1 }, modelContextWindow },
+      },
+    });
+    const { proc } = fakeProc({
+      lines: [JSON.stringify({ id: 1, result: { capabilities: {} } })],
+      onStdin(data, stdout) {
+        for (const line of data.split('\n').filter(Boolean)) {
+          const msg = JSON.parse(line) as { id?: number; method?: string };
+          if (msg.method !== 'turn/start') continue;
+          stdout.push(JSON.stringify({ id: msg.id, result: { turn: { id: 't' } } }) + '\n');
+          // Repeated identical windows must not produce repeated events.
+          stdout.push(JSON.stringify(tokenUsage(258_400)) + '\n');
+          stdout.push(JSON.stringify(tokenUsage(258_400)) + '\n');
+          stdout.push(JSON.stringify(tokenUsage(null)) + '\n');
+          stdout.push(
+            JSON.stringify({
+              method: 'turn/completed',
+              params: { threadId: 's', turn: { id: 't', status: 'completed' } },
+            }) + '\n'
+          );
+        }
+      },
+    });
+    spawnMock.mockReturnValueOnce(proc as never);
+
+    const client = new CodexAppServerClient('/bin/codex', {});
+    const events = [];
+    for await (const event of client.runTurn('s', [], async () => ({ behavior: 'deny' as const }))) {
+      events.push(event);
+    }
+
+    const inits = events.filter(e => e.type === 'init');
+    expect(inits).toHaveLength(2);
+    expect(inits[0].systemInfo?.contextWindow).toBeUndefined();
+    expect(inits[1]).toMatchObject({
+      systemInfo: { contextWindow: 258_400, contextWindowSource: 'runtime' },
+    });
+    // A systemInfo update must not re-bind the provider session.
+    expect(inits[1].sessionId).toBeUndefined();
+    client.destroy();
   });
 
   it('spawns app-server with stdio listen and extra args', async () => {
@@ -175,8 +287,18 @@ describe('CodexAppServerClient', () => {
     expect(events.some(e => e.type === 'provider_turn_finished' && e.isComplete === true)).toBe(
       true
     );
+    // Codex's cachedInputTokens is a subset of inputTokens, so the cached
+    // share is subtracted out of `input` (host buckets are disjoint) and the
+    // undivided inputTokens is the final call's window occupancy.
     expect(events.find(e => e.type === 'provider_turn_finished')).toMatchObject({
-      usage: { input: 12, output: 5, cacheRead: 3, cacheWrite: 2, totalTokens: 17 },
+      usage: {
+        input: 9,
+        output: 5,
+        cacheRead: 3,
+        cacheWrite: 2,
+        totalTokens: 17,
+        contextUsedTokens: 12,
+      },
     });
     client.destroy();
   });
@@ -956,5 +1078,50 @@ describe('formatCodexAccount', () => {
     expect(formatCodexAccount(null)).toBeUndefined();
     expect(formatCodexAccount({ account: null, requiresOpenaiAuth: false })).toBeUndefined();
     expect(formatCodexAccount({ account: null, requiresOpenaiAuth: true })).toBe('Signed out');
+  });
+});
+
+describe('toProviderUsage', () => {
+  const breakdown = (over: Record<string, number> = {}) => ({
+    inputTokens: 0,
+    outputTokens: 0,
+    cachedInputTokens: 0,
+    cacheWriteInputTokens: 0,
+    totalTokens: 0,
+    reasoningOutputTokens: 0,
+    ...over,
+  });
+
+  // Shape probed against codex-cli 0.154.0: totalTokens === inputTokens +
+  // outputTokens while cachedInputTokens was ~72% of inputTokens, proving the
+  // cached count is a subset rather than a separate bucket.
+  it('splits the probed overlapping counters into disjoint host buckets', () => {
+    expect(
+      toProviderUsage(
+        breakdown({
+          inputTokens: 17_993,
+          cachedInputTokens: 12_928,
+          outputTokens: 5,
+          totalTokens: 17_998,
+        })
+      )
+    ).toMatchObject({
+      input: 5_065,
+      cacheRead: 12_928,
+      output: 5,
+      totalTokens: 17_998,
+      // input + cacheRead === the final call's real occupancy.
+      contextUsedTokens: 17_993,
+    });
+  });
+
+  it('clamps a cached count that exceeds the input it belongs to', () => {
+    const usage = toProviderUsage(breakdown({ inputTokens: 100, cachedInputTokens: 900 }));
+    expect(usage.input).toBe(0);
+    expect(usage.cacheRead).toBe(100);
+  });
+
+  it('omits contextUsedTokens when the call reported no input', () => {
+    expect(toProviderUsage(breakdown({ outputTokens: 7 }))).not.toHaveProperty('contextUsedTokens');
   });
 });

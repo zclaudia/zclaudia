@@ -55,6 +55,52 @@ export class ClaudeAgentAdapter implements ExternalAgentAdapter {
 
   constructor(private readonly createToolBridge: ToolBridgeFactory) {}
 
+  async discoverModels(context: ExternalAgentRunContext, signal: AbortSignal) {
+    const { query } = await import('@anthropic-ai/claude-agent-sdk');
+    const { resolveClaudeCliFromPath } = await import('./resolve-cli.js');
+    const abortController = new AbortController();
+    const stop = () => abortController.abort();
+    signal.throwIfAborted();
+    signal.addEventListener('abort', stop, { once: true });
+    // Keep the input stream open without yielding a message. Initialization
+    // supports catalog requests and never starts a model turn.
+    let release!: () => void;
+    const closed = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    async function* prompt(): AsyncGenerator<never> {
+      await closed;
+      yield* [];
+    }
+    const stream = query({
+      prompt: prompt(),
+      options: {
+        cwd: context.cwd,
+        pathToClaudeCodeExecutable:
+          context.cliPath || resolveClaudeCliFromPath(context.env?.PATH ?? process.env.PATH),
+        env: { ...process.env, ...context.env },
+        abortController,
+        persistSession: false,
+      },
+    });
+    try {
+      const models = await stream.supportedModels();
+      return {
+        models: models.map(m => ({
+          id: m.value,
+          label: m.displayName,
+          thinkingLevels:
+            m.supportsAdaptiveThinking && m.supportsEffort ? (m.supportedEffortLevels ?? []) : [],
+        })),
+      };
+    } finally {
+      release();
+      stream.close();
+      abortController.abort();
+      signal.removeEventListener('abort', stop);
+    }
+  }
+
   async *startTurn(
     input: RuntimeTurnInput,
     context: ExternalAgentRunContext,

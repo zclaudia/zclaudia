@@ -124,7 +124,12 @@ export interface CodexClientRequestMap {
     result: { data: string[] };
   };
   'turn/start': {
-    params: { threadId: string; input: AppServerInputBlock[]; model?: string | null };
+    params: {
+      threadId: string;
+      input: AppServerInputBlock[];
+      model?: string | null;
+      effort?: string | null;
+    };
     result: { turn: Turn };
   };
   'turn/interrupt': {

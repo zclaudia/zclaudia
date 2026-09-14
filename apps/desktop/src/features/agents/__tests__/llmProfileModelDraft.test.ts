@@ -21,6 +21,13 @@ function draft(patch: Partial<ModelRowDraft>): ModelRowDraft {
 }
 
 describe('llmProfileModelDraft', () => {
+  it('preserves declared thinking support when editing a model', () => {
+    const entry = { modelId: 'custom', thinkingLevels: ['low', 'high'] as const };
+    expect(
+      draftsToEntries([entryToDraft({ ...entry, thinkingLevels: [...entry.thinkingLevels] })])[0]
+        .thinkingLevels
+    ).toEqual(['low', 'high']);
+  });
   it('validates required, duplicate, and positive integer fields', () => {
     const rows = [
       draft({ modelId: 'claude-sonnet', contextWindowStr: '0' }),

@@ -72,6 +72,24 @@ const RUNTIME_CAPABILITIES: Record<string, ProviderCapabilities> = {
   codex: CODEX_CAPABILITIES,
 };
 
+export function capabilitiesForSession(
+  runtimeType: string,
+  supportsPermissionOverrides: boolean
+): ProviderCapabilities {
+  const base = RUNTIME_CAPABILITIES[normalizeAgentRuntimeType(runtimeType)] ?? PI_CAPABILITIES;
+  if (runtimeType !== 'cursor' || !supportsPermissionOverrides)
+    return { ...base, supportsPermissionOverrides };
+  return {
+    ...base,
+    supportsPermissionOverrides: true,
+    modes: base.modes.map(mode =>
+      mode.id === 'default'
+        ? { ...mode, description: 'Tool approval requests are reviewed by ZClaudia' }
+        : mode
+    ),
+  };
+}
+
 export function mountCapabilityRoutes(router: Router, db: Database.Database): void {
   router.get('/type/:type/capabilities', (req: Request, res: Response) => {
     const capabilities = RUNTIME_CAPABILITIES[normalizeAgentRuntimeType(req.params.type)];

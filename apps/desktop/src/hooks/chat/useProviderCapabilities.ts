@@ -48,8 +48,8 @@ export function useProviderCapabilities({
     resolveCanonicalBackendId(activeServerId ?? LEGACY_LOCAL_SERVER_ID, LEGACY_LOCAL_SERVER_ID) ||
     LEGACY_LOCAL_SERVER_ID;
   const metadataKey = usesPiMetadata ? llmProfileId || '_default' : `runtime:${runtimeType}`;
-  const capsCacheKey = `${providerScopeKey}:${metadataKey}`;
-  const commandsCacheKey = capsCacheKey;
+  const capsCacheKey = `${providerScopeKey}:${metadataKey}${runtimeType === 'cursor' ? `:${sessionId}:${currentSession?.sdkSessionId ?? 'new'}` : ''}`;
+  const commandsCacheKey = `${providerScopeKey}:${metadataKey}`;
 
   // Fetch commands when provider or project changes (via HTTP)
   useEffect(() => {
@@ -102,7 +102,9 @@ export function useProviderCapabilities({
 
     const fetchCaps = llmProfileId
       ? api.getProviderCapabilities(llmProfileId, { signal: controller.signal })
-      : api.getProviderTypeCapabilities(runtimeType, { signal: controller.signal });
+      : runtimeType === 'cursor'
+        ? api.getSessionCapabilities(sessionId, { signal: controller.signal })
+        : api.getProviderTypeCapabilities(runtimeType, { signal: controller.signal });
 
     fetchCaps
       .then(caps => {
@@ -115,6 +117,7 @@ export function useProviderCapabilities({
     return () => controller.abort();
   }, [
     capsCacheKey,
+    sessionId,
     runtimeType,
     llmProfileId,
     isConnected,

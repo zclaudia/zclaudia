@@ -38,6 +38,7 @@ export interface CodexRunOptions {
   cliPath?: string;
   env?: Record<string, string>;
   model?: string;
+  thinkingLevel?: import('@zclaudia/plugin-sdk/providers').ExternalAgentRunContext['thinkingLevel'];
   mode?: string;
   systemPrompt?: string;
   claudiaSessionId?: string;
@@ -316,6 +317,7 @@ export async function* runCodexSdkTurn(
     for await (const msg of client.runTurn(threadId, inputBlocks, onPermission, {
       cwd: options.cwd,
       model,
+      thinkingLevel: options.thinkingLevel,
       mode: options.mode,
       apiKeySource: SDK_API_KEY_SOURCE,
     })) {
@@ -445,6 +447,7 @@ export async function* runCodexAppServer(
     for await (const msg of client.runTurn(threadId, inputBlocks, onPermission, {
       cwd: options.cwd,
       model: options.model,
+      thinkingLevel: options.thinkingLevel,
       mode: options.mode,
       systemPrompt: options.systemPrompt,
     })) {
@@ -496,6 +499,7 @@ export async function* runCodexAppServer(
       yield* client.runTurn(freshThreadId, inputBlocks, onPermission, {
         cwd: options.cwd,
         model: options.model,
+        thinkingLevel: options.thinkingLevel,
         mode: options.mode,
         systemPrompt: options.systemPrompt,
       });

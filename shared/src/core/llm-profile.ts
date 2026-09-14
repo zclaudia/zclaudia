@@ -150,6 +150,8 @@ export interface LlmProfileCompat {
 }
 
 export interface LlmProfileModelEntry {
+  /** Explicit effort capabilities of this connection; never inferred from model names. */
+  thinkingLevels?: import('./agent-profile.js').ThinkingLevel[];
   /** pi-ai model id, e.g. "claude-opus-4-7". Unique within a profile. */
   modelId: string;
   /** Optional human-readable label shown in UI. Falls back to modelId. */

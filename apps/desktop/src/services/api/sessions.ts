@@ -260,3 +260,37 @@ export async function branchSession(
     }
   );
 }
+
+export async function getSessionModelSettings(
+  sessionId: string,
+  discover: boolean | 'refresh' = false,
+  signal?: AbortSignal
+) {
+  return apiCallForBackend<import('@zclaudia/shared').SessionModelSettings>(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/model-settings${discover ? `?discover=${discover}` : ''}`,
+    { signal }
+  );
+}
+
+export async function saveSessionModelSettings(
+  sessionId: string,
+  selection: import('@zclaudia/shared').SessionModelSelection
+) {
+  return apiCallForBackend<import('@zclaudia/shared').SessionModelSettings>(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/model-settings`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(selection),
+    }
+  );
+}
+
+export async function getSessionCapabilities(sessionId: string, options?: RequestInit) {
+  return apiCallForBackend<import('@zclaudia/shared').ProviderCapabilities>(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/capabilities`,
+    options
+  );
+}

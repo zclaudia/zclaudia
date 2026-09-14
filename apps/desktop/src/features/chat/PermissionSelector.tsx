@@ -24,6 +24,7 @@ interface PermissionSelectorProps {
   value: Partial<UnifiedPermissionPolicy> | null;
   onChange: (policy: Partial<UnifiedPermissionPolicy> | null) => void;
   disabled?: boolean;
+  inline?: boolean;
 }
 
 // Preset profiles mapping to v3 CategoryProfile
@@ -36,7 +37,7 @@ const PRESETS: {
 }[] = [
   {
     id: 'read-only',
-    label: 'Read Only',
+    label: 'Ask Before Edits',
     icon: Shield,
     description: 'Only auto-approve read operations',
     profile: {
@@ -92,9 +93,9 @@ const PRESETS: {
   },
   {
     id: 'bypass-all',
-    label: 'Bypass All',
+    label: 'Approve All Requests',
     icon: AlertTriangle,
-    description: '⚠ Auto-approves EVERYTHING including destructive operations',
+    description: 'Auto-approves host requests, including destructive operations',
     profile: {
       fileRead: 'auto-approve',
       fileWrite: 'auto-approve',
@@ -134,7 +135,12 @@ function profilesEqual(a: CategoryProfile, b: CategoryProfile): boolean {
   return CATEGORY_ORDER.every(cat => a[cat] === b[cat]);
 }
 
-export function PermissionSelector({ value, onChange, disabled }: PermissionSelectorProps) {
+export function PermissionSelector({
+  value,
+  onChange,
+  disabled,
+  inline = false,
+}: PermissionSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showCustom, setShowCustom] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -215,10 +221,12 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
       </SelectorTrigger>
 
       {isOpen && (
-        <div className="absolute bottom-full left-0 mb-1 z-50 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl py-1 min-w-[260px] max-h-[400px] overflow-y-auto animate-apple-fade-in">
+        <div
+          className={`${inline ? 'relative mt-2' : 'absolute bottom-full left-0 mb-1 z-50'} bg-popover/95 border border-border/50 rounded-xl py-1 min-w-[260px] max-h-[400px] overflow-y-auto`}
+        >
           {/* Header */}
           <div className={`px-3 py-1.5 ${SECTION_LABEL} border-b border-border`}>
-            Session permission override
+            Host approval override
           </div>
 
           {/* Project Default option */}
@@ -361,7 +369,8 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
           {/* Info footer */}
           <div className="px-3 py-1.5 text-[10px] text-muted-foreground border-t border-border mt-1">
             <span className="flex items-center gap-1">
-              <Lightbulb size={10} strokeWidth={1.75} /> Session override is temporary
+              <Lightbulb size={10} strokeWidth={1.75} /> Temporary for this window; applies to host
+              approval requests
             </span>
           </div>
         </div>

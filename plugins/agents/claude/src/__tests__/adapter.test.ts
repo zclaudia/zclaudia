@@ -203,3 +203,47 @@ describe('ClaudeAgentAdapter MCP bridge merge', () => {
     );
   });
 });
+
+describe('Claude model controls', () => {
+  it('discovers supported effort from initialization without submitting a prompt', async () => {
+    const stream = Object.assign(emptyStream(), {
+      supportedModels: vi.fn(async () => [
+        {
+          value: 'supported',
+          displayName: 'Supported',
+          supportsEffort: true,
+          supportsAdaptiveThinking: true,
+          supportedEffortLevels: ['low', 'high'],
+        },
+        { value: 'unknown', displayName: 'Unknown' },
+      ]),
+    });
+    queryMock.mockReturnValueOnce(stream);
+    const adapter = new ClaudeAgentAdapter(async () => null);
+    const result = await adapter.discoverModels({ cwd: '/tmp' }, new AbortController().signal);
+    expect(result.models).toEqual([
+      { id: 'supported', label: 'Supported', thinkingLevels: ['low', 'high'] },
+      { id: 'unknown', label: 'Unknown', thinkingLevels: [] },
+    ]);
+    const args = queryMock.mock.calls.at(-1)![0];
+    expect(typeof args.prompt).not.toBe('string');
+    expect(await args.prompt.next()).toEqual({ done: true, value: undefined });
+    expect(args.options.persistSession).toBe(false);
+  });
+  it('forwards the selected model and thinking level to the SDK', async () => {
+    queryMock.mockReturnValueOnce(emptyStream());
+    const adapter = new ClaudeAgentAdapter(async () => null);
+    for await (const _event of adapter.run('hello', {
+      cwd: '/tmp',
+      model: 'chosen',
+      thinkingLevel: 'high',
+    })) {
+      /* drain */
+    }
+    expect(queryMock.mock.calls.at(-1)![0].options).toMatchObject({
+      model: 'chosen',
+      thinking: { type: 'adaptive' },
+      effort: 'high',
+    });
+  });
+});

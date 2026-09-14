@@ -51,9 +51,9 @@ describe('PermissionSelector', () => {
 
     fireEvent.click(screen.getByRole('button'));
 
-    expect(screen.getByText('Session permission override')).toBeInTheDocument();
-    // v3 presets: Read Only, Standard, Power User, Full Auto
-    expect(screen.getAllByText(/Read Only/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Host approval override')).toBeInTheDocument();
+    // v3 presets: Ask Before Edits, Standard, Power User, Full Auto
+    expect(screen.getAllByText(/Ask Before Edits/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Standard/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Power User/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Full Auto/).length).toBeGreaterThanOrEqual(1);
@@ -63,12 +63,12 @@ describe('PermissionSelector', () => {
     render(<PermissionSelector value={null} onChange={() => {}} />);
 
     fireEvent.click(screen.getByRole('button'));
-    expect(screen.getByText('Session permission override')).toBeInTheDocument();
+    expect(screen.getByText('Host approval override')).toBeInTheDocument();
 
     // Click outside
     fireEvent.mouseDown(document.body);
 
-    expect(screen.queryByText('Session permission override')).not.toBeInTheDocument();
+    expect(screen.queryByText('Host approval override')).not.toBeInTheDocument();
   });
 
   it('should call onChange with selected preset', () => {
@@ -183,7 +183,7 @@ describe('PermissionSelector', () => {
 
     fireEvent.click(screen.getByRole('button'));
 
-    expect(screen.queryByText('Session permission override')).not.toBeInTheDocument();
+    expect(screen.queryByText('Host approval override')).not.toBeInTheDocument();
   });
 
   it('should show temporary override info in footer', () => {
@@ -191,6 +191,8 @@ describe('PermissionSelector', () => {
 
     fireEvent.click(screen.getByRole('button'));
 
-    expect(screen.getByText(/Session override is temporary/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Temporary for this window; applies to host approval requests/)
+    ).toBeInTheDocument();
   });
 });

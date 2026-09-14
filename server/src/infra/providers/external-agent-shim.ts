@@ -57,6 +57,15 @@ export function wrapExternalAgentAdapter(
   }
   return {
     type: ext.type,
+    discoverModels:
+      typeof (ext as ExternalAgentAdapter & Pick<ProviderAdapter, 'discoverModels'>)
+        .discoverModels === 'function'
+        ? (context, signal) =>
+            (ext as ExternalAgentAdapter & Pick<ProviderAdapter, 'discoverModels'>).discoverModels!(
+              context,
+              signal
+            )
+        : undefined,
     manifest: descriptor.manifest,
     policy: descriptor.policy,
     // URIP runtime catalog source (§21): forwarded so the host catalog

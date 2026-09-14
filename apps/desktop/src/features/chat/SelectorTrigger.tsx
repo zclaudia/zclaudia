@@ -7,7 +7,7 @@ interface SelectorTriggerProps {
   lockReason?: string;
   title?: string;
   ariaLabel?: string;
-  ariaHasPopup?: 'listbox' | 'menu';
+  ariaHasPopup?: 'listbox' | 'menu' | 'dialog';
   ariaExpanded?: boolean;
   className?: string;
   children: ReactNode;
