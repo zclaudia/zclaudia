@@ -7,6 +7,16 @@ import type { ContextWindowSource } from '@zclaudia/shared/wire/messages/core';
 
 export type { ContextWindowSource };
 
+/**
+ * The subset of {@link ContextWindowSource} the pi resolution chain can report.
+ * `runtime` is excluded on purpose: only external agent runtimes (Claude SDK,
+ * Cursor, Codex) report a window they measured themselves — every branch below
+ * picks from the profile/registry/default chain. Narrowing here also keeps the
+ * result assignable to the plugin-sdk `SystemInfo.contextWindowSource` union,
+ * which predates `runtime`.
+ */
+export type ResolvedContextWindowSource = Exclude<ContextWindowSource, 'runtime'>;
+
 const FALLBACK_CONTEXT_WINDOW = 100_000;
 /**
  * Mirror of build-model.ts's openai-compat literal default. Kept in sync so
@@ -27,7 +37,7 @@ const DEFAULT_PROVIDER = 'anthropic';
  */
 export interface ResolvedContextWindow {
   value: number;
-  source: ContextWindowSource;
+  source: ResolvedContextWindowSource;
   /** Only set when source === 'pi_ai_registry'. The pi-ai registry provider
    *  id that matched the requested model id (same-provider hit reports the
    *  configured providerType; cross-provider hit reports the discovered

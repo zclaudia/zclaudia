@@ -12,7 +12,6 @@ import type {
   RuntimeModelConnection,
   SystemInfo,
 } from '@zclaudia/plugin-sdk/providers';
-import type { ContextWindowSource } from '@zclaudia/plugin-sdk/types';
 import { RuntimeContractError } from '@zclaudia/plugin-sdk/providers';
 import {
   boundedToolInput,
@@ -189,14 +188,6 @@ async function* runClaudeSdkAgent(
 }
 
 /**
- * The plugin-sdk contract (0.3.0) doesn't carry these two context fields yet,
- * but the host does: the server forwards `usage` verbatim as wire `UsageInfo`
- * (which has `contextUsedTokens`), and the wire `ContextWindowSource`
- * vocabulary includes `'runtime'`. Drop the casts once the SDK catches up.
- */
-const RUNTIME_REPORTED = 'runtime' as unknown as ContextWindowSource;
-
-/**
  * Context occupancy of one API call, read off a top-level SDK `assistant`
  * message. On a single call the prompt is `input_tokens` (uncached) +
  * `cache_read_input_tokens` (cached prefix) + `cache_creation_input_tokens`
@@ -280,6 +271,10 @@ export async function* pumpClaudeStream(
         }
         if (event.type === 'result') {
           if (event.usage && lastCallContextTokens != null) {
+            // `contextUsedTokens` isn't on the plugin-sdk `ProviderUsage` yet,
+            // but the host carries it: the server forwards `usage` verbatim as
+            // wire `UsageInfo`, which does have the field. Drop the widening
+            // once the SDK catches up.
             const withContext: NonNullable<ProviderRuntimeEvent['usage']> & {
               contextUsedTokens?: number;
             } = { ...event.usage, contextUsedTokens: lastCallContextTokens };
@@ -295,7 +290,7 @@ export async function* pumpClaudeStream(
             initSystemInfo = {
               ...initSystemInfo,
               contextWindow,
-              contextWindowSource: RUNTIME_REPORTED,
+              contextWindowSource: 'runtime',
             };
             yield { type: 'init', systemInfo: initSystemInfo };
           }

@@ -5,7 +5,7 @@ import type {
   ProviderRuntimeEvent,
   SystemInfo,
 } from '@zclaudia/plugin-sdk/providers';
-import type { ContextWindowSource, ProviderUsage } from '@zclaudia/plugin-sdk/types';
+import type { ProviderUsage } from '@zclaudia/plugin-sdk/types';
 import {
   debugLog,
   redactSensitiveValues,
@@ -854,10 +854,7 @@ export class CodexAppServerClient {
                   ...systemInfo,
                   model,
                   contextWindow: modelContextWindow,
-                  // plugin-sdk 0.3.0's ContextWindowSource lags the wire
-                  // vocabulary, which has `'runtime'`; drop the cast when the
-                  // SDK catches up.
-                  contextWindowSource: 'runtime' as unknown as ContextWindowSource,
+                  contextWindowSource: 'runtime',
                 },
               },
             });

@@ -1,5 +1,5 @@
 import type { ProviderRuntimeEvent, SystemInfo } from '@zclaudia/plugin-sdk/providers';
-import type { ContextWindowSource, ToolEffect } from '@zclaudia/plugin-sdk/types';
+import type { ToolEffect } from '@zclaudia/plugin-sdk/types';
 import type {
   SessionUpdate,
   ToolCallUpdate,
@@ -420,11 +420,7 @@ export class AcpEventMapper {
     return {
       model: input.displayName,
       ...(input.effectiveModelId ? { modelId: input.effectiveModelId } : {}),
-      ...(contextWindow
-        ? // plugin-sdk 0.3.0's ContextWindowSource lags the wire vocabulary,
-          // which has `'runtime'`; drop the cast when the SDK catches up.
-          { contextWindow, contextWindowSource: 'runtime' as unknown as ContextWindowSource }
-        : {}),
+      ...(contextWindow ? { contextWindow, contextWindowSource: 'runtime' } : {}),
       cwd: input.cwd,
       ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
       ...(this.slashCommands.length > 0 ? { slashCommands: [...this.slashCommands] } : {}),
