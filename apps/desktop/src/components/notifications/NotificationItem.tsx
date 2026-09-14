@@ -1,21 +1,19 @@
 import type { NotificationItem as NotificationItemData } from '@zclaudia/shared';
-import { Bot, Clock, HelpCircle, User, X, Zap, type LucideIcon } from 'lucide-react';
+import { Bot, Clock, X, Zap, type LucideIcon } from 'lucide-react';
 import { useNotificationFeedStore } from '../../stores/notificationFeedStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
-import { timeAgo } from '../../utils/timeAgo';
+import { IconButton } from '../ui/Button';
+import { TONE_DOT } from '../ui/tone';
 import { extractThinking } from '../../utils/messageContent';
+import { notificationStatus, notificationSubject, notificationTime } from './presenter';
 
-const STATUS_STYLES: Record<string, { dot: string }> = {
-  running: { dot: 'bg-amber-500 animate-pulse' },
-  completed: { dot: 'bg-green-500' },
-  failed: { dot: 'bg-red-500' },
-};
-
-const SOURCE_ICONS: Record<string, LucideIcon> = {
+/* Only sources that tell the reader something get a glyph. `manual` is the
+ * default for every run the user started themselves, so its icon would sit on
+ * nearly every row carrying no information — the definition of chrome noise. */
+const SOURCE_ICONS: Partial<Record<NotificationItemData['source'], LucideIcon>> = {
   trigger: Zap,
   scheduled: Clock,
-  manual: User,
   delegation: Bot,
 };
 
@@ -29,12 +27,13 @@ interface NotificationItemProps {
 export function NotificationItem({ item, onDismiss, onAfterSelect }: NotificationItemProps) {
   const { selectSession } = useSelectionCoordinator();
   const { sendMessage } = useConnection();
-  const statusStyle = STATUS_STYLES[item.status] || STATUS_STYLES.running;
-  const SourceIcon = SOURCE_ICONS[item.source] ?? HelpCircle;
+  const { tone, label: statusLabel } = notificationStatus(item.status);
+  const subject = notificationSubject(item);
+  const SourceIcon = SOURCE_ICONS[item.source];
   const isUnread = !item.readAt;
+  const summary = item.summary ? extractThinking(item.summary).content.trim() : '';
 
   const handleClick = () => {
-    // Mark as read on click
     if (isUnread) {
       sendMessage({ type: 'mark_notifications_read', itemIds: [item.id] });
       useNotificationFeedStore.getState().markRead([item.id]);
@@ -45,70 +44,84 @@ export function NotificationItem({ item, onDismiss, onAfterSelect }: Notificatio
     }
   };
 
-  const handleDismiss = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onDismiss?.(item.id);
-  };
+  /* Unread is carried by ink weight and a filled dot; read rows dim the same
+   * dot rather than dropping it, so a failure stays legible after it is read.
+   * One indicator per row — two (unread marker plus status dot) read as a
+   * smudge at this size and spend two semantic colors on every row. */
+  const dotTone = `${TONE_DOT[tone]} ${isUnread ? '' : 'opacity-40'} ${
+    item.status === 'running' ? 'animate-pulse' : ''
+  }`;
+  const subjectTone = subject.isOpaqueId
+    ? isUnread
+      ? 'text-muted-foreground'
+      : 'text-muted-foreground/60'
+    : isUnread
+      ? 'text-foreground'
+      : 'text-muted-foreground';
 
   return (
-    <button
-      onClick={handleClick}
-      className="group w-full text-left px-3 py-2.5 hover:bg-secondary/50 transition-colors relative"
-    >
-      {/* Unread marker — a leading dot instead of a colored side-stripe */}
-      {isUnread && (
-        <span
-          className="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-primary"
-          aria-hidden="true"
-        />
-      )}
-      {/* Dismiss button — visible on hover */}
+    <div className="group relative">
+      <button
+        onClick={handleClick}
+        className="w-full select-none rounded-md px-2 py-1.5 text-left outline-none transition-colors hover:bg-secondary focus-visible:ring-1 focus-visible:ring-ring max-md:py-2.5"
+      >
+        <div className="flex items-start gap-2">
+          {/* Fixed-height box centers the dot on the title's line box without
+              magic offsets, and keeps it put when a second line appears. */}
+          <span className="flex h-5 shrink-0 items-center">
+            <span className={`h-1.5 w-1.5 rounded-full ${dotTone}`} aria-hidden="true" />
+          </span>
+
+          <div className={`min-w-0 flex-1 ${onDismiss ? 'max-md:pr-7' : ''}`}>
+            <div className="flex items-center gap-1.5">
+              {SourceIcon && (
+                <SourceIcon
+                  className="h-3 w-3 shrink-0 text-muted-foreground"
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                />
+              )}
+              <span className={`flex-1 truncate text-sm ${isUnread ? 'font-medium' : ''} ${subjectTone}`}>
+                <span className="sr-only">{statusLabel}: </span>
+                {subject.text}
+              </span>
+              <span
+                className={`shrink-0 text-3xs tabular-nums text-muted-foreground/60 transition-opacity ${
+                  onDismiss ? 'md:group-hover:opacity-0' : ''
+                }`}
+              >
+                {notificationTime(item.createdAt)}
+              </span>
+            </div>
+
+            {item.error ? (
+              <p className="mt-0.5 line-clamp-2 text-2xs text-destructive">{item.error}</p>
+            ) : (
+              summary && (
+                <p className="mt-0.5 line-clamp-1 text-2xs text-muted-foreground/60">{summary}</p>
+              )
+            )}
+          </div>
+        </div>
+      </button>
+
+      {/* Sibling, not a nested clickable span: a control inside a button is
+          invalid and unreachable by keyboard. It takes over the timestamp's
+          corner on hover so the two never overlap. The wrapper owns the
+          positioning because IconButton's own `relative` would win over an
+          `absolute` passed in via className (Tailwind orders position
+          utilities in the stylesheet, not by class order). */}
       {onDismiss && (
-        <span
-          onClick={handleDismiss}
-          className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-secondary opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-        >
-          <X className="w-3 h-3" strokeWidth={1.75} aria-hidden="true" />
+        <span className="absolute right-1 top-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100">
+          <IconButton
+            size="sm"
+            aria-label={`Dismiss notification: ${subject.text}`}
+            onClick={() => onDismiss(item.id)}
+          >
+            <X className="h-3 w-3" strokeWidth={1.75} aria-hidden="true" />
+          </IconButton>
         </span>
       )}
-
-      <div className="flex items-start gap-2">
-        {/* Status dot */}
-        <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${statusStyle.dot}`} />
-
-        <div className="flex-1 min-w-0 pr-4">
-          {/* Title + source icon + time */}
-          <div className="flex items-center gap-1.5">
-            <span title={item.source} className="flex shrink-0">
-              <SourceIcon
-                className="h-3 w-3 text-muted-foreground"
-                strokeWidth={1.75}
-                aria-hidden="true"
-              />
-            </span>
-            <span
-              className={`text-xs truncate flex-1 ${isUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}
-            >
-              {item.title}
-            </span>
-            <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">
-              {timeAgo(item.createdAt)}
-            </span>
-          </div>
-
-          {/* Summary */}
-          {item.summary && (
-            <p className="text-[11px] text-muted-foreground/70 mt-0.5 line-clamp-1">
-              {extractThinking(item.summary).content.trim()}
-            </p>
-          )}
-
-          {/* Error */}
-          {item.error && (
-            <p className="text-[11px] text-destructive mt-0.5 line-clamp-1">{item.error}</p>
-          )}
-        </div>
-      </div>
-    </button>
+    </div>
   );
 }

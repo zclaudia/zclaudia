@@ -384,7 +384,6 @@ describe('ws/run-events', () => {
         expect.objectContaining({
           sessionId: 'session-1',
           title: 'Run completed: session-1',
-          summary: 'Session response is ready.',
           status: 'completed',
           source: 'manual',
         })

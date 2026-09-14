@@ -39,7 +39,6 @@ describe('run-terminal-notifications', () => {
         sessionId: 'session-1',
         projectId: 'project-1',
         title: 'Run completed: Build API',
-        summary: 'Session response is ready.',
         status: 'completed',
       })
     );

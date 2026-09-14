@@ -86,7 +86,9 @@ export function postRunCompletedNotification(input: TerminalRunNotificationInput
       ownerBackendId: getBackendRouteId(db) ?? 'local-standalone',
       source: 'manual',
       title,
-      summary: 'Session response is ready.',
+      // No summary: the feed row renders status as a dot and the title as the
+      // session, so a constant "response is ready" line would be a second line
+      // of nothing on every completed run in the inbox.
       status: 'completed',
       initiator: 'system',
     });
