@@ -4,9 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  '@zclaudia/plugin-sdk': 0.4.0
-
 importers:
 
   .:
@@ -113,6 +110,9 @@ importers:
       '@zclaudia/agent-transcript-kit':
         specifier: ^0.7.0
         version: 0.7.0(react@19.2.7)
+      '@zclaudia/gateway-protocol':
+        specifier: ^0.1.0
+        version: 0.1.0
       '@zclaudia/protocol':
         specifier: ^0.2.0
         version: 0.2.0
@@ -2513,6 +2513,10 @@ packages:
 
   '@zclaudia/gateway-protocol@0.1.0':
     resolution: {integrity: sha512-2DZ/TOxOXDDcz7WOumGoqV+nDQ60E3p+DpBlc+puCVWHE/d2T0lLyEd3gBdSiYu20sL9b7bG1lzQZRgHJDSAKQ==}
+
+  '@zclaudia/plugin-sdk@0.1.0':
+    resolution: {integrity: sha512-Njpk7b02nENaoJhyE3WsgBfoRRUzHPxsL+1Kr5zCOst0HfxM3unkOhJ5HIU5lTpPF1F3fJcEzZvrWliXqWnkig==}
+    engines: {node: '>=22.19.0'}
 
   '@zclaudia/plugin-sdk@0.4.0':
     resolution: {integrity: sha512-UAeb7j4R9zd4RW22pKAQka7nj1V7X7uPKsT8eXAZ6BArw+J0UnEt7PJbl/+6RhertP+3f3IXvBm3iLcvAYDEkA==}
@@ -7599,13 +7603,15 @@ snapshots:
 
   '@zclaudia/agent-tool-bridge@0.1.0':
     dependencies:
-      '@zclaudia/plugin-sdk': 0.4.0
+      '@zclaudia/plugin-sdk': 0.1.0
 
   '@zclaudia/agent-transcript-kit@0.7.0(react@19.2.7)':
     optionalDependencies:
       react: 19.2.7
 
   '@zclaudia/gateway-protocol@0.1.0': {}
+
+  '@zclaudia/plugin-sdk@0.1.0': {}
 
   '@zclaudia/plugin-sdk@0.4.0': {}
 

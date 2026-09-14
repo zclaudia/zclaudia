@@ -26,36 +26,14 @@ import type {
   GatewayErrorMessage,
 } from '@zclaudia/protocol/gateway';
 import type { ProjectItem, SessionItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
+import type {
+  ChannelClosedMessage,
+  ChannelReadyMessage,
+  TopicMessage,
+  TopicSubscribedMessage,
+  TopicUnsubscribedMessage,
+} from '@zclaudia/gateway-protocol';
 
-// --- Protocol v4 frames (local declarations until @zclaudia/gateway-protocol
-// ships to npm; wire spec: zclaudia-gateway docs/protocol-v4.md) ---
-interface ChannelReadyMessage {
-  type: 'channel_ready';
-  channelId: string;
-  ticket: string;
-  dataPath: string;
-}
-interface ChannelClosedMessage {
-  type: 'channel_closed';
-  channelId: string;
-  reason: string;
-}
-interface TopicSubscribedMessage {
-  type: 'topic_subscribed';
-  backendId: string;
-  topic: string;
-}
-interface TopicUnsubscribedMessage {
-  type: 'topic_unsubscribed';
-  backendId: string;
-  topic: string;
-}
-interface TopicMessage {
-  type: 'topic_message';
-  backendId: string;
-  topic: string;
-  payload?: unknown;
-}
 /** Channel kind carrying zclaudia business messages (server: MESSAGE_CHANNEL_KIND). */
 const MESSAGE_CHANNEL_KIND = 'zclaudia';
 /** Topic carrying resource snapshots/events (server: RESOURCES_TOPIC). */
