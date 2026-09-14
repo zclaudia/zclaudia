@@ -138,7 +138,7 @@ docs/superpowers/
 .zcode/
 .impeccable/
 
-/artifacts/agent-runtime-migration/
+/artifacts/
 
 .cache/runtime-artifacts/
 plugins/agents/codex/engine/
