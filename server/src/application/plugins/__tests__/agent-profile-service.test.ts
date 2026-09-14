@@ -38,17 +38,17 @@ describe('PluginAgentProfileService runtimeType binding', () => {
     }
   });
 
-  it('falls back to zclaudia when contribution omits runtimeType', () => {
+  it('falls back to pi when contribution omits runtimeType', () => {
     const svc = new PluginAgentProfileService(db);
     const installed = svc.installContributions('com.test.aps-default', [{ id: 'y', name: 'Y' }]);
     expect(installed).toBe(1);
 
     const row = new AgentProfileRepository(db).findByPluginProfile('com.test.aps-default', 'y');
     expect(row).toBeDefined();
-    expect(row!.runtimeType).toBe('zclaudia');
+    expect(row!.runtimeType).toBe('pi');
   });
 
-  it('falls back to zclaudia when contribution declares an unregistered runtimeType', () => {
+  it('falls back to pi when contribution declares an unregistered runtimeType', () => {
     const svc = new PluginAgentProfileService(db);
     const installed = svc.installContributions('com.test.aps-invalid', [
       { id: 'z', name: 'Z', runtimeType: 'not-a-real-runtime' },
@@ -57,6 +57,6 @@ describe('PluginAgentProfileService runtimeType binding', () => {
 
     const row = new AgentProfileRepository(db).findByPluginProfile('com.test.aps-invalid', 'z');
     expect(row).toBeDefined();
-    expect(row!.runtimeType).toBe('zclaudia');
+    expect(row!.runtimeType).toBe('pi');
   });
 });

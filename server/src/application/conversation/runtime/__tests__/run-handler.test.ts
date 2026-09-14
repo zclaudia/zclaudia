@@ -283,10 +283,11 @@ describe('ws/run-handler', () => {
 
     // Left at the column default.
     await runWithRuntimeType('session-default-runtime', null);
-    expect(mockProviderRegistry.get).toHaveBeenCalledWith('zclaudia');
+    expect(mockProviderRegistry.get).toHaveBeenCalledWith('pi');
 
+    // Legacy rows written before the rename normalize onto the same adapter.
     await runWithRuntimeType('session-zclaudia-runtime', 'zclaudia');
-    expect(mockProviderRegistry.get).toHaveBeenCalledWith('zclaudia');
+    expect(mockProviderRegistry.get).toHaveBeenCalledWith('pi');
   });
 
   it('fails instead of falling back when a runtime adapter is not registered', async () => {

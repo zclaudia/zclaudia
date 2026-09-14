@@ -3,6 +3,7 @@ import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from 'fs
 import { tmpdir } from 'os';
 import path from 'path';
 import { buildTools } from '../tool-bridge.js';
+import { isSandboxAvailable } from '../sandbox.js';
 
 function makeWorkspace(): string {
   return mkdtempSync(path.join(tmpdir(), 'zc-guards-'));
@@ -100,6 +101,10 @@ describe('critical Bash command guard (integration)', () => {
   });
 
   it('runs the command when the user approves the escalation', async () => {
+    // Sandbox-gated: approval only unlocks a critical command when sandboxed
+    // execution is actually in effect, so without a sandbox (no socat/bwrap)
+    // the guard correctly refuses and there is nothing to assert here.
+    if (!isSandboxAvailable()) return;
     const dir = makeWorkspace();
 
     let request: any;

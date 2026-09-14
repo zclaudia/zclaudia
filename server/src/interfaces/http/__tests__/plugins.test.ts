@@ -15,6 +15,9 @@ vi.mock('fs', async importOriginal => {
 
 // Mock pluginLoader
 vi.mock('../../../application/plugins/loader.js', () => ({
+  // management-service narrows lifecycle failures with `instanceof`, so the
+  // mock has to carry the error class too, not just the loader.
+  PluginRuntimeBusyError: class PluginRuntimeBusyError extends Error {},
   pluginLoader: {
     getPlugins: vi.fn(() => []),
     getPlugin: vi.fn(),
@@ -261,7 +264,7 @@ describe('plugin routes', () => {
 
     it('deactivates plugin successfully', async () => {
       vi.mocked(pluginLoader.hasPlugin).mockReturnValue(true);
-      vi.mocked(pluginLoader.deactivate).mockResolvedValue(undefined);
+      vi.mocked(pluginLoader.deactivate).mockResolvedValue(true);
 
       const res = await request(app).post('/api/plugins/test-plugin/deactivate');
 
