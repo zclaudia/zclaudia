@@ -1,0 +1,295 @@
+# Reusable platform build matrix, shared by the stable and nightly channels of
+# release.yml. It only builds and uploads assets — the caller owns version
+# computation and creating the GitHub release that `tag` points at.
+name: Release build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Release version, e.g. 0.1.1221 or 0.1.6258-nightly.
+        required: true
+        type: string
+      build:
+        description: Raw build number (third semver component).
+        required: true
+        type: string
+      version_code:
+        description: Integer Android versionCode.
+        required: true
+        type: string
+      tag:
+        description: Git tag of the release the assets are uploaded to.
+        required: true
+        type: string
+      platforms:
+        description: '`all`, or a single platform: macos | linux | windows | android.'
+        required: false
+        type: string
+        default: all
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    if: inputs.platforms == 'all' || inputs.platforms == 'macos'
+    # Intel Mac (macos-13) runners are deprecated by GitHub — ARM only for now.
+    runs-on: macos-14
+    timeout-minutes: 90
+    env:
+      CI: true
+      GH_TOKEN: ${{ github.token }}
+      RELEASE: 1
+      RELEASE_REMOTE: origin
+      RELEASE_CREATE_IF_MISSING: 0
+      # SKIP_LATEST_JSON_UPLOAD: only needed for dual-arch builds with a merge job.
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_BUILD: ${{ inputs.build }}
+      RELEASE_VERSION_CODE: ${{ inputs.version_code }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+      SKIP_SIGNING: ${{ secrets.MACOS_CERT_P12_BASE64 == '' && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: 'true'
+
+      - name: Install updater signing key
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PUBLIC_KEY: ${{ secrets.TAURI_SIGNING_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.tauri"
+          printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" > "$HOME/.tauri/zclaudia.key"
+          chmod 600 "$HOME/.tauri/zclaudia.key"
+          if [ -n "${TAURI_SIGNING_PUBLIC_KEY:-}" ]; then
+            printf '%s' "$TAURI_SIGNING_PUBLIC_KEY" > "$HOME/.tauri/zclaudia.key.pub"
+            chmod 644 "$HOME/.tauri/zclaudia.key.pub"
+          fi
+          echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$HOME/.tauri/zclaudia.key" >> "$GITHUB_ENV"
+
+      - name: Import macOS signing certificate
+        if: env.MACOS_CERT_P12_BASE64 != ''
+        shell: bash
+        env:
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/macos-signing.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          printf '%s' "$MACOS_CERT_P12_BASE64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$MACOS_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security default-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      # macos.sh runs its own `pnpm install`; CI=true makes pnpm frozen by default.
+      - name: Build and upload macOS assets
+        shell: bash
+        run: ./scripts/build/macos.sh
+
+  linux:
+    if: inputs.platforms == 'all' || inputs.platforms == 'linux'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CI: true
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_REMOTE: origin
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_BUILD: ${{ inputs.build }}
+      RELEASE_VERSION_CODE: ${{ inputs.version_code }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install Linux system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: 'true'
+
+      # linux.sh runs its own `pnpm install`; CI=true makes pnpm frozen by default.
+      - name: Build Linux packages
+        shell: bash
+        run: ./scripts/build/linux.sh
+
+      - name: Upload Linux artifacts to release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            apps/desktop/src-tauri/target/release/bundle/deb/*.deb \
+            apps/desktop/src-tauri/target/release/bundle/rpm/*.rpm \
+            --clobber
+
+  # Linux x64 server bundle embedded in the Windows installer and run under WSL.
+  # Built on Ubuntu so native modules (better-sqlite3, node-pty, ripgrep) are
+  # compiled for Linux.
+  wsl-server:
+    if: inputs.platforms == 'all' || inputs.platforms == 'windows'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: true
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+        with:
+          install: 'true'
+
+      - name: Build server bundle (Linux x64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export APP_VERSION="$RELEASE_VERSION"
+          pnpm -r run build
+          pnpm --filter @zclaudia/server run bundle
+
+          # Copy the Linux node sidecar binary into the bundle
+          NODE_BIN=$(ls apps/desktop/src-tauri/binaries/node-*-unknown-linux-gnu 2>/dev/null | head -n1)
+          if [ -z "$NODE_BIN" ]; then
+            echo "ERROR: Linux node sidecar binary not found" >&2
+            exit 1
+          fi
+          cp "$NODE_BIN" server/bundle/node
+          chmod +x server/bundle/node
+          echo "Bundled node binary: $(du -h server/bundle/node | cut -f1)"
+
+          # Version file for runtime version checking
+          echo "$RELEASE_VERSION" > server/bundle/.version
+          echo "WSL server bundle ready: $(du -sh server/bundle/ | cut -f1)"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wsl-server-bundle
+          path: server/bundle/
+          retention-days: 1
+
+  windows:
+    if: inputs.platforms == 'all' || inputs.platforms == 'windows'
+    needs: wsl-server
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      CI: true
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_BUILD: ${{ inputs.build }}
+      TAG: ${{ inputs.tag }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # windows.ps1 does not install dependencies itself — install here.
+      - uses: ./.github/actions/setup
+        with:
+          rust: 'true'
+          install: 'true'
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: wsl-server-bundle
+          path: apps/desktop/src-tauri/wsl-server
+
+      - name: Build Windows installers
+        shell: pwsh
+        run: .\scripts\build\windows.ps1
+
+      - name: Upload Windows artifacts to release
+        shell: pwsh
+        run: |
+          gh release upload $env:TAG `
+            --repo $env:GITHUB_REPOSITORY `
+            apps/desktop/src-tauri/target/release/bundle/msi/*.msi `
+            apps/desktop/src-tauri/target/release/bundle/nsis/*.exe `
+            --clobber
+
+  android:
+    if: inputs.platforms == 'all' || inputs.platforms == 'android'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CI: true
+      GH_TOKEN: ${{ github.token }}
+      RELEASE: 1
+      RELEASE_REMOTE: origin
+      RELEASE_CREATE_IF_MISSING: 0
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_BUILD: ${{ inputs.build }}
+      RELEASE_VERSION_CODE: ${{ inputs.version_code }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: 'true'
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes 2>/dev/null | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;35.0.0" \
+            "ndk;27.0.12077973"
+
+      - name: Install Android signing keystore
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/zclaudia-release.keystore"
+          chmod 600 "$HOME/.android/zclaudia-release.keystore"
+
+      # android.sh runs its own `pnpm install`; CI=true makes pnpm frozen by default.
+      - name: Build and upload Android assets
+        shell: bash
+        run: ./scripts/build/android.sh

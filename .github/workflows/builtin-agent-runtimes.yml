@@ -1,7 +1,19 @@
 name: Built-in agent runtimes
 
 on:
+  push:
+    branches: [main]
+    # Kept in sync with pull_request below — GitHub Actions does not support
+    # YAML anchors in workflow files.
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.github/skills/**'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.github/skills/**'
   workflow_dispatch:
 
 permissions:
@@ -16,13 +28,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version-file: .node-version
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          install: 'true'
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm plugins:check && pnpm plugins:test
       - name: Portable production dependency packaging
@@ -60,7 +69,7 @@ jobs:
           bash scripts/dev/test-builtin-runtime-container.sh server/bundle \
             "apps/desktop/src-tauri/binaries/node-$node_target" \
             "artifacts/agent-runtime-migration/container-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: builtin-agent-e2e
