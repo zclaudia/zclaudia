@@ -96,6 +96,5 @@ describe('GatewayBackendDataPublisher', () => {
       expect.objectContaining({ type: 'backend_resource_event', op: 'remove', resourceId: 'p1' }),
       undefined
     );
-
   });
 });

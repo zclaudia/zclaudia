@@ -28,7 +28,11 @@ import type {
   ContentPatchErrorMessage,
   ContentPatchMessage,
 } from '@zclaudia/protocol/sync';
-import { MESSAGE_CHANNEL_KIND, RESOURCES_TOPIC, ZCLAUDIA_NAMESPACE } from '@zclaudia/protocol/transport';
+import {
+  MESSAGE_CHANNEL_KIND,
+  RESOURCES_TOPIC,
+  ZCLAUDIA_NAMESPACE,
+} from '@zclaudia/protocol/transport';
 import type { ProjectItem, SessionItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
 import type { GatewayBackendInfo } from '@zclaudia/shared/core/server';
 import type { ClientMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
@@ -36,10 +40,7 @@ import { GatewayBackendDataPublisher } from './gateway-backend-data-publisher.js
 import { getOrCreateDeviceId } from './gateway-device-id.js';
 import { GatewayHeartbeat } from './gateway-heartbeat.js';
 import { handleHttpChannelOffer } from './gateway-channel-http.js';
-import {
-  GatewayMessageChannels,
-  GatewayOutgoingChannels,
-} from './gateway-channel-messages.js';
+import { GatewayMessageChannels, GatewayOutgoingChannels } from './gateway-channel-messages.js';
 import { createSocksProxyAgent } from './gateway-proxy-agent.js';
 import { GatewayTransport } from './gateway-transport.js';
 
@@ -499,15 +500,26 @@ export class GatewayClient {
     if (!this.transport.hasSocket() || !this.isConnected) return;
     if (this.subscribedBackends.has(targetBackendId)) return;
     if (!this.isV4Backend(targetBackendId)) {
-      console.warn('[Gateway] Backend does not speak protocol v4, cannot subscribe:', targetBackendId);
+      console.warn(
+        '[Gateway] Backend does not speak protocol v4, cannot subscribe:',
+        targetBackendId
+      );
       return;
     }
-    this.transport.send({ type: 'topic_subscribe', backendId: targetBackendId, topic: RESOURCES_TOPIC });
+    this.transport.send({
+      type: 'topic_subscribe',
+      backendId: targetBackendId,
+      topic: RESOURCES_TOPIC,
+    });
   }
 
   unsubscribeBackend(targetBackendId: string): void {
     if (!this.transport.hasSocket() || !this.isConnected) return;
-    this.transport.send({ type: 'topic_unsubscribe', backendId: targetBackendId, topic: RESOURCES_TOPIC });
+    this.transport.send({
+      type: 'topic_unsubscribe',
+      backendId: targetBackendId,
+      topic: RESOURCES_TOPIC,
+    });
     this.subscribedBackends.delete(targetBackendId);
     this.outgoingChannels.close(targetBackendId);
   }
@@ -703,7 +715,9 @@ export class GatewayClient {
         );
         break;
       case 'channel_closed':
-        this.outgoingChannels.handleChannelClosed((msg as unknown as { channelId: string }).channelId);
+        this.outgoingChannels.handleChannelClosed(
+          (msg as unknown as { channelId: string }).channelId
+        );
         break;
       // Fallback targeted path from remote backends (used while their
       // channel toward us reopens); resource data itself rides on topics.

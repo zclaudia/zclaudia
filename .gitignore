@@ -112,9 +112,11 @@ server/data/
 .worktrees/
 .zclaudia/
 .supervision/
-# Ignore .github except workflows
+# Ignore .github except CI definitions
 .github/*
 !.github/workflows/
+!.github/actions/
+!.github/dependabot.yml
 
 .cursor/
 

@@ -1,0 +1,35 @@
+name: Setup toolchain
+description: pnpm + Node from .node-version, with optional Rust toolchain/cache and a frozen dependency install.
+
+inputs:
+  rust:
+    description: Install the stable Rust toolchain and restore the Tauri target cache.
+    default: 'false'
+  install:
+    description: Run `pnpm install --frozen-lockfile`.
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    # No `version:` — pnpm/action-setup reads `packageManager` from package.json,
+    # so the pin lives in one place instead of once per workflow.
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: .node-version
+        cache: pnpm
+
+    - if: inputs.rust == 'true'
+      uses: dtolnay/rust-toolchain@stable
+
+    - if: inputs.rust == 'true'
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: |
+          apps/desktop/src-tauri -> target
+
+    - if: inputs.install == 'true'
+      shell: bash
+      run: pnpm install --frozen-lockfile

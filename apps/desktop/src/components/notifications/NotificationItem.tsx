@@ -81,7 +81,9 @@ export function NotificationItem({ item, onDismiss, onAfterSelect }: Notificatio
                   aria-hidden="true"
                 />
               )}
-              <span className={`flex-1 truncate text-sm ${isUnread ? 'font-medium' : ''} ${subjectTone}`}>
+              <span
+                className={`flex-1 truncate text-sm ${isUnread ? 'font-medium' : ''} ${subjectTone}`}
+              >
                 <span className="sr-only">{statusLabel}: </span>
                 {subject.text}
               </span>

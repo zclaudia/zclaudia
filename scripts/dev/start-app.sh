@@ -82,7 +82,13 @@ setup_node() {
 }
 
 run_pnpm() {
-  corepack pnpm "$@"
+  # pnpm >= 10 pins itself to `packageManager`; corepack is only a fallback for
+  # machines without pnpm, and it cannot launch pnpm 11+ (pure ESM).
+  if command -v pnpm >/dev/null 2>&1; then
+    pnpm "$@"
+  else
+    corepack pnpm "$@"
+  fi
 }
 
 MODE="tauri"

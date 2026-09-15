@@ -6,9 +6,20 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 EXPECTED_NODE="$(tr -d '[:space:]' < "$PROJECT_ROOT/.node-version")"
 CURRENT_NODE="$(node -p "process.version.slice(1)")"
 
+# How to invoke pnpm. Prefer pnpm on PATH: since pnpm 10 it reads
+# `packageManager` from package.json and delegates to that exact version
+# itself, which is what corepack used to do for us. Corepack is only a
+# fallback now — it cannot launch pnpm 11+ (pure ESM, no bin/pnpm.cjs) and
+# Node 25 drops it entirely.
+if command -v pnpm >/dev/null 2>&1; then
+  pnpm_command=(pnpm)
+else
+  pnpm_command=(corepack pnpm)
+fi
+
 resolve_command=("$@")
 if [[ "${resolve_command[0]:-}" == "pnpm" ]]; then
-  resolve_command=(corepack pnpm "${resolve_command[@]:1}")
+  resolve_command=("${pnpm_command[@]}" "${resolve_command[@]:1}")
 elif [[ "${resolve_command[0]:-}" == "env" ]]; then
   command_index=1
   while [[ $command_index -lt ${#resolve_command[@]} && "${resolve_command[$command_index]}" == *=* ]]; do
@@ -17,8 +28,7 @@ elif [[ "${resolve_command[0]:-}" == "env" ]]; then
   if [[ $command_index -lt ${#resolve_command[@]} && "${resolve_command[$command_index]}" == "pnpm" ]]; then
     resolve_command=(
       "${resolve_command[@]:0:$command_index}"
-      corepack
-      pnpm
+      "${pnpm_command[@]}"
       "${resolve_command[@]:$((command_index + 1))}"
     )
   fi

@@ -4,6 +4,25 @@ import { vi } from 'vitest';
 // Lightweight setup file for pure-logic tests (stores/utils/hooks).
 // Runs in the node environment but keeps the necessary browser API mocks.
 
+// Node 22 exposes Event globally but not CloseEvent, and this config runs in
+// the node environment. Tests invoke `onclose` handlers directly, so they need
+// the constructor to exist.
+if (typeof (globalThis as { CloseEvent?: unknown }).CloseEvent === 'undefined') {
+  class CloseEventPolyfill extends Event {
+    readonly code: number;
+    readonly reason: string;
+    readonly wasClean: boolean;
+
+    constructor(type: string, init: { code?: number; reason?: string; wasClean?: boolean } = {}) {
+      super(type);
+      this.code = init.code ?? 1000;
+      this.reason = init.reason ?? '';
+      this.wasClean = init.wasClean ?? true;
+    }
+  }
+  (globalThis as { CloseEvent?: unknown }).CloseEvent = CloseEventPolyfill;
+}
+
 // Mock WebSocket
 class MockWebSocket {
   static readonly CONNECTING = 0;

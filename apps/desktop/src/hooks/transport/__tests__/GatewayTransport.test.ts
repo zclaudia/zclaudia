@@ -447,7 +447,12 @@ describe('GatewayTransport', () => {
           type: 'topic_message',
           backendId: 'backend-123',
           topic: 'resources',
-          payload: { type: 'backend_resource_event', op: 'remove', resourceType: 'session', resourceId: 's1' },
+          payload: {
+            type: 'backend_resource_event',
+            op: 'remove',
+            resourceType: 'session',
+            resourceId: 's1',
+          },
         }),
       } as MessageEvent);
       expect(mockConfig.onBackendDataEvent).toHaveBeenCalledWith(
@@ -513,7 +518,6 @@ describe('GatewayTransport', () => {
 
       expect(mockConfig.onError).toHaveBeenCalledWith('GENERIC_ERROR: Something went wrong');
     });
-
   });
 
   describe('health probe', () => {

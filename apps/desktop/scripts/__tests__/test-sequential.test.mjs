@@ -14,15 +14,15 @@ function writeExecutable(filePath, content) {
   chmodSync(filePath, 0o755);
 }
 
-test('spawns vitest through corepack pnpm and reports child errors', () => {
+test('spawns vitest through pnpm exec and reports child errors', () => {
   const tempDir = mkdtempSync(path.join(tmpdir(), 'zclaudia-test-sequential-'));
   const binDir = path.join(tempDir, 'bin');
-  const argsFile = path.join(tempDir, 'corepack-args.txt');
+  const argsFile = path.join(tempDir, 'pnpm-args.txt');
 
   spawnSync('mkdir', ['-p', binDir]);
   writeExecutable(
-    path.join(binDir, 'corepack'),
-    '#!/usr/bin/env bash\nprintf "%s\\n" "$@" > "$COREPACK_ARGS_FILE"\n'
+    path.join(binDir, 'pnpm'),
+    '#!/usr/bin/env bash\nprintf "%s\\n" "$@" > "$PNPM_ARGS_FILE"\n'
   );
 
   const result = spawnSync(
@@ -33,7 +33,7 @@ test('spawns vitest through corepack pnpm and reports child errors', () => {
       env: {
         ...process.env,
         PATH: `${binDir}:/usr/bin:/bin`,
-        COREPACK_ARGS_FILE: argsFile,
+        PNPM_ARGS_FILE: argsFile,
       },
       encoding: 'utf8',
     }
@@ -42,6 +42,6 @@ test('spawns vitest through corepack pnpm and reports child errors', () => {
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.equal(
     readFileSync(argsFile, 'utf8'),
-    'pnpm\nexec\nvitest\nrun\n--config\nvitest.unit.config.ts\nsrc/stores/__tests__/gatewayStore.test.ts\n'
+    'exec\nvitest\nrun\n--config\nvitest.unit.config.ts\nsrc/stores/__tests__/gatewayStore.test.ts\n'
   );
 });

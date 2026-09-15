@@ -45,7 +45,7 @@ test('start-app rebuilds agent plugins before starting the server', () => {
   assert.match(buildFn, /--filter "@zclaudia\/plugin-\*" run build/);
 });
 
-test('start-app runs pnpm through corepack', () => {
+test('start-app routes every pnpm call through the run_pnpm helper', () => {
   assert.match(script, /run_pnpm\(\)/);
-  assert.doesNotMatch(script, /[^a-zA-Z_]pnpm (install|build|dev|exec)/);
+  assert.doesNotMatch(script, /[^a-zA-Z_"]pnpm (install|build|dev|exec)/);
 });

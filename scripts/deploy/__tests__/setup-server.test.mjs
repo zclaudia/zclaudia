@@ -8,7 +8,7 @@ const script = readFileSync(path.join(repoRoot, 'scripts/deploy/setup-server.sh'
 
 test('setup-server pins pnpm to the repository packageManager version', () => {
   assert.match(script, /PACKAGE_MANAGER=/);
-  assert.match(script, /corepack prepare "\$PACKAGE_MANAGER" --activate/);
+  assert.match(script, /npm install -g "\$PACKAGE_MANAGER"/);
   assert.doesNotMatch(script, /pnpm@latest/);
 });
 
