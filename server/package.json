@@ -30,7 +30,7 @@
     "@puppeteer/browsers": "^3.0.6",
     "@zclaudia/agent-tool-bridge": "^0.1.0",
     "@zclaudia/gateway-protocol": "^0.2.0",
-    "@zclaudia/protocol": "^0.2.1",
+    "@zclaudia/protocol": "^0.3.0",
     "@zclaudia/shared": "workspace:*",
     "ajv": "^8.20.0",
     "async-mutex": "^0.5.0",

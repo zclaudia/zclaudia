@@ -1,7 +1,7 @@
 # 公共协议包职责拆分与迁移计划
 
 日期：2026-09-14  
-状态：阶段 0–4 已实施（本地 tarball 联调通过）；阶段 5 待 npm 发布后执行。实施基线与类型迁移表见 `2026-09-14-protocol-boundary-migration-baseline.md`。
+状态：已全部完成。gateway-protocol 0.2.0、protocol 0.2.1/0.3.0 已发布；0.3.0 已删除 /gateway、/agent 兼容入口，zclaudia 三包消费 ^0.3.0。实施基线与类型迁移表见 `2026-09-14-protocol-boundary-migration-baseline.md`。
 
 修订：已核对 Gateway 提交 `77e877b`、当前 validation/发送点、应用消费路径及评审意见；阶段 0 可独立实施，阶段 2 的网关协议发布按破坏性变更处理。
 

@@ -278,8 +278,8 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0
       '@zclaudia/protocol':
-        specifier: ^0.2.1
-        version: 0.2.1
+        specifier: ^0.3.0
+        version: 0.3.0
       '@zclaudia/shared':
         specifier: workspace:*
         version: link:../../shared
@@ -478,8 +478,8 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0
       '@zclaudia/protocol':
-        specifier: ^0.2.1
-        version: 0.2.1
+        specifier: ^0.3.0
+        version: 0.3.0
       '@zclaudia/shared':
         specifier: workspace:*
         version: link:../shared
@@ -614,8 +614,8 @@ importers:
         specifier: 0.4.0
         version: 0.4.0
       '@zclaudia/protocol':
-        specifier: ^0.2.0
-        version: 0.2.1
+        specifier: ^0.3.0
+        version: 0.3.0
     devDependencies:
       typescript:
         specifier: ^5.9.3
@@ -2689,8 +2689,8 @@ packages:
     resolution: {integrity: sha512-UAeb7j4R9zd4RW22pKAQka7nj1V7X7uPKsT8eXAZ6BArw+J0UnEt7PJbl/+6RhertP+3f3IXvBm3iLcvAYDEkA==}
     engines: {node: '>=22.19.0'}
 
-  '@zclaudia/protocol@0.2.1':
-    resolution: {integrity: sha512-+jwG2edFyhRJeJOfur8zr6nCok2OHI29qNCBEuyTVERX+A1nRM9m0ED7OnUQkveapgv7bF6swdcIyrykhSrUKw==}
+  '@zclaudia/protocol@0.3.0':
+    resolution: {integrity: sha512-5QUgNNKfPG7HNEXRFsC7xf5BXgp8J2RBEGuVoAnWfNOgVOu1MoCw4hghE7yPIjV1ZSM3z0SuDmAKcDeKKWmd/Q==}
 
   abbrev@5.0.0:
     resolution: {integrity: sha512-/XrFJgzQQQHpti1raDJC6m4ws6aNktmjBlhk8Fdlk7LwCEuDoieEJJY9OFHjfiFJFFRM2tK+Ky/IsfbbmlMu1w==}
@@ -7842,7 +7842,7 @@ snapshots:
 
   '@zclaudia/plugin-sdk@0.4.0': {}
 
-  '@zclaudia/protocol@0.2.1': {}
+  '@zclaudia/protocol@0.3.0': {}
 
   abbrev@5.0.0: {}
 
