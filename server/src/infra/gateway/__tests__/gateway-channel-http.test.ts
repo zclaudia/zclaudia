@@ -163,7 +163,11 @@ describe('gateway-channel-http', () => {
       });
       handleHttpChannelOffer(
         { type: 'channel_offer', channelId: 'ch-stream', kind: 'http', ticket: 't', dataPath: '/' },
-        { serverPort: localPort, resolveWsBase: () => `ws://127.0.0.1:${wsPort}`, createAgent: () => undefined }
+        {
+          serverPort: localPort,
+          resolveWsBase: () => `ws://127.0.0.1:${wsPort}`,
+          createAgent: () => undefined,
+        }
       );
     });
 
@@ -211,7 +215,11 @@ describe('gateway-channel-http', () => {
       });
       handleHttpChannelOffer(
         { type: 'channel_offer', channelId: 'ch-abort', kind: 'http', ticket: 't', dataPath: '/' },
-        { serverPort: localPort, resolveWsBase: () => `ws://127.0.0.1:${wsPort}`, createAgent: () => undefined }
+        {
+          serverPort: localPort,
+          resolveWsBase: () => `ws://127.0.0.1:${wsPort}`,
+          createAgent: () => undefined,
+        }
       );
     });
 

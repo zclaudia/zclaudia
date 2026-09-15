@@ -107,10 +107,19 @@ describe('gateway-channel-messages', () => {
     const connP = nextConnection();
     outgoing.send('backend-x', { type: 'ping' });
     // channel_open went out; the frame waits
-    expect(sendControl).toHaveBeenCalledWith({ type: 'channel_open', target: 'backend-x', kind: 'zclaudia' });
+    expect(sendControl).toHaveBeenCalledWith({
+      type: 'channel_open',
+      target: 'backend-x',
+      kind: 'zclaudia',
+    });
     expect(outgoing.has('backend-x')).toBe(false);
 
-    outgoing.handleChannelReady({ type: 'channel_ready', channelId: 'ch-o1', ticket: 't', dataPath: '/' });
+    outgoing.handleChannelReady({
+      type: 'channel_ready',
+      channelId: 'ch-o1',
+      ticket: 't',
+      dataPath: '/',
+    });
     const socket = await connP;
     const received: unknown[] = [];
     socket.on('message', d => received.push(JSON.parse(d.toString())));

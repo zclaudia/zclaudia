@@ -8,7 +8,12 @@ import type {
   BrowserPickedElement,
   BrowserViewport,
 } from '@zclaudia/shared';
-import type { BrowserEngine, EngineSession, EngineSessionCallbacks, EngineStatus } from './engine.js';
+import type {
+  BrowserEngine,
+  EngineSession,
+  EngineSessionCallbacks,
+  EngineStatus,
+} from './engine.js';
 import { defaultChromeDiscoveryDeps, resolveChromePath } from './chrome-discovery.js';
 import { toCdpInput } from './input-mapping.js';
 
@@ -167,12 +172,12 @@ class PuppeteerSession implements EngineSession {
 
   async init(): Promise<void> {
     this.defaultUserAgent = await this.page.browser().userAgent();
-    this.page.on('framenavigated', (frame) => {
+    this.page.on('framenavigated', frame => {
       if (frame !== this.page.mainFrame()) return;
       this.callbacks.onConsoleReset();
       void this.refreshState({ loading: true });
     });
-    this.page.on('console', (msg) => {
+    this.page.on('console', msg => {
       const loc = msg.location();
       this.callbacks.onConsole({
         level: CONSOLE_LEVELS[msg.type()] ?? 'log',
@@ -181,18 +186,22 @@ class PuppeteerSession implements EngineSession {
         ...(loc.url ? { location: `${loc.url}:${(loc.lineNumber ?? 0) + 1}` } : {}),
       });
     });
-    this.page.on('pageerror', (err) => {
+    this.page.on('pageerror', err => {
       this.callbacks.onConsole({
         level: 'error',
         text: err instanceof Error ? (err.stack ?? err.message) : String(err),
         ts: Date.now(),
       });
     });
-    this.page.on('request', (req) => {
+    this.page.on('request', req => {
       // DevTools semantics: a fresh main-frame navigation clears the log and
       // becomes its first entry (clearing on framenavigated instead would drop
       // the document request, which fires earlier).
-      if (req.isNavigationRequest() && req.frame() === this.page.mainFrame() && req.redirectChain().length === 0) {
+      if (
+        req.isNavigationRequest() &&
+        req.frame() === this.page.mainFrame() &&
+        req.redirectChain().length === 0
+      ) {
         this.callbacks.onNetworkReset();
       }
       const entry: BrowserNetworkEntry = {
@@ -205,7 +214,7 @@ class PuppeteerSession implements EngineSession {
       this.networkEntries.set(req, entry);
       this.callbacks.onNetwork({ ...entry });
     });
-    this.page.on('response', (res) => {
+    this.page.on('response', res => {
       const entry = this.networkEntries.get(res.request());
       if (!entry) return;
       entry.status = res.status();
@@ -215,13 +224,13 @@ class PuppeteerSession implements EngineSession {
       if (Number.isFinite(contentLength)) entry.sizeBytes = contentLength;
       this.callbacks.onNetwork({ ...entry });
     });
-    this.page.on('requestfinished', (req) => {
+    this.page.on('requestfinished', req => {
       const entry = this.networkEntries.get(req);
       if (!entry) return;
       entry.durationMs = Date.now() - entry.ts;
       this.callbacks.onNetwork({ ...entry });
     });
-    this.page.on('requestfailed', (req) => {
+    this.page.on('requestfailed', req => {
       const entry = this.networkEntries.get(req);
       if (!entry) return;
       entry.errorText = req.failure()?.errorText ?? 'failed';
@@ -236,7 +245,7 @@ class PuppeteerSession implements EngineSession {
       this.onClosedHook();
       if (!this.closedByUs) this.callbacks.onCrashed();
     });
-    this.cdp.on('Page.screencastFrame', (ev) => {
+    this.cdp.on('Page.screencastFrame', ev => {
       this.callbacks.onFrame(ev.data, {
         deviceWidth: ev.metadata.deviceWidth,
         deviceHeight: ev.metadata.deviceHeight,
@@ -318,7 +327,10 @@ class PuppeteerSession implements EngineSession {
       // Injected mouse events become touch events, so touch-only pages
       // (carousels, mobile menus) respond to panel interaction.
       await this.cdp
-        .send('Emulation.setEmitTouchEventsForMouse', { enabled: emulation.hasTouch, configuration: 'mobile' })
+        .send('Emulation.setEmitTouchEventsForMouse', {
+          enabled: emulation.hasTouch,
+          configuration: 'mobile',
+        })
         .catch(() => {});
       await this.applyViewport(
         { width: emulation.width, height: emulation.height, dpr: emulation.dpr },
@@ -326,7 +338,9 @@ class PuppeteerSession implements EngineSession {
       );
     } else {
       await this.page.setUserAgent(this.defaultUserAgent);
-      await this.cdp.send('Emulation.setEmitTouchEventsForMouse', { enabled: false }).catch(() => {});
+      await this.cdp
+        .send('Emulation.setEmitTouchEventsForMouse', { enabled: false })
+        .catch(() => {});
       await this.applyViewport(fallbackViewport, { isMobile: false, hasTouch: false });
     }
     // UA and server-side responsive rendering only take effect on reload.
@@ -367,7 +381,11 @@ class PuppeteerSession implements EngineSession {
       await this.cdp.send('Runtime.releaseObject', { objectId: object.objectId }).catch(() => {});
       const summary = result.value as Omit<BrowserPickedElement, 'pageUrl'> | undefined;
       if (summary?.selector) {
-        this.callbacks.onElementPicked({ ...summary, classes: summary.classes ?? [], pageUrl: this.page.url() });
+        this.callbacks.onElementPicked({
+          ...summary,
+          classes: summary.classes ?? [],
+          pageUrl: this.page.url(),
+        });
       }
     } catch {
       /* page navigated/closed mid-pick; nothing to deliver */
@@ -393,7 +411,9 @@ class PuppeteerSession implements EngineSession {
 
   async dispatchInput(event: BrowserInputEvent): Promise<void> {
     for (const call of toCdpInput(event)) {
-      await this.cdp.send(call.method as 'Input.dispatchMouseEvent', call.params as never).catch(() => {});
+      await this.cdp
+        .send(call.method as 'Input.dispatchMouseEvent', call.params as never)
+        .catch(() => {});
     }
   }
 

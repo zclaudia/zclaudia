@@ -142,7 +142,9 @@ interface RunState {
 // ── Kit transcript projection ─────────────────────────────────────
 
 function runTurn(transcript: TranscriptState, runId: string): AssistantTurnItem | undefined {
-  const item = transcript.items.find(entry => entry.kind === 'assistant_turn' && entry.id === runId);
+  const item = transcript.items.find(
+    entry => entry.kind === 'assistant_turn' && entry.id === runId
+  );
   return item as AssistantTurnItem | undefined;
 }
 

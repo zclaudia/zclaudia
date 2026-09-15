@@ -116,7 +116,6 @@ describe('provider command routes', () => {
   });
 });
 
-
 it.each(['pi', 'zclaudia'])('serves Pi commands through %s', async runtime => {
   scanCustomCommandsMock.mockResolvedValueOnce([]);
   const response = await request(makeApp()).get(`/api/providers/type/${runtime}/commands`);

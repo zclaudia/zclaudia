@@ -6,14 +6,19 @@ describe('installEngine', () => {
   it('emits downloading progress then ready with the executable path', async () => {
     const events: BrowserEngineStatusMessage[] = [];
     const deps: EngineInstallDeps = {
-      install: async (onProgress) => {
+      install: async onProgress => {
         onProgress(50, 100);
         onProgress(100, 100);
         return '/cache/chrome/linux-1/chrome';
       },
     };
-    await installEngine(deps, (msg) => events.push(msg));
-    expect(events.map((e) => e.status)).toEqual(['downloading', 'downloading', 'downloading', 'ready']);
+    await installEngine(deps, msg => events.push(msg));
+    expect(events.map(e => e.status)).toEqual([
+      'downloading',
+      'downloading',
+      'downloading',
+      'ready',
+    ]);
     expect(events[0].progress).toBe(0);
     expect(events[1].progress).toBe(0.5);
     expect(events.at(-1)?.executablePath).toBe('/cache/chrome/linux-1/chrome');
@@ -26,23 +31,23 @@ describe('installEngine', () => {
         throw new Error('network down');
       },
     };
-    await installEngine(deps, (msg) => events.push(msg));
+    await installEngine(deps, msg => events.push(msg));
     expect(events.at(-1)).toMatchObject({ status: 'error', message: 'network down' });
   });
 
   it('refuses concurrent installs (second call no-ops with no events)', async () => {
     const events: BrowserEngineStatusMessage[] = [];
     let release!: () => void;
-    const gate = new Promise<void>((r) => (release = r));
+    const gate = new Promise<void>(r => (release = r));
     const deps: EngineInstallDeps = {
       install: async () => {
         await gate;
         return '/x';
       },
     };
-    const first = installEngine(deps, (msg) => events.push(msg));
+    const first = installEngine(deps, msg => events.push(msg));
     const countAfterFirst = events.length;
-    await installEngine(deps, (msg) => events.push(msg));
+    await installEngine(deps, msg => events.push(msg));
     expect(events.length).toBe(countAfterFirst); // second call emitted nothing
     release();
     await first;

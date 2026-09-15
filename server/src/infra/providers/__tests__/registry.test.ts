@@ -207,7 +207,6 @@ describe('ProviderRegistry plugin ownership', () => {
   });
 });
 
-
 describe('legacy Pi registry identity', () => {
   it('resolves every read API through the same adapter and protects both names', () => {
     const registry = new ProviderRegistry();
@@ -219,7 +218,9 @@ describe('legacy Pi registry identity', () => {
     expect(registry.listTypes()).toEqual(['pi']);
     for (const name of ['pi', 'zclaudia']) {
       expect(registry.hasType(name)).toBe(true);
-      expect(() => registry.registerPluginAdapter('plugin', fakeAdapter(name))).toThrow(/already registered/);
+      expect(() => registry.registerPluginAdapter('plugin', fakeAdapter(name))).toThrow(
+        /already registered/
+      );
     }
   });
 });

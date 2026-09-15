@@ -117,7 +117,7 @@ describe('BrowserManager', () => {
     manager = new BrowserManager(engine, (clientId, msg) => sent.push({ clientId, msg }));
   });
 
-  const of = (type: string) => sent.filter((s) => s.msg.type === type);
+  const of = (type: string) => sent.filter(s => s.msg.type === type);
 
   it('open creates one session per sessionId (idempotent) and replies browser_opened', async () => {
     await manager.open('c1', 's1');
@@ -318,7 +318,10 @@ describe('BrowserManager', () => {
   });
 
   describe('console capture', () => {
-    const entry = (text: string, level: BrowserConsoleEntry['level'] = 'log'): BrowserConsoleEntry => ({
+    const entry = (
+      text: string,
+      level: BrowserConsoleEntry['level'] = 'log'
+    ): BrowserConsoleEntry => ({
       level,
       text,
       ts: 1,
@@ -333,7 +336,10 @@ describe('BrowserManager', () => {
       expect(replay).toHaveLength(1);
       expect(replay[0].msg).toMatchObject({ replace: true, entries: [entry('early')] });
       engine.sessions[0].callbacks.onConsole(entry('live', 'error'));
-      const live = of('browser_console')[1].msg as { entries: BrowserConsoleEntry[]; replace?: boolean };
+      const live = of('browser_console')[1].msg as {
+        entries: BrowserConsoleEntry[];
+        replace?: boolean;
+      };
       expect(live.replace).toBeUndefined();
       expect(live.entries).toEqual([entry('live', 'error')]);
       expect(manager.getConsole('s1')).toEqual([entry('early'), entry('live', 'error')]);
@@ -381,7 +387,7 @@ describe('BrowserManager', () => {
       cb.onNetwork(req('a'));
       cb.onNetwork(req('b'));
       cb.onNetwork(req('a', { status: 200, durationMs: 12 }));
-      expect(manager.getNetwork('s1')!.map((e) => [e.id, e.status])).toEqual([
+      expect(manager.getNetwork('s1')!.map(e => [e.id, e.status])).toEqual([
         ['a', 200],
         ['b', undefined],
       ]);
@@ -389,7 +395,10 @@ describe('BrowserManager', () => {
       const replay = of('browser_network');
       expect(replay).toHaveLength(1);
       expect((replay[0].msg as { replace?: boolean }).replace).toBe(true);
-      expect((replay[0].msg as { entries: BrowserNetworkEntry[] }).entries.map((e) => e.id)).toEqual(['a', 'b']);
+      expect((replay[0].msg as { entries: BrowserNetworkEntry[] }).entries.map(e => e.id)).toEqual([
+        'a',
+        'b',
+      ]);
       cb.onNetwork(req('c'));
       expect(of('browser_network')).toHaveLength(2); // live update reaches the attached client
     });
@@ -430,7 +439,13 @@ describe('BrowserManager', () => {
       await manager.pickElement('s1', true);
       await manager.pickElement('s1', false);
       expect(engine.sessions[0].inspectModes).toEqual([true, false]);
-      const element = { selector: '#x', tag: 'div', classes: [], outerHtml: '<div id="x"></div>', pageUrl: 'http://x/' };
+      const element = {
+        selector: '#x',
+        tag: 'div',
+        classes: [],
+        outerHtml: '<div id="x"></div>',
+        pageUrl: 'http://x/',
+      };
       engine.sessions[0].callbacks.onElementPicked(element);
       const picked = of('browser_element_picked');
       expect(picked).toHaveLength(1);
@@ -459,7 +474,11 @@ describe('BrowserManager', () => {
     it('screenshot/extractText/clickSelector/typeText delegate to the session', async () => {
       await manager.ensureSession('s1');
       expect(await manager.screenshot('s1')).toEqual({ data: 'AAAA', width: 800, height: 600 });
-      expect(await manager.extractText('s1')).toEqual({ url: 'http://x/', title: 'X', text: 'hello world' });
+      expect(await manager.extractText('s1')).toEqual({
+        url: 'http://x/',
+        title: 'X',
+        text: 'hello world',
+      });
       expect(await manager.clickSelector('s1', '#btn')).toBe(true);
       expect(await manager.clickSelector('s1', '#missing')).toBe(false);
       expect(await manager.typeText('s1', 'hi', true)).toBe(true);
@@ -489,7 +508,7 @@ class GatedFakeEngine extends FakeEngine {
 
   /** Blocks subsequent createSession() calls until release() is invoked. */
   hold(): void {
-    this.gate = new Promise((resolve) => {
+    this.gate = new Promise(resolve => {
       this.gateResolve = resolve;
     });
   }
@@ -511,14 +530,14 @@ describe('BrowserManager open() race conditions', () => {
     const engine = new GatedFakeEngine();
     const sent: Array<{ clientId: string; msg: ServerMessage }> = [];
     const manager = new BrowserManager(engine, (clientId, msg) => sent.push({ clientId, msg }));
-    const of = (type: string) => sent.filter((s) => s.msg.type === type);
+    const of = (type: string) => sent.filter(s => s.msg.type === type);
 
     engine.hold();
     const openPromise = manager.open('c1', 's1'); // Not awaited: Chrome launch is "in flight".
     const attachPromise = manager.attach('c1', 's1', { width: 800, height: 600, dpr: 1 });
 
     // Give both async calls a chance to run up to the gate.
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
     expect(engine.createSessionCalls).toBe(1);
     expect(of('browser_opened')).toHaveLength(0); // Still waiting on the gate.
 
@@ -537,7 +556,7 @@ describe('BrowserManager open() race conditions', () => {
     const engine = new GatedFakeEngine();
     const sent: Array<{ clientId: string; msg: ServerMessage }> = [];
     const manager = new BrowserManager(engine, (clientId, msg) => sent.push({ clientId, msg }));
-    const of = (type: string) => sent.filter((s) => s.msg.type === type);
+    const of = (type: string) => sent.filter(s => s.msg.type === type);
 
     engine.hold();
     const open1 = manager.open('c1', 's1');
@@ -549,6 +568,6 @@ describe('BrowserManager open() race conditions', () => {
     expect(engine.sessions).toHaveLength(1);
     const opened = of('browser_opened');
     expect(opened).toHaveLength(2);
-    expect(opened.map((o) => o.clientId).sort()).toEqual(['c1', 'c2']);
+    expect(opened.map(o => o.clientId).sort()).toEqual(['c1', 'c2']);
   });
 });

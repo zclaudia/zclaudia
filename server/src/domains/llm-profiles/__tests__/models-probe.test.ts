@@ -9,7 +9,18 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
  */
 function anthropicStream(text: string): Response {
   const events = [
-    { type: 'message_start', message: { id: 'msg_x', type: 'message', role: 'assistant', model: 'claude-opus-4-7', content: [], stop_reason: null, usage: { input_tokens: 1, output_tokens: 0 } } },
+    {
+      type: 'message_start',
+      message: {
+        id: 'msg_x',
+        type: 'message',
+        role: 'assistant',
+        model: 'claude-opus-4-7',
+        content: [],
+        stop_reason: null,
+        usage: { input_tokens: 1, output_tokens: 0 },
+      },
+    },
     { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
     { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } },
     { type: 'content_block_stop', index: 0 },
@@ -22,7 +33,6 @@ function anthropicStream(text: string): Response {
     headers: { 'content-type': 'text/event-stream' },
   });
 }
-
 
 const baseProfile: LlmProfileConfig = {
   id: 'p',

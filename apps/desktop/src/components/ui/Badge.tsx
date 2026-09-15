@@ -16,9 +16,7 @@ export function Badge({
   online?: boolean;
 }) {
   return (
-    <span
-      className={`inline-flex h-5 items-center gap-1 rounded-full px-2 text-2xs ${TONE[tone]}`}
-    >
+    <span className={`inline-flex h-5 items-center gap-1 rounded-full px-2 text-2xs ${TONE[tone]}`}>
       {online !== undefined && (
         <span
           data-testid="badge-dot"

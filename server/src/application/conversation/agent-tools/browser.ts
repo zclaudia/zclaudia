@@ -139,23 +139,44 @@ export function registerBrowserTool(deps: BrowserToolDeps): void {
           properties: {
             action: {
               type: 'string',
-              enum: ['navigate', 'read_page', 'screenshot', 'click', 'type', 'scroll', 'read_console', 'read_network', 'fetch'],
+              enum: [
+                'navigate',
+                'read_page',
+                'screenshot',
+                'click',
+                'type',
+                'scroll',
+                'read_console',
+                'read_network',
+                'fetch',
+              ],
               description: 'Defaults to fetch when omitted.',
             },
             url: { type: 'string', description: 'navigate/fetch target' },
             selector: { type: 'string', description: 'click: CSS selector' },
-            x: { type: 'number', description: 'click: page x (CSS px), used with y when no selector' },
+            x: {
+              type: 'number',
+              description: 'click: page x (CSS px), used with y when no selector',
+            },
             y: { type: 'number' },
             text: { type: 'string', description: 'type: text to enter' },
             submit: { type: 'boolean', description: 'type: press Enter after (default false)' },
-            direction: { type: 'string', enum: ['up', 'down'], description: 'scroll (default down)' },
+            direction: {
+              type: 'string',
+              enum: ['up', 'down'],
+              description: 'scroll (default down)',
+            },
             amount: { type: 'number', description: 'scroll: pixels (default 600)' },
             level: {
               type: 'string',
               enum: ['error', 'warn'],
-              description: 'read_console: error = errors only, warn = warnings + errors (default all levels)',
+              description:
+                'read_console: error = errors only, warn = warnings + errors (default all levels)',
             },
-            limit: { type: 'number', description: 'read_console/read_network: max entries, most recent (default 50)' },
+            limit: {
+              type: 'number',
+              description: 'read_console/read_network: max entries, most recent (default 50)',
+            },
             filter: {
               type: 'string',
               enum: ['error'],
@@ -264,7 +285,13 @@ async function runBrowserAction(
         if (hit === null) return JSON.stringify({ error: 'no page' });
         if (!hit) return JSON.stringify({ error: `no element matches ${selector}` });
       } else if (typeof args.x === 'number' && typeof args.y === 'number') {
-        const base = { kind: 'mouse' as const, x: args.x, y: args.y, button: 'left' as const, clickCount: 1 };
+        const base = {
+          kind: 'mouse' as const,
+          x: args.x,
+          y: args.y,
+          button: 'left' as const,
+          clickCount: 1,
+        };
         await manager.input(sessionId, { ...base, type: 'down' });
         await manager.input(sessionId, { ...base, type: 'up' });
       } else {
@@ -288,9 +315,9 @@ async function runBrowserAction(
       const level = args.level as string | undefined;
       const wanted =
         level === 'error'
-          ? entries.filter((e) => e.level === 'error')
+          ? entries.filter(e => e.level === 'error')
           : level === 'warn'
-            ? entries.filter((e) => e.level === 'error' || e.level === 'warn')
+            ? entries.filter(e => e.level === 'error' || e.level === 'warn')
             : entries;
       const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.floor(args.limit) : 50;
       return JSON.stringify({
@@ -303,7 +330,9 @@ async function runBrowserAction(
       if (!entries) return JSON.stringify({ error: 'no page' });
       const wanted =
         args.filter === 'error'
-          ? entries.filter((e) => e.errorText !== undefined || (e.status !== undefined && e.status >= 400))
+          ? entries.filter(
+              e => e.errorText !== undefined || (e.status !== undefined && e.status >= 400)
+            )
           : entries;
       const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.floor(args.limit) : 50;
       return JSON.stringify({

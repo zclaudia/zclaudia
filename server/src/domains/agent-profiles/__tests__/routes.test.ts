@@ -226,16 +226,23 @@ describe('agent-profiles routes', () => {
   });
 
   it('accepts the legacy runtime in POST and PATCH but persists and returns pi', async () => {
-    const created = await request(app).post('/api/agent-profiles')
-      .send({ name: 'Legacy import', llmProfileId, model: 'm', runtimeType: 'zclaudia', enabledTools: [] });
+    const created = await request(app).post('/api/agent-profiles').send({
+      name: 'Legacy import',
+      llmProfileId,
+      model: 'm',
+      runtimeType: 'zclaudia',
+      enabledTools: [],
+    });
     expect(created.status).toBe(201);
     expect(created.body.data.runtimeType).toBe('pi');
-    const patched = await request(app).patch(`/api/agent-profiles/${created.body.data.id}`)
+    const patched = await request(app)
+      .patch(`/api/agent-profiles/${created.body.data.id}`)
       .send({ runtimeType: 'zclaudia' });
     expect(patched.status).toBe(200);
     expect(patched.body.data.runtimeType).toBe('pi');
-    expect(db.prepare('SELECT runtime_type FROM agent_profiles WHERE id = ?').get(created.body.data.id))
-      .toEqual({ runtime_type: 'pi' });
+    expect(
+      db.prepare('SELECT runtime_type FROM agent_profiles WHERE id = ?').get(created.body.data.id)
+    ).toEqual({ runtime_type: 'pi' });
   });
 
   it('PATCH accepts clearing llmProfileId when switching to claude', async () => {

@@ -16,8 +16,12 @@ export const ANTHROPIC_DEFAULT_ENGINE_BASE_URL = 'https://api.anthropic.com';
  * format ("Name: Value" pairs separated by newlines). Reserved headers were
  * already rejected by the host; values must not contain CR/LF.
  */
-export function formatCustomHeaders(headers: Record<string, string> | undefined): string | undefined {
-  const entries = Object.entries(headers ?? {}).filter(([, value]) => value !== undefined && value !== '');
+export function formatCustomHeaders(
+  headers: Record<string, string> | undefined
+): string | undefined {
+  const entries = Object.entries(headers ?? {}).filter(
+    ([, value]) => value !== undefined && value !== ''
+  );
   if (entries.length === 0) return undefined;
   return entries.map(([name, value]) => `${name}: ${value}`).join('\n');
 }

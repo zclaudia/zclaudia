@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { toAnthropicEngineBaseUrl, resolveRuntimeModelConnection } from '../runtime-model-connection.js';
+import {
+  toAnthropicEngineBaseUrl,
+  resolveRuntimeModelConnection,
+} from '../runtime-model-connection.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 
 function profile(overrides: Partial<LlmProfileConfig>): LlmProfileConfig {
@@ -57,12 +60,19 @@ describe('resolveRuntimeModelConnection (claude sdk)', () => {
 
   it('rejects missing keys and OAuth credentials', () => {
     expect(
-      resolveRuntimeModelConnection({ runtimeType: 'claude', profile: profile({ apiKey: undefined }), model: 'm' })
+      resolveRuntimeModelConnection({
+        runtimeType: 'claude',
+        profile: profile({ apiKey: undefined }),
+        model: 'm',
+      })
     ).toMatchObject({ ok: false, code: 'LLM_AUTH_UNSUPPORTED' });
     expect(
       resolveRuntimeModelConnection({
         runtimeType: 'claude',
-        profile: profile({ apiKey: undefined, oauthCredentials: { access: 'a', refresh: 'r', expires: 1, accountId: 'x' } }),
+        profile: profile({
+          apiKey: undefined,
+          oauthCredentials: { access: 'a', refresh: 'r', expires: 1, accountId: 'x' },
+        }),
         model: 'm',
       })
     ).toMatchObject({ ok: false, code: 'LLM_AUTH_UNSUPPORTED' });

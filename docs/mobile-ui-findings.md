@@ -85,7 +85,7 @@ buttons overlap it. Measured: the text "Permission Escalation (Default)"
 occupies `x 246..304, y 219..271`; "Run now" is at `x 258..286, y 220..248` and
 "Disable" at `x 290..318` — both painted over the text.
 
-Tapping what looks like descriptive text triggers *Run now* or *Disable*.
+Tapping what looks like descriptive text triggers _Run now_ or _Disable_.
 
 Fix: give the row a wrapping/stacked mobile layout so the meta column and the
 action cluster never share space.
@@ -140,14 +140,14 @@ consume ~100px of a 812px screen before any content.
 
 Effective sizes measured live (including `::before` hit-area expanders):
 
-| Control | Size | Where |
-|---|---|---|
-| Session header hamburger / "…" | 32×32 | `SessionHeader.tsx` — hand-rolled `h-8 w-8`, so it misses the `IconButton` `before:-inset-1.5` expander added in `463220c6` |
-| Composer selector trio | 28px tall | `PermissionSelector`, mode selector |
-| Suggestion chips | 28px tall | `EmptySessionOverview` |
-| Automations "New" | 61×24 | `AutomationsTab` |
-| Automations delete | 24×24 | row actions |
-| Orphan "Hide panel" | 22×22 | rendered at `y 58` in chat with no visible panel; `title` only, no `aria-label`, and covered by the composer container |
+| Control                        | Size      | Where                                                                                                                       |
+| ------------------------------ | --------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Session header hamburger / "…" | 32×32     | `SessionHeader.tsx` — hand-rolled `h-8 w-8`, so it misses the `IconButton` `before:-inset-1.5` expander added in `463220c6` |
+| Composer selector trio         | 28px tall | `PermissionSelector`, mode selector                                                                                         |
+| Suggestion chips               | 28px tall | `EmptySessionOverview`                                                                                                      |
+| Automations "New"              | 61×24     | `AutomationsTab`                                                                                                            |
+| Automations delete             | 24×24     | row actions                                                                                                                 |
+| Orphan "Hide panel"            | 22×22     | rendered at `y 58` in chat with no visible panel; `title` only, no `aria-label`, and covered by the composer container      |
 
 Other polish items:
 

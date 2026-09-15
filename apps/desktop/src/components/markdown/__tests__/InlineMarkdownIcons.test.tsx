@@ -40,7 +40,9 @@ describe('MarkdownChildrenWithInlineIcons', () => {
   });
 
   it('replaces the stats emoji with an inline icon', () => {
-    render(<MarkdownChildrenWithInlineIcons>{'📊 Resolution stats'}</MarkdownChildrenWithInlineIcons>);
+    render(
+      <MarkdownChildrenWithInlineIcons>{'📊 Resolution stats'}</MarkdownChildrenWithInlineIcons>
+    );
     expect(screen.getByRole('img', { name: 'Stats' })).toBeInTheDocument();
   });
 

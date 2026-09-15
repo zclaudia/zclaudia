@@ -3,7 +3,14 @@ import { toCdpInput } from '../input-mapping.js';
 
 describe('toCdpInput', () => {
   it('maps mouse down to mousePressed with button and clickCount', () => {
-    const calls = toCdpInput({ kind: 'mouse', type: 'down', x: 10, y: 20, button: 'left', clickCount: 1 });
+    const calls = toCdpInput({
+      kind: 'mouse',
+      type: 'down',
+      x: 10,
+      y: 20,
+      button: 'left',
+      clickCount: 1,
+    });
     expect(calls).toEqual([
       {
         method: 'Input.dispatchMouseEvent',
@@ -21,7 +28,15 @@ describe('toCdpInput', () => {
     const [call] = toCdpInput({ kind: 'wheel', x: 1, y: 2, deltaX: 0, deltaY: -120 });
     expect(call).toEqual({
       method: 'Input.dispatchMouseEvent',
-      params: { type: 'mouseWheel', x: 1, y: 2, button: 'none', deltaX: 0, deltaY: -120, modifiers: 0 },
+      params: {
+        type: 'mouseWheel',
+        x: 1,
+        y: 2,
+        button: 'none',
+        deltaX: 0,
+        deltaY: -120,
+        modifiers: 0,
+      },
     });
   });
 
@@ -40,7 +55,12 @@ describe('toCdpInput', () => {
   });
 
   it('adds virtual key codes for editing/navigation keys (Chromium ignores them otherwise)', () => {
-    const [backspace] = toCdpInput({ kind: 'key', type: 'down', key: 'Backspace', code: 'Backspace' });
+    const [backspace] = toCdpInput({
+      kind: 'key',
+      type: 'down',
+      key: 'Backspace',
+      code: 'Backspace',
+    });
     expect(backspace.params).toMatchObject({ windowsVirtualKeyCode: 8, nativeVirtualKeyCode: 8 });
     const [up] = toCdpInput({ kind: 'key', type: 'up', key: 'ArrowLeft', code: 'ArrowLeft' });
     expect(up.params).toMatchObject({ type: 'keyUp', windowsVirtualKeyCode: 37 });

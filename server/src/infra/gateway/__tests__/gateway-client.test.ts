@@ -280,7 +280,6 @@ describe('GatewayClient', () => {
     });
   });
 
-
   describe('message handling', () => {
     beforeEach(() => {
       client = new GatewayClient(mockConfig);
@@ -473,9 +472,7 @@ describe('GatewayClient', () => {
         topic: 'resources',
         payload: {
           type: 'backend_resource_snapshot',
-          resources: [
-            { resourceType: 'session', resourceId: 's1', resource: { sessionId: 's1' } },
-          ],
+          resources: [{ resourceType: 'session', resourceId: 's1', resource: { sessionId: 's1' } }],
         },
       });
 

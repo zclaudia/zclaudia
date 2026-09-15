@@ -33,7 +33,9 @@ describe('Gateway backend routing demo', () => {
 
     console.log('Backend A URL:', backendA.url);
     console.log('Backend B URL:', backendB.url);
-    console.log('\nThe gateway uses the backendId in the URL to decide which backend handles the request');
+    console.log(
+      '\nThe gateway uses the backendId in the URL to decide which backend handles the request'
+    );
     console.log('\nPath format: /api/proxy/{backendId}{original API path}');
     console.log('          /api/proxy/backend-laptop-001/api/projects');
     console.log('                     ↑                  ↑');

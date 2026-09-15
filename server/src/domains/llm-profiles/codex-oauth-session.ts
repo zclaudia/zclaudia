@@ -152,22 +152,21 @@ export class CodexOAuthSessionManager {
     // handler: a login that returns something unexpected has to land in the
     // same error path as a login that threw, or it escapes unhandled and the
     // session sits at `pending` forever.
-    const promise = (async () => toCodexCredentials(await codexOAuth().login(interaction)))()
-      .then(
-        async credentials => {
-          await this.markSuccess(sessionId, credentials);
-        },
-        (err: unknown) => {
-          if (controller.signal.aborted) {
-            this.markCancelled(sessionId);
-            rejectFirst(new CodexOAuthError('OAUTH_CANCELLED', 'OAuth login cancelled.'));
-            return;
-          }
-          const classified = this.classifyLoginError(err);
-          this.markError(sessionId, classified.code, classified.message);
-          rejectFirst(new CodexOAuthError(classified.code, classified.message));
+    const promise = (async () => toCodexCredentials(await codexOAuth().login(interaction)))().then(
+      async credentials => {
+        await this.markSuccess(sessionId, credentials);
+      },
+      (err: unknown) => {
+        if (controller.signal.aborted) {
+          this.markCancelled(sessionId);
+          rejectFirst(new CodexOAuthError('OAUTH_CANCELLED', 'OAuth login cancelled.'));
+          return;
         }
-      );
+        const classified = this.classifyLoginError(err);
+        this.markError(sessionId, classified.code, classified.message);
+        rejectFirst(new CodexOAuthError(classified.code, classified.message));
+      }
+    );
 
     this.sessions.set(sessionId, {
       sessionId,

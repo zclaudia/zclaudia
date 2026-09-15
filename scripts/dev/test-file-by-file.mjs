@@ -150,7 +150,9 @@ function detectModule(inputPath) {
     return { moduleDir: gatewayRoot, moduleName: 'gateway' };
   }
 
-  fail('Cannot resolve module path. Supported modules: apps/desktop, server. Use --allow-external for out-of-repo paths.');
+  fail(
+    'Cannot resolve module path. Supported modules: apps/desktop, server. Use --allow-external for out-of-repo paths.'
+  );
 }
 
 function selectDesktopConfig(relativePath) {

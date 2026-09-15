@@ -20,7 +20,7 @@ requestAnimationFrame(() => {
 // Suppress the WebView's default context menu (Reload, etc.) in production
 // chrome. Text-editing surfaces and real text selections keep the native menu.
 if (!import.meta.env.DEV) {
-  document.addEventListener('contextmenu', (e) => {
+  document.addEventListener('contextmenu', e => {
     const target = e.target instanceof Element ? e.target : null;
     const editable = target?.closest('input, textarea, [contenteditable="true"]');
     const hasSelection = Boolean(window.getSelection()?.toString());

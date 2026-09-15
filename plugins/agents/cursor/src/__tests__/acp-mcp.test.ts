@@ -48,9 +48,9 @@ describe('mapBridgeToAcpMcpServers', () => {
     } catch (error) {
       expect((error as CursorAcpError).code).toBe('CURSOR_MCP_BRIDGE_UNAVAILABLE');
     }
-    expect(() =>
-      mapBridgeToAcpMcpServers({ name: 'b', config: { command: 'node' } })
-    ).toThrowError(CursorAcpError);
+    expect(() => mapBridgeToAcpMcpServers({ name: 'b', config: { command: 'node' } })).toThrowError(
+      CursorAcpError
+    );
   });
 
   it('rejects malformed args and env instead of silently changing the launch config', () => {

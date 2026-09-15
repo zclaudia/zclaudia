@@ -3,7 +3,6 @@ import { appendMessagesToTree } from '../write-path.js';
 import { readRecentMessages } from '../read-path.js';
 import { makeSessionDb } from './fixture.js';
 
-
 const msg = (role: string, content: string) => ({ role, content }) as never;
 
 describe('readRecentMessages', () => {
@@ -14,7 +13,10 @@ describe('readRecentMessages', () => {
   it('returns all messages (in root→leaf order) when fewer than the limit', async () => {
     const db = makeSessionDb();
     appendMessagesToTree(db, 's1', [msg('user', 'a'), msg('assistant', 'b'), msg('user', 'c')]);
-    const out = (await readRecentMessages(db, 's1', 16)) as Array<{ role: string; content: string }>;
+    const out = (await readRecentMessages(db, 's1', 16)) as Array<{
+      role: string;
+      content: string;
+    }>;
     expect(out.map(m => m.content)).toEqual(['a', 'b', 'c']);
   });
 

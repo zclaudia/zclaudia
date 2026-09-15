@@ -14,16 +14,16 @@
 
 保留一个 `runtimeType: 'codex'`，支持以下两种模式：
 
-| 项目 | CLI 模式 | SDK + LLM Profile 模式 |
-| --- | --- | --- |
-| 配置值 | `engineMode: 'cli'` | `engineMode: 'sdk'` |
-| 界面名称 | CLI（外部环境） | SDK（内置引擎 + LLM Profile） |
-| 执行文件 | 现有显式路径、系统 PATH、Managed Agent CLI | 当前应用版本验证并交付的 Codex 平台资源 |
-| 模型连接 | 沿用外部 Codex 配置与认证 | 显式 Profile、API key、Responses endpoint、模型 |
-| 底层通信 | `codex app-server`，JSON-RPC over stdio | 相同 app-server 协议 |
-| 配置和会话状态 | 现有外部 Codex 环境 | 后端管理、按 ZClaudia 会话隔离的 CODEX_HOME |
-| 额外安装或登录 CLI | 沿用现有流程 | 不需要 |
-| 运行时自动下载 | 沿用既有外部 CLI 管理能力 | 不下载；资源缺失即报错 |
+| 项目               | CLI 模式                                   | SDK + LLM Profile 模式                          |
+| ------------------ | ------------------------------------------ | ----------------------------------------------- |
+| 配置值             | `engineMode: 'cli'`                        | `engineMode: 'sdk'`                             |
+| 界面名称           | CLI（外部环境）                            | SDK（内置引擎 + LLM Profile）                   |
+| 执行文件           | 现有显式路径、系统 PATH、Managed Agent CLI | 当前应用版本验证并交付的 Codex 平台资源         |
+| 模型连接           | 沿用外部 Codex 配置与认证                  | 显式 Profile、API key、Responses endpoint、模型 |
+| 底层通信           | `codex app-server`，JSON-RPC over stdio    | 相同 app-server 协议                            |
+| 配置和会话状态     | 现有外部 Codex 环境                        | 后端管理、按 ZClaudia 会话隔离的 CODEX_HOME     |
+| 额外安装或登录 CLI | 沿用现有流程                               | 不需要                                          |
+| 运行时自动下载     | 沿用既有外部 CLI 管理能力                  | 不下载；资源缺失即报错                          |
 
 这里的 `sdk` 是与 Claude 对齐的产品配置值，表示“应用管理引擎和连接”。首期不引入 `@openai/codex-sdk` npm 包，也不把现有 app-server adapter 改为另一套执行 API。官方将 app-server 用于需要认证、历史、审批和流式事件的完整客户端；现有适配已经建立在这条路径上。[官方 app-server 文档](https://learn.chatgpt.com/docs/app-server)
 
@@ -35,20 +35,20 @@ LLM 凭据静态加密迁移也不在本期：现有 `llm_profiles.api_key` 明�
 
 ## 2. 当前实现与需要修改的位置
 
-| 位置 | 当前行为 | 本方案改动 |
-| --- | --- | --- |
-| `plugins/agents/codex/plugin.json` | `model.kind: none`、`capabilities.providers: external` | 按 engineMode 投影配置编辑器和 readiness |
-| `src/adapter.ts` | 转发模型、权限、CLI 路径、env 和 MCP bridge | 转发明确的执行来源和模型连接，校验模式契约 |
-| `src/runner.ts` | 按路径、完整 env 和 MCP config signature 缓存 client | SDK 采用每个宿主会话一个进程；替换前等待旧进程退出 |
-| `src/runner.ts` | resume 失败或部分运行错误后自动新建 thread | SDK 严格恢复；CLI 兼容行为与限制见 §7.3 |
-| `src/runner.ts` | 内存 cwd 记录和 `.worktrees` 路径规则决定恢复 | SDK 采用持久绑定、规范化 cwd 和引擎返回结果校验 |
-| `src/config.ts` | buildEnv 继承 process.env，只清理部分模型变量 | SDK 独立构造完整环境，排除外部连接和认证来源 |
-| `src/config.ts` | 公共 codex-config 目录、无目录 key 的 lastWrittenConfig | SDK 独立目录；配置生成和缓存显式带目录身份 |
-| `src/config.ts` | ensureCodexProjectTrusted 写用户 Codex 配置 | SDK 不调用此全局写入路径，信任设置仅写自身目录 |
-| `src/app-server-client.ts` | start 只传 cwd，resume 只传 threadId，turn 传 model | start/resume 显式绑定 provider、model 和受支持的指令/权限参数 |
-| `src/app-server-client.ts` | updateExtraArgs 打印参数并销毁进程 | 去除完整参数日志；不得销毁承载其他活动会话的进程 |
+| 位置                                                                                       | 当前行为                                                     | 本方案改动                                                                                                          |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `plugins/agents/codex/plugin.json`                                                         | `model.kind: none`、`capabilities.providers: external`       | 按 engineMode 投影配置编辑器和 readiness                                                                            |
+| `src/adapter.ts`                                                                           | 转发模型、权限、CLI 路径、env 和 MCP bridge                  | 转发明确的执行来源和模型连接，校验模式契约                                                                          |
+| `src/runner.ts`                                                                            | 按路径、完整 env 和 MCP config signature 缓存 client         | SDK 采用每个宿主会话一个进程；替换前等待旧进程退出                                                                  |
+| `src/runner.ts`                                                                            | resume 失败或部分运行错误后自动新建 thread                   | SDK 严格恢复；CLI 兼容行为与限制见 §7.3                                                                             |
+| `src/runner.ts`                                                                            | 内存 cwd 记录和 `.worktrees` 路径规则决定恢复                | SDK 采用持久绑定、规范化 cwd 和引擎返回结果校验                                                                     |
+| `src/config.ts`                                                                            | buildEnv 继承 process.env，只清理部分模型变量                | SDK 独立构造完整环境，排除外部连接和认证来源                                                                        |
+| `src/config.ts`                                                                            | 公共 codex-config 目录、无目录 key 的 lastWrittenConfig      | SDK 独立目录；配置生成和缓存显式带目录身份                                                                          |
+| `src/config.ts`                                                                            | ensureCodexProjectTrusted 写用户 Codex 配置                  | SDK 不调用此全局写入路径，信任设置仅写自身目录                                                                      |
+| `src/app-server-client.ts`                                                                 | start 只传 cwd，resume 只传 threadId，turn 传 model          | start/resume 显式绑定 provider、model 和受支持的指令/权限参数                                                       |
+| `src/app-server-client.ts`                                                                 | updateExtraArgs 打印参数并销毁进程                           | 去除完整参数日志；不得销毁承载其他活动会话的进程                                                                    |
 | `src/app-server-protocol.ts`、`plugins/agents/codex/scripts/check-app-server-protocol.mjs` | 维护较窄的协议子集；脚本尚未检查 thread/start、thread/resume | 增加这两个方法的 cwd、modelProvider 等参数及返回字段的 schema 断言；cwd 的实际绑定/恢复语义另用真实引擎集成测试验证 |
-| `scripts/plugins/stage-builtin-agents.mjs` | Codex 只 stage 插件代码，没有平台引擎 | 加入目标平台完整 runtime payload 和发布验收 |
+| `scripts/plugins/stage-builtin-agents.mjs`                                                 | Codex 只 stage 插件代码，没有平台引擎                        | 加入目标平台完整 runtime payload 和发布验收                                                                         |
 
 表中 `src/*` 均位于 `plugins/agents/codex/`。宿主改动点复用 Claude 方案中的 resolver、readiness、external-agent-shim、run-managed-runtime、Profile CRUD 和 `/api/agent-runtimes` 投影。
 
@@ -104,10 +104,10 @@ CRUD、默认 Profile 创建、导入导出、WS、删除引用检查、前端�
 
 Codex 的声明如下，模型选项和工具/技能能力继续取现有 descriptor：
 
-| 模式 | connection | executable | 派生结果 |
-| --- | --- | --- | --- |
-| cli | external，modelSelection: optional | external-cli | model.kind: native、providers: external、hasCliPath: true |
-| sdk | llm-profile，acceptedModelProtocols: [openai-responses] | bundled-engine | model.kind: llm-profile、providers: profile、hasCliPath: false |
+| 模式 | connection                                              | executable     | 派生结果                                                       |
+| ---- | ------------------------------------------------------- | -------------- | -------------------------------------------------------------- |
+| cli  | external，modelSelection: optional                      | external-cli   | model.kind: native、providers: external、hasCliPath: true      |
+| sdk  | llm-profile，acceptedModelProtocols: [openai-responses] | bundled-engine | model.kind: llm-profile、providers: profile、hasCliPath: false |
 
 这是对 Claude 提案契约的显式增量：`executable` 和 `EngineExecutionContext.executableSource` 增加 `bundled-engine`。Claude 仍使用 `bundled-sdk`，因为其资源随 Agent SDK 配套；Codex 使用独立的版本化引擎包。不为二者各造一个布尔字段。顶层 descriptor 从默认 CLI 模式生成兼容视图；旧插件未声明模式时继续使用原有顶层规范。
 
@@ -118,10 +118,7 @@ Codex 的声明如下，模型选项和工具/技能能力继续取现有 descri
 当前 `providerType: 'openai'` 对应的已有 pi 路径不能证明 endpoint 支持 Responses。为避免把“支持哪些协议”和“pi 默认采用哪个协议”混为一谈，增加可选能力声明：
 
 ```ts
-type LlmWireProtocol =
-  | 'anthropic-messages'
-  | 'openai-completions'
-  | 'openai-responses';
+type LlmWireProtocol = 'anthropic-messages' | 'openai-completions' | 'openai-responses';
 
 interface LlmProfileConfig {
   // 原有字段不变
@@ -131,13 +128,13 @@ interface LlmProfileConfig {
 
 该字段表达 endpoint 能力，不修改现有 pi transport 选择，不取代 `providerType`、模型 dialect 或 compat。它是本 Codex 方案在 Claude “未来扩展协议”位置上的共享增量；Claude resolver 仍限定 Anthropic 类型和 Messages，不会因某个 Profile 声明多个协议而接受 OpenAI。
 
-| Profile | 未声明 supportedProtocols 时的规范化 | Codex SDK |
-| --- | --- | --- |
-| anthropic | anthropic-messages | 拒绝 |
-| openai，默认或规范官方 `https://api.openai.com/v1` | openai-completions + openai-responses | 可选，API key 和模型仍需验证 |
-| openai，自定义 baseUrl | openai-completions | 显式声明 openai-responses 后才可选 |
-| openai-codex | 保持原 OAuth 语义，不推断 API key Responses 能力 | 拒绝，即使手工声明 Responses |
-| 其他 providerType | 不推断 | 首期拒绝 |
+| Profile                                            | 未声明 supportedProtocols 时的规范化             | Codex SDK                          |
+| -------------------------------------------------- | ------------------------------------------------ | ---------------------------------- |
+| anthropic                                          | anthropic-messages                               | 拒绝                               |
+| openai，默认或规范官方 `https://api.openai.com/v1` | openai-completions + openai-responses            | 可选，API key 和模型仍需验证       |
+| openai，自定义 baseUrl                             | openai-completions                               | 显式声明 openai-responses 后才可选 |
+| openai-codex                                       | 保持原 OAuth 语义，不推断 API key Responses 能力 | 拒绝，即使手工声明 Responses       |
+| 其他 providerType                                  | 不推断                                           | 首期拒绝                           |
 
 现有 `shared/src/core/llm-profile.ts` 将 `LlmProviderType` 定义为 `(typeof LLM_PROVIDER_TYPES)[number] | string`，它实际上是开放字符串类型。上述准入必须在运行时用白名单判断：Codex SDK 首期只接受精确的 `providerType === 'openai'`，再检查协议、凭据和模型；不能依赖 TS 联合类型收窄、类型断言或前端选项来拒绝未知值。HTTP、WS、导入和数据库旧记录最终都经过同一严格 resolver；不收窄其他 runtime 已有的扩展类型范围。
 
@@ -303,17 +300,17 @@ stage/portable/installer/container 都必须纳入实际引擎 payload。校验 
 
 ## 9. 错误与诊断
 
-| 错误 | 用户可采取的动作 |
-| --- | --- |
-| LLM_PROFILE_REQUIRED / LLM_PROFILE_NOT_FOUND | 选择或恢复原 Profile |
-| LLM_PROTOCOL_UNSUPPORTED / LLM_AUTH_UNSUPPORTED | 配置 API key Responses Profile |
-| LLM_PROFILE_FIELD_UNSUPPORTED | 移除或调整未映射的显式覆盖 |
-| BUNDLED_ENGINE_UNAVAILABLE / RUNTIME_PROTOCOL_UNSUPPORTED | 修复安装或使用匹配版本 |
-| RUNTIME_CONFIGURATION_CONFLICT | 查看脱敏的冲突字段与配置来源 |
-| SESSION_CONNECTION_CHANGED / SESSION_WORKSPACE_CHANGED | 恢复原配置或明确新建会话 |
-| SESSION_RESUME_UNAVAILABLE | 恢复状态备份或明确新建会话 |
-| RUNTIME_BINDING_KEY_UNAVAILABLE | 恢复匹配的绑定密钥备份 |
-| SESSION_RUNTIME_BUSY / RUNTIME_START_TIMEOUT | 等待当前运行结束或重试启动 |
+| 错误                                                      | 用户可采取的动作               |
+| --------------------------------------------------------- | ------------------------------ |
+| LLM_PROFILE_REQUIRED / LLM_PROFILE_NOT_FOUND              | 选择或恢复原 Profile           |
+| LLM_PROTOCOL_UNSUPPORTED / LLM_AUTH_UNSUPPORTED           | 配置 API key Responses Profile |
+| LLM_PROFILE_FIELD_UNSUPPORTED                             | 移除或调整未映射的显式覆盖     |
+| BUNDLED_ENGINE_UNAVAILABLE / RUNTIME_PROTOCOL_UNSUPPORTED | 修复安装或使用匹配版本         |
+| RUNTIME_CONFIGURATION_CONFLICT                            | 查看脱敏的冲突字段与配置来源   |
+| SESSION_CONNECTION_CHANGED / SESSION_WORKSPACE_CHANGED    | 恢复原配置或明确新建会话       |
+| SESSION_RESUME_UNAVAILABLE                                | 恢复状态备份或明确新建会话     |
+| RUNTIME_BINDING_KEY_UNAVAILABLE                           | 恢复匹配的绑定密钥备份         |
+| SESSION_RUNTIME_BUSY / RUNTIME_START_TIMEOUT              | 等待当前运行结束或重试启动     |
 
 错误码为目标公共分类，实施时与 Claude 方案统一注册，不创建仅文本不同的平行分类。诊断可显示模式、执行文件来源、引擎版本、协议、Profile ID 和配置来源；不输出 API key、完整 headers、OAuth 凭据或含密钥的 argv/env/config。
 
@@ -325,14 +322,14 @@ stage/portable/installer/container 都必须纳入实际引擎 payload。校验 
 
 ## 10. 分期实施
 
-| 阶段 | 交付物 | 退出条件 |
-| --- | --- | --- |
-| 独立先行修复：现存日志泄漏 | §9 的日志修复及合成敏感标记回归，可独立发布 | 文件与控制台不泄漏 MCP env/完整参数；不等待 P2，真实凭据探针开始前完成 |
-| P0：固定版本探针 | §11 证据记录、候选引擎和平台清单 | 唯一连接、权限、恢复和隔离可验证；失败则调整版本或阻止 SDK 发布 |
-| P1：共享契约和数据 | 插件 SDK 发布；engineMode、协议声明、会话绑定及迁移；纯 descriptor 投影 | 旧 CLI 默认行为兼容；新旧 host/plugin 能力门禁有效 |
-| P2：Codex 执行链 | 严格连接 resolver、独立环境/目录、专用进程、协议扩展、取消恢复、脱敏 | 本地可控 Responses fixture 经真实引擎跑通工具/多轮/恢复 |
-| P3：全入口体验 | Agent/Profile 编辑、readiness、连接测试、会话标记、错误和远端归属 | HTTP/WS/导入导出/默认 Agent/Remote/Gateway 一致 |
-| P4：发布验收 | 精确资源 stage、真实平台包、升级备份文档 | 完成 §12 矩阵，干净环境不用宿主 CLI 即可运行 |
+| 阶段                       | 交付物                                                                  | 退出条件                                                               |
+| -------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| 独立先行修复：现存日志泄漏 | §9 的日志修复及合成敏感标记回归，可独立发布                             | 文件与控制台不泄漏 MCP env/完整参数；不等待 P2，真实凭据探针开始前完成 |
+| P0：固定版本探针           | §11 证据记录、候选引擎和平台清单                                        | 唯一连接、权限、恢复和隔离可验证；失败则调整版本或阻止 SDK 发布        |
+| P1：共享契约和数据         | 插件 SDK 发布；engineMode、协议声明、会话绑定及迁移；纯 descriptor 投影 | 旧 CLI 默认行为兼容；新旧 host/plugin 能力门禁有效                     |
+| P2：Codex 执行链           | 严格连接 resolver、独立环境/目录、专用进程、协议扩展、取消恢复、脱敏    | 本地可控 Responses fixture 经真实引擎跑通工具/多轮/恢复                |
+| P3：全入口体验             | Agent/Profile 编辑、readiness、连接测试、会话标记、错误和远端归属       | HTTP/WS/导入导出/默认 Agent/Remote/Gateway 一致                        |
+| P4：发布验收               | 精确资源 stage、真实平台包、升级备份文档                                | 完成 §12 矩阵，干净环境不用宿主 CLI 即可运行                           |
 
 P1 与 Claude 共用的迁移和契约必须作为同一批变更协调：Codex 新增的是 Responses 能力声明、bundled-engine 和连接 union 分支；不顺带给 Claude 增加 OpenAI 支持。
 
@@ -354,35 +351,34 @@ P1 与 Claude 共用的迁移和契约必须作为同一批变更协调：Codex 
 
 ## 12. 实现验收矩阵
 
-| 类别 | 必须覆盖 |
-| --- | --- |
-| 兼容 | 旧 Agent 默认 CLI；已有 CLI LLM 引用不转为 SDK；外部 OAuth 流程可用；无 engineModes 的插件保持原行为 |
-| 配置 | 模式原子切换；null/省略/旧空串；Responses 能力推断与显式空数组；自定义 endpoint 未声明不可选；拒绝 openai-codex OAuth |
-| CLI 模型输入 | 默认值省略覆盖；已有/手动值保留；不混入 Profile 模型列表；保存不调用模型；运行时无效值不自动换模型 |
-| 开放 providerType | 未知字符串、大小写变体和手工导入值在 SDK 严格 resolver 被拒绝；不能仅依靠 TS 类型或前端筛选 |
-| 契约 | 模式投影唯一；SDK 缺字段/旧插件拒绝；Claude 不接受 Responses；Codex 不接受 Messages |
-| 连接 | Profile key/header 精确命中；代理前缀正确；无外部 fallback；配置冲突在 turn 前失败 |
-| 生命周期 | SDK 会话进程隔离；启动/审批/流式阶段取消；idle 回收后恢复；轮换重启等待退出；多后端锁 |
-| 会话 | 绑定冻结；endpoint 变化阻止旧历史外发；cwd 校验；thread 丢失明确错误；CLI 回退事件明确 |
-| 安全与权限 | 日志/argv/子工具无连接密钥；不写个人 Codex 配置；plan 实际只读；审批不串会话 |
-| 交付 | 固定版本与摘要一致；完整资源可离线安装；无宿主 CLI 仍可运行；缺资源不降级；旧状态升级/恢复 |
+| 类别              | 必须覆盖                                                                                                              |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| 兼容              | 旧 Agent 默认 CLI；已有 CLI LLM 引用不转为 SDK；外部 OAuth 流程可用；无 engineModes 的插件保持原行为                  |
+| 配置              | 模式原子切换；null/省略/旧空串；Responses 能力推断与显式空数组；自定义 endpoint 未声明不可选；拒绝 openai-codex OAuth |
+| CLI 模型输入      | 默认值省略覆盖；已有/手动值保留；不混入 Profile 模型列表；保存不调用模型；运行时无效值不自动换模型                    |
+| 开放 providerType | 未知字符串、大小写变体和手工导入值在 SDK 严格 resolver 被拒绝；不能仅依靠 TS 类型或前端筛选                           |
+| 契约              | 模式投影唯一；SDK 缺字段/旧插件拒绝；Claude 不接受 Responses；Codex 不接受 Messages                                   |
+| 连接              | Profile key/header 精确命中；代理前缀正确；无外部 fallback；配置冲突在 turn 前失败                                    |
+| 生命周期          | SDK 会话进程隔离；启动/审批/流式阶段取消；idle 回收后恢复；轮换重启等待退出；多后端锁                                 |
+| 会话              | 绑定冻结；endpoint 变化阻止旧历史外发；cwd 校验；thread 丢失明确错误；CLI 回退事件明确                                |
+| 安全与权限        | 日志/argv/子工具无连接密钥；不写个人 Codex 配置；plan 实际只读；审批不串会话                                          |
+| 交付              | 固定版本与摘要一致；完整资源可离线安装；无宿主 CLI 仍可运行；缺资源不降级；旧状态升级/恢复                            |
 
 测试分三层：纯配置/契约单测与回归；真实打包引擎连接本地 Responses fixture 的集成测试；受控真实 provider 和目标安装包验收。mock app-server 只能证明宿主分支，不能证明引擎接受配置或认证隔离。本文当前只完成设计与代码/schema 核对，以上发布验收尚未执行。
-
 
 ### P0 探针执行记录（2026-09-12，darwin-arm64，本机 codex 0.154.0，本地 OpenAI Responses SSE fixture，无外部网络）
 
 探针以可重复测试形式固化于 `plugins/agents/codex/src/__tests__/p0.local-engine.test.ts`（插件真实 client/config/环境构造代码路径 + 真实 `codex app-server` 二进制 + 本地 fixture）。执行结果：
 
-| §11 探针 | 结果 | 证据 |
-| --- | --- | --- |
-| 1. 协议和版本 | **通过（结构层）**：扩展后的 `scripts/check-app-server-protocol.mjs` 对 0.154.0 真实生成的 schema 断言通过——thread/start 与 thread/resume 均含 `cwd`、`model`、`modelProvider`、`developerInstructions`，Thread 返回含 `id`、`cwd` | `pnpm --dir plugins/agents/codex protocol:check` |
-| 2. 完整 Responses 流 | **通过**：本地 SSE fixture（response.created → output_item.added → output_text.delta → output_item.done → response.completed 含 usage）在真实引擎下完整走通 tool-less 轮次；工具调用/流中断/401/429/5xx 分支仍待 fixture 扩展后回归 | 第 1/3 探针 |
-| 3. 外部环境污染 | **通过**：宿主环境预置 `OPENAI_API_KEY`（继承毒饵）下，引擎全部请求仅携带 `Authorization: Bearer <Profile key>`（来自 env_key），继承 key 在请求数据中零出现 | 第 1 探针断言 |
-| 4. 配置层重锁 | **通过**：项目级 `.codex/config.toml` 预置同名 `zclaudia_profile`（指向 127.0.0.1:1/evil）+ `model="evil-model"` 后，全部请求仍命中绑定 base_url 与绑定模型——`-c` 最高优先级覆盖压制了项目层 | 第 2 探针 |
-| 5. 认证落点 | **通过**：无登录（空 CODEX_HOME）下 env_key 认证可用；运行后 CODEX_HOME 未生成 `auth.json`；config.toml/-c/argv 中无密钥明文（仅变量名 `ZCLAUDIA_CODEX_API_KEY`） | 第 1 探针 |
-| 7. 恢复 | **通过**：真实引擎 thread/resume（携带锁定 provider/model）后第二轮成功；resume 失败时的结构化错误路径由单元测试覆盖（`SESSION_RESUME_UNAVAILABLE`，不自动新建 thread） | 第 3 探针 + runner.sdk.test |
-| 6/8/9/10 | **部分/待探**：权限 bridge 实际落盘、rollout 清理边界、并发轮换、review/子任务辅助请求需在 fixture 扩展（工具轮次、SSE 中断、多会话并发）后回归 | — |
+| §11 探针             | 结果                                                                                                                                                                                                                                | 证据                                             |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| 1. 协议和版本        | **通过（结构层）**：扩展后的 `scripts/check-app-server-protocol.mjs` 对 0.154.0 真实生成的 schema 断言通过——thread/start 与 thread/resume 均含 `cwd`、`model`、`modelProvider`、`developerInstructions`，Thread 返回含 `id`、`cwd`  | `pnpm --dir plugins/agents/codex protocol:check` |
+| 2. 完整 Responses 流 | **通过**：本地 SSE fixture（response.created → output_item.added → output_text.delta → output_item.done → response.completed 含 usage）在真实引擎下完整走通 tool-less 轮次；工具调用/流中断/401/429/5xx 分支仍待 fixture 扩展后回归 | 第 1/3 探针                                      |
+| 3. 外部环境污染      | **通过**：宿主环境预置 `OPENAI_API_KEY`（继承毒饵）下，引擎全部请求仅携带 `Authorization: Bearer <Profile key>`（来自 env_key），继承 key 在请求数据中零出现                                                                        | 第 1 探针断言                                    |
+| 4. 配置层重锁        | **通过**：项目级 `.codex/config.toml` 预置同名 `zclaudia_profile`（指向 127.0.0.1:1/evil）+ `model="evil-model"` 后，全部请求仍命中绑定 base_url 与绑定模型——`-c` 最高优先级覆盖压制了项目层                                        | 第 2 探针                                        |
+| 5. 认证落点          | **通过**：无登录（空 CODEX_HOME）下 env_key 认证可用；运行后 CODEX_HOME 未生成 `auth.json`；config.toml/-c/argv 中无密钥明文（仅变量名 `ZCLAUDIA_CODEX_API_KEY`）                                                                   | 第 1 探针                                        |
+| 7. 恢复              | **通过**：真实引擎 thread/resume（携带锁定 provider/model）后第二轮成功；resume 失败时的结构化错误路径由单元测试覆盖（`SESSION_RESUME_UNAVAILABLE`，不自动新建 thread）                                                             | 第 3 探针 + runner.sdk.test                      |
+| 6/8/9/10             | **部分/待探**：权限 bridge 实际落盘、rollout 清理边界、并发轮换、review/子任务辅助请求需在 fixture 扩展（工具轮次、SSE 中断、多会话并发）后回归                                                                                     | —                                                |
 
 **P0 发现并已修复的实现缺陷**：`-c model_providers.<id>.*` 表级覆盖由引擎按字段合并后整体校验，部分字段覆盖（缺 `name`）会导致配置加载失败（"provider name must not be empty"）。`buildSdkConfigArgs` 已补齐全部必填 provider 字段；这同时实证了"不能假定写入整个 table 就清除低优先级子字段，也不能只覆盖部分字段"的设计预警（§6.2）。
 

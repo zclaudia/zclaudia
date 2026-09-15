@@ -1,12 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  writeFileSync,
-  closeSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync, closeSync } from 'node:fs';
 import path from 'node:path';
 import { resolveDataDir } from '../../utils/data-dir.js';
 
@@ -141,10 +134,7 @@ export interface ConnectionIdentity {
  * identity. Deterministic for identical connections; infeasible to forge a
  * hash for a modified endpoint/headers without the key file.
  */
-export function computeConnectionIdentityHash(
-  key: Buffer,
-  identity: ConnectionIdentity
-): string {
+export function computeConnectionIdentityHash(key: Buffer, identity: ConnectionIdentity): string {
   const headers = Object.entries(identity.headers ?? {})
     .map(([name, value]) => [name.trim().toLowerCase(), value] as const)
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));

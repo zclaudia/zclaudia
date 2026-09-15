@@ -22,7 +22,10 @@ describe('buildMemoryContext', () => {
   });
 
   it('wraps the index with guidance when present', () => {
-    fs.writeFileSync(path.join(memoryDir, 'MEMORY.md'), '- [Layout decision](layout.md) — shared builds first');
+    fs.writeFileSync(
+      path.join(memoryDir, 'MEMORY.md'),
+      '- [Layout decision](layout.md) — shared builds first'
+    );
     const result = buildMemoryContext(memoryDir)!;
     expect(result).toContain('/memories');
     expect(result).toContain('Layout decision');
@@ -41,7 +44,9 @@ describe('buildMemoryContext', () => {
       { length: 90 },
       (_, i) =>
         `- Memory and caching ${i}: ` +
-        'Lessons learned about build order and cache stability. Design patterns, permission rules, hooks, subscriptions, event streams. '.repeat(3)
+        'Lessons learned about build order and cache stability. Design patterns, permission rules, hooks, subscriptions, event streams. '.repeat(
+          3
+        )
     ).join('\n');
     fs.writeFileSync(path.join(memoryDir, 'MEMORY.md'), cjkLines);
     const byBytes = buildMemoryContext(memoryDir)!;

@@ -12,16 +12,16 @@
 
 保留一个 `runtimeType: 'claude'`，在 Agent Profile 上提供两种运行模式：
 
-| 项目 | CLI 模式 | SDK + LLM Profile 模式 |
-| --- | --- | --- |
-| 配置值 | `engineMode: 'cli'` | `engineMode: 'sdk'` |
-| 执行引擎 | 外部 Claude Code 执行文件 | 应用随 SDK 配套交付的 Claude Code 执行文件 |
-| 文件来源 | 现有显式路径、系统 PATH、Managed Agent CLI 解析机制 | 当前应用版本验证过的平台资源 |
-| 模型连接 | 沿用外部 Claude 环境与认证 | 显式绑定系统 LLM Profile |
-| 模型 | 外部默认；可选覆盖 | 必须明确选择 |
-| 用户额外安装 CLI | 按现有机制处理 | 不需要 |
-| 底层执行 API | `query()` | `query()` |
-| 会话、权限、事件、MCP bridge | 复用 Claude adapter | 复用 Claude adapter |
+| 项目                         | CLI 模式                                            | SDK + LLM Profile 模式                     |
+| ---------------------------- | --------------------------------------------------- | ------------------------------------------ |
+| 配置值                       | `engineMode: 'cli'`                                 | `engineMode: 'sdk'`                        |
+| 执行引擎                     | 外部 Claude Code 执行文件                           | 应用随 SDK 配套交付的 Claude Code 执行文件 |
+| 文件来源                     | 现有显式路径、系统 PATH、Managed Agent CLI 解析机制 | 当前应用版本验证过的平台资源               |
+| 模型连接                     | 沿用外部 Claude 环境与认证                          | 显式绑定系统 LLM Profile                   |
+| 模型                         | 外部默认；可选覆盖                                  | 必须明确选择                               |
+| 用户额外安装 CLI             | 按现有机制处理                                      | 不需要                                     |
+| 底层执行 API                 | `query()`                                           | `query()`                                  |
+| 会话、权限、事件、MCP bridge | 复用 Claude adapter                                 | 复用 Claude adapter                        |
 
 评审后决定使用 `engineMode`，同时将新 descriptor 字段命名为 `defaultEngineMode`、`engineModes`，数据库列命名为 `engine_mode`。初稿的 `runtimeMode` 与前端 `sessionConfigStore.runtimeModes` 及 `setRuntimeMode/getRuntimeMode/clearRuntimeMode` 撞义，后者暂存会话权限模式；本次保留旧 store 命名，不混入引擎模式，也不借机重构权限状态。插件 manifest 的 `executionMode: 'main'` 表达插件执行位置，`mode` 继续表示权限/Plan 模式。新字段必须在 Agent、会话绑定、运行契约和前端中统一使用 `engineMode`。
 
@@ -35,17 +35,17 @@ SDK 模式仍使用 Claude Code 引擎。它提供应用控制的模型连接和
 
 ## 2. 当前实现与必须补齐的位置
 
-| 位置 | 当前行为 | 设计影响 |
-| --- | --- | --- |
-| `plugins/agents/claude/src/runner.ts` | 强制解析 CLI 路径；合并 `process.env`；调用 `query()`；传 `resume` | 分离 CLI 环境继承与 SDK 完整环境构造 |
-| `plugins/agents/claude/src/adapter.ts` | 配置加载、权限回调、MCP bridge、会话取消 | 保留共享逻辑，新增模式预处理 |
-| `plugins/agents/claude/plugin.json` | `model.kind: none`、`capabilities.providers: external` | 增加模式描述，按模式解析编辑器和 readiness |
-| `server/src/infra/providers/external-agent-shim.ts` | 不传 LLM Profile | 增加明确、最小化的模型连接运行契约 |
-| `server/src/domains/agent-profiles/agent-resolver.ts` | 未绑定或丢失的 LLM 可回退全局默认 | Claude SDK 必须使用明确绑定；CLI 不将默认 LLM 当成引擎连接 |
-| `server/src/application/conversation/runtime/run-managed-runtime.ts` | 所有适用 runtime 走统一 CLI resolver | SDK 模式分支选择配套资源，跳过外部登录链 |
-| `server/src/domains/agent-readiness/check.ts` | 需要 LLM 的 runtime 跳过 CLI inspector | SDK 需要同时检查连接结构和配套引擎 |
-| `scripts/plugins/portable-dependencies.mjs` | 明确排除 SDK optional 平台执行文件 | 必须增加目标平台资源交付，不能只删除 runner 的路径检查 |
-| `sessions.sdk_session_id` | 只存供应商会话 ID | 增加会话运行绑定，避免 Profile 修改后错误 resume |
+| 位置                                                                 | 当前行为                                                           | 设计影响                                                   |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------- |
+| `plugins/agents/claude/src/runner.ts`                                | 强制解析 CLI 路径；合并 `process.env`；调用 `query()`；传 `resume` | 分离 CLI 环境继承与 SDK 完整环境构造                       |
+| `plugins/agents/claude/src/adapter.ts`                               | 配置加载、权限回调、MCP bridge、会话取消                           | 保留共享逻辑，新增模式预处理                               |
+| `plugins/agents/claude/plugin.json`                                  | `model.kind: none`、`capabilities.providers: external`             | 增加模式描述，按模式解析编辑器和 readiness                 |
+| `server/src/infra/providers/external-agent-shim.ts`                  | 不传 LLM Profile                                                   | 增加明确、最小化的模型连接运行契约                         |
+| `server/src/domains/agent-profiles/agent-resolver.ts`                | 未绑定或丢失的 LLM 可回退全局默认                                  | Claude SDK 必须使用明确绑定；CLI 不将默认 LLM 当成引擎连接 |
+| `server/src/application/conversation/runtime/run-managed-runtime.ts` | 所有适用 runtime 走统一 CLI resolver                               | SDK 模式分支选择配套资源，跳过外部登录链                   |
+| `server/src/domains/agent-readiness/check.ts`                        | 需要 LLM 的 runtime 跳过 CLI inspector                             | SDK 需要同时检查连接结构和配套引擎                         |
+| `scripts/plugins/portable-dependencies.mjs`                          | 明确排除 SDK optional 平台执行文件                                 | 必须增加目标平台资源交付，不能只删除 runner 的路径检查     |
+| `sessions.sdk_session_id`                                            | 只存供应商会话 ID                                                  | 增加会话运行绑定，避免 Profile 修改后错误 resume           |
 
 现有 Managed Agent CLI 服务已经能安装/选择执行文件，但继承外部身份。它属于 CLI 模式。SDK 模式可以复用其文件校验、资源信息和引用管理思想，不复用其“已登录外部 CLI 才可用”的认证判断。现有机制详见 [Managed Agent CLI 文档](../managed-runtimes.md)。
 
@@ -103,14 +103,14 @@ interface AgentProfileConfig {
 
 这里的 nullable TS 类型是目标改动：当前 shared 类型仍为 `llmProfileId: string`，repository 将 DB NULL 映射为空串；迁移 036 已允许 DB NULL。本次需同步收敛 shared/wire、repository、CRUD、删除引用检查和前端，而不是假定 TS 已与 DB 一致。新响应和 DB 统一用 null 表示无绑定；旧输入空串在兼容边界规范化为 null。PATCH 省略字段表示保留原值，显式 null 表示清空，SDK 模式清空失败；创建时省略字段按 null 处理。
 
-| 条件 | 校验规则 |
-| --- | --- |
-| Claude CLI | 不要求 LLM；模型允许为空；显式无效 CLI 路径报错 |
-| Claude SDK | LLM ID、凭据、模型必须有效；不得自动绑定默认 LLM |
-| Claude SDK 提交 CLI 路径 | 返回字段不适用错误；编辑器切换时原子清空 |
-| 旧 CLI 记录含 LLM ID | 保留旧数据但不用于 Claude 引擎，不据此推断 SDK 模式 |
-| 新建/显式切换到 CLI | 清空 LLM 绑定；模型可保留为用户确认的 CLI 覆盖 |
-| 修改运行中 Agent | 当前 run 使用已解析的不可变配置；后续按会话绑定解析 |
+| 条件                     | 校验规则                                            |
+| ------------------------ | --------------------------------------------------- |
+| Claude CLI               | 不要求 LLM；模型允许为空；显式无效 CLI 路径报错     |
+| Claude SDK               | LLM ID、凭据、模型必须有效；不得自动绑定默认 LLM    |
+| Claude SDK 提交 CLI 路径 | 返回字段不适用错误；编辑器切换时原子清空            |
+| 旧 CLI 记录含 LLM ID     | 保留旧数据但不用于 Claude 引擎，不据此推断 SDK 模式 |
+| 新建/显式切换到 CLI      | 清空 LLM 绑定；模型可保留为用户确认的 CLI 覆盖      |
+| 修改运行中 Agent         | 当前 run 使用已解析的不可变配置；后续按会话绑定解析 |
 
 CRUD、插件默认 Profile 创建、导入导出和 WS 类型统一支持此字段。只改 HTTP routes 不够。
 
@@ -134,12 +134,12 @@ interface EngineModeDescriptor {
 
 唯一的 UI 派生规则如下：
 
-| 规范字段 | 派生 UI 字段 |
-| --- | --- |
-| `connection.kind: external`，`modelSelection: hidden` | `model.kind: none`、`capabilities.providers: external` |
-| `connection.kind: external`，`modelSelection: optional` | `model.kind: native`、`capabilities.providers: external` |
-| `connection.kind: llm-profile` | `model.kind: llm-profile`、`capabilities.providers: profile` |
-| `executable: external-cli` / `bundled-sdk` | `hasCliPath: true` / `false` |
+| 规范字段                                                | 派生 UI 字段                                                 |
+| ------------------------------------------------------- | ------------------------------------------------------------ |
+| `connection.kind: external`，`modelSelection: hidden`   | `model.kind: none`、`capabilities.providers: external`       |
+| `connection.kind: external`，`modelSelection: optional` | `model.kind: native`、`capabilities.providers: external`     |
+| `connection.kind: llm-profile`                          | `model.kind: llm-profile`、`capabilities.providers: profile` |
+| `executable: external-cli` / `bundled-sdk`              | `hasCliPath: true` / `false`                                 |
 
 `connection` 和 `executable` 分别说明模型连接与执行资源，不互相推导：使用 LLM Profile 并不能一般性地推出需要哪种执行文件。Claude 在本方案里仅声明 `cli = external + external-cli`、`sdk = llm-profile + bundled-sdk` 两种组合；宿主按声明执行，插件拒绝不符合自身模式的运行契约。无需同时校验四份重复的连接状态。
 
@@ -159,14 +159,14 @@ Claude 的 `cli` 使用 `modelSelection: optional`；`sdk` 明确声明 Anthropi
 
 不为这一个模式立即重构全部 LLM schema。宿主增加 `resolveRuntimeModelConnection()`，将已有 Profile 规范化为明确的协议连接。未来确有多个 runtime 使用显式协议时，再把 protocol 升级为全局可配置字段。
 
-| 输入配置 | 首期处理 |
-| --- | --- |
-| Anthropic 官方端点 + Claude 模型 | 支持，需真实验收 |
+| 输入配置                                     | 首期处理                                    |
+| -------------------------------------------- | ------------------------------------------- |
+| Anthropic 官方端点 + Claude 模型             | 支持，需真实验收                            |
 | 自定义 Anthropic Messages 端点 + Claude 模型 | 支持连接配置；按受测端点验证工具/流式等能力 |
-| 非 Claude 模型的 Messages 兼容端点 | 单独实验验证，不进入默认支持承诺 |
-| OpenAI Completions/Responses、Codex OAuth | 明确拒绝；不尝试只替换 baseUrl |
-| 仅支持 Bearer 的网关 | 首期不自动猜测；后续显式增加认证方式 |
-| Bedrock/Vertex/其他云身份 | 后续独立连接适配 |
+| 非 Claude 模型的 Messages 兼容端点           | 单独实验验证，不进入默认支持承诺            |
+| OpenAI Completions/Responses、Codex OAuth    | 明确拒绝；不尝试只替换 baseUrl              |
+| 仅支持 Bearer 的网关                         | 首期不自动猜测；后续显式增加认证方式        |
+| Bedrock/Vertex/其他云身份                    | 后续独立连接适配                            |
 
 模型可从 Profile 声明列表选择；列表为空时允许经过现有 registry 校验的 Claude 模型，也可先在 Profile 中登记自定义模型 ID。不根据模型名字自动选择另一 Profile。主模型、默认子 agent 模型别名及辅助模型路由都必须保持在该连接内；首期将可配置的模型别名映射到所选模型。若受测引擎仍会请求其他模型，必须显式披露依赖并阻止未满足条件的启动，不能静默调用外部默认模型。
 
@@ -193,7 +193,7 @@ interface EngineExecutionContext {
 interface RuntimeModelConnection {
   protocol: 'anthropic-messages'; // 后续通过版本化契约扩展
   baseUrl: string;
-  apiKey: string;               // 仅本次运行内存使用
+  apiKey: string; // 仅本次运行内存使用
   requestHeaders?: Record<string, string>;
 }
 
@@ -263,15 +263,15 @@ SDK 模式显式指定 `settingSources: []`，避免用户/项目 settings 中�
 
 为避免“更换模型连接”意外丢失所有工具扩展，采用显式加载：
 
-| 配置来源 | CLI 模式 | SDK 模式 |
-| --- | --- | --- |
-| Claude 原生工具 | 当前机制 | 当前机制 |
-| ZClaudia MCP bridge | 当前注入和权限回调 | 复用同一 bridge |
-| 用户 MCP 与已启用 Claude 插件 | 当前 loader/引擎行为 | 从真实用户配置目录显式读取所需条目，通过 SDK options 加载 |
-| 用户/项目 settings 的认证、env、apiKeyHelper | 当前外部规则 | 不导入 |
-| CLAUDE.md 项目指令 | 当前宿主与引擎行为 | 引擎不自动加载；仅宿主明确注入的内容生效，披露实际来源与未覆盖范围 |
-| 独立 Skills、rules、项目 MCP、settings hooks | 当前行为 | 逐类显式导入并验证；首期未覆盖的项目在 UI 标为不继承 |
-| Claude 自动记忆 | 当前行为 | 首期关闭，使用宿主已有 memory 上下文，避免共享目录串会话 |
+| 配置来源                                     | CLI 模式             | SDK 模式                                                           |
+| -------------------------------------------- | -------------------- | ------------------------------------------------------------------ |
+| Claude 原生工具                              | 当前机制             | 当前机制                                                           |
+| ZClaudia MCP bridge                          | 当前注入和权限回调   | 复用同一 bridge                                                    |
+| 用户 MCP 与已启用 Claude 插件                | 当前 loader/引擎行为 | 从真实用户配置目录显式读取所需条目，通过 SDK options 加载          |
+| 用户/项目 settings 的认证、env、apiKeyHelper | 当前外部规则         | 不导入                                                             |
+| CLAUDE.md 项目指令                           | 当前宿主与引擎行为   | 引擎不自动加载；仅宿主明确注入的内容生效，披露实际来源与未覆盖范围 |
+| 独立 Skills、rules、项目 MCP、settings hooks | 当前行为             | 逐类显式导入并验证；首期未覆盖的项目在 UI 标为不继承               |
+| Claude 自动记忆                              | 当前行为             | 首期关闭，使用宿主已有 memory 上下文，避免共享目录串会话           |
 
 `loadClaudeAgentConfig()` 的“发现来源目录”和 SDK 的“运行配置目录”必须分离。其现有全局 TTL cache 应按来源目录缓存；不能因 SDK 会话目录不同读错用户插件，也不能把前一后端/测试目录缓存复用到另一目录。
 
@@ -314,19 +314,19 @@ SDK 的 `configNamespace` 存相对逻辑标识，由当前后端 data-dir 推�
 
 新会话在第一轮成功预检后、启动引擎前持久化绑定；未开始的空白会话可以使用 Agent 的最新配置。供应商 session ID 继续通过现有 `handleProviderInit()` 持久化，不另外发明会话 ID。
 
-| 操作 | 行为 |
-| --- | --- |
-| 修改 Agent 模式、模型、LLM ID、CLI 路径 | 已绑定会话保留原值；新会话使用新值 |
-| 修改 systemPrompt、工具/技能设置 | 保持现有产品语义；本绑定不冒充完整 Agent 快照 |
-| CLI 模式没有显式模型/路径 | 保留“外部默认”的语义；外部配置更新仍可能生效，界面不承诺钉死模型和身份 |
-| 修改绑定 LLM 的 key | 下一轮读取新 key；本轮使用已解析配置 |
-| 修改绑定 LLM 的 endpoint/路由 | 旧会话报连接变更，允许用户恢复原 Profile 配置或新建会话 |
-| 删除被 SDK 会话引用的 LLM | 引用计数纳入会话绑定，沿用现有删除/停用语义，不产生孤儿会话 |
-| 会话运行中切换 Agent | 拒绝；新建会话使用新 Agent |
-| 已有 provider session 的会话更新 Agent ID | SDK/CLI Claude 会话均禁止隐式重绑；保留历史，创建新会话 |
-| 模式切换或另一后端继续 | 首期不复用原 provider session ID；没有 transcript 与环境迁移则明确不支持无损恢复 |
-| 中止、错误、后端重启 | 保留绑定与已确认的 provider session ID；关闭 stream，继续遵循既有恢复机制 |
-| 找不到 SDK transcript | 报恢复错误；不得清除 ID 后静默当成新会话 |
+| 操作                                      | 行为                                                                             |
+| ----------------------------------------- | -------------------------------------------------------------------------------- |
+| 修改 Agent 模式、模型、LLM ID、CLI 路径   | 已绑定会话保留原值；新会话使用新值                                               |
+| 修改 systemPrompt、工具/技能设置          | 保持现有产品语义；本绑定不冒充完整 Agent 快照                                    |
+| CLI 模式没有显式模型/路径                 | 保留“外部默认”的语义；外部配置更新仍可能生效，界面不承诺钉死模型和身份           |
+| 修改绑定 LLM 的 key                       | 下一轮读取新 key；本轮使用已解析配置                                             |
+| 修改绑定 LLM 的 endpoint/路由             | 旧会话报连接变更，允许用户恢复原 Profile 配置或新建会话                          |
+| 删除被 SDK 会话引用的 LLM                 | 引用计数纳入会话绑定，沿用现有删除/停用语义，不产生孤儿会话                      |
+| 会话运行中切换 Agent                      | 拒绝；新建会话使用新 Agent                                                       |
+| 已有 provider session 的会话更新 Agent ID | SDK/CLI Claude 会话均禁止隐式重绑；保留历史，创建新会话                          |
+| 模式切换或另一后端继续                    | 首期不复用原 provider session ID；没有 transcript 与环境迁移则明确不支持无损恢复 |
+| 中止、错误、后端重启                      | 保留绑定与已确认的 provider session ID；关闭 stream，继续遵循既有恢复机制        |
+| 找不到 SDK transcript                     | 报恢复错误；不得清除 ID 后静默当成新会话                                         |
 
 ZClaudia 当前 fork service 复制 pi session tree，不能据此宣称已支持 Claude 原生 fork。首期不提供 Claude 跨模式 fork/无损迁移；如果现有通用 fork 入口对 Claude 可见，增加能力校验。原模式内的 Claude 原生 fork 留待独立接入和验证。
 
@@ -386,13 +386,13 @@ SDK `0.2.141` 的类型注释表明：`CLAUDE_CONFIG_DIR` 下本地 transcript �
 
 ## 10. 实现分批
 
-| 批次 | 交付 | 完成条件 |
-| --- | --- | --- |
-| P0：技术探针 | 固定 SDK/引擎，临时目录和本地模型 HTTP fixture；检查认证、CLAUDE.md 注入、辅助模型、persistSession、过期清扫、resume、取消和平台资源发现 | 证明“不依赖系统 CLI”和“连接确实来自 Profile”；明确指令来源及 transcript 有效保留期 |
-| P1：契约和迁移 | 公共 SDK 可选字段；engineMode、descriptor 单一来源投影、nullable LLM 类型、会话绑定表、独立 HMAC key；旧数据迁移；精确 SDK 依赖和 lockfile | 现有 CLI 行为保留，新模式不能被旧链路误执行；版本一致，密钥失败不退化 |
-| P2：运行链路 | 严格 Profile 解析、宿主到插件连接、SDK 环境构造、readiness、事件错误/用量、session 恢复 | fixture 完整经过真实 adapter、SDK 和引擎调用模型 HTTP 服务 |
-| P3：界面和入口 | 模式选择、原子保存、连接筛选、会话标记；workflow/委派/远程入口统一 | 从实际界面配置两种 Agent，后端运行身份可核对 |
-| P4：产物与真实验收 | SDK 目标平台资源交付、安装包/升级/重启和真实端点场景 | 支持的平台与端点分别有验收证据，SDK 功能再开放 |
+| 批次               | 交付                                                                                                                                       | 完成条件                                                                           |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| P0：技术探针       | 固定 SDK/引擎，临时目录和本地模型 HTTP fixture；检查认证、CLAUDE.md 注入、辅助模型、persistSession、过期清扫、resume、取消和平台资源发现   | 证明“不依赖系统 CLI”和“连接确实来自 Profile”；明确指令来源及 transcript 有效保留期 |
+| P1：契约和迁移     | 公共 SDK 可选字段；engineMode、descriptor 单一来源投影、nullable LLM 类型、会话绑定表、独立 HMAC key；旧数据迁移；精确 SDK 依赖和 lockfile | 现有 CLI 行为保留，新模式不能被旧链路误执行；版本一致，密钥失败不退化              |
+| P2：运行链路       | 严格 Profile 解析、宿主到插件连接、SDK 环境构造、readiness、事件错误/用量、session 恢复                                                    | fixture 完整经过真实 adapter、SDK 和引擎调用模型 HTTP 服务                         |
+| P3：界面和入口     | 模式选择、原子保存、连接筛选、会话标记；workflow/委派/远程入口统一                                                                         | 从实际界面配置两种 Agent，后端运行身份可核对                                       |
+| P4：产物与真实验收 | SDK 目标平台资源交付、安装包/升级/重启和真实端点场景                                                                                       | 支持的平台与端点分别有验收证据，SDK 功能再开放                                     |
 
 P0 是消除技术不确定性的工作，不是产品功能完成。若认证/配置隔离探针失败，先收窄受支持 SDK 版本或补充配置准备逻辑；不能把隔离承诺悄悄降为继承外部凭据。
 
@@ -412,31 +412,31 @@ P0 是消除技术不确定性的工作，不是产品功能完成。若认证/�
 
 ## 11. 验收矩阵
 
-| 场景 | 必须观察到的结果 |
-| --- | --- |
-| 旧数据库升级，已有 CLI 会话继续 | ID/cwd/显式路径保留；模式为 CLI；resume 参数正确 |
-| 无系统 CLI、无外部登录，SDK + 正确 Profile | 从随包资源启动，真实 HTTP 请求到指定 endpoint，能读写文件并完成任务 |
-| 缺失随包平台执行文件 | 明确资源错误，系统即使有 CLI 也不被调用 |
-| SDK Profile 缺失、key 失效、协议错误、模型不存在 | 定位到正确配置，不回退全局 Profile、外部登录或模型 |
-| 宿主预置冲突 API key、OAuth token、baseUrl、headers、云开关 | 请求仍使用选中 Profile；冲突 endpoint 的请求记录为零 |
-| 用户/项目 settings、全局配置、自动记忆有冲突项 | 验证 SDK 的实际来源；未实现的继承能力如实显示；组织约束仍生效 |
-| 根目录/父目录/子目录及 worktree 中放置不同 CLAUDE.md 标记 | `[]` 下不依赖引擎自动注入；模型 HTTP 请求证实宿主最终实际注入范围，UI 来源披露一致 |
-| 两个 SDK Profile + 一个 CLI 并发 | 各自 endpoint、认证、模型与 session ID 正确；取消一个不影响其他运行 |
-| SDK 多轮和后端重启 | 同绑定、同配置目录、正确 provider session 恢复，无上下文丢失 |
-| 长期闲置/归档 transcript、清扫触发及过期边界 | persistSession 为 true；实际保留期内可恢复；超期/外部删除返回明确恢复错误，不静默重建 |
-| HMAC key 首次并发创建、无权限、损坏、已有绑定时丢失 | 安全创建或明确失败；不得派生 hostname/home key、生成新 key 自动重绑或关闭校验 |
-| 修改 Agent 模式/模型/Profile | 老会话保留绑定，新会话采用修改 |
-| 同 Profile 轮换 key / 修改 endpoint | 前者下一轮使用新 key；后者旧会话在发请求前报连接变更 |
-| 绑定 LLM 删除、会话删除与归档 | 引用约束有效；归档可恢复；永久删除可清理且不误删他人目录 |
-| 审批允许、拒绝、Plan、MCP bridge | 文件副作用与决定一致，MCP 调用关联正确会话 |
-| 辅助调用与原生子 agent | 请求全部留在显式连接内；模型路由符合首期约束 |
-| 网络中断、取消、SDK error result | 错误/取消终态正确，无悬挂审批、残留进程或误报完成 |
-| UI 切模式、autosave、旧客户端 PATCH | 完整配置原子更新，无部分保存或字段被静默清空 |
-| CLI 默认/已有/手动模型覆盖 | 默认时省略 model；已有值保留；不混入 Profile 候选；保存不调用模型；运行时无效值不自动换模型 |
-| LLM 引用省略/null/旧空串、冗余 descriptor 字段 | PATCH 省略保持原值，null 按模式校验，空串仅边界兼容；mode schema 拒绝重复 UI 状态字段 |
-| workflow、委派、远端/Gateway | 通过同一解析链路，使用执行后端的资源与凭据 |
-| 生产 bundle/安装包、只读资源、重启升级 | 实际启动随包平台执行文件，不依赖源码 node_modules 或系统 PATH |
-| package.json/lockfile/实际 SDK/平台包/catalog 被设置为不一致 | 构建在交付前失败，不能以 catalog 摘要正确掩盖依赖漂移 |
+| 场景                                                         | 必须观察到的结果                                                                            |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| 旧数据库升级，已有 CLI 会话继续                              | ID/cwd/显式路径保留；模式为 CLI；resume 参数正确                                            |
+| 无系统 CLI、无外部登录，SDK + 正确 Profile                   | 从随包资源启动，真实 HTTP 请求到指定 endpoint，能读写文件并完成任务                         |
+| 缺失随包平台执行文件                                         | 明确资源错误，系统即使有 CLI 也不被调用                                                     |
+| SDK Profile 缺失、key 失效、协议错误、模型不存在             | 定位到正确配置，不回退全局 Profile、外部登录或模型                                          |
+| 宿主预置冲突 API key、OAuth token、baseUrl、headers、云开关  | 请求仍使用选中 Profile；冲突 endpoint 的请求记录为零                                        |
+| 用户/项目 settings、全局配置、自动记忆有冲突项               | 验证 SDK 的实际来源；未实现的继承能力如实显示；组织约束仍生效                               |
+| 根目录/父目录/子目录及 worktree 中放置不同 CLAUDE.md 标记    | `[]` 下不依赖引擎自动注入；模型 HTTP 请求证实宿主最终实际注入范围，UI 来源披露一致          |
+| 两个 SDK Profile + 一个 CLI 并发                             | 各自 endpoint、认证、模型与 session ID 正确；取消一个不影响其他运行                         |
+| SDK 多轮和后端重启                                           | 同绑定、同配置目录、正确 provider session 恢复，无上下文丢失                                |
+| 长期闲置/归档 transcript、清扫触发及过期边界                 | persistSession 为 true；实际保留期内可恢复；超期/外部删除返回明确恢复错误，不静默重建       |
+| HMAC key 首次并发创建、无权限、损坏、已有绑定时丢失          | 安全创建或明确失败；不得派生 hostname/home key、生成新 key 自动重绑或关闭校验               |
+| 修改 Agent 模式/模型/Profile                                 | 老会话保留绑定，新会话采用修改                                                              |
+| 同 Profile 轮换 key / 修改 endpoint                          | 前者下一轮使用新 key；后者旧会话在发请求前报连接变更                                        |
+| 绑定 LLM 删除、会话删除与归档                                | 引用约束有效；归档可恢复；永久删除可清理且不误删他人目录                                    |
+| 审批允许、拒绝、Plan、MCP bridge                             | 文件副作用与决定一致，MCP 调用关联正确会话                                                  |
+| 辅助调用与原生子 agent                                       | 请求全部留在显式连接内；模型路由符合首期约束                                                |
+| 网络中断、取消、SDK error result                             | 错误/取消终态正确，无悬挂审批、残留进程或误报完成                                           |
+| UI 切模式、autosave、旧客户端 PATCH                          | 完整配置原子更新，无部分保存或字段被静默清空                                                |
+| CLI 默认/已有/手动模型覆盖                                   | 默认时省略 model；已有值保留；不混入 Profile 候选；保存不调用模型；运行时无效值不自动换模型 |
+| LLM 引用省略/null/旧空串、冗余 descriptor 字段               | PATCH 省略保持原值，null 按模式校验，空串仅边界兼容；mode schema 拒绝重复 UI 状态字段       |
+| workflow、委派、远端/Gateway                                 | 通过同一解析链路，使用执行后端的资源与凭据                                                  |
+| 生产 bundle/安装包、只读资源、重启升级                       | 实际启动随包平台执行文件，不依赖源码 node_modules 或系统 PATH                               |
+| package.json/lockfile/实际 SDK/平台包/catalog 被设置为不一致 | 构建在交付前失败，不能以 catalog 摘要正确掩盖依赖漂移                                       |
 
 测试分层：纯函数测试验证规范化和错误边界；集成测试验证 schema/绑定/参数和权限；确定性 E2E 使用真实应用、adapter、SDK 和执行引擎，仅在模型 HTTP 边界提供 fixture；另用专用真实 API Profile 验证供应商兼容性。模拟 CLI 或 mock query 的结果只能证明对应层，不能证明 SDK 配套引擎可用。
 
@@ -457,19 +457,18 @@ CI fixture 记录请求路由、模型、工具轮次和受控凭据标记；真
 
 方案的完成标准是：用户可以在同一后端创建 CLI Claude Agent 和 SDK Claude Agent，两者独立运行；SDK Agent 的连接、凭据和模型来自指定 LLM Profile，且安装、重启、会话恢复和配置修改都具有明确、可验证的行为。
 
-
 ### P0 探针执行记录（2026-09-12，darwin-arm64，随包引擎 2.1.141 / SDK 0.2.141，本地 Anthropic Messages fixture，无外部网络）
 
 探针以可重复测试形式固化于 `plugins/agents/claude/src/__tests__/p0.local-engine.test.ts`（宿主 runner 真实代码路径 + 随包二进制 + 本地 fixture）。执行结果：
 
-| §12 问题 | 结果 | 证据 |
-| --- | --- | --- |
-| 1. 固定版本配置目录 + 显式 API key 能否避免已有登录 | **通过**：空 HOME + 预置 `~/.claude/settings.json` 毒饵（env 注入 ANTHROPIC_AUTH_TOKEN/BASE_URL）下，全部请求仅携带注入的 `x-api-key`，毒饵 token 零出现；`settingSources: []` 下用户 settings 未参与 | 第 1 探针断言 |
-| 2. 辅助模型请求能否约束到绑定模型 | **通过**：引擎的会话标题辅助调用（本为 haiku 级）被 `ANTHROPIC_DEFAULT_*_MODEL` 别名钉定重定向，实测全部请求 `model` 均为绑定模型，零外部模型请求 | 第 1 探针全量请求断言 |
-| 3. CLAUDE.md 自动注入 | **通过**：项目根放置标记文件，`settingSources: []` 下主对话与辅助请求的 system/messages 均无标记；宿主注入的 systemPrompt 出现在主对话 system 中 | 第 1 探针断言 |
-| 6. transcript 清扫 | **部分**：`settings.cleanupPeriodDays=36500` 被引擎接受，400 天前的 transcript 文件跨运行保留（承诺保留期成立）；1 天窗口的启动清扫未观察到删除（清扫触发时机与交互模式相关）——过期边界的精确行为仍需长周期观察，UI 承诺保留期时以此为准 | 第 3 探针 |
-| 7. persistSession | **通过**：transcript 落于会话 `CLAUDE_CONFIG_DIR`；以 `resume` 续跑同一 provider session 成功；`sessionStore` 未启用（按设计首期不接入） | 第 2 探针 |
-| 8. 本地 fixture 完成真实协议 | **通过**：Messages SSE（含辅助 title 生成的 JSON schema 输出请求）在 fixture 完整走通；压缩/恢复语义留给真实端点验收 | 全部探针 |
+| §12 问题                                            | 结果                                                                                                                                                                                                                                     | 证据                  |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| 1. 固定版本配置目录 + 显式 API key 能否避免已有登录 | **通过**：空 HOME + 预置 `~/.claude/settings.json` 毒饵（env 注入 ANTHROPIC_AUTH_TOKEN/BASE_URL）下，全部请求仅携带注入的 `x-api-key`，毒饵 token 零出现；`settingSources: []` 下用户 settings 未参与                                    | 第 1 探针断言         |
+| 2. 辅助模型请求能否约束到绑定模型                   | **通过**：引擎的会话标题辅助调用（本为 haiku 级）被 `ANTHROPIC_DEFAULT_*_MODEL` 别名钉定重定向，实测全部请求 `model` 均为绑定模型，零外部模型请求                                                                                        | 第 1 探针全量请求断言 |
+| 3. CLAUDE.md 自动注入                               | **通过**：项目根放置标记文件，`settingSources: []` 下主对话与辅助请求的 system/messages 均无标记；宿主注入的 systemPrompt 出现在主对话 system 中                                                                                         | 第 1 探针断言         |
+| 6. transcript 清扫                                  | **部分**：`settings.cleanupPeriodDays=36500` 被引擎接受，400 天前的 transcript 文件跨运行保留（承诺保留期成立）；1 天窗口的启动清扫未观察到删除（清扫触发时机与交互模式相关）——过期边界的精确行为仍需长周期观察，UI 承诺保留期时以此为准 | 第 3 探针             |
+| 7. persistSession                                   | **通过**：transcript 落于会话 `CLAUDE_CONFIG_DIR`；以 `resume` 续跑同一 provider session 成功；`sessionStore` 未启用（按设计首期不接入）                                                                                                 | 第 2 探针             |
+| 8. 本地 fixture 完成真实协议                        | **通过**：Messages SSE（含辅助 title 生成的 JSON schema 输出请求）在 fixture 完整走通；压缩/恢复语义留给真实端点验收                                                                                                                     | 全部探针              |
 
 **发现并修复的实现缺陷**：SDK 包 exports 不暴露 `./package.json`，dev/pnpm 布局下按子路径 resolve 会失败——bundled 引擎解析器已改为解析主模块并向上一级定位 pnpm sibling 布局。
 

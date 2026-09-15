@@ -10,9 +10,7 @@ vi.mock('../codex-oauth-pi.js', async importActual => ({
 import { codexOAuth } from '../codex-oauth-pi.js';
 
 /** Installs a fake `OAuthAuth` and returns its `refresh` spy. */
-function mockRefresh(
-  impl: (...args: unknown[]) => unknown
-): ReturnType<typeof vi.fn> {
+function mockRefresh(impl: (...args: unknown[]) => unknown): ReturnType<typeof vi.fn> {
   const refresh = vi.fn(impl);
   (codexOAuth as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
     name: 'OpenAI (test)',

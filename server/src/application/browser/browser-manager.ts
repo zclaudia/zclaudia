@@ -84,18 +84,24 @@ export class BrowserManager {
     });
   }
 
-  async ensureSession(sessionId: string): Promise<{ ok: true } | { ok: false; reason: 'engine_missing' }> {
+  async ensureSession(
+    sessionId: string
+  ): Promise<{ ok: true } | { ok: false; reason: 'engine_missing' }> {
     const managed = await this.ensure(sessionId);
     return managed ? { ok: true } : { ok: false, reason: 'engine_missing' };
   }
 
-  async screenshot(sessionId: string): Promise<{ data: string; width: number; height: number } | null> {
+  async screenshot(
+    sessionId: string
+  ): Promise<{ data: string; width: number; height: number } | null> {
     await this.ready(sessionId);
     const managed = this.sessions.get(sessionId);
     return managed ? managed.session.screenshot() : null;
   }
 
-  async extractText(sessionId: string): Promise<{ url: string; title: string; text: string } | null> {
+  async extractText(
+    sessionId: string
+  ): Promise<{ url: string; title: string; text: string } | null> {
     await this.ready(sessionId);
     const managed = this.sessions.get(sessionId);
     return managed ? managed.session.extractText() : null;
@@ -139,23 +145,26 @@ export class BrowserManager {
       onFrame: (data, metadata) => {
         if (entry.streaming) this.send(entry, { type: 'browser_frame', sessionId, data, metadata });
       },
-      onState: (state) => this.send(entry, { type: 'browser_state', sessionId, state }),
+      onState: state => this.send(entry, { type: 'browser_state', sessionId, state }),
       onCrashed: () => {
         this.send(entry, { type: 'browser_closed', sessionId, reason: 'crash' });
         this.sessions.delete(sessionId);
       },
-      onConsole: (raw) => {
+      onConsole: raw => {
         const item: BrowserConsoleEntry =
-          raw.text.length > CONSOLE_TEXT_MAX ? { ...raw, text: `${raw.text.slice(0, CONSOLE_TEXT_MAX)}…` } : raw;
+          raw.text.length > CONSOLE_TEXT_MAX
+            ? { ...raw, text: `${raw.text.slice(0, CONSOLE_TEXT_MAX)}…` }
+            : raw;
         entry.console.push(item);
-        if (entry.console.length > CONSOLE_BUFFER_MAX) entry.console.splice(0, entry.console.length - CONSOLE_BUFFER_MAX);
+        if (entry.console.length > CONSOLE_BUFFER_MAX)
+          entry.console.splice(0, entry.console.length - CONSOLE_BUFFER_MAX);
         this.send(entry, { type: 'browser_console', sessionId, entries: [item] });
       },
       onConsoleReset: () => {
         entry.console = [];
         this.send(entry, { type: 'browser_console', sessionId, entries: [], replace: true });
       },
-      onNetwork: (item) => {
+      onNetwork: item => {
         if (!entry.network.has(item.id) && entry.network.size >= NETWORK_BUFFER_MAX) {
           const oldest = entry.network.keys().next().value;
           if (oldest !== undefined) entry.network.delete(oldest);
@@ -167,7 +176,7 @@ export class BrowserManager {
         entry.network.clear();
         this.send(entry, { type: 'browser_network', sessionId, entries: [], replace: true });
       },
-      onElementPicked: (element) => {
+      onElementPicked: element => {
         this.send(entry, { type: 'browser_element_picked', sessionId, element });
       },
     });
@@ -188,8 +197,18 @@ export class BrowserManager {
     this.send(managed, { type: 'browser_state', sessionId, state: managed.session.getState() });
     // Resync toggle state and replay the console buffer for (re)connecting clients.
     this.send(managed, { type: 'browser_emulation', sessionId, emulation: managed.emulation });
-    this.send(managed, { type: 'browser_console', sessionId, entries: managed.console, replace: true });
-    this.send(managed, { type: 'browser_network', sessionId, entries: [...managed.network.values()], replace: true });
+    this.send(managed, {
+      type: 'browser_console',
+      sessionId,
+      entries: managed.console,
+      replace: true,
+    });
+    this.send(managed, {
+      type: 'browser_network',
+      sessionId,
+      entries: [...managed.network.values()],
+      replace: true,
+    });
   }
 
   async detach(clientId: string, sessionId: string): Promise<void> {
@@ -202,11 +221,19 @@ export class BrowserManager {
     await managed.session.stopScreencast();
   }
 
-  async close(clientId: string, sessionId: string, reason: 'user' | 'idle' | 'shutdown'): Promise<void> {
+  async close(
+    clientId: string,
+    sessionId: string,
+    reason: 'user' | 'idle' | 'shutdown'
+  ): Promise<void> {
     await this.ready(sessionId);
     const managed = this.sessions.get(sessionId);
     if (!managed) return;
-    if (reason === 'user' && managed.attachedClientId !== null && managed.attachedClientId !== clientId) {
+    if (
+      reason === 'user' &&
+      managed.attachedClientId !== null &&
+      managed.attachedClientId !== clientId
+    ) {
       return; // Refused: another client owns the attach.
     }
     await this.closeInternal(sessionId, managed, reason);

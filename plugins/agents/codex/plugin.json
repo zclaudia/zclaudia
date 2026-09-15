@@ -9,11 +9,7 @@
   "engines": {
     "claudia": "*"
   },
-  "permissions": [
-    "provider.register",
-    "provider.call",
-    "network.fetch"
-  ],
+  "permissions": ["provider.register", "provider.call", "network.fetch"],
   "contributes": {
     "agentRuntimes": [
       {
@@ -145,9 +141,7 @@
         },
         "policy": {
           "modeSwitchSessionPolicy": "preserve",
-          "escalateAlwaysTools": [
-            "ExitPlanMode"
-          ]
+          "escalateAlwaysTools": ["ExitPlanMode"]
         }
       }
     ],

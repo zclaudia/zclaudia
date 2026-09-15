@@ -107,10 +107,7 @@ describe('SqliteSessionStorage', () => {
 
   it('findEntries filters by type', async () => {
     await storage.appendEntry(userEntry('e1', 'a'), MAIN_LANE);
-    await storage.appendEntry(
-      { type: 'custom', id: 'c1', customType: 'note' },
-      MAIN_LANE
-    );
+    await storage.appendEntry({ type: 'custom', id: 'c1', customType: 'note' }, MAIN_LANE);
     expect((await storage.findEntries({ type: 'message' })).map(e => e.id)).toEqual(['e1']);
     expect((await storage.findEntries({ customType: 'note' })).map(e => e.id)).toEqual(['c1']);
   });

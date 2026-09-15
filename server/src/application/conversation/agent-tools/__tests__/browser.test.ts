@@ -30,10 +30,25 @@ const manager = {
     { level: 'error', text: 'kaboom', ts: 3 },
   ]),
   getNetwork: vi.fn(
-    (): Array<{ id: string; url: string; method: string; resourceType: string; ts: number; status?: number; errorText?: string }> | null => [
+    (): Array<{
+      id: string;
+      url: string;
+      method: string;
+      resourceType: string;
+      ts: number;
+      status?: number;
+      errorText?: string;
+    }> | null => [
       { id: 'a', url: 'http://x/ok', method: 'GET', resourceType: 'fetch', ts: 1, status: 200 },
       { id: 'b', url: 'http://x/miss', method: 'GET', resourceType: 'fetch', ts: 2, status: 404 },
-      { id: 'c', url: 'http://x/dead', method: 'POST', resourceType: 'xhr', ts: 3, errorText: 'net::ERR_CONNECTION_REFUSED' },
+      {
+        id: 'c',
+        url: 'http://x/dead',
+        method: 'POST',
+        resourceType: 'xhr',
+        ts: 3,
+        errorText: 'net::ERR_CONNECTION_REFUSED',
+      },
     ]
   ),
   getState: vi.fn(() => ({
@@ -125,7 +140,10 @@ describe('agent_browser actions', () => {
   });
 
   it('adds a monotonic counter suffix so same-millisecond screenshots do not collide', async () => {
-    const [a, b] = await Promise.all([run({ action: 'screenshot' }), run({ action: 'screenshot' })]);
+    const [a, b] = await Promise.all([
+      run({ action: 'screenshot' }),
+      run({ action: 'screenshot' }),
+    ]);
     const fileA = JSON.parse(a).file;
     const fileB = JSON.parse(b).file;
     expect(fileA).not.toBe(fileB);
@@ -174,7 +192,11 @@ describe('agent_browser actions', () => {
   it('read_console returns buffered entries with level filtering and limit', async () => {
     const all = JSON.parse(await run({ action: 'read_console' }));
     expect(all.total).toBe(3);
-    expect(all.entries.map((e: { text: string }) => e.text)).toEqual(['boot', 'deprecated', 'kaboom']);
+    expect(all.entries.map((e: { text: string }) => e.text)).toEqual([
+      'boot',
+      'deprecated',
+      'kaboom',
+    ]);
 
     const errors = JSON.parse(await run({ action: 'read_console', level: 'error' }));
     expect(errors.entries).toEqual([{ level: 'error', text: 'kaboom', ts: 3 }]);

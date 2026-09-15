@@ -93,12 +93,10 @@ describe('CodexOAuthSessionManager', () => {
     mockLogin(async interaction => {
       await interaction.prompt({ type: 'select', message: 'pick', options: [] });
       interaction.notify({ type: 'auth_url', url: 'http://x' });
-      interaction
-        .prompt({ type: 'manual_code', message: 'paste' })
-        .then(
-          () => (promptSettled = 'resolved'),
-          () => (promptSettled = 'rejected')
-        );
+      interaction.prompt({ type: 'manual_code', message: 'paste' }).then(
+        () => (promptSettled = 'resolved'),
+        () => (promptSettled = 'rejected')
+      );
       return new Promise((_resolve, reject) => {
         interaction.signal.addEventListener('abort', () => reject(new Error('aborted')));
       });

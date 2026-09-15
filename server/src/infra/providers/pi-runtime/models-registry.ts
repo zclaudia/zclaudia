@@ -16,7 +16,11 @@ import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messag
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy';
 import { openAICodexResponsesApi } from '@earendil-works/pi-ai/api/openai-codex-responses.lazy';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
-import { codexOAuth, toCodexCredentials, toOAuthCredential } from '../../../domains/llm-profiles/codex-oauth-pi.js';
+import {
+  codexOAuth,
+  toCodexCredentials,
+  toOAuthCredential,
+} from '../../../domains/llm-profiles/codex-oauth-pi.js';
 import { getLlmProfileWriter } from '../../../domains/llm-profiles/repository-registry.js';
 
 /**

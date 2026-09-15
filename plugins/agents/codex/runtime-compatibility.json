@@ -6,9 +6,7 @@
   },
   "executable": {
     "command": "codex",
-    "versionArgs": [
-      "--version"
-    ],
+    "versionArgs": ["--version"],
     "versionPattern": "(?:^|\\s)(\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?)(?=\\s|$)"
   },
   "versionPolicy": {
@@ -18,22 +16,13 @@
   },
   "probe": {
     "kind": "json-rpc",
-    "args": [
-      "app-server",
-      "--listen",
-      "stdio://"
-    ]
+    "args": ["app-server", "--listen", "stdio://"]
   },
   "managedInstall": {
     "recommendedVersion": "0.144.1",
     "authProbe": {
-      "args": [
-        "login",
-        "status"
-      ],
-      "successExitCodes": [
-        0
-      ],
+      "args": ["login", "status"],
+      "successExitCodes": [0],
       "authenticatedPattern": "Logged in",
       "unauthenticatedPattern": "Not logged in"
     },
@@ -122,11 +111,7 @@
   },
   "live": {
     "kind": "json-rpc-turn",
-    "args": [
-      "app-server",
-      "--listen",
-      "stdio://"
-    ],
+    "args": ["app-server", "--listen", "stdio://"],
     "prompt": "Reply exactly ZCLAUDIA_RUNTIME_COMPAT_OK. Do not use tools, files, shell commands, or MCP."
   },
   "distribution": {

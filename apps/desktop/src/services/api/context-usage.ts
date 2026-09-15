@@ -7,8 +7,7 @@ export type SessionContextUsage =
    * (external CLI runtimes); missing/`true` means "no run yet". Older servers
    * omit the field, so treat `undefined` as supported.
    */
-  | { available: false; supported?: boolean }
-  | ({ available: true } & ContextUsagePayload);
+  { available: false; supported?: boolean } | ({ available: true } & ContextUsagePayload);
 
 export async function getSessionContextUsage(sessionId: string): Promise<SessionContextUsage> {
   return apiCall<SessionContextUsage>(

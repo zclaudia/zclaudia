@@ -24,14 +24,14 @@ cluster then overflows the viewport and is clipped (`document.scrollWidth` stays
 
 Measured on the LLM provider editor:
 
-| element | x-range | on screen? |
-| --- | --- | --- |
-| `Dev MacBook` | 24 → 112 | yes |
-| `Default` | 120 → 174 | yes |
-| `OpenAI Codex (ChatGPT Plus/Pro)` | 182 → 378 | clipped |
-| `No credential` | 386 → 472 | **no** |
-| `Saved` | 480 → 528 | **no** |
-| `⋯` actions menu | 536 → 564 | **no** |
+| element                           | x-range   | on screen? |
+| --------------------------------- | --------- | ---------- |
+| `Dev MacBook`                     | 24 → 112  | yes        |
+| `Default`                         | 120 → 174 | yes        |
+| `OpenAI Codex (ChatGPT Plus/Pro)` | 182 → 378 | clipped    |
+| `No credential`                   | 386 → 472 | **no**     |
+| `Saved`                           | 480 → 528 | **no**     |
+| `⋯` actions menu                  | 536 → 564 | **no**     |
 
 Header `scrollWidth` 570 vs `clientWidth` 375. So on a phone the provider's
 "No credential" warning, the save state, and the delete / set-default menu are all
@@ -59,14 +59,14 @@ Desktop still fits on one line (`scrollWidth === clientWidth`, height unchanged)
 tool preview on one flex line. The name is the only element allowed to shrink, so
 it loses every time:
 
-| group | width given | width needed | rendered as |
-| --- | --- | --- | --- |
-| Core Coding | 39px | 82px | `Cor…` |
-| Interaction | 32px | 71px | `Int…` |
-| Web | 20px | 29px | `W..` |
-| MCP Control | 21px | 84px | `M..` |
-| Tasks | 14px | 37px | `T..` |
-| Code Intelligence | 35px | 115px | `Co...` |
+| group             | width given | width needed | rendered as |
+| ----------------- | ----------- | ------------ | ----------- |
+| Core Coding       | 39px        | 82px         | `Cor…`      |
+| Interaction       | 32px        | 71px         | `Int…`      |
+| Web               | 20px        | 29px         | `W..`       |
+| MCP Control       | 21px        | 84px         | `M..`       |
+| Tasks             | 14px        | 37px         | `T..`       |
+| Code Intelligence | 35px        | 115px        | `Co...`     |
 
 The one thing that identifies the row gets 25–30% of the space it needs.
 
@@ -93,13 +93,13 @@ The header `⋯` measured 28×28 as a border box but `IconButton` already carrie
 
 `EditorRow` stacks label above control unconditionally below `md`, costing:
 
-| row | height |
-| --- | --- |
-| Description | 121px |
-| Agent Type | 95px |
-| LLM Profile | 113px |
-| Model | 125px |
-| Thinking Level | 95px |
+| row            | height |
+| -------------- | ------ |
+| Description    | 121px  |
+| Agent Type     | 95px   |
+| LLM Profile    | 113px  |
+| Model          | 125px  |
+| Thinking Level | 95px   |
 
 549px of rows for five controls — a bare "label + dropdown" row costs 95px.
 

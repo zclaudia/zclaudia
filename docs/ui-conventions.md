@@ -94,15 +94,16 @@ hand-rolling their recipes:
   (see `src/main.tsx`); editable fields and real selections keep it.
 
 ## 9. Radius tiers
+
 (live, real-CSS showcase: `docs/radius-tiers.html`)
 
 Radius is assigned by **role**, never by size or local taste:
 
-| Tier | Value | Applies to |
-| --- | --- | --- |
-| Control | `rounded-md` (10px) | Every bordered data-entry or action control: inputs, textareas, native selects, `Select` triggers, buttons, checkboxes |
-| Panel | `rounded-xl` (16px) | Floating surfaces: `Select`/`DropdownMenu` panels, popovers |
-| Chrome | `rounded-2xl` | Modals, the chat composer container |
+| Tier         | Value                              | Applies to                                                                                                                                                                                                                                                                                      |
+| ------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Control      | `rounded-md` (10px)                | Every bordered data-entry or action control: inputs, textareas, native selects, `Select` triggers, buttons, checkboxes                                                                                                                                                                          |
+| Panel        | `rounded-xl` (16px)                | Floating surfaces: `Select`/`DropdownMenu` panels, popovers                                                                                                                                                                                                                                     |
+| Chrome       | `rounded-2xl`                      | Modals, the chat composer container                                                                                                                                                                                                                                                             |
 | Inline token | `var(--radius-inline-token)` (5px) | Chips embedded in the text flow: prose inline code, `@file` reference chips (`FileLineReference`, `FileReference`). At ~20px line height, the control-tier 10px reads as a half-pill — inline tokens stay small. In TSX use `rounded-[var(--radius-inline-token)]`; in CSS use the var directly |
 
 One more consistency rule: sibling controls in the same form share a height

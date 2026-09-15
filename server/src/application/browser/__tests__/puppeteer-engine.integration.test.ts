@@ -17,7 +17,10 @@ const chromePath = await resolveChromePath(defaultChromeDiscoveryDeps(join(tmpdi
 
 describe.skipIf(!chromePath)('PuppeteerEngine (integration, requires Chrome)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'zclaudia-browser-test-'));
-  const engine = new PuppeteerEngine({ profileDir: join(dir, 'profile'), cacheDir: join(dir, 'cache') });
+  const engine = new PuppeteerEngine({
+    profileDir: join(dir, 'profile'),
+    cacheDir: join(dir, 'cache'),
+  });
 
   afterAll(async () => {
     await engine.dispose();
@@ -27,8 +30,8 @@ describe.skipIf(!chromePath)('PuppeteerEngine (integration, requires Chrome)', (
     const frames: string[] = [];
     const states: BrowserPageState[] = [];
     const session = await engine.createSession({
-      onFrame: (data) => frames.push(data),
-      onState: (s) => states.push(s),
+      onFrame: data => frames.push(data),
+      onState: s => states.push(s),
       onCrashed: () => {},
       onConsole: () => {},
       onConsoleReset: () => {},
@@ -39,9 +42,9 @@ describe.skipIf(!chromePath)('PuppeteerEngine (integration, requires Chrome)', (
     await session.setViewport({ width: 640, height: 480, dpr: 1 });
     await session.startScreencast();
     await session.navigate('data:text/html,<title>hello</title><h1>hi</h1>');
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 1500));
     expect(frames.length).toBeGreaterThan(0);
-    expect(states.some((s) => s.title === 'hello')).toBe(true);
+    expect(states.some(s => s.title === 'hello')).toBe(true);
     await session.close();
   }, 30_000);
 
@@ -69,7 +72,7 @@ describe.skipIf(!chromePath)('PuppeteerEngine (integration, requires Chrome)', (
     await session.clickSelector('#i');
     await session.typeText('hello', false);
     expect(await session.clickSelector('#b')).toBe(true);
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 300));
     expect((await session.extractText()).title).toBe('clicked');
     await session.close();
   }, 30_000);
@@ -93,7 +96,15 @@ describe.skipIf(!chromePath)('PuppeteerEngine (integration, requires Chrome)', (
       'data:text/html,<meta name="viewport" content="width=device-width"><script>document.title=navigator.userAgent+" w"+innerWidth</script>'
     );
     await session.setEmulation(
-      { presetId: 'test', width: 393, height: 852, dpr: 2, userAgent: 'zclaudia-test-ua', mobile: true, hasTouch: true },
+      {
+        presetId: 'test',
+        width: 393,
+        height: 852,
+        dpr: 2,
+        userAgent: 'zclaudia-test-ua',
+        mobile: true,
+        hasTouch: true,
+      },
       { width: 640, height: 480, dpr: 1 }
     );
     let text = await session.extractText();
@@ -116,7 +127,7 @@ describe.skipIf(!chromePath)('PuppeteerEngine (integration, requires Chrome)', (
       onFrame: () => {},
       onState: () => {},
       onCrashed: () => {},
-      onConsole: (e) => entries.push(e),
+      onConsole: e => entries.push(e),
       onConsoleReset: () => resets++,
       onNetwork: () => {},
       onNetworkReset: () => {},
@@ -125,10 +136,10 @@ describe.skipIf(!chromePath)('PuppeteerEngine (integration, requires Chrome)', (
     await session.navigate(
       'data:text/html,<script>console.log("plain log");console.warn("warned");throw new Error("kaboom")</script>'
     );
-    await new Promise((r) => setTimeout(r, 500));
-    expect(entries.some((e) => e.level === 'log' && e.text === 'plain log')).toBe(true);
-    expect(entries.some((e) => e.level === 'warn' && e.text === 'warned')).toBe(true);
-    expect(entries.some((e) => e.level === 'error' && e.text.includes('kaboom'))).toBe(true);
+    await new Promise(r => setTimeout(r, 500));
+    expect(entries.some(e => e.level === 'log' && e.text === 'plain log')).toBe(true);
+    expect(entries.some(e => e.level === 'warn' && e.text === 'warned')).toBe(true);
+    expect(entries.some(e => e.level === 'error' && e.text.includes('kaboom'))).toBe(true);
     expect(resets).toBeGreaterThan(0);
     await session.close();
   }, 30_000);
@@ -146,7 +157,7 @@ describe.skipIf(!chromePath)('PuppeteerEngine (integration, requires Chrome)', (
         res.end('nope');
       }
     });
-    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', r));
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
     const entries = new Map<string, BrowserNetworkEntry>();
@@ -157,26 +168,30 @@ describe.skipIf(!chromePath)('PuppeteerEngine (integration, requires Chrome)', (
       onCrashed: () => {},
       onConsole: () => {},
       onConsoleReset: () => {},
-      onNetwork: (e) => entries.set(e.id, e),
+      onNetwork: e => entries.set(e.id, e),
       onNetworkReset: () => resets++,
       onElementPicked: () => {},
     });
     try {
       await session.navigate(`${base}/page`);
-      await new Promise((r) => setTimeout(r, 800));
-      const byPath = (path: string) => [...entries.values()].find((e) => e.url === `${base}${path}`);
+      await new Promise(r => setTimeout(r, 800));
+      const byPath = (path: string) => [...entries.values()].find(e => e.url === `${base}${path}`);
       expect(resets).toBe(1); // main-frame navigation cleared before its own entry
-      expect(byPath('/page')).toMatchObject({ method: 'GET', resourceType: 'document', status: 200 });
+      expect(byPath('/page')).toMatchObject({
+        method: 'GET',
+        resourceType: 'document',
+        status: 200,
+      });
       expect(byPath('/ok')).toMatchObject({ status: 200, contentType: 'application/json' });
       expect(byPath('/missing')).toMatchObject({ status: 404 });
       expect(byPath('/ok')?.durationMs).toBeGreaterThanOrEqual(0);
 
       await session.navigate(`${base}/page`);
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 300));
       expect(resets).toBe(2);
     } finally {
       await session.close();
-      await new Promise((r) => server.close(r));
+      await new Promise(r => server.close(r));
     }
   }, 30_000);
 
@@ -190,7 +205,7 @@ describe.skipIf(!chromePath)('PuppeteerEngine (integration, requires Chrome)', (
       onConsoleReset: () => {},
       onNetwork: () => {},
       onNetworkReset: () => {},
-      onElementPicked: (el) => picked.push(el),
+      onElementPicked: el => picked.push(el),
     });
     await session.setViewport({ width: 640, height: 480, dpr: 1 });
     await session.navigate(
@@ -200,9 +215,23 @@ describe.skipIf(!chromePath)('PuppeteerEngine (integration, requires Chrome)', (
     // Overlay inspect mode intercepts the click and fires inspectNodeRequested
     // instead of delivering it to the page.
     await session.dispatchInput({ kind: 'mouse', type: 'move', x: 50, y: 40 });
-    await session.dispatchInput({ kind: 'mouse', type: 'down', x: 50, y: 40, button: 'left', clickCount: 1 });
-    await session.dispatchInput({ kind: 'mouse', type: 'up', x: 50, y: 40, button: 'left', clickCount: 1 });
-    await new Promise((r) => setTimeout(r, 800));
+    await session.dispatchInput({
+      kind: 'mouse',
+      type: 'down',
+      x: 50,
+      y: 40,
+      button: 'left',
+      clickCount: 1,
+    });
+    await session.dispatchInput({
+      kind: 'mouse',
+      type: 'up',
+      x: 50,
+      y: 40,
+      button: 'left',
+      clickCount: 1,
+    });
+    await new Promise(r => setTimeout(r, 800));
     expect(picked).toHaveLength(1);
     expect(picked[0].selector).toBe('#target');
     expect(picked[0].tag).toBe('button');

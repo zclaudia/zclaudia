@@ -55,7 +55,10 @@ describe('runtime binding key', () => {
   it('throws on a wrong-length key', () => {
     const dataDir = makeDataDir();
     try {
-      writeFileSync(path.join(dataDir, 'runtime-binding-key'), Buffer.from('short').toString('base64url'));
+      writeFileSync(
+        path.join(dataDir, 'runtime-binding-key'),
+        Buffer.from('short').toString('base64url')
+      );
       expect(() => getOrCreateRuntimeBindingKey({ dataDir, allowCreate: true })).toThrow(
         /expected 32 bytes/
       );
@@ -78,18 +81,26 @@ describe('connection identity hash', () => {
     const a = computeConnectionIdentityHash(key, identity);
     const b = computeConnectionIdentityHash(key, { ...identity });
     expect(a).toBe(b);
-    expect(computeConnectionIdentityHash(key, { ...identity, baseUrl: 'https://other/v1' })).not.toBe(a);
+    expect(
+      computeConnectionIdentityHash(key, { ...identity, baseUrl: 'https://other/v1' })
+    ).not.toBe(a);
     expect(
       computeConnectionIdentityHash(key, { ...identity, headers: { 'X-Pool': 'b' } })
     ).not.toBe(a);
     // Header order must not matter (canonical serialization).
     expect(
       computeConnectionIdentityHash(key, { ...identity, headers: { 'X-Pool': 'a', 'A-B': 'c' } })
-    ).toBe(computeConnectionIdentityHash(key, { ...identity, headers: { 'A-B': 'c', 'X-Pool': 'a' } }));
+    ).toBe(
+      computeConnectionIdentityHash(key, { ...identity, headers: { 'A-B': 'c', 'X-Pool': 'a' } })
+    );
   });
 
   it('differs across keys and compares in constant time', () => {
-    const identity = { protocol: 'anthropic-messages', baseUrl: 'https://x', authMethod: 'api-key' };
+    const identity = {
+      protocol: 'anthropic-messages',
+      baseUrl: 'https://x',
+      authMethod: 'api-key',
+    };
     expect(computeConnectionIdentityHash(Buffer.alloc(32, 1), identity)).not.toBe(
       computeConnectionIdentityHash(Buffer.alloc(32, 2), identity)
     );

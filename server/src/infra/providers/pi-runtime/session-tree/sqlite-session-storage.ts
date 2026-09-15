@@ -148,10 +148,7 @@ export class SqliteSessionStorage implements SessionStorage {
    * batch a turn under `db.transaction` need the throw to be synchronous, so
    * the real work lives here and `appendEntry` is the async face of it.
    */
-  appendEntrySync<TEntry extends Entry>(
-    newEntry: ProvisionedEntry<TEntry>,
-    lane: string
-  ): TEntry {
+  appendEntrySync<TEntry extends Entry>(newEntry: ProvisionedEntry<TEntry>, lane: string): TEntry {
     const state = this.projection;
     const parentId = state.requireLane(lane);
     state.validateUnusedId(newEntry.id);

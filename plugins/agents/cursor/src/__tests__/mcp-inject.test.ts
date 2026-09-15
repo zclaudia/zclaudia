@@ -148,7 +148,10 @@ describe('externalizeBridgeEnv', () => {
         name: 'claudia-plugins',
         config: {
           command: 'node',
-          env: { AGENT_TOOL_BRIDGE_TOKEN: token, AGENT_TOOL_BRIDGE_URL: `http://127.0.0.1:${port}` },
+          env: {
+            AGENT_TOOL_BRIDGE_TOKEN: token,
+            AGENT_TOOL_BRIDGE_URL: `http://127.0.0.1:${port}`,
+          },
         },
       }).bridge.config;
     expect(make('a', 1)).toEqual(make('b', 2));

@@ -228,7 +228,9 @@ export function ProfileEditor({
   // Form state — mirror LlmProfileManager `form*` naming convention
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [formRuntimeType, setFormRuntimeType] = useState<RuntimeOption>(normalizeAgentRuntimeType());
+  const [formRuntimeType, setFormRuntimeType] = useState<RuntimeOption>(
+    normalizeAgentRuntimeType()
+  );
   /** Engine mode of the selected runtime ('' when the runtime declares no modes). */
   const [formEngineMode, setFormEngineMode] = useState('');
   const [formLlmProfileId, setFormLlmProfileId] = useState('');
@@ -597,9 +599,7 @@ export function ProfileEditor({
     );
     return resolved.ok ? resolved.descriptor : base;
   }, [descriptorFor, formRuntimeType, formEngineMode]);
-  const activeEngineModeDeclared = Boolean(
-    descriptorFor(formRuntimeType).engineModes?.length
-  );
+  const activeEngineModeDeclared = Boolean(descriptorFor(formRuntimeType).engineModes?.length);
 
   const buildPayload = useCallback(() => {
     const resolvedTools = resolveToolSelection(formToolSelection).builtinTools;

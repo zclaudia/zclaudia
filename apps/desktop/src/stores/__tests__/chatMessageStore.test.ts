@@ -66,7 +66,9 @@ describe('chatMessageStore', () => {
     // snapshot carries only the earlier prefix. Merging must not truncate it.
     useChatMessageStore
       .getState()
-      .setMessages('s1', [msg('a1', 'assistant', 1, 'Hello world, this is the full streamed reply')]);
+      .setMessages('s1', [
+        msg('a1', 'assistant', 1, 'Hello world, this is the full streamed reply'),
+      ]);
 
     useChatMessageStore.getState().mergeMessages('s1', [msg('a1', 'assistant', 1, 'Hello world')]);
 
@@ -78,9 +80,7 @@ describe('chatMessageStore', () => {
   it('mergeMessages still grows content when the incoming snapshot is more complete', () => {
     // The lost-delta repair path: the client fell behind and the server tail is
     // longer. Merge must adopt the longer content.
-    useChatMessageStore
-      .getState()
-      .setMessages('s1', [msg('a1', 'assistant', 1, 'Hello world')]);
+    useChatMessageStore.getState().setMessages('s1', [msg('a1', 'assistant', 1, 'Hello world')]);
 
     useChatMessageStore
       .getState()

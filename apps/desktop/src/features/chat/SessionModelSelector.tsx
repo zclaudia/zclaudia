@@ -234,9 +234,7 @@ export function SessionModelSelector({
                   <Select
                     value={modelSelectValue}
                     onChange={next => {
-                      setModel(
-                        next === '__inherit__' ? null : next === '__custom__' ? '' : next
-                      );
+                      setModel(next === '__inherit__' ? null : next === '__custom__' ? '' : next);
                       setThinking(null);
                     }}
                     disabled={saving || loading || disabled}

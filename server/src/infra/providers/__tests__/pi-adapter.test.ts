@@ -27,10 +27,9 @@ vi.mock('../pi-runtime/sandbox.js', () => ({
 // The runtime reads the model catalog and the stream helpers from the compat
 // entry point, so that is the module this has to stand in for.
 vi.mock('@earendil-works/pi-ai/compat', async () => {
-  const actual =
-    await vi.importActual<typeof import('@earendil-works/pi-ai/compat')>(
-      '@earendil-works/pi-ai/compat'
-    );
+  const actual = await vi.importActual<typeof import('@earendil-works/pi-ai/compat')>(
+    '@earendil-works/pi-ai/compat'
+  );
   const KNOWN_PROVIDERS = ['anthropic', 'openai', 'deepseek'];
   function buildEntry(provider: string, model: string) {
     return {

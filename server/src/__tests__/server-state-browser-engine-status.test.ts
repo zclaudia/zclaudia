@@ -31,14 +31,22 @@ describe('ServerState browser engine status', () => {
     const state = new ServerState();
     expect(state.lastBrowserEngineStatus).toBeUndefined();
 
-    state.broadcastBrowserEngineStatus({ type: 'browser_engine_status', status: 'downloading', progress: 0.5 });
+    state.broadcastBrowserEngineStatus({
+      type: 'browser_engine_status',
+      status: 'downloading',
+      progress: 0.5,
+    });
     expect(state.lastBrowserEngineStatus).toEqual({
       type: 'browser_engine_status',
       status: 'downloading',
       progress: 0.5,
     });
 
-    state.broadcastBrowserEngineStatus({ type: 'browser_engine_status', status: 'ready', executablePath: '/x/chrome' });
+    state.broadcastBrowserEngineStatus({
+      type: 'browser_engine_status',
+      status: 'ready',
+      executablePath: '/x/chrome',
+    });
     expect(state.lastBrowserEngineStatus).toEqual({
       type: 'browser_engine_status',
       status: 'ready',

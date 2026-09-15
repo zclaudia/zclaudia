@@ -21,7 +21,10 @@ describe('BrowserEngineGate', () => {
 
   it('shows the error message on error', () => {
     const { getByText } = render(
-      <BrowserEngineGate engine={{ status: 'error', message: 'network down' }} onInstall={() => {}} />
+      <BrowserEngineGate
+        engine={{ status: 'error', message: 'network down' }}
+        onInstall={() => {}}
+      />
     );
     expect(getByText('network down')).toBeTruthy();
   });

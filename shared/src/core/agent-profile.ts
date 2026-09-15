@@ -11,7 +11,7 @@ export const BUILTIN_AGENT_RUNTIME_TYPES = [PI_AGENT_RUNTIME] as const;
 
 /** Normalize legacy runtime identities without coercing unknown plugin types. */
 export function normalizeAgentRuntimeType(type?: string | null): string {
-  return type === 'zclaudia' ? PI_AGENT_RUNTIME : type ?? DEFAULT_AGENT_RUNTIME;
+  return type === 'zclaudia' ? PI_AGENT_RUNTIME : (type ?? DEFAULT_AGENT_RUNTIME);
 }
 
 /** Pi-specific host behavior; this does not classify other runtimes as CLI/external. */

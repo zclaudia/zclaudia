@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { Session, buildSessionContext} from '@earendil-works/pi-agent-core';
+import { Session, buildSessionContext } from '@earendil-works/pi-agent-core';
 import type { MessageEntry } from '@earendil-works/pi-agent-core';
 import { makeSessionDb } from './fixture.js';
 import { SqliteSessionStorage } from '../sqlite-session-storage.js';
-
 
 function msg(role: 'user' | 'assistant', content: string): MessageEntry['message'] {
   return { role, content } as MessageEntry['message'];
