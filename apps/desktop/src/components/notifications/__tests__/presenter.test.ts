@@ -26,13 +26,17 @@ describe('notificationSubject', () => {
   });
 
   it('shortens an unnamed session down to a recognizable id', () => {
-    const subject = notificationSubject(makeItem({ title: `Run failed: ${SESSION_ID}` , status: 'failed' }));
+    const subject = notificationSubject(
+      makeItem({ title: `Run failed: ${SESSION_ID}`, status: 'failed' })
+    );
     expect(subject).toEqual({ text: '019f8e45', isOpaqueId: true });
   });
 
   it('keeps a prefix that disagrees with the item status', () => {
     // A "completed" word on a failed row is not ours to reinterpret.
-    const subject = notificationSubject(makeItem({ title: 'Run completed: Nightly', status: 'failed' }));
+    const subject = notificationSubject(
+      makeItem({ title: 'Run completed: Nightly', status: 'failed' })
+    );
     expect(subject.text).toBe('Run completed: Nightly');
   });
 

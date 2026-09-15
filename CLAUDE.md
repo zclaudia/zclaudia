@@ -27,16 +27,16 @@ zclaudia/
 | Gateway  | 3200         | `GATEWAY_PORT`                   |                                                                                                  |
 | Vite dev | 1420         | -                                | hardcoded, `strictPort: true`                                                                    |
 
-| Env Var                               | Used By         | Purpose                                                           |
-| ------------------------------------- | --------------- | ----------------------------------------------------------------- |
-| `ZCLAUDIA_DATA_DIR`                   | server, gateway | Override data directory (default: `~/.zclaudia/`)                 |
-| `GATEWAY_URL`                         | server          | WebSocket URL to connect to gateway                               |
+| Env Var                               | Used By         | Purpose                                                                                |
+| ------------------------------------- | --------------- | -------------------------------------------------------------------------------------- |
+| `ZCLAUDIA_DATA_DIR`                   | server, gateway | Override data directory (default: `~/.zclaudia/`)                                      |
+| `GATEWAY_URL`                         | server          | WebSocket URL to connect to gateway                                                    |
 | `GATEWAY_SECRET`                      | server          | Legacy variable name; value is a gateway-issued peer credential (`zgd_`/`zgb_`/`zga_`) |
-| `GATEWAY_NAME`                        | server          | Backend display name on gateway                                   |
-| `GATEWAY_ADMIN_TOKEN`                 | gateway         | Required at gateway startup; admin API credential only — never a peer login |
-| `ZCLAUDIA_CHROME_PATH`                | server          | Explicit Chromium executable path for the browser panel engine (skips auto-discovery) |
-| `ZCLAUDIA_TRUSTED_RUNTIME_PUBLISHERS` | server          | Comma-separated publishers trusted for managed CLI auto-install   |
-| `ZCLAUDIA_RUNTIME_MIRROR_ORIGINS`     | server          | Exact enterprise mirror origins allowed for managed CLI downloads |
+| `GATEWAY_NAME`                        | server          | Backend display name on gateway                                                        |
+| `GATEWAY_ADMIN_TOKEN`                 | gateway         | Required at gateway startup; admin API credential only — never a peer login            |
+| `ZCLAUDIA_CHROME_PATH`                | server          | Explicit Chromium executable path for the browser panel engine (skips auto-discovery)  |
+| `ZCLAUDIA_TRUSTED_RUNTIME_PUBLISHERS` | server          | Comma-separated publishers trusted for managed CLI auto-install                        |
+| `ZCLAUDIA_RUNTIME_MIRROR_ORIGINS`     | server          | Exact enterprise mirror origins allowed for managed CLI downloads                      |
 
 ## Server (`server/`)
 

@@ -177,7 +177,10 @@ export class GatewayTransport {
   subscribe(backendId: string): void {
     if (this.subscribedBackends.has(backendId)) return;
     if (!this.isV4Backend(backendId)) {
-      console.warn('[GatewayTransport] Backend does not speak protocol v4, cannot subscribe:', backendId);
+      console.warn(
+        '[GatewayTransport] Backend does not speak protocol v4, cannot subscribe:',
+        backendId
+      );
       return;
     }
     this.send({ type: 'topic_subscribe', backendId, topic: RESOURCES_TOPIC });
