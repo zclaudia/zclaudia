@@ -20,6 +20,11 @@ export default [
       '**/.cache/**',
       '**/.worktrees/**',
       '**/.claude/**',
+      // Impeccable's vendored copies. The .claude one is covered above; this is
+      // the GitHub Copilot install. Third-party, untracked, and not ours to fix
+      // — it accounted for 997 of the repo's 1032 lint errors.
+      '.github/skills/**',
+      '.github/hooks/**',
       '**/.claire/**',
       '**/.zclaudia/**',
       // Tauri 生成的文件
