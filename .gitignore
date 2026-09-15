@@ -112,11 +112,14 @@ server/data/
 .worktrees/
 .zclaudia/
 .supervision/
-# Ignore .github except CI definitions
-.github/*
-!.github/workflows/
-!.github/actions/
-!.github/dependabot.yml
+# Impeccable installs a copy of itself for GitHub Copilot here. That copy is
+# machine-local; the Claude Code one under .claude/ is ignored separately.
+# Everything else in .github/ — workflows, actions, dependabot, and any
+# CODEOWNERS or templates added later — is tracked by default. Denying the
+# whole directory and allowlisting back silently drops new GitHub config,
+# which is how the composite action and dependabot.yml both nearly got lost.
+.github/skills/
+.github/hooks/
 
 .cursor/
 
