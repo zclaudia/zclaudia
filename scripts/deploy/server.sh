@@ -70,16 +70,19 @@ echo ""
 NODE_BIN="$(command -v node 2>/dev/null)" || die "node not found"
 NODE_DIR="$(dirname "$NODE_BIN")"
 PACKAGE_MANAGER="$(node -e 'console.log(require(process.argv[1]).packageManager)' "$PROJECT_ROOT/package.json")"
-corepack enable
-corepack prepare "$PACKAGE_MANAGER" --activate
+# pnpm >= 10 reads `packageManager` from package.json and delegates to that
+# exact version itself — the job corepack used to do. Corepack cannot launch
+# pnpm 11+ (pure ESM: no bin/pnpm.cjs) and Node 25 removes it, so install
+# pnpm directly and let it pin itself.
+command -v pnpm >/dev/null 2>&1 || npm install -g "$PACKAGE_MANAGER"
 
 # ── 1. Install deps ──────────────────────────────────────────
 info "Installing dependencies..."
 cd "$PROJECT_ROOT"
-if ! corepack pnpm install --frozen-lockfile; then
+if ! pnpm install --frozen-lockfile; then
   if [[ "${ZCLAUDIA_DEPLOY_REPAIR_INSTALL:-0}" == "1" ]]; then
     echo -e "${YELLOW}▸ Frozen install failed; running mutable install because ZCLAUDIA_DEPLOY_REPAIR_INSTALL=1${NC}"
-    corepack pnpm install
+    pnpm install
   else
     die "Frozen install failed. Fix pnpm-lock.yaml or rerun with ZCLAUDIA_DEPLOY_REPAIR_INSTALL=1 to repair dependencies."
   fi
@@ -88,13 +91,13 @@ ok "Dependencies installed"
 
 # ── 2. Build ──────────────────────────────────────────────────
 info "Building shared..."
-corepack pnpm --filter @zclaudia/shared run build
+pnpm --filter @zclaudia/shared run build
 # Agent runtimes are loaded from each plugin's built dist/main.js. A checkout
 # that never builds them has no working agents at all.
 info "Building agent plugins..."
-corepack pnpm --filter "@zclaudia/plugin-*" run build
+pnpm --filter "@zclaudia/plugin-*" run build
 info "Building server..."
-corepack pnpm --filter @zclaudia/server run build
+pnpm --filter @zclaudia/server run build
 ok "Build complete"
 
 # ── 3. Ensure ~/.zclaudia/.env ──────────────────────────────

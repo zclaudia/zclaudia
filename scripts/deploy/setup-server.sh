@@ -68,9 +68,9 @@ check_pnpm() {
   PACKAGE_MANAGER="$(node -p "require('${PROJECT_ROOT}/package.json').packageManager")"
 
   if ! command -v pnpm &>/dev/null; then
-    warn "pnpm is not installed. Installing via corepack..."
-    corepack enable && corepack prepare "$PACKAGE_MANAGER" --activate \
-      || die "Failed to install pnpm. Please install manually: npm install -g pnpm"
+    warn "pnpm is not installed. Installing $PACKAGE_MANAGER globally..."
+    npm install -g "$PACKAGE_MANAGER" \
+      || die "Failed to install pnpm. Please install manually: npm install -g $PACKAGE_MANAGER"
   fi
 
   local pnpm_version

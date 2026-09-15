@@ -14,19 +14,21 @@ function writeExecutable(filePath, content) {
   chmodSync(filePath, 0o755);
 }
 
-test('resolves pnpm through corepack when project node already matches', () => {
+test('resolves pnpm from PATH when project node already matches', () => {
   const tempDir = mkdtempSync(path.join(tmpdir(), 'zclaudia-node-wrapper-'));
   const binDir = path.join(tempDir, 'bin');
-  const argsFile = path.join(tempDir, 'corepack-args.txt');
+  const argsFile = path.join(tempDir, 'pnpm-args.txt');
 
   spawnSync('mkdir', ['-p', binDir]);
   writeExecutable(
     path.join(binDir, 'node'),
     '#!/usr/bin/env bash\nif [[ "$1" == "-p" ]]; then echo "22.20.0"; else exit 99; fi\n'
   );
+  // pnpm >= 10 pins itself to `packageManager`, so the wrapper invokes it
+  // directly rather than through corepack.
   writeExecutable(
-    path.join(binDir, 'corepack'),
-    '#!/usr/bin/env bash\nprintf "%s\\n" "$@" > "$COREPACK_ARGS_FILE"\n'
+    path.join(binDir, 'pnpm'),
+    '#!/usr/bin/env bash\nprintf "%s\\n" "$@" > "$PNPM_ARGS_FILE"\n'
   );
 
   const result = spawnSync('bash', ['scripts/with-project-node.sh', 'pnpm', '--version'], {
@@ -34,11 +36,11 @@ test('resolves pnpm through corepack when project node already matches', () => {
     env: {
       ...process.env,
       PATH: `${binDir}:/usr/bin:/bin`,
-      COREPACK_ARGS_FILE: argsFile,
+      PNPM_ARGS_FILE: argsFile,
     },
     encoding: 'utf8',
   });
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.equal(readFileSync(argsFile, 'utf8'), 'pnpm\n--version\n');
+  assert.equal(readFileSync(argsFile, 'utf8'), '--version\n');
 });

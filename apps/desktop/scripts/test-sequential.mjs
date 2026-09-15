@@ -153,9 +153,11 @@ if (configsToRun.length === 0) {
 }
 
 for (const config of configsToRun) {
+  // pnpm >= 10 pins itself to `packageManager`; corepack cannot launch
+  // pnpm 11+ (pure ESM) and Node 25 drops it.
   const result = spawnSync(
-    process.platform === 'win32' ? 'corepack.cmd' : 'corepack',
-    ['pnpm', 'exec', 'vitest', 'run', '--config', config.file, ...forwardedArgs],
+    process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
+    ['exec', 'vitest', 'run', '--config', config.file, ...forwardedArgs],
     {
       cwd: projectRoot,
       stdio: 'inherit',

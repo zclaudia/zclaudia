@@ -132,23 +132,26 @@ load_env_file() {
   validate_port
 }
 
-prepare_corepack() {
+# pnpm >= 10 reads `packageManager` from package.json and delegates to that
+# exact version itself — the job corepack used to do. Corepack cannot launch
+# pnpm 11+ (pure ESM: no bin/pnpm.cjs) and Node 25 removes it, so install
+# pnpm directly and let it pin itself.
+ensure_pnpm() {
   local package_manager
   package_manager="$(node -e 'console.log(require(process.argv[1]).packageManager)' "$PROJECT_ROOT/package.json")"
-  corepack enable
-  corepack prepare "$package_manager" --activate
+  command -v pnpm >/dev/null 2>&1 || npm install -g "$package_manager"
 }
 
 build_project() {
   info "Building shared, agent plugins, server, and desktop packages..."
   cd "$PROJECT_ROOT"
-  prepare_corepack
-  corepack pnpm --filter @zclaudia/shared run build
+  ensure_pnpm
+  pnpm --filter @zclaudia/shared run build
   # Agent runtimes are loaded from each plugin's built dist/main.js; without
   # this the service runs whatever bundle happens to be on disk.
-  corepack pnpm --filter "@zclaudia/plugin-*" run build
-  corepack pnpm --filter @zclaudia/server run build
-  corepack pnpm --filter @zclaudia/desktop run build
+  pnpm --filter "@zclaudia/plugin-*" run build
+  pnpm --filter @zclaudia/server run build
+  pnpm --filter @zclaudia/desktop run build
   ok "Build complete"
 }
 

@@ -4,3 +4,24 @@ packages:
   - 'shared'
   - 'plugins/agents/*'
   - 'packages/*'
+
+# pnpm 10+ no longer reads the `pnpm` field from package.json — resolution and
+# build settings live here instead.
+overrides:
+  '@zclaudia/plugin-sdk': 0.4.0
+
+# pnpm 10+ does not run dependency lifecycle scripts unless the package is
+# allowed here. This list is every dependency that had an install/postinstall
+# script under pnpm 9, so install behaviour is unchanged.
+allowBuilds:
+  better-sqlite3: true # native — server SQLite storage
+  node-pty: true # native — terminal sessions
+  bufferutil: true # native — ws performance addon
+  esbuild: true # postinstall: platform binary
+  sharp: true # postinstall: platform binary
+  protobufjs: true
+  '@google/genai': true
+
+# pnpm 11+ defaults this to 1 day, which would block consuming a freshly
+# published @zclaudia/* package for 24h. Restore the pnpm 9 behaviour.
+minimumReleaseAge: 0
