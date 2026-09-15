@@ -116,6 +116,7 @@ server/data/
 .github/*
 !.github/workflows/
 !.github/actions/
+!.github/dependabot.yml
 
 .cursor/
 

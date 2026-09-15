@@ -1,0 +1,21 @@
+# Only GitHub Actions. Every action in this repo was one or two majors behind
+# before 2026-09-15; this is what keeps that from happening again.
+#
+# npm is deliberately not enabled: this is a pnpm workspace whose native
+# modules and Tauri/Vite versions need a real install and test run to validate,
+# which a Dependabot PR cannot do on its own.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # One PR a month for everything, rather than one per action.
+    groups:
+      actions:
+        patterns:
+          - '*'
+    open-pull-requests-limit: 1
+    commit-message:
+      prefix: ci
