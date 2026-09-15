@@ -5,6 +5,17 @@ import { MAX_MESSAGE_ATTACHMENT_BYTES } from '@zclaudia/shared';
 import type { SlashCommand } from '@zclaudia/shared';
 
 // Mock hooks
+// `/ns:command` is only dispatched as a plugin command when the composer can
+// resolve the session's agent. The real hook loads it from the backend, which
+// has no server in tests, so `agent` would always be undefined and every
+// namespaced command would fall through to a plain message.
+const sessionAgent = vi.hoisted(() => ({
+  current: { id: 'a1', name: 'Test Agent', runtimeType: 'pi' } as any,
+}));
+vi.mock('../../../hooks/useAgentForSession', () => ({
+  useAgentForSession: () => ({ agent: sessionAgent.current, llm: undefined, loading: false }),
+}));
+
 vi.mock('../../../hooks/useMediaQuery', () => ({
   useIsMobile: () => false,
 }));

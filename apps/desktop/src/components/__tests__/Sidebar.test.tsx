@@ -88,6 +88,19 @@ vi.mock('../../hooks/useSelectionCoordinator', () => ({
   }),
 }));
 
+// NewProjectModal loads its agent picker from this submodule, not the
+// services/api barrel below, so the barrel mock does not reach it. Without this
+// the real call runs, fails with "No server configured", and Create stays
+// disabled because the modal never finishes loading profiles.
+const backendAgentProfiles = vi.hoisted(() => ({ current: [] as any[] }));
+vi.mock('../../services/api/agent-profiles', async importOriginal => {
+  const mod = await importOriginal<Record<string, any>>();
+  return {
+    ...mod,
+    listAgentProfilesForBackend: vi.fn(async () => backendAgentProfiles.current),
+  };
+});
+
 // Mock services
 vi.mock('../../services/api', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
@@ -169,6 +182,27 @@ const baseSession = {
   updatedAt: Date.now(),
 };
 const LOCAL_BACKEND_ID = 'local-standalone';
+
+/** An agent profile the NewProjectModal treats as usable. */
+function usableAgentProfile(overrides: Record<string, any> = {}) {
+  return {
+    id: 'a1',
+    name: 'Default Coding Agent',
+    llmProfileId: 'l1',
+    model: 'claude-sonnet-4-6',
+    systemPrompt: '',
+    enabledTools: ['Read'],
+    isDefault: true,
+    createdAt: 0,
+    updatedAt: 0,
+    ...overrides,
+  };
+}
+
+/** Set what listAgentProfilesForBackend resolves with for the next render. */
+function setBackendAgentProfiles(profiles: any[]) {
+  backendAgentProfiles.current = profiles;
+}
 
 function setupStores(overrides: Record<string, any> = {}) {
   useLlmProfileMetaStore.setState({
@@ -294,6 +328,7 @@ function getSearchInput(container: HTMLElement): HTMLInputElement {
 describe('Sidebar', () => {
   beforeEach(() => {
     setupStores();
+    setBackendAgentProfiles([usableAgentProfile()]);
     // Reset persisted backend-row expansion so the Sidebar's auto-expand effect
     // fires fresh each test (it only runs when nothing is expanded).
     useSidebarExpansionStore.setState({ expandedBackendIds: [] });
@@ -717,33 +752,48 @@ describe('Sidebar', () => {
     expect(pathInput).toBeTruthy();
   });
 
-  it('blocks new project creation when readiness is initially unknown and refresh reports no usable agent', async () => {
-    const refresh = vi.fn(async () => {
-      useAgentReadinessStore.setState({
-        readiness: { usable: false, reason: 'no_agent' },
-        loading: false,
-      });
-    });
-    setupStores({
-      agentReadinessStore: {
-        readiness: null,
-        refresh,
-      },
-    });
+  // Creating a project no longer routes through the global readiness dialog.
+  // NewProjectModal picks the agent inline, so "you cannot create a project
+  // without a usable agent" is now enforced by the modal itself.
+  it('keeps project creation blocked when the backend has no usable agent', async () => {
+    setBackendAgentProfiles([
+      usableAgentProfile({
+        recordStatus: {
+          completeness: 'ready',
+          availability: { usable: false, reason: 'no_credential' },
+        },
+      }),
+    ]);
+    setupStores();
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const newProjectBtn = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="New project"]'
+    fireEvent.click(
+      container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!
+    );
+
+    const nameInput = Array.from(document.querySelectorAll('input')).find(
+      i => i.placeholder === 'Project name'
     )!;
-    fireEvent.click(newProjectBtn);
+    fireEvent.change(nameInput, { target: { value: 'Blocked Project' } });
 
     await waitFor(() => {
-      expect(document.body.textContent).toContain('No agent available yet');
+      expect(document.body.textContent).toContain('No coding agent is ready on this backend');
     });
-    expect(refresh).toHaveBeenCalled();
-    expect(document.querySelector('input[placeholder="Project name"]')).toBeFalsy();
+
+    const createBtn = Array.from(document.querySelectorAll('button')).find(
+      b => b.textContent === 'Create'
+    ) as HTMLButtonElement;
+    expect(createBtn.disabled).toBe(true);
+
+    await act(async () => {
+      fireEvent.click(createBtn);
+    });
+    expect(api.createProject).not.toHaveBeenCalled();
   });
 
+  // The readiness dialog is no longer on the new-project path — creating a
+  // project picks its agent in the modal instead. It still gates new sessions,
+  // which is where its deep-link behaviour is covered now.
   it('opens the Agents shell mode from the agent setup dialog configure action', async () => {
     const onOpenSettings = vi.fn();
     const refresh = vi.fn(async () => {
@@ -752,21 +802,25 @@ describe('Sidebar', () => {
         loading: false,
       });
     });
-    setupStores({
-      agentReadinessStore: {
-        readiness: null,
-        refresh,
-      },
-    });
+    setupStores({ agentReadinessStore: { readiness: null, refresh } });
     useTopLevelViewStore.setState({ view: { kind: 'app' }, agentsSelection: null });
 
     const { container } = render(
       <Sidebar collapsed={false} onToggle={vi.fn()} onOpenSettings={onOpenSettings} />
     );
-    const newProjectBtn = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="New project"]'
+    const projBtn = Array.from(container.querySelectorAll('button')).find(b =>
+      b.textContent?.includes('Project One')
     )!;
-    fireEvent.click(newProjectBtn);
+    fireEvent.click(projBtn);
+
+    const newSessionBtn = projBtn
+      .closest('div')!
+      .querySelector('button[aria-label="New session"]') as HTMLButtonElement;
+    // Readiness is unknown, so the gate runs before the session modal opens and
+    // the dialog is what appears.
+    await act(async () => {
+      fireEvent.click(newSessionBtn);
+    });
 
     await waitFor(() => {
       expect(document.body.textContent).toContain('No agent available yet');
@@ -777,8 +831,12 @@ describe('Sidebar', () => {
     expect(onOpenSettings).not.toHaveBeenCalled();
     expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'agents', tab: 'profiles' });
     expect(document.body.textContent).not.toContain('No agent available yet');
+    expect(api.createSession).not.toHaveBeenCalled();
   });
 
+  // The readiness dialog is no longer on the new-project path — creating a
+  // project picks its agent in the modal instead. It still gates new sessions,
+  // which is where its deep-link behaviour is covered now.
   it('deep-links provider-shaped readiness reasons to the agents providers tab', async () => {
     const onOpenSettings = vi.fn();
     const refresh = vi.fn(async () => {
@@ -787,21 +845,25 @@ describe('Sidebar', () => {
         loading: false,
       });
     });
-    setupStores({
-      agentReadinessStore: {
-        readiness: null,
-        refresh,
-      },
-    });
+    setupStores({ agentReadinessStore: { readiness: null, refresh } });
     useTopLevelViewStore.setState({ view: { kind: 'app' }, agentsSelection: null });
 
     const { container } = render(
       <Sidebar collapsed={false} onToggle={vi.fn()} onOpenSettings={onOpenSettings} />
     );
-    const newProjectBtn = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="New project"]'
+    const projBtn = Array.from(container.querySelectorAll('button')).find(b =>
+      b.textContent?.includes('Project One')
     )!;
-    fireEvent.click(newProjectBtn);
+    fireEvent.click(projBtn);
+
+    const newSessionBtn = projBtn
+      .closest('div')!
+      .querySelector('button[aria-label="New session"]') as HTMLButtonElement;
+    // Readiness is unknown, so the gate runs before the session modal opens and
+    // the dialog is what appears.
+    await act(async () => {
+      fireEvent.click(newSessionBtn);
+    });
 
     await waitFor(() => {
       expect(document.body.textContent).toContain('No agent available yet');
@@ -812,6 +874,7 @@ describe('Sidebar', () => {
     expect(onOpenSettings).not.toHaveBeenCalled();
     expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'agents', tab: 'providers' });
     expect(document.body.textContent).not.toContain('No agent available yet');
+    expect(api.createSession).not.toHaveBeenCalled();
   });
 
   it('creates project when form is submitted', async () => {
@@ -830,60 +893,67 @@ describe('Sidebar', () => {
     const nameInput = Array.from(inputs).find(i => i.placeholder === 'Project name')!;
     fireEvent.change(nameInput, { target: { value: 'My New Project' } });
 
-    // Click Create button (portaled modal footer)
-    const allButtons = Array.from(document.querySelectorAll('button'));
-    const createBtn = allButtons.find(b => b.textContent === 'Create')!;
+    // Click Create button (portaled modal footer). The modal loads its agent
+    // list asynchronously and keeps Create disabled until it has one, so wait
+    // for that rather than clicking into a no-op.
+    const createBtn = Array.from(document.querySelectorAll('button')).find(
+      b => b.textContent === 'Create'
+    ) as HTMLButtonElement;
+    await waitFor(() => expect(createBtn.disabled).toBe(false));
     await act(async () => {
       fireEvent.click(createBtn);
     });
 
+    // The modal preselects the backend's default agent and passes it through,
+    // so the created project is pinned to it.
     expect(api.createProject).toHaveBeenCalledWith(
       {
         name: 'My New Project',
         type: 'code',
         rootPath: undefined,
+        defaultAgentProfileId: 'a1',
       },
       'local-standalone'
     );
   });
 
-  it('blocks project submit when readiness becomes unusable while the form is open', async () => {
-    let shouldFailReadiness = false;
-    const refresh = vi.fn(async () => {
-      useAgentReadinessStore.setState({
-        readiness: shouldFailReadiness
-          ? { usable: false, reason: 'no_credential' }
-          : { usable: true },
-        loading: false,
-      });
-    });
-    setupStores({
-      agentReadinessStore: {
-        readiness: { usable: true },
-        refresh,
-      },
-    });
+  it('blocks project submit when the chosen agent is unavailable', async () => {
+    setBackendAgentProfiles([
+      usableAgentProfile({ id: 'a1', name: 'Ready Agent', isDefault: false }),
+      usableAgentProfile({
+        id: 'a2',
+        name: 'Broken Agent',
+        isDefault: false,
+        recordStatus: {
+          completeness: 'ready',
+          availability: { usable: false, reason: 'no_model' },
+        },
+      }),
+    ]);
+    setupStores();
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const newProjectBtn = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="New project"]'
+    fireEvent.click(
+      container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!
+    );
+
+    const nameInput = Array.from(document.querySelectorAll('input')).find(
+      i => i.placeholder === 'Project name'
     )!;
-    fireEvent.click(newProjectBtn);
+    fireEvent.change(nameInput, { target: { value: 'Needs An Agent' } });
 
-    const nameInput = document.querySelector('input[placeholder="Project name"]')!;
-    fireEvent.change(nameInput, { target: { value: 'Blocked Project' } });
-    shouldFailReadiness = true;
-    useAgentReadinessStore.setState({ readiness: null, refresh } as any);
-
+    // No profile is the backend default, so nothing is preselected and there is
+    // no global default to fall back on: Create stays disabled.
+    await waitFor(() => {
+      expect(document.querySelector('button[aria-label="Project coding agent"]')).toBeTruthy();
+    });
     const createBtn = Array.from(document.querySelectorAll('button')).find(
       b => b.textContent === 'Create'
-    )!;
+    ) as HTMLButtonElement;
+    expect(createBtn.disabled).toBe(true);
+
     await act(async () => {
       fireEvent.click(createBtn);
-    });
-
-    await waitFor(() => {
-      expect(document.body.textContent).toContain('No agent available yet');
     });
     expect(api.createProject).not.toHaveBeenCalled();
   });
@@ -942,6 +1012,11 @@ describe('Sidebar', () => {
     fireEvent.change(nameInput, { target: { value: 'Test Project' } });
     fireEvent.change(pathInput, { target: { value: '/tmp/test' } });
 
+    // Enter submits through the same canCreate guard as the Create button.
+    const createBtn = Array.from(document.querySelectorAll('button')).find(
+      b => b.textContent === 'Create'
+    ) as HTMLButtonElement;
+    await waitFor(() => expect(createBtn.disabled).toBe(false));
     await act(async () => {
       fireEvent.keyDown(pathInput, { key: 'Enter' });
     });
@@ -951,6 +1026,7 @@ describe('Sidebar', () => {
         name: 'Test Project',
         type: 'code',
         rootPath: '/tmp/test',
+        defaultAgentProfileId: 'a1',
       },
       'local-standalone'
     );
