@@ -14,11 +14,16 @@ import type { BrowserDeviceEmulation, BrowserInputEvent } from '@zclaudia/shared
 
 const RESIZE_DEBOUNCE_MS = 200;
 
-export function BrowserPanel(_props: { projectId?: string; projectRoot?: string; workingDirectory?: string; panelId?: string }) {
+export function BrowserPanel(_props: {
+  projectId?: string;
+  projectRoot?: string;
+  workingDirectory?: string;
+  panelId?: string;
+}) {
   const { sendMessage, isConnected } = useConnection();
-  const sessionId = useSelectionStore((s) => s.selectedSessionId);
-  const engine = useBrowserStore((s) => s.engine);
-  const view = useBrowserStore((s) => (sessionId ? s.sessions[sessionId] : undefined));
+  const sessionId = useSelectionStore(s => s.selectedSessionId);
+  const engine = useBrowserStore(s => s.engine);
+  const view = useBrowserStore(s => (sessionId ? s.sessions[sessionId] : undefined));
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ width: 1024, height: 768 });
   const emulation = view?.emulation ?? null;
@@ -130,7 +135,7 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
     if (emulation) {
       applyEmulation(null);
     } else {
-      const preset = DEVICE_PRESETS.find((p) => p.id === lastPresetRef.current) ?? DEVICE_PRESETS[0];
+      const preset = DEVICE_PRESETS.find(p => p.id === lastPresetRef.current) ?? DEVICE_PRESETS[0];
       applyEmulation(toEmulation(preset));
     }
   }, [emulation, applyEmulation]);
@@ -151,16 +156,23 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
     if (isTauri()) {
       void import('@tauri-apps/plugin-shell')
         .then(({ open }) => open(url))
-        .catch((err) => console.error('[BrowserPanel] Failed to open external browser:', err));
+        .catch(err => console.error('[BrowserPanel] Failed to open external browser:', err));
     } else {
       window.open(url, '_blank', 'noopener,noreferrer');
     }
   }, [view?.state?.url]);
 
-  const gateNeeded = engine.status === 'missing' || engine.status === 'downloading' || (engine.status === 'error' && !view?.state);
+  const gateNeeded =
+    engine.status === 'missing' ||
+    engine.status === 'downloading' ||
+    (engine.status === 'error' && !view?.state);
 
   if (!sessionId) {
-    return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">No active session</div>;
+    return (
+      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+        No active session
+      </div>
+    );
   }
 
   return (
@@ -169,8 +181,8 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
         state={view?.state ?? null}
         agentActive={view?.agentActive ?? false}
         emulationActive={emulation !== null}
-        onNavigate={(url) => sendMessage({ type: 'browser_navigate', sessionId, url })}
-        onHistory={(direction) => sendMessage({ type: 'browser_history', sessionId, direction })}
+        onNavigate={url => sendMessage({ type: 'browser_navigate', sessionId, url })}
+        onHistory={direction => sendMessage({ type: 'browser_history', sessionId, direction })}
         onReload={() => sendMessage({ type: 'browser_reload', sessionId })}
         onStop={() => sendMessage({ type: 'browser_stop', sessionId })}
         pickActive={pickActive}
@@ -180,12 +192,14 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
       />
       {emulation && <DeviceBar emulation={emulation} onChange={applyEmulation} />}
       {view?.error && (
-        <div className="px-2 py-1 text-[11px] font-medium text-destructive border-b border-border">{view.error}</div>
+        <div className="px-2 py-1 text-[11px] font-medium text-destructive border-b border-border">
+          {view.error}
+        </div>
       )}
       <div
         ref={containerRef}
         className="relative flex-1 min-h-0 overflow-hidden bg-background"
-        onKeyDownCapture={(e) => {
+        onKeyDownCapture={e => {
           // Escape cancels element-pick mode before the canvas forwards it to the page.
           if (pickActive && e.key === 'Escape') {
             e.preventDefault();
@@ -195,7 +209,10 @@ export function BrowserPanel(_props: { projectId?: string; projectRoot?: string;
         }}
       >
         {gateNeeded ? (
-          <BrowserEngineGate engine={engine} onInstall={() => sendMessage({ type: 'browser_engine_install' })} />
+          <BrowserEngineGate
+            engine={engine}
+            onInstall={() => sendMessage({ type: 'browser_engine_install' })}
+          />
         ) : view?.closedReason === 'crash' ? (
           <div className="flex h-full flex-col items-center justify-center gap-3">
             <div className="text-sm text-muted-foreground">Browser page crashed</div>

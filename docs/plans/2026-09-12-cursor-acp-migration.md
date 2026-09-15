@@ -91,11 +91,11 @@ ACP SDK 管理 JSON-RPC / NDJSON
 
 ### 2.4 会话恢复（关键结论）
 
-| 场景 | 结果 |
-| --- | --- |
-| ACP 建会话 → 关进程 → 新进程 `session/load` | ✅ 成功，上下文连续（写入的暗号能在新进程答出） |
-| `session/load` 期间是否重放历史 | ✅ **会重放**，实测 3 条：`user_message_chunk`、`agent_thought_chunk`、`agent_message_chunk` |
-| stream-json 建会话 → ACP `session/load` 同一 ID | ❌ **失败**：`-32602 Invalid params` / `Session "<id>" not found`（会话完整跑完后仍然失败） |
+| 场景                                            | 结果                                                                                         |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| ACP 建会话 → 关进程 → 新进程 `session/load`     | ✅ 成功，上下文连续（写入的暗号能在新进程答出）                                              |
+| `session/load` 期间是否重放历史                 | ✅ **会重放**，实测 3 条：`user_message_chunk`、`agent_thought_chunk`、`agent_message_chunk` |
+| stream-json 建会话 → ACP `session/load` 同一 ID | ❌ **失败**：`-32602 Invalid params` / `Session "<id>" not found`（会话完整跑完后仍然失败）  |
 
 结论：在当前 CLI 基线上，旧 session ID **不能被 ACP 直接 load**。这足以要求 §14 的 transport binding，但不能外推为永久不同命名空间；未来 CLI 如果增加兼容 load 或导入能力，可以再迁移存量会话。
 
@@ -104,8 +104,12 @@ ACP SDK 管理 JSON-RPC / NDJSON
 用一个最小 stdio MCP server（node 脚本，暴露一个返回固定暗号的工具）作为 `session/new` 的 `mcpServers` 参数传入：
 
 ```json
-{ "name": "zclaudia-probe", "command": "<node>", "args": ["fake-mcp.mjs"],
-  "env": [{ "name": "PROBE_TOKEN", "value": "secret-123" }] }
+{
+  "name": "zclaudia-probe",
+  "command": "<node>",
+  "args": ["fake-mcp.mjs"],
+  "env": [{ "name": "PROBE_TOKEN", "value": "secret-123" }]
+}
 ```
 
 结果：**工具被真实调用，返回值出现在助手回复中**。这意味着：
@@ -130,9 +134,11 @@ tool_call_update  { status: "completed", rawOutput: { success: true } }
 当前探针版本的 `session/request_permission` options **每次均为三个**：
 
 ```json
-[{ "optionId": "allow-once",   "kind": "allow_once"  },
- { "optionId": "allow-always", "kind": "allow_always"},
- { "optionId": "reject-once",  "kind": "reject_once" }]
+[
+  { "optionId": "allow-once", "kind": "allow_once" },
+  { "optionId": "allow-always", "kind": "allow_always" },
+  { "optionId": "reject-once", "kind": "reject_once" }
+]
 ```
 
 当前 Cursor 未提供 `reject_always`。但 ACP 标准允许 agent 返回不同 option 集合，生产代码必须按 `kind` 查找、容忍额外选项，不能写死数组长度或顺序。`toolCall.content` 里带可展示的原因串（例如 `"Not in allowlist: echo"`），适合作为审批弹窗的 detail。
@@ -193,12 +199,12 @@ tool_call_update  { status: "completed", rawOutput: { success: true } }
 
 这个方案已经能工作，四类长期成本如下。**注意与早期版本的差异**：`--yolo` 语义坍缩与 MCP 凭据落盘这两个问题已分别被修复，不应再作为迁移动机。
 
-| 问题 | 当前影响 | ACP 后的改善 |
-| --- | --- | --- |
-| 私有事件结构漂移 | Cursor CLI 改字段时需要追着修 parser | 主要依赖 ACP v1 标准类型和能力协商 |
+| 问题                         | 当前影响                                                                                                                                    | ACP 后的改善                                                         |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 私有事件结构漂移             | Cursor CLI 改字段时需要追着修 parser                                                                                                        | 主要依赖 ACP v1 标准类型和能力协商                                   |
 | **default 模式没有用户审批** | `--auto-review` 让 Cursor 服务端分类器代替用户决策，`PermissionCallback` 在 adapter 中未使用，manifest 的 `interaction.approval` 为 `false` | `session/request_permission` 把审批交回 ZClaudia，是本次迁移最大收益 |
-| MCP 配置有副作用 | 写项目文件、需要 enable 与 cleanup、并发时容易冲突（凭据落盘问题已修） | 通过 session 参数传入，仅对当前会话生效，已实测可用 |
-| 生命周期靠 stdout 推断 | 完成、取消、拒绝、会话恢复边界容易含糊 | 由 JSON-RPC 请求、通知和 `PromptResponse.stopReason` 明确表达 |
+| MCP 配置有副作用             | 写项目文件、需要 enable 与 cleanup、并发时容易冲突（凭据落盘问题已修）                                                                      | 通过 session 参数传入，仅对当前会话生效，已实测可用                  |
+| 生命周期靠 stdout 推断       | 完成、取消、拒绝、会话恢复边界容易含糊                                                                                                      | 由 JSON-RPC 请求、通知和 `PromptResponse.stopReason` 明确表达        |
 
 迁移仍需保留一层适配，因为 ZClaudia 的 `ExternalAgentAdapter` 与 ACP 的模型并不完全一致，尤其是权限回复、结构化问答、计划审批和 Cursor 私有扩展。
 
@@ -255,16 +261,16 @@ flowchart LR
 
 建议把实现拆成以下职责：
 
-| 模块 | 职责 |
-| --- | --- |
-| `acp-runner.ts` | 运行状态机、spawn、超时、取消、清理和最终结果 |
-| `acp-client.ts` | SDK 初始化、连接、请求/通知注册、能力协商 |
-| `acp-events.ts` | 标准 ACP session update 到 `ProviderRuntimeEvent` 的映射与 tool accumulator |
-| `cursor-acp-extensions.ts` | Cursor 私有 ACP 方法的窄类型、runtime guard 和响应映射 |
-| `acp-permissions.ts` | ACP permission options 与 ZClaudia `PermissionCallback` 的桥接 |
-| `acp-mcp.ts` | `ProviderToolBridgeEntry` 到 ACP `McpServer` 的转换与校验 |
-| `acp-models.ts` | `modelId` ↔ 显示名的双向映射（见 §7.4） |
-| `errors.ts` | 错误分类、脱敏、stderr 摘要和用户提示 |
+| 模块                       | 职责                                                                        |
+| -------------------------- | --------------------------------------------------------------------------- |
+| `acp-runner.ts`            | 运行状态机、spawn、超时、取消、清理和最终结果                               |
+| `acp-client.ts`            | SDK 初始化、连接、请求/通知注册、能力协商                                   |
+| `acp-events.ts`            | 标准 ACP session update 到 `ProviderRuntimeEvent` 的映射与 tool accumulator |
+| `cursor-acp-extensions.ts` | Cursor 私有 ACP 方法的窄类型、runtime guard 和响应映射                      |
+| `acp-permissions.ts`       | ACP permission options 与 ZClaudia `PermissionCallback` 的桥接              |
+| `acp-mcp.ts`               | `ProviderToolBridgeEntry` 到 ACP `McpServer` 的转换与校验                   |
+| `acp-models.ts`            | `modelId` ↔ 显示名的双向映射（见 §7.4）                                     |
+| `errors.ts`                | 错误分类、脱敏、stderr 摘要和用户提示                                       |
 
 新模块统一走 `acp-` 前缀，与 legacy 的 `runner.ts` / `map-events.ts` 并存且互不引用，方便最终整体删除。
 
@@ -425,13 +431,13 @@ session/load {
 
 `session/prompt` 返回 `PromptResponse` 后，根据 `stopReason` 形成唯一终态：
 
-| ACP stop reason | ZClaudia 行为 |
-| --- | --- |
-| `end_turn` | `provider_turn_finished(isComplete: true)` |
-| `cancelled` | 若由本地 abort 发起则正常结束，否则生成 cancelled 错误 |
-| `max_tokens` | 结束本轮并附带可重试的容量提示，不伪装成完整成功 |
-| `max_turn_requests` | 结束本轮并提示达到请求上限 |
-| `refusal` | 生成明确的 provider refusal 错误 |
+| ACP stop reason     | ZClaudia 行为                                          |
+| ------------------- | ------------------------------------------------------ |
+| `end_turn`          | `provider_turn_finished(isComplete: true)`             |
+| `cancelled`         | 若由本地 abort 发起则正常结束，否则生成 cancelled 错误 |
+| `max_tokens`        | 结束本轮并附带可重试的容量提示，不伪装成完整成功       |
+| `max_turn_requests` | 结束本轮并提示达到请求上限                             |
+| `refusal`           | 生成明确的 provider refusal 错误                       |
 
 只有一处代码可以发出最终 terminal event，避免 response、进程 exit 和 stream close 竞争导致重复结束。
 
@@ -439,12 +445,12 @@ session/load {
 
 ### 8.1 模式映射
 
-| ZClaudia mode | Cursor ACP mode | 权限策略 |
-| --- | --- | --- |
-| `default` | `agent` | 每个 ACP permission request 交给宿主 callback |
-| `plan` | `plan` | 使用 plan mode；任何意外的变更型工具请求默认拒绝 |
-| `ask` | `ask` | 使用 ask mode；任何意外的变更型工具请求默认拒绝 |
-| `bypassPermissions` | `agent` | runtime 自动选择允许选项，不弹审批 |
+| ZClaudia mode       | Cursor ACP mode | 权限策略                                         |
+| ------------------- | --------------- | ------------------------------------------------ |
+| `default`           | `agent`         | 每个 ACP permission request 交给宿主 callback    |
+| `plan`              | `plan`          | 使用 plan mode；任何意外的变更型工具请求默认拒绝 |
+| `ask`               | `ask`           | 使用 ask mode；任何意外的变更型工具请求默认拒绝  |
+| `bypassPermissions` | `agent`         | runtime 自动选择允许选项，不弹审批               |
 
 设置 mode 前先读取 `session/new` 响应中的 `availableModes`，使用返回的 mode ID（实测为 `agent` / `plan` / `ask`），不把显示名称当稳定 ID。如果请求的 mode 不存在，返回 `CURSOR_ACP_MODE_UNSUPPORTED`，不得退回 agent 模式继续执行。
 
@@ -494,22 +500,22 @@ bypass 模式下也固定自动选择 `allow_once`。子进程生命周期不等
 
 维护一个以 `toolCallId` 为键的 tool accumulator，用来合并 `tool_call` 与后续 `tool_call_update`。核心映射如下：
 
-| ACP 消息 | ProviderRuntimeEvent | 说明 |
-| --- | --- | --- |
-| session 建立 | `init` | 写入 provider session ID、`providerTransport` 和 `SystemInfo`；Host 持久化成功后才继续 prompt |
-| `agent_message_chunk` | `assistant_delta` | 仅转发 text block；其他 block 按能力处理 |
-| `agent_thought_chunk` | `thinking_delta` | 不混入普通 assistant 文本 |
-| `user_message_chunk` | 丢弃 | 仅在 load 重放中出现，属于协议状态重建，不是新内容 |
-| `tool_call` | `tool_started`（可延迟） | 初始化 accumulator，见 §9.1 |
-| 非终态 `tool_call_update` | `tool_activity` | 合并 status、content、locations、rawInput/rawOutput |
-| completed/failed `tool_call_update` | `tool_finished` | 终态由客户端决策覆盖，见 §9.2 |
-| `plan` / `plan_update` | `tool_activity` 或 todo 语义事件 | 首版展示为计划进度，不虚报可编辑表单能力 |
-| `current_mode_update` | `mode_transition` | 走 `makeModeTransition`；与请求 mode 不符时记录警告 |
-| `session_info_update` | 内部状态 | 当前事件 contract 没有 session title 字段；首版不持久化，后续需专用 host contract |
-| `available_commands_update` | `SystemInfo.slashCommands` | session new/load 响应前先累积，并随首次 `init` 发出；后续增量首版只保存在 run 内 |
-| `usage_update` | 最终 result usage | 只在字段存在且通过 runtime guard 时采用 |
-| `compaction_update` / summary | activity/metadata | 不作为新的 assistant message 重复持久化 |
-| prompt response | `provider_turn_finished` 或 `provider_error` | 根据 stop reason 归一化 |
+| ACP 消息                            | ProviderRuntimeEvent                         | 说明                                                                                          |
+| ----------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| session 建立                        | `init`                                       | 写入 provider session ID、`providerTransport` 和 `SystemInfo`；Host 持久化成功后才继续 prompt |
+| `agent_message_chunk`               | `assistant_delta`                            | 仅转发 text block；其他 block 按能力处理                                                      |
+| `agent_thought_chunk`               | `thinking_delta`                             | 不混入普通 assistant 文本                                                                     |
+| `user_message_chunk`                | 丢弃                                         | 仅在 load 重放中出现，属于协议状态重建，不是新内容                                            |
+| `tool_call`                         | `tool_started`（可延迟）                     | 初始化 accumulator，见 §9.1                                                                   |
+| 非终态 `tool_call_update`           | `tool_activity`                              | 合并 status、content、locations、rawInput/rawOutput                                           |
+| completed/failed `tool_call_update` | `tool_finished`                              | 终态由客户端决策覆盖，见 §9.2                                                                 |
+| `plan` / `plan_update`              | `tool_activity` 或 todo 语义事件             | 首版展示为计划进度，不虚报可编辑表单能力                                                      |
+| `current_mode_update`               | `mode_transition`                            | 走 `makeModeTransition`；与请求 mode 不符时记录警告                                           |
+| `session_info_update`               | 内部状态                                     | 当前事件 contract 没有 session title 字段；首版不持久化，后续需专用 host contract             |
+| `available_commands_update`         | `SystemInfo.slashCommands`                   | session new/load 响应前先累积，并随首次 `init` 发出；后续增量首版只保存在 run 内              |
+| `usage_update`                      | 最终 result usage                            | 只在字段存在且通过 runtime guard 时采用                                                       |
+| `compaction_update` / summary       | activity/metadata                            | 不作为新的 assistant message 重复持久化                                                       |
+| prompt response                     | `provider_turn_finished` 或 `provider_error` | 根据 stop reason 归一化                                                                       |
 
 事件映射必须满足：
 
@@ -553,13 +559,13 @@ Cursor 公开了若干 `cursor/*` 扩展。它们不能混入标准 ACP 类型�
 
 ### 10.1 首版范围
 
-| Cursor 扩展 | 首版处理 | 依据 |
-| --- | --- | --- |
-| `cursor/create_plan` | **必须实现。** 映射到现有二元 `PermissionCallback` 的 accepted/rejected；`plan` 正文（Markdown）放入受限 detail | 官方定义为显式计划审批，且 §2.7 探针已触发 |
-| `cursor/update_todos` | 按官方 schema 做 guard，映射为 todo/tool activity；不宣称可编辑 todo | 官方已公布 payload，本机行为待验 |
-| `cursor/task` | 按官方 schema 做 guard，映射为 `task_notification` | 官方已公布 payload，本机行为待验 |
-| `cursor/generate_image` | 按官方 schema 做 guard，记录为 display-only activity；未实现媒体链路时不宣称图片能力 | 官方已公布 payload，本机行为待验 |
-| `cursor/ask_question` | 首版返回正式 `{ outcome: { outcome: "skipped", reason } }` | 比 `method-not-found` 更符合已公布扩展协议 |
+| Cursor 扩展             | 首版处理                                                                                                        | 依据                                       |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `cursor/create_plan`    | **必须实现。** 映射到现有二元 `PermissionCallback` 的 accepted/rejected；`plan` 正文（Markdown）放入受限 detail | 官方定义为显式计划审批，且 §2.7 探针已触发 |
+| `cursor/update_todos`   | 按官方 schema 做 guard，映射为 todo/tool activity；不宣称可编辑 todo                                            | 官方已公布 payload，本机行为待验           |
+| `cursor/task`           | 按官方 schema 做 guard，映射为 `task_notification`                                                              | 官方已公布 payload，本机行为待验           |
+| `cursor/generate_image` | 按官方 schema 做 guard，记录为 display-only activity；未实现媒体链路时不宣称图片能力                            | 官方已公布 payload，本机行为待验           |
+| `cursor/ask_question`   | 首版返回正式 `{ outcome: { outcome: "skipped", reason } }`                                                      | 比 `method-not-found` 更符合已公布扩展协议 |
 
 `cursor/create_plan` 是 v1 的必做项。其余方法先依据 Cursor 官方公开 schema 写 runtime guard，再用本地 fixture/探针验证；不能通过线上 telemetry 收集 plan、prompt、todo 内容或文件路径。生产 telemetry 只记录方法名、schema 校验成败和字段集合 hash，不记录真实 payload。
 
@@ -567,7 +573,7 @@ Cursor 公开了若干 `cursor/*` 扩展。它们不能混入标准 ACP 类型�
 
 ```ts
 interface InteractionDecision {
-  outcome: "submitted" | "cancelled";
+  outcome: 'submitted' | 'cancelled';
   values?: Record<string, unknown>;
 }
 ```
@@ -632,19 +638,19 @@ bridge 名称应使用受控的保留前缀；如果与用户配置冲突，应�
 
 引入稳定错误码，避免 UI 解析 stderr 文案。首版只实现有明确触发场景的一组：
 
-| 错误码 | 场景 | 首版 |
-| --- | --- | --- |
-| `CURSOR_ACP_UNSUPPORTED` | CLI 无 acp 子命令或协议版本不兼容 | ✅ |
-| `CURSOR_AUTH_REQUIRED` | Cursor CLI 尚未登录或认证失效 | ✅ |
-| `CURSOR_ACP_HANDSHAKE_FAILED` | initialize/能力协商失败 | ✅ |
-| `CURSOR_ACP_MODE_UNSUPPORTED` | 请求 mode 不在 available modes 中 | ✅ |
-| `CURSOR_SESSION_NOT_FOUND` | `session/load` 找不到 provider session | ✅（实测错误形状：`-32602` + `data.message` 含 `not found`） |
-| `CURSOR_MODEL_UNSUPPORTED` | 显式模型无法匹配任何 `modelId` 或 `name` | ✅（§7.4） |
-| `CURSOR_MCP_BRIDGE_UNAVAILABLE` | MCP 映射或启动失败 | ✅ |
-| `CURSOR_PERMISSION_PROTOCOL_ERROR` | permission payload/options 无法安全处理 | ✅ |
-| `CURSOR_ACP_PROTOCOL_ERROR` | JSON-RPC/消息 schema 违约 | ✅ |
-| `CURSOR_PROCESS_EXIT` | 尚无终态时子进程异常退出 | ✅ |
-| `CURSOR_SESSION_CWD_MISMATCH` | 恢复时 cwd 不兼容 | ⏸ 暂无已知触发场景，等实际遇到再加 |
+| 错误码                             | 场景                                     | 首版                                                         |
+| ---------------------------------- | ---------------------------------------- | ------------------------------------------------------------ |
+| `CURSOR_ACP_UNSUPPORTED`           | CLI 无 acp 子命令或协议版本不兼容        | ✅                                                           |
+| `CURSOR_AUTH_REQUIRED`             | Cursor CLI 尚未登录或认证失效            | ✅                                                           |
+| `CURSOR_ACP_HANDSHAKE_FAILED`      | initialize/能力协商失败                  | ✅                                                           |
+| `CURSOR_ACP_MODE_UNSUPPORTED`      | 请求 mode 不在 available modes 中        | ✅                                                           |
+| `CURSOR_SESSION_NOT_FOUND`         | `session/load` 找不到 provider session   | ✅（实测错误形状：`-32602` + `data.message` 含 `not found`） |
+| `CURSOR_MODEL_UNSUPPORTED`         | 显式模型无法匹配任何 `modelId` 或 `name` | ✅（§7.4）                                                   |
+| `CURSOR_MCP_BRIDGE_UNAVAILABLE`    | MCP 映射或启动失败                       | ✅                                                           |
+| `CURSOR_PERMISSION_PROTOCOL_ERROR` | permission payload/options 无法安全处理  | ✅                                                           |
+| `CURSOR_ACP_PROTOCOL_ERROR`        | JSON-RPC/消息 schema 违约                | ✅                                                           |
+| `CURSOR_PROCESS_EXIT`              | 尚无终态时子进程异常退出                 | ✅                                                           |
+| `CURSOR_SESSION_CWD_MISMATCH`      | 恢复时 cwd 不兼容                        | ⏸ 暂无已知触发场景，等实际遇到再加                           |
 
 日志要求：
 
@@ -712,10 +718,10 @@ AND sessions.provider_transport IS NULL
 
 ZClaudia 近期为 Claude/Codex 引入了 engine mode（bundled SDK engine vs. 用户自己的 CLI，见 `EngineExecutionContext` / `RuntimeModelConnection`）。ACP transport 与 engine mode 是**两个不同概念**：
 
-| 轴 | 取值 | 谁决定 | 是否暴露给用户 |
-| --- | --- | --- | --- |
-| engine mode | bundled SDK / 用户 CLI | 仅由声明 `engineModes` 的 runtime/profile 选择 | 对 Claude/Codex 可见；Cursor 当前不适用 |
-| Cursor transport | `cursor-acp-v1` / `cursor-stream-json-v1` | 新建时由发布策略确定，恢复时由会话绑定确定 | ❌ 否，内部实现细节 |
+| 轴               | 取值                                      | 谁决定                                         | 是否暴露给用户                          |
+| ---------------- | ----------------------------------------- | ---------------------------------------------- | --------------------------------------- |
+| engine mode      | bundled SDK / 用户 CLI                    | 仅由声明 `engineModes` 的 runtime/profile 选择 | 对 Claude/Codex 可见；Cursor 当前不适用 |
+| Cursor transport | `cursor-acp-v1` / `cursor-stream-json-v1` | 新建时由发布策略确定，恢复时由会话绑定确定     | ❌ 否，内部实现细节                     |
 
 具体约束：
 
@@ -729,19 +735,19 @@ ZClaudia 近期为 Claude/Codex 引入了 engine mode（bundled SDK engine vs. �
 
 manifest 与 host capability descriptor 必须只声明已经端到端验证的能力。Cursor manifest 当前的 `interaction.approval` 为 `false`、`tool.inject` 为 `bridged/best_effort`，本次迁移会改变其中数项。下表只列当前 PCP schema 中真实存在的 capability ID：
 
-| Capability | 当前 | 首版建议 | 条件 |
-| --- | --- | --- | --- |
-| `chat.stream` | native/best_effort | native/strict | 文本 chunk 顺序、终态和错误测试通过 |
-| `tool.call` | native/best_effort | native/strict | start/update/finish、§9.1 占位处理与 §9.2 终态覆盖通过 |
-| `interaction.approval` | **false** | **true, native/strict** | default/bypass/deny/timeout 全部通过——本次迁移的核心新增 |
-| `tool.inject` | bridged/best_effort | bridged/strict | inline MCP 已验证（§2.5），补完 §11.2 门禁后升级 |
-| `session.abort` | native/strict | native/strict | 维持；cancel + kill fallback 测试通过 |
-| `permission.mode` | native/strict | native/best_effort | plan/ask 已有初步实测，但客户端异常检测不是安全隔离；只有加入强制只读边界后才能恢复 strict |
-| `interaction.todo` | false | false | 官方 schema 已知，但本机行为、Host 映射和 UI 尚未端到端验证 |
-| `interaction.form` | false | false | 等结构化回答 contract |
-| `input.image` | false | false | ACP 声明 `promptCapabilities.image: true`，但 ZClaudia 媒体链路未实现，保持 false |
-| `session.steer` | false | false | 未实现 active prompt steering |
-| `session.background_task` | false | false | task notification 不等于可控后台任务 |
+| Capability                | 当前                | 首版建议                | 条件                                                                                       |
+| ------------------------- | ------------------- | ----------------------- | ------------------------------------------------------------------------------------------ |
+| `chat.stream`             | native/best_effort  | native/strict           | 文本 chunk 顺序、终态和错误测试通过                                                        |
+| `tool.call`               | native/best_effort  | native/strict           | start/update/finish、§9.1 占位处理与 §9.2 终态覆盖通过                                     |
+| `interaction.approval`    | **false**           | **true, native/strict** | default/bypass/deny/timeout 全部通过——本次迁移的核心新增                                   |
+| `tool.inject`             | bridged/best_effort | bridged/strict          | inline MCP 已验证（§2.5），补完 §11.2 门禁后升级                                           |
+| `session.abort`           | native/strict       | native/strict           | 维持；cancel + kill fallback 测试通过                                                      |
+| `permission.mode`         | native/strict       | native/best_effort      | plan/ask 已有初步实测，但客户端异常检测不是安全隔离；只有加入强制只读边界后才能恢复 strict |
+| `interaction.todo`        | false               | false                   | 官方 schema 已知，但本机行为、Host 映射和 UI 尚未端到端验证                                |
+| `interaction.form`        | false               | false                   | 等结构化回答 contract                                                                      |
+| `input.image`             | false               | false                   | ACP 声明 `promptCapabilities.image: true`，但 ZClaudia 媒体链路未实现，保持 false          |
+| `session.steer`           | false               | false                   | 未实现 active prompt steering                                                              |
+| `session.background_task` | false               | false                   | task notification 不等于可控后台任务                                                       |
 
 以下是 runtime event/行为覆盖，不是当前 PCP capability ID，不能写进 manifest：
 
@@ -823,38 +829,38 @@ manifest 与 host capability descriptor 必须只声明已经端到端验证的�
 
 ### `zclaudia-plugins`
 
-| 文件 | 改动 |
-| --- | --- |
-| `agents/cursor/package.json` | 添加固定版本 ACP SDK |
-| `agents/cursor/runtime-compatibility.json` | `vendorDependencies: true`；改用 ACP probe/live kind；以 `testedMaximum` 记录验证版本 |
-| `agents/cursor/src/acp-runner.ts` | 新增 ACP 状态机编排 |
-| `agents/cursor/src/acp-client.ts` | 新增 SDK client 与连接管理 |
-| `agents/cursor/src/acp-events.ts` | 新增标准事件映射与 tool accumulator（含 §9.1 / §9.2） |
+| 文件                                         | 改动                                                                                          |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `agents/cursor/package.json`                 | 添加固定版本 ACP SDK                                                                          |
+| `agents/cursor/runtime-compatibility.json`   | `vendorDependencies: true`；改用 ACP probe/live kind；以 `testedMaximum` 记录验证版本         |
+| `agents/cursor/src/acp-runner.ts`            | 新增 ACP 状态机编排                                                                           |
+| `agents/cursor/src/acp-client.ts`            | 新增 SDK client 与连接管理                                                                    |
+| `agents/cursor/src/acp-events.ts`            | 新增标准事件映射与 tool accumulator（含 §9.1 / §9.2）                                         |
 | `agents/cursor/src/cursor-acp-extensions.ts` | 按官方 schema 新增 Cursor 扩展类型与 runtime guards；`create_plan` 完整审批，ask 返回 skipped |
-| `agents/cursor/src/acp-permissions.ts` | 新增权限 option 桥接与本地决策记录 |
-| `agents/cursor/src/acp-mcp.ts` | 新增 MCP config 映射（`config: unknown` 需 runtime guard） |
-| `agents/cursor/src/acp-models.ts` | 新增 `modelId` ↔ `name` 映射 |
-| `agents/cursor/src/errors.ts` | 新增稳定错误码与脱敏 |
-| `agents/cursor/src/adapter.ts` | 按 transport 选择 runner；接上此前未使用的 `onPermission` |
-| `agents/cursor/src/runner.ts` | 兼容期仅供 legacy 使用，最终删除 |
-| `agents/cursor/src/map-events.ts` | 兼容期仅供 legacy 使用，最终删除 |
-| `agents/cursor/src/mcp-inject.ts` | 仅供 legacy 使用，随 legacy driver 一起删除 |
-| `agents/cursor/plugin.json` | 按 §16 更新 capabilities 与 `authNote` |
-| `agents/cursor/probes/` | 新增 P0 探针脚本（不入生产包） |
-| `agents/cursor/src/__tests__/*` | 增加 fake ACP、协议 fixture、状态机和真机验收测试 |
+| `agents/cursor/src/acp-permissions.ts`       | 新增权限 option 桥接与本地决策记录                                                            |
+| `agents/cursor/src/acp-mcp.ts`               | 新增 MCP config 映射（`config: unknown` 需 runtime guard）                                    |
+| `agents/cursor/src/acp-models.ts`            | 新增 `modelId` ↔ `name` 映射                                                                  |
+| `agents/cursor/src/errors.ts`                | 新增稳定错误码与脱敏                                                                          |
+| `agents/cursor/src/adapter.ts`               | 按 transport 选择 runner；接上此前未使用的 `onPermission`                                     |
+| `agents/cursor/src/runner.ts`                | 兼容期仅供 legacy 使用，最终删除                                                              |
+| `agents/cursor/src/map-events.ts`            | 兼容期仅供 legacy 使用，最终删除                                                              |
+| `agents/cursor/src/mcp-inject.ts`            | 仅供 legacy 使用，随 legacy driver 一起删除                                                   |
+| `agents/cursor/plugin.json`                  | 按 §16 更新 capabilities 与 `authNote`                                                        |
+| `agents/cursor/probes/`                      | 新增 P0 探针脚本（不入生产包）                                                                |
+| `agents/cursor/src/__tests__/*`              | 增加 fake ACP、协议 fixture、状态机和真机验收测试                                             |
 
 ### `zclaudia`
 
-| 文件/区域 | 改动 |
-| --- | --- |
-| `scripts/plugins/stage-builtin-agents.mjs` | 为内置 Cursor runtime 复制 portable dependencies |
-| runtime compatibility descriptor/validator/runner | 新增 ACP initialize probe 与 ACP live turn，不复用 Codex `thread/*` 流程 |
-| Cursor provider capability descriptor | 修正 default/bypass 语义和已验证能力 |
-| storage migration + `sessions` repository/types | 增加 `provider_transport`，按 §14.2 精确回填历史 Cursor 会话 |
-| plugin SDK `ExternalAgentRunContext` / `ProviderRuntimeEvent` / `SystemInfo` | 增加 `providerTransport` 与 `modelId` 可选字段 |
-| run bootstrap / provider session coordinator | 读取 transport，并在首次 init 时原子保存 transport + provider session ID |
-| 插件 SDK interaction 类型 | P5 增加结构化问答，不阻塞首版 ACP |
-| runtime/e2e fixtures | 增加 ACP executable、取消、并发和恢复测试 |
+| 文件/区域                                                                    | 改动                                                                     |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `scripts/plugins/stage-builtin-agents.mjs`                                   | 为内置 Cursor runtime 复制 portable dependencies                         |
+| runtime compatibility descriptor/validator/runner                            | 新增 ACP initialize probe 与 ACP live turn，不复用 Codex `thread/*` 流程 |
+| Cursor provider capability descriptor                                        | 修正 default/bypass 语义和已验证能力                                     |
+| storage migration + `sessions` repository/types                              | 增加 `provider_transport`，按 §14.2 精确回填历史 Cursor 会话             |
+| plugin SDK `ExternalAgentRunContext` / `ProviderRuntimeEvent` / `SystemInfo` | 增加 `providerTransport` 与 `modelId` 可选字段                           |
+| run bootstrap / provider session coordinator                                 | 读取 transport，并在首次 init 时原子保存 transport + provider session ID |
+| 插件 SDK interaction 类型                                                    | P5 增加结构化问答，不阻塞首版 ACP                                        |
+| runtime/e2e fixtures                                                         | 增加 ACP executable、取消、并发和恢复测试                                |
 
 ## 19. 测试方案
 
@@ -969,23 +975,23 @@ ACP 成为新会话默认之前，以下条件必须全部满足：
 
 ## 22. 主要风险
 
-| 风险 | 影响 | 缓解 |
-| --- | --- | --- |
-| **ACP 无公开最低 CLI 版本，且当前顶层 help 未列出** | 不同 CLI 版本的能力可能不同 | 运行时握手而非纯版本门禁；探针 fixture 每次 CLI 升级后重跑 |
-| **当前基线不能直接 load 旧会话** | 用户无法在 ACP 下续聊旧会话 | `sessions.provider_transport` + 显式「以新会话继续」；未来有导入能力时再迁移 |
-| **拒绝后 status 仍为 completed** | 被拒绝的破坏性命令显示为成功，用户误判 | §9.2 客户端决策覆盖 + 专项测试 + 上线门禁 |
-| MCP 占位 tool_call | UI 短暂显示 `"MCP: tool"` 无意义标题 | §9.1 延迟或可修正的 `tool_started` |
-| Cursor 私有扩展变化 | 问答/计划等交互失效 | 与标准 ACP 隔离、runtime guard、method 级降级（已验证 `-32601` 不致崩溃） |
-| load 重放历史（已确认） | 对话重复、计费/持久化异常 | load 响应前的 update 一律作为协议状态；`user_message_chunk` 作辅助判据 |
-| modelId 参数化串不匹配 | 用户选的模型静默失效 | `acp-models.ts` 双向映射 + 未匹配时快速失败 |
-| bridge 工具触发审批 | 用户被自己的工具反复打断 | 首版保持统一审批；后续基于可信 effect/risk 元数据建立窄白名单 |
-| `allow_always` 作用域未知 | bypass 可能意外形成持久授权 | 首版始终自动选择 `allow_once`，验证持久化行为后再评估 |
-| SDK 被 externalize 但未随包分发 | 安装后启动失败 | `vendorDependencies`、干净安装测试、许可证检查 |
-| 权限 option 无法表达宿主 decision | 错误放行或用户困惑 | `allow_once`/`reject_once` 显式映射；无匹配即 cancel |
-| 自动 fallback | 权限语义变化、会话被永久绑定 legacy 或重复执行 | 新会话启动失败直接失败；transport 仅由发布配置或已有 binding 选择 |
-| plan/ask 缺少强只读边界 | provider 回归时 cancel 可能晚于工具执行 | capability 降为 best-effort；需要强承诺时增加只读 filesystem/OS sandbox |
-| 每轮新 ACP 进程启动较慢 | 首 token 延迟增加 | 先测量；稳定后再单独评估进程复用 |
-| 能力声明超前 | UI 暴露不可用功能 | capability 以端到端测试为门禁 |
+| 风险                                                | 影响                                           | 缓解                                                                         |
+| --------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------- |
+| **ACP 无公开最低 CLI 版本，且当前顶层 help 未列出** | 不同 CLI 版本的能力可能不同                    | 运行时握手而非纯版本门禁；探针 fixture 每次 CLI 升级后重跑                   |
+| **当前基线不能直接 load 旧会话**                    | 用户无法在 ACP 下续聊旧会话                    | `sessions.provider_transport` + 显式「以新会话继续」；未来有导入能力时再迁移 |
+| **拒绝后 status 仍为 completed**                    | 被拒绝的破坏性命令显示为成功，用户误判         | §9.2 客户端决策覆盖 + 专项测试 + 上线门禁                                    |
+| MCP 占位 tool_call                                  | UI 短暂显示 `"MCP: tool"` 无意义标题           | §9.1 延迟或可修正的 `tool_started`                                           |
+| Cursor 私有扩展变化                                 | 问答/计划等交互失效                            | 与标准 ACP 隔离、runtime guard、method 级降级（已验证 `-32601` 不致崩溃）    |
+| load 重放历史（已确认）                             | 对话重复、计费/持久化异常                      | load 响应前的 update 一律作为协议状态；`user_message_chunk` 作辅助判据       |
+| modelId 参数化串不匹配                              | 用户选的模型静默失效                           | `acp-models.ts` 双向映射 + 未匹配时快速失败                                  |
+| bridge 工具触发审批                                 | 用户被自己的工具反复打断                       | 首版保持统一审批；后续基于可信 effect/risk 元数据建立窄白名单                |
+| `allow_always` 作用域未知                           | bypass 可能意外形成持久授权                    | 首版始终自动选择 `allow_once`，验证持久化行为后再评估                        |
+| SDK 被 externalize 但未随包分发                     | 安装后启动失败                                 | `vendorDependencies`、干净安装测试、许可证检查                               |
+| 权限 option 无法表达宿主 decision                   | 错误放行或用户困惑                             | `allow_once`/`reject_once` 显式映射；无匹配即 cancel                         |
+| 自动 fallback                                       | 权限语义变化、会话被永久绑定 legacy 或重复执行 | 新会话启动失败直接失败；transport 仅由发布配置或已有 binding 选择            |
+| plan/ask 缺少强只读边界                             | provider 回归时 cancel 可能晚于工具执行        | capability 降为 best-effort；需要强承诺时增加只读 filesystem/OS sandbox      |
+| 每轮新 ACP 进程启动较慢                             | 首 token 延迟增加                              | 先测量；稳定后再单独评估进程复用                                             |
+| 能力声明超前                                        | UI 暴露不可用功能                              | capability 以端到端测试为门禁                                                |
 
 ## 23. 结论
 

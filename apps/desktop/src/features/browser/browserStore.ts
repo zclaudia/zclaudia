@@ -46,16 +46,16 @@ interface BrowserStore {
   reset(): void;
 }
 
-export const useBrowserStore = create<BrowserStore>((set) => ({
+export const useBrowserStore = create<BrowserStore>(set => ({
   engine: { status: 'unknown' },
   sessions: {},
   patchSession: (sessionId, patch) =>
-    set((s) => ({
+    set(s => ({
       sessions: {
         ...s.sessions,
         [sessionId]: { ...(s.sessions[sessionId] ?? EMPTY_SESSION), ...patch },
       },
     })),
-  setEngine: (engine) => set({ engine }),
+  setEngine: engine => set({ engine }),
   reset: () => set({ engine: { status: 'unknown' }, sessions: {} }),
 }));

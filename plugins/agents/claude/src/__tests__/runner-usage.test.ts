@@ -180,7 +180,11 @@ describe('pumpClaudeStream context reporting', () => {
         total_cost_usd: 0.01,
         usage: { input_tokens: 30, output_tokens: 5, cache_read_input_tokens: 41_000 },
         modelUsage: {
-          'claude-opus-5': { inputTokens: 30, cacheReadInputTokens: 41_000, contextWindow: 200_000 },
+          'claude-opus-5': {
+            inputTokens: 30,
+            cacheReadInputTokens: 41_000,
+            contextWindow: 200_000,
+          },
         },
       },
     ]);

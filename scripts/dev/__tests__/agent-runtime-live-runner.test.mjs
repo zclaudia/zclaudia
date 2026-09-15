@@ -30,6 +30,7 @@ test('interrupting the runner fails acceptance and kills an unresponsive owned p
   const directory = await mkdtemp(path.join(tmpdir(), 'live-runner-interrupt-'));
   let child;
   let pids = [];
+  let cleanupFailure;
   try {
     const ready = path.join(directory, 'ready.json');
     const fixture = path.join(directory, 'fake-pnpm.mjs');
@@ -91,7 +92,9 @@ test('interrupting the runner fails acceptance and kills an unresponsive owned p
       try {
         process.kill(-pids[0], 'SIGKILL');
       } catch (error) {
-        if (error.code !== 'ESRCH') throw error;
+        // Recorded, not thrown: a throw here would replace whatever the test
+        // body actually failed with.
+        if (error.code !== 'ESRCH') cleanupFailure = error;
       }
     }
     if (child && child.exitCode === null && child.signalCode === null) {
@@ -101,4 +104,7 @@ test('interrupting the runner fails acceptance and kills an unresponsive owned p
     }
     await rm(directory, { recursive: true, force: true });
   }
+  // Reached only when the body passed; an unexpected kill failure still fails
+  // the test.
+  if (cleanupFailure) throw cleanupFailure;
 });

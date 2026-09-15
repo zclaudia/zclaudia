@@ -120,11 +120,15 @@ for (const interruption of ['signal', 'parent-exit'])
       if (group)
         try {
           process.kill(-group, 'SIGKILL');
-        } catch {}
+        } catch {
+          // Already gone; this cleanup must not mask the test's own failure.
+        }
       if (launcherPid)
         try {
           process.kill(launcherPid, 'SIGKILL');
-        } catch {}
+        } catch {
+          // Already gone; see above.
+        }
       if (child && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
       await rm(directory, { recursive: true, force: true });
     }

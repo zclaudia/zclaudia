@@ -30,3 +30,8 @@ docs/quality-audit/
 
 # 锁文件
 pnpm-lock.yaml
+
+# Vendored tooling (Impeccable's copies), mirroring eslint.config.mjs
+.claude/
+.github/skills/
+.github/hooks/

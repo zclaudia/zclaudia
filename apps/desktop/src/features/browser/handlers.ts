@@ -8,7 +8,14 @@ import { useComposerStore } from '../../stores/composerStore';
 
 /** Chat-ready markdown snippet for a picked element (Windsurf-style "send element"). */
 export function formatPickedElement(el: BrowserPickedElement): string {
-  return [`Selected element on ${el.pageUrl}:`, `\`${el.selector}\``, '', '```html', el.outerHtml, '```'].join('\n');
+  return [
+    `Selected element on ${el.pageUrl}:`,
+    `\`${el.selector}\``,
+    '',
+    '```html',
+    el.outerHtml,
+    '```',
+  ].join('\n');
 }
 
 export function handleBrowserMessage(msg: ServerMessage): boolean {
@@ -22,7 +29,11 @@ export function handleBrowserMessage(msg: ServerMessage): boolean {
       return true;
     case 'browser_frame':
       store.patchSession(msg.sessionId, {
-        frame: { data: msg.data, deviceWidth: msg.metadata.deviceWidth, deviceHeight: msg.metadata.deviceHeight },
+        frame: {
+          data: msg.data,
+          deviceWidth: msg.metadata.deviceWidth,
+          deviceHeight: msg.metadata.deviceHeight,
+        },
       });
       return true;
     case 'browser_closed':
@@ -52,7 +63,7 @@ export function handleBrowserMessage(msg: ServerMessage): boolean {
       } else {
         next = [...prev];
         for (const item of msg.entries) {
-          const at = next.findIndex((e) => e.id === item.id);
+          const at = next.findIndex(e => e.id === item.id);
           if (at >= 0) next[at] = item;
           else next.push(item);
         }

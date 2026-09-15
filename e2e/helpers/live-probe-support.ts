@@ -20,15 +20,19 @@ export async function withLiveDeadline<T>(
       cleanupError = error;
     });
   }, timeoutMs);
+  let result: T;
   try {
-    const result = await action();
+    result = await action();
     if (expired) throw new Error('Live turn deadline exceeded');
-    return result;
   } finally {
     clearTimeout(timer);
     await shutdown;
-    if (cleanupError) throw cleanupError;
   }
+  // Raised after the try/finally, not inside it: throwing from `finally`
+  // replaces whatever the action itself failed with, so a genuine live-turn
+  // failure would surface as the shutdown error instead.
+  if (cleanupError) throw cleanupError;
+  return result;
 }
 
 export async function liveMessagesAfter(

@@ -45,7 +45,7 @@ export function defaultChromeDiscoveryDeps(cacheDir: string): ChromeDiscoveryDep
   return {
     env: process.env,
     platform: process.platform,
-    exists: (p) => {
+    exists: p => {
       try {
         return existsSync(p);
       } catch {
@@ -56,7 +56,7 @@ export function defaultChromeDiscoveryDeps(cacheDir: string): ChromeDiscoveryDep
       const { getInstalledBrowsers } = await import('@puppeteer/browsers');
       try {
         const browsers = await getInstalledBrowsers({ cacheDir });
-        return browsers.map((b) => b.executablePath);
+        return browsers.map(b => b.executablePath);
       } catch {
         return [];
       }

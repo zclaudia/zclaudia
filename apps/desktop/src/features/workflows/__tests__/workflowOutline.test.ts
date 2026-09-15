@@ -32,10 +32,7 @@ describe('buildWorkflowOutline', () => {
 
   it('indents branch targets and labels how they were reached', () => {
     const outline = buildWorkflowOutline(
-      def(
-        [node('run'), node('ok'), node('fix')],
-        [edge('run', 'ok'), edge('run', 'fix', 'error')]
-      )
+      def([node('run'), node('ok'), node('fix')], [edge('run', 'ok'), edge('run', 'fix', 'error')])
     );
     const [first, second, third] = outline.rows;
     expect(first).toMatchObject({ depth: 0, via: undefined });
@@ -112,9 +109,9 @@ describe('buildWorkflowOutline', () => {
 
 describe('edgeLabel', () => {
   it('prefers an author-supplied label', () => {
-    expect(edgeLabel({ id: 'e', source: 'a', target: 'b', type: 'error', label: 'timed out' })).toBe(
-      'timed out'
-    );
+    expect(
+      edgeLabel({ id: 'e', source: 'a', target: 'b', type: 'error', label: 'timed out' })
+    ).toBe('timed out');
   });
 
   it('leaves a plain success edge unlabelled', () => {

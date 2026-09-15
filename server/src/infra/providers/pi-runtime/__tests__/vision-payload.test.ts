@@ -35,12 +35,16 @@ async function capturePayload(
       apiKey: 'test-key',
       createdAt: 1,
       updatedAt: 1,
-    } as LlmProfileConfig).streamSimple(model, context as never, {
-      onPayload: (payload: unknown) => {
-        captured = payload as Record<string, unknown>;
-        throw SENTINEL;
-      },
-    } as never);
+    } as LlmProfileConfig).streamSimple(
+      model,
+      context as never,
+      {
+        onPayload: (payload: unknown) => {
+          captured = payload as Record<string, unknown>;
+          throw SENTINEL;
+        },
+      } as never
+    );
 
     for await (const _event of stream) {
       /* drain until error */

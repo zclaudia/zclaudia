@@ -1,4 +1,7 @@
-import { normalizeAgentRuntimeType, DEFAULT_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
+import {
+  normalizeAgentRuntimeType,
+  DEFAULT_AGENT_RUNTIME,
+} from '@zclaudia/shared/core/agent-profile';
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type {
@@ -45,7 +48,9 @@ type AgentProfileUpdate = Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 
 };
 
 function normalizeRuntimeType(raw: unknown): string {
-  return typeof raw === 'string' && isValidRuntimeType(raw) ? normalizeAgentRuntimeType(raw) : DEFAULT_AGENT_RUNTIME;
+  return typeof raw === 'string' && isValidRuntimeType(raw)
+    ? normalizeAgentRuntimeType(raw)
+    : DEFAULT_AGENT_RUNTIME;
 }
 
 function normalizeEnabledTools(tools: string[]): string[] {

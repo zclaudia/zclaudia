@@ -34,7 +34,7 @@ export function ConsoleStrip({ entries }: Props) {
         type="button"
         aria-expanded={open}
         className="flex w-full items-center gap-1.5 px-2 h-7 text-[11px] font-medium text-muted-foreground hover:bg-secondary hover:text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(v => !v)}
       >
         <ChevronRight
           size={12}
@@ -63,7 +63,10 @@ export function ConsoleStrip({ entries }: Props) {
             <div className="py-1 text-[11px] text-muted-foreground/60">No console output</div>
           ) : (
             entries.map((e, i) => (
-              <div key={`${e.ts}-${i}`} className={`py-0.5 text-[11px] font-mono whitespace-pre-wrap break-words ${LEVEL_TEXT[e.level]}`}>
+              <div
+                key={`${e.ts}-${i}`}
+                className={`py-0.5 text-[11px] font-mono whitespace-pre-wrap break-words ${LEVEL_TEXT[e.level]}`}
+              >
                 {e.text}
                 {e.location && <span className="text-muted-foreground/60"> {e.location}</span>}
               </div>

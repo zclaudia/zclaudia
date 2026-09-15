@@ -62,11 +62,12 @@ describe('RuntimeDescriptorRegistry', () => {
   });
 });
 
-
 it('resolves the legacy descriptor without exposing or allowing a duplicate runtime', () => {
   const registry = new RuntimeDescriptorRegistry();
   expect(registry.get('zclaudia')).toBe(registry.get('pi'));
   expect(registry.hasType('zclaudia')).toBe(true);
   expect(registry.list().map(d => d.type)).toEqual(['pi']);
-  expect(() => registry.registerForPlugin('plugin', { ...otherDesc, type: 'zclaudia' })).toThrow(/already registered/);
+  expect(() => registry.registerForPlugin('plugin', { ...otherDesc, type: 'zclaudia' })).toThrow(
+    /already registered/
+  );
 });

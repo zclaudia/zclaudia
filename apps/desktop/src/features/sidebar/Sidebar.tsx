@@ -764,7 +764,9 @@ export function Sidebar({
           onNameChange={setNewProjectName}
           rootPath={newProjectRootPath}
           onRootPathChange={setNewProjectRootPath}
-          onCreate={agentProfileId => actions.handleCreateProject(newProjectBackendId, agentProfileId)}
+          onCreate={agentProfileId =>
+            actions.handleCreateProject(newProjectBackendId, agentProfileId)
+          }
           creatingProject={creatingProject}
           isConnected={isConnected}
           isMobile={isMobile}

@@ -35,7 +35,10 @@ export interface EngineSession {
    * Enable device emulation (fixed viewport + UA + touch, then reload), or
    * disable it (null) and fall back to `fallbackViewport`.
    */
-  setEmulation(emulation: BrowserDeviceEmulation | null, fallbackViewport: BrowserViewport): Promise<void>;
+  setEmulation(
+    emulation: BrowserDeviceEmulation | null,
+    fallbackViewport: BrowserViewport
+  ): Promise<void>;
   /**
    * Toggle Overlay element-inspect mode: hover highlights render into the
    * screencast, a click fires onElementPicked and auto-disables the mode.

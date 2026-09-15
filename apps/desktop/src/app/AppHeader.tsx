@@ -60,9 +60,7 @@ export function AppHeader({
 
       {/* Center section: title (mobile only) */}
       <div className="flex-1 flex items-center justify-start ml-2 md:ml-4 min-w-0 gap-2">
-        {isMobile && (
-          <span className="font-semibold text-sm text-foreground">Claudia</span>
-        )}
+        {isMobile && <span className="font-semibold text-sm text-foreground">Claudia</span>}
       </div>
 
       <PluginWindowButtons />

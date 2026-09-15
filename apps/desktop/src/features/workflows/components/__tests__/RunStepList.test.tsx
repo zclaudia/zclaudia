@@ -35,17 +35,16 @@ describe('RunStepList', () => {
 
   it('falls back to the id for a step the workflow no longer defines', () => {
     // Runs outlive edits, so a recorded step may have no definition entry left.
-    render(<RunStepList stepRuns={[stepRun({ stepId: 'removed_step' })]} definition={definition} />);
+    render(
+      <RunStepList stepRuns={[stepRun({ stepId: 'removed_step' })]} definition={definition} />
+    );
     expect(screen.getByText('removed_step')).toBeInTheDocument();
   });
 
   it('keeps the order the steps actually ran in', () => {
     render(
       <RunStepList
-        stepRuns={[
-          stepRun({ id: 'a', stepId: 'second' }),
-          stepRun({ id: 'b', stepId: 'first' }),
-        ]}
+        stepRuns={[stepRun({ id: 'a', stepId: 'second' }), stepRun({ id: 'b', stepId: 'first' })]}
       />
     );
     const names = screen.getAllByRole('button').map(b => b.textContent);

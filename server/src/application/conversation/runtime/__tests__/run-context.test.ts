@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { BuildRunContextInput } from '../run-context.js';
 
-const assembleSystemPromptMock = vi.fn(async () => '## Project Context\n\nproject CLAUDE.md content');
+const assembleSystemPromptMock = vi.fn(
+  async () => '## Project Context\n\nproject CLAUDE.md content'
+);
 const buildSkillDirectoryHintMock = vi.fn(() => '<available_skills>hint</available_skills>');
 const toolRegistryGetAllMock = vi.fn(() => [] as Array<{ id: string; source: string }>);
 

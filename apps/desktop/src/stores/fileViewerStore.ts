@@ -220,8 +220,7 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   resetInFileSearch: () =>
     set({ inFileSearchOpen: false, inFileSearchQuery: '', inFileSearchCaseSensitive: false }),
 
-  toggleMarkdownSourceView: () =>
-    set(state => ({ markdownSourceView: !state.markdownSourceView })),
+  toggleMarkdownSourceView: () => set(state => ({ markdownSourceView: !state.markdownSourceView })),
 
   getCached: (projectRoot: string, relativePath: string) =>
     get().contentCache.get(cacheKey(projectRoot, relativePath))?.content,

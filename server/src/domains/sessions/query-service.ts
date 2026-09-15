@@ -36,7 +36,10 @@ function mapSessionRow(row: unknown): Session {
   if (typeof runtimeEngineMode === 'string' && runtimeEngineMode) {
     session.runtimeEngine = {
       engineMode: runtimeEngineMode,
-      model: typeof runtimeEngineModel === 'string' && runtimeEngineModel ? runtimeEngineModel : undefined,
+      model:
+        typeof runtimeEngineModel === 'string' && runtimeEngineModel
+          ? runtimeEngineModel
+          : undefined,
       llmProfileName:
         typeof runtimeEngineProfileName === 'string' && runtimeEngineProfileName
           ? runtimeEngineProfileName
@@ -84,81 +87,71 @@ export class SessionQueryService {
 
   listSessions(projectId?: string, includeArchived = false): Session[] {
     if (projectId && includeArchived) {
-      return (
-        this.db
-          .prepare(
-            `
+      return this.db
+        .prepare(
+          `
         SELECT ${SESSION_SELECT}
         FROM ${SESSION_FROM}
         WHERE sessions.project_id = ?
         ORDER BY sessions.sort_order ASC, sessions.updated_at DESC
       `
-          )
-          .all(projectId)
-          .map(mapSessionRow) as Session[]
-      );
+        )
+        .all(projectId)
+        .map(mapSessionRow) as Session[];
     }
 
     if (projectId) {
-      return (
-        this.db
-          .prepare(
-            `
+      return this.db
+        .prepare(
+          `
         SELECT ${SESSION_SELECT}
         FROM ${SESSION_FROM}
         WHERE sessions.project_id = ? AND sessions.archived_at IS NULL
         ORDER BY sessions.sort_order ASC, sessions.updated_at DESC
       `
-          )
-          .all(projectId)
-          .map(mapSessionRow) as Session[]
-      );
+        )
+        .all(projectId)
+        .map(mapSessionRow) as Session[];
     }
 
     if (includeArchived) {
-      return (
-        this.db
-          .prepare(
-            `
+      return this.db
+        .prepare(
+          `
         SELECT ${SESSION_SELECT}
         FROM ${SESSION_FROM}
         ORDER BY sessions.sort_order ASC, sessions.updated_at DESC
       `
-          )
-          .all()
-          .map(mapSessionRow) as Session[]
-      );
+        )
+        .all()
+        .map(mapSessionRow) as Session[];
     }
 
-    return (
-      this.db
-        .prepare(
-          `
+    return this.db
+      .prepare(
+        `
       SELECT ${SESSION_SELECT}
       FROM ${SESSION_FROM}
       WHERE sessions.archived_at IS NULL
       ORDER BY sessions.sort_order ASC, sessions.updated_at DESC
     `
-        )
-        .all()
-        .map(mapSessionRow) as Session[]
-    );
+      )
+      .all()
+      .map(mapSessionRow) as Session[];
   }
 
   listArchivedSessions(): Session[] {
-    return (
-      this.db
-        .prepare(
-          `
+    return this.db
+      .prepare(
+        `
       SELECT ${SESSION_SELECT}
       FROM ${SESSION_FROM}
       WHERE sessions.archived_at IS NOT NULL
       ORDER BY sessions.archived_at DESC
     `
-        )
-        .all()
-        .map(mapSessionRow) as Session[]
-    );
+      )
+      .all()
+      .map(mapSessionRow) as Session[];
   }
 
   syncSessions(since: string | undefined): SessionSyncResult {

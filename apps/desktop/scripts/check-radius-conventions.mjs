@@ -54,7 +54,9 @@ for (const file of walk(sourceRoot)) {
       );
     }
     if (/(?:triggerClassName|panelClassName)=["'{`][^"'{`]*rounded/.test(line)) {
-      failures.push(`${at}: no radius in Select className overrides — the primitive owns its radius`);
+      failures.push(
+        `${at}: no radius in Select className overrides — the primitive owns its radius`
+      );
     }
   });
 }
@@ -65,7 +67,9 @@ if (!fs.readFileSync(selectPrimitive, 'utf8').includes('rounded-md')) {
   );
 }
 if (fs.readFileSync(selectPrimitive, 'utf8').includes('rounded-full')) {
-  failures.push('src/components/ui/Select.tsx: rounded-full is not allowed in the Select primitive');
+  failures.push(
+    'src/components/ui/Select.tsx: rounded-full is not allowed in the Select primitive'
+  );
 }
 
 if (failures.length > 0) {

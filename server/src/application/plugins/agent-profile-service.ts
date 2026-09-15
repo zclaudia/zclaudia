@@ -1,10 +1,16 @@
-import { normalizeAgentRuntimeType, DEFAULT_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
+import {
+  normalizeAgentRuntimeType,
+  DEFAULT_AGENT_RUNTIME,
+} from '@zclaudia/shared/core/agent-profile';
 import type Database from 'better-sqlite3';
 import type { AgentProfileContribution } from '@zclaudia/shared/plugin-types';
 import { defaultToolSelection, resolveToolSelection } from '@zclaudia/shared/core/tools';
 import { AgentProfileRepository } from '../../domains/agent-profiles/repository.js';
 import { LlmProfileRepository } from '../../domains/llm-profiles/repository.js';
-import { isValidRuntimeType, runtimeRequiresLlmProfile } from '../../domains/agent-profiles/runtime-type-guard.js';
+import {
+  isValidRuntimeType,
+  runtimeRequiresLlmProfile,
+} from '../../domains/agent-profiles/runtime-type-guard.js';
 import { resolveProfileEngineMode } from '../../domains/agent-profiles/engine-mode.js';
 
 export class PluginAgentProfileService {
@@ -27,7 +33,9 @@ export class PluginAgentProfileService {
 
     const requestedRuntime = contribution.runtimeType;
     const runtimeType =
-      requestedRuntime && isValidRuntimeType(requestedRuntime) ? normalizeAgentRuntimeType(requestedRuntime) : DEFAULT_AGENT_RUNTIME;
+      requestedRuntime && isValidRuntimeType(requestedRuntime)
+        ? normalizeAgentRuntimeType(requestedRuntime)
+        : DEFAULT_AGENT_RUNTIME;
     const requiresLlm = runtimeRequiresLlmProfile(runtimeType);
     const llmRepo = new LlmProfileRepository(this.db);
     const llmProfile = llmRepo.findDefault() ?? llmRepo.findAllOrdered()[0];
@@ -45,16 +53,15 @@ export class PluginAgentProfileService {
     // declared default (CLI) mode with no LLM binding; SDK is an explicit user
     // opt-in. Runtimes without declared modes persist no engineMode.
     const modeResolution = resolveProfileEngineMode({ runtimeType, engineMode: 'cli' });
-    const engineMode = modeResolution.ok && modeResolution.engineMode
-      ? modeResolution.engineMode
-      : undefined;
+    const engineMode =
+      modeResolution.ok && modeResolution.engineMode ? modeResolution.engineMode : undefined;
 
     agentRepo.create({
       name: contribution.name,
       description: contribution.description,
       engineMode,
       llmProfileId: requiresLlm ? llmProfile!.id : null,
-      model: contribution.model ?? (requiresLlm ? llmProfile!.models?.[0]?.modelId ?? '' : ''),
+      model: contribution.model ?? (requiresLlm ? (llmProfile!.models?.[0]?.modelId ?? '') : ''),
       systemPrompt: contribution.systemPrompt ?? '',
       enabledTools,
       toolSelection,

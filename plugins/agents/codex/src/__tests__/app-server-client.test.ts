@@ -195,7 +195,9 @@ describe('CodexAppServerClient', () => {
 
     const client = new CodexAppServerClient('/bin/codex', {});
     const events = [];
-    for await (const event of client.runTurn('s', [], async () => ({ behavior: 'deny' as const }))) {
+    for await (const event of client.runTurn('s', [], async () => ({
+      behavior: 'deny' as const,
+    }))) {
       events.push(event);
     }
 

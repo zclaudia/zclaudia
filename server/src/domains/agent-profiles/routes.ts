@@ -1,4 +1,7 @@
-import { normalizeAgentRuntimeType, DEFAULT_AGENT_RUNTIME } from '@zclaudia/shared/core/agent-profile';
+import {
+  normalizeAgentRuntimeType,
+  DEFAULT_AGENT_RUNTIME,
+} from '@zclaudia/shared/core/agent-profile';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type Database from 'better-sqlite3';
@@ -16,7 +19,10 @@ import {
 } from '../agent-readiness/check.js';
 import { resolveAgentProfileRecordStatus } from '../agent-readiness/record-status.js';
 import { isValidRuntimeType, runtimeRequiresLlmProfile } from './runtime-type-guard.js';
-import { validateEngineModeConfiguration, engineModeForResponse } from './engine-mode-validation.js';
+import {
+  validateEngineModeConfiguration,
+  engineModeForResponse,
+} from './engine-mode-validation.js';
 import { providerRegistry } from '../../infra/providers/registry.js';
 
 const VALID_THINKING_LEVELS: readonly ThinkingLevel[] = [
@@ -282,7 +288,10 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
       if (requestedLlmProfileId && !llmRepo.findById(requestedLlmProfileId)) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: `llmProfileId not found: ${requestedLlmProfileId}` },
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `llmProfileId not found: ${requestedLlmProfileId}`,
+          },
         });
         return;
       }
@@ -321,7 +330,8 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         name,
         description,
         engineMode: engineModeValidation.engineMode || undefined,
-        llmProfileId: engineModeValidation.llmProfileId ?? (requiresLlmProfile ? requestedLlmProfileId : null),
+        llmProfileId:
+          engineModeValidation.llmProfileId ?? (requiresLlmProfile ? requestedLlmProfileId : null),
         model: normalizedModel,
         cliPath: normalizedCliPath,
         systemPrompt: typeof systemPrompt === 'string' ? systemPrompt : '',
@@ -480,7 +490,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         ? typeof body.llmProfileId === 'string' && body.llmProfileId.trim()
           ? body.llmProfileId.trim()
           : null
-        : existing.llmProfileId ?? null;
+        : (existing.llmProfileId ?? null);
       const mergedModel = Object.prototype.hasOwnProperty.call(body, 'model')
         ? typeof body.model === 'string'
           ? body.model.trim()
@@ -490,7 +500,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         ? typeof body.cliPath === 'string'
           ? body.cliPath.trim()
           : null
-        : existing.cliPath ?? null;
+        : (existing.cliPath ?? null);
 
       const engineModeValidation = validateEngineModeConfiguration({
         runtimeType: mergedRuntimeType,
@@ -528,7 +538,11 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         });
         return;
       }
-      if (engineModeInBody || engineModeValidation.llmProfileIdForced || Object.prototype.hasOwnProperty.call(body, 'llmProfileId')) {
+      if (
+        engineModeInBody ||
+        engineModeValidation.llmProfileIdForced ||
+        Object.prototype.hasOwnProperty.call(body, 'llmProfileId')
+      ) {
         patch.llmProfileId = engineModeValidation.llmProfileId;
       }
       if (Object.prototype.hasOwnProperty.call(body, 'model'))

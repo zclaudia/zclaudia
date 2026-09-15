@@ -69,7 +69,12 @@ export function loadMcpServersFromDb(
     if (providerType && row.provider_scope) {
       try {
         const scope = JSON.parse(row.provider_scope) as string[];
-        if (!scope.some(type => normalizeAgentRuntimeType(type) === normalizeAgentRuntimeType(providerType))) continue;
+        if (
+          !scope.some(
+            type => normalizeAgentRuntimeType(type) === normalizeAgentRuntimeType(providerType)
+          )
+        )
+          continue;
       } catch {
         // Invalid JSON scope — skip filtering, include the server
       }

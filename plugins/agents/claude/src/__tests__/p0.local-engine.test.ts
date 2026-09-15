@@ -1,6 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -167,7 +175,12 @@ describe.skipIf(!engineBinary)('P0 local engine probe (claude sdk, real engine b
     return dir;
   }
 
-  function sdkOptions(configDirectory: string, projectDir: string, homeDir: string, sessionId?: string) {
+  function sdkOptions(
+    configDirectory: string,
+    projectDir: string,
+    homeDir: string,
+    sessionId?: string
+  ) {
     const connection = {
       protocol: 'anthropic-messages' as const,
       baseUrl: `http://127.0.0.1:${port}`,
@@ -229,7 +242,12 @@ describe.skipIf(!engineBinary)('P0 local engine probe (claude sdk, real engine b
       writeFileSync(
         path.join(homeDir, '.claude', 'settings.json'),
         JSON.stringify(
-          { env: { ANTHROPIC_AUTH_TOKEN: SETTINGS_LEAK_TOKEN, ANTHROPIC_BASE_URL: 'http://127.0.0.1:1/leak' } },
+          {
+            env: {
+              ANTHROPIC_AUTH_TOKEN: SETTINGS_LEAK_TOKEN,
+              ANTHROPIC_BASE_URL: 'http://127.0.0.1:1/leak',
+            },
+          },
           null,
           2
         ),
@@ -277,7 +295,7 @@ describe.skipIf(!engineBinary)('P0 local engine probe (claude sdk, real engine b
       // plus benign engine endpoints — specifically no /v1/complete or oauth.
       const paths = fixture.requests.map(r => r.path);
       expect(paths.some(p => p.includes('oauth'))).toBe(false);
-    },
+    }
   );
 
   it(
@@ -300,8 +318,10 @@ describe.skipIf(!engineBinary)('P0 local engine probe (claude sdk, real engine b
       const second = await runTurn({ ...options, sessionId: first.sessionId });
       expect(second.sessionId).toBe(first.sessionId);
       expect(second.assistantText).toContain('PROBE_TURN_');
-      expect(fixture.requests.filter(r => r.path.includes('/messages')).length).toBeGreaterThanOrEqual(2);
-    },
+      expect(
+        fixture.requests.filter(r => r.path.includes('/messages')).length
+      ).toBeGreaterThanOrEqual(2);
+    }
   );
 
   it(
@@ -355,6 +375,6 @@ describe.skipIf(!engineBinary)('P0 local engine probe (claude sdk, real engine b
       }
       const swept = !existsSync(agedFile);
       console.log(`[P0][claude] cleanupPeriodDays=1 sweep observed: ${swept}`);
-    },
+    }
   );
 });

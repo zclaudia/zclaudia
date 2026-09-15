@@ -37,33 +37,33 @@ export function BrowserViewportView({ frame, viewport, onInput }: Props) {
       ref={canvasRef}
       tabIndex={0}
       className="w-full h-full object-contain outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-default"
-      onPointerDown={(e) => {
+      onPointerDown={e => {
         e.currentTarget.focus();
         e.currentTarget.setPointerCapture(e.pointerId);
         const ev = mapPointer(e.nativeEvent, rect(), viewport);
         if (ev) onInput(ev);
       }}
-      onPointerUp={(e) => {
+      onPointerUp={e => {
         const ev = mapPointer(e.nativeEvent, rect(), viewport);
         if (ev) onInput(ev);
       }}
-      onPointerMove={(e) => {
+      onPointerMove={e => {
         const ev = mapPointer(e.nativeEvent, rect(), viewport);
         if (ev) onInput(ev);
       }}
-      onWheel={(e) => onInput(mapWheel(e.nativeEvent, rect(), viewport))}
-      onKeyDown={(e) => {
+      onWheel={e => onInput(mapWheel(e.nativeEvent, rect(), viewport))}
+      onKeyDown={e => {
         // Keep app-level shortcuts working: let Cmd/Ctrl+L pass upward.
         if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l') return;
         e.preventDefault();
         const ev = mapKey(e.nativeEvent);
         if (ev) onInput(ev);
       }}
-      onKeyUp={(e) => {
+      onKeyUp={e => {
         const ev = mapKey(e.nativeEvent);
         if (ev) onInput(ev);
       }}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={e => e.preventDefault()}
     />
   );
 }

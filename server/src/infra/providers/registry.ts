@@ -1,4 +1,7 @@
-import { DEFAULT_AGENT_RUNTIME, normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
+import {
+  DEFAULT_AGENT_RUNTIME,
+  normalizeAgentRuntimeType,
+} from '@zclaudia/shared/core/agent-profile';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ProviderDefinition } from './definitions.js';
@@ -87,7 +90,9 @@ export class ProviderRegistry implements ProviderRegistryPort {
 
   getOrDefault(type: string): ProviderAdapter {
     this.ensureBuiltinsRegistered();
-    return this.adapters.get(normalizeAgentRuntimeType(type)) || this.adapters.get(this.defaultType)!;
+    return (
+      this.adapters.get(normalizeAgentRuntimeType(type)) || this.adapters.get(this.defaultType)!
+    );
   }
 
   /** Get PCP manifest for a provider */

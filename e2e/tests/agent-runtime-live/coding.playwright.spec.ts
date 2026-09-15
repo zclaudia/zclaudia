@@ -40,6 +40,8 @@ test(`${options.coveredCases.join('/')}: ${options.runtime} real application ${o
   let watchdog: ReturnType<typeof setTimeout> | undefined;
   let watchdogShutdown: Promise<void> | undefined;
   let watchdogError: unknown;
+  let primaryFailure: unknown;
+  let cleanupFailure: unknown;
   try {
     if (options.selfTest)
       for (const name of [
@@ -293,6 +295,9 @@ test(`${options.coveredCases.join('/')}: ${options.runtime} real application ${o
     evidence.status = 'passed';
   } catch (error) {
     evidence.failurePhase = phase;
+    // Remembered so the cleanup below can tell "the run failed" from "only
+    // cleanup failed" and avoid replacing the real cause with its own error.
+    primaryFailure = error;
     if (options.selfTest) throw error;
     // Do not leak provider stderr, request URLs or account data into reporters.
     throw new Error(
@@ -301,6 +306,15 @@ test(`${options.coveredCases.join('/')}: ${options.runtime} real application ${o
   } finally {
     clearTimeout(watchdog);
     await watchdogShutdown;
+    const recordCleanupFailure = (error: unknown) => {
+      evidence.status = 'failed';
+      evidence.processCleanup = 'failed';
+      evidence.cleanupFailure = String(error);
+      if (primaryFailure || cleanupFailure) return;
+      cleanupFailure = options.selfTest
+        ? error
+        : new Error('Live CLI process cleanup failed; acceptance did not pass');
+    };
     try {
       // Collect cleanup evidence on failures too, before dispose removes the
       // owned workspace. Cleanup success never turns a failed task into a pass.
@@ -313,20 +327,15 @@ test(`${options.coveredCases.join('/')}: ${options.runtime} real application ${o
         })
       ).filter(row => row.boundary);
       evidence.processCleanup = 'passed';
-      if (watchdogError) throw watchdogError;
+      if (watchdogError) recordCleanupFailure(watchdogError);
     } catch (error) {
-      evidence.status = 'failed';
-      evidence.processCleanup = 'failed';
-      if (options.selfTest) throw error;
-      throw new Error('Live CLI process cleanup failed; acceptance did not pass');
+      recordCleanupFailure(error);
     } finally {
       try {
         await app.dispose();
       } catch (error) {
-        evidence.status = 'failed';
-        evidence.processCleanup = 'failed';
-        if (options.selfTest) throw error;
-        throw new Error('Live CLI disposal failed; acceptance did not pass');
+        evidence.disposalFailure = String(error);
+        recordCleanupFailure(error);
       } finally {
         await writeFile(
           path.join(options.outputDirectory, 'acceptance-evidence.json'),
@@ -336,4 +345,8 @@ test(`${options.coveredCases.join('/')}: ${options.runtime} real application ${o
       }
     }
   }
+  // Only reachable when the run itself passed: a failing run has already been
+  // rethrown from the catch above. Cleanup failure still fails the task, it
+  // just no longer overwrites the reason a real failure happened.
+  if (cleanupFailure) throw cleanupFailure;
 });

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { validateEngineModeConfiguration, engineModeForResponse } from '../engine-mode-validation.js';
+import {
+  validateEngineModeConfiguration,
+  engineModeForResponse,
+} from '../engine-mode-validation.js';
 import { runtimeDescriptorRegistry } from '../../../infra/providers/runtime-descriptor-registry.js';
 import { LlmProfileRepository } from '../../llm-profiles/repository.js';
 import type { AgentRuntimeContribution } from '@zclaudia/shared/providers';
@@ -135,16 +138,24 @@ describe('validateEngineModeConfiguration', () => {
       llmRepo,
     });
     // Legacy value survives an unrelated edit (it is never used as engine auth).
-    expect(result).toMatchObject({ ok: true, llmProfileId: 'legacy-profile-id', llmProfileIdForced: false });
+    expect(result).toMatchObject({
+      ok: true,
+      llmProfileId: 'legacy-profile-id',
+      llmProfileIdForced: false,
+    });
   });
 });
 
 describe('engineModeForResponse', () => {
   it('normalizes unset claude engine mode to cli', () => {
-    expect(engineModeForResponse({ runtimeType: 'claude', llmProfileId: null } as never)).toBe('cli');
+    expect(engineModeForResponse({ runtimeType: 'claude', llmProfileId: null } as never)).toBe(
+      'cli'
+    );
   });
 
   it('returns undefined for runtimes without modes', () => {
-    expect(engineModeForResponse({ runtimeType: 'zclaudia', llmProfileId: null } as never)).toBeUndefined();
+    expect(
+      engineModeForResponse({ runtimeType: 'zclaudia', llmProfileId: null } as never)
+    ).toBeUndefined();
   });
 });

@@ -37,7 +37,7 @@ export async function installEngine(
 /** Production deps: download stable Chrome into the zclaudia browsers cache. */
 export function defaultEngineInstallDeps(cacheDir: string): EngineInstallDeps {
   return {
-    install: async (onProgress) => {
+    install: async onProgress => {
       const { install, resolveBuildId, detectBrowserPlatform, Browser, computeExecutablePath } =
         await import('@puppeteer/browsers');
       const platform = detectBrowserPlatform();

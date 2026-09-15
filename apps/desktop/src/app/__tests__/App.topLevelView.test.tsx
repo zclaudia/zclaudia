@@ -376,8 +376,7 @@ describe('Mobile drawer detents', () => {
     return {
       ...view,
       surface,
-      drawerWidth: () =>
-        view.getByTestId('drawer-panel').style.getPropertyValue('--drawer-width'),
+      drawerWidth: () => view.getByTestId('drawer-panel').style.getPropertyValue('--drawer-width'),
       isOpen: () => view.getByTestId('app-sidebar').getAttribute('data-open') === 'true',
     };
   }
@@ -457,7 +456,9 @@ describe('Mobile drawer detents', () => {
     expect(drawerWidth()).toBe(`${EXPANDED_WIDTH_PX}px`);
 
     const stepBack = () => {
-      const call = mockUseAndroidBack.mock.calls.filter(([, , priority]) => priority === 10).at(-1)!;
+      const call = mockUseAndroidBack.mock.calls
+        .filter(([, , priority]) => priority === 10)
+        .at(-1)!;
       expect(call[1]).toBe(true);
       act(() => call[0]());
     };

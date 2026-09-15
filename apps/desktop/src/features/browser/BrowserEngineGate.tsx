@@ -21,7 +21,8 @@ export function BrowserEngineGate({ engine, onInstall }: Props) {
         <>
           <div className="text-sm text-foreground">No Chromium-based browser found</div>
           <div className="text-[11px] font-medium text-muted-foreground max-w-64">
-            Install Google Chrome or Chromium on the server machine, set ZCLAUDIA_CHROME_PATH, or download a copy for zclaudia.
+            Install Google Chrome or Chromium on the server machine, set ZCLAUDIA_CHROME_PATH, or
+            download a copy for zclaudia.
           </div>
           {engine.status === 'error' && engine.message && (
             <div className="text-[11px] font-medium text-destructive">{engine.message}</div>

@@ -115,7 +115,8 @@ export class SessionState {
   }
 
   validateNewLane(lane: string): void {
-    if (this.lanes.has(lane)) throw new SessionError('already_exists', `Lane already exists: ${lane}`);
+    if (this.lanes.has(lane))
+      throw new SessionError('already_exists', `Lane already exists: ${lane}`);
   }
 
   validateTarget(targetId: string | null): void {
@@ -326,14 +327,19 @@ export class SessionState {
         targetId = position === 'at' ? entry.id : entry.parentId;
       }
       copiedEntries =
-        targetId === null ? [] : this.findEntriesOnBranch({ start: targetId, order: 'oldestFirst' });
+        targetId === null
+          ? []
+          : this.findEntriesOnBranch({ start: targetId, order: 'oldestFirst' });
       forkLanes = [{ lane: MAIN_LANE, leafId: targetId }];
     }
 
     const mutations: SessionMutation[] = [];
     let sequence = 1;
     for (const sourceEntry of copiedEntries) {
-      mutations.push({ kind: 'entry', entry: { ...structuredClone(sourceEntry), seq: sequence++ } });
+      mutations.push({
+        kind: 'entry',
+        entry: { ...structuredClone(sourceEntry), seq: sequence++ },
+      });
     }
     for (const pointer of forkLanes) {
       mutations.push({

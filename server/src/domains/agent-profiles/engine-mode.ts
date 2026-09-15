@@ -152,11 +152,17 @@ export function resolveProfileEngineMode(input: {
       ok: true,
       engineMode: '',
       declaredModes: null,
-      projected: resolved.ok ? resolved.descriptor : projectedFallback(descriptor, input.runtimeType),
+      projected: resolved.ok
+        ? resolved.descriptor
+        : projectedFallback(descriptor, input.runtimeType),
     };
   }
 
-  const resolved = resolveProfileConfigDescriptor(descriptor, input.runtimeType, input.engineMode ?? null);
+  const resolved = resolveProfileConfigDescriptor(
+    descriptor,
+    input.runtimeType,
+    input.engineMode ?? null
+  );
   if (!resolved.ok) {
     return { ok: false, code: resolved.code, message: resolved.message };
   }
@@ -168,7 +174,10 @@ export function resolveProfileEngineMode(input: {
   };
 }
 
-function projectedFallback(descriptor: EngineModeSourceDescriptor, runtime: string): ProfileConfigDescriptor {
+function projectedFallback(
+  descriptor: EngineModeSourceDescriptor,
+  runtime: string
+): ProfileConfigDescriptor {
   return {
     runtime,
     label: descriptor.label,

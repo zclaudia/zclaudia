@@ -466,7 +466,10 @@ describe('runCursor', () => {
         name: 'claudia-plugins',
         config: {
           command: 'node',
-          env: { AGENT_TOOL_BRIDGE_TOKEN: 'live-token', AGENT_TOOL_BRIDGE_URL: 'http://127.0.0.1:9' },
+          env: {
+            AGENT_TOOL_BRIDGE_TOKEN: 'live-token',
+            AGENT_TOOL_BRIDGE_URL: 'http://127.0.0.1:9',
+          },
         },
       },
     })) {

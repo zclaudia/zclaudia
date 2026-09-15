@@ -19,17 +19,20 @@ function makeApp() {
 }
 
 describe('provider capability routes', () => {
-  it.each(['pi', 'zclaudia'])('exposes the same Pi capabilities for %s and LLM profile routes', async runtime => {
-    const app = makeApp();
+  it.each(['pi', 'zclaudia'])(
+    'exposes the same Pi capabilities for %s and LLM profile routes',
+    async runtime => {
+      const app = makeApp();
 
-    const byType = await request(app).get(`/api/providers/type/${runtime}/capabilities`);
-    const byProfile = await request(app).get('/api/providers/llm-1/capabilities');
+      const byType = await request(app).get(`/api/providers/type/${runtime}/capabilities`);
+      const byProfile = await request(app).get('/api/providers/llm-1/capabilities');
 
-    expect(byType.status).toBe(200);
-    expect(byType.body.data.supportsAIReview).toBe(true);
-    expect(byProfile.status).toBe(200);
-    expect(byProfile.body.data.supportsAIReview).toBe(true);
-  });
+      expect(byType.status).toBe(200);
+      expect(byType.body.data.supportsAIReview).toBe(true);
+      expect(byProfile.status).toBe(200);
+      expect(byProfile.body.data.supportsAIReview).toBe(true);
+    }
+  );
 
   it('returns cursor runtime capabilities with default/plan/ask/bypass modes', async () => {
     const app = makeApp();

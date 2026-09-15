@@ -296,23 +296,26 @@ describe('FileLineReference', () => {
     );
   });
 
-  it.each(['missing.ts:1', 'src/missing.ts:1'])('shows a toast when %s cannot be resolved', async text => {
-    mockListDirectory.mockResolvedValueOnce({
-      entries: [],
-      currentPath: '',
-      hasMore: false,
-    });
+  it.each(['missing.ts:1', 'src/missing.ts:1'])(
+    'shows a toast when %s cannot be resolved',
+    async text => {
+      mockListDirectory.mockResolvedValueOnce({
+        entries: [],
+        currentPath: '',
+        hasMore: false,
+      });
 
-    render(<FileLineReference text={text} projectRoot="/repo" />);
-    fireEvent.click(screen.getByRole('button'));
+      render(<FileLineReference text={text} projectRoot="/repo" />);
+      fireEvent.click(screen.getByRole('button'));
 
-    await waitFor(() => {
-      expect(mockToastAdd).toHaveBeenCalledWith(
-        expect.objectContaining({ title: 'File not found' })
-      );
-    });
-    expect(mockOpenFile).not.toHaveBeenCalled();
-  });
+      await waitFor(() => {
+        expect(mockToastAdd).toHaveBeenCalledWith(
+          expect.objectContaining({ title: 'File not found' })
+        );
+      });
+      expect(mockOpenFile).not.toHaveBeenCalled();
+    }
+  );
 
   // jsdom (like real browsers) normalizes self-closing foreign-element tags
   // (e.g. `<path ... />`) to explicit closing tags (`<path ...></path>`) when

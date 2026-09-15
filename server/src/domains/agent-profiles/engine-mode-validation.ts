@@ -1,10 +1,7 @@
 import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileRepository } from '../llm-profiles/repository.js';
-import {
-  resolveProfileEngineMode,
-  getEngineModeSourceDescriptor,
-} from './engine-mode.js';
+import { resolveProfileEngineMode, getEngineModeSourceDescriptor } from './engine-mode.js';
 import { resolveRuntimeModelConnection } from './runtime-model-connection.js';
 
 /**
@@ -118,7 +115,13 @@ function validateImpl(input: EngineModeConfigValidationInput): EngineModeConfigV
         };
       }
     }
-    return { ok: true, engineMode, llmProfileId, llmProfileIdForced: false, requiresLlmProfile: true };
+    return {
+      ok: true,
+      engineMode,
+      llmProfileId,
+      llmProfileIdForced: false,
+      requiresLlmProfile: true,
+    };
   }
 
   // CLI (or external) mode. New profiles and explicit mode switches clear the
@@ -126,7 +129,13 @@ function validateImpl(input: EngineModeConfigValidationInput): EngineModeConfigV
   // (they are never used as the engine connection, but wiping user data on an
   // unrelated edit is not ours to do).
   if (input.engineModeExplicit) {
-    return { ok: true, engineMode, llmProfileId: null, llmProfileIdForced: true, requiresLlmProfile: false };
+    return {
+      ok: true,
+      engineMode,
+      llmProfileId: null,
+      llmProfileIdForced: true,
+      requiresLlmProfile: false,
+    };
   }
   return {
     ok: true,

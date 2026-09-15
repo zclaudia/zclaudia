@@ -27,7 +27,7 @@ for (const runtime of ['claude', 'codex']) {
     const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
     await writeFile(
       path.join(payload, `bin/${runtime}`),
-      `#!/bin/sh\nif ${runtime === 'claude' ? '[ \"$1\" = auth ] && [ \"$2\" = login ]' : '[ \"$1\" = login ] && [ -z \"$2\" ]'}; then\n  rm -f \"${'$'}{E2E_RUNTIME_AUDIT}.auth-required\"\nfi\nif [ \"$1\" = ${runtime === 'claude' ? 'auth' : 'login'} ] && [ -f \"${'$'}{E2E_RUNTIME_AUDIT}.auth-required\" ]; then\n  echo '${runtime === 'claude' ? '{\"loggedIn\":false}' : 'Not logged in'}'\n  exit 1\nfi\nexec ${quote(process.execPath)} \"$(dirname \"$0\")/cli.mjs\" \"$@\"\n`
+      `#!/bin/sh\nif ${runtime === 'claude' ? '[ "$1" = auth ] && [ "$2" = login ]' : '[ "$1" = login ] && [ -z "$2" ]'}; then\n  rm -f "${'$'}{E2E_RUNTIME_AUDIT}.auth-required"\nfi\nif [ "$1" = ${runtime === 'claude' ? 'auth' : 'login'} ] && [ -f "${'$'}{E2E_RUNTIME_AUDIT}.auth-required" ]; then\n  echo '${runtime === 'claude' ? '{"loggedIn":false}' : 'Not logged in'}'\n  exit 1\nfi\nexec ${quote(process.execPath)} "$(dirname "$0")/cli.mjs" "$@"\n`
     );
     await chmod(path.join(payload, `bin/${runtime}`), 0o755);
     const archive = path.join(app.directory, `${runtime}.tar.gz`);

@@ -103,7 +103,9 @@ function rowToConfig(row: McpServerRow): McpServerConfig {
     enabled: row.enabled === 1,
     description: row.description || undefined,
     source: row.source as McpServerConfig['source'],
-    providerScope: row.provider_scope ? (JSON.parse(row.provider_scope) as string[]).map(normalizeAgentRuntimeType) : undefined,
+    providerScope: row.provider_scope
+      ? (JSON.parse(row.provider_scope) as string[]).map(normalizeAgentRuntimeType)
+      : undefined,
     trustPolicy: parseTrustPolicy(row.trust_policy),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -223,7 +225,9 @@ export class McpServerService {
         input.env ? JSON.stringify(input.env) : null,
         input.enabled !== false ? 1 : 0,
         input.description || null,
-        input.providerScope ? JSON.stringify(input.providerScope.map(normalizeAgentRuntimeType)) : null,
+        input.providerScope
+          ? JSON.stringify(input.providerScope.map(normalizeAgentRuntimeType))
+          : null,
         stringifyTrustPolicy(input.trustPolicy),
         transport,
         input.url || null,

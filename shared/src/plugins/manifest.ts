@@ -78,7 +78,9 @@ export function validateAgentRuntimeContributions(contributes: unknown): string[
       return [`contributes.agentRuntimes[${index}] must have a non-empty string type`];
     }
     // Dual-mode declarations: same structural contract the plugin SDK enforces.
-    return validateEngineModeDeclarations(runtime).map(error => `contributes.agentRuntimes[${index}]: ${error}`);
+    return validateEngineModeDeclarations(runtime).map(
+      error => `contributes.agentRuntimes[${index}]: ${error}`
+    );
   });
 }
 

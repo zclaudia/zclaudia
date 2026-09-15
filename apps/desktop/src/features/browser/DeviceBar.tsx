@@ -11,14 +11,14 @@ interface Props {
 
 /** Slim bar under the toolbar while device emulation is active. */
 export function DeviceBar({ emulation, onChange }: Props) {
-  const preset = DEVICE_PRESETS.find((p) => p.id === emulation.presetId);
+  const preset = DEVICE_PRESETS.find(p => p.id === emulation.presetId);
   const landscape = emulation.width > emulation.height;
 
   return (
     <div className="flex items-center gap-1 px-2 h-8 border-b border-border">
       <DropdownMenu
         ariaLabel="Device preset"
-        entries={DEVICE_PRESETS.map((p) => ({
+        entries={DEVICE_PRESETS.map(p => ({
           key: p.id,
           label: p.label,
           icon: p.id === emulation.presetId ? <Check size={14} strokeWidth={1.75} /> : undefined,

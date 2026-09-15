@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, ExternalLink, RotateCw, Smartphone, SquareDashedMousePointer, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  ExternalLink,
+  RotateCw,
+  Smartphone,
+  SquareDashedMousePointer,
+  X,
+} from 'lucide-react';
 import type { BrowserPageState } from '@zclaudia/shared';
 
 interface Props {
@@ -42,10 +50,20 @@ export function BrowserToolbar({
 
   return (
     <div className="flex items-center gap-1 px-2 h-9 border-b border-border">
-      <button aria-label="Back" className={BTN} disabled={!state?.canGoBack} onClick={() => onHistory('back')}>
+      <button
+        aria-label="Back"
+        className={BTN}
+        disabled={!state?.canGoBack}
+        onClick={() => onHistory('back')}
+      >
         <ArrowLeft size={14} strokeWidth={1.75} />
       </button>
-      <button aria-label="Forward" className={BTN} disabled={!state?.canGoForward} onClick={() => onHistory('forward')}>
+      <button
+        aria-label="Forward"
+        className={BTN}
+        disabled={!state?.canGoForward}
+        onClick={() => onHistory('forward')}
+      >
         <ArrowRight size={14} strokeWidth={1.75} />
       </button>
       {state?.loading ? (
@@ -62,7 +80,7 @@ export function BrowserToolbar({
         className="flex-1 min-w-0 h-7 px-2 rounded-md bg-secondary/50 text-sm font-mono text-foreground outline-none focus:ring-1 focus:ring-ring"
         value={draft}
         spellCheck={false}
-        onFocus={(e) => {
+        onFocus={e => {
           editing.current = true;
           e.currentTarget.select();
         }}
@@ -70,8 +88,8 @@ export function BrowserToolbar({
           editing.current = false;
           setDraft(state?.url ?? '');
         }}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => {
           if (e.key === 'Enter' && draft.trim()) {
             onNavigate(draft.trim());
             editing.current = false;

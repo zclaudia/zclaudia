@@ -9,11 +9,7 @@
   "engines": {
     "claudia": "*"
   },
-  "permissions": [
-    "provider.register",
-    "provider.call",
-    "network.fetch"
-  ],
+  "permissions": ["provider.register", "provider.call", "network.fetch"],
   "contributes": {
     "agentRuntimes": [
       {
@@ -144,15 +140,10 @@
           }
         },
         "policy": {
-          "nativeInteractionTools": [
-            "enter_plan_mode",
-            "exit_plan_mode"
-          ],
+          "nativeInteractionTools": ["enter_plan_mode", "exit_plan_mode"],
           "modeSwitchSessionPolicy": "preserve",
           "sessionCwdPolicy": "requested",
-          "escalateAlwaysTools": [
-            "ExitPlanMode"
-          ]
+          "escalateAlwaysTools": ["ExitPlanMode"]
         }
       }
     ],

@@ -50,7 +50,10 @@ function readinessForResolvedAgent(
 
   // Layer 1: engine mode validity. An explicitly stored unknown mode fails
   // closed instead of silently executing under another mode.
-  const engineMode = resolveProfileEngineMode({ runtimeType, engineMode: agent.engineMode ?? null });
+  const engineMode = resolveProfileEngineMode({
+    runtimeType,
+    engineMode: agent.engineMode ?? null,
+  });
   if (!engineMode.ok) return { usable: false, reason: 'engine_mode_unsupported' };
   // Only runtimes that DECLARE engine modes route through the SDK checks;
   // classic llm-profile runtimes (zclaudia) keep their original semantics.
@@ -66,9 +69,16 @@ function readinessForResolvedAgent(
     }
     if (!llm) return { usable: false, reason: 'no_llm_profile' };
     if (!hasLlmCredential(llm)) return { usable: false, reason: 'no_credential' };
-    const connection = resolveRuntimeModelConnection({ runtimeType, profile: llm, model: agent.model });
+    const connection = resolveRuntimeModelConnection({
+      runtimeType,
+      profile: llm,
+      model: agent.model,
+    });
     if (!connection.ok) {
-      if (connection.code === 'LLM_PROFILE_FIELD_UNSUPPORTED' || connection.code === 'LLM_OPTION_UNSUPPORTED') {
+      if (
+        connection.code === 'LLM_PROFILE_FIELD_UNSUPPORTED' ||
+        connection.code === 'LLM_OPTION_UNSUPPORTED'
+      ) {
         return { usable: false, reason: 'llm_option_unsupported' };
       }
       return { usable: false, reason: 'llm_protocol_unsupported' };
@@ -143,7 +153,12 @@ export async function resolveAgentReadinessWithRuntimeCheck(
   if (!agents.length) return { usable: false, reason: 'no_agent' };
   const llms = new LlmProfileRepository(db);
   const readiness = await Promise.all(
-    agents.map(agent => resolveAgentExecutionReadiness(agent, agent.llmProfileId ? llms.findById(agent.llmProfileId) : undefined))
+    agents.map(agent =>
+      resolveAgentExecutionReadiness(
+        agent,
+        agent.llmProfileId ? llms.findById(agent.llmProfileId) : undefined
+      )
+    )
   );
   if (readiness.some(item => item.usable)) return { usable: true };
   const primary = repo.findDefault() ?? agents[0];

@@ -36,10 +36,7 @@ export function drawerExpandedWidth(viewportWidth: number): number {
   if (!Number.isFinite(viewportWidth) || viewportWidth <= 0) {
     return DRAWER_MAX_EXPANDED_WIDTH_PX;
   }
-  return Math.max(
-    DRAWER_PEEK_WIDTH_PX,
-    Math.min(viewportWidth, DRAWER_MAX_EXPANDED_WIDTH_PX)
-  );
+  return Math.max(DRAWER_PEEK_WIDTH_PX, Math.min(viewportWidth, DRAWER_MAX_EXPANDED_WIDTH_PX));
 }
 
 /** Whether the viewport is wide enough for the expanded stage to add anything. */

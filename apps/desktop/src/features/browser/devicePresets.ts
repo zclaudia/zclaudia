@@ -23,14 +23,24 @@ const ANDROID_UA =
 
 export const DEVICE_PRESETS: BrowserDevicePreset[] = [
   { id: 'iphone-se', label: 'iPhone SE', width: 375, height: 667, dpr: 2, userAgent: IOS_PHONE_UA },
-  { id: 'iphone-15-pro', label: 'iPhone 15 Pro', width: 393, height: 852, dpr: 3, userAgent: IOS_PHONE_UA },
+  {
+    id: 'iphone-15-pro',
+    label: 'iPhone 15 Pro',
+    width: 393,
+    height: 852,
+    dpr: 3,
+    userAgent: IOS_PHONE_UA,
+  },
   { id: 'pixel-8', label: 'Pixel 8', width: 412, height: 915, dpr: 2.625, userAgent: ANDROID_UA },
   { id: 'ipad-mini', label: 'iPad Mini', width: 768, height: 1024, dpr: 2, userAgent: IPAD_UA },
 ];
 
 export const DEFAULT_PRESET_ID = 'iphone-15-pro';
 
-export function toEmulation(preset: BrowserDevicePreset, landscape = false): BrowserDeviceEmulation {
+export function toEmulation(
+  preset: BrowserDevicePreset,
+  landscape = false
+): BrowserDeviceEmulation {
   return {
     presetId: preset.id,
     width: landscape ? preset.height : preset.width,

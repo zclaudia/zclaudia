@@ -39,7 +39,7 @@ export function NetworkStrip({ entries }: Props) {
         type="button"
         aria-expanded={open}
         className="flex w-full items-center gap-1.5 px-2 h-7 text-[11px] font-medium text-muted-foreground hover:bg-secondary hover:text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(v => !v)}
       >
         <ChevronRight
           size={12}
@@ -67,11 +67,15 @@ export function NetworkStrip({ entries }: Props) {
                 key={e.id}
                 className={`flex items-baseline gap-2 py-0.5 text-[11px] font-mono ${isFailed(e) ? 'text-destructive' : 'text-muted-foreground'}`}
               >
-                <span className="w-8 shrink-0 text-right">{e.errorText ? 'ERR' : (e.status ?? '…')}</span>
+                <span className="w-8 shrink-0 text-right">
+                  {e.errorText ? 'ERR' : (e.status ?? '…')}
+                </span>
                 <span className="w-10 shrink-0">{e.method}</span>
                 <span className="min-w-0 flex-1 truncate">{displayUrl(e.url, i)}</span>
                 {e.durationMs !== undefined && (
-                  <span className="shrink-0 text-muted-foreground/60">{Math.round(e.durationMs)}ms</span>
+                  <span className="shrink-0 text-muted-foreground/60">
+                    {Math.round(e.durationMs)}ms
+                  </span>
                 )}
               </div>
             ))

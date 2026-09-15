@@ -92,7 +92,10 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
     now
   );
   if (options.agentRuntimeType) {
-    db.prepare('UPDATE agent_profiles SET runtime_type = ? WHERE id = ?').run(options.agentRuntimeType, 'agent-1');
+    db.prepare('UPDATE agent_profiles SET runtime_type = ? WHERE id = ?').run(
+      options.agentRuntimeType,
+      'agent-1'
+    );
   }
   // `sessionAgentProfileId` lets a test reference a stale agent id (no row exists
   // for that id) — required for the "stale agent_profile_id fallback" path. Default
@@ -191,15 +194,22 @@ function bootstrapWithDb(
 }
 
 describe('initializeRunBootstrap mode/session policy', () => {
-  it.each(['pi', 'zclaudia'])('resumes a %s profile through Pi while retaining its LLM provider and session ID', runtime => {
-    const { result, db } = bootstrapWithDb('anthropic', 'plan', 'continue', { agentRuntimeType: runtime });
-    try {
-      expect(result?.providerType).toBe('pi');
-      expect(result?.agentProfile.runtimeType).toBe('pi');
-      expect(result?.providerConfig?.providerType).toBe('anthropic');
-      expect(result?.providerEventState.sdkSessionId).toBe('sdk-existing');
-    } finally { db.close(); }
-  });
+  it.each(['pi', 'zclaudia'])(
+    'resumes a %s profile through Pi while retaining its LLM provider and session ID',
+    runtime => {
+      const { result, db } = bootstrapWithDb('anthropic', 'plan', 'continue', {
+        agentRuntimeType: runtime,
+      });
+      try {
+        expect(result?.providerType).toBe('pi');
+        expect(result?.agentProfile.runtimeType).toBe('pi');
+        expect(result?.providerConfig?.providerType).toBe('anthropic');
+        expect(result?.providerEventState.sdkSessionId).toBe('sdk-existing');
+      } finally {
+        db.close();
+      }
+    }
+  );
 
   it('preserves zclaudia sdk_session_id across mode switches (preserve policy)', () => {
     const result = bootstrap('zclaudia', 'plan');

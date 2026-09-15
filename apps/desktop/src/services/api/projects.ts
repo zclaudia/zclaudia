@@ -21,7 +21,7 @@ export async function createProject(
     type?: 'chat_only' | 'code';
     llmProfileId?: string;
     rootPath?: string;
-  defaultAgentProfileId?: string | null;
+    defaultAgentProfileId?: string | null;
   },
   backendId?: string | null
 ): Promise<Project> {

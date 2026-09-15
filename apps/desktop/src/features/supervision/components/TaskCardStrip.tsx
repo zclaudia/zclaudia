@@ -176,7 +176,9 @@ function TaskMiniCard({ task }: { task: SupervisionTask }) {
     <div className="flex-shrink-0 w-[160px] p-2 bg-background border border-border rounded-lg hover:border-border/80 transition-colors">
       {/* Status + indicators */}
       <div className="flex items-center gap-1.5 mb-1">
-        <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${TONE_BADGE[badge.tone]}`}>
+        <span
+          className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${TONE_BADGE[badge.tone]}`}
+        >
           {badge.label}
         </span>
         {task.status === 'running' && (

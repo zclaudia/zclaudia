@@ -31,7 +31,12 @@ interface Size {
  * equals the element box, degrading to the previous 1:1 mapping. Points in the
  * letterbox margin clamp to the page edge.
  */
-function scale(offsetX: number, offsetY: number, rect: Size, viewport: Size): { x: number; y: number } {
+function scale(
+  offsetX: number,
+  offsetY: number,
+  rect: Size,
+  viewport: Size
+): { x: number; y: number } {
   if (rect.width <= 0 || rect.height <= 0 || viewport.width <= 0 || viewport.height <= 0) {
     return { x: Math.round(offsetX), y: Math.round(offsetY) };
   }

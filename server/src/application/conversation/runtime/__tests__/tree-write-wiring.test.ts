@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
-import { Session, buildSessionContext} from '@earendil-works/pi-agent-core';
+import { Session, buildSessionContext } from '@earendil-works/pi-agent-core';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { SqliteSessionStorage } from '../../../../infra/providers/pi-runtime/session-tree/sqlite-session-storage.js';
 import { upsertAssistantMessage } from '../run-lifecycle.js';
@@ -35,9 +35,7 @@ describe('Route C tree write wiring (assistant final save)', () => {
     const db = makeDb();
     const run = fakeRun(db);
     upsertAssistantMessage(run, { indexMetadata: true });
-    const ctx = buildSessionContext(
-      await new SqliteSessionStorage(db, 's1').getActivePath()
-    );
+    const ctx = buildSessionContext(await new SqliteSessionStorage(db, 's1').getActivePath());
     expect(ctx.messages.map((m: any) => m.role)).toEqual(['assistant']);
     expect((ctx.messages[0] as any).content.find((b: any) => b.type === 'text').text).toBe(
       'hello world'
@@ -48,7 +46,9 @@ describe('Route C tree write wiring (assistant final save)', () => {
       tree_entry_id: string | null;
     };
     const entryRow = db
-      .prepare("SELECT json_extract(payload, '$.entry.id') AS id FROM session_log WHERE session_id = ? AND json_extract(payload, '$.entry.type') = ?")
+      .prepare(
+        "SELECT json_extract(payload, '$.entry.id') AS id FROM session_log WHERE session_id = ? AND json_extract(payload, '$.entry.type') = ?"
+      )
       .get('s1', 'message') as { id: string } | undefined;
     expect(msgRow.tree_entry_id).toBeTruthy();
     expect(msgRow.tree_entry_id).toBe(entryRow?.id);

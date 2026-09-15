@@ -10,7 +10,6 @@ import {
   appendMessagesToTree,
 } from '../write-path.js';
 
-
 describe('write-path builders', () => {
   it('buildUserMessage: plain text', () => {
     expect(buildUserMessage('hi', [])).toEqual({ role: 'user', content: 'hi' });
@@ -114,7 +113,9 @@ describe('write-path builders', () => {
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
     const leafBefore = await new SqliteSessionStorage(db, 's1').getLeafId();
     const countBefore = (
-      db.prepare(`SELECT count(*) AS c FROM session_log WHERE session_id='s1' AND kind='entry'`).get() as {
+      db
+        .prepare(`SELECT count(*) AS c FROM session_log WHERE session_id='s1' AND kind='entry'`)
+        .get() as {
         c: number;
       }
     ).c;
@@ -127,7 +128,9 @@ describe('write-path builders', () => {
     ).toThrow();
 
     const countAfter = (
-      db.prepare(`SELECT count(*) AS c FROM session_log WHERE session_id='s1' AND kind='entry'`).get() as {
+      db
+        .prepare(`SELECT count(*) AS c FROM session_log WHERE session_id='s1' AND kind='entry'`)
+        .get() as {
         c: number;
       }
     ).c;
@@ -156,7 +159,9 @@ describe('write-path builders', () => {
     expect((db.prepare(`SELECT count(*) AS c FROM messages`).get() as { c: number }).c).toBe(0);
     expect(
       (
-        db.prepare(`SELECT count(*) AS c FROM session_log WHERE session_id='s1' AND kind='entry'`).get() as {
+        db
+          .prepare(`SELECT count(*) AS c FROM session_log WHERE session_id='s1' AND kind='entry'`)
+          .get() as {
           c: number;
         }
       ).c

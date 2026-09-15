@@ -1,4 +1,9 @@
-import { DEFAULT_AGENT_RUNTIME, PI_AGENT_RUNTIME, normalizeAgentRuntimeType, type AgentRuntimeType } from './agent-profile.js';
+import {
+  DEFAULT_AGENT_RUNTIME,
+  PI_AGENT_RUNTIME,
+  normalizeAgentRuntimeType,
+  type AgentRuntimeType,
+} from './agent-profile.js';
 import { builtinAgentPluginForRuntime } from '../plugins/builtin-agents.js';
 
 export type ModelConfigKind = 'llm-profile' | 'native' | 'none';
@@ -53,7 +58,10 @@ export interface EngineModeSummary {
   id: string;
   label: string;
   /** Projection onto the legacy descriptor fields for this mode. */
-  descriptor: Omit<ProfileConfigDescriptor, 'runtime' | 'label' | 'enabled' | 'defaultEngineMode' | 'engineModes'>;
+  descriptor: Omit<
+    ProfileConfigDescriptor,
+    'runtime' | 'label' | 'enabled' | 'defaultEngineMode' | 'engineModes'
+  >;
   connection: EngineModeDescriptor['connection'];
   executable: EngineModeDescriptor['executable'];
   authNote?: string;
@@ -73,7 +81,10 @@ export const PROFILE_CONFIG_DESCRIPTORS: Record<string, ProfileConfigDescriptor>
 export function getProfileConfigDescriptor(
   runtime: AgentRuntimeType | undefined
 ): ProfileConfigDescriptor {
-  return PROFILE_CONFIG_DESCRIPTORS[normalizeAgentRuntimeType(runtime)] ?? PROFILE_CONFIG_DESCRIPTORS[DEFAULT_AGENT_RUNTIME];
+  return (
+    PROFILE_CONFIG_DESCRIPTORS[normalizeAgentRuntimeType(runtime)] ??
+    PROFILE_CONFIG_DESCRIPTORS[DEFAULT_AGENT_RUNTIME]
+  );
 }
 
 export function enabledRuntimeDescriptors(): ProfileConfigDescriptor[] {
@@ -99,10 +110,7 @@ export type {
   RuntimeModelProtocol,
 } from '@zclaudia/plugin-sdk/providers';
 
-import type {
-  EngineModeDescriptor,
-  RuntimeModelProtocol,
-} from '@zclaudia/plugin-sdk/providers';
+import type { EngineModeDescriptor, RuntimeModelProtocol } from '@zclaudia/plugin-sdk/providers';
 
 /** The default engine mode used when a descriptor declares modes but no explicit default. */
 export const DEFAULT_ENGINE_MODE = 'cli';
@@ -240,7 +248,9 @@ export function engineModeAuthNote(summary: EngineModeSummary): string | undefin
  * Whether a resolved profile configuration requires a bound LLM profile.
  * Engine-mode aware: only `connection.kind === 'llm-profile'` modes do.
  */
-export function projectedDescriptorRequiresLlmProfile(descriptor: ProfileConfigDescriptor): boolean {
+export function projectedDescriptorRequiresLlmProfile(
+  descriptor: ProfileConfigDescriptor
+): boolean {
   return descriptor.model.kind === 'llm-profile';
 }
 

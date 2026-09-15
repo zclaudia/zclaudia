@@ -23,7 +23,13 @@ interface EntryRow {
 
 function toRow(entry: Entry): EntryRow {
   const { id, parentId, type, ...rest } = entry as Entry & Record<string, unknown>;
-  return { id, parent_id: parentId, type, payload: JSON.stringify(rest), timestamp: entry.timestamp };
+  return {
+    id,
+    parent_id: parentId,
+    type,
+    payload: JSON.stringify(rest),
+    timestamp: entry.timestamp,
+  };
 }
 
 const NODE_ENTRY_TYPES = new Set(['message', 'compaction', 'label', 'leaf']);

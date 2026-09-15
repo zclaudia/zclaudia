@@ -20,6 +20,9 @@ export function forkSessionAt(
   newSessionId: string
 ): void {
   db.transaction(() => {
-    new SqliteSessionStorage(db, sourceSessionId).forkInto(newSessionId, { entryId, position: 'at' });
+    new SqliteSessionStorage(db, sourceSessionId).forkInto(newSessionId, {
+      entryId,
+      position: 'at',
+    });
   })();
 }

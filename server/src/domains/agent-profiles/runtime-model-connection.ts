@@ -50,9 +50,7 @@ export interface ConnectionResolution {
   };
 }
 
-export type RuntimeModelConnectionResolution =
-  | ConnectionResolution
-  | ConnectionRejection;
+export type RuntimeModelConnectionResolution = ConnectionResolution | ConnectionRejection;
 
 /** Anthropic engine base URL: keep proxy path prefixes, drop a terminal `/v1` (the engine appends versioned paths). */
 export function toAnthropicEngineBaseUrl(rawBaseUrl: string | undefined | null): string {
@@ -100,11 +98,9 @@ export function validateConnectionHeaders(
       );
     }
     if (/[^\x20-\x7E]/.test(name) || /[\r\n]/.test(value)) {
-      return reject(
-        'LLM_OPTION_UNSUPPORTED',
-        `Header "${name}" contains control characters`,
-        { header: name }
-      );
+      return reject('LLM_OPTION_UNSUPPORTED', `Header "${name}" contains control characters`, {
+        header: name,
+      });
     }
   }
   return null;
