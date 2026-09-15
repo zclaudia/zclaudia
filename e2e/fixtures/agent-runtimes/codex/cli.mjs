@@ -42,6 +42,24 @@ createInterface({ input: process.stdin }).on('line', async line => {
     reply({ userAgent: 'zclaudia-e2e' });
     return;
   }
+  if (method === 'model/list') {
+    reply({
+      data: [
+        {
+          id: 'fixture-model',
+          model: 'fixture-model',
+          displayName: 'Fixture Model',
+          description: 'Deterministic test model',
+          isDefault: true,
+          hidden: false,
+          supportedReasoningEfforts: [],
+          defaultReasoningEffort: 'medium',
+        },
+      ],
+      nextCursor: null,
+    });
+    return;
+  }
   if (method === 'thread/start') {
     const sessionId = randomUUID();
     threads[sessionId] = params.cwd;
@@ -138,7 +156,7 @@ createInterface({ input: process.stdin }).on('line', async line => {
     return;
   }
   if (prompt.includes('E2E_WAIT_FOR_CANCEL')) {
-    if (prompt.includes('E2E_MCP')) await exerciseMcp('codex', args, cwd);
+    if (prompt.includes('E2E_MCP')) await exerciseMcp('codex', args, cwd, prompt);
     notify('item/agentMessage/delta', { delta: 'Fixture task is running' });
     active.set(
       threadId,
@@ -146,7 +164,7 @@ createInterface({ input: process.stdin }).on('line', async line => {
     );
     return;
   }
-  if (prompt.includes('E2E_MCP')) await exerciseMcp('codex', args, cwd);
+  if (prompt.includes('E2E_MCP')) await exerciseMcp('codex', args, cwd, prompt);
   const file = path.join(cwd, 'add.mjs');
   readFileSync(file, 'utf8');
   const edit = {

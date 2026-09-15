@@ -88,7 +88,13 @@ describe('ws/run-provider-launch', () => {
     });
   });
 
-  it('emits run_started, background status, negotiates profile, and starts periodic save', async () => {
+  it.each([undefined, 'Return JSON.'])('launches with task input: %s', async taskContext => {
+    if (taskContext)
+      buildRunContextMock.mockResolvedValueOnce({
+        nativeMode: 'default',
+        runOptions: { cwd: '/tmp/project', mode: 'default' },
+        taskContext,
+      });
     const { launchProviderRun } = await import('../run-provider-launch.js');
 
     const trace = {
@@ -233,7 +239,7 @@ describe('ws/run-provider-launch', () => {
       })
     );
     expect(adapter.run).toHaveBeenCalledWith(
-      'processed hello',
+      taskContext ? `${taskContext}\n\nprocessed hello` : 'processed hello',
       expect.objectContaining({
         cwd: '/tmp/project',
         mode: 'default',

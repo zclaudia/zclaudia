@@ -324,6 +324,8 @@ describe.skipIf(!codexBinary)('P0 local engine probe (codex app-server, real bin
     { timeout: 180_000 },
     async () => {
       const projectDir = tempRoot('project3');
+      const projectMarker = 'NATIVE_PROJECT_AGENTS_MARKER_7129';
+      writeFileSync(path.join(projectDir, 'AGENTS.md'), `# Project rules\n${projectMarker}\n`);
       const { client } = makeSession(projectDir);
       const threadId = await client.startThread(projectDir, {
         model: BOUND_MODEL,
@@ -331,6 +333,9 @@ describe.skipIf(!codexBinary)('P0 local engine probe (codex app-server, real bin
       });
       const first = await runTurn(client, threadId, projectDir);
       expect(first.text).toContain('PROBE_OK');
+      const firstRequest = fixture.requests.filter(r => r.path.includes('/responses')).at(-1)!;
+      expect(JSON.stringify(firstRequest.body)).toContain(projectMarker);
+      expect(JSON.stringify(firstRequest.body)).not.toContain(DEV_INSTRUCTIONS_MARKER);
 
       // Resume with the same locked provider/model — no auto fresh-thread.
       await client.resumeThread(threadId, {

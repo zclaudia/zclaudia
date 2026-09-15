@@ -40,9 +40,26 @@ function expandEnvPlaceholders(env) {
 
 // Runs the host's actual stdio proxy. No bridge URL, credential, or generated
 // config is copied to the test report.
-export async function exerciseMcp(runtime, args, cwd) {
-  let config;
-  if (runtime === 'cursor') {
+export async function exerciseMcp(runtime, args, cwd, prompt, inlineConfig) {
+  assert.ok(prompt, 'The fixture must inspect the actual turn input');
+  for (const section of [
+    '[System Context]',
+    '## Your Identity',
+    '## Behavior Guidelines',
+    '## Tool Usage Guide',
+  ]) {
+    assert.ok(!prompt.includes(section), `Unexpected automatic host prompt: ${section}`);
+  }
+  if (runtime === 'claude') {
+    assert.ok(
+      !args.includes('--append-system-prompt'),
+      'Default Claude runs must use only the native preset'
+    );
+  }
+  let config = inlineConfig;
+  if (inlineConfig) {
+    assert.ok(inlineConfig.command, 'ACP must provide the bridge in session/new');
+  } else if (runtime === 'cursor') {
     // cursor-agent expands ${VAR} in an MCP server's env from its own process
     // environment, so the adapter references the bridge values by variable name
     // instead of writing them into the user's project file. Mirror that here,
@@ -121,6 +138,22 @@ export async function exerciseMcp(runtime, args, cwd) {
     assert.equal(initialized.serverInfo.name, 'agent-tool-bridge');
     const listed = await request('tools/list');
     assert.ok(listed.tools.some(tool => tool.name === 'e2e_session_probe'));
+    const pushFile = listed.tools.find(tool => tool.name === 'push_file');
+    assert.ok(pushFile, 'push_file must be discoverable without a system prompt');
+    assert.ok(pushFile.description.includes('local file'));
+    assert.ok(pushFile.inputSchema.required.includes('filePath'));
+    const fileName = `mcp-delivery-${sessionId}.txt`;
+    const filePath = path.join(cwd, fileName);
+    writeFileSync(filePath, `MCP delivery for ${sessionId}\n`);
+    const pushed = await request('tools/call', {
+      name: 'push_file',
+      arguments: { filePath, description: 'MCP injection verification' },
+    });
+    assert.ok(!pushed.isError);
+    const delivery = JSON.parse(pushed.content[0].text);
+    assert.equal(delivery.success, true, JSON.stringify(delivery));
+    assert.equal(delivery.fileName, fileName);
+    writeFileSync(path.join(cwd, 'mcp-delivery-result.json'), JSON.stringify(delivery));
     const spoof = await fetch(
       `${config.env.AGENT_TOOL_BRIDGE_URL}/v1/tools/e2e_session_probe/call`,
       {

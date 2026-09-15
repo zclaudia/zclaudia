@@ -48,7 +48,7 @@ function createInput(overrides: Partial<BuildRunContextInput> = {}): BuildRunCon
       sessionId: 'session-1',
     },
     modeValue: 'default',
-    providerType: 'anthropic',
+    providerType: 'pi',
     runId: 'run-1',
     serverPort: null,
     session: {
@@ -141,5 +141,53 @@ describe('buildRunContext — workspace prompt merge', () => {
 
     expect(nativeMode).toBe('plan');
     expect(runOptions.mode).toBe('plan');
+  });
+
+  describe.each(['claude', 'codex', 'cursor'])('%s native context', providerType => {
+    it.each(['regular', 'agent', 'background'] as const)(
+      'omits all automatic host prompt sections for %s sessions but keeps tool bridge identity and mode',
+      async sessionType => {
+        const { buildRunContext } = await import('../run-context.js');
+        toolRegistryGetAllMock.mockReturnValue([{ id: 'push_file', source: 'interaction' }]);
+        const { runOptions, taskContext } = await buildRunContext(
+          createInput({
+            providerType,
+            sessionType,
+            agentProfile: createAgentProfile({ runtimeType: providerType, systemPrompt: '' }),
+            serverPort: 3100,
+            sdkSessionId: 'native-session',
+            modeValue: 'plan_only',
+            adapter: { manifest: { permissionModeMap: { plan_only: 'plan' } } },
+            message: { input: 'hello', sessionId: 'session-1', _contextTemplate: 'review' },
+          })
+        );
+        expect(runOptions.systemPrompt).toBeUndefined();
+        expect(taskContext).toBeUndefined();
+        expect(runOptions).toMatchObject({
+          cwd: '/tmp/project',
+          sessionId: 'native-session',
+          claudiaSessionId: 'session-1',
+          serverPort: 3100,
+          mode: 'plan',
+        });
+        expect(runOptions.env).toBeUndefined();
+        expect(runOptions.memoryDir).toBeUndefined();
+        expect(assembleSystemPromptMock).not.toHaveBeenCalled();
+        expect(buildSkillDirectoryHintMock).not.toHaveBeenCalled();
+        expect(toolRegistryGetAllMock).not.toHaveBeenCalled();
+      }
+    );
+
+    it('keeps explicit profile instructions and moves per-task requirements to ordinary input', async () => {
+      const { buildRunContext } = await import('../run-context.js');
+      const input = createInput({ providerType, forcedPlanBySession: true });
+      input.session.task_id = 'task-1';
+      input.message.systemContext = 'Return the requested JSON result.';
+      const { runOptions, taskContext } = await buildRunContext(input);
+      expect(runOptions.systemPrompt).toBe('You are the profile-defined assistant.');
+      expect(taskContext).toContain('Return the requested JSON result.');
+      expect(taskContext).toContain('.supervision/plans/task-task-1.plan.md');
+      expect(assembleSystemPromptMock).not.toHaveBeenCalled();
+    });
   });
 });

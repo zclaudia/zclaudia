@@ -5,6 +5,7 @@ import type {
   Options,
   PermissionMode,
   SdkPluginConfig,
+  SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 import type {
   EngineExecutionContext,
@@ -55,6 +56,13 @@ export interface ClaudeAgentRunOptions {
  * host's responsibility beyond what the engine guarantees.
  */
 const SDK_CLEANUP_PERIOD_DAYS = 36_500;
+const SDK_ALTERNATE_AUTH_ENV = {
+  ANTHROPIC_AUTH_TOKEN: '',
+  CLAUDE_CODE_OAUTH_TOKEN: '',
+  CLAUDE_CODE_USE_BEDROCK: '0',
+  CLAUDE_CODE_USE_VERTEX: '0',
+  CLAUDE_CODE_USE_FOUNDRY: '0',
+};
 
 export async function* runClaudeAgent(
   input: string,
@@ -69,6 +77,7 @@ export async function* runClaudeAgent(
   const sdkOptions: Partial<Options> = {
     cwd: options.cwd,
     abortController,
+    systemPrompt: { type: 'preset', preset: 'claude_code' },
   };
 
   if (options.sessionId) sdkOptions.resume = options.sessionId;
@@ -153,13 +162,20 @@ async function* runClaudeSdkAgent(
   const sdkOptions: Partial<Options> = {
     cwd: options.cwd,
     abortController,
-    // Isolation mode: no user/project/local settings files, hence no CLAUDE.md
-    // auto-loading and no settings-file credentials. Only host-injected
-    // context (systemPrompt) reaches the model.
-    settingSources: [],
+    // Let the engine discover project instructions natively. Global user
+    // settings stay isolated; the host still owns the SDK connection.
+    settingSources: ['project', 'local'],
+    systemPrompt: { type: 'preset', preset: 'claude_code' },
     // Keep transcripts on disk so provider sessions can be resumed later.
     persistSession: true,
-    settings: { cleanupPeriodDays: SDK_CLEANUP_PERIOD_DAYS },
+    settings: {
+      cleanupPeriodDays: SDK_CLEANUP_PERIOD_DAYS,
+      // Project settings may introduce alternate auth/cloud-provider switches.
+      // Mask those at the flag-settings layer while the bound API connection
+      // stays in the process environment (never serialized into CLI args).
+      env: SDK_ALTERNATE_AUTH_ENV,
+      apiKeyHelper: '',
+    },
     pathToClaudeCodeExecutable: cliPath,
     env,
   };
@@ -183,8 +199,42 @@ async function* runClaudeSdkAgent(
     sdkOptions.plugins = options.plugins;
   }
 
-  const stream = query({ prompt: input, options: sdkOptions });
-  yield* pumpClaudeStream(stream, options);
+  // Do not put credentials in --settings argv or a settings file. Gate the
+  // first user message until the native control channel has locked the SDK
+  // connection above project settings. This also applies when resuming.
+  let releaseInput!: () => void;
+  let inputAllowed = false;
+  const ready = new Promise<void>(resolve => {
+    releaseInput = resolve;
+  });
+  async function* prompt(): AsyncGenerator<SDKUserMessage> {
+    await ready;
+    if (!inputAllowed || abortController.signal.aborted) return;
+    yield {
+      type: 'user',
+      message: { role: 'user', content: input },
+      parent_tool_use_id: null,
+      session_id: options.sessionId ?? '',
+    };
+  }
+  const stream = query({ prompt: prompt(), options: sdkOptions });
+  try {
+    await stream.applyFlagSettings({
+      env: {
+        ...env,
+        ...SDK_ALTERNATE_AUTH_ENV,
+        ANTHROPIC_CUSTOM_HEADERS: env.ANTHROPIC_CUSTOM_HEADERS ?? '',
+      },
+      apiKeyHelper: '',
+    });
+    inputAllowed = true;
+    releaseInput();
+    yield* pumpClaudeStream(stream, options);
+  } finally {
+    inputAllowed = false;
+    releaseInput();
+    stream.close();
+  }
 }
 
 /**

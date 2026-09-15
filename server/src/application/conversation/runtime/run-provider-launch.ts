@@ -409,7 +409,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     }
   }
 
-  const { runOptions } = await buildRunContext({
+  const { runOptions, taskContext } = await buildRunContext({
     adapter,
     agentProfile: effectiveAgentProfile,
     cwd,
@@ -519,16 +519,22 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     }
   }
 
-  const providerRunner = message.runtimeTurnInput
+  // Per-task contracts are ordinary input, never a standing host persona.
+  const taskInput = taskContext ? `${taskContext}\n\n${effectiveInput}` : effectiveInput;
+  const runtimeTurnInput =
+    message.runtimeTurnInput?.type === 'message' && taskContext
+      ? { ...message.runtimeTurnInput, text: `${taskContext}\n\n${message.runtimeTurnInput.text}` }
+      : message.runtimeTurnInput;
+  const providerRunner = runtimeTurnInput
     ? adapter.startTurn
-      ? adapter.startTurn(message.runtimeTurnInput, runOptions, permissionCallback)
+      ? adapter.startTurn(runtimeTurnInput, runOptions, permissionCallback)
       : (() => {
           throw new RunLaunchError(
             'INVOCATION_UNSUPPORTED',
             `Runtime "${effectiveProviderType}" does not implement typed invocation execution.`
           );
         })()
-    : adapter.run(effectiveInput, runOptions, permissionCallback);
+    : adapter.run(taskInput, runOptions, permissionCallback);
 
   activeRun.providerType = effectiveProviderType;
   const runState = adapter.getRunState?.(runOptions) || {};

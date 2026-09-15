@@ -42,6 +42,9 @@ for (const runtime of ['claude', 'codex', 'cursor']) {
       expect(
         JSON.parse(await readFile(path.join(app.directory, `mcp-${run.session.id}.json`), 'utf8'))
       ).toEqual({ sessionId: run.session.id, marker: `E2E_MCP_${run.session.id}` });
+      expect(
+        JSON.parse(await readFile(path.join(run.cwd, 'mcp-delivery-result.json'), 'utf8'))
+      ).toMatchObject({ success: true, fileName: `mcp-delivery-${run.session.id}.txt` });
       await expect(tab.getByText(`E2E_MCP_${otherRun.session.id}`, { exact: true })).toHaveCount(0);
       await expect(tab.getByText('E2E_MCP_FORGED', { exact: true })).toHaveCount(0);
       await expect

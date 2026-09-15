@@ -4,6 +4,7 @@ import type { RunOptions } from '../../../infra/providers/types.js';
 import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
+import { builtinAgentPluginForRuntime } from '@zclaudia/shared/plugins/builtin-agents';
 import type { ToolName } from '@zclaudia/shared/core/tools';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
 import {
@@ -69,6 +70,8 @@ export interface BuildRunContextInput {
 export async function buildRunContext(input: BuildRunContextInput): Promise<{
   nativeMode: string;
   runOptions: RunOptions;
+  /** Explicit task requirements belong in the turn input for native agents. */
+  taskContext?: string;
 }> {
   const {
     adapter,
@@ -89,6 +92,50 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     session,
     sessionType,
   } = input;
+
+  const nativeMode = adapter.manifest
+    ? mapPermissionMode(adapter.manifest as never, modeValue)
+    : modeValue;
+  const usesNativeContext = !!builtinAgentPluginForRuntime(providerType);
+  const baseRunOptions: RunOptions = {
+    cwd,
+    sessionId: sdkSessionId,
+    providerTransport: providerTransport ?? null,
+    mode: nativeMode,
+    sessionTitle: session.name || undefined,
+    serverPort: serverPort || undefined,
+    claudiaSessionId: message.sessionId,
+    runId,
+    permissionOverride: message.permissionOverride as Partial<UnifiedPermissionPolicy> | undefined,
+    db,
+    agentTaskExecutor,
+    llmProfileConfig: providerConfig,
+    agentProfile,
+    enabledTools,
+    thinkingLevel: agentProfile.thinkingLevel,
+  };
+
+  if (usesNativeContext) {
+    // Claude/Codex/Cursor own persona, project discovery, memory, skills and
+    // mode instructions. The MCP bridge supplies host tools independently.
+    // Only the user's explicitly configured profile prompt is appended.
+    return {
+      nativeMode,
+      runOptions: {
+        ...baseRunOptions,
+        systemPrompt: agentProfile.systemPrompt?.trim() ? agentProfile.systemPrompt : undefined,
+      },
+      taskContext:
+        [
+          message.systemContext,
+          forcedPlanBySession && session.task_id
+            ? buildPlanDocumentPrompt(session.task_id)
+            : undefined,
+        ]
+          .filter(Boolean)
+          .join('\n\n') || undefined,
+    };
+  }
 
   const nativeToolSet = new Set(adapter?.policy?.nativeInteractionTools ?? []);
   const allInteractionTools = pluginToolRegistry
@@ -130,10 +177,6 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
   const memoryContext = memoryDir ? buildMemoryContext(memoryDir) : undefined;
   const skillDirectoryHint = buildSkillDirectoryHint();
 
-  const nativeMode = adapter.manifest
-    ? mapPermissionMode(adapter.manifest as never, modeValue)
-    : modeValue;
-
   const template = ((message as Record<string, unknown>)._contextTemplate ||
     (sessionType === 'agent' ? 'agent' : 'coding')) as ContextTemplate;
   // Merge transform: agentProfile.systemPrompt fully replaces the template's
@@ -159,26 +202,10 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
   return {
     nativeMode,
     runOptions: {
-      cwd,
-      sessionId: sdkSessionId,
-      providerTransport: providerTransport ?? null,
+      ...baseRunOptions,
       env: filePushEnv,
-      mode: nativeMode,
       systemPrompt,
-      sessionTitle: session.name || undefined,
-      serverPort: serverPort || undefined,
-      claudiaSessionId: message.sessionId,
-      runId,
-      permissionOverride: message.permissionOverride as
-        | Partial<UnifiedPermissionPolicy>
-        | undefined,
       memoryDir,
-      db,
-      agentTaskExecutor,
-      llmProfileConfig: providerConfig,
-      agentProfile,
-      enabledTools,
-      thinkingLevel: agentProfile.thinkingLevel,
     },
   };
 }

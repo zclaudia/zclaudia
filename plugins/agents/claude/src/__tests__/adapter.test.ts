@@ -151,6 +151,7 @@ describe('ClaudeAgentAdapter MCP bridge merge', () => {
     expect(queryMock).toHaveBeenCalledWith(
       expect.objectContaining({
         options: expect.objectContaining({
+          systemPrompt: { type: 'preset', preset: 'claude_code' },
           mcpServers: {
             docs: { command: 'node', args: ['docs.js'] },
             'claudia-plugins': { command: 'node', args: ['bridge.js'] },

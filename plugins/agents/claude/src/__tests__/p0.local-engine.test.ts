@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
   utimesSync,
   writeFileSync,
@@ -15,6 +16,7 @@ import path from 'node:path';
 import { type AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { runClaudeAgent } from '../runner.js';
+import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { buildClaudeSdkEnvironment } from '../sdk-environment.js';
 import type { ProviderRuntimeEvent } from '@zclaudia/plugin-sdk/providers';
 
@@ -228,15 +230,16 @@ describe.skipIf(!engineBinary)('P0 local engine probe (claude sdk, real engine b
     return { events, sessionId, assistantText };
   }
 
-  it(
-    'engine runs from bundled binary against fixture: settings isolation, no CLAUDE.md auto-load, host prompt injected, all requests on bound model',
+  it.each([undefined, HOST_PROMPT_MARKER])(
+    'engine loads project instructions and MCP tools, isolates credentials, custom prompt: %s',
     { timeout: 240_000 },
-    async () => {
+    async customPrompt => {
+      const requestStart = fixture.requests.length;
       const homeDir = tempRoot('home');
       const projectDir = tempRoot('project');
       const configDirectory = tempRoot('cfg');
 
-      // Booby trap: if user settings were loaded (settingSources not []), the
+      // Booby trap: if global user settings were loaded, the
       // engine would pick up this env-injected auth token and send it to us.
       mkdirSync(path.join(homeDir, '.claude'), { recursive: true });
       writeFileSync(
@@ -253,16 +256,46 @@ describe.skipIf(!engineBinary)('P0 local engine probe (claude sdk, real engine b
         ),
         { mode: 0o600 }
       );
-      // Project instruction that must NOT be auto-loaded in SDK isolation mode.
+      // Project instructions must be loaded by the engine, not the host.
       writeFileSync(path.join(projectDir, 'CLAUDE.md'), `# probe\n${CLAUDE_MD_MARKER}\n`);
       writeFileSync(path.join(projectDir, 'README.md'), 'probe project\n');
+      mkdirSync(path.join(projectDir, '.claude'), { recursive: true });
+      writeFileSync(
+        path.join(projectDir, '.claude', 'settings.json'),
+        JSON.stringify({
+          env: {
+            ANTHROPIC_AUTH_TOKEN: SETTINGS_LEAK_TOKEN,
+            ANTHROPIC_API_KEY: SETTINGS_LEAK_TOKEN,
+            ANTHROPIC_BASE_URL: `http://127.0.0.1:${port}/project-override`,
+            ANTHROPIC_DEFAULT_HAIKU_MODEL: 'project-override-model',
+          },
+        })
+      );
 
-      const result = await runTurn(sdkOptions(configDirectory, projectDir, homeDir));
+      const events: ProviderRuntimeEvent[] = [];
+      const mcpServer = createSdkMcpServer({
+        name: 'delivery-probe',
+        tools: [
+          tool('push_file', 'Push a local file to the user device.', {}, async () => ({
+            content: [{ type: 'text' as const, text: 'delivered' }],
+          })),
+        ],
+      });
+      for await (const event of runClaudeAgent('Reply briefly.', {
+        ...sdkOptions(configDirectory, projectDir, homeDir),
+        systemPrompt: customPrompt,
+        mcpServers: { 'delivery-probe': mcpServer },
+      }))
+        events.push(event);
 
-      expect(result.sessionId).toBeTruthy();
-      expect(result.assistantText).toContain('PROBE_TURN_');
+      expect(events.some(event => event.type === 'init' && event.sessionId)).toBe(true);
+      expect(
+        events.some(event => event.type === 'assistant' && event.content?.includes('PROBE_TURN_'))
+      ).toBe(true);
 
-      const messagesRequests = fixture.requests.filter(r => r.path.includes('/messages'));
+      const messagesRequests = fixture.requests
+        .slice(requestStart)
+        .filter(r => r.path.includes('/messages'));
       expect(messagesRequests.length).toBeGreaterThan(0);
 
       for (const request of messagesRequests) {
@@ -272,24 +305,32 @@ describe.skipIf(!engineBinary)('P0 local engine probe (claude sdk, real engine b
         // The engine's haiku-class aux calls are re-routed onto the bound
         // model by the ANTHROPIC_DEFAULT_*_MODEL alias pinning.
         expect(request.headers['x-api-key']).toBe(PROBE_KEY);
+        expect(request.path).not.toContain('project-override');
         expect((request.body as { model?: string }).model).toBe(BOUND_MODEL);
-        // Isolation: CLAUDE.md must NOT be auto-injected…
-        expect(bodyText).not.toContain(CLAUDE_MD_MARKER);
-        // …and user settings env must NOT leak into auth headers.
+        // User settings env must NOT leak into auth headers.
         expect(JSON.stringify(request.headers)).not.toContain(SETTINGS_LEAK_TOKEN);
         expect(bodyText).not.toContain(SETTINGS_LEAK_TOKEN);
       }
-      // The MAIN conversation request (distinguished from the auxiliary
-      // title-generation request by its Claude Code system prompt) carries the
-      // host-injected system prompt.
-      const mainRequests = messagesRequests.filter(request =>
-        JSON.stringify((request.body as { system?: unknown }).system ?? '').includes(
-          'running within the Claude Agent SDK'
-        )
+      // Main turns include tools; auxiliary title requests do not. The native
+      // preset's identity text differs from the preset-with-append variant.
+      const mainRequests = messagesRequests.filter(
+        request => ((request.body as { tools?: unknown[] }).tools?.length ?? 0) > 0
       );
       expect(mainRequests.length).toBeGreaterThan(0);
       for (const request of mainRequests) {
-        expect(JSON.stringify(request.body)).toContain(HOST_PROMPT_MARKER);
+        if (customPrompt) expect(JSON.stringify(request.body)).toContain(customPrompt);
+        else expect(JSON.stringify(request.body)).not.toContain(HOST_PROMPT_MARKER);
+        expect(JSON.stringify(request.body)).toContain(CLAUDE_MD_MARKER);
+      }
+      expect(
+        mainRequests.some(request =>
+          JSON.stringify((request.body as { tools?: unknown }).tools).includes(
+            'mcp__delivery-probe__push_file'
+          )
+        )
+      ).toBe(true);
+      for (const file of findTranscripts(configDirectory).filter(file => file.endsWith('.jsonl'))) {
+        expect(readFileSync(file, 'utf8')).not.toContain(PROBE_KEY);
       }
       // No request may leave for any other path than the fixture's messages API
       // plus benign engine endpoints — specifically no /v1/complete or oauth.

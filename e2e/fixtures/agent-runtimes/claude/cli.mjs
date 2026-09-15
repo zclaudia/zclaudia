@@ -88,7 +88,7 @@ createInterface({ input: process.stdin }).on('line', async line => {
       message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content }] },
     });
   if (prompt.includes('E2E_WAIT_FOR_CANCEL')) {
-    if (prompt.includes('E2E_MCP')) await exerciseMcp('claude', args, process.cwd());
+    if (prompt.includes('E2E_MCP')) await exerciseMcp('claude', args, process.cwd(), prompt);
     assistant([{ type: 'text', text: 'Fixture task is running' }]);
     timer = setInterval(() => writeFileSync('cancel-tick.txt', String(Date.now())), 100);
     return;
@@ -164,7 +164,7 @@ createInterface({ input: process.stdin }).on('line', async line => {
     });
     return;
   }
-  if (prompt.includes('E2E_MCP')) await exerciseMcp('claude', args, process.cwd());
+  if (prompt.includes('E2E_MCP')) await exerciseMcp('claude', args, process.cwd(), prompt);
   const file = path.join(process.cwd(), 'add.mjs');
   readFileSync(file, 'utf8');
   assistant([
