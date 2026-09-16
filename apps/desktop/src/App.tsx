@@ -389,7 +389,7 @@ function AppContent() {
 
   /**
    * Paint the drawer at `position` pixels of revealed width. Below the peek
-   * width the 256px panel slides in; above it the panel grows in place.
+   * width the 300px panel slides in; above it the panel grows in place.
    */
   const setDrawerVisualPosition = useCallback(
     (position: number, transitionDurationMs: number) => {

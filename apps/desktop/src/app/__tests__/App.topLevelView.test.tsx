@@ -339,7 +339,7 @@ describe('App shell modes on mobile', () => {
 describe('Mobile drawer detents', () => {
   // jsdom reports a 1024px viewport, so the expanded stage lands on the cap.
   const EXPANDED_WIDTH_PX = 420;
-  const PEEK_WIDTH_PX = 256;
+  const PEEK_WIDTH_PX = 300;
 
   beforeEach(() => {
     resetStores();

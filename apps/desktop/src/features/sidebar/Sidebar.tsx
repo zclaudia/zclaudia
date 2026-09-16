@@ -21,7 +21,6 @@ import type { AutomationTab } from '../automation/automation-types';
 import type { AgentsTab } from '../agents/agents-types';
 import type { PluginsTab } from '../plugins/plugins-types';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
-import { SidebarSearch } from './SidebarSearch';
 import { SearchModal } from './SearchModal';
 import { ProjectListItem } from './ProjectListItem';
 import { NewSessionModal } from './NewSessionModal';
@@ -673,6 +672,7 @@ export function Sidebar({
                   latencyMs={serverConnections[backend.backendId]?.latencyMs}
                   isActive={isActive}
                   onActivate={() => selectionCoordinator.selectBackend(backend.backendId)}
+                  isMobile={isMobile}
                   expanded={expanded}
                   onToggle={() => toggleBackend(backend.backendId)}
                   onNewProject={() => {
@@ -819,24 +819,16 @@ export function Sidebar({
         >
           <MobileSidebarHeader
             onClose={onClose}
+            onOpenSearch={() => {
+              setSearchOpen(true);
+              onClose?.();
+            }}
             onOpenNotifications={onOpenNotifications}
             isNotificationsOpen={isNotificationsOpen}
             notificationUnreadCount={notificationUnreadCount}
-            isClaudiaExpanded={isClaudiaExpanded}
-            setClaudiaExpanded={setClaudiaExpanded}
-            hasClaudiaPermissionPending={hasClaudiaPermissionPending}
-            hasClaudiaUnread={hasClaudiaUnread}
-            hasClaudiaRunning={hasClaudiaRunning}
           />
 
-          <SidebarSearch
-            search={search}
-            isMobile
-            sessions={sessions}
-            onResultSelect={actions.handleSearchResultSelect}
-          />
-
-          {/* Every navigation callback closes the 256px drawer after it fires
+          {/* Every navigation callback closes the 300px drawer after it fires
               (same pattern as onHome) so the destination is actually visible. */}
           <SidebarNav
             onHome={() => {
@@ -845,6 +837,20 @@ export function Sidebar({
             }}
             isHomeActive={isHomeActive}
             isMobile
+            onOpenClaudia={() => {
+              setClaudiaExpanded(true);
+              onClose?.();
+            }}
+            isClaudiaActive={isClaudiaExpanded}
+            claudiaStatus={
+              hasClaudiaPermissionPending
+                ? 'permission'
+                : hasClaudiaUnread
+                  ? 'unread'
+                  : hasClaudiaRunning
+                    ? 'running'
+                    : null
+            }
             onOpenAutomations={
               onOpenAutomations
                 ? () => {

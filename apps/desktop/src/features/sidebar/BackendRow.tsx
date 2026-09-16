@@ -20,6 +20,7 @@ interface BackendRowProps {
    */
   isActive?: boolean;
   onActivate?: () => void;
+  isMobile?: boolean;
 }
 
 /**
@@ -40,6 +41,7 @@ export function BackendRow({
   latencyMs,
   isActive = true,
   onActivate,
+  isMobile,
 }: BackendRowProps) {
   const effectiveState: BackendViewState = viewState ?? (online ? 'ready' : 'offline');
   const statusLabel = backendStatusLabel(effectiveState);
@@ -52,10 +54,16 @@ export function BackendRow({
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
-          // pr-1 (not px-2) matches ProjectListItem's px-1 right padding so the
-          // trailing chevron lines up vertically with the project row's chevron;
-          // pl-2 keeps this parent row one indent level shallower than projects.
-          className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-2 pr-1 text-left"
+          // The name span takes flex-1 so the trailing chevron parks against the
+          // action button at a fixed x rather than trailing the text — that is
+          // what keeps this chevron on the same column as the project row's.
+          // Mobile uses the 44px touch tier and pl-3, which lands the status dot
+          // on the drawer's x=20 rail (tree p-2 + 12).
+          className={
+            isMobile
+              ? 'flex min-w-0 flex-1 items-center gap-2.5 h-11 pl-3 pr-1 text-left'
+              : 'flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-2 pr-1 text-left'
+          }
         >
           {/* Status dot leads (like the project row's folder icon); the expand
               chevron trails at the right end, matching ProjectListItem. */}
@@ -63,21 +71,31 @@ export function BackendRow({
             className={`h-2 w-2 flex-shrink-0 rounded-full ${backendStatusColor(effectiveState)}`}
             title={statusLabel ?? 'Ready'}
           />
-          <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
+          <span
+            className={`min-w-0 flex-1 truncate text-foreground ${
+              isMobile ? 'text-sm font-semibold' : 'text-xs font-medium'
+            }`}
+          >
             {name}
           </span>
           {statusLabel && (
-            <span className="flex-shrink-0 text-[10px] text-muted-foreground">{statusLabel}</span>
+            <span
+              className={`flex-shrink-0 text-muted-foreground ${isMobile ? 'text-2xs' : 'text-3xs'}`}
+            >
+              {statusLabel}
+            </span>
           )}
           {!statusLabel && typeof latencyMs === 'number' && (
-            <span className="flex-shrink-0 text-[10px] text-muted-foreground/70">
+            <span
+              className={`flex-shrink-0 text-muted-foreground/60 ${isMobile ? 'text-2xs' : 'text-3xs'}`}
+            >
               {latencyMs}ms
             </span>
           )}
           <ChevronRight
-            size={14}
-            strokeWidth={2}
-            className={`flex-shrink-0 text-muted-foreground/70 transition-transform ${expanded ? 'rotate-90' : ''}`}
+            size={isMobile ? 16 : 14}
+            strokeWidth={1.75}
+            className={`flex-shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-90' : ''}`}
           />
         </button>
         {onNewProject && (
@@ -86,11 +104,17 @@ export function BackendRow({
             type="button"
             onClick={onNewProject}
             disabled={newProjectDisabled}
-            className="mr-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md hover:bg-accent disabled:cursor-not-allowed md:hidden md:group-hover:flex"
+            className={`flex-shrink-0 items-center justify-center rounded-md hover:bg-accent disabled:cursor-not-allowed md:hidden md:group-hover:flex ${
+              isMobile ? 'flex h-11 w-11' : 'mr-1 flex h-6 w-6'
+            }`}
             title="New project"
             aria-label="New project"
           >
-            <Plus size={14} strokeWidth={2} className="text-muted-foreground" />
+            <Plus
+              size={isMobile ? 16 : 14}
+              strokeWidth={1.75}
+              className="text-muted-foreground"
+            />
           </button>
         )}
       </div>
@@ -100,9 +124,15 @@ export function BackendRow({
             <button
               type="button"
               onClick={onActivate}
-              className="flex w-full items-center gap-1.5 rounded-md px-2 py-2 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              className={`flex w-full items-center gap-1.5 rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground ${
+                isMobile ? 'h-11 px-3 text-sm' : 'px-2 py-2 text-xs'
+              }`}
             >
-              <ArrowLeftRight size={12} strokeWidth={1.75} className="flex-shrink-0" />
+              <ArrowLeftRight
+                size={isMobile ? 16 : 12}
+                strokeWidth={1.75}
+                className="flex-shrink-0"
+              />
               Switch to this backend
             </button>
           ) : (

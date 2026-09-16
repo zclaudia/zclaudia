@@ -10,9 +10,11 @@ export function SidebarFooter({ onShowSettings, isMobile }: SidebarFooterProps) 
           <button
             onClick={() => onShowSettings()}
             data-testid="settings-button"
-            className="w-full text-left px-3 py-3 rounded-md text-sm text-muted-foreground hover:bg-secondary active:bg-secondary hover:text-foreground flex items-center gap-2"
+            // Same row recipe as SidebarNav's mobile destinations: 44px tier,
+            // foreground label, muted glyph.
+            className="w-full text-left px-3 h-11 rounded-md text-sm font-medium text-foreground hover:bg-secondary active:bg-secondary flex items-center gap-3"
           >
-            <Settings className="w-5 h-5" strokeWidth={1.75} />
+            <Settings className="w-5 h-5 text-muted-foreground" strokeWidth={1.75} />
             Settings
           </button>
         </div>

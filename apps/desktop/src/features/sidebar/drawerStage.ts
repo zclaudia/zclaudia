@@ -2,9 +2,9 @@
  * Mobile drawer detents.
  *
  * The drawer travels along a single scalar `position` measured in pixels of
- * revealed width: 0 is fully closed, `peek` is the standard 256px drawer, and
+ * revealed width: 0 is fully closed, `peek` is the standard 300px drawer, and
  * `expandedWidth` is the widened "reading" stage. Positions below `peek` slide
- * the 256px panel in from the left; positions above it grow the panel's width
+ * the 300px panel in from the left; positions above it grow the panel's width
  * in place. One scalar keeps drag math, snapping, and the CSS variables that
  * paint the panel in agreement.
  *
@@ -16,8 +16,14 @@
 
 export type DrawerStage = 'closed' | 'peek' | 'full';
 
-/** Width of the standard drawer, and the position of the `peek` detent. */
-export const DRAWER_PEEK_WIDTH_PX = 256;
+/**
+ * Width of the standard drawer, and the position of the `peek` detent. 256
+ * (screen-width-minus-56dp on a 390pt phone would be 334) can't hold a 44px
+ * row's dot + name + chevron + a 44px ⋮ button without truncating a name like
+ * "Backend on lima-devbox"; 300 is the deliberate trim that still leaves a
+ * 90px peek at the live session underneath.
+ */
+export const DRAWER_PEEK_WIDTH_PX = 300;
 
 /**
  * Upper bound for the expanded stage. Phones expand to the full viewport; on

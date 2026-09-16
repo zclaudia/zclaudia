@@ -1,103 +1,77 @@
-import { SquareStack, Bell } from 'lucide-react';
-import { BrandMark } from '../../components/BrandMark';
+import { Bell, Search, SquareStack, X } from 'lucide-react';
 import type { MobileSidebarHeaderProps } from './types';
 import { isDesktopTauri } from '../../utils/platform';
 import { openWindowManagerWindow } from '../../utils/windowManagerWindow';
 
+/** The drawer's one header-control recipe: a 44px ghost circle. */
+const ACTION =
+  'relative h-11 w-11 flex-shrink-0 flex items-center justify-center rounded-full transition-colors';
+const ACTION_REST =
+  'text-muted-foreground hover:text-foreground hover:bg-secondary active:bg-secondary';
+
 export function MobileSidebarHeader({
   onClose,
+  onOpenSearch,
   onOpenNotifications,
   isNotificationsOpen,
   notificationUnreadCount,
-  isClaudiaExpanded,
-  setClaudiaExpanded,
-  hasClaudiaPermissionPending,
-  hasClaudiaUnread,
-  hasClaudiaRunning,
 }: MobileSidebarHeaderProps) {
   return (
     <>
-      {/* Single header band: title plus the drawer's global actions. Backends
-          live in the tree below (which owns status and switching), so there is
-          no separate picker row here. */}
-      <div className="h-[72px] border-b border-border flex items-center gap-1 px-3">
-        <h1 className="min-w-0 flex-1 truncate font-semibold text-lg">Claudia</h1>
-        <button
-          onClick={() => {
-            onOpenNotifications?.();
-            onClose?.();
-          }}
-          className={`relative h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full transition-colors ${
-            isNotificationsOpen
-              ? 'bg-secondary text-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-          }`}
-          title="Notifications"
-          aria-label="Open notifications"
-        >
-          <Bell size={18} strokeWidth={1.75} />
-          {notificationUnreadCount > 0 && !isNotificationsOpen && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center bg-muted/60 text-primary-foreground text-[9px] font-medium rounded-full px-0.5">
-              {notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}
-            </span>
-          )}
-        </button>
-        {isDesktopTauri() && (
+      {/* No wordmark: the drawer does not need to announce which app you are in.
+          The content actions sit left so the search glyph's left edge lands on
+          the drawer's left rail — px-2 plus the 44px button's 12px inset is the
+          same x as every nav icon, backend dot and section label below. Close
+          stays right because it dismisses the drawer rather than acting on
+          anything inside it. */}
+      <div className="h-14 flex-shrink-0 flex items-center justify-between px-2">
+        <div className="flex min-w-0 items-center">
+          <button
+            onClick={onOpenSearch}
+            className={`${ACTION} ${ACTION_REST}`}
+            aria-label="Search messages"
+          >
+            <Search size={20} strokeWidth={1.75} />
+          </button>
           <button
             onClick={() => {
-              void openWindowManagerWindow();
+              onOpenNotifications?.();
               onClose?.();
             }}
-            className="relative h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary"
-            title="Windows"
-            aria-label="Open window manager"
+            className={`${ACTION} ${
+              isNotificationsOpen ? 'bg-secondary text-foreground' : ACTION_REST
+            }`}
+            aria-label="Open notifications"
           >
-            <SquareStack size={18} strokeWidth={1.75} />
-          </button>
-        )}
-        <button
-          onClick={() => {
-            setClaudiaExpanded(true);
-            onClose?.();
-          }}
-          className={`relative h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full transition-colors ${
-            isClaudiaExpanded
-              ? 'bg-secondary text-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-          }`}
-          title="Open Claudia"
-          aria-label="Open Claudia"
-        >
-          <BrandMark className="w-[18px] h-[18px] object-contain" />
-          {(hasClaudiaPermissionPending || hasClaudiaUnread || hasClaudiaRunning) &&
-            !isClaudiaExpanded && (
-              <span
-                className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
-                  hasClaudiaPermissionPending
-                    ? 'bg-warning'
-                    : hasClaudiaUnread
-                      ? 'bg-primary animate-pulse'
-                      : 'bg-warning animate-pulse'
-                }`}
-              />
+            <Bell size={20} strokeWidth={1.75} />
+            {notificationUnreadCount > 0 && !isNotificationsOpen && (
+              // primary/primary-foreground is the only pair guaranteed to
+              // contrast in every theme; muted/60 + primary-foreground was
+              // dark-on-dark in all three dark themes.
+              <span className="absolute right-0.5 top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-3xs font-semibold text-primary-foreground">
+                {notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}
+              </span>
             )}
-        </button>
-        <button
-          onClick={onClose}
-          className="h-10 w-10 flex-shrink-0 rounded-full hover:bg-secondary active:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center"
-          title="Close menu"
-          aria-label="Close menu"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
+          </button>
+          {isDesktopTauri() && (
+            <button
+              onClick={() => {
+                void openWindowManagerWindow();
+                onClose?.();
+              }}
+              className={`${ACTION} ${ACTION_REST}`}
+              aria-label="Open window manager"
+            >
+              <SquareStack size={20} strokeWidth={1.75} />
+            </button>
+          )}
+        </div>
+        <button onClick={onClose} className={`${ACTION} ${ACTION_REST}`} aria-label="Close menu">
+          <X size={20} strokeWidth={1.75} />
         </button>
       </div>
+      {/* Inset divider — one rule language across header / nav / footer. */}
+      <div className="mx-3 flex-shrink-0 border-t border-border" aria-hidden />
     </>
   );
 }

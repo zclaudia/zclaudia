@@ -17,8 +17,10 @@ export function backendStatusColor(viewState: BackendViewState): string {
     case 'data_syncing':
     case 'session_syncing':
       return 'bg-warning animate-pulse';
+    // Idle is not a warning — it is simply "connected but not the active
+    // backend". Warning tokens stay reserved for states that need attention.
     case 'backend_visible':
-      return 'bg-warning';
+      return 'bg-muted-foreground';
     case 'error':
       return 'bg-destructive';
     case 'offline':

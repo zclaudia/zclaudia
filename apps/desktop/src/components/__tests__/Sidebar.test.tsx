@@ -1645,7 +1645,7 @@ describe('Sidebar', () => {
         onClose={onClose}
       />
     );
-    const closeBtn = container.querySelector('button[title="Close menu"]');
+    const closeBtn = container.querySelector('button[aria-label="Close menu"]');
     expect(closeBtn).toBeTruthy();
     if (closeBtn) {
       fireEvent.click(closeBtn);

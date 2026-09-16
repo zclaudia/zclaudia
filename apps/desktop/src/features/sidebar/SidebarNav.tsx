@@ -15,6 +15,7 @@ import {
   ToyBrick,
   LayoutPanelTop,
 } from 'lucide-react';
+import { BrandMark } from '../../components/BrandMark';
 import type { AutomationTab } from '../automation/automation-types';
 import type { AgentsTab } from '../agents/agents-types';
 import type { PluginsTab } from '../plugins/plugins-types';
@@ -54,6 +55,11 @@ interface SidebarNavProps {
   onOpenPlugins?: () => void;
   /** When present, the nav renders the plugins tabs instead of app destinations. */
   pluginsMode?: SidebarPluginsNavMode;
+  /** Open the Claudia panel. Mobile only — on desktop it has its own chrome. */
+  onOpenClaudia?: () => void;
+  isClaudiaActive?: boolean;
+  /** Drives the trailing status dot on the Claudia row. */
+  claudiaStatus?: 'permission' | 'unread' | 'running' | null;
   isMobile?: boolean;
 }
 
@@ -88,25 +94,21 @@ function ModeTabsNav<K extends string>({
   activeKey,
   onSelect,
   onBack,
-  rowBase,
-  iconSize,
+  rowClass,
+  iconClass,
 }: {
   tabs: { key: K; label: string; Icon: typeof Zap }[];
   activeKey: K;
   onSelect: (key: K) => void;
   onBack: () => void;
-  rowBase: string;
-  iconSize: string;
+  rowClass: (active: boolean) => string;
+  iconClass: (active: boolean) => string;
 }) {
   return (
     <>
       <div className="p-2 space-y-0.5">
-        <button
-          onClick={onBack}
-          aria-label="Back to app"
-          className={`${rowBase} text-muted-foreground`}
-        >
-          <ArrowLeft className={iconSize} strokeWidth={1.75} />
+        <button onClick={onBack} aria-label="Back to app" className={rowClass(false)}>
+          <ArrowLeft className={iconClass(false)} strokeWidth={1.75} />
           Back to app
         </button>
 
@@ -118,9 +120,9 @@ function ModeTabsNav<K extends string>({
               type="button"
               onClick={() => onSelect(key)}
               aria-label={label}
-              className={`${rowBase} ${active ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
+              className={rowClass(active)}
             >
-              <Icon className={iconSize} strokeWidth={1.75} />
+              <Icon className={iconClass(active)} strokeWidth={1.75} />
               {label}
             </button>
           );
@@ -145,12 +147,30 @@ export function SidebarNav({
   agentsMode,
   onOpenPlugins,
   pluginsMode,
+  onOpenClaudia,
+  isClaudiaActive,
+  claudiaStatus,
   isMobile,
 }: SidebarNavProps) {
+  // Mobile rows are a 44px touch tier and sit at full foreground: navigation
+  // used to render muted while the smaller tree rows rendered foreground/600,
+  // which inverted the hierarchy. Depth now reads from inset and weight.
   const rowBase = isMobile
-    ? 'w-full text-left px-3 py-3 rounded-md text-sm hover:bg-secondary active:bg-secondary hover:text-foreground flex items-center gap-2'
+    ? 'w-full text-left px-3 h-11 rounded-md text-sm font-medium hover:bg-secondary active:bg-secondary flex items-center gap-3'
     : 'w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-secondary hover:text-foreground flex items-center gap-2';
   const iconSize = isMobile ? 'w-5 h-5' : 'w-4 h-4';
+  const rowClass = (active: boolean) =>
+    `${rowBase} ${
+      active
+        ? 'bg-secondary text-foreground'
+        : isMobile
+          ? 'text-foreground'
+          : 'text-muted-foreground'
+    }`;
+  // The label carries the hierarchy, so the glyph stays muted until the row is
+  // active (on desktop the whole row is muted and the icon inherits it).
+  const iconClass = (active: boolean) =>
+    isMobile && !active ? `${iconSize} text-muted-foreground` : iconSize;
 
   if (automationMode) {
     return (
@@ -159,8 +179,8 @@ export function SidebarNav({
         activeKey={automationMode.tab}
         onSelect={automationMode.onSelectTab}
         onBack={automationMode.onBack}
-        rowBase={rowBase}
-        iconSize={iconSize}
+        rowClass={rowClass}
+        iconClass={iconClass}
       />
     );
   }
@@ -172,8 +192,8 @@ export function SidebarNav({
         activeKey={agentsMode.tab}
         onSelect={agentsMode.onSelectTab}
         onBack={agentsMode.onBack}
-        rowBase={rowBase}
-        iconSize={iconSize}
+        rowClass={rowClass}
+        iconClass={iconClass}
       />
     );
   }
@@ -185,8 +205,8 @@ export function SidebarNav({
         activeKey={pluginsMode.tab}
         onSelect={pluginsMode.onSelectTab}
         onBack={pluginsMode.onBack}
-        rowBase={rowBase}
-        iconSize={iconSize}
+        rowClass={rowClass}
+        iconClass={iconClass}
       />
     );
   }
@@ -194,44 +214,53 @@ export function SidebarNav({
   return (
     <>
       <div className="p-2 space-y-0.5">
-        <button
-          onClick={onHome}
-          aria-label="Home"
-          className={`${rowBase} ${isHomeActive ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
-        >
-          <Home className={iconSize} strokeWidth={1.75} />
+        <button onClick={onHome} aria-label="Home" className={rowClass(!!isHomeActive)}>
+          <Home className={iconClass(!!isHomeActive)} strokeWidth={1.75} />
           Home
         </button>
 
-        {onOpenAgents && (
+        {onOpenClaudia && (
+          // Claudia is a destination, not a global action — it used to be a
+          // header icon whose PNG mark painted a solid disc, the brightest
+          // thing in the drawer.
           <button
-            onClick={onOpenAgents}
-            aria-label="Agents"
-            className={`${rowBase} text-muted-foreground`}
+            onClick={onOpenClaudia}
+            aria-label="Claudia"
+            className={rowClass(!!isClaudiaActive)}
           >
-            <Bot className={iconSize} strokeWidth={1.75} />
+            <BrandMark className={`${iconSize} flex-shrink-0 object-contain`} />
+            <span className="flex-1 truncate text-left">Claudia</span>
+            {claudiaStatus && !isClaudiaActive && (
+              <span
+                className={`h-[7px] w-[7px] flex-shrink-0 rounded-full ${
+                  claudiaStatus === 'permission'
+                    ? 'bg-warning'
+                    : claudiaStatus === 'unread'
+                      ? 'bg-primary animate-pulse'
+                      : 'bg-warning animate-pulse'
+                }`}
+              />
+            )}
+          </button>
+        )}
+
+        {onOpenAgents && (
+          <button onClick={onOpenAgents} aria-label="Agents" className={rowClass(false)}>
+            <Bot className={iconClass(false)} strokeWidth={1.75} />
             Agents
           </button>
         )}
 
         {onOpenPlugins && (
-          <button
-            onClick={onOpenPlugins}
-            aria-label="Extensions"
-            className={`${rowBase} text-muted-foreground`}
-          >
-            <Blocks className={iconSize} strokeWidth={1.75} />
+          <button onClick={onOpenPlugins} aria-label="Extensions" className={rowClass(false)}>
+            <Blocks className={iconClass(false)} strokeWidth={1.75} />
             Extensions
           </button>
         )}
 
         {onOpenAutomations && (
-          <button
-            onClick={onOpenAutomations}
-            aria-label="Automations"
-            className={`${rowBase} text-muted-foreground`}
-          >
-            <Zap className={iconSize} strokeWidth={1.75} />
+          <button onClick={onOpenAutomations} aria-label="Automations" className={rowClass(false)}>
+            <Zap className={iconClass(false)} strokeWidth={1.75} />
             Automations
           </button>
         )}

@@ -13,15 +13,8 @@ export interface AgentPhaseInfo {
   mainSessionId?: string;
 }
 
-/** Props for SidebarSearch */
-export interface SidebarSearchProps {
-  search: SearchSidebarState;
-  isMobile?: boolean;
-  sessions: Session[];
-  onResultSelect: (sessionId: string, messageId: string, ownerBackendId?: string) => void;
-}
-
-/** Props for SearchModal (desktop centered command-palette search) */
+/** Props for SearchModal — the app's only search surface, centered on desktop
+ *  and full-screen on mobile. */
 export interface SearchModalProps {
   open: boolean;
   onClose: () => void;
@@ -38,14 +31,11 @@ export interface SidebarHeaderProps {
 /** Props for MobileSidebarHeader */
 export interface MobileSidebarHeaderProps {
   onClose?: () => void;
+  /** Opens the full-screen SearchModal. Claudia moved to the nav list. */
+  onOpenSearch?: () => void;
   onOpenNotifications?: () => void;
   isNotificationsOpen: boolean;
   notificationUnreadCount: number;
-  isClaudiaExpanded: boolean;
-  setClaudiaExpanded: (expanded: boolean) => void;
-  hasClaudiaPermissionPending: boolean;
-  hasClaudiaUnread: boolean;
-  hasClaudiaRunning: boolean;
 }
 
 /** Props for ProjectListItem */

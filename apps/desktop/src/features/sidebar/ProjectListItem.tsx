@@ -101,11 +101,14 @@ export function ProjectListItem({
   // Touch has no hover, so the mobile row actions stay visible; only the
   // desktop variant is hover-revealed.
   const menuButtonClass = isMobile
-    ? 'w-8 h-8 rounded-md hover:bg-secondary active:bg-secondary flex-shrink-0 flex items-center justify-center'
+    ? 'w-11 h-11 rounded-md hover:bg-secondary active:bg-secondary flex-shrink-0 flex items-center justify-center'
     : 'w-6 h-6 rounded-md hidden group-hover:flex hover:bg-secondary flex-shrink-0 items-center justify-center';
+  // Mobile: the 44px touch tier, and pl-3 inside BackendRow's pl-3 child wrapper
+  // puts the folder glyph on x=32 — one indent step below the backend dot.
   const projectButtonClass = isMobile
-    ? 'flex-1 min-w-0 min-h-[36px] text-left px-1 text-xs flex items-center gap-1.5 text-foreground'
+    ? 'flex-1 min-w-0 h-11 text-left pl-3 pr-1 text-sm flex items-center gap-2.5 text-foreground'
     : 'flex-1 min-w-0 h-7 text-left px-1 text-xs flex items-center gap-1.5';
+  const glyphClass = isMobile ? 'w-4 h-4 flex-shrink-0' : 'w-3.5 h-3.5 flex-shrink-0';
   const menuItemBaseClass = isMobile
     ? 'w-full text-left px-3 py-3 text-sm flex items-center gap-2'
     : 'w-full text-left px-3 py-1.5 text-xs flex items-center gap-2';
@@ -237,28 +240,29 @@ export function ProjectListItem({
       <div className="flex items-center group relative">
         <button onClick={onToggle} className={projectButtonClass}>
           {isExpanded ? (
-            <FolderOpen
-              className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground"
-              strokeWidth={1.75}
-            />
+            <FolderOpen className={`${glyphClass} text-muted-foreground`} strokeWidth={1.75} />
           ) : (
-            <Folder
-              className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground"
-              strokeWidth={1.75}
-            />
+            <Folder className={`${glyphClass} text-muted-foreground`} strokeWidth={1.75} />
           )}
-          <span className="min-w-0 truncate text-xs font-medium text-foreground">
+          {/* flex-1 (not just min-w-0) so the chevron parks against the menu
+              button at a fixed x instead of trailing the truncated name — that
+              is what puts it on the same column as BackendRow's chevron. */}
+          <span
+            className={`min-w-0 flex-1 truncate text-foreground ${
+              isMobile ? 'text-sm font-medium' : 'text-xs font-medium'
+            }`}
+          >
             {project.name}
           </span>
           {isExpanded ? (
             <ChevronDown
-              className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70"
-              strokeWidth={2}
+              className={`${glyphClass} text-muted-foreground`}
+              strokeWidth={1.75}
             />
           ) : (
             <ChevronRight
-              className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70"
-              strokeWidth={2}
+              className={`${glyphClass} text-muted-foreground`}
+              strokeWidth={1.75}
             />
           )}
         </button>
@@ -278,18 +282,23 @@ export function ProjectListItem({
           className={menuButtonClass}
           aria-label="Project menu"
         >
-          <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.75} />
+          <MoreVertical className={`${glyphClass} text-muted-foreground`} strokeWidth={1.75} />
         </button>
-        {/* New session — placed last */}
-        <button
-          onClick={() => onStartCreatingSession()}
-          disabled={!isConnected}
-          className={`${menuButtonClass} disabled:cursor-not-allowed`}
-          title="New session"
-          aria-label="New session"
-        >
-          <Plus className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={2} />
-        </button>
+        {/* New session — placed last. On touch it leaves the row entirely: a
+            collapsed project carrying chevron + ⋮ + "+" is three affordances on
+            one 44px row, so mobile gets a real "New session" row inside the
+            expanded project instead (below). */}
+        {!isMobile && (
+          <button
+            onClick={() => onStartCreatingSession()}
+            disabled={!isConnected}
+            className={`${menuButtonClass} disabled:cursor-not-allowed`}
+            title="New session"
+            aria-label="New session"
+          >
+            <Plus className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={2} />
+          </button>
+        )}
 
         {/* Project context menu */}
         {contextMenuProject === project.id &&
@@ -327,10 +336,18 @@ export function ProjectListItem({
           )}
       </div>
 
-      {/* Sessions — a left guide rail fades in only while this region is hovered */}
+      {/* Sessions hang off a left guide rail. On desktop it fades in on hover;
+          on touch there is no hover, and the rail is what makes three tiers read
+          as a tree, so it stays on. ml-8 aligns it with the folder glyph's
+          centre (tree p-2 + BackendRow pl-3 + the button's pl-3 + half of a
+          16px glyph). */}
       {isExpanded && (
         <div
-          className="ml-1 mt-0.5 pl-2 border-l border-transparent hover:border-border/60 transition-colors"
+          className={
+            isMobile
+              ? 'ml-8 mt-0.5 pl-3 border-l border-border'
+              : 'ml-1 mt-0.5 pl-2 border-l border-transparent hover:border-border/60 transition-colors'
+          }
           data-testid="session-list"
         >
           {hasSupervisor && (
@@ -371,6 +388,17 @@ export function ProjectListItem({
             </div>
           )}
           {!hasSupervisor && renderRegularSessions()}
+          {isMobile && (
+            <button
+              onClick={() => onStartCreatingSession()}
+              disabled={!isConnected}
+              aria-label="New session"
+              className="w-full h-11 px-3 rounded-md text-sm text-muted-foreground flex items-center gap-2.5 hover:bg-secondary active:bg-secondary hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="w-4 h-4 flex-shrink-0" strokeWidth={1.75} />
+              New session
+            </button>
+          )}
         </div>
       )}
     </>

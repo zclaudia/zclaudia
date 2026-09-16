@@ -65,6 +65,8 @@ export function SessionItem({
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const hasRowMenu = !isMobile && Boolean(onDeleteWorktree || onPopOut);
   const actionPadding = hasRowMenu ? 'pr-6' : 'pr-2';
+  // Micro text uses the token tiers only — text-[9px] had no tier at all.
+  const microClass = isMobile ? 'text-2xs' : 'text-3xs';
 
   const openMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -93,13 +95,17 @@ export function SessionItem({
     <div className="relative group" data-testid="session-item">
       <button
         onClick={() => onSelect(session.id)}
-        className={`-ml-5 w-[calc(100%+1.25rem)] text-left pl-7 rounded-md truncate flex items-center gap-1 transition-colors text-xs ${
-          isMobile ? 'min-h-[44px]' : 'h-7'
-        } ${actionPadding} ${isSelected ? selectedClass : unselectedClass}`}
+        // Mobile sits inside the always-on rail at the 44px tier; desktop keeps
+        // the negative-margin pull so its hover fill spans the rail padding.
+        className={`text-left rounded-md truncate flex items-center transition-colors ${
+          isMobile
+            ? 'w-full h-11 px-3 gap-2.5 text-sm'
+            : `-ml-5 w-[calc(100%+1.25rem)] pl-7 h-7 gap-1 text-xs ${actionPadding}`
+        } ${isSelected ? selectedClass : unselectedClass}`}
       >
         {!isTask && (
           <span
-            className={`h-1.5 w-1.5 mr-1.5 shrink-0 rounded-full ${isActive ? 'bg-success' : 'bg-muted-foreground/40'}`}
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${isMobile ? '' : 'mr-1.5'} ${isActive ? 'bg-success' : 'bg-muted-foreground/60'}`}
             aria-hidden
           />
         )}
@@ -107,7 +113,7 @@ export function SessionItem({
         {/* Project role badge */}
         {roleBadge && (
           <span
-            className={`text-[10px] px-1 rounded-md font-medium shrink-0 ${TONE_BADGE[roleBadge.tone]}`}
+            className={`${microClass} px-1 rounded-md font-medium shrink-0 ${TONE_BADGE[roleBadge.tone]}`}
           >
             {roleBadge.label}
           </span>
@@ -115,10 +121,8 @@ export function SessionItem({
         {/* Provider name tag (for regular sessions, only when idle) */}
         {!session.projectRole && providerName && !statusLabel && (
           <span
-            className={`text-[10px] px-1 rounded-md shrink-0 ${
-              isSelected
-                ? 'bg-foreground/10 text-muted-foreground'
-                : 'bg-muted-foreground/10 text-muted-foreground/60'
+            className={`${microClass} px-1 rounded-md shrink-0 text-muted-foreground ${
+              isSelected ? 'bg-foreground/10' : 'bg-muted-foreground/10'
             }`}
           >
             {providerName}
@@ -131,19 +135,17 @@ export function SessionItem({
         {/* Worktree branch indicator — right-aligned with a branch glyph */}
         {!session.projectRole && worktreeBranch && !hideWorktreeBranch && (
           <span
-            className={`ml-auto flex items-center gap-0.5 text-[9px] truncate max-w-[90px] shrink-0 ${
-              isSelected ? 'text-foreground/50' : 'text-muted-foreground/50'
-            }`}
+            className={`ml-auto flex items-center gap-0.5 ${microClass} truncate max-w-[90px] shrink-0 text-muted-foreground`}
             title={worktreeBranch}
           >
-            <GitBranch size={9} strokeWidth={1.75} className="shrink-0" />
+            <GitBranch size={isMobile ? 11 : 10} strokeWidth={1.75} className="shrink-0" />
             <span className="truncate">{worktreeBranch}</span>
           </span>
         )}
         {/* Status label (right side) */}
         {statusLabel && (
           <span
-            className={`ml-auto flex items-center gap-1 shrink-0 text-[9px] font-medium ${TONE_TEXT[statusLabel.tone]}`}
+            className={`ml-auto flex items-center gap-1 shrink-0 ${microClass} font-medium ${TONE_TEXT[statusLabel.tone]}`}
           >
             {statusLabel.pulse && (
               <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
