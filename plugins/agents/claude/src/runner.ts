@@ -27,6 +27,7 @@ import {
 import { inspectClaudeCli, resolveClaudeCliFromPath } from './resolve-cli.js';
 import { buildClaudeSdkEnvironment } from './sdk-environment.js';
 import { toClaudeModelConnectionEnv } from './model-connection.js';
+import { createClaudeProcessOwner } from './cli-process.js';
 
 export interface ClaudeAgentRunOptions {
   cwd: string;
@@ -74,9 +75,11 @@ export async function* runClaudeAgent(
   }
 
   const abortController = options.abortController ?? new AbortController();
+  const processOwner = createClaudeProcessOwner();
   const sdkOptions: Partial<Options> = {
     cwd: options.cwd,
     abortController,
+    spawnClaudeCodeProcess: processOwner.spawnClaudeCodeProcess,
     systemPrompt: { type: 'preset', preset: 'claude_code' },
   };
 
@@ -113,7 +116,17 @@ export async function* runClaudeAgent(
   }
 
   const stream = query({ prompt: input, options: sdkOptions });
-  yield* pumpClaudeStream(stream, options);
+  const detachCancellation = bindClaudeCancellation(stream, abortController, processOwner);
+  try {
+    yield* pumpClaudeStream(stream, options);
+  } finally {
+    detachCancellation();
+    try {
+      stream.close();
+    } catch {
+      // already closed
+    }
+  }
 }
 
 /**
@@ -159,9 +172,11 @@ async function* runClaudeSdkAgent(
   });
 
   const abortController = options.abortController ?? new AbortController();
+  const processOwner = createClaudeProcessOwner();
   const sdkOptions: Partial<Options> = {
     cwd: options.cwd,
     abortController,
+    spawnClaudeCodeProcess: processOwner.spawnClaudeCodeProcess,
     // Let the engine discover project instructions natively. Global user
     // settings stay isolated; the host still owns the SDK connection.
     settingSources: ['project', 'local'],
@@ -218,6 +233,7 @@ async function* runClaudeSdkAgent(
     };
   }
   const stream = query({ prompt: prompt(), options: sdkOptions });
+  const detachCancellation = bindClaudeCancellation(stream, abortController, processOwner);
   try {
     await stream.applyFlagSettings({
       env: {
@@ -231,10 +247,30 @@ async function* runClaudeSdkAgent(
     releaseInput();
     yield* pumpClaudeStream(stream, options);
   } finally {
+    detachCancellation();
     inputAllowed = false;
     releaseInput();
     stream.close();
   }
+}
+
+function bindClaudeCancellation(
+  stream: ReturnType<typeof query>,
+  controller: AbortController,
+  processOwner: ReturnType<typeof createClaudeProcessOwner>
+): () => void {
+  const onAbort = () => {
+    try {
+      stream.close();
+    } catch {
+      // The SDK may already have closed the transport on abort.
+    } finally {
+      processOwner.kill();
+    }
+  };
+  controller.signal.addEventListener('abort', onAbort, { once: true });
+  if (controller.signal.aborted) onAbort();
+  return () => controller.signal.removeEventListener('abort', onAbort);
 }
 
 /**

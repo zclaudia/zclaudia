@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { GatewayBackendInfo, BackendSnapshot } from '@zclaudia/shared';
 import { isTauri } from '../utils/platform';
+import { normalizeGatewayUrl } from '../utils/gatewayUrl';
 
 export type BackendAuthStatus = 'authenticated' | 'pending' | 'failed';
 export const GATEWAY_SERVER_PREFIX = 'gw:';
@@ -134,11 +135,12 @@ export const useGatewayStore = create<GatewayState>()(
 
       // Mobile: set gateway config directly (persisted)
       setDirectGatewayConfig: (url, secret) => {
+        const normalizedUrl = normalizeGatewayUrl(url);
         set({
-          directGatewayUrl: url,
+          directGatewayUrl: normalizedUrl,
           directGatewaySecret: secret,
           // Also set runtime state so the connection hook picks it up
-          gatewayUrl: url,
+          gatewayUrl: normalizedUrl,
           gatewaySecret: secret,
         });
       },

@@ -112,9 +112,13 @@ describe('runner', () => {
     getOrCreateAppServerClient({ cwd: '/tmp/p', mode: 'ask', model: 'gpt-5', bridge: null });
     expect(MockCodexAppServerClient).toHaveBeenCalledTimes(1);
     expect(mockClient.currentMode).toBe('ask');
+    // Non-plan modes append the sandbox network grant that the interaction
+    // bridge's push_file requires (workspace-write blocks loopback by default).
     expect(mockClient.updateExtraArgs).toHaveBeenLastCalledWith([
       '-c',
       'approval_policy="on-request"',
+      '-c',
+      'sandbox_workspace_write.network_access=true',
     ]);
   });
 

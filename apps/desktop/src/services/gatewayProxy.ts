@@ -12,6 +12,7 @@
 import { useServerStore } from '../stores/serverStore';
 import { useGatewayStore } from '../stores/gatewayStore';
 import { getBrowserShellBaseUrl } from '../utils/browserShellRuntime';
+import { normalizeGatewayUrl } from '../utils/gatewayUrl';
 
 /**
  * Resolve a gateway backend ID to its HTTP base URL.
@@ -34,9 +35,9 @@ export function resolveGatewayBackendUrl(backendId: string): string | null {
   // Mobile fallback: direct connection to gateway
   const { gatewayUrl } = useGatewayStore.getState();
   if (!gatewayUrl) return null;
-  const gwAddr = gatewayUrl.includes('://')
+  const gwAddr = normalizeGatewayUrl(gatewayUrl.includes('://')
     ? gatewayUrl.replace(/^ws/, 'http')
-    : `http://${gatewayUrl}`;
+    : `http://${gatewayUrl}`);
   return `${gwAddr}/api/proxy/${backendId}`;
 }
 
@@ -63,9 +64,9 @@ export function resolveGatewayDirectUrl(path: string): string | null {
   // Mobile fallback: direct connection to gateway
   const { gatewayUrl } = useGatewayStore.getState();
   if (!gatewayUrl) return null;
-  const gwAddr = gatewayUrl.includes('://')
+  const gwAddr = normalizeGatewayUrl(gatewayUrl.includes('://')
     ? gatewayUrl.replace(/^ws/, 'http')
-    : `http://${gatewayUrl}`;
+    : `http://${gatewayUrl}`);
   return `${gwAddr}${path}`;
 }
 

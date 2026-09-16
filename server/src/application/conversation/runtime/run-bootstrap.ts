@@ -311,6 +311,9 @@ export function initializeRunBootstrap(
     lastActivityAt: Date.now(),
     recentToolCalls: [],
     loopHeartbeatStreak: 0,
+    // Owns the run's cancellation signal. Cancel aborts it; the provider chain
+    // (runOptions.abortController → plugin session) listens on this instance.
+    abortController: new AbortController(),
     pendingBackgroundTasks: 0,
     sessionType,
     workspaceRoot: cwd,

@@ -135,6 +135,12 @@ export function mapModeToConfigArgs(mode?: string): string[] {
       args.push('-c', 'approval_policy="on-request"');
       break;
   }
+  if (mode !== 'plan') {
+    // The workspace-write sandbox blocks ALL network by default, which also
+    // kills the documented push_file flow (curl to the local backend's
+    // /api/files/push). Loopback must be reachable for file delivery.
+    args.push('-c', 'sandbox_workspace_write.network_access=true');
+  }
   return args;
 }
 

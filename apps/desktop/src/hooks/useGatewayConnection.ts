@@ -21,22 +21,23 @@ export function useGatewayConnection() {
   // Poll server gateway status and sync to store
   // Skip when direct config is active (mobile mode — no local server to poll)
   useEffect(() => {
-    const { directGatewayUrl, directGatewaySecret } = useGatewayStore.getState();
-    if (directGatewayUrl && directGatewaySecret) {
-      // Direct mode: seed runtime gateway config from persisted settings.
-      useGatewayStore.setState({
-        gatewayUrl: directGatewayUrl,
-        gatewaySecret: directGatewaySecret,
-      });
-      return;
-    }
-
     let mounted = true;
-
+    // Direct mode takes precedence regardless of when it appears: the poll
+    // below is armed at mount and would otherwise keep running and clobber
+    // the runtime config the user just saved (mobile: the backend's
+    // advertised LAN/cleartext address is never valid for the device).
     const syncFromServer = async () => {
+      const { directGatewayUrl, directGatewaySecret } = useGatewayStore.getState();
+      if (directGatewayUrl && directGatewaySecret) {
+        useGatewayStore.setState({
+          gatewayUrl: directGatewayUrl,
+          gatewaySecret: directGatewaySecret,
+        });
+        return;
+      }
       try {
         const status = await getServerGatewayStatus();
-        if (!mounted) return;
+        if (!mounted || useGatewayStore.getState().directGatewayUrl) return;
         if (status.enabled && status.gatewayUrl && status.gatewaySecret) {
           useGatewayStore.setState({
             gatewayUrl: status.gatewayUrl,
@@ -55,7 +56,7 @@ export function useGatewayConnection() {
       }
     };
 
-    syncFromServer();
+    void syncFromServer();
     const interval = setInterval(syncFromServer, 30000);
 
     return () => {

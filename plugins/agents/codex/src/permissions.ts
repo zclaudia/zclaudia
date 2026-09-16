@@ -143,6 +143,15 @@ export async function resolveApprovalDecision(
     return { decision: 'accept' };
   }
 
+  // Session-bound interaction bridge tools (claudia_plugins: push_file, todos,
+  // ask_user_form, …) execute host-side behind the backend's own permission
+  // gates, and push_file is classified non-blocking there. Declining their
+  // approval requests here (codex's default for MCP tools) would dead-end file
+  // delivery without ever surfacing a card, so accept them directly.
+  if (method.includes('mcpToolCall') && JSON.stringify(params ?? {}).includes('claudia_plugins')) {
+    return { decision: 'accept' };
+  }
+
   if (onPermission) {
     try {
       const permissionRequest = mapApprovalToPermissionRequest(method, params);

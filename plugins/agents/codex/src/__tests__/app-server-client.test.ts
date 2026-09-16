@@ -533,6 +533,109 @@ describe('CodexAppServerClient', () => {
     client.destroy();
   });
 
+  it.each([false, true])(
+    'releases a silent cancelled turn after 10s (cancel before turn/start replies: %s)',
+    async delayStart => {
+      let replyToStart!: () => void;
+      const { proc, stdinWrites } = fakeProc({
+        lines: [JSON.stringify({ id: 1, result: { capabilities: {} } })],
+        onStdin(data, stdout) {
+          for (const line of data.split('\n').filter(Boolean)) {
+            const msg = JSON.parse(line);
+            if (msg.method === 'turn/start') {
+              replyToStart = () =>
+                stdout.push(
+                  JSON.stringify({ id: msg.id, result: { turn: { id: 'cancelled-turn' } } }) + '\n'
+                );
+              if (!delayStart) replyToStart();
+            }
+            // Deliberately send neither an interrupt ACK nor turn/completed.
+          }
+        },
+      });
+      spawnMock.mockReturnValueOnce(proc as never);
+      const client = new CodexAppServerClient('/bin/codex', {});
+      const turn = client.runTurn('thread-1', [], async () => ({ behavior: 'deny' }));
+      await turn.next();
+      vi.useFakeTimers();
+      try {
+        let finished = false;
+        const completion = (async () => {
+          for await (const _event of turn) {
+            /* drain */
+          }
+          finished = true;
+        })();
+        await vi.advanceTimersByTimeAsync(0);
+        void client.interruptTurn('thread-1');
+        if (delayStart) replyToStart();
+        await vi.advanceTimersByTimeAsync(5_000);
+        // Progress and repeated cancellation must not restart the deadline.
+        proc.stdout.push(
+          JSON.stringify({
+            method: 'item/agentMessage/delta',
+            params: { threadId: 'thread-1', turnId: 'cancelled-turn', delta: 'late output' },
+          }) + '\n'
+        );
+        void client.interruptTurn('thread-1');
+        await vi.advanceTimersByTimeAsync(4_999);
+        expect(finished).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(finished).toBe(true);
+        await completion;
+        expect(client.activeTurns).toBe(0);
+        expect(vi.getTimerCount()).toBe(0);
+        expect(stdinWrites.join('')).toContain('"turnId":"cancelled-turn"');
+        const nextTurn = client.runTurn('thread-1', [], async () => ({ behavior: 'deny' }));
+        expect((await nextTurn.next()).value).toMatchObject({ type: 'init' });
+        await nextTurn.return();
+      } finally {
+        client.destroy();
+        await turn.return();
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it.each([undefined, null, 42, 'untrusted-server', 'claudia-plugins', 'claudia_plugins'])(
+    'handles elicitation serverName safely: %j',
+    async serverName => {
+      const { proc, stdinWrites } = fakeProc({
+        lines: [JSON.stringify({ id: 1, result: { capabilities: {} } })],
+      });
+      spawnMock.mockReturnValueOnce(proc as never);
+      const client = new CodexAppServerClient('/bin/codex', {});
+      try {
+        await client.ensureRunning();
+        proc.stdout.push(
+          JSON.stringify({
+            id: 'elicitation-1',
+            method: 'mcpServer/elicitation/request',
+            params: { serverName },
+          }) + '\n'
+        );
+        await new Promise(resolve => setImmediate(resolve));
+        const messages = stdinWrites.flatMap(data =>
+          data
+            .split('\n')
+            .filter(Boolean)
+            .map(line => JSON.parse(line))
+        );
+        expect(messages.find(msg => msg.id === 'elicitation-1')?.result).toMatchObject({
+          action:
+            serverName === 'claudia-plugins' || serverName === 'claudia_plugins'
+              ? 'accept'
+              : 'decline',
+        });
+        expect(
+          messages.find(msg => msg.method === 'initialize')?.params.capabilities
+        ).toMatchObject({ mcpServerOpenaiFormElicitation: true });
+      } finally {
+        client.destroy();
+      }
+    }
+  );
+
   it('waits for one shared initialization when callers start concurrently', async () => {
     let initializeId: number | undefined;
     const { proc } = fakeProc({

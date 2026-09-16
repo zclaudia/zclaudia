@@ -19,6 +19,7 @@ export interface InitializeParams {
   capabilities?: {
     experimentalApi: boolean;
     requestAttestation: boolean;
+    mcpServerOpenaiFormElicitation?: boolean;
   } | null;
 }
 

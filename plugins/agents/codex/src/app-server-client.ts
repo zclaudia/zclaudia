@@ -35,6 +35,7 @@ interface ActiveTurnContext {
   mode: string | undefined;
   turnId?: string;
   abortRequested: boolean;
+  onAbort?: () => void;
 }
 
 const MAX_STDERR_TAIL_LENGTH = 4096;
@@ -249,11 +250,28 @@ export class CodexAppServerClient {
       if (this.process === child) this.handleStdoutData(data as Buffer | string);
     });
 
-    debugLog('[Codex AppServer] Sending initialize...');
+    debugLog(
+      `[Codex AppServer] Sending initialize... ${JSON.stringify({
+        clientInfo: { name: 'zclaudia', version: '1.0.0' },
+        capabilities: {
+          experimentalApi: false,
+          requestAttestation: false,
+          mcpServerOpenaiFormElicitation: true,
+        },
+      })}`
+    );
     try {
       const initResult = await Promise.race([
         this.sendRequest('initialize', {
           clientInfo: { name: 'zclaudia', version: '1.0.0' },
+          // Opt into the openai/form elicitation extension: the interaction
+          // bridge's push_file confirms delivery via a form-mode elicitation,
+          // and without this capability codex resolves it as declined.
+          capabilities: {
+            experimentalApi: false,
+            requestAttestation: false,
+            mcpServerOpenaiFormElicitation: true,
+          },
         }),
         spawnErrorPromise,
       ]);
@@ -515,9 +533,24 @@ export class CodexAppServerClient {
     }
 
     if (method === 'mcpServer/elicitation/request') {
-      debugLog(
-        `[Codex AppServer] MCP elicitation: server=${params?.serverName} mode=${params?.mode}`
-      );
+      debugLog(`[Codex AppServer] MCP elicitation FULL: ${JSON.stringify(params)}`);
+      // The session-bound interaction bridge (claudia_plugins) raises this
+      // confirmation for its own tools (push_file, todos, …). Those tools run
+      // host-side behind the backend's permission gates and are non-blocking by
+      // design; replying 'decline' made codex report "user rejected MCP tool
+      // call" and dead-ended file delivery. Accept bridge confirmations; keep
+      // declining unknown servers.
+      if (
+        typeof params?.serverName === 'string' &&
+        params.serverName.replace(/[_-]/g, '') === 'claudiaplugins'
+      ) {
+        // content/_meta must be present (nullable) for the response to
+        // deserialize into McpServerElicitationRequestResponse.
+        const acceptResponse = { action: 'accept', content: null, _meta: null };
+        debugLog(`[Codex AppServer] Sending elicitation accept: ${JSON.stringify(acceptResponse)}`);
+        this.sendResponse(id, acceptResponse);
+        return;
+      }
       this.sendResponse(id, { action: 'decline' });
       return;
     }
@@ -705,6 +738,7 @@ export class CodexAppServerClient {
       return;
     }
     context.abortRequested = true;
+    context.onAbort?.();
     if (!context.turnId) return;
     try {
       await this.sendRequest('turn/interrupt', { threadId, turnId: context.turnId });
@@ -741,8 +775,17 @@ export class CodexAppServerClient {
       apiKeySource?: string;
     }
   ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
-    if (this.activeTurnContexts.has(threadId)) {
-      throw new Error(`A Codex turn is already active for thread ${threadId}`);
+    const existingTurn = this.activeTurnContexts.get(threadId);
+    if (existingTurn) {
+      // A context left behind by a cancelled turn (the turn/interrupt path can
+      // race turn/start and skip cleanup) is stale — evict it so the thread
+      // recovers instead of being locked forever. An untouched live turn still
+      // hard-throws as before.
+      if (existingTurn.abortRequested) {
+        this.activeTurnContexts.delete(threadId);
+      } else {
+        throw new Error(`A Codex turn is already active for thread ${threadId}`);
+      }
     }
     this.lastActivity = Date.now();
     this.activeTurns += 1;
@@ -798,6 +841,15 @@ export class CodexAppServerClient {
           resolve = r;
         });
       };
+
+      // Arm the deadline when cancellation is requested, even while the
+      // generator is asleep in waitForItem(). Enqueueing wakes that waiter;
+      // ordinary progress notifications must not reset the deadline.
+      let cancelTimer: ReturnType<typeof setTimeout> | undefined;
+      activeTurnContext.onAbort = () => {
+        cancelTimer ??= setTimeout(() => enqueue({ type: 'done' }), 10_000);
+      };
+      if (activeTurnContext.abortRequested) activeTurnContext.onAbort();
 
       let lastUsage: TokenUsageBreakdown | undefined;
       let modelContextWindow: number | undefined;
@@ -939,9 +991,11 @@ export class CodexAppServerClient {
         const turn = requireRecord(turnStart.turn, 'turn/start response turn');
         activeTurnContext.turnId = requireString(turn, 'id', 'turn/start response turn');
         if (activeTurnContext.abortRequested) {
-          await this.sendRequest('turn/interrupt', {
+          void this.sendRequest('turn/interrupt', {
             threadId,
             turnId: activeTurnContext.turnId,
+          }).catch(error => {
+            debugLog(`[Codex AppServer] WARN: turn/interrupt failed: ${error}`);
           });
         }
 
@@ -955,6 +1009,8 @@ export class CodexAppServerClient {
           }
         }
       } finally {
+        clearTimeout(cancelTimer);
+        activeTurnContext.onAbort = undefined;
         this.emitter.off('notification', onNotification);
         this.emitter.off('exit', onExit);
       }

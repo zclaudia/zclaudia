@@ -1,6 +1,10 @@
 import { processAtMentions } from '../../../utils/server-utils.js';
 import { parseMessageInput } from './message-input.js';
-import { resolveImageAttachments, type ResolvedImage } from './resolve-image-attachments.js';
+import {
+  resolveImageAttachments,
+  resolveFileAttachments,
+  type ResolvedImage,
+} from './resolve-image-attachments.js';
 import { getFileStore } from '../../../infra/storage/fileStore.js';
 import { createPermissionCallback } from './run-permissions.js';
 import { resolveUserHooks } from './resolve-user-hooks.js';
@@ -66,12 +70,26 @@ export function prepareProviderRun(input: PrepareProviderRunInput): PreparedProv
 
   const parsedInput = parseMessageInput(message.input);
   const { images, notices } = resolveImageAttachments(parsedInput.attachments, getFileStore());
+  const { files: textFiles, notices: fileNotices } = resolveFileAttachments(
+    parsedInput.attachments,
+    getFileStore()
+  );
   const mentionProcessed = processAtMentions(parsedInput.text, session.root_path);
   // Background tasks that settled while the session was idle surface here.
   const taskNotices = drainPendingTaskNotices(message.sessionId);
-  const allNotices = [...notices, ...taskNotices];
-  const processedInput =
-    allNotices.length > 0 ? `${mentionProcessed}\n\n${allNotices.join('\n')}` : mentionProcessed;
+  // Text-like file attachments ride the prompt itself so the agent actually
+  // receives what the user attached (images go via RunOptions instead).
+  const fileBlocks = textFiles.map(
+    f => `[Attached file: ${f.name} (${f.mimeType})]\n<attachment>\n${f.content}\n</attachment>`
+  );
+  const allNotices = [...notices, ...fileNotices, ...taskNotices];
+  const inputSuffix =
+    fileBlocks.length > 0
+      ? `\n\n${fileBlocks.join('\n\n')}${allNotices.length > 0 ? `\n\n${allNotices.join('\n')}` : ''}`
+      : allNotices.length > 0
+        ? `\n\n${allNotices.join('\n')}`
+        : '';
+  const processedInput = `${mentionProcessed}${inputSuffix}`;
   console.log('[@ Mention] Original input:', parsedInput.text);
   if (mentionProcessed !== parsedInput.text) {
     console.log('[@ Mention] Processed input:', mentionProcessed);

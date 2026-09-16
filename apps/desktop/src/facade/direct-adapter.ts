@@ -17,6 +17,7 @@ import type {
 } from '@zclaudia/shared';
 import { GatewayTransport } from '../hooks/transport/GatewayTransport';
 import type { GatewayTransportConfig } from '../hooks/transport/GatewayTransport';
+import { normalizeGatewayUrl } from '../utils/gatewayUrl';
 
 // ============================================================================
 // DirectGatewayAdapter
@@ -50,7 +51,7 @@ export class DirectGatewayAdapter implements FacadeRuntimeGatewayAdapter {
     instanceId: string;
   }) {
     this.transportConfig = config;
-    this.gatewayHttpUrl = config.url.replace(/^ws/, 'http');
+    this.gatewayHttpUrl = normalizeGatewayUrl(config.url.replace(/^ws/, 'http'));
     this.gatewaySecret = config.gatewaySecret;
   }
 

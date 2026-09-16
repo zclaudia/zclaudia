@@ -3,7 +3,11 @@ import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { resolveImageAttachments, MAX_IMAGES_PER_MESSAGE } from '../resolve-image-attachments.js';
+import {
+  resolveImageAttachments,
+  resolveFileAttachments,
+  MAX_IMAGES_PER_MESSAGE,
+} from '../resolve-image-attachments.js';
 
 // We import the class via initFileStore + getFileStore to construct a real instance
 // with an in-memory SQLite DB and a temp dir on disk.
@@ -115,5 +119,88 @@ describe('resolveImageAttachments', () => {
     expect(images).toHaveLength(MAX_IMAGES_PER_MESSAGE);
     expect(notices).toHaveLength(2);
     expect(notices[0]).toContain('max 10 images');
+  });
+});
+
+describe('resolveFileAttachments', () => {
+  let db: Database.Database;
+  let tmpDir: string;
+  let fileStore: ReturnType<typeof getFileStore>;
+
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    db = createTestDb();
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zclaudia-test-filestore-'));
+    const origEnv = process.env.ZCLAUDIA_DATA_DIR;
+    process.env.ZCLAUDIA_DATA_DIR = tmpDir;
+    initFileStore(db);
+    if (origEnv === undefined) {
+      delete process.env.ZCLAUDIA_DATA_DIR;
+    } else {
+      process.env.ZCLAUDIA_DATA_DIR = origEnv;
+    }
+    fileStore = getFileStore();
+  });
+
+  afterEach(() => {
+    db.close();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('inlines text file attachments', async () => {
+    const fileId = fileStore.storeFileFromBuffer(
+      'notes.txt',
+      'text/plain',
+      Buffer.from('hello\nworld')
+    );
+    const { files, notices } = resolveFileAttachments(
+      [{ fileId, name: 'notes.txt', mimeType: 'text/plain', type: 'file' }],
+      fileStore
+    );
+    expect(notices).toEqual([]);
+    expect(files).toHaveLength(1);
+    expect(files[0].name).toBe('notes.txt');
+    expect(files[0].content).toBe('hello\nworld');
+  });
+
+  it('emits a notice for missing file attachments instead of dropping them', () => {
+    const { files, notices } = resolveFileAttachments(
+      [{ fileId: 'missing', name: 'gone.txt', mimeType: 'text/plain', type: 'file' }],
+      fileStore
+    );
+    expect(files).toEqual([]);
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toContain('gone.txt');
+  });
+
+  it('emits a notice for binary file attachments', async () => {
+    const fileId = fileStore.storeFileFromBuffer(
+      'blob.bin',
+      'application/octet-stream',
+      Buffer.from([0, 1, 2])
+    );
+    const { files, notices } = resolveFileAttachments(
+      [{ fileId, name: 'blob.bin', mimeType: 'application/octet-stream', type: 'file' }],
+      fileStore
+    );
+    expect(files).toEqual([]);
+    expect(notices[0]).toContain('binary');
+  });
+
+  it('does not decode PDF bytes as inline UTF-8 text', () => {
+    const fileId = fileStore.storeFileFromBuffer(
+      'report.pdf',
+      'application/pdf',
+      Buffer.from('%PDF-1.7\nstream\n\x00\xff\nendstream')
+    );
+    const { files, notices } = resolveFileAttachments(
+      [{ fileId, name: 'report.pdf', mimeType: 'application/pdf', type: 'file' }],
+      fileStore
+    );
+    expect(files).toEqual([]);
+    expect(notices).toEqual([expect.stringContaining('report.pdf — application/pdf')]);
+    expect(notices[0]).toContain('binary content not inlined');
   });
 });

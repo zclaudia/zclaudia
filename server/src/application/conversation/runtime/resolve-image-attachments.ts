@@ -52,3 +52,71 @@ export function resolveImageAttachments(
   }
   return { images, notices };
 }
+
+/** Non-image attachments above this size are not inlined; the agent gets a
+ *  notice instead. 256KB of text is far more than any prompt needs. */
+export const MAX_INLINE_TEXT_BYTES = 256 * 1024;
+
+const TEXTUAL_MIME_RE =
+  /^(text\/|application\/(json|xml|javascript|typescript|x-yaml|toml|sql|csv))/;
+const TEXTUAL_NAME_RE =
+  /\.(md|txt|json|ya?ml|toml|csv|log|ts|tsx|js|jsx|py|rb|go|rs|java|kt|c|h|cpp|hpp|cs|sh|zsh|bash|sql|html?|css|xml|ini|cfg|conf|env)$/i;
+
+function isTextual(mimeType: string, name: string): boolean {
+  return TEXTUAL_MIME_RE.test(mimeType) || TEXTUAL_NAME_RE.test(name);
+}
+
+export interface ResolvedTextFile {
+  name: string;
+  mimeType: string;
+  content: string;
+}
+
+export interface ResolveFilesResult {
+  files: ResolvedTextFile[];
+  /** Human-readable substitutes appended to the prompt text for file
+   *  attachments that could not be inlined (missing, binary, oversize). */
+  notices: string[];
+}
+
+/**
+ * Resolve non-image (`type: 'file'`) attachments. Text-like files are inlined
+ * verbatim so the agent actually receives what the user attached; anything
+ * else surfaces a descriptive notice instead of being silently dropped.
+ */
+export function resolveFileAttachments(
+  attachments: MessageAttachment[],
+  fileStore: ImageFileSource
+): ResolveFilesResult {
+  const files: ResolvedTextFile[] = [];
+  const notices: string[] = [];
+  for (const att of attachments) {
+    if (att.type !== 'file') continue;
+    const file = fileStore.getFile(att.fileId);
+    if (!file) {
+      notices.push(`[File attached: ${att.name} — file unavailable]`);
+      continue;
+    }
+    if (!isTextual(file.mimeType, file.name)) {
+      notices.push(
+        `[File attached: ${att.name} — ${file.mimeType}, ${file.size} bytes (binary content not inlined)]`
+      );
+      continue;
+    }
+    if (file.size > MAX_INLINE_TEXT_BYTES) {
+      notices.push(
+        `[File attached: ${att.name} — skipped, ${file.size} bytes exceeds ${MAX_INLINE_TEXT_BYTES}-byte inline limit]`
+      );
+      continue;
+    }
+    let content: string;
+    try {
+      content = Buffer.from(file.data, 'base64').toString('utf-8');
+    } catch {
+      notices.push(`[File attached: ${att.name} — could not decode content]`);
+      continue;
+    }
+    files.push({ name: file.name, mimeType: file.mimeType, content });
+  }
+  return { files, notices };
+}
