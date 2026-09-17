@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ProjectDashboardView } from './projectStore';
+import type { ProjectDashboardView } from './selectionTypes';
 
 interface SelectionState {
   selectedProjectId: string | null;
