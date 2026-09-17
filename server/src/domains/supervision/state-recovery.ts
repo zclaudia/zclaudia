@@ -6,6 +6,7 @@ import type { SupervisorService } from './supervisor-service.js';
 import { assertTaskTransition, TERMINAL_TASK_STATUSES } from './status-machine.js';
 import { getActiveTaskStatuses, holdsTaskWorktree } from './model.js';
 import { shouldTransitionAgentToIdle } from './model.js';
+import { RuntimeUsageRepository } from '../usage/repository.js';
 
 export interface RecoveryAction {
   type:
@@ -87,6 +88,26 @@ export class StateRecovery {
         id: s.id,
         detail: `Was ${s.last_run_status} when server stopped`,
       });
+    }
+
+    // Usage ledger (design §6.6): settle records left non-terminal by the
+    // dead process. Known token values are preserved and downgraded to
+    // partial; unconfirmed dispatches become missing. The model is never
+    // re-requested.
+    try {
+      const recovered = new RuntimeUsageRepository(this.db).recoverInterrupted(now);
+      if (recovered > 0) {
+        actions.push({
+          type: 'run_interrupted',
+          id: `usage_records:${recovered}`,
+          detail: `Settled ${recovered} interrupted invocation usage record(s)`,
+        });
+      }
+    } catch (err) {
+      console.warn(
+        '[StateRecovery] usage record recovery failed:',
+        err instanceof Error ? err.message : err
+      );
     }
 
     return actions;

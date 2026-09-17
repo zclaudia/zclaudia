@@ -130,6 +130,13 @@
               "id": "session.background_task",
               "supported": false,
               "degradation": "fallback_to_text"
+            },
+            {
+              "id": "usage.tracking",
+              "supported": true,
+              "mode": "native",
+              "reliability": "best_effort",
+              "notes": "Emits provider_usage_updated snapshots from thread/tokenUsage/updated cumulative totals against a trusted per-invocation baseline; without one the snapshot stays partial."
             }
           ],
           "permissionModeMap": {

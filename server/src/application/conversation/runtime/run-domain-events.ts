@@ -1,5 +1,6 @@
 import type { ContentBlock, ToolEffect } from '@zclaudia/shared/core/message';
 import type { UsageInfo } from '@zclaudia/shared/core/message';
+import type { RuntimeUsageSnapshot } from '@zclaudia/shared/core/runtime-usage';
 import type { PCPEffectiveProfile } from '@zclaudia/shared/core/pcp';
 import type { ToolSemantic } from '@zclaudia/shared/wire/messages/run';
 import type { RunPhase } from './active-run-phase.js';
@@ -8,6 +9,7 @@ import { newId } from '../../../utils/uuid.js';
 export const RUN_DOMAIN_EVENT_TYPES = [
   'run.started',
   'run.providerTurnFinished',
+  'usage.updated',
   'run.retryScheduled',
   'run.completed',
   'run.failed',
@@ -122,6 +124,16 @@ export interface RunDomainEventPayloadMap {
   'run.providerTurnFinished': {
     content?: string;
     usage?: UsageInfo;
+  };
+  /**
+   * Host-internal cumulative usage snapshot for the current invocation
+   * (design §4). Deliberately NOT projected to wire messages: clients read
+   * token stats from the ledger-backed stats endpoints, and the snapshot may
+   * carry a restricted checkpoint.
+   */
+  'usage.updated': {
+    invocationId: string;
+    snapshot: RuntimeUsageSnapshot;
   };
   'run.retryScheduled': {
     attempt: number;

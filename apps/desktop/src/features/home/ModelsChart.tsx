@@ -36,6 +36,8 @@ export function ModelsChart({ range }: { range: UsageStatsRange }) {
 
   useEffect(() => {
     let cancelled = false;
+    setStats(null);
+    setUnavailable(false);
     if (targets.length === 0) {
       setUnavailable(true);
       return;

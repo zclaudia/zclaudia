@@ -31,6 +31,7 @@ export function dispatchProviderRuntimeEventToDomain(
     sessionId: input.activeRun.sessionId,
     providerType: input.providerType,
     seq: (input.activeRun.eventSeq ?? 0) + 1,
+    invocationId: input.activeRun.usageAccounting?.invocationId,
   } satisfies TranslateProviderRuntimeEventInput);
 
   for (const event of domainEvents) {

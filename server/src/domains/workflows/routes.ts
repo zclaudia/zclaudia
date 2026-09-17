@@ -359,13 +359,11 @@ export function createWorkflowRoutes(
     try {
       const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
       const limit = parseInt(req.query.limit as string) || 50;
-      if (!projectId) {
-        return res.status(400).json({
-          success: false,
-          error: { code: 'VALIDATION_ERROR', message: 'projectId query parameter is required' },
-        });
-      }
-      const runs = service.getRunsByProject(projectId, limit);
+      // Without a project scope, return runs for the whole backend. Global
+      // automations (no projectId) would otherwise be invisible in Runs.
+      const runs = projectId
+        ? service.getRunsByProject(projectId, limit)
+        : service.getAllRuns(limit);
       res.json({ success: true, data: runs });
     } catch (error) {
       res.status(500).json({

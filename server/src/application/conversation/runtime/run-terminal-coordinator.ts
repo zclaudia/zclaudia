@@ -34,6 +34,7 @@ import { projectRunDomainEventToWireMessages } from './wire-projector.js';
 import { broadcastRunMessage } from '../transport/broadcast.js';
 import { maybeGenerateSessionTitle } from '../title/session-title-service.js';
 import { setSessionRunStatus } from './session-run-status.js';
+import { getUsageRecorder } from '../../../domains/usage/recorder.js';
 
 export interface TerminalProviderEventState {
   systemInfo?: SystemInfo;
@@ -104,6 +105,23 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
   if (msg.usage) {
     input.state.lastTurnTotalTokens =
       (input.state.lastTurnTotalTokens ?? 0) + msg.usage.totalTokens;
+  }
+
+  // Usage ledger settlement (design §6.4): the single settlement entrance for
+  // successful turns. Usage status stays evidence-based; the terminal result
+  // usage of runtimes that never streamed snapshots is recorded as a
+  // low-confidence compat snapshot so known consumption is not lost and is
+  // never double counted.
+  if (
+    activeRun.usageAccounting &&
+    !activeRun.usageAccounting.deferSettlement &&
+    (activeRun.pendingBackgroundTasks ?? 0) === 0
+  ) {
+    getUsageRecorder(db).settleInvocation({
+      invocationId: activeRun.usageAccounting.invocationId,
+      executionState: 'completed',
+      compatUsage: msg.usage,
+    });
   }
 
   finalizeRunInteractions({
@@ -277,6 +295,12 @@ export function failProviderTurn(input: FailProviderTurnInput): void {
       sendRunEvent,
       type: 'run.failed',
     });
+    if (activeRun.usageAccounting) {
+      getUsageRecorder(db).settleInvocation({
+        invocationId: activeRun.usageAccounting.invocationId,
+        executionState: 'failed',
+      });
+    }
     setPhase(activeRun, 'failed');
     setSessionRunStatus(db, sessionId, 'failed');
     broadcastHeartbeat();

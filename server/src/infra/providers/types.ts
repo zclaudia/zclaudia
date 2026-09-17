@@ -84,6 +84,19 @@ export interface RunOptions {
   engineExecution?: import('@zclaudia/shared/providers').EngineExecutionContext;
   /** Explicit model connection for SDK engine modes; in-memory for this run only. */
   modelConnection?: import('@zclaudia/shared/providers').RuntimeModelConnection;
+  /** Ledger invocation this dispatch is accounted under (runtime usage design §6). */
+  usageAccounting?: { invocationId: string };
+  /**
+   * Trusted cumulative usage checkpoint for resumed native threads (Codex
+   * design §5.2), read from the ledger before dispatch. `null` means the
+   * host looked and found none — the plugin must treat the baseline as
+   * unknown, never as zero. The plugin proves same-thread identity (its own
+   * threadId vs `nativeThreadId`) before trusting the counters.
+   */
+  usageBaseline?: {
+    cumulative: import('@zclaudia/shared/core/runtime-usage').CodexTokenUsageCounters;
+    nativeThreadId?: string;
+  } | null;
 }
 
 /** Agent runtime adapter interface. */

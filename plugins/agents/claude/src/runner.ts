@@ -24,6 +24,7 @@ import {
   planToolSemantic,
   truncateUtf8,
 } from '@zclaudia/agent-common';
+import { ClaudeUsageAccumulator, providerUsageUpdatedEvent } from '@zclaudia/agent-common';
 import { inspectClaudeCli, resolveClaudeCliFromPath } from './resolve-cli.js';
 import { buildClaudeSdkEnvironment } from './sdk-environment.js';
 import { toClaudeModelConnectionEnv } from './model-connection.js';
@@ -343,9 +344,71 @@ export async function* pumpClaudeStream(
   const planModeTools = new Map<string, 'EnterPlanMode' | 'ExitPlanMode'>();
   let initSystemInfo: SystemInfo | undefined;
   let lastCallContextTokens: number | undefined;
+  // Usage accounting (runtime usage design §5.1): assistant usage is deduped
+  // by message id and streamed to the host as cumulative invocation
+  // snapshots; the SDK result settles the invocation.
+  const usage = new ClaudeUsageAccumulator();
   try {
     for await (const message of stream) {
       lastCallContextTokens = extractClaudeCallContextTokens(message) ?? lastCallContextTokens;
+
+      // Mid-call usage snapshot. Sub-agent messages (parent_tool_use_id) are
+      // not attributable to the main-loop window and stay out of the
+      // accumulator — their inclusion in the final total is decided at
+      // result time, never guessed here.
+      const assistantMsg = message as {
+        type?: unknown;
+        parent_tool_use_id?: unknown;
+        message?: { id?: unknown; usage?: Record<string, unknown> };
+      };
+      if (assistantMsg.type === 'assistant' && assistantMsg.parent_tool_use_id == null) {
+        const rawUsage = assistantMsg.message?.usage;
+        if (rawUsage && typeof rawUsage === 'object') {
+          const snapshot = usage.onAssistantUsage({
+            messageId:
+              typeof assistantMsg.message?.id === 'string' ? assistantMsg.message.id : undefined,
+            isSubagent: false,
+            usage: {
+              input_tokens: numberOf(rawUsage.input_tokens),
+              output_tokens: numberOf(rawUsage.output_tokens),
+              cache_read_input_tokens: numberOf(rawUsage.cache_read_input_tokens),
+              cache_creation_input_tokens: numberOf(rawUsage.cache_creation_input_tokens),
+            },
+          });
+          if (snapshot) yield providerUsageUpdatedEvent(snapshot);
+        }
+      }
+
+      // Result messages settle the usage snapshot BEFORE the terminal event
+      // reaches the host, so the ledger holds the authoritative total when
+      // the run completes. Error results keep whatever usage they carry —
+      // the snapshot is downgraded to partial, never zeroed (design §5.1.5).
+      const resultMsg = message as {
+        type?: unknown;
+        subtype?: unknown;
+        usage?: Record<string, unknown>;
+        modelUsage?: Record<string, Record<string, unknown>>;
+      };
+      if (resultMsg.type === 'result') {
+        yield providerUsageUpdatedEvent(
+          usage.onResult({
+            usage:
+              resultMsg.usage && typeof resultMsg.usage === 'object'
+                ? {
+                    input_tokens: numberOf(resultMsg.usage.input_tokens),
+                    output_tokens: numberOf(resultMsg.usage.output_tokens),
+                    cache_read_input_tokens: numberOf(resultMsg.usage.cache_read_input_tokens),
+                    cache_creation_input_tokens: numberOf(
+                      resultMsg.usage.cache_creation_input_tokens
+                    ),
+                  }
+                : undefined,
+            modelUsage: readClaudeModelUsage(resultMsg.modelUsage),
+            errored: resultMsg.subtype !== 'success',
+          })
+        );
+      }
+
       const transformed = transformClaudeSdkMessage(message);
       const events = Array.isArray(transformed) ? transformed : [transformed];
       for (const event of events) {
@@ -403,6 +466,43 @@ export async function* pumpClaudeStream(
   } finally {
     stream.close();
   }
+}
+
+function numberOf(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function readClaudeModelUsage(modelUsage: Record<string, Record<string, unknown>> | undefined):
+  | Record<
+      string,
+      {
+        inputTokens?: number;
+        outputTokens?: number;
+        cacheReadInputTokens?: number;
+        cacheCreationInputTokens?: number;
+      }
+    >
+  | undefined {
+  if (!modelUsage || typeof modelUsage !== 'object') return undefined;
+  const result: Record<
+    string,
+    {
+      inputTokens?: number;
+      outputTokens?: number;
+      cacheReadInputTokens?: number;
+      cacheCreationInputTokens?: number;
+    }
+  > = {};
+  for (const [model, entry] of Object.entries(modelUsage)) {
+    if (!entry || typeof entry !== 'object') continue;
+    result[model] = {
+      inputTokens: numberOf(entry.inputTokens),
+      outputTokens: numberOf(entry.outputTokens),
+      cacheReadInputTokens: numberOf(entry.cacheReadInputTokens),
+      cacheCreationInputTokens: numberOf(entry.cacheCreationInputTokens),
+    };
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 function canonicalClaudePlanTool(toolName: unknown): 'EnterPlanMode' | 'ExitPlanMode' | undefined {

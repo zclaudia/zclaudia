@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const { settleInvocation, settleNotStarted } = vi.hoisted(() => ({
+  settleInvocation: vi.fn(),
+  settleNotStarted: vi.fn(),
+}));
+vi.mock('../../../../domains/usage/recorder.js', () => ({
+  getUsageRecorder: () => ({ settleInvocation, settleNotStarted }),
+}));
+
 const { compactForOverflow } = vi.hoisted(() => ({ compactForOverflow: vi.fn() }));
 vi.mock('../../compaction/compaction-service.js', () => ({ compactForOverflow }));
 
@@ -51,9 +59,24 @@ function baseInput(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   compactForOverflow.mockReset();
+  settleInvocation.mockReset();
+  settleNotStarted.mockReset();
 });
 
 describe('handleRunException — overflow recovery', () => {
+  it('settles consumed usage before handing off to an overflow retry', async () => {
+    compactForOverflow.mockResolvedValue({ outcome: 'compacted', compacted: true });
+    const { input, handleRetry } = baseInput();
+    input.activeRun.usageAccounting = { invocationId: 'first', runningMarked: true };
+    handleRetry.mockImplementation(async () => {
+      expect(settleInvocation).toHaveBeenCalledWith({
+        invocationId: 'first',
+        executionState: 'failed',
+      });
+    });
+    expect((await handleRunException(input as any)).handedOffToRetry).toBe(true);
+  });
+
   it('compacts and retries when overflow compaction succeeds', async () => {
     compactForOverflow.mockResolvedValue({ outcome: 'compacted', compacted: true });
     const { input, handleRetry } = baseInput();

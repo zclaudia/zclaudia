@@ -1,5 +1,6 @@
 import { resolveAgentForSession } from '../../../domains/agent-profiles/agent-resolver.js';
 import { isPiAgentRuntime } from '@zclaudia/shared/core/agent-profile';
+import { newId } from '../../../utils/uuid.js';
 import { negotiateProfile } from '../../../infra/providers/pcp-negotiator.js';
 import type { ProviderAdapter, ProviderRuntimeEvent } from '../../../infra/providers/types.js';
 import type Database from 'better-sqlite3';
@@ -28,6 +29,8 @@ import {
   prepareDirectSkillInvocation,
 } from '../../../infra/providers/pi-runtime/skills.js';
 import { setPhase } from './active-run-phase.js';
+import { getUsageRecorder } from '../../../domains/usage/recorder.js';
+import { RuntimeUsageRepository } from '../../../domains/usage/repository.js';
 import { maybeCompact, waitForPendingCompaction } from '../compaction/compaction-service.js';
 import { compactionDomainEventFor } from './compaction-events.js';
 import { createSkillActivationObserver } from './skill-activation-observer.js';
@@ -176,6 +179,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
 
   let engineExecution: EngineExecutionContext | undefined;
   let modelConnection: RuntimeModelConnection | undefined;
+  let runtimeVersion: string | undefined;
 
   if (isSdkEngineMode) {
     // SDK modes skip the external CLI resolution chain entirely: no managed
@@ -248,6 +252,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
       effectiveAgentProfile
     );
     const runtimeResolution = managedRuntime.resolution;
+    runtimeVersion = runtimeResolution?.version;
     if (runtimeResolution) {
       effectiveAgentProfile = managedRuntime.agentProfile;
       activeRun.agentProfile = effectiveAgentProfile;
@@ -441,6 +446,45 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   runOptions.engineExecution = engineExecution;
   runOptions.modelConnection = modelConnection;
 
+  // Usage ledger (design §6): a dispatching record exists BEFORE the runtime
+  // is invoked; each retry/dispatch attempt gets a fresh invocationId while
+  // listener reconnects and event replays never create rows. Resumed native
+  // threads receive the latest trusted cumulative checkpoint so Codex can
+  // baseline its thread totals instead of guessing.
+  const usageRecorder = getUsageRecorder(db as Database.Database);
+  const usageInvocationId = newId();
+  usageRecorder.beginInvocation({
+    invocationId: usageInvocationId,
+    runId,
+    sessionId: message.sessionId,
+    assistantMessageId: activeRun.assistantMessageId,
+    runtimeId: effectiveProviderType,
+    runtimeVersion,
+    transport: session.provider_transport ?? undefined,
+    engineMode: engineExecution?.engineMode,
+    adapterVersion: adapter.manifest?.version,
+    requestedModel: effectiveAgentProfile.model || undefined,
+  });
+  activeRun.usageAccounting = { invocationId: usageInvocationId };
+  runOptions.usageAccounting = { invocationId: usageInvocationId };
+  try {
+    const checkpoint = sdkSessionId
+      ? new RuntimeUsageRepository(db as Database.Database).findLatestCheckpoint(
+          message.sessionId,
+          effectiveProviderType
+        )
+      : null;
+    runOptions.usageBaseline = checkpoint
+      ? { cumulative: checkpoint.cumulative, nativeThreadId: checkpoint.nativeThreadId }
+      : null;
+  } catch (err) {
+    console.warn(
+      '[Usage] checkpoint lookup failed; resumed thread will run without a trusted baseline:',
+      err instanceof Error ? err.message : err
+    );
+    runOptions.usageBaseline = null;
+  }
+
   // Wire mid-run steering callbacks. The closure captures `activeRun` directly
   // (not via activeRuns map) so registration is robust even if the run is
   // removed from the map mid-flight; the mutations are idempotent on a stale
@@ -525,16 +569,24 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     message.runtimeTurnInput?.type === 'message' && taskContext
       ? { ...message.runtimeTurnInput, text: `${taskContext}\n\n${message.runtimeTurnInput.text}` }
       : message.runtimeTurnInput;
-  const providerRunner = runtimeTurnInput
-    ? adapter.startTurn
-      ? adapter.startTurn(runtimeTurnInput, runOptions, permissionCallback)
-      : (() => {
-          throw new RunLaunchError(
-            'INVOCATION_UNSUPPORTED',
-            `Runtime "${effectiveProviderType}" does not implement typed invocation execution.`
-          );
-        })()
-    : adapter.run(taskInput, runOptions, permissionCallback);
+  let providerRunner: AsyncIterable<ProviderRuntimeEvent>;
+  try {
+    providerRunner = runtimeTurnInput
+      ? adapter.startTurn
+        ? adapter.startTurn(runtimeTurnInput, runOptions, permissionCallback)
+        : (() => {
+            throw new RunLaunchError(
+              'INVOCATION_UNSUPPORTED',
+              `Runtime "${effectiveProviderType}" does not implement typed invocation execution.`
+            );
+          })()
+      : adapter.run(taskInput, runOptions, permissionCallback);
+  } catch (error) {
+    // The dispatch itself failed before the runtime could begin: excluded
+    // from the coverage denominator (design §3.3).
+    usageRecorder.settleNotStarted(usageInvocationId);
+    throw error;
+  }
 
   activeRun.providerType = effectiveProviderType;
   const runState = adapter.getRunState?.(runOptions) || {};

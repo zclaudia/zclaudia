@@ -14,6 +14,8 @@ export interface TranslateProviderRuntimeEventInput {
   sessionId: string;
   providerType?: string;
   seq: number;
+  /** Accounting unit the snapshot belongs to; absent when the run predates the ledger. */
+  invocationId?: string;
 }
 
 export function translateProviderRuntimeEvent(
@@ -93,6 +95,18 @@ export function translateProviderRuntimeEvent(
           usage: event.usage as UsageInfo | undefined,
         }),
       ];
+
+    case 'provider_usage_updated':
+      // Cumulative invocation snapshot from a usage-tracking runtime; the
+      // recorder replaces the stored snapshot, never sums successive ones.
+      return input.invocationId && event.snapshot
+        ? [
+            domainEvent(input, 'usage.updated', {
+              invocationId: input.invocationId,
+              snapshot: event.snapshot,
+            }),
+          ]
+        : [];
 
     case 'retry_scheduled':
       return event.retryInfo

@@ -1,12 +1,27 @@
 import { apiCallForBackend } from './unwrap';
-import type { ModelUsagePayload, UsageStatsPayload, UsageStatsRange } from '@zclaudia/shared';
+import type {
+  ModelUsagePayload,
+  RuntimeUsagePayload,
+  UsageStatsPayload,
+  UsageStatsRange,
+} from '@zclaudia/shared';
+
+/** The device's IANA zone, shared with every backend so merged views bucket
+ *  calendar days identically (runtime usage design §8). */
+export function localTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
 
 /** Local-backend usage stats for the Home page panel. */
 export async function getUsageStats(
   backendId: string | null,
   range: UsageStatsRange = 'all'
 ): Promise<UsageStatsPayload> {
-  const suffix = range === 'all' ? '' : `?range=${range}`;
+  const suffix = `?${new URLSearchParams({ range, timeZone: localTimeZone() })}`;
   return apiCallForBackend<UsageStatsPayload>(backendId, `/api/stats/usage${suffix}`);
 }
 
@@ -15,6 +30,28 @@ export async function getModelStats(
   backendId: string | null,
   range: UsageStatsRange = 'all'
 ): Promise<ModelUsagePayload> {
-  const suffix = range === 'all' ? '' : `?range=${range}`;
+  const suffix = `?${new URLSearchParams({ range, timeZone: localTimeZone() })}`;
   return apiCallForBackend<ModelUsagePayload>(backendId, `/api/stats/models${suffix}`);
+}
+
+/**
+ * Ledger-backed runtime usage (Overview coverage + Runtimes tab). Every
+ * backend receives the same asOf/timeZone so merged views stay consistent;
+ * callers dedupe payloads by datasetId (same database, multiple connections).
+ */
+export async function getRuntimeUsage(
+  backendId: string | null,
+  range: UsageStatsRange = 'all',
+  options: { timeZone?: string; asOf?: number } = {}
+): Promise<RuntimeUsagePayload> {
+  const params = new URLSearchParams();
+  if (range !== 'all') params.set('range', range);
+  const timeZone = options.timeZone ?? localTimeZone();
+  if (timeZone) params.set('timeZone', timeZone);
+  if (options.asOf !== undefined) params.set('asOf', String(options.asOf));
+  const query = params.toString();
+  return apiCallForBackend<RuntimeUsagePayload>(
+    backendId,
+    `/api/stats/runtime-usage${query ? `?${query}` : ''}`
+  );
 }

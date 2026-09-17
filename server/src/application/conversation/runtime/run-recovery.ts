@@ -18,6 +18,7 @@ import type { TraceRecorder } from '../../../utils/provider-trace.js';
 import type { NotificationService } from '../../../domains/notification-feed/index.js';
 import { postRunFailedNotification } from './run-terminal-notifications.js';
 import { setPhase, isTerminalPhase } from './active-run-phase.js';
+import { getUsageRecorder } from '../../../domains/usage/recorder.js';
 
 interface HandleRunExceptionInput {
   activeRun: ActiveRun;
@@ -81,6 +82,24 @@ export async function handleRunException(
 
   console.error('Run error:', error);
   trace.log('server_norm', 'run_exception', error, 'handleRunStart exception');
+
+  // Usage ledger settlement for the failed invocation. A failure after the
+  // runtime provably started counts against coverage; a dispatch that never
+  // started is excluded (design §3.3/§6.2). The launch wrapper may already
+  // have settled a synchronous dispatch failure — the UPDATE is guarded and
+  // idempotent. If a retry handoff re-runs the turn, that attempt
+  // opens its own invocation record (design §3.1).
+  if (activeRun.usageAccounting) {
+    const recorder = getUsageRecorder(input.db);
+    if (activeRun.usageAccounting.runningMarked) {
+      recorder.settleInvocation({
+        invocationId: activeRun.usageAccounting.invocationId,
+        executionState: 'failed',
+      });
+    } else {
+      recorder.settleNotStarted(activeRun.usageAccounting.invocationId);
+    }
+  }
 
   const errMsg = error instanceof Error ? error.message : '';
   const authHint = activeRun.providerType
@@ -176,6 +195,7 @@ export async function handleRunException(
   if (activeRun.phase !== 'cancelling' && activeRun.phase !== 'finalizing') {
     setPhase(activeRun, 'finalizing');
   }
+
   let terminalSnapshot: AssistantTerminalSnapshot | undefined;
   try {
     terminalSnapshot = persistAssistantTerminalSnapshot(activeRun, { indexMetadata: true });

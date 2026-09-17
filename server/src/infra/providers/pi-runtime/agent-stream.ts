@@ -24,6 +24,7 @@ import {
 } from './usage-extractor.js';
 import { recordPiContextUsage } from './context-observer.js';
 import { wrapStreamFnWithToolSchemaCompat } from './tool-schema-compat.js';
+import { buildPiInvocationSnapshot } from './usage-snapshot.js';
 
 export async function* runPiAgentStream(input: {
   userInput: string;
@@ -153,6 +154,15 @@ export async function* runPiAgentStream(input: {
       // `message_end` path). Without this, a 503 / bad model id / auth
       // failure looks like "session ran for 120ms and produced nothing".
       const errorReason = extractErrorStop(messages);
+
+      // Usage ledger snapshot (runtime usage design §5.4): emitted BEFORE the
+      // terminal handling so completed calls keep their recorded consumption
+      // even when the turn ends in an error — an error stop must not zero it.
+      queue.push({
+        type: 'provider_usage_updated',
+        snapshot: buildPiInvocationSnapshot(messages, { errored: !!errorReason }),
+      });
+
       if (errorReason) {
         queue.push({
           type: 'error',

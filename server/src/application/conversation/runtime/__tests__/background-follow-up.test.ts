@@ -1,4 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+const { applySnapshotEvent, settleInvocation } = vi.hoisted(() => ({
+  applySnapshotEvent: vi.fn(),
+  settleInvocation: vi.fn(),
+}));
+vi.mock('../../../../domains/usage/recorder.js', () => ({
+  getUsageRecorder: () => ({ applySnapshotEvent, settleInvocation }),
+}));
+
 import { RunDomainEventListenerRegistry } from '../run-domain-event-listeners.js';
 
 /** Minimal db stub: terminal run events persist last_run_status. */
@@ -34,6 +42,36 @@ async function flushPromises(): Promise<void> {
 describe('background follow-up consumer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('persists late cumulative usage even without a follow-up UI message', async () => {
+    const snapshot = { final: true, revision: 2 };
+    const iterator = (async function* () {
+      yield { type: 'provider_usage_updated', snapshot } as any;
+    })();
+    const { spawnBackgroundFollowUpConsumer } = await import('../background-follow-up.js');
+    spawnBackgroundFollowUpConsumer(iterator, {
+      activeRuns: new Map(),
+      broadcastHeartbeat: vi.fn(),
+      client: {} as any,
+      connectedClients: new Map(),
+      db: stubDb(),
+      sessionId: 'session-1',
+      projectId: 'project-1',
+      providerType: 'claude',
+      providerRegistry: {} as any,
+      notificationService: {} as any,
+      initialPendingTasks: 0,
+      workspaceRoot: '/repo',
+      usageInvocationId: 'original',
+    });
+    await vi.waitFor(() =>
+      expect(settleInvocation).toHaveBeenCalledWith({
+        invocationId: 'original',
+        executionState: 'completed',
+      })
+    );
+    expect(applySnapshotEvent).toHaveBeenCalledWith('original', snapshot);
   });
 
   it('emits backgroundFollowup started and finished domain events', async () => {

@@ -1,3 +1,4 @@
+import { getUsageRecorder } from '../../../domains/usage/recorder.js';
 /**
  * Background follow-up consumer for provider streams with in-flight background tasks.
  *
@@ -45,6 +46,8 @@ export interface BackgroundFollowUpContext {
   notificationService: NotificationSender;
   notificationsService?: NotificationService;
   initialPendingTasks: number;
+  /** The same native invocation continues after the foreground reply. */
+  usageInvocationId?: string;
   workspaceRoot: string;
   listeners?: RunDomainEventListenerRegistry;
 }
@@ -67,6 +70,7 @@ async function consumeBackgroundStream(
   ctx: BackgroundFollowUpContext
 ): Promise<void> {
   let pendingTasks = ctx.initialPendingTasks;
+  let executionState: 'completed' | 'failed' = 'failed';
   let followUpRun: ActiveRun | null = null;
   let followUpSendRunEvent: ((event: ServerMessage) => void) | null = null;
   const toolUseIdToName = new Map<string, string>();
@@ -75,8 +79,20 @@ async function consumeBackgroundStream(
   try {
     while (true) {
       const iterResult = await iterator.next();
-      if (iterResult.done) break;
+      if (iterResult.done) {
+        executionState = 'completed';
+        break;
+      }
       const msg = iterResult.value;
+      // Snapshots cover the original native invocation, not the synthetic
+      // follow-up UI message. They can arrive before that UI run exists.
+      if (msg.type === 'provider_usage_updated' && ctx.usageInvocationId) {
+        getUsageRecorder(ctx.db).applySnapshotEvent(
+          ctx.usageInvocationId,
+          pendingTasks > 0 && msg.snapshot ? { ...msg.snapshot, final: false } : msg.snapshot
+        );
+        continue;
+      }
 
       // Track background task lifecycle
       if (msg.type === 'task_notification') {
@@ -121,6 +137,13 @@ async function consumeBackgroundStream(
       if (!followUpRun && (msg.type === 'assistant' || msg.type === 'tool_use')) {
         const created = createFollowUpRun(ctx);
         followUpRun = created.activeRun;
+        if (ctx.usageInvocationId) {
+          followUpRun.usageAccounting = {
+            invocationId: ctx.usageInvocationId,
+            runningMarked: true,
+            deferSettlement: true,
+          };
+        }
         followUpSendRunEvent = created.sendRunEvent;
         console.log(
           `[BackgroundFollowUp] Follow-up run ${followUpRun.runId} started for session ${ctx.sessionId}`
@@ -153,6 +176,7 @@ async function consumeBackgroundStream(
         });
 
         if (isTerminalPhase(followUpRun.phase)) {
+          executionState = followUpRun.phase === 'failed' ? 'failed' : 'completed';
           finalizeFollowUpRun(followUpRun, ctx);
           followUpRun = null;
           followUpSendRunEvent = null;
@@ -165,7 +189,16 @@ async function consumeBackgroundStream(
         }
       }
     }
+  } catch (error) {
+    executionState = 'failed';
+    throw error;
   } finally {
+    if (ctx.usageInvocationId) {
+      getUsageRecorder(ctx.db).settleInvocation({
+        invocationId: ctx.usageInvocationId,
+        executionState,
+      });
+    }
     await iterator.return?.();
     if (followUpRun) {
       finalizeFollowUpRun(followUpRun, ctx);

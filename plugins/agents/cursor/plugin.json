@@ -110,6 +110,13 @@
               "id": "session.background_task",
               "supported": false,
               "degradation": "fallback_to_text"
+            },
+            {
+              "id": "usage.tracking",
+              "supported": true,
+              "mode": "native",
+              "reliability": "best_effort",
+              "notes": "Usage from terminal result/prompt response only; a missing terminal usage reports missing. usage_update semantics are unverified and never counted."
             }
           ],
           "permissionModeMap": {

@@ -25,6 +25,7 @@ export interface AutomationItem {
   status: string;
   runCount: number;
   lastError?: string;
+  isSystem?: boolean;
 }
 
 export function isInternalProject(name: string): boolean {
@@ -85,5 +86,6 @@ export function automationToItem(
     source: 'automation',
     status: a.enabled ? 'idle' : 'disabled',
     runCount: 0,
+    isSystem: a.isSystem,
   };
 }

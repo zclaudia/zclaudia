@@ -14,6 +14,7 @@ import type {
   ModelUsageDay,
   ModelUsageTotal,
 } from '@zclaudia/shared/core/usage-stats';
+import { initializeUsageLedger } from '../../domains/usage/register.js';
 
 const DAY_MS = 86_400_000;
 /** Heatmap horizon: 26 weeks. */
@@ -204,22 +205,54 @@ export function computeModelStats(db: Database, range: UsageStatsRange = 'all'):
   return { days, models, trackedSince: tracked.t ?? null, capturedAt: now };
 }
 
+function readRange(raw: unknown): UsageStatsRange {
+  return raw === '30d' || raw === '7d' ? raw : 'all';
+}
+
+/** `timeZone=<IANA>` — shared by every backend so merged views bucket days alike. */
+function readTimeZone(raw: unknown): string | undefined {
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+}
+
+/** `asOf=<epoch-ms>` — pinned snapshot instant for consistent multi-backend merges. */
+function readAsOf(raw: unknown): number | undefined {
+  if (typeof raw !== 'string' || !raw.trim()) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
 export function createUsageStatsRoutes(db: Database, opts: { ttlMs?: number } = {}): Router {
   const ttlMs = opts.ttlMs ?? 60_000;
   const router = Router();
-  const cache = new Map<UsageStatsRange, { data: UsageStatsPayload; at: number }>();
-  const modelCache = new Map<UsageStatsRange, { data: ModelUsagePayload; at: number }>();
+  const cache = new Map<string, { data: UsageStatsPayload; at: number }>();
+  const modelCache = new Map<string, { data: ModelUsagePayload; at: number }>();
+  // Ledger-backed accounting: runs the idempotent legacy backfill once and
+  // arms the recorder. When activation failed, both legacy endpoints keep
+  // serving the message projection — the two sources are never mixed.
+  const usageLedger = initializeUsageLedger(db, { log: true });
 
   // GET /api/stats/usage?range=all|30d|7d — aggregate usage stats for the Home page
   router.get('/usage', (req: Request, res: Response) => {
     try {
-      const raw = req.query.range;
-      const range: UsageStatsRange = raw === '30d' || raw === '7d' ? raw : 'all';
-      const hit = cache.get(range);
+      const range = readRange(req.query.range);
+      const timeZone = readTimeZone(req.query.timeZone);
+      const asOf = readAsOf(req.query.asOf) ?? Date.now();
+      const ledgerActive = usageLedger.accountingActive();
+      // The ledger path is window-sensitive (timeZone/asOf): the cache key
+      // must cover the full window identity, never just the range.
+      const cacheKey = ledgerActive
+        ? `${range}|${timeZone ?? ''}|${readAsOf(req.query.asOf) ?? ''}`
+        : range;
+      const hit = cache.get(cacheKey);
       if (!hit || Date.now() - hit.at > ttlMs) {
-        cache.set(range, { data: computeUsageStats(db, range), at: Date.now() });
+        const activity = computeUsageStats(db, range);
+        const data = ledgerActive
+          ? usageLedger.usageStatsPayload(range, activity, timeZone, asOf)
+          : activity;
+        if (cache.size >= 64) cache.clear();
+        cache.set(cacheKey, { data, at: Date.now() });
       }
-      res.json({ success: true, data: cache.get(range)!.data });
+      res.json({ success: true, data: cache.get(cacheKey)!.data });
     } catch (error) {
       res.status(500).json({
         success: false,
@@ -231,13 +264,37 @@ export function createUsageStatsRoutes(db: Database, opts: { ttlMs?: number } = 
   // GET /api/stats/models?range=all|30d|7d — per-model usage for the Models tab
   router.get('/models', (req: Request, res: Response) => {
     try {
-      const raw = req.query.range;
-      const range: UsageStatsRange = raw === '30d' || raw === '7d' ? raw : 'all';
-      const hit = modelCache.get(range);
+      const range = readRange(req.query.range);
+      const timeZone = readTimeZone(req.query.timeZone);
+      const asOf = readAsOf(req.query.asOf) ?? Date.now();
+      const cacheKey = usageLedger.accountingActive()
+        ? `${range}|${timeZone ?? ''}|${readAsOf(req.query.asOf) ?? ''}`
+        : range;
+      const hit = modelCache.get(cacheKey);
       if (!hit || Date.now() - hit.at > ttlMs) {
-        modelCache.set(range, { data: computeModelStats(db, range), at: Date.now() });
+        const data = usageLedger.accountingActive()
+          ? usageLedger.modelUsagePayload(range, timeZone, asOf)
+          : computeModelStats(db, range);
+        if (modelCache.size >= 64) modelCache.clear();
+        modelCache.set(cacheKey, { data, at: Date.now() });
       }
-      res.json({ success: true, data: modelCache.get(range)!.data });
+      res.json({ success: true, data: modelCache.get(cacheKey)!.data });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: { code: 'STATS_ERROR', message: (error as Error).message },
+      });
+    }
+  });
+
+  // GET /api/stats/runtime-usage?range=&timeZone=&asOf= — the unified ledger
+  // view (Overview / Models / Runtimes read the same source; design §8).
+  router.get('/runtime-usage', (req: Request, res: Response) => {
+    try {
+      const range = readRange(req.query.range);
+      const timeZone = readTimeZone(req.query.timeZone);
+      const asOf = readAsOf(req.query.asOf) ?? Date.now();
+      res.json({ success: true, data: usageLedger.runtimeUsagePayload(range, timeZone, asOf) });
     } catch (error) {
       res.status(500).json({
         success: false,

@@ -160,6 +160,30 @@ describe('pumpClaudeStream context reporting', () => {
     return events;
   }
 
+  it.each(['success', 'error_during_execution'])(
+    'emits final usage before %s terminal delivery',
+    async subtype => {
+      const seen: unknown[] = [];
+      for await (const event of pumpClaudeStream(
+        fakeStream([
+          {
+            type: 'result',
+            subtype,
+            usage: { input_tokens: 100, output_tokens: 20 },
+          },
+        ]),
+        {} as never
+      )) {
+        seen.push(event);
+        if (event.type === 'result' || event.type === 'error') break;
+      }
+      expect(seen[0]).toMatchObject({
+        type: 'provider_usage_updated',
+        snapshot: { final: true, tokens: { total: 120 } },
+      });
+    }
+  );
+
   it('attaches the final call occupancy to the result usage', async () => {
     const events = await collect([
       INIT,

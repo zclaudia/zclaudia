@@ -80,6 +80,20 @@ export interface RunPersistenceState {
   assistantMessageId: string;
 }
 
+/**
+ * Runtime usage accounting for this run (design §6): one ledger record per
+ * actual dispatch attempt. `runningMarked` avoids a DB hit on every event;
+ * the underlying UPDATE is idempotent anyway.
+ */
+export interface RunUsageAccountingState {
+  usageAccounting?: {
+    invocationId: string;
+    runningMarked?: boolean;
+    /** A background consumer owns settlement of the continuing native stream. */
+    deferSettlement?: boolean;
+  };
+}
+
 export interface RunMessagingState {
   // Streaming state for message persistence (allows cancelRun to save partial content)
   fullContent: string;
@@ -194,6 +208,7 @@ export interface ActiveRun
     RunProviderState,
     RunPermissionState,
     RunPersistenceState,
+    RunUsageAccountingState,
     RunMessagingState,
     RunLifecycleState,
     RunWorkspaceState,

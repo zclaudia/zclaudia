@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import type { ModelUsagePayload, UsageStatsPayload } from '@zclaudia/shared';
-import { aggregateUsageStats, aggregateModelStats } from '../aggregateUsageStats';
+import type { ModelUsagePayload, RuntimeUsagePayload, UsageStatsPayload } from '@zclaudia/shared';
+import {
+  aggregateUsageStats,
+  aggregateModelStats,
+  aggregateRuntimeUsage,
+} from '../aggregateUsageStats';
 
 function stats(over: Partial<UsageStatsPayload> = {}): UsageStatsPayload {
   return {
@@ -20,6 +24,58 @@ function stats(over: Partial<UsageStatsPayload> = {}): UsageStatsPayload {
 }
 
 describe('aggregateUsageStats', () => {
+  it('deduplicates the same dataset in Overview and Models', () => {
+    const p = stats({ datasetId: 'db', totalTokens: 100 });
+    expect(
+      aggregateUsageStats(
+        [
+          { backendId: 'local', name: 'Local', stats: p },
+          { backendId: 'gateway', name: 'Gateway', stats: p },
+        ],
+        '2026-09-17',
+        'all'
+      )!.totalTokens
+    ).toBe(100);
+    const m: ModelUsagePayload = {
+      datasetId: 'db',
+      days: [],
+      trackedSince: null,
+      capturedAt: 1,
+      models: [{ model: 'm', inTokens: 90, outTokens: 10, totalTokens: 100, share: 1 }],
+    };
+    expect(aggregateModelStats([m, m])!.models[0].totalTokens).toBe(100);
+  });
+
+  it('does not claim whole-set coverage or discard old-backend tokens in mixed versions', () => {
+    const merged = aggregateUsageStats(
+      [
+        { backendId: 'old', name: 'Old', stats: stats({ totalTokens: 100 }) },
+        {
+          backendId: 'new',
+          name: 'New',
+          stats: stats({
+            totalTokens: 20,
+            accounting: {
+              active: true,
+              recordedTokens: 20,
+              completeCalls: 1,
+              partialCalls: 0,
+              missingCalls: 0,
+              eligibleFinalized: 1,
+              inFlightCalls: 0,
+              legacyRecords: 0,
+              accountingSince: 1,
+            },
+          }),
+        },
+      ],
+      '2026-09-17',
+      'all'
+    )!;
+    expect(merged.totalTokens).toBe(120);
+    expect(merged.accounting).toBeUndefined();
+  });
+
   it('returns the single payload untouched', () => {
     const only = stats({ sessions: 3 });
     expect(
@@ -158,5 +214,144 @@ describe('aggregateModelStats', () => {
     ]);
     // Tracking started as early as the earliest backend recorded it.
     expect(merged!.trackedSince).toBe(100);
+  });
+});
+
+// === Runtime usage ledger aggregation (runtime usage design §8) ===
+
+function runtimePayload(
+  datasetId: string,
+  over: Partial<RuntimeUsagePayload> = {}
+): RuntimeUsagePayload {
+  return {
+    schemaVersion: 1,
+    datasetId,
+    asOf: 1000,
+    timeZone: 'UTC',
+    accountingSince: 500,
+    accountingActive: true,
+    capturedAt: 1000,
+    totals: {
+      recordedTokens: null,
+      completeTokens: null,
+      partialTokens: null,
+      legacyTokens: null,
+      activeRecordedTokens: null,
+    },
+    coverage: {
+      complete: 0,
+      partial: 0,
+      missing: 0,
+      eligibleFinalized: 0,
+      inFlight: 0,
+      rate: null,
+      legacyRecordCount: 0,
+    },
+    runtimes: [],
+    series: [],
+    ...over,
+  };
+}
+
+describe('aggregateRuntimeUsage', () => {
+  it('counts the same datasetId once (local + gateway connection to one database)', () => {
+    const same = runtimePayload('ds-1', {
+      totals: { ...runtimePayload('').totals, recordedTokens: 500 },
+      coverage: {
+        complete: 4,
+        partial: 1,
+        missing: 0,
+        eligibleFinalized: 5,
+        inFlight: 1,
+        rate: 0.8,
+        legacyRecordCount: 0,
+      },
+    });
+    const { merged, deduplicated, sourcesTotal } = aggregateRuntimeUsage([
+      { backendId: 'local', name: 'Local', payload: same },
+      { backendId: 'gw', name: 'Gateway relay', payload: same },
+    ]);
+    expect(deduplicated).toBe(1);
+    expect(sourcesTotal).toBe(2);
+    // 500 + 500 would be a double count; the dedupe keeps one copy.
+    expect(merged!.totals.recordedTokens).toBe(500);
+    expect(merged!.coverage.eligibleFinalized).toBe(5);
+  });
+
+  it('merges distinct datasets additively and recomputes coverage from merged counts', () => {
+    const a = runtimePayload('ds-1', {
+      totals: { ...runtimePayload('').totals, recordedTokens: 100, legacyTokens: 40 },
+      coverage: {
+        complete: 1,
+        partial: 1,
+        missing: 0,
+        eligibleFinalized: 2,
+        inFlight: 0,
+        rate: 0.5,
+        legacyRecordCount: 3,
+      },
+      runtimes: [
+        {
+          runtimeId: 'claude',
+          runtimeLabel: 'Claude Code',
+          recordedTokens: 100,
+          inputTokens: 80,
+          outputTokens: 20,
+          calls: 2,
+          completeCalls: 1,
+          partialCalls: 1,
+          missingCalls: 0,
+          legacyCalls: 0,
+          inFlightCalls: 0,
+          coverageRate: 0.5,
+          models: [{ modelId: 'sonnet', tokens: 100 }],
+        },
+      ],
+      series: [{ date: '2026-09-15', runtimes: { claude: 100 } }],
+    });
+    const b = runtimePayload('ds-2', {
+      coverage: {
+        complete: 0,
+        partial: 1,
+        missing: 1,
+        eligibleFinalized: 2,
+        inFlight: 2,
+        rate: 0,
+        legacyRecordCount: 0,
+      },
+      runtimes: [
+        {
+          runtimeId: 'codex',
+          runtimeLabel: 'Codex',
+          recordedTokens: null,
+          inputTokens: null,
+          outputTokens: null,
+          calls: 2,
+          completeCalls: 0,
+          partialCalls: 1,
+          missingCalls: 1,
+          legacyCalls: 0,
+          inFlightCalls: 2,
+          coverageRate: 0,
+          models: [],
+        },
+      ],
+      series: [{ date: '2026-09-15', runtimes: { codex: 25 } }],
+    });
+
+    const { merged } = aggregateRuntimeUsage([
+      { backendId: 'a', name: 'A', payload: a },
+      { backendId: 'b', name: 'B', payload: b },
+    ]);
+    expect(merged!.totals.recordedTokens).toBe(100); // null codex stays null-aware
+    expect(merged!.totals.legacyTokens).toBe(40);
+    expect(merged!.coverage.eligibleFinalized).toBe(4);
+    expect(merged!.coverage.complete).toBe(1);
+    // Percentages recompute from merged numerators/denominators, never averaged
+    // (0.5 and 0 average to 0.5 — but 1/4 is 0.25).
+    expect(merged!.coverage.rate).toBeCloseTo(0.25);
+    expect(merged!.coverage.inFlight).toBe(2);
+    expect(merged!.series).toEqual([{ date: '2026-09-15', runtimes: { claude: 100, codex: 25 } }]);
+    expect(merged!.runtimes.map(r => r.runtimeId)).toEqual(['claude', 'codex']);
   });
 });

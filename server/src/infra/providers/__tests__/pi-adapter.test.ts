@@ -684,7 +684,14 @@ describe('PiAgentProviderAdapter.run', () => {
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hello', {});
 
-    expect(out.map(m => m.type)).toEqual(['init', 'assistant', 'assistant', 'assistant', 'result']);
+    expect(out.map(m => m.type)).toEqual([
+      'init',
+      'assistant',
+      'assistant',
+      'assistant',
+      'provider_usage_updated',
+      'result',
+    ]);
     expect(out.filter(m => m.type === 'assistant').map(m => m.content)).toEqual(['Hel', 'lo', '!']);
     expect(out[out.length - 1].isComplete).toBe(true);
   });
@@ -878,8 +885,8 @@ describe('PiAgentProviderAdapter.run', () => {
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {});
 
-    expect(out.map(m => m.type)).toEqual(['init', 'error']);
-    const err = out[1];
+    expect(out.map(m => m.type)).toEqual(['init', 'provider_usage_updated', 'error']);
+    const err = out[2];
     expect(err.error).toContain('LLM call failed');
     expect(err.error).toContain('HTTP 503 model_not_found');
     expect(err.isComplete).toBe(true);
@@ -900,7 +907,12 @@ describe('PiAgentProviderAdapter.run', () => {
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {});
 
-    expect(out.map(m => m.type)).toEqual(['init', 'assistant', 'result']);
+    expect(out.map(m => m.type)).toEqual([
+      'init',
+      'assistant',
+      'provider_usage_updated',
+      'result',
+    ]);
   });
 
   it('translates mode "plan" to systemInfo.permissionMode "plan"', async () => {

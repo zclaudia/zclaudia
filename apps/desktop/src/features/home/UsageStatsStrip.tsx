@@ -15,6 +15,7 @@ import {
 } from './usageStats';
 import { prettyModelName } from './modelStats';
 import { ModelsChart } from './ModelsChart';
+import { RuntimesView } from './RuntimesView';
 
 const HEATMAP_WEEKS = 26;
 /** Columns kept visible below md: — the older half hides so the remaining
@@ -57,7 +58,7 @@ export function UsageStatsStrip() {
   const targets = useStatsBackendTargets();
   const targetKey = targets.map(t => t.backendId).join(',');
   const [range, setRange] = useState<UsageStatsRange>('all');
-  const [tab, setTab] = useState<'overview' | 'models'>('overview');
+  const [tab, setTab] = useState<'overview' | 'models' | 'runtimes'>('overview');
   const [perBackend, setPerBackend] = useState<BackendUsage[]>([]);
   const [unavailable, setUnavailable] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -71,6 +72,8 @@ export function UsageStatsStrip() {
 
   useEffect(() => {
     let cancelled = false;
+    setPerBackend([]);
+    setUnavailable(false);
     if (targets.length === 0) {
       // No backend to ask (e.g. mobile before any backend connects).
       setUnavailable(true);
@@ -132,10 +135,30 @@ export function UsageStatsStrip() {
   // build or a remote backend behind on updates) omits the newer fields, and
   // those cards hide instead of rendering "undefined" / "NaN PM".
   const line = funLine(stats.allTimeTokens ?? stats.totalTokens, localToday());
-  const cards: Array<{ label: string; value: string; title?: string }> = [
+  // Ledger-backed accounting (runtime usage design §9): when present, the
+  // tokens card becomes "Recorded tokens" with a coverage line that links to
+  // the Runtimes tab — the same source behind Models and Runtimes.
+  const accounting = stats.accounting;
+  const coverageLine =
+    accounting && accounting.eligibleFinalized > 0
+      ? `${Math.round((accounting.completeCalls / accounting.eligibleFinalized) * 100)}% fully reported` +
+        (accounting.missingCalls > 0 ? ` · ${accounting.missingCalls} missing` : '')
+      : null;
+  const cards: Array<{
+    label: string;
+    value: string;
+    title?: string;
+    sub?: string;
+    onClick?: () => void;
+  }> = [
     { label: 'Sessions', value: stats.sessions.toLocaleString('en-US') },
     { label: 'Messages', value: stats.messages.toLocaleString('en-US') },
-    { label: 'Total tokens', value: formatTokens(stats.totalTokens) },
+    {
+      label: accounting ? 'Recorded tokens' : 'Total tokens',
+      value: formatTokens(stats.totalTokens),
+      sub: coverageLine ?? undefined,
+      onClick: coverageLine ? () => setTab('runtimes') : undefined,
+    },
     ...(typeof stats.activeDaysCount === 'number'
       ? [{ label: 'Active days', value: String(stats.activeDaysCount) }]
       : []),
@@ -187,7 +210,7 @@ export function UsageStatsStrip() {
     <div className="mt-10 border-t border-border pt-5 px-2">
       <div className="flex items-center mb-3">
         <div className="flex gap-0.5">
-          {(['overview', 'models'] as const).map(t => (
+          {(['overview', 'models', 'runtimes'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -197,7 +220,7 @@ export function UsageStatsStrip() {
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              {t === 'overview' ? 'Overview' : 'Models'}
+              {t === 'overview' ? 'Overview' : t === 'models' ? 'Models' : 'Runtimes'}
             </button>
           ))}
         </div>
@@ -220,17 +243,34 @@ export function UsageStatsStrip() {
       {tab === 'overview' ? (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {cards.map(c => (
-              <div key={c.label} className="bg-secondary/50 rounded-lg px-3.5 py-2.5">
-                <span className="block text-[11px] text-muted-foreground">{c.label}</span>
-                <span
-                  title={c.title}
-                  className={`block mt-0.5 font-medium text-foreground truncate ${cardValueClass(c.value)}`}
-                >
-                  {c.value}
-                </span>
-              </div>
-            ))}
+            {cards.map(c => {
+              const card = (
+                <div key={c.label} className="bg-secondary/50 rounded-lg px-3.5 py-2.5">
+                  <span className="block text-[11px] text-muted-foreground">{c.label}</span>
+                  <span
+                    title={c.title}
+                    className={`block mt-0.5 font-medium text-foreground truncate ${cardValueClass(c.value)}`}
+                  >
+                    {c.value}
+                  </span>
+                  {c.sub && (
+                    <span
+                      data-testid="recorded-tokens-coverage"
+                      className="block mt-0.5 text-[10px] text-muted-foreground/70"
+                    >
+                      {c.sub}
+                    </span>
+                  )}
+                </div>
+              );
+              return c.onClick ? (
+                <button key={c.label} type="button" onClick={c.onClick} className="text-left">
+                  {card}
+                </button>
+              ) : (
+                card
+              );
+            })}
           </div>
           {/* Row-major grid with one fr column per week so the heatmap spans the
               exact same width as the cards above (26 = HEATMAP_WEEKS from md: up;
@@ -286,8 +326,10 @@ export function UsageStatsStrip() {
           )}
           {line && <div className="mt-3 text-xs text-muted-foreground/60">{line}</div>}
         </>
-      ) : (
+      ) : tab === 'models' ? (
         <ModelsChart range={range} />
+      ) : (
+        <RuntimesView range={range} />
       )}
     </div>
   );

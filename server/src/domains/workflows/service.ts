@@ -309,6 +309,10 @@ export class WorkflowService {
     return this.runRepo.findByProject(projectId, limit);
   }
 
+  getAllRuns(limit?: number): WorkflowRun[] {
+    return this.runRepo.findAll(limit);
+  }
+
   getRun(runId: string): { run: WorkflowRun; stepRuns: WorkflowStepRun[] } | null {
     const run = this.runRepo.findById(runId);
     if (!run) return null;

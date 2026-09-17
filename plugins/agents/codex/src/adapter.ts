@@ -245,6 +245,12 @@ export class CodexAgentAdapter implements ExternalAgentAdapter {
       bridge: null,
       engineExecution: context.engineExecution,
       modelConnection: context.modelConnection,
+      // Runtime usage checkpoint (design §5.2): the host reads the trusted
+      // per-thread cumulative counters from its ledger before dispatch. The
+      // field lives outside the published SDK context type until the SDK
+      // grows it, hence the structural read.
+      usageBaseline: (context as { usageBaseline?: CodexRunOptions['usageBaseline'] })
+        .usageBaseline,
     };
   }
 

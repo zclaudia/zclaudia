@@ -344,7 +344,9 @@ describe('mapCursorEvent', () => {
           outputTokens: 50,
         },
       });
-      expect(events[0]).toMatchObject({
+      // events[0] is the usage ledger snapshot; the terminal result follows.
+      expect(events[0].type).toBe('provider_usage_updated');
+      expect(events[1]).toMatchObject({
         type: 'result',
         isComplete: true,
         usage: {
@@ -367,7 +369,7 @@ describe('mapCursorEvent', () => {
           cacheWriteTokens: 128,
         },
       });
-      expect(events[0]).toMatchObject({
+      expect(events[1]).toMatchObject({
         type: 'result',
         usage: {
           input: 6429,
@@ -385,7 +387,7 @@ describe('mapCursorEvent', () => {
         type: 'result',
         usage: { inputTokens: 31816, outputTokens: 476, cacheReadTokens: 56320 },
       });
-      expect(events[0]).toMatchObject({
+      expect(events[1]).toMatchObject({
         type: 'result',
         usage: { input: 31816, cacheRead: 56320, cacheWrite: 0 },
       });
@@ -396,7 +398,7 @@ describe('mapCursorEvent', () => {
         type: 'result',
         usage: { inputTokens: 100, outputTokens: 5, cacheReadTokens: 900 },
       });
-      const usage = (events[0] as { usage: Record<string, unknown> }).usage;
+      const usage = (events[1] as { usage: Record<string, unknown> }).usage;
       expect(usage.contextUsedTokens).toBeUndefined();
     });
 

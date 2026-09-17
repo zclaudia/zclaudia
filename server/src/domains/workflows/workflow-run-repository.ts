@@ -122,6 +122,13 @@ export class WorkflowRunRepository extends BaseRepository<
     return rows.map(row => this.mapRow(row));
   }
 
+  findAll(limit = 50): WorkflowRun[] {
+    const rows = this.db
+      .prepare('SELECT * FROM workflow_runs ORDER BY started_at DESC LIMIT ?')
+      .all(limit);
+    return rows.map(row => this.mapRow(row));
+  }
+
   findByInitiator(initiator: string, limit = 50): WorkflowRun[] {
     const rows = this.db
       .prepare('SELECT * FROM workflow_runs WHERE initiator = ? ORDER BY started_at DESC LIMIT ?')

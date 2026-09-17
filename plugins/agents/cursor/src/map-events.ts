@@ -3,9 +3,11 @@ import type { ToolEffect } from '@zclaudia/plugin-sdk/types';
 import {
   boundedJsonText,
   boundedToolInput,
+  CursorUsageAccumulator,
   DEFAULT_DELTA_BYTES,
   DEFAULT_TOOL_RESULT_BYTES,
   makeModeTransition,
+  providerUsageUpdatedEvent,
   truncateUtf8,
 } from '@zclaudia/agent-common';
 import {
@@ -241,6 +243,19 @@ export function mapCursorEvent(event: Record<string, unknown>): MapCursorEventRe
         const output = rawUsage?.outputTokens ?? 0;
         const cacheRead = rawUsage?.cacheReadTokens ?? 0;
         const cacheWrite = rawUsage?.cacheWriteTokens ?? 0;
+        if (rawUsage) {
+          // Usage ledger snapshot (runtime usage design §5.3): the result
+          // counters are the turn aggregate; a result without usage fields
+          // reports missing through the host's default record state.
+          const snapshot = new CursorUsageAccumulator().onResult({
+            inputTokens: rawUsage.inputTokens ?? null,
+            outputTokens: rawUsage.outputTokens ?? null,
+            cacheReadTokens: rawUsage.cacheReadTokens ?? null,
+            cacheWriteTokens: rawUsage.cacheWriteTokens ?? null,
+            totalTokens: null,
+          });
+          results.push(providerUsageUpdatedEvent(snapshot));
+        }
         results.push({
           type: 'result',
           isComplete: true,

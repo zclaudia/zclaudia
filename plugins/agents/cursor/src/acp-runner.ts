@@ -5,6 +5,7 @@ import type {
   ProviderToolBridgeEntry,
 } from '@zclaudia/plugin-sdk/providers';
 import type { SessionUpdate, StopReason } from '@agentclientprotocol/sdk';
+import { CursorUsageAccumulator, providerUsageUpdatedEvent } from '@zclaudia/agent-common';
 import { AcpClient, jsonRpcErrorToAcpError } from './acp-client.js';
 import { AcpEventMapper } from './acp-events.js';
 import { AcpPermissionBridge } from './acp-permissions.js';
@@ -337,6 +338,23 @@ export async function* runCursorAcp(
     if (abortController.signal.aborted || promptAborted) {
       // Local abort: converge quietly like the legacy runner.
       return;
+    }
+    // Usage ledger snapshot (runtime usage design §5.3): emitted only when
+    // the prompt response carries usage — its presence is unverified for
+    // this CLI, so absence reports missing via the host's default record
+    // state. `usage_update` mid-turn events stay ignored: their protocol
+    // meaning (context occupancy vs consumption) is unverified and they are
+    // never counted as consumed tokens.
+    if (response.usage) {
+      yield providerUsageUpdatedEvent(
+        new CursorUsageAccumulator().onResult({
+          inputTokens: response.usage.inputTokens ?? null,
+          outputTokens: response.usage.outputTokens ?? null,
+          cacheReadTokens: response.usage.cachedReadTokens ?? null,
+          cacheWriteTokens: response.usage.cachedWriteTokens ?? null,
+          totalTokens: response.usage.totalTokens ?? null,
+        })
+      );
     }
     yield terminalFromStopReason(response);
   } catch (error) {

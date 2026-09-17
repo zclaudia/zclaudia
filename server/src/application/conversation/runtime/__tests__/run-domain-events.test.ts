@@ -11,6 +11,7 @@ describe('run domain events', () => {
     expect(RUN_DOMAIN_EVENT_TYPES).toEqual([
       'run.started',
       'run.providerTurnFinished',
+      'usage.updated',
       'run.retryScheduled',
       'run.completed',
       'run.failed',
@@ -78,6 +79,7 @@ describe('run domain events', () => {
     expect(isPublicRunDomainEventType('interaction.promptRequested')).toBe(true);
     expect(isPublicRunDomainEventType('run.phaseChanged')).toBe(true);
     expect(isPublicRunDomainEventType('assistant.textDelta')).toBe(false);
+    expect(isPublicRunDomainEventType('usage.updated')).toBe(false);
     expect(isPublicRunDomainEventType('run.providerTurnFinished')).toBe(false);
   });
 

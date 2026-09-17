@@ -10,7 +10,7 @@ import type {
 } from '@zclaudia/plugin-sdk/providers';
 import { RuntimeContractError } from '@zclaudia/plugin-sdk/providers';
 import { CodexAppServerClient } from './app-server-client.js';
-import type { AppServerInputBlock } from './app-server-protocol.js';
+import type { AppServerInputBlock, TokenUsageBreakdown } from './app-server-protocol.js';
 import {
   buildCodexSdkEnvironment,
   buildEnv,
@@ -47,6 +47,40 @@ export interface CodexRunOptions {
   engineExecution?: EngineExecutionContext;
   /** Dual-mode contract: explicit model connection (SDK mode requires it). */
   modelConnection?: RuntimeModelConnection;
+  /**
+   * Host-provided cumulative usage checkpoint (runtime usage design §5.2).
+   * `null`/undefined = the host found no trusted checkpoint; resuming then
+   * runs with an UNKNOWN baseline, never a zero one.
+   */
+  usageBaseline?: { cumulative: TokenUsageBreakdown; nativeThreadId?: string } | null;
+}
+
+function zeroTokenUsage(): TokenUsageBreakdown {
+  return {
+    totalTokens: 0,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    cacheWriteInputTokens: 0,
+    outputTokens: 0,
+    reasoningOutputTokens: 0,
+  };
+}
+
+/**
+ * Baseline decision for one invocation (design §5.2). A fresh thread starts
+ * from proven zero. A resumed thread requires a live pre-turn counter snapshot; a saved
+ * same-thread checkpoint alone cannot exclude intervening external work.
+ */
+export function resolveCodexUsageBaseline(
+  _options: CodexRunOptions,
+  _threadId: string,
+  isResumed: boolean
+): { baseline: TokenUsageBreakdown; baselineKnown: boolean } {
+  if (!isResumed) return { baseline: zeroTokenUsage(), baselineKnown: true };
+  // A persisted same-thread checkpoint may precede external CLI work, or
+  // the unreported tail of an interrupted invocation. Until resume provides
+  // a live pre-turn counter snapshot, no saved checkpoint is a trusted baseline.
+  return { baseline: zeroTokenUsage(), baselineKnown: false };
 }
 
 // ── Session-info auth label ──────────────────────────────────
@@ -320,6 +354,7 @@ export async function* runCodexSdkTurn(
       thinkingLevel: options.thinkingLevel,
       mode: options.mode,
       apiKeySource: SDK_API_KEY_SOURCE,
+      usage: resolveCodexUsageBaseline(options, threadId, isResumed),
     })) {
       if (streamingMode) {
         yield msg;
@@ -450,6 +485,7 @@ export async function* runCodexAppServer(
       thinkingLevel: options.thinkingLevel,
       mode: options.mode,
       systemPrompt: options.systemPrompt,
+      usage: resolveCodexUsageBaseline(options, threadId, isResumed),
     })) {
       if (isProviderError(msg) && !streamingMode && isRecoverableSessionError(msg.error || '')) {
         encounteredError = msg.error || 'Unknown session error';
@@ -502,6 +538,8 @@ export async function* runCodexAppServer(
         thinkingLevel: options.thinkingLevel,
         mode: options.mode,
         systemPrompt: options.systemPrompt,
+        // The recovered thread is brand new: its baseline is provably zero.
+        usage: { baseline: zeroTokenUsage(), baselineKnown: true },
       });
     }
   } finally {

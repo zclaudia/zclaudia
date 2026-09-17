@@ -385,8 +385,20 @@ export class SessionLifecycleService {
 
     // The session log has no FK to sessions, so the sessions delete doesn't
     // cascade to it — remove its rows explicitly to avoid an orphaned tree
-    // accumulating after a session is deleted.
+    // accumulating after a session is deleted. Runtime usage ledger rows
+    // (design §6) are removed in the same way AND in the same statement
+    // sequence: usage must never outlive its session's messages.
     this.db.prepare('DELETE FROM session_log WHERE session_id = ?').run(sessionId);
+    // Guarded: databases created before migration 045 (test fixtures, old
+    // backups restored without the ledger) have no runtime_usage_records.
+    const usageTable = this.db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'runtime_usage_records'"
+      )
+      .get();
+    if (usageTable) {
+      this.db.prepare('DELETE FROM runtime_usage_records WHERE session_id = ?').run(sessionId);
+    }
 
     this.broadcastSessionEvent('deleted', session);
     this.emitPluginEvent('session.deleted', { sessionId, session }).catch(() => {});

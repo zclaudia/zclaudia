@@ -15,6 +15,7 @@ import {
 import { mapCodexNotification } from './map-events.js';
 import { resolveApprovalDecision } from './permissions.js';
 import { resolveCodexCli } from './resolve-cli.js';
+import { CodexUsageAccumulator, providerUsageUpdatedEvent } from '@zclaudia/agent-common';
 import {
   type ClientRequestParams,
   type ClientRequestResult,
@@ -773,6 +774,13 @@ export class CodexAppServerClient {
        * account instead.
        */
       apiKeySource?: string;
+      /**
+       * Invocation baseline (runtime usage design §5.2): `baselineKnown`
+       * false means the resumed thread's prior consumption CANNOT be
+       * separated from this invocation — the accumulator then only reports
+       * provably-attributable deltas.
+       */
+      usage?: { baseline: TokenUsageBreakdown; baselineKnown: boolean };
     }
   ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
     const existingTurn = this.activeTurnContexts.get(threadId);
@@ -853,6 +861,14 @@ export class CodexAppServerClient {
 
       let lastUsage: TokenUsageBreakdown | undefined;
       let modelContextWindow: number | undefined;
+      // Cumulative-invocation usage accounting (design §4/§5.2): the `total`
+      // breakdown diffs against the invocation baseline; `last` stays a
+      // single-request diagnostic and is never accumulated.
+      const usageAccumulator = new CodexUsageAccumulator({
+        baseline: options?.usage?.baseline ?? null,
+        baselineKnown: options?.usage?.baselineKnown ?? false,
+        nativeThreadId: threadId,
+      });
       const onNotification = (method: string, params: Record<string, unknown>) => {
         if (!this.notificationBelongsToThread(threadId, params)) return;
         const notificationTurnId =
@@ -884,6 +900,24 @@ export class CodexAppServerClient {
               totalTokens: number('totalTokens'),
               reasoningOutputTokens: number('reasoningOutputTokens'),
             };
+          }
+          if (tokenUsage && isRecord(tokenUsage.total)) {
+            const total = tokenUsage.total;
+            const number = (field: keyof TokenUsageBreakdown): number =>
+              typeof total[field] === 'number' && Number.isFinite(total[field])
+                ? (total[field] as number)
+                : 0;
+            const snapshot = usageAccumulator.onNotification({
+              inputTokens: number('inputTokens'),
+              outputTokens: number('outputTokens'),
+              cachedInputTokens: number('cachedInputTokens'),
+              cacheWriteInputTokens: number('cacheWriteInputTokens'),
+              totalTokens: number('totalTokens'),
+              reasoningOutputTokens: number('reasoningOutputTokens'),
+            });
+            // Duplicate notifications (identical counters) return null and
+            // are dropped instead of bumping the revision.
+            if (snapshot) enqueue({ type: 'msg', msg: providerUsageUpdatedEvent(snapshot) });
           }
           // `modelContextWindow` is optional and nullable in the app-server
           // schema (pinned 0.154.0), so absence is normal, not an error.
@@ -951,6 +985,11 @@ export class CodexAppServerClient {
             });
             enqueue({ type: 'done' });
           } else {
+            // Settle the invocation usage snapshot before the terminal event
+            // so the ledger holds the authoritative total at completion. An
+            // interrupted turn never reaches here; the host settles it.
+            const finalSnapshot = usageAccumulator.finalize();
+            enqueue({ type: 'msg', msg: providerUsageUpdatedEvent(finalSnapshot) });
             enqueue({
               type: 'msg',
               msg: {

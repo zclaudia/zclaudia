@@ -8,9 +8,39 @@ const getUsageStats = vi.fn();
 const getModelStats = vi.fn(() =>
   Promise.resolve({ days: [], models: [], trackedSince: null, capturedAt: 1 })
 );
+const getRuntimeUsage = vi.fn(() =>
+  Promise.resolve({
+    schemaVersion: 1,
+    datasetId: 'ds-1',
+    asOf: 1,
+    timeZone: 'UTC',
+    accountingSince: null,
+    accountingActive: true,
+    capturedAt: 1,
+    totals: {
+      recordedTokens: null,
+      completeTokens: null,
+      partialTokens: null,
+      legacyTokens: null,
+      activeRecordedTokens: null,
+    },
+    coverage: {
+      complete: 0,
+      partial: 0,
+      missing: 0,
+      eligibleFinalized: 0,
+      inFlight: 0,
+      rate: null,
+      legacyRecordCount: 0,
+    },
+    runtimes: [],
+    series: [],
+  })
+);
 vi.mock('../../../services/api', () => ({
   getUsageStats: (...args: unknown[]) => getUsageStats(...args),
   getModelStats: (...args: unknown[]) => getModelStats(...args),
+  getRuntimeUsage: (...args: unknown[]) => getRuntimeUsage(...args),
 }));
 
 const payload = {
@@ -93,6 +123,119 @@ describe('UsageStatsStrip', () => {
     expect(container.textContent).not.toContain('NaN');
   });
 
+  it('labels the tokens card "Recorded tokens" with a coverage line when the ledger is active', async () => {
+    getUsageStats.mockResolvedValue({
+      ...payload,
+      accounting: {
+        active: true,
+        recordedTokens: 39_900_000,
+        completeCalls: 92,
+        partialCalls: 3,
+        missingCalls: 8,
+        eligibleFinalized: 100,
+        inFlightCalls: 2,
+        legacyRecords: 40,
+        accountingSince: 1_758_000_000_000,
+      },
+    });
+    render(<UsageStatsStrip />);
+    await waitFor(() => expect(screen.getByText('Recorded tokens')).toBeTruthy());
+    expect(screen.queryByText('Total tokens')).toBeNull();
+    expect(screen.getByTestId('recorded-tokens-coverage').textContent).toBe(
+      '92% fully reported · 8 missing'
+    );
+  });
+
+  it('the coverage line links to the Runtimes tab fed by the ledger endpoint', async () => {
+    getUsageStats.mockResolvedValue({
+      ...payload,
+      accounting: {
+        active: true,
+        recordedTokens: 39_900_000,
+        completeCalls: 9,
+        partialCalls: 0,
+        missingCalls: 1,
+        eligibleFinalized: 10,
+        inFlightCalls: 0,
+        legacyRecords: 0,
+        accountingSince: 1_758_000_000_000,
+      },
+    });
+    getRuntimeUsage.mockResolvedValue({
+      schemaVersion: 1,
+      datasetId: 'ds-1',
+      asOf: 1,
+      timeZone: 'UTC',
+      accountingSince: 1_758_000_000_000,
+      accountingActive: true,
+      capturedAt: 1,
+      totals: {
+        recordedTokens: 123_456,
+        completeTokens: 120_000,
+        partialTokens: 3_456,
+        legacyTokens: null,
+        activeRecordedTokens: null,
+      },
+      coverage: {
+        complete: 9,
+        partial: 0,
+        missing: 1,
+        eligibleFinalized: 10,
+        inFlight: 0,
+        rate: 0.9,
+        legacyRecordCount: 0,
+      },
+      runtimes: [
+        {
+          runtimeId: 'claude',
+          runtimeLabel: 'Claude Code',
+          recordedTokens: 100_000,
+          inputTokens: 80_000,
+          outputTokens: 20_000,
+          calls: 8,
+          completeCalls: 7,
+          partialCalls: 0,
+          missingCalls: 1,
+          legacyCalls: 0,
+          inFlightCalls: 0,
+          coverageRate: 0.875,
+          models: [],
+        },
+        {
+          runtimeId: 'cursor',
+          runtimeLabel: 'Cursor',
+          recordedTokens: null,
+          inputTokens: null,
+          outputTokens: null,
+          calls: 2,
+          completeCalls: 0,
+          partialCalls: 0,
+          missingCalls: 2,
+          legacyCalls: 0,
+          inFlightCalls: 0,
+          coverageRate: 0,
+          models: [],
+        },
+      ],
+      series: [],
+    });
+    render(<UsageStatsStrip />);
+    await waitFor(() => expect(screen.getByText('Recorded tokens')).toBeTruthy());
+    expect(screen.getByTestId('recorded-tokens-coverage').textContent).toBe(
+      '90% fully reported · 1 missing'
+    );
+    fireEvent.click(screen.getByTestId('recorded-tokens-coverage'));
+    await waitFor(() => expect(screen.getByTestId('runtimes-view')).toBeTruthy());
+    expect(getRuntimeUsage).toHaveBeenCalled();
+    // Legacy-style honesty: Cursor reports missing rather than a fabricated 0.
+    expect(screen.getByText('Claude Code')).toBeTruthy();
+    expect(screen.getByText('Cursor')).toBeTruthy();
+    fireEvent.click(screen.getByText('Cursor'));
+    expect(
+      await screen.findByText('No token usage reported by this version of Cursor.')
+    ).toBeTruthy();
+  });
+
   it('hides the peak hour card when null', async () => {
     getUsageStats.mockResolvedValue({ ...payload, peakHour: null });
     render(<UsageStatsStrip />);
@@ -114,7 +257,7 @@ describe('UsageStatsStrip', () => {
     expect(screen.queryByText('Favorite model')).toBeNull();
   });
 
-  it('refetches with the chosen range and keeps previous numbers while pending', async () => {
+  it('refetches with the chosen range without presenting the previous range as current', async () => {
     getUsageStats.mockResolvedValueOnce(payload);
     let resolveSecond!: (v: unknown) => void;
     getUsageStats.mockImplementationOnce(() => new Promise(resolve => (resolveSecond = resolve)));
@@ -122,8 +265,8 @@ describe('UsageStatsStrip', () => {
     await waitFor(() => expect(screen.getByText('241')).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: '7d' }));
     expect(getUsageStats).toHaveBeenLastCalledWith(expect.anything(), '7d');
-    // Previous data still visible while the refetch is pending.
-    expect(screen.getByText('241')).toBeTruthy();
+    // The previous range must not appear under the new range selection.
+    expect(screen.queryByText('241')).toBeNull();
     resolveSecond({ ...payload, sessions: 9 });
     await waitFor(() => expect(screen.getByText('9')).toBeTruthy());
   });

@@ -18,6 +18,7 @@ import {
   appendMessagesToTree,
   buildAssistantTurnMessages,
 } from '../../../infra/providers/pi-runtime/session-tree/write-path.js';
+import { getUsageRecorder } from '../../../domains/usage/recorder.js';
 
 /**
  * Extract a plain-text string from an AgentMessage's content field, handling
@@ -199,6 +200,15 @@ export function cancelRun(
       setPhase(run, 'failed');
     }
 
+    // Settle the usage ledger for the cancelled invocation: known consumption
+    // stays, the execution outcome never rewrites usage status (design §6.4).
+    if (run.usageAccounting) {
+      getUsageRecorder(run.db).settleInvocation({
+        invocationId: run.usageAccounting.invocationId,
+        executionState: 'cancelled',
+      });
+    }
+
     // If the user queued any mid-run steers that pi hadn't yet drained, hand
     // them back as a single restorable draft so the client can repopulate the
     // input box. join('\n\n') matches what a user typing the same text across
@@ -274,6 +284,14 @@ export function upsertAssistantMessage(
   const metadata: Record<string, unknown> = {};
   if (options?.usage) {
     metadata.usage = options.usage;
+    // Accounting reference (design §7.3): links the message's compat usage
+    // projection to the ledger record that owns the authoritative numbers.
+    if (run.usageAccounting) {
+      metadata.usageRef = {
+        invocationId: run.usageAccounting.invocationId,
+        accountingVersion: 1,
+      };
+    }
   }
   if (run.agentProfile?.model) {
     metadata.model = run.agentProfile.model;

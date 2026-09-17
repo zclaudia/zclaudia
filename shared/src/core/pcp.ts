@@ -29,7 +29,10 @@ export type PCPCapabilityId =
   | 'invocation.execute'
   | 'invocation.refresh'
   | 'invocation.structured-input'
-  | 'skill.portable';
+  | 'skill.portable'
+  // Usage accounting (additive, versioned) — runtime emits cumulative
+  // invocation snapshots via provider_usage_updated events.
+  | 'usage.tracking';
 
 // === Capability Metadata ===
 

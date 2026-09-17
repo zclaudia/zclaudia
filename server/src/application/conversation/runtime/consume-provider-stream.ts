@@ -8,6 +8,7 @@ import { handleProviderEvent, type ProviderEventState } from './run-events.js';
 import { spawnBackgroundFollowUpConsumer } from './background-follow-up.js';
 import { isTerminalPhase } from './active-run-phase.js';
 import { failProviderTurn } from './run-terminal-coordinator.js';
+import { getUsageRecorder } from '../../../domains/usage/recorder.js';
 
 interface ConsumeProviderStreamInput {
   activeRun: ActiveRun;
@@ -66,6 +67,15 @@ export async function consumeProviderStream(input: ConsumeProviderStreamInput): 
   // off the still-open iterator to a background consumer when there are
   // in-flight background tasks.
   const iterator = providerRunner[Symbol.asyncIterator]();
+
+  // Usage ledger: entering the stream confirms the dispatch was handed to the
+  // runtime (design §6.2). From here a failure is a failed invocation — in
+  // the coverage denominator — rather than an unstarted dispatch. handleProviderEvent
+  // marks it again on the first event for streams that fail before producing one.
+  if (activeRun.usageAccounting && !activeRun.usageAccounting.runningMarked) {
+    activeRun.usageAccounting.runningMarked = true;
+    getUsageRecorder(db).markRunning(activeRun.usageAccounting.invocationId);
+  }
 
   try {
     while (true) {
@@ -132,6 +142,7 @@ export async function consumeProviderStream(input: ConsumeProviderStreamInput): 
             notificationService,
             notificationsService,
             initialPendingTasks: activeRun.pendingBackgroundTasks,
+            usageInvocationId: activeRun.usageAccounting?.invocationId,
             workspaceRoot: activeRun.workspaceRoot,
           });
           // Return without closing the iterator — background consumer owns it now

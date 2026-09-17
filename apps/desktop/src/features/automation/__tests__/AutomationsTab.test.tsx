@@ -194,3 +194,116 @@ describe('Catalog-driven activity actions', () => {
     });
   });
 });
+
+describe('Failure feedback', () => {
+  beforeEach(() => {
+    useTopLevelViewStore.setState({ selectedAutomationItemId: null });
+  });
+
+  it('shows a load error with retry instead of the empty state when the list request fails', async () => {
+    const failingApi = {
+      get: vi.fn().mockRejectedValue(new Error('HTTP 503')),
+      post: vi.fn(),
+      patch: vi.fn(),
+      del: vi.fn(),
+    } as any;
+    render(<AutomationsTab api={failingApi} projectName={() => 'Global'} />);
+    expect(await screen.findByText('Failed to load automations')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.queryByText('No automations yet')).toBeNull();
+  });
+
+  it('shows an action error instead of failing silently when disable is rejected', async () => {
+    const failingApi = {
+      get: vi.fn().mockResolvedValue([
+        {
+          id: 'a1',
+          name: 'Alpha',
+          enabled: true,
+          trigger: { type: 'manual' },
+          action: { kind: 'activity', ref: 'git_commit' },
+        },
+      ]),
+      post: vi.fn(),
+      patch: vi.fn().mockRejectedValue(new Error('HTTP 409')),
+      del: vi.fn(),
+    } as any;
+    render(<AutomationsTab api={failingApi} projectName={() => 'Global'} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Disable' }));
+    expect(
+      await screen.findByText(/Failed to disable "Alpha": HTTP 409/)
+    ).toBeInTheDocument();
+    // The failed item must still be listed as enabled.
+    expect(screen.getByRole('button', { name: 'Disable' })).toBeInTheDocument();
+  });
+});
+
+describe('System automations', () => {
+  beforeEach(() => {
+    useTopLevelViewStore.setState({ selectedAutomationItemId: null });
+  });
+
+  it('renders system items read-only instead of offering Run/Disable/Delete', async () => {
+    const sysApi = {
+      get: vi.fn().mockResolvedValue([
+        {
+          id: 'sys1',
+          name: 'Permission Escalation (System)',
+          enabled: true,
+          isSystem: true,
+          trigger: { type: 'event', event: 'permission.escalated' },
+          action: { kind: 'workflow', ref: 'wf1' },
+        },
+        {
+          id: 'usr1',
+          name: 'Mine',
+          enabled: true,
+          trigger: { type: 'manual' },
+          action: { kind: 'activity', ref: 'git_commit' },
+        },
+      ]),
+      post: vi.fn(),
+      patch: vi.fn(),
+      del: vi.fn(),
+    } as any;
+    render(<AutomationsTab api={sysApi} projectName={() => 'Global'} />);
+    await screen.findByText('Permission Escalation (System)');
+    const sysCard = screen.getByText('Permission Escalation (System)').closest('[data-automation-card]');
+    expect(sysCard?.textContent).toContain('System');
+    expect(sysCard?.querySelector('button[aria-label="Run now"]')).toBeNull();
+    expect(sysCard?.querySelector('button[aria-label="Disable"]')).toBeNull();
+    expect(sysCard?.querySelector('button[aria-label="Delete"]')).toBeNull();
+    const userCard = screen.getByText('Mine').closest('[data-automation-card]');
+    expect(userCard?.querySelector('button[aria-label="Run now"]')).not.toBeNull();
+  });
+});
+
+describe('Interval validation', () => {
+  beforeEach(() => {
+    useTopLevelViewStore.setState({ selectedAutomationItemId: null });
+  });
+
+  it('rejects a zero interval instead of silently saving 60', async () => {
+    const get = vi.fn().mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/workflows')) return [];
+      if (url.startsWith('/api/workflow-step-types')) {
+        return { success: true, data: [] };
+      }
+      return [];
+    });
+    const post = vi.fn();
+    const itvApi = { get, post, patch: vi.fn(), del: vi.fn() } as any;
+
+    render(<AutomationsTab api={itvApi} projectName={() => 'Global'} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'New' }));
+    fireEvent.change(await screen.findByPlaceholderText('Automation name'), {
+      target: { value: 'Zero interval' },
+    });
+    fireEvent.change(await screen.findByPlaceholderText('60'), {
+      target: { value: '0' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(await screen.findByText('Interval must be a positive whole number of minutes')).toBeInTheDocument();
+    expect(post).not.toHaveBeenCalled();
+  });
+});

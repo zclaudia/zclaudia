@@ -48,6 +48,7 @@ import {
   getOrCreateAppServerClient,
   resetCodexRunnerForTests,
   runCodexAppServer,
+  resolveCodexUsageBaseline,
 } from '../runner.js';
 
 const denyAll: PermissionCallback = async () => ({ behavior: 'deny' as const });
@@ -215,5 +216,33 @@ describe('runner', () => {
 
   afterEach(async () => {
     await destroyAllCodexClients();
+  });
+});
+
+describe('usage baseline trust', () => {
+  it('does not trust a persisted checkpoint after a native thread resumes', () => {
+    const checkpoint = {
+      totalTokens: 100,
+      inputTokens: 80,
+      outputTokens: 20,
+      cachedInputTokens: 0,
+      cacheWriteInputTokens: 0,
+      reasoningOutputTokens: 0,
+    };
+    // The same thread may have incurred another 500 tokens in an external CLI.
+    expect(
+      resolveCodexUsageBaseline(
+        {
+          cwd: '/tmp',
+          usageBaseline: {
+            cumulative: checkpoint,
+            nativeThreadId: 'thread-1',
+          },
+        },
+        'thread-1',
+        true
+      ).baselineKnown
+    ).toBe(false);
+    expect(resolveCodexUsageBaseline({ cwd: '/tmp' }, 'new', false).baselineKnown).toBe(true);
   });
 });

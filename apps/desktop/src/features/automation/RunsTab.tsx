@@ -30,6 +30,7 @@ export function RunsTab({ api, projectId }: RunsTabProps) {
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   const effectiveProjectId = projectId ?? '';
@@ -49,8 +50,8 @@ export function RunsTab({ api, projectId }: RunsTabProps) {
       // Runs are project-scoped, but the workflows they reference often are not
       // (the built-in ones carry no projectId). Scoping the name lookup the same
       // way returned an empty list, so every row fell back to a raw UUID slice.
-      const [runsData, scopedWorkflows, globalWorkflows] = await Promise.all([
-        api.get(`/api/workflow-runs${query}`).catch(() => []),
+      const runsData = await api.get(`/api/workflow-runs${query}`);
+      const [scopedWorkflows, globalWorkflows] = await Promise.all([
         query ? api.get(`/api/workflows${query}`).catch(() => []) : Promise.resolve([]),
         api.get('/api/workflows').catch(() => []),
       ]);
@@ -58,8 +59,10 @@ export function RunsTab({ api, projectId }: RunsTabProps) {
       const byId = new Map<string, Workflow>();
       for (const w of [...globalWorkflows, ...scopedWorkflows]) byId.set(w.id, w);
       setWorkflows([...byId.values()]);
+      setLoadError(null);
     } catch {
-      /* ignore */
+      // Keep previous runs; a fetch failure must not render as "no runs yet".
+      setLoadError('Failed to load run history');
     }
     setLoading(false);
   }, [api, effectiveProjectId]);
@@ -98,6 +101,16 @@ export function RunsTab({ api, projectId }: RunsTabProps) {
       {loading && runs.length === 0 ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 size={20} className="animate-spin text-muted-foreground" />
+        </div>
+      ) : loadError && runs.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-12 text-sm text-destructive">
+          <span>{loadError}</span>
+          <button
+            onClick={refresh}
+            className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-secondary"
+          >
+            Retry
+          </button>
         </div>
       ) : runs.length === 0 ? (
         <div className="text-center py-12 text-sm text-muted-foreground">No workflow runs yet.</div>

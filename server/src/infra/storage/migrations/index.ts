@@ -46,6 +46,7 @@ import { migration as m_041_runtime_engine_modes_and_session_bindings } from './
 import { migration as m_042_pi_runtime_identity } from './042_pi_runtime_identity.js';
 import { migration as m_043_session_provider_transport } from './043_session_provider_transport.js';
 import { migration as m_044_session_model_settings } from './044_session_model_settings.js';
+import { migration as m_045_runtime_usage_records } from './045_runtime_usage_records.js';
 
 export type { Migration };
 
@@ -94,6 +95,7 @@ export const migrations: Migration[] = [
   m_042_pi_runtime_identity,
   m_043_session_provider_transport,
   m_044_session_model_settings,
+  m_045_runtime_usage_records,
 ];
 
 /**

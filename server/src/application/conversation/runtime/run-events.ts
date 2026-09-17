@@ -8,6 +8,7 @@ import { isTerminalPhase } from './active-run-phase.js';
 import { isContextOverflowError, ContextOverflowError } from './context-overflow.js';
 import { dispatchProviderRuntimeEventToDomain } from './run-domain-dispatcher.js';
 import { completeProviderTurn, failProviderTurn } from './run-terminal-coordinator.js';
+import { getUsageRecorder } from '../../../domains/usage/recorder.js';
 import {
   handleTaskNotification,
   trackBackgroundTaskFromToolResult,
@@ -70,6 +71,13 @@ export function handleProviderEvent({
   state,
   toolUseIdToName,
 }: HandleProviderEventParams): void {
+  // Ledger lifecycle: the first provider event confirms the runtime actually
+  // started (design §6.2). The UPDATE itself is dispatching→running guarded.
+  if (activeRun.usageAccounting && !activeRun.usageAccounting.runningMarked) {
+    activeRun.usageAccounting.runningMarked = true;
+    getUsageRecorder(db).markRunning(activeRun.usageAccounting.invocationId);
+  }
+
   switch (msg.type) {
     case 'init':
       handleProviderInit({
@@ -213,6 +221,25 @@ export function handleProviderEvent({
         sessionId,
         sessionType,
         state,
+      });
+      break;
+    }
+
+    case 'provider_usage_updated': {
+      if (activeRun.usageAccounting) {
+        getUsageRecorder(db).applySnapshotEvent(
+          activeRun.usageAccounting.invocationId,
+          activeRun.pendingBackgroundTasks > 0 && msg.snapshot
+            ? { ...msg.snapshot, final: false }
+            : msg.snapshot
+        );
+      }
+      dispatchProviderRuntimeEventToDomain({
+        activeRun,
+        providerEvent: msg,
+        providerType,
+        runId,
+        sendRunEvent,
       });
       break;
     }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { EYEBROW } from '../../components/ui/typography';
 import { IconButton } from '../../components/ui/Button';
-import { Plus, RefreshCw, Play, Pause, Trash2, FolderOpen, Globe } from 'lucide-react';
+import { Plus, RefreshCw, Play, Pause, Trash2, FolderOpen, Globe, Shield } from 'lucide-react';
 import type { Automation, Workflow, WorkflowStepTypeMeta } from '@zclaudia/shared';
 import type { AutomationApiType } from './useAutomationApi';
 import type { AutomationItem } from './automation-types';
@@ -20,7 +20,10 @@ interface AutomationsTabProps {
 export function AutomationsTab({ api, projectName, projectId }: AutomationsTabProps) {
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const selectedItemId = useTopLevelViewStore(s => s.selectedAutomationItemId);
+  const bumpAutomationListRefresh = useTopLevelViewStore(s => s.bumpAutomationListRefresh);
 
   // Create form state
   const [showCreate, setShowCreate] = useState(false);
@@ -45,12 +48,13 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const allAutomations: Automation[] = await api
-        .get(`/api/automations${projectQuery}`)
-        .catch(() => []);
+      const allAutomations: Automation[] = await api.get(`/api/automations${projectQuery}`);
       setAutomations(allAutomations);
+      setListError(null);
     } catch {
-      /* ignore */
+      // Keep the previous list on failure: clearing it would render the same
+      // "No automations yet" state as a genuinely empty backend (A17).
+      setListError('Failed to load automations');
     }
     setLoading(false);
   }, [api, projectQuery]);
@@ -123,7 +127,14 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
     }
 
     const trigger: Record<string, unknown> = { type: newTriggerType };
-    if (newTriggerType === 'interval') trigger.intervalMinutes = parseInt(newIntervalMinutes) || 60;
+    if (newTriggerType === 'interval') {
+      const raw = newIntervalMinutes.trim();
+      if (raw !== '' && (!/^\d+$/.test(raw) || parseInt(raw, 10) <= 0)) {
+        setCreateError('Interval must be a positive whole number of minutes');
+        return;
+      }
+      trigger.intervalMinutes = raw === '' ? 60 : parseInt(raw, 10);
+    }
     if (newTriggerType === 'cron') trigger.cron = newCron;
     if (newTriggerType === 'once') {
       const onceAt = newOnceAt ? new Date(newOnceAt).getTime() : NaN;
@@ -151,6 +162,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
       setNewCron('');
       setNewEvent('');
       setNewOnceAt('');
+      bumpAutomationListRefresh();
       refresh();
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'Failed to create automation');
@@ -158,17 +170,47 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
   };
 
   const handleToggle = async (item: AutomationItem) => {
-    await api.patch(`/api/automations/${item.id}`, { enabled: !item.enabled }).catch(() => {});
+    try {
+      await api.patch(`/api/automations/${item.id}`, { enabled: !item.enabled });
+      setActionError(null);
+      bumpAutomationListRefresh();
+    } catch (error) {
+      setActionError(
+        `Failed to ${item.enabled ? 'disable' : 'enable'} "${item.name}": ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`
+      );
+    }
     refresh();
   };
 
   const handleTriggerNow = async (item: AutomationItem) => {
-    await api.post(`/api/automations/${item.id}/trigger`).catch(() => {});
+    try {
+      await api.post(`/api/automations/${item.id}/trigger`);
+      setActionError(null);
+      bumpAutomationListRefresh();
+    } catch (error) {
+      setActionError(
+        `Failed to run "${item.name}": ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`
+      );
+    }
     refresh();
   };
 
   const handleDelete = async (item: AutomationItem) => {
-    await api.del(`/api/automations/${item.id}`).catch(() => {});
+    try {
+      await api.del(`/api/automations/${item.id}`);
+      setActionError(null);
+      bumpAutomationListRefresh();
+    } catch (error) {
+      setActionError(
+        `Failed to delete "${item.name}": ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`
+      );
+    }
     refresh();
   };
 
@@ -312,6 +354,30 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
         </div>
       )}
 
+      {/* Operation failure — must never look like a successful no-op (A12/A17) */}
+      {actionError && (
+        <div className="flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
+          <span>{actionError}</span>
+          <button onClick={() => setActionError(null)} aria-label="Dismiss error" className="shrink-0">
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* List load failure — distinct from the empty state (A17) */}
+      {listError && (
+        <div className="flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
+          <span>{listError}</span>
+          <button
+            onClick={refresh}
+            aria-label="Retry"
+            className="shrink-0 rounded-md border border-destructive/40 px-2 py-0.5 hover:bg-destructive/20"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Enabled Automations */}
       {enabledItems.length > 0 && (
         <div>
@@ -352,7 +418,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
         </div>
       )}
 
-      {items.length === 0 && !showCreate && (
+      {items.length === 0 && !showCreate && !listError && (
         <EmptyState
           message="No automations yet"
           subtitle="Create one or enable a template to get started"
@@ -428,24 +494,38 @@ function AutomationCard({
         </div>
       </div>
       <div className="flex flex-shrink-0 items-center gap-1">
-        <IconButton onClick={onTrigger} title="Run now" aria-label="Run now">
-          <Play size={12} />
-        </IconButton>
-        <IconButton
-          onClick={onToggle}
-          title={item.enabled ? 'Disable' : 'Enable'}
-          aria-label={item.enabled ? 'Disable' : 'Enable'}
-        >
-          {item.enabled ? <Pause size={12} /> : <Play size={12} />}
-        </IconButton>
-        <button
-          onClick={onDelete}
-          className="relative p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400 before:absolute before:-inset-1.5 before:content-[''] md:before:content-none"
-          title="Delete"
-          aria-label="Delete"
-        >
-          <Trash2 size={12} />
-        </button>
+        {item.isSystem ? (
+          // System automations are immutable server-side; rendering Run/Disable/
+          // Delete here invited taps that could only fail silently (A12).
+          <span
+            className="flex items-center gap-1 text-[10px] text-muted-foreground px-1.5 py-1"
+            title="System automation — managed by the app and read-only"
+          >
+            <Shield size={11} aria-hidden />
+            System
+          </span>
+        ) : (
+          <>
+            <IconButton onClick={onTrigger} title="Run now" aria-label="Run now">
+              <Play size={12} />
+            </IconButton>
+            <IconButton
+              onClick={onToggle}
+              title={item.enabled ? 'Disable' : 'Enable'}
+              aria-label={item.enabled ? 'Disable' : 'Enable'}
+            >
+              {item.enabled ? <Pause size={12} /> : <Play size={12} />}
+            </IconButton>
+            <button
+              onClick={onDelete}
+              className="relative p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400 before:absolute before:-inset-1.5 before:content-[''] md:before:content-none"
+              title="Delete"
+              aria-label="Delete"
+            >
+              <Trash2 size={12} />
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
