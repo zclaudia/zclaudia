@@ -101,7 +101,9 @@ vi.mock('../../hooks/useAutoUpdate', () => ({ useAutoUpdate: () => undefined }))
 vi.mock('../../hooks/useServerLatencyMonitor', () => ({
   useServerLatencyMonitor: () => undefined,
 }));
-vi.mock('../../hooks/useActiveSessionStream', () => ({ useActiveSessionStream: () => undefined }));
+vi.mock('../../features/chat/hooks/useActiveSessionStream', () => ({
+  useActiveSessionStream: () => undefined,
+}));
 vi.mock('../../hooks/useMainWindowGeometry', () => ({ useMainWindowGeometry: () => undefined }));
 vi.mock('../../hooks/useAgentInitialization', () => ({ useAgentInitialization: () => undefined }));
 vi.mock('../../hooks/useDeepLinkNavigation', () => ({ useDeepLinkNavigation: () => undefined }));
