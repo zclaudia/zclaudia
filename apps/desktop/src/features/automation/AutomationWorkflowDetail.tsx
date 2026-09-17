@@ -1,200 +1,206 @@
-import { useState, useEffect } from 'react';
-import { SECTION_LABEL } from '../../components/ui/typography';
-import { Loader2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Loader2, RefreshCw, ChevronRight, Workflow as WorkflowIcon } from 'lucide-react';
 import type { Workflow, WorkflowTemplate } from '@zclaudia/shared';
-import type { AutomationApiType } from './useAutomationApi';
-import type { ProjectInfo } from './automation-types';
-import { isInternalProject, CATEGORY_COLORS } from './automation-types';
+import { categoryTone } from './automation-types';
+import type { AutomationBackend } from './automation-types';
+import { Button, IconButton } from '../../components/ui/Button';
+import { Tooltip } from '../../components/ui/Tooltip';
 import { WorkflowEditor } from '../workflows/components/WorkflowEditor';
 import { WorkflowMobileView } from '../workflows/components/WorkflowMobileView';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
+import { createAutomationApi } from './useAutomationApi';
+import { useAutomationByBackend } from './useAutomationByBackend';
+import {
+  EmptyState,
+  TabToolbar,
+  SectionGroup,
+  ListCard,
+  StatusDot,
+  ToneBadge,
+  MetaSep,
+  LoadingState,
+} from './AutomationSharedComponents';
+import { AutomationScopeChips, BackendGroups, ScopeChunk, projectLabel } from './AutomationScope';
+import type { AutomationTabScope } from './AutomationContent';
 
 const PERMISSION_FALLBACK_TEMPLATE_ID = 'permission-escalation-default';
 
-interface AutomationWorkflowDetailProps {
-  api: AutomationApiType;
-  projects: ProjectInfo[];
-  projectId?: string;
-}
-
-export function AutomationWorkflowDetail({
-  api,
-  projects,
-  projectId,
-}: AutomationWorkflowDetailProps) {
+export function AutomationWorkflowDetail({ scope }: { scope: AutomationTabScope }) {
   const selectedId = useTopLevelViewStore(s => s.selectedAutomationItemId);
+  const selectedBackendId = useTopLevelViewStore(s => s.selectedAutomationItemBackendId);
   const selectItem = useTopLevelViewStore(s => s.selectAutomationItem);
   const bump = useTopLevelViewStore(s => s.bumpAutomationListRefresh);
 
-  const effectiveProjectId = projectId ?? '';
-  const selectedProject = projects.find(p => p.id === effectiveProjectId);
-  const selectedIsGlobal = selectedProject ? isInternalProject(selectedProject.name) : false;
-
   if (!selectedId) {
-    return (
-      <EmptyStatePanel
-        api={api}
-        effectiveProjectId={effectiveProjectId}
-        selectedIsGlobal={selectedIsGlobal}
-        onTemplateEnabled={bump}
-        onSelect={selectItem}
-      />
-    );
+    return <WorkflowOverview scope={scope} onSelect={selectItem} onTemplateEnabled={bump} />;
   }
 
   return (
     <WorkflowDetailPanel
-      api={api}
+      backendId={selectedBackendId ?? scope.backends[0]?.backendId ?? null}
       selectedId={selectedId}
-      effectiveProjectId={effectiveProjectId}
+      effectiveProjectId={scope.projectId ?? ''}
       selectItem={selectItem}
       bump={bump}
     />
   );
 }
 
-// ----- Empty state panel -----
+// ----- Overview: workflows per backend + quick-start templates -----
 
-interface EmptyStatePanelProps {
-  api: AutomationApiType;
-  effectiveProjectId: string;
-  selectedIsGlobal: boolean;
-  onTemplateEnabled: () => void;
-  onSelect: (id: string) => void;
-}
-
-function EmptyStatePanel({
-  api,
-  effectiveProjectId,
-  selectedIsGlobal,
-  onTemplateEnabled,
+function WorkflowOverview({
+  scope,
   onSelect,
-}: EmptyStatePanelProps) {
-  const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
-  const refreshNonce = useTopLevelViewStore(s => s.automationListRefreshNonce);
+  onTemplateEnabled,
+}: {
+  scope: AutomationTabScope;
+  onSelect: (id: string, backendId: string) => void;
+  onTemplateEnabled: () => void;
+}) {
+  const { projectId } = scope;
+  const catalog = useAutomationByBackend<Workflow[]>(scope.backends, api =>
+    api.get('/api/workflows').then((list: Workflow[]) => {
+      const all = list ?? [];
+      // A project scope shows that project's workflows plus the global ones it
+      // can bind; "All projects" shows everything on the backend.
+      return projectId ? all.filter(w => !w.projectId || w.projectId === projectId) : all;
+    })
+  );
+  const total = [...catalog.data.values()].reduce((n, list) => n + list.length, 0);
 
+  // Templates need a target project, so they only show for one backend + one project.
+  const templateBackend: AutomationBackend | undefined =
+    projectId && scope.backends.length === 1 ? scope.backends[0] : undefined;
+  const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   useEffect(() => {
+    if (!templateBackend) {
+      setTemplates([]);
+      return;
+    }
     let cancelled = false;
-    api
+    createAutomationApi(templateBackend.backendId)
       .get('/api/workflow-templates')
       .then((tpls: WorkflowTemplate[]) => {
         if (!cancelled) {
-          setTemplates(
-            tpls.filter((t: WorkflowTemplate) => t.id !== PERMISSION_FALLBACK_TEMPLATE_ID)
-          );
+          setTemplates((tpls ?? []).filter(t => t.id !== PERMISSION_FALLBACK_TEMPLATE_ID));
         }
       })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [api]);
-
-  // The sidebar tree is the only other route to a workflow, and on a phone that
-  // tree lives in a drawer which closes the moment a project row is tapped — so
-  // without this list an enabled workflow could not be opened at all.
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .get('/api/workflows')
-      .then((list: Workflow[]) => {
-        if (cancelled) return;
-        setWorkflows(
-          list.filter(w =>
-            selectedIsGlobal || !effectiveProjectId
-              ? !w.projectId
-              : w.projectId === effectiveProjectId
-          )
-        );
-      })
       .catch(() => {
-        if (!cancelled) setWorkflows([]);
+        if (!cancelled) setTemplates([]);
       });
     return () => {
       cancelled = true;
     };
-  }, [api, effectiveProjectId, selectedIsGlobal, refreshNonce]);
+  }, [templateBackend]);
 
-  const handleEnableTemplate = async (templateId: string, projId: string) => {
-    await api.post(`/api/projects/${projId}/workflows/from-template/${templateId}`).catch(() => {});
+  const handleEnableTemplate = async (templateId: string) => {
+    if (!templateBackend || !projectId) return;
+    await createAutomationApi(templateBackend.backendId)
+      .post(`/api/projects/${projectId}/workflows/from-template/${templateId}`)
+      .catch(() => {});
     onTemplateEnabled();
+    catalog.refresh();
   };
 
   return (
-    <div className="flex h-full flex-col items-center gap-6 p-6">
-      {workflows.length > 0 ? (
-        <div className="w-full max-w-lg">
-          <h3 className={`${SECTION_LABEL} mb-2`}>Workflows</h3>
-          <div className="space-y-1.5">
-            {workflows.map(w => (
-              <button
-                key={w.id}
-                type="button"
-                onClick={() => onSelect(w.id)}
-                className="flex w-full items-center gap-2 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-secondary/40"
-              >
-                <span
-                  className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${
-                    w.status === 'active' ? 'bg-green-500' : 'bg-muted-foreground/40'
-                  }`}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-medium">{w.name}</span>
-                  {w.description && (
-                    <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
-                      {w.description}
-                    </span>
-                  )}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
+    <div className="space-y-4">
+      <TabToolbar
+        unknown={catalog.data.size === 0 && catalog.errors.size > 0}
+        count={total}
+        noun="workflow"
+      >
+        <Tooltip content="Refresh">
+          <IconButton onClick={catalog.refresh} aria-label="Refresh">
+            <RefreshCw size={14} className={catalog.loading ? 'animate-spin' : ''} />
+          </IconButton>
+        </Tooltip>
+      </TabToolbar>
+      <AutomationScopeChips backends={scope.allBackends} withProjects />
+
+      {catalog.loading && catalog.data.size === 0 ? (
+        <LoadingState />
       ) : (
-        <div className="pt-6 text-center">
-          <p className="text-sm text-muted-foreground">No workflows yet — enable one below.</p>
-        </div>
+        <BackendGroups
+          backends={scope.backends}
+          catalog={catalog}
+          grouped={scope.grouped}
+          count={items => items.length}
+          empty={
+            <EmptyState
+              icon={WorkflowIcon}
+              message="No workflows yet"
+              subtitle={
+                templates.length > 0
+                  ? 'Enable a template below to get started.'
+                  : 'Pick a backend and a project to enable a quick-start template.'
+              }
+            />
+          }
+          render={(items, backend) => (
+            <div className="space-y-1.5">
+              {items.map(w => (
+                <ListCard
+                  key={w.id}
+                  onClick={() => onSelect(w.id, backend.backendId)}
+                  lead={<StatusDot tone={w.status === 'active' ? 'success' : 'neutral'} />}
+                  title={w.name}
+                  titleExtra={w.isSystem ? <ToneBadge tone="neutral">System</ToneBadge> : undefined}
+                  meta={
+                    <>
+                      <ScopeChunk
+                        projectId={w.projectId}
+                        label={projectLabel(scope.projects, backend.backendId, w.projectId)}
+                      />
+                      {w.description && (
+                        <>
+                          <MetaSep />
+                          <span className="min-w-0 truncate max-md:whitespace-normal">
+                            {w.description}
+                          </span>
+                        </>
+                      )}
+                    </>
+                  }
+                  trail={
+                    <ChevronRight size={14} strokeWidth={1.75} className="text-muted-foreground" />
+                  }
+                />
+              ))}
+            </div>
+          )}
+        />
       )}
 
-      {templates.length > 0 && !selectedIsGlobal && (
-        <div className="w-full max-w-lg">
-          <h3 className={`${SECTION_LABEL} mb-2`}>Quick Start Templates</h3>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-            {templates.map(t => (
-              <div
+      {templates.length > 0 && (
+        <SectionGroup label="Quick start templates">
+          {templates.map(t => {
+            const category = (t as { category?: string }).category;
+            return (
+              <ListCard
                 key={t.id}
-                className="rounded-lg border border-border bg-card p-3 flex flex-col gap-2"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-xs font-medium">{t.name}</div>
-                    {t.description && (
-                      <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
-                        {t.description}
-                      </div>
-                    )}
-                  </div>
-                  {(t as any).category && (
-                    <span
-                      className={`px-1.5 py-0.5 rounded-md text-[9px] font-medium shrink-0 ${CATEGORY_COLORS[(t as any).category] ?? 'bg-muted text-muted-foreground'}`}
-                    >
-                      {(t as any).category}
+                lead={<WorkflowIcon size={15} strokeWidth={1.75} />}
+                title={t.name}
+                titleExtra={
+                  category ? (
+                    <ToneBadge tone={categoryTone(category)}>{category}</ToneBadge>
+                  ) : undefined
+                }
+                meta={
+                  t.description ? (
+                    <span className="min-w-0 truncate max-md:whitespace-normal">
+                      {t.description}
                     </span>
-                  )}
-                </div>
-                {effectiveProjectId && (
-                  <button
-                    onClick={() => handleEnableTemplate(t.id, effectiveProjectId)}
-                    className="self-start text-[10px] px-2 py-0.5 rounded-md transition-colors bg-muted/60 text-primary hover:bg-muted max-md:px-3 max-md:py-2 max-md:text-xs"
-                  >
+                  ) : undefined
+                }
+                trail={
+                  <Button variant="outline" size="sm" onClick={() => handleEnableTemplate(t.id)}>
                     Enable
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+                  </Button>
+                }
+              />
+            );
+          })}
+        </SectionGroup>
       )}
     </div>
   );
@@ -203,7 +209,7 @@ function EmptyStatePanel({
 // ----- Workflow detail panel -----
 
 interface WorkflowDetailPanelProps {
-  api: AutomationApiType;
+  backendId: string | null;
   selectedId: string;
   effectiveProjectId: string;
   selectItem: (id: string | null) => void;
@@ -211,12 +217,13 @@ interface WorkflowDetailPanelProps {
 }
 
 function WorkflowDetailPanel({
-  api,
+  backendId,
   selectedId,
   effectiveProjectId,
   selectItem,
   bump,
 }: WorkflowDetailPanelProps) {
+  const api = useMemo(() => createAutomationApi(backendId), [backendId]);
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -260,12 +267,9 @@ function WorkflowDetailPanel({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-sm text-destructive mb-2">{error ?? 'Workflow not found'}</div>
-          <button
-            onClick={() => selectItem(null)}
-            className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-secondary"
-          >
+          <Button variant="outline" onClick={() => selectItem(null)}>
             Back
-          </button>
+          </Button>
         </div>
       </div>
     );

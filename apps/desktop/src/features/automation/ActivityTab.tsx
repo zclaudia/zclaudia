@@ -2,107 +2,121 @@
  * Activity catalog — read-only list of the registered activity building-blocks
  * (server-side ActivityRegistry) that workflows and automations are composed from.
  *
- * Sources the unified /api/workflow-step-types catalog and keeps only the entries
- * tagged `source: 'activity'`, grouped by category. Scoped to the selected backend
- * via the shared automation api, like the other tabs. No create/edit/delete.
+ * Sources the unified /api/workflow-step-types catalog of every scoped backend
+ * and keeps only the entries tagged `source: 'activity'`, grouped by category
+ * (and by backend under "All"). No create/edit/delete.
  */
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, Repeat } from 'lucide-react';
+import { RefreshCw, Repeat, Sparkles, GitBranch, Blocks, type LucideIcon } from 'lucide-react';
 import type { WorkflowStepTypeMeta } from '@zclaudia/shared';
-import type { AutomationApiType } from './useAutomationApi';
 import { IconButton } from '../../components/ui/Button';
-import { LoadingState, EmptyState } from './AutomationSharedComponents';
+import { Tooltip } from '../../components/ui/Tooltip';
+import {
+  LoadingState,
+  EmptyState,
+  TabToolbar,
+  SectionGroup,
+  ListCard,
+  categoryLabel,
+} from './AutomationSharedComponents';
+import { AutomationScopeChips, BackendGroups } from './AutomationScope';
+import { useAutomationByBackend } from './useAutomationByBackend';
+import type { AutomationTabScope } from './AutomationContent';
 
-interface ActivityTabProps {
-  api: AutomationApiType;
+/** Monochrome lead glyph per category; activities carry no status, so the lead
+ *  slot names the family instead of leaving the title unaligned with other tabs. */
+const CATEGORY_ICON: Record<string, LucideIcon> = {
+  ai: Sparkles,
+  git: GitBranch,
+};
+
+function byCategory(items: WorkflowStepTypeMeta[]): [string, WorkflowStepTypeMeta[]][] {
+  const map = new Map<string, WorkflowStepTypeMeta[]>();
+  for (const a of items) {
+    const key = a.category || 'Other';
+    const list = map.get(key) ?? [];
+    list.push(a);
+    map.set(key, list);
+  }
+  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
-export function ActivityTab({ api }: ActivityTabProps) {
-  const [activities, setActivities] = useState<WorkflowStepTypeMeta[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    await api
+export function ActivityTab({ scope }: { scope: AutomationTabScope }) {
+  const catalog = useAutomationByBackend<WorkflowStepTypeMeta[]>(scope.backends, api =>
+    api
       .get('/api/workflow-step-types')
-      .then((all: WorkflowStepTypeMeta[]) =>
-        setActivities((all ?? []).filter(m => m.source === 'activity'))
-      )
-      .catch(() => setActivities([]));
-    setLoading(false);
-  }, [api]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  const grouped = useMemo(() => {
-    const byCategory = new Map<string, WorkflowStepTypeMeta[]>();
-    for (const a of activities) {
-      const key = a.category || 'Other';
-      const list = byCategory.get(key) ?? [];
-      list.push(a);
-      byCategory.set(key, list);
-    }
-    return [...byCategory.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [activities]);
-
-  if (loading) return <LoadingState />;
+      .then((all: WorkflowStepTypeMeta[]) => (all ?? []).filter(m => m.source === 'activity'))
+  );
+  const total = [...catalog.data.values()].reduce((n, list) => n + list.length, 0);
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-muted-foreground">
-          {activities.length} activit{activities.length !== 1 ? 'ies' : 'y'}
-        </h2>
-        <IconButton onClick={refresh} title="Refresh" aria-label="Refresh">
-          <RefreshCw size={14} />
-        </IconButton>
-      </div>
+    <div className="space-y-4">
+      <TabToolbar
+        unknown={catalog.data.size === 0 && catalog.errors.size > 0}
+        count={total}
+        noun={{ one: 'activity', other: 'activities' }}
+      >
+        <Tooltip content="Refresh">
+          <IconButton onClick={catalog.refresh} aria-label="Refresh">
+            <RefreshCw size={14} className={catalog.loading ? 'animate-spin' : ''} />
+          </IconButton>
+        </Tooltip>
+      </TabToolbar>
+      <AutomationScopeChips backends={scope.allBackends} />
 
-      {activities.length === 0 ? (
-        <EmptyState
-          message="No activities registered"
-          subtitle="Activities are the building blocks workflows are composed from."
-        />
+      {catalog.loading && catalog.data.size === 0 ? (
+        <LoadingState />
       ) : (
-        grouped.map(([category, items]) => (
-          <div key={category} className="space-y-1.5">
-            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground/70 px-0.5">
-              {category}
-            </h3>
-            <div className="space-y-1.5">
-              {items.map(a => (
-                <ActivityCard key={a.type} activity={a} />
+        <BackendGroups
+          backends={scope.backends}
+          catalog={catalog}
+          grouped={scope.grouped}
+          count={items => items.length}
+          empty={
+            <EmptyState
+              icon={Blocks}
+              message="No activities registered"
+              subtitle="Activities are the building blocks workflows are composed from."
+            />
+          }
+          render={items => (
+            <div className="space-y-4">
+              {byCategory(items).map(([category, list]) => (
+                <SectionGroup key={category} label={categoryLabel(category)}>
+                  {list.map(a => (
+                    <ActivityRow key={a.type} activity={a} />
+                  ))}
+                </SectionGroup>
               ))}
             </div>
-          </div>
-        ))
+          )}
+        />
       )}
     </div>
   );
 }
 
-function ActivityCard({ activity }: { activity: WorkflowStepTypeMeta }) {
+function ActivityRow({ activity }: { activity: WorkflowStepTypeMeta }) {
+  const Icon = CATEGORY_ICON[(activity.category ?? '').toLowerCase()] ?? Blocks;
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2.5">
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-foreground">{activity.name}</span>
-        <code className="text-[11px] font-mono text-muted-foreground/70 bg-muted/50 rounded px-1 py-0.5">
+    <ListCard
+      lead={<Icon size={15} strokeWidth={1.75} />}
+      title={activity.name}
+      titleExtra={
+        <code className="shrink-0 rounded-[var(--radius-inline-token)] bg-muted/60 px-1 py-0.5 font-mono text-2xs text-muted-foreground max-md:hidden">
           {activity.type}
         </code>
-        {activity.supportsLoop && (
-          <span
-            className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground"
-            title="Supports loop steps"
-          >
-            <Repeat size={11} /> loops
-          </span>
-        )}
-      </div>
-      {activity.description && (
-        <p className="text-xs text-muted-foreground mt-1">{activity.description}</p>
-      )}
-    </div>
+      }
+      meta={activity.description ? <span>{activity.description}</span> : undefined}
+      trail={
+        activity.supportsLoop ? (
+          <Tooltip content="Can run inside loop steps">
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <Repeat size={12} strokeWidth={1.75} />
+              <span className="max-md:hidden">Supports loops</span>
+            </span>
+          </Tooltip>
+        ) : undefined
+      }
+    />
   );
 }

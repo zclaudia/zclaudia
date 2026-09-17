@@ -1,11 +1,29 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Loader2, RefreshCw, ArrowLeft } from 'lucide-react';
+import { RefreshCw, ArrowLeft, ChevronRight, History } from 'lucide-react';
 import type { Workflow, WorkflowDefinition, WorkflowRun, WorkflowStepRun } from '@zclaudia/shared';
 import { normalizeWorkflowDefinition } from '@zclaudia/shared';
-import { RunStatusBadge, formatDuration } from '../workflows/components/RunComponents';
+import {
+  RunStatusBadge,
+  formatDuration,
+  runStatusTone,
+} from '../workflows/components/RunComponents';
 import { RunStepList } from '../workflows/components/RunStepList';
-import { IconButton } from '../../components/ui/Button';
-import type { AutomationApiType } from './useAutomationApi';
+import { Button, IconButton } from '../../components/ui/Button';
+import { Tooltip } from '../../components/ui/Tooltip';
+import { createAutomationApi, type AutomationApiType } from './useAutomationApi';
+import { useAutomationByBackend } from './useAutomationByBackend';
+import type { AutomationBackend } from './automation-types';
+import {
+  LoadingState,
+  EmptyState,
+  TabToolbar,
+  SectionGroup,
+  ListCard,
+  StatusDot,
+  MetaSep,
+} from './AutomationSharedComponents';
+import { AutomationScopeChips, BackendGroups, ScopeChunk, projectLabel } from './AutomationScope';
+import type { AutomationTabScope } from './AutomationContent';
 
 /**
  * What to call a run in a list. Prefers the workflow's name, then the action it
@@ -21,134 +39,199 @@ function runLabel(run: WorkflowRun, names: Map<string, string>): string {
   return run.workflowId ? `Workflow ${run.workflowId.slice(0, 8)}` : 'Activity';
 }
 
-interface RunsTabProps {
-  api: AutomationApiType;
-  projectId?: string;
+/** Group label for a run's start time: Today / Yesterday / a short date. */
+function dayLabel(ts: number, now = new Date()): string {
+  const d = new Date(ts);
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.round((startOf(now) - startOf(d)) / 86_400_000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+  });
 }
 
-export function RunsTab({ api, projectId }: RunsTabProps) {
-  const [runs, setRuns] = useState<WorkflowRun[]>([]);
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+function timeLabel(ts: number): string {
+  return new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
 
-  const effectiveProjectId = projectId ?? '';
+function stampLabel(ts: number): string {
+  return new Date(ts).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
 
-  const workflowNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const w of workflows) map.set(w.id, w.name);
-    return map;
-  }, [workflows]);
+interface RunsCatalog {
+  runs: WorkflowRun[];
+  names: Map<string, string>;
+}
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const query = effectiveProjectId
-        ? `?projectId=${encodeURIComponent(effectiveProjectId)}`
-        : '';
-      // Runs are project-scoped, but the workflows they reference often are not
-      // (the built-in ones carry no projectId). Scoping the name lookup the same
-      // way returned an empty list, so every row fell back to a raw UUID slice.
-      const runsData = await api.get(`/api/workflow-runs${query}`);
-      const [scopedWorkflows, globalWorkflows] = await Promise.all([
-        query ? api.get(`/api/workflows${query}`).catch(() => []) : Promise.resolve([]),
-        api.get('/api/workflows').catch(() => []),
-      ]);
-      setRuns(runsData);
-      const byId = new Map<string, Workflow>();
-      for (const w of [...globalWorkflows, ...scopedWorkflows]) byId.set(w.id, w);
-      setWorkflows([...byId.values()]);
-      setLoadError(null);
-    } catch {
-      // Keep previous runs; a fetch failure must not render as "no runs yet".
-      setLoadError('Failed to load run history');
-    }
-    setLoading(false);
-  }, [api, effectiveProjectId]);
+export function RunsTab({ scope }: { scope: AutomationTabScope }) {
+  const [selected, setSelected] = useState<{ backendId: string; runId: string } | null>(null);
+  const projectQuery = scope.projectId ? `?projectId=${encodeURIComponent(scope.projectId)}` : '';
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  const catalog = useAutomationByBackend<RunsCatalog>(scope.backends, async api => {
+    // Runs are project-scoped, but the workflows they reference often are not
+    // (the built-in ones carry no projectId), so names come from the unscoped
+    // list plus the scoped one.
+    const [runs, scopedWorkflows, globalWorkflows] = await Promise.all([
+      api.get(`/api/workflow-runs${projectQuery}`).then((r: WorkflowRun[]) => r ?? []),
+      projectQuery
+        ? api.get(`/api/workflows${projectQuery}`).catch(() => [] as Workflow[])
+        : Promise.resolve([] as Workflow[]),
+      api.get('/api/workflows').catch(() => [] as Workflow[]),
+    ]);
+    const names = new Map<string, string>();
+    for (const w of [...globalWorkflows, ...scopedWorkflows] as Workflow[]) names.set(w.id, w.name);
+    const sorted = [...runs].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
+    return { runs: sorted, names };
+  });
+  const total = [...catalog.data.values()].reduce((n, c) => n + c.runs.length, 0);
 
-  if (selectedRunId) {
+  if (selected) {
+    const entry = catalog.data.get(selected.backendId);
+    const run = entry?.runs.find(r => r.id === selected.runId);
     return (
       <RunDetail
-        api={api}
-        runId={selectedRunId}
-        workflowName={(() => {
-          const run = runs.find(r => r.id === selectedRunId);
-          if (!run) return '';
-          return runLabel(run, workflowNameMap);
-        })()}
-        onBack={() => setSelectedRunId(null)}
+        api={createAutomationApi(selected.backendId)}
+        runId={selected.runId}
+        workflowName={run && entry ? runLabel(run, entry.names) : ''}
+        onBack={() => setSelected(null)}
       />
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Run History</h2>
-        <div className="flex items-center gap-2">
-          <IconButton aria-label="Refresh" onClick={refresh} disabled={loading}>
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+      <TabToolbar
+        count={total}
+        noun="run"
+        unknown={catalog.data.size === 0 && catalog.errors.size > 0}
+      >
+        <Tooltip content="Refresh">
+          <IconButton aria-label="Refresh" onClick={catalog.refresh} disabled={catalog.loading}>
+            <RefreshCw size={14} className={catalog.loading ? 'animate-spin' : ''} />
           </IconButton>
-        </div>
-      </div>
+        </Tooltip>
+      </TabToolbar>
+      <AutomationScopeChips backends={scope.allBackends} withProjects />
 
-      {loading && runs.length === 0 ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 size={20} className="animate-spin text-muted-foreground" />
-        </div>
-      ) : loadError && runs.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-12 text-sm text-destructive">
-          <span>{loadError}</span>
-          <button
-            onClick={refresh}
-            className="rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-secondary"
-          >
-            Retry
-          </button>
-        </div>
-      ) : runs.length === 0 ? (
-        <div className="text-center py-12 text-sm text-muted-foreground">No workflow runs yet.</div>
+      {catalog.loading && catalog.data.size === 0 ? (
+        <LoadingState />
       ) : (
-        <div className="space-y-2">
-          {runs.map(run => (
-            <button
-              key={run.id}
-              onClick={() => setSelectedRunId(run.id)}
-              className="w-full text-left border border-border rounded-lg p-3 hover:bg-secondary/30 transition-colors"
-            >
-              <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                  <RunStatusBadge status={run.status} />
-                  <span className="text-sm font-medium truncate">
-                    {runLabel(run, workflowNameMap)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground md:shrink-0">
-                  <span className="px-1.5 py-0.5 rounded-md bg-muted">{run.triggerSource}</span>
-                  <span>{formatDuration(run.startedAt, run.completedAt)}</span>
-                  <span className="truncate">
-                    {new Date(run.startedAt).toLocaleString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </div>
-              </div>
-              {run.error && (
-                <div className="mt-1 text-xs text-destructive truncate">{run.error}</div>
-              )}
-            </button>
-          ))}
-        </div>
+        <BackendGroups
+          backends={scope.backends}
+          catalog={catalog}
+          grouped={scope.grouped}
+          count={c => c.runs.length}
+          empty={
+            <EmptyState
+              icon={History}
+              message="No workflow runs yet"
+              subtitle="Runs appear here once an automation or workflow is triggered."
+            />
+          }
+          render={(c, backend) => (
+            <RunList
+              runs={c.runs}
+              names={c.names}
+              backend={backend}
+              scope={scope}
+              byDay={!scope.grouped}
+              onOpen={runId => setSelected({ backendId: backend.backendId, runId })}
+            />
+          )}
+        />
       )}
+    </div>
+  );
+}
+
+function RunList({
+  runs,
+  names,
+  backend,
+  scope,
+  byDay,
+  onOpen,
+}: {
+  runs: WorkflowRun[];
+  names: Map<string, string>;
+  backend: AutomationBackend;
+  scope: AutomationTabScope;
+  /** Day sections read well for one backend; under backend headers a full stamp does. */
+  byDay: boolean;
+  onOpen: (runId: string) => void;
+}) {
+  const row = (run: WorkflowRun) => (
+    <ListCard
+      key={run.id}
+      onClick={() => onOpen(run.id)}
+      lead={<StatusDot tone={runStatusTone(run.status)} pulse={run.status === 'running'} />}
+      title={runLabel(run, names)}
+      titleExtra={<RunStatusBadge status={run.status} />}
+      meta={
+        <>
+          <ScopeChunk
+            projectId={run.projectId}
+            label={projectLabel(scope.projects, backend.backendId, run.projectId)}
+          />
+          <MetaSep />
+          <span>{run.triggerSource}</span>
+          <MetaSep />
+          <span className="tabular-nums">{formatDuration(run.startedAt, run.completedAt)}</span>
+          {run.startedAt && (
+            <>
+              <MetaSep />
+              <span className="tabular-nums md:hidden">
+                {byDay ? timeLabel(run.startedAt) : stampLabel(run.startedAt)}
+              </span>
+            </>
+          )}
+          {run.error && (
+            <>
+              <MetaSep />
+              <span className="min-w-0 truncate text-destructive max-md:whitespace-normal">
+                {run.error}
+              </span>
+            </>
+          )}
+        </>
+      }
+      trail={
+        <>
+          {run.startedAt && (
+            <span className="text-xs tabular-nums text-muted-foreground max-md:hidden">
+              {byDay ? timeLabel(run.startedAt) : stampLabel(run.startedAt)}
+            </span>
+          )}
+          <ChevronRight size={14} strokeWidth={1.75} className="text-muted-foreground" />
+        </>
+      }
+    />
+  );
+
+  if (!byDay) return <div className="space-y-1.5">{runs.map(row)}</div>;
+
+  const days = new Map<string, WorkflowRun[]>();
+  for (const run of runs) {
+    const key = run.startedAt ? dayLabel(run.startedAt) : 'Not started';
+    const list = days.get(key) ?? [];
+    list.push(run);
+    days.set(key, list);
+  }
+  return (
+    <div className="space-y-4">
+      {[...days.entries()].map(([day, list]) => (
+        <SectionGroup key={day} label={day}>
+          {list.map(row)}
+        </SectionGroup>
+      ))}
     </div>
   );
 }
@@ -211,18 +294,15 @@ function RunDetail({
     }
   };
 
+  const stamp = useMemo(() => (run ? new Date(run.startedAt).toLocaleString() : ''), [run]);
+
   if (loading || !run) {
     return (
       <div className="space-y-4">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
+        <Button onClick={onBack} className="-ml-2">
           <ArrowLeft size={16} /> Back
-        </button>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 size={20} className="animate-spin text-muted-foreground" />
-        </div>
+        </Button>
+        <LoadingState />
       </div>
     );
   }
@@ -232,32 +312,30 @@ function RunDetail({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-          >
+          <IconButton onClick={onBack} aria-label="Back to runs">
             <ArrowLeft size={16} />
-          </button>
+          </IconButton>
           <div>
             <div className="text-sm font-medium">{workflowName}</div>
-            <div className="text-xs text-muted-foreground flex items-center gap-2">
+            <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-2">
               <RunStatusBadge status={run.status} />
               <span>
                 {run.triggerSource}
                 {run.triggerDetail ? ` · ${run.triggerDetail}` : ''}
               </span>
               <span>{formatDuration(run.startedAt, run.completedAt)}</span>
-              <span>{new Date(run.startedAt).toLocaleString()}</span>
+              <span>{stamp}</span>
             </div>
           </div>
         </div>
         {(run.status === 'running' || run.status === 'pending') && (
-          <button
+          <Button
+            variant="destructive"
             onClick={() => void runAction('Cancel', `/api/workflow-runs/${runId}/cancel`)}
-            className="shrink-0 rounded-md border border-border px-3 py-1 text-xs transition-colors hover:bg-destructive hover:text-destructive-foreground max-md:py-2"
+            className="shrink-0"
           >
             Cancel
-          </button>
+          </Button>
         )}
       </div>
 

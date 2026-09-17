@@ -49,13 +49,6 @@ vi.mock('../worktreeGrouping', () => ({
 vi.mock('../../../hooks/useSwipeBack', () => ({
   useSwipeBack: vi.fn().mockReturnValue({ current: null }),
 }));
-vi.mock('../../automation/AutomationTree', () => ({
-  AutomationTree: ({ tab, onSelectScope }: any) => (
-    <div data-testid="automation-tree" data-tab={tab}>
-      <button onClick={() => onSelectScope('backend-1', 'proj-1')}>select-scope</button>
-    </div>
-  ),
-}));
 vi.mock('../../../hooks/useSelectionCoordinator', () => ({
   useSelectionCoordinator: () => ({
     selectProject: selectionMocks.selectProject,
@@ -331,18 +324,11 @@ describe('Sidebar mobile drawer — top-level mode entries', () => {
     expect(onClose).toHaveBeenCalledTimes(entries.length);
   });
 
-  it('automation mode: tab select, back, and scope select all close the drawer', () => {
+  it('automation mode: tab select and back close the drawer, and no project tree renders', () => {
     const onSelectTab = vi.fn();
     const onBack = vi.fn();
-    const onSelectScope = vi.fn();
     const { onClose } = renderSidebarMobileOpen({
-      automationMode: {
-        tab: 'activity',
-        activeBackendId: LOCAL_BACKEND_ID,
-        onSelectTab,
-        onBack,
-        onSelectScope,
-      },
+      automationMode: { tab: 'activity', onSelectTab, onBack },
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Workflows' }));
@@ -351,10 +337,10 @@ describe('Sidebar mobile drawer — top-level mode entries', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to app' }));
     expect(onBack).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'select-scope' }));
-    expect(onSelectScope).toHaveBeenCalledWith('backend-1', 'proj-1');
+    // Backend / project scope lives in the content pane now (like agents mode).
+    expect(screen.queryByText('No projects yet')).toBeNull();
 
-    expect(onClose).toHaveBeenCalledTimes(3);
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   it('agents mode: tab select and back close the drawer', () => {

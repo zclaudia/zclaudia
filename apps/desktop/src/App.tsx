@@ -103,7 +103,6 @@ function AppContent() {
 
   // --- Store selectors ---
   const activeServerId = useServerStore(s => s.activeServerId);
-  const setActiveServer = useServerStore(s => s.setActiveServer);
   const transportStatus = useRecoveryStore(s => s.transport.status);
   const facadeConnectionState = useFacadeStore(s => s.connectionState);
   const facadeSnapshotVersion = useFacadeStore(s => s.snapshotVersion);
@@ -128,7 +127,6 @@ function AppContent() {
   const returnToApp = useTopLevelViewStore(s => s.returnToApp);
   const openAutomations = useTopLevelViewStore(s => s.openAutomations);
   const setAutomationTab = useTopLevelViewStore(s => s.setAutomationTab);
-  const setAutomationProjectFilter = useTopLevelViewStore(s => s.setAutomationProjectFilter);
   const openAgents = useTopLevelViewStore(s => s.openAgents);
   const setAgentsTab = useTopLevelViewStore(s => s.setAgentsTab);
   const openPlugins = useTopLevelViewStore(s => s.openPlugins);
@@ -236,14 +234,8 @@ function AppContent() {
     topLevelView.kind === 'automations'
       ? {
           tab: topLevelView.tab,
-          projectId: topLevelView.projectId,
-          activeBackendId: activeServerId ?? localBackendId,
           onSelectTab: setAutomationTab,
           onBack: closeTopLevelView,
-          onSelectScope: (backendId: string, projectId?: string) => {
-            setActiveServer(backendId);
-            setAutomationProjectFilter(projectId);
-          },
         }
       : undefined;
 
@@ -685,11 +677,7 @@ function AppContent() {
 
             {topLevelView.kind === 'automations' ? (
               <Suspense fallback={<LazyFallback />}>
-                <AutomationContent
-                  tab={topLevelView.tab}
-                  projectId={topLevelView.projectId}
-                  backendId={activeServerId ?? localBackendId}
-                />
+                <AutomationContent tab={topLevelView.tab} />
               </Suspense>
             ) : topLevelView.kind === 'agents' ? (
               <Suspense fallback={<LazyFallback />}>
@@ -711,7 +699,12 @@ function AppContent() {
                   projectId={dashboardProject.id}
                   projectRootPath={dashboardProject.rootPath}
                   onOpenAutomations={opts =>
-                    openAutomations({ tab: opts.tab, projectId: opts.projectId })
+                    openAutomations({
+                      tab: opts.tab,
+                      projectId: opts.projectId,
+                      // The dashboard's project lives on the active backend.
+                      backendId: activeServerId ?? localBackendId ?? undefined,
+                    })
                   }
                   onOpenDashboardWindow={openProjectDashboardWindowFn}
                 />

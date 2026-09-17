@@ -1,10 +1,20 @@
 import type { Project, Automation } from '@zclaudia/shared';
+import type { Tone } from '../../components/ui/tone';
 
 export type AutomationTab = 'automations' | 'activity' | 'workflows' | 'runs' | 'system';
 
 export interface OpenAutomationsOptions {
   tab?: AutomationTab;
   projectId?: string;
+  /** Backend the project lives on; narrows the backend filter to it. */
+  backendId?: string;
+}
+
+/** One backend as the automation tabs see it (mirrors AgentsBackend). */
+export interface AutomationBackend {
+  backendId: string;
+  name: string;
+  online: boolean;
 }
 
 export type ProjectInfo = Pick<Project, 'id' | 'name' | 'permissionWorkflowOverrideId'>;
@@ -44,16 +54,21 @@ export function formatInterval(ms: number): string {
   return `${Math.round(ms / 3600000)}h`;
 }
 
-export const CATEGORY_COLORS: Record<string, string> = {
-  ai: 'bg-muted/60 text-primary',
-  git: 'bg-success/15 text-success',
-  maintenance: 'bg-warning/15 text-warning',
-  quality: 'bg-thinking/15 text-thinking',
-  scheduling: 'bg-muted/60 text-primary',
-  sync: 'bg-success/15 text-success',
-  supervision: 'bg-thinking/15 text-thinking',
-  plugin: 'bg-muted text-muted-foreground',
+/** Semantic tone per workflow/system-task category; rendered through TONE_BADGE. */
+export const CATEGORY_TONE: Record<string, Tone> = {
+  ai: 'info',
+  git: 'success',
+  maintenance: 'warning',
+  quality: 'thinking',
+  scheduling: 'info',
+  sync: 'success',
+  supervision: 'thinking',
+  plugin: 'neutral',
 };
+
+export function categoryTone(category: string | undefined): Tone {
+  return (category && CATEGORY_TONE[category.toLowerCase()]) || 'neutral';
+}
 
 export function automationToItem(
   a: Automation,

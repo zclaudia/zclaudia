@@ -14,11 +14,12 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import type { WorkflowStepRun } from '@zclaudia/shared';
+import { TONE_BADGE, type Tone } from '../../../components/ui/tone';
 
 export function StepStatusIcon({ status }: { status: string }) {
   switch (status) {
     case 'completed':
-      return <CheckCircle2 size={16} className="text-green-500 shrink-0" />;
+      return <CheckCircle2 size={16} className="text-success shrink-0" />;
     case 'running':
       return <Loader2 size={16} className="text-primary animate-spin shrink-0" />;
     case 'failed':
@@ -26,7 +27,7 @@ export function StepStatusIcon({ status }: { status: string }) {
     case 'skipped':
       return <SkipForward size={16} className="text-muted-foreground shrink-0" />;
     case 'waiting':
-      return <Pause size={16} className="text-yellow-500 shrink-0" />;
+      return <Pause size={16} className="text-warning shrink-0" />;
     default:
       return <Clock size={16} className="text-muted-foreground/40 shrink-0" />;
   }
@@ -44,18 +45,23 @@ export function formatDuration(startedAt?: number, completedAt?: number): string
   return `${minutes}m ${secs}s`;
 }
 
-export function RunStatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    running: 'bg-muted/60 text-primary',
-    completed: 'bg-green-500/10 text-green-600',
-    failed: 'bg-destructive/10 text-destructive',
-    cancelled: 'bg-muted text-muted-foreground',
-    pending: 'bg-muted text-muted-foreground',
-  };
+/** Semantic tone per run status; colors come from the shared tone map. */
+export const RUN_STATUS_TONE: Record<string, Tone> = {
+  running: 'info',
+  completed: 'success',
+  failed: 'destructive',
+  cancelled: 'neutral',
+  pending: 'neutral',
+};
 
+export function runStatusTone(status: string): Tone {
+  return RUN_STATUS_TONE[status] ?? 'neutral';
+}
+
+export function RunStatusBadge({ status }: { status: string }) {
   return (
     <span
-      className={`text-xs font-medium px-2 py-0.5 rounded-full ${colors[status] ?? colors.pending}`}
+      className={`inline-flex h-[18px] shrink-0 items-center rounded-md px-1.5 text-2xs font-medium leading-none whitespace-nowrap ${TONE_BADGE[runStatusTone(status)]}`}
     >
       {status}
     </span>

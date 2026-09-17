@@ -1,32 +1,239 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { EYEBROW } from '../../components/ui/typography';
-import { IconButton } from '../../components/ui/Button';
-import { Plus, RefreshCw, Play, Pause, Trash2, FolderOpen, Globe, Shield } from 'lucide-react';
+import { Button, IconButton } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Tooltip } from '../../components/ui/Tooltip';
+import { Plus, RefreshCw, Play, Pause, Trash2, Zap, Shield, X } from 'lucide-react';
 import type { Automation, Workflow, WorkflowStepTypeMeta } from '@zclaudia/shared';
-import type { AutomationApiType } from './useAutomationApi';
-import type { AutomationItem } from './automation-types';
+import type { AutomationItem, AutomationBackend } from './automation-types';
 import { automationToItem } from './automation-types';
 import { Select } from '../../components/ui/Select';
-import { LoadingState, EmptyState } from './AutomationSharedComponents';
-import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
+import { createAutomationApi, type AutomationApiType } from './useAutomationApi';
+import { useAutomationByBackend } from './useAutomationByBackend';
+import {
+  LoadingState,
+  EmptyState,
+  TabToolbar,
+  SectionGroup,
+  ListCard,
+  StatusDot,
+  ToneBadge,
+  MetaSep,
+} from './AutomationSharedComponents';
+import { AutomationScopeChips, BackendGroups, ScopeChunk, projectLabel } from './AutomationScope';
+import type { AutomationTabScope } from './AutomationContent';
+import type { Tone } from '../../components/ui/tone';
 import { SchemaForm, missingRequiredKeys } from './SchemaForm';
 
-interface AutomationsTabProps {
-  api: AutomationApiType;
-  projectName: (id?: string) => string;
-  projectId?: string;
+interface AutomationsCatalog {
+  items: AutomationItem[];
 }
 
-export function AutomationsTab({ api, projectName, projectId }: AutomationsTabProps) {
-  const [automations, setAutomations] = useState<Automation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [listError, setListError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const selectedItemId = useTopLevelViewStore(s => s.selectedAutomationItemId);
-  const bumpAutomationListRefresh = useTopLevelViewStore(s => s.bumpAutomationListRefresh);
+export function AutomationsTab({ scope }: { scope: AutomationTabScope }) {
+  const { projectId } = scope;
+  const projectQuery = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
 
-  // Create form state
+  const catalog = useAutomationByBackend<AutomationsCatalog>(scope.backends, async api => {
+    // Bindable workflows are global/system ones which a project-scoped list
+    // would exclude, so names come from the unscoped list.
+    const [automations, workflows] = await Promise.all([
+      api.get(`/api/automations${projectQuery}`).then((a: Automation[]) => a ?? []),
+      api.get('/api/workflows').catch(() => [] as Workflow[]),
+    ]);
+    const names = new Map((workflows as Workflow[]).map(w => [w.id, w.name]));
+    const items = automations
+      .map(a => automationToItem(a, names))
+      .sort((a, b) => (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0));
+    return { items };
+  });
+  const total = [...catalog.data.values()].reduce((n, c) => n + c.items.length, 0);
+
   const [showCreate, setShowCreate] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  /** Run one mutation against the row's backend; a failure must never look
+   *  like a successful no-op, so it lands in a banner and the list refetches. */
+  const mutate = async (
+    backendId: string,
+    label: string,
+    fn: (api: AutomationApiType) => Promise<unknown>
+  ) => {
+    try {
+      await fn(createAutomationApi(backendId));
+      setActionError(null);
+    } catch (error) {
+      setActionError(`${label}: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
+    catalog.refresh();
+  };
+
+  return (
+    <div className="space-y-4">
+      <TabToolbar
+        count={total}
+        noun="automation"
+        unknown={catalog.data.size === 0 && catalog.errors.size > 0}
+      >
+        <Button
+          variant="primary"
+          onClick={() => setShowCreate(!showCreate)}
+          aria-expanded={showCreate}
+          disabled={scope.backends.length === 0}
+        >
+          <Plus size={13} />
+          New
+        </Button>
+        <Tooltip content="Refresh">
+          <IconButton onClick={catalog.refresh} aria-label="Refresh">
+            <RefreshCw size={14} className={catalog.loading ? 'animate-spin' : ''} />
+          </IconButton>
+        </Tooltip>
+      </TabToolbar>
+      <AutomationScopeChips backends={scope.allBackends} withProjects />
+
+      {actionError && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        >
+          <span>{actionError}</span>
+          <IconButton
+            size="sm"
+            onClick={() => setActionError(null)}
+            aria-label="Dismiss error"
+            className="shrink-0 text-destructive hover:text-destructive"
+          >
+            <X size={12} />
+          </IconButton>
+        </div>
+      )}
+
+      {showCreate && scope.backends.length > 0 && (
+        <CreateAutomationForm
+          backends={scope.backends}
+          projectId={projectId}
+          onCancel={() => setShowCreate(false)}
+          onCreated={() => {
+            setShowCreate(false);
+            catalog.refresh();
+          }}
+        />
+      )}
+
+      {catalog.loading && catalog.data.size === 0 ? (
+        <LoadingState />
+      ) : (
+        <BackendGroups
+          backends={scope.backends}
+          catalog={catalog}
+          grouped={scope.grouped}
+          count={c => c.items.length}
+          empty={
+            showCreate ? null : (
+              <EmptyState
+                icon={Zap}
+                message="No automations yet"
+                subtitle="Create one or enable a template to get started"
+              />
+            )
+          }
+          render={(c, backend) => (
+            <AutomationList
+              items={c.items}
+              backend={backend}
+              scope={scope}
+              sections={!scope.grouped}
+              onToggle={item =>
+                mutate(
+                  backend.backendId,
+                  `Failed to ${item.enabled ? 'disable' : 'enable'} "${item.name}"`,
+                  api => api.patch(`/api/automations/${item.id}`, { enabled: !item.enabled })
+                )
+              }
+              onTrigger={item =>
+                mutate(backend.backendId, `Failed to run "${item.name}"`, api =>
+                  api.post(`/api/automations/${item.id}/trigger`)
+                )
+              }
+              onDelete={item =>
+                mutate(backend.backendId, `Failed to delete "${item.name}"`, api =>
+                  api.del(`/api/automations/${item.id}`)
+                )
+              }
+            />
+          )}
+        />
+      )}
+    </div>
+  );
+}
+
+function AutomationList({
+  items,
+  backend,
+  scope,
+  sections,
+  onToggle,
+  onTrigger,
+  onDelete,
+}: {
+  items: AutomationItem[];
+  backend: AutomationBackend;
+  scope: AutomationTabScope;
+  /** Active / Disabled sections for one backend; a flat list under backend headers. */
+  sections: boolean;
+  onToggle: (item: AutomationItem) => void;
+  onTrigger: (item: AutomationItem) => void;
+  onDelete: (item: AutomationItem) => void;
+}) {
+  const row = (item: AutomationItem) => (
+    <AutomationCard
+      key={item.id}
+      item={item}
+      scopeLabel={projectLabel(scope.projects, backend.backendId, item.projectId)}
+      onToggle={() => onToggle(item)}
+      onTrigger={() => onTrigger(item)}
+      onDelete={() => onDelete(item)}
+    />
+  );
+  if (!sections) return <div className="space-y-1.5">{items.map(row)}</div>;
+
+  const enabled = items.filter(i => i.enabled);
+  const disabled = items.filter(i => !i.enabled);
+  return (
+    <div className="space-y-4">
+      {enabled.length > 0 && (
+        <SectionGroup label={`Active (${enabled.length})`}>{enabled.map(row)}</SectionGroup>
+      )}
+      {disabled.length > 0 && (
+        <SectionGroup label={`Disabled (${disabled.length})`}>{disabled.map(row)}</SectionGroup>
+      )}
+    </div>
+  );
+}
+
+// ----- Create form -----
+
+function CreateAutomationForm({
+  backends,
+  projectId,
+  onCancel,
+  onCreated,
+}: {
+  backends: AutomationBackend[];
+  projectId?: string;
+  onCancel: () => void;
+  onCreated: () => void;
+}) {
+  // Under "All" the automation is created on the first (local) backend unless
+  // the picker says otherwise — the same default the Agents shell uses.
+  const [targetBackendId, setTargetBackendId] = useState(backends[0].backendId);
+  useEffect(() => {
+    if (!backends.some(b => b.backendId === targetBackendId)) {
+      setTargetBackendId(backends[0].backendId);
+    }
+  }, [backends, targetBackendId]);
+  const api = useMemo(() => createAutomationApi(targetBackendId), [targetBackendId]);
+
   const [newName, setNewName] = useState('');
   const [newTriggerType, setNewTriggerType] = useState<string>('interval');
   const [newIntervalMinutes, setNewIntervalMinutes] = useState('60');
@@ -39,29 +246,6 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
   const [createError, setCreateError] = useState<string | null>(null);
   const [stepTypes, setStepTypes] = useState<WorkflowStepTypeMeta[]>([]);
   const [actionConfig, setActionConfig] = useState<Record<string, unknown>>({});
-
-  const effectiveProjectId = projectId ?? '';
-  const projectQuery = effectiveProjectId
-    ? `?projectId=${encodeURIComponent(effectiveProjectId)}`
-    : '';
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const allAutomations: Automation[] = await api.get(`/api/automations${projectQuery}`);
-      setAutomations(allAutomations);
-      setListError(null);
-    } catch {
-      // Keep the previous list on failure: clearing it would render the same
-      // "No automations yet" state as a genuinely empty backend (A17).
-      setListError('Failed to load automations');
-    }
-    setLoading(false);
-  }, [api, projectQuery]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
 
   useEffect(() => {
     // Fetch all workflows (unfiltered) for the picker: bindable workflows are global/system
@@ -84,11 +268,6 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
       .catch(() => setStepTypes([]));
   }, [api]);
 
-  const workflowNameMap = useMemo(
-    () => new Map(availableWorkflows.map(w => [w.id, w.name])),
-    [availableWorkflows]
-  );
-
   const inlineActionOptions = useMemo(
     () =>
       stepTypes
@@ -101,14 +280,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
     [stepTypes, newActionType]
   );
 
-  // Build unified list
-  const items: AutomationItem[] = useMemo(() => {
-    return automations
-      .map(a => automationToItem(a, workflowNameMap))
-      .sort((a, b) => (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0));
-  }, [automations, workflowNameMap]);
-
-  const handleCreate = async () => {
+  const handleCreate = useCallback(async () => {
     if (!newName.trim()) return;
     if (newActionType === 'workflow' && !workflowRef) return;
 
@@ -150,389 +322,240 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
       setCreateError(null);
       await api.post('/api/automations', {
         name: newName.trim(),
-        projectId: effectiveProjectId || undefined,
+        projectId: projectId || undefined,
         trigger,
         action,
       });
-
-      setShowCreate(false);
-      setNewName('');
-      setActionConfig({});
-      setWorkflowRef('');
-      setNewCron('');
-      setNewEvent('');
-      setNewOnceAt('');
-      bumpAutomationListRefresh();
-      refresh();
+      onCreated();
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'Failed to create automation');
     }
-  };
-
-  const handleToggle = async (item: AutomationItem) => {
-    try {
-      await api.patch(`/api/automations/${item.id}`, { enabled: !item.enabled });
-      setActionError(null);
-      bumpAutomationListRefresh();
-    } catch (error) {
-      setActionError(
-        `Failed to ${item.enabled ? 'disable' : 'enable'} "${item.name}": ${
-          error instanceof Error ? error.message : 'unknown error'
-        }`
-      );
-    }
-    refresh();
-  };
-
-  const handleTriggerNow = async (item: AutomationItem) => {
-    try {
-      await api.post(`/api/automations/${item.id}/trigger`);
-      setActionError(null);
-      bumpAutomationListRefresh();
-    } catch (error) {
-      setActionError(
-        `Failed to run "${item.name}": ${
-          error instanceof Error ? error.message : 'unknown error'
-        }`
-      );
-    }
-    refresh();
-  };
-
-  const handleDelete = async (item: AutomationItem) => {
-    try {
-      await api.del(`/api/automations/${item.id}`);
-      setActionError(null);
-      bumpAutomationListRefresh();
-    } catch (error) {
-      setActionError(
-        `Failed to delete "${item.name}": ${
-          error instanceof Error ? error.message : 'unknown error'
-        }`
-      );
-    }
-    refresh();
-  };
-
-  if (loading) return <LoadingState />;
-
-  const enabledItems = items.filter(i => i.enabled);
-  const disabledItems = items.filter(i => !i.enabled);
+  }, [
+    api,
+    actionConfig,
+    newActionType,
+    newCron,
+    newEvent,
+    newIntervalMinutes,
+    newName,
+    newOnceAt,
+    newTriggerType,
+    onCreated,
+    projectId,
+    selectedStepType,
+    workflowRef,
+  ]);
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        {/* Hide the count while the list is in an error state: a stale "0" next
-            to the error banner still reads as "the backend has no data" (A17). */}
-        {listError ? (
-          <h2 className="text-sm font-medium text-muted-foreground">…</h2>
-        ) : (
-          <h2 className="text-sm font-medium text-muted-foreground">
-            {items.length} automation{items.length !== 1 ? 's' : ''}
-          </h2>
-        )}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="flex items-center gap-1 px-2.5 py-2 md:py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors"
-          >
-            <Plus size={12} />
-            New
-          </button>
-          <IconButton onClick={refresh} title="Refresh" aria-label="Refresh">
-            <RefreshCw size={14} />
-          </IconButton>
-        </div>
-      </div>
-
-      {/* Create Form */}
-      {showCreate && (
-        <div className="rounded-lg border border-primary/30 bg-muted/40 p-3 space-y-2">
-          <input
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            placeholder="Automation name"
-            className="w-full px-2 py-1.5 text-xs rounded-md border border-border bg-background text-foreground"
+    <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+      {backends.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-xs text-muted-foreground">Backend</span>
+          <Select
+            value={targetBackendId}
+            onChange={setTargetBackendId}
+            size="md"
+            triggerClassName="min-w-[140px]"
+            options={backends.map(b => ({ value: b.backendId, label: b.name }))}
           />
-          <div className="flex gap-2 flex-wrap">
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] text-muted-foreground">Trigger:</span>
-              <Select
-                value={newTriggerType}
-                onChange={setNewTriggerType}
-                size="md"
-                triggerClassName="min-w-[100px]"
-                options={[
-                  { value: 'manual', label: 'Manual' },
-                  { value: 'interval', label: 'Interval' },
-                  { value: 'cron', label: 'Cron' },
-                  { value: 'once', label: 'Once' },
-                  { value: 'event', label: 'Event' },
-                ]}
-              />
-            </div>
-            {newTriggerType === 'interval' && (
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-muted-foreground">every</span>
-                <input
-                  value={newIntervalMinutes}
-                  onChange={e => setNewIntervalMinutes(e.target.value)}
-                  placeholder="60"
-                  className="w-16 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground max-md:py-2"
-                />
-                <span className="text-[10px] text-muted-foreground">min</span>
-              </div>
-            )}
-            {newTriggerType === 'cron' && (
-              <input
-                value={newCron}
-                onChange={e => setNewCron(e.target.value)}
-                placeholder="0 9 * * *"
-                className="flex-1 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground max-md:py-2 font-mono"
-              />
-            )}
-            {newTriggerType === 'once' && (
-              <input
-                type="datetime-local"
-                value={newOnceAt}
-                onChange={e => setNewOnceAt(e.target.value)}
-                className="px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground max-md:py-2"
-              />
-            )}
-            {newTriggerType === 'event' && (
-              <input
-                value={newEvent}
-                onChange={e => setNewEvent(e.target.value)}
-                placeholder="plugin.event.name"
-                className="flex-1 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground max-md:py-2"
-              />
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="text-[10px] text-muted-foreground">Action:</span>
-            <Select
-              value={newActionType}
-              onChange={v => {
-                setNewActionType(v);
-                setActionConfig({});
-              }}
-              size="md"
-              triggerClassName="min-w-[140px]"
-              options={[...inlineActionOptions, { value: 'workflow', label: 'Workflow' }]}
+        </div>
+      )}
+      <Input
+        value={newName}
+        onChange={e => setNewName(e.target.value)}
+        placeholder="Automation name"
+        aria-label="Automation name"
+      />
+      <div className="flex gap-2 flex-wrap">
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground">Trigger</span>
+          <Select
+            value={newTriggerType}
+            onChange={setNewTriggerType}
+            size="md"
+            triggerClassName="min-w-[100px]"
+            options={[
+              { value: 'manual', label: 'Manual' },
+              { value: 'interval', label: 'Interval' },
+              { value: 'cron', label: 'Cron' },
+              { value: 'once', label: 'Once' },
+              { value: 'event', label: 'Event' },
+            ]}
+          />
+        </div>
+        {newTriggerType === 'interval' && (
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-muted-foreground">every</span>
+            <Input
+              value={newIntervalMinutes}
+              onChange={e => setNewIntervalMinutes(e.target.value)}
+              placeholder="60"
+              aria-label="Interval in minutes"
+              className="w-16"
             />
+            <span className="text-xs text-muted-foreground">min</span>
           </div>
-          {newActionType === 'workflow' ? (
-            <Select
-              value={workflowRef}
-              onChange={setWorkflowRef}
-              size="md"
-              block
-              placeholder="Select workflow…"
-              options={availableWorkflows.map(w => ({ value: w.id, label: w.name }))}
-            />
-          ) : (
-            <SchemaForm
-              schema={selectedStepType?.configSchema}
-              value={actionConfig}
-              onChange={setActionConfig}
-            />
-          )}
-          {createError && <div className="text-[11px] text-destructive">{createError}</div>}
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => {
-                setShowCreate(false);
-                setCreateError(null);
-              }}
-              className="px-2 py-1 text-xs rounded-md border border-border hover:bg-secondary max-md:flex-1 max-md:py-2"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCreate}
-              disabled={!newName.trim() || (newActionType === 'workflow' && !workflowRef)}
-              className="px-2 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50 max-md:flex-1 max-md:py-2"
-            >
-              Create
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Operation failure — must never look like a successful no-op (A12/A17) */}
-      {actionError && (
-        <div className="flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
-          <span>{actionError}</span>
-          <button onClick={() => setActionError(null)} aria-label="Dismiss error" className="shrink-0">
-            ×
-          </button>
-        </div>
-      )}
-
-      {/* List load failure — distinct from the empty state (A17) */}
-      {listError && (
-        <div className="flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
-          <span>{listError}</span>
-          <button
-            onClick={refresh}
-            aria-label="Retry"
-            className="shrink-0 rounded-md border border-destructive/40 px-2 py-0.5 hover:bg-destructive/20"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {/* Enabled Automations */}
-      {enabledItems.length > 0 && (
-        <div>
-          <h3 className={`${EYEBROW} mb-2`}>Active ({enabledItems.length})</h3>
-          <div className="space-y-1.5">
-            {enabledItems.map(item => (
-              <AutomationCard
-                key={item.id}
-                item={item}
-                projectName={projectName}
-                onToggle={() => handleToggle(item)}
-                onTrigger={() => handleTriggerNow(item)}
-                onDelete={() => handleDelete(item)}
-                selected={item.id === selectedItemId}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Disabled Automations */}
-      {disabledItems.length > 0 && (
-        <div>
-          <h3 className={`${EYEBROW} mb-2`}>Disabled ({disabledItems.length})</h3>
-          <div className="space-y-1.5">
-            {disabledItems.map(item => (
-              <AutomationCard
-                key={item.id}
-                item={item}
-                projectName={projectName}
-                onToggle={() => handleToggle(item)}
-                onTrigger={() => handleTriggerNow(item)}
-                onDelete={() => handleDelete(item)}
-                selected={item.id === selectedItemId}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {items.length === 0 && !showCreate && !listError && (
-        <EmptyState
-          message="No automations yet"
-          subtitle="Create one or enable a template to get started"
+        )}
+        {newTriggerType === 'cron' && (
+          <Input
+            value={newCron}
+            onChange={e => setNewCron(e.target.value)}
+            placeholder="0 9 * * *"
+            aria-label="Cron expression"
+            className="flex-1 font-mono"
+          />
+        )}
+        {newTriggerType === 'once' && (
+          <Input
+            type="datetime-local"
+            value={newOnceAt}
+            onChange={e => setNewOnceAt(e.target.value)}
+            aria-label="Run at"
+            className="w-auto"
+          />
+        )}
+        {newTriggerType === 'event' && (
+          <Input
+            value={newEvent}
+            onChange={e => setNewEvent(e.target.value)}
+            placeholder="plugin.event.name"
+            aria-label="Event name"
+            className="flex-1"
+          />
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-1">
+        <span className="text-xs text-muted-foreground">Action</span>
+        <Select
+          value={newActionType}
+          onChange={v => {
+            setNewActionType(v);
+            setActionConfig({});
+          }}
+          size="md"
+          triggerClassName="min-w-[140px]"
+          options={[...inlineActionOptions, { value: 'workflow', label: 'Workflow' }]}
+        />
+      </div>
+      {newActionType === 'workflow' ? (
+        <Select
+          value={workflowRef}
+          onChange={setWorkflowRef}
+          size="md"
+          block
+          placeholder="Select workflow…"
+          options={availableWorkflows.map(w => ({ value: w.id, label: w.name }))}
+        />
+      ) : (
+        <SchemaForm
+          schema={selectedStepType?.configSchema}
+          value={actionConfig}
+          onChange={setActionConfig}
         />
       )}
+      {createError && <div className="text-xs text-destructive">{createError}</div>}
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={onCancel} className="max-md:flex-1">
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          onClick={handleCreate}
+          disabled={!newName.trim() || (newActionType === 'workflow' && !workflowRef)}
+          className="max-md:flex-1"
+        >
+          Create
+        </Button>
+      </div>
     </div>
   );
 }
 
+// ----- Row -----
+
 function AutomationCard({
   item,
-  projectName,
+  scopeLabel,
   onToggle,
   onTrigger,
   onDelete,
-  selected,
 }: {
   item: AutomationItem;
-  projectName: (id?: string) => string;
+  scopeLabel: string;
   onToggle: () => void;
   onTrigger: () => void;
   onDelete: () => void;
-  selected?: boolean;
 }) {
+  const tone: Tone =
+    item.status === 'running'
+      ? 'warning'
+      : item.status === 'error'
+        ? 'destructive'
+        : item.enabled
+          ? 'success'
+          : 'neutral';
   return (
-    <div
+    <ListCard
       data-automation-card
-      className={`rounded-lg border p-3 flex items-center gap-3 ${selected ? 'ring-2 ring-primary ' : ''}${item.enabled ? 'border-border bg-card/50' : 'border-border/50 bg-muted/30 opacity-60'}`}
-    >
-      <span
-        className={`w-2 h-2 rounded-full flex-shrink-0 ${
-          item.status === 'running'
-            ? 'bg-amber-500 animate-pulse'
-            : item.status === 'error'
-              ? 'bg-red-500'
-              : item.enabled
-                ? 'bg-green-500'
-                : 'bg-muted-foreground'
-        }`}
-      />
-      <div className="flex-1 min-w-0 overflow-hidden">
-        <div className="flex items-center gap-2">
-          {/* Wraps rather than truncating below md: with the action cluster on
-              the right the name only gets ~197px, and it is the one thing that
-              tells two automations apart. */}
-          <span className="text-sm font-medium truncate max-md:line-clamp-2 max-md:whitespace-normal">
-            {item.name}
-          </span>
-        </div>
-        {/* Wraps as whole chunks at narrow widths; without this each span
-            shrinks and its text re-wraps internally, spilling under the action
-            cluster so taps landed on Run/Disable. */}
-        <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground mt-0.5">
-          <span className="flex min-w-0 items-center gap-1">
-            {item.projectId ? <FolderOpen size={10} /> : <Globe size={10} />}
-            <span className="truncate">{projectName(item.projectId)}</span>
-          </span>
-          <span>·</span>
+      muted={!item.enabled}
+      lead={<StatusDot tone={tone} pulse={item.status === 'running'} />}
+      title={item.name}
+      titleExtra={item.isSystem ? <ToneBadge tone="neutral">System</ToneBadge> : undefined}
+      meta={
+        <>
+          <ScopeChunk projectId={item.projectId} label={scopeLabel} />
+          <MetaSep />
           <span className="min-w-0 truncate">{item.triggerSummary}</span>
-          <span>·</span>
+          <MetaSep />
           <span className="min-w-0 truncate">{item.actionSummary}</span>
           {item.runCount > 0 && (
             <>
-              <span>·</span>
-              <span>{item.runCount} runs</span>
+              <MetaSep />
+              <span className="tabular-nums">
+                {item.runCount} run{item.runCount !== 1 ? 's' : ''}
+              </span>
             </>
           )}
           {item.lastError && (
-            <span className="text-destructive truncate max-w-[120px]" title={item.lastError}>
-              · {item.lastError.slice(0, 30)}
-            </span>
+            <>
+              <MetaSep />
+              <Tooltip content={item.lastError}>
+                <span className="max-w-[10rem] truncate text-destructive">{item.lastError}</span>
+              </Tooltip>
+            </>
           )}
-        </div>
-      </div>
-      <div className="flex flex-shrink-0 items-center gap-1">
-        {item.isSystem ? (
-          // System automations are immutable server-side; rendering Run/Disable/
-          // Delete here invited taps that could only fail silently (A12).
-          <span
-            className="flex items-center gap-1 text-[10px] text-muted-foreground px-1.5 py-1"
-            title="System automation — managed by the app and read-only"
-          >
-            <Shield size={11} aria-hidden />
-            System
-          </span>
+        </>
+      }
+      trail={
+        item.isSystem ? (
+          // System automations are immutable server-side; offering Run/Disable/
+          // Delete here invited taps that could only fail.
+          <Tooltip content="System automation — managed by the app and read-only">
+            <span className="inline-flex items-center gap-1 px-1.5 text-xs text-muted-foreground">
+              <Shield size={12} strokeWidth={1.75} aria-hidden />
+              Read-only
+            </span>
+          </Tooltip>
         ) : (
           <>
-            <IconButton onClick={onTrigger} title="Run now" aria-label="Run now">
-              <Play size={12} />
-            </IconButton>
-            <IconButton
-              onClick={onToggle}
-              title={item.enabled ? 'Disable' : 'Enable'}
-              aria-label={item.enabled ? 'Disable' : 'Enable'}
-            >
-              {item.enabled ? <Pause size={12} /> : <Play size={12} />}
-            </IconButton>
-            <button
-              onClick={onDelete}
-              className="relative p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400 before:absolute before:-inset-1.5 before:content-[''] md:before:content-none"
-              title="Delete"
-              aria-label="Delete"
-            >
-              <Trash2 size={12} />
-            </button>
+            <Tooltip content="Run now">
+              <IconButton onClick={onTrigger} aria-label="Run now">
+                <Play size={12} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip content={item.enabled ? 'Disable' : 'Enable'}>
+              <IconButton onClick={onToggle} aria-label={item.enabled ? 'Disable' : 'Enable'}>
+                {item.enabled ? <Pause size={12} /> : <Play size={12} />}
+              </IconButton>
+            </Tooltip>
+            <Tooltip content="Delete">
+              <IconButton onClick={onDelete} aria-label="Delete" className="hover:text-destructive">
+                <Trash2 size={12} />
+              </IconButton>
+            </Tooltip>
           </>
-        )}
-      </div>
-    </div>
+        )
+      }
+    />
   );
 }

@@ -75,6 +75,22 @@ describe('topLevelViewStore', () => {
     });
   });
 
+  it('narrows the backend filter when opened for a project, and clears the project on backend change', () => {
+    useTopLevelViewStore.setState({ automationBackendFilter: 'all' });
+    useTopLevelViewStore.getState().openAutomations({ projectId: 'p1', backendId: 'b2' });
+    expect(useTopLevelViewStore.getState().automationBackendFilter).toBe('b2');
+    expect(useTopLevelViewStore.getState().view).toEqual({
+      kind: 'automations',
+      tab: 'automations',
+      projectId: 'p1',
+    });
+    useTopLevelViewStore.getState().setAutomationBackendFilter('all');
+    expect(useTopLevelViewStore.getState().view).toEqual({
+      kind: 'automations',
+      tab: 'automations',
+    });
+  });
+
   it('ignores automation mutators when not in automations view', () => {
     useTopLevelViewStore.getState().openSettings();
     useTopLevelViewStore.getState().setAutomationTab('runs');
@@ -92,9 +108,12 @@ describe('topLevelViewStore automation selection', () => {
     });
   });
 
-  it('selectAutomationItem sets the id', () => {
-    useTopLevelViewStore.getState().selectAutomationItem('wf-1');
+  it('selectAutomationItem sets the id and its backend', () => {
+    useTopLevelViewStore.getState().selectAutomationItem('wf-1', 'b1');
     expect(useTopLevelViewStore.getState().selectedAutomationItemId).toBe('wf-1');
+    expect(useTopLevelViewStore.getState().selectedAutomationItemBackendId).toBe('b1');
+    useTopLevelViewStore.getState().selectAutomationItem(null);
+    expect(useTopLevelViewStore.getState().selectedAutomationItemBackendId).toBeNull();
   });
 
   it('setAutomationTab resets the selection to null', () => {

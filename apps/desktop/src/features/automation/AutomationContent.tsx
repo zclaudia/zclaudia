@@ -1,27 +1,47 @@
 /**
  * Automation management content rendered inline in the main pane.
  *
- * The active tab is chosen from the sidebar nav; backend/project scope comes from
- * the sidebar hierarchy. This component owns only the per-tab body plus a light
- * title header — no tab strip and no backend dropdown (both live in the sidebar).
+ * The active tab is chosen from the sidebar nav. Backend / project scope is
+ * the Agents shell's model: every online backend is fetched in parallel and a
+ * Backend chip row in each tab narrows to one (then a Project row appears).
+ * This component owns the light title header and the shared scope plumbing;
+ * each tab renders its own toolbar, chips and rows.
  */
-
-import { useState, useEffect, useCallback } from 'react';
-import { Zap, Blocks, Workflow, History, Server } from 'lucide-react';
-import { useAutomationApi } from './useAutomationApi';
+import { useMemo } from 'react';
+import { Zap, Blocks, Workflow, History, Server, ServerOff } from 'lucide-react';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import type { ProjectInfo, AutomationTab } from './automation-types';
-import { isInternalProject } from './automation-types';
+import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
+import type { AutomationTab, AutomationBackend } from './automation-types';
 import { AutomationsTab } from './AutomationsTab';
 import { ActivityTab } from './ActivityTab';
 import { AutomationWorkflowDetail } from './AutomationWorkflowDetail';
 import { RunsTab } from './RunsTab';
 import { SystemTasksTab } from './SystemTasksTab';
+import { EmptyState } from './AutomationSharedComponents';
+import {
+  useAutomationBackends,
+  scopedBackends,
+  isGroupedByBackend,
+} from './useAutomationByBackend';
+import { useProjectsByBackend, type ProjectInfoLite } from './AutomationScope';
+import type { ByBackend } from './useAutomationByBackend';
 
 interface AutomationContentProps {
   tab: AutomationTab;
+}
+
+/** Scope every tab receives. */
+export interface AutomationTabScope {
+  /** Every known backend (for the chip row; offline ones render dimmed). */
+  allBackends: AutomationBackend[];
+  /** The online backends the tab fetches from under the current filter. */
+  backends: AutomationBackend[];
+  /** Rows sit under per-backend headers. */
+  grouped: boolean;
+  /** Project filter; only set while a single backend is selected. */
   projectId?: string;
-  backendId: string | null;
+  /** Projects per backend, for naming a row's scope. */
+  projects: ByBackend<ProjectInfoLite[]>;
 }
 
 const TAB_META: Record<AutomationTab, { label: string; Icon: typeof Zap }> = {
@@ -32,40 +52,33 @@ const TAB_META: Record<AutomationTab, { label: string; Icon: typeof Zap }> = {
   system: { label: 'System', Icon: Server },
 };
 
-export function AutomationContent({ tab, projectId, backendId }: AutomationContentProps) {
-  const api = useAutomationApi(backendId, '', '');
+export function AutomationContent({ tab }: AutomationContentProps) {
   const isMobile = useIsMobile();
+  const allBackends = useAutomationBackends();
+  const backendFilter = useTopLevelViewStore(s => s.automationBackendFilter);
+  const viewProjectId = useTopLevelViewStore(s =>
+    s.view.kind === 'automations' ? s.view.projectId : undefined
+  );
 
-  const [projects, setProjects] = useState<ProjectInfo[]>([]);
+  const backends = useMemo(
+    () => scopedBackends(allBackends, backendFilter),
+    [allBackends, backendFilter]
+  );
+  const grouped = isGroupedByBackend(allBackends, backendFilter);
+  const projectId = backendFilter !== 'all' ? viewProjectId : undefined;
+  const projects = useProjectsByBackend(backends);
 
-  useEffect(() => {
-    setProjects([]);
-    api
-      .get('/api/projects')
-      .then(projectData => {
-        setProjects(projectData);
-      })
-      .catch(() => {});
-  }, [api]);
-
-  const projectName = useCallback(
-    (id?: string) => {
-      if (!id) return 'Global';
-      const project = projects.find(p => p.id === id);
-      if (!project) return id.slice(0, 8);
-      return isInternalProject(project.name) ? 'Global' : project.name;
-    },
-    [projects]
+  const scope: AutomationTabScope = useMemo(
+    () => ({ allBackends, backends, grouped, projectId, projects }),
+    [allBackends, backends, grouped, projectId, projects]
   );
 
   const meta = TAB_META[tab];
-  const scopeKey = backendId || 'fallback';
   const MetaIcon = meta.Icon;
-  const hasProjectScope = !!projectId && projects.length > 0;
   // On mobile MobileModeHeader already titles the mode, so this bar would just
-  // repeat "Automations". Keep it only when it adds something (another tab, or
-  // a project scope).
-  const showTabBar = !isMobile || tab !== 'automations' || hasProjectScope;
+  // repeat "Automations". Keep it only when it names a different tab.
+  const showTabBar = !isMobile || tab !== 'automations';
+  const anyOnline = allBackends.some(b => b.online);
 
   return (
     <div className="flex flex-col h-full bg-background text-foreground">
@@ -74,31 +87,24 @@ export function AutomationContent({ tab, projectId, backendId }: AutomationConte
       >
         <MetaIcon size={17} className="text-primary" />
         <h1 className="text-sm font-semibold">{meta.label}</h1>
-        {hasProjectScope && (
-          <span className="text-xs text-muted-foreground">· {projectName(projectId)}</span>
-        )}
       </div>
 
       <div className="flex-1 overflow-auto p-4">
-        {tab === 'automations' && (
-          <AutomationsTab
-            key={`automations-${scopeKey}`}
-            api={api}
-            projectName={projectName}
-            projectId={projectId}
+        {!anyOnline ? (
+          <EmptyState
+            icon={ServerOff}
+            message="No backends online"
+            subtitle="Connect a backend to see its automations."
           />
+        ) : (
+          <>
+            {tab === 'automations' && <AutomationsTab scope={scope} />}
+            {tab === 'activity' && <ActivityTab scope={scope} />}
+            {tab === 'workflows' && <AutomationWorkflowDetail scope={scope} />}
+            {tab === 'runs' && <RunsTab scope={scope} />}
+            {tab === 'system' && <SystemTasksTab scope={scope} />}
+          </>
         )}
-        {tab === 'activity' && <ActivityTab key={`activity-${scopeKey}`} api={api} />}
-        {tab === 'workflows' && (
-          <AutomationWorkflowDetail
-            key={`workflows-${scopeKey}`}
-            api={api}
-            projects={projects}
-            projectId={projectId}
-          />
-        )}
-        {tab === 'runs' && <RunsTab key={`runs-${scopeKey}`} api={api} projectId={projectId} />}
-        {tab === 'system' && <SystemTasksTab key={`system-${scopeKey}`} api={api} />}
       </div>
     </div>
   );

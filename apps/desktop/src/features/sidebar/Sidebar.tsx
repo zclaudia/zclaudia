@@ -15,8 +15,6 @@ import { useSearchSidebar } from './useSearchSidebar';
 import { groupSessionsByWorktree as groupSessionsByWorktreeFn } from './worktreeGrouping';
 import { SidebarTopBar } from './SidebarTopBar';
 import { SidebarNav } from './SidebarNav';
-import { AutomationTree } from '../automation/AutomationTree';
-import { useAutomationApi } from '../automation/useAutomationApi';
 import type { AutomationTab } from '../automation/automation-types';
 import type { AgentsTab } from '../agents/agents-types';
 import type { PluginsTab } from '../plugins/plugins-types';
@@ -90,15 +88,12 @@ interface SidebarProps {
   drawerBackdropRef?: RefObject<HTMLDivElement | null>;
   onOpenDashboard?: (projectId: string) => void;
   onOpenAutomations?: () => void;
-  /** When present, the sidebar renders in automation mode (tab nav + scope list). */
+  /** When present, the sidebar renders in automation mode (tab nav only —
+   *  backend / project scope lives in the content pane, like agents mode). */
   automationMode?: {
     tab: AutomationTab;
-    projectId?: string;
-    activeBackendId: string | null;
     onSelectTab: (tab: AutomationTab) => void;
     onBack: () => void;
-    /** projectId omitted = scope to the whole backend (global). */
-    onSelectScope: (backendId: string, projectId?: string) => void;
   };
   onOpenAgents?: () => void;
   /** When present, the sidebar renders in agents mode (tab nav only). */
@@ -347,9 +342,6 @@ export function Sidebar({
     ? (allProjects.find(p => p.id === newSessionRequest.projectId) ?? null)
     : null;
 
-  // --- Automation mode wiring ---
-  // Hook must run unconditionally; only consumed when automationMode is present.
-  const automationApi = useAutomationApi(automationMode?.activeBackendId ?? null, '', '');
   const showAgentRequiredDialog = useCallback((reason: AgentReadinessReason | undefined) => {
     setAgentDialogReason(reason);
     setAgentDialogOpen(true);
@@ -923,25 +915,7 @@ export function Sidebar({
           />
 
           <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
-            {automationMode ? (
-              <AutomationTree
-                tab={automationMode.tab}
-                api={automationApi}
-                activeBackendId={automationMode.activeBackendId}
-                selectedProjectId={automationMode.projectId}
-                backends={onlineBackends}
-                getProjectsForBackend={getProjectsForBackend}
-                expandedBackendIds={expandedBackendIds}
-                onToggleBackend={toggleBackend}
-                enabled={isOpen}
-                onSelectScope={(backendId, projectId) => {
-                  automationMode.onSelectScope(backendId, projectId);
-                  onClose?.();
-                }}
-              />
-            ) : agentsMode || pluginsMode ? null : (
-              renderProjectList()
-            )}
+            {automationMode || agentsMode || pluginsMode ? null : renderProjectList()}
           </div>
 
           <SidebarFooter onShowSettings={() => onOpenSettings?.()} isMobile />
@@ -1042,21 +1016,7 @@ export function Sidebar({
           />
 
           <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
-            {automationMode ? (
-              <AutomationTree
-                tab={automationMode.tab}
-                api={automationApi}
-                activeBackendId={automationMode.activeBackendId}
-                selectedProjectId={automationMode.projectId}
-                backends={onlineBackends}
-                getProjectsForBackend={getProjectsForBackend}
-                expandedBackendIds={expandedBackendIds}
-                onToggleBackend={toggleBackend}
-                onSelectScope={automationMode.onSelectScope}
-              />
-            ) : agentsMode || pluginsMode ? null : (
-              renderProjectList()
-            )}
+            {automationMode || agentsMode || pluginsMode ? null : renderProjectList()}
           </div>
 
           <SidebarFooter onShowSettings={() => onOpenSettings?.()} />

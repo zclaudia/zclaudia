@@ -18,7 +18,11 @@ export type TopLevelView =
 interface TopLevelViewState {
   view: TopLevelView;
   selectedAutomationItemId: string | null;
+  /** Backend the selected automation item lives on (null = unknown / active). */
+  selectedAutomationItemBackendId: string | null;
   automationListRefreshNonce: number;
+  /** Which backend the automation tabs show: every online one, or a single id. */
+  automationBackendFilter: 'all' | string;
   agentsSelection: AgentsSelection | null;
   agentsRefreshNonce: number;
   agentsBackendFilter: 'all' | string;
@@ -26,8 +30,10 @@ interface TopLevelViewState {
   openAutomations: (opts?: OpenAutomationsOptions) => void;
   setAutomationTab: (tab: AutomationTab) => void;
   setAutomationProjectFilter: (projectId?: string) => void;
+  /** Picking a backend clears the project filter — projects are per backend. */
+  setAutomationBackendFilter: (backendFilter: 'all' | string) => void;
   returnToApp: () => void;
-  selectAutomationItem: (id: string | null) => void;
+  selectAutomationItem: (id: string | null, backendId?: string | null) => void;
   bumpAutomationListRefresh: () => void;
   openAgents: (tab?: AgentsTab) => void;
   setAgentsTab: (tab: AgentsTab) => void;
@@ -41,7 +47,9 @@ interface TopLevelViewState {
 export const useTopLevelViewStore = create<TopLevelViewState>(set => ({
   view: { kind: 'app' },
   selectedAutomationItemId: null,
+  selectedAutomationItemBackendId: null,
   automationListRefreshNonce: 0,
+  automationBackendFilter: 'all',
   agentsSelection: null,
   agentsRefreshNonce: 0,
   agentsBackendFilter: 'all',
@@ -50,18 +58,26 @@ export const useTopLevelViewStore = create<TopLevelViewState>(set => ({
       view: initialTab ? { kind: 'settings', initialTab } : { kind: 'settings' },
     }),
   openAutomations: opts =>
-    set({
+    set(state => ({
       view: {
         kind: 'automations',
         tab: opts?.tab ?? 'automations',
         ...(opts?.projectId ? { projectId: opts.projectId } : {}),
       },
+      // A project scope only makes sense on one backend; opening for a project
+      // narrows to that backend. Otherwise keep whatever filter was in use.
+      automationBackendFilter: opts?.backendId ?? state.automationBackendFilter,
       selectedAutomationItemId: null,
-    }),
+      selectedAutomationItemBackendId: null,
+    })),
   setAutomationTab: tab =>
     set(state =>
       state.view.kind === 'automations'
-        ? { view: { ...state.view, tab }, selectedAutomationItemId: null }
+        ? {
+            view: { ...state.view, tab },
+            selectedAutomationItemId: null,
+            selectedAutomationItemBackendId: null,
+          }
         : state
     ),
   setAutomationProjectFilter: projectId =>
@@ -72,8 +88,20 @@ export const useTopLevelViewStore = create<TopLevelViewState>(set => ({
           }
         : state
     ),
+  setAutomationBackendFilter: backendFilter =>
+    set(state =>
+      state.view.kind === 'automations'
+        ? {
+            automationBackendFilter: backendFilter,
+            view: { kind: 'automations', tab: state.view.tab },
+            selectedAutomationItemId: null,
+            selectedAutomationItemBackendId: null,
+          }
+        : { automationBackendFilter: backendFilter }
+    ),
   returnToApp: () => set({ view: { kind: 'app' }, agentsSelection: null }),
-  selectAutomationItem: id => set({ selectedAutomationItemId: id }),
+  selectAutomationItem: (id, backendId = null) =>
+    set({ selectedAutomationItemId: id, selectedAutomationItemBackendId: id ? backendId : null }),
   bumpAutomationListRefresh: () =>
     set(s => ({ automationListRefreshNonce: s.automationListRefreshNonce + 1 })),
   openAgents: (tab = 'profiles') => set({ view: { kind: 'agents', tab }, agentsSelection: null }),

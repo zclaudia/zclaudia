@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../services/api/base', () => ({
-  getBaseUrlForBackend: () => 'http://localhost:3100',
+  getBaseUrlForBackend: (id: string) => `http://${id}.local`,
   getAuthHeadersForBackend: () => ({ Authorization: '' }),
 }));
 
@@ -14,6 +14,8 @@ vi.mock('../AutomationWorkflowDetail', () => ({
 vi.mock('../RunsTab', () => ({ RunsTab: () => <div data-testid="runs-tab" /> }));
 
 import { AutomationContent } from '../AutomationContent';
+import { useFacadeStore } from '../../../stores/facadeStore';
+import { useTopLevelViewStore } from '../../../stores/topLevelViewStore';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -22,65 +24,109 @@ function ok(data: unknown) {
   return { ok: true, json: async () => ({ success: true, data }) };
 }
 
+function backend(backendId: string, name: string, online = true) {
+  return { backendId, name, online, isThisInstance: backendId === 'b1' } as never;
+}
+
+function setBackends(list: unknown[]) {
+  useFacadeStore.setState({ backends: list as never, localBackendId: 'b1' });
+}
+
+const automation = (id: string, name: string) => ({
+  id,
+  name,
+  enabled: true,
+  projectId: 'p1',
+  trigger: { type: 'interval', intervalMinutes: 60 },
+  action: { kind: 'activity', ref: 'shell', input: {} },
+  createdAt: 0,
+  updatedAt: 0,
+});
+
 describe('AutomationContent', () => {
   afterEach(() => {
     document.body.innerHTML = '';
   });
 
   beforeEach(() => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'automations', tab: 'automations' },
+      automationBackendFilter: 'all',
+      selectedAutomationItemId: null,
+      selectedAutomationItemBackendId: null,
+    });
+    setBackends([backend('b1', 'Local')]);
     mockFetch.mockReset();
     mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith('/api/projects')) return ok([{ id: 'p1', name: 'Project 1' }]);
-      if (url.endsWith('/api/agent/config')) return ok({ permissionWorkflowOverrideId: null });
+      if (url.endsWith('/api/workflows')) return ok([]);
+      if (url.endsWith('/api/workflow-step-types')) return ok([]);
       if (url.includes('/api/automations')) {
         return ok([
-          {
-            id: 'w1',
-            name: 'Build',
-            enabled: true,
-            projectId: 'p1',
-            trigger: { type: 'interval', intervalMinutes: 60 },
-            action: { kind: 'activity', ref: 'shell', input: {} },
-            createdAt: 0,
-            updatedAt: 0,
-          },
+          automation(
+            url.startsWith('http://b2') ? 'w2' : 'w1',
+            url.startsWith('http://b2') ? 'Deploy' : 'Build'
+          ),
         ]);
       }
       throw new Error(`Unhandled fetch: ${url}`);
     });
   });
 
-  it('renders the automations tab body for the selected backend', async () => {
-    render(<AutomationContent tab="automations" backendId="b1" />);
+  it('renders the automations of the online backend', async () => {
+    render(<AutomationContent tab="automations" />);
     await waitFor(() => {
       expect(screen.getByText('Build')).toBeTruthy();
     });
+    // A single backend needs no chip row.
+    expect(screen.queryByRole('button', { name: 'All' })).toBeNull();
+  });
+
+  it('fetches every online backend and narrows through the Backend chips', async () => {
+    setBackends([backend('b1', 'Local'), backend('b2', 'Remote'), backend('b3', 'Off', false)]);
+    render(<AutomationContent tab="automations" />);
+    await waitFor(() => {
+      expect(screen.getByText('Build')).toBeTruthy();
+      expect(screen.getByText('Deploy')).toBeTruthy();
+    });
+    const hosts = mockFetch.mock.calls
+      .map(([input]) => new URL(String(input)).host)
+      .filter((h, i, all) => all.indexOf(h) === i)
+      .sort();
+    // Offline backends are never fetched.
+    expect(hosts).toEqual(['b1.local', 'b2.local']);
+
+    fireEvent.click(screen.getByRole('button', { name: /Remote/ }));
+    await waitFor(() => {
+      expect(screen.queryByText('Build')).toBeNull();
+      expect(screen.getByText('Deploy')).toBeTruthy();
+    });
+    expect(useTopLevelViewStore.getState().automationBackendFilter).toBe('b2');
   });
 
   it('does not refetch automations when re-rendered with the same props', async () => {
-    const { rerender } = render(<AutomationContent tab="automations" backendId="b1" />);
+    const { rerender } = render(<AutomationContent tab="automations" />);
     await waitFor(() => {
       expect(screen.getByText('Build')).toBeTruthy();
     });
-    const countAfterLoad = mockFetch.mock.calls.filter(
-      ([input]) =>
-        String(input).includes('/api/automations') && !(input as RequestInit | undefined)?.method
-    ).length;
+    const count = () =>
+      mockFetch.mock.calls.filter(
+        ([input, init]) =>
+          String(input).includes('/api/automations') && !(init as RequestInit | undefined)?.method
+      ).length;
+    const countAfterLoad = count();
 
-    rerender(<AutomationContent tab="automations" backendId="b1" />);
+    rerender(<AutomationContent tab="automations" />);
     await new Promise(r => setTimeout(r, 0));
-
-    const countAfterRerender = mockFetch.mock.calls.filter(
-      ([input]) =>
-        String(input).includes('/api/automations') && !(input as RequestInit | undefined)?.method
-    ).length;
-    expect(countAfterRerender).toBe(countAfterLoad);
+    expect(count()).toBe(countAfterLoad);
   });
 
-  it('does not fetch when no backend is selected', async () => {
-    render(<AutomationContent tab="automations" backendId={null} />);
+  it('shows an empty state and fetches nothing when no backend is online', async () => {
+    setBackends([backend('b1', 'Local', false)]);
+    render(<AutomationContent tab="automations" />);
     expect(screen.getByRole('heading', { name: 'Automations' })).toBeTruthy();
+    expect(screen.getByText('No backends online')).toBeTruthy();
     await new Promise(r => setTimeout(r, 0));
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -89,19 +135,19 @@ describe('AutomationContent', () => {
     mockFetch.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith('/api/projects')) return ok([]);
-      if (url.endsWith('/api/agent/config')) return ok({ permissionWorkflowOverrideId: null });
+      if (url.endsWith('/api/workflows')) return ok([]);
+      if (url.endsWith('/api/workflow-step-types')) return ok([]);
       if (url.includes('/api/automations') && init?.method === 'POST') return ok({ id: 'created' });
       if (url.includes('/api/automations')) return ok([]);
       throw new Error(`Unhandled fetch: ${url}`);
     });
 
-    render(<AutomationContent tab="automations" backendId="b1" />);
+    render(<AutomationContent tab="automations" />);
 
-    const newBtn = await screen.findByRole('button', { name: 'New' });
-    fireEvent.click(newBtn);
-
-    const nameInput = await screen.findByPlaceholderText('Automation name');
-    fireEvent.change(nameInput, { target: { value: 'One shot' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'New' }));
+    fireEvent.change(await screen.findByPlaceholderText('Automation name'), {
+      target: { value: 'One shot' },
+    });
 
     const triggerSelect = await waitFor(() => {
       const buttons = screen
@@ -121,12 +167,11 @@ describe('AutomationContent', () => {
     });
     fireEvent.change(onceInput, { target: { value: '2026-03-25T09:30' } });
 
-    const createBtn = await screen.findByRole('button', { name: 'Create' });
-    fireEvent.click(createBtn);
+    fireEvent.click(await screen.findByRole('button', { name: 'Create' }));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3100/api/automations',
+        'http://b1.local/api/automations',
         expect.objectContaining({ method: 'POST', body: expect.any(String) })
       );
     });
@@ -143,7 +188,7 @@ describe('AutomationContent', () => {
   });
 
   it('renders AutomationWorkflowDetail for the workflows tab', async () => {
-    render(<AutomationContent tab="workflows" backendId="b1" />);
+    render(<AutomationContent tab="workflows" />);
     await waitFor(() => {
       expect(screen.getByTestId('wf-detail')).toBeTruthy();
     });
@@ -151,7 +196,7 @@ describe('AutomationContent', () => {
   });
 
   it('renders RunsTab for the runs tab', async () => {
-    render(<AutomationContent tab="runs" backendId="b1" />);
+    render(<AutomationContent tab="runs" />);
     await waitFor(() => {
       expect(screen.getByTestId('runs-tab')).toBeTruthy();
     });

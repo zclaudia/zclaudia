@@ -1,16 +1,19 @@
 // @vitest-environment jsdom
 
 import { render, screen, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ActivityTab } from '../ActivityTab';
+import { makeBackend, makeScope } from './scopeTestUtils';
 
-function makeApi(stepTypes: unknown[]) {
-  return {
-    get: vi.fn().mockResolvedValue(stepTypes),
-    post: vi.fn().mockResolvedValue({}),
-    patch: vi.fn().mockResolvedValue({}),
-    del: vi.fn().mockResolvedValue(undefined),
-  };
+const apis = vi.hoisted(() => new Map<string, { get: ReturnType<typeof vi.fn> }>());
+vi.mock('../useAutomationApi', () => ({
+  createAutomationApi: (id: string) => apis.get(id) ?? { get: async () => [] },
+}));
+
+function installApi(backendId: string, stepTypes: unknown[]) {
+  const api = { get: vi.fn().mockResolvedValue(stepTypes) };
+  apis.set(backendId, api);
+  return api;
 }
 
 const CATALOG = [
@@ -46,10 +49,12 @@ const CATALOG = [
   },
 ];
 
+beforeEach(() => apis.clear());
+
 describe('ActivityTab', () => {
   it('fetches the step-type catalog and shows only source=activity entries', async () => {
-    const api = makeApi(CATALOG);
-    render(<ActivityTab api={api as never} />);
+    const api = installApi('b1', CATALOG);
+    render(<ActivityTab scope={makeScope([makeBackend('b1')])} />);
 
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith('/api/workflow-step-types');
@@ -65,18 +70,32 @@ describe('ActivityTab', () => {
   });
 
   it('groups activities under their category headings', async () => {
-    const api = makeApi(CATALOG);
-    render(<ActivityTab api={api as never} />);
-    // Category headings (uppercased via CSS, text stays as provided).
+    installApi('b1', CATALOG);
+    render(<ActivityTab scope={makeScope([makeBackend('b1')])} />);
+    // Category headings are sentence-case section labels; text stays as provided.
     expect(await screen.findByText('Git')).toBeDefined();
     expect(screen.getByText('AI')).toBeDefined();
   });
 
   it('shows an empty state when no activities are registered', async () => {
-    const api = makeApi([
+    installApi('b1', [
       { type: 'shell', name: 'Shell', description: '', category: 'Automation', source: 'builtin' },
     ]);
-    render(<ActivityTab api={api as never} />);
+    render(<ActivityTab scope={makeScope([makeBackend('b1')])} />);
     expect(await screen.findByText('No activities registered')).toBeDefined();
+  });
+
+  it('groups by backend under "All" with several backends and isolates a failure', async () => {
+    installApi('b1', CATALOG);
+    apis.set('b2', { get: vi.fn().mockRejectedValue(new Error('HTTP 502')) });
+    render(
+      <ActivityTab scope={makeScope([makeBackend('b1', 'Local'), makeBackend('b2', 'Remote')])} />
+    );
+    expect(await screen.findByRole('heading', { name: 'Local' })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Remote' })).toBeDefined();
+    expect(screen.getByText('Git Commit')).toBeDefined();
+    expect(screen.getByText(/Couldn't load from Remote/)).toBeDefined();
+    // The count only includes what actually loaded.
+    expect(screen.getByText('2 activities')).toBeDefined();
   });
 });

@@ -76,9 +76,6 @@ vi.mock('../../features/sidebar/worktreeGrouping', () => ({
 vi.mock('../../hooks/useSwipeBack', () => ({
   useSwipeBack: vi.fn().mockReturnValue({ current: null }),
 }));
-vi.mock('../../features/automation/AutomationTree', () => ({
-  AutomationTree: ({ tab }: any) => <div data-testid="automation-tree" data-tab={tab} />,
-}));
 vi.mock('../../hooks/useSelectionCoordinator', () => ({
   useSelectionCoordinator: () => ({
     selectProject: selectionMocks.selectProject,
@@ -2183,27 +2180,21 @@ describe('Sidebar', () => {
 
   // ---- Automation mode ----
 
-  it('renders AutomationTree and text nav rows when automationMode is active', () => {
+  it('renders the tab nav and no project tree when automationMode is active', () => {
     const onSelectTab = vi.fn();
     const onBack = vi.fn();
-    const onSelectScope = vi.fn();
-    const { container } = render(
+    render(
       <Sidebar
         collapsed={false}
         onToggle={vi.fn()}
-        automationMode={{
-          tab: 'workflows',
-          activeBackendId: LOCAL_BACKEND_ID,
-          projectId: undefined,
-          onSelectTab,
-          onBack,
-          onSelectScope,
-        }}
+        automationMode={{ tab: 'workflows', onSelectTab, onBack }}
       />
     );
 
-    expect(screen.getByTestId('automation-tree')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Workflows' })).toBeTruthy();
+    // Backend / project scope lives in the content pane (like agents mode).
+    expect(screen.queryByText('No projects yet')).toBeNull();
+    expect(screen.queryByText(/switch to this backend/i)).toBeNull();
   });
 
   // ---- Agents mode ----
