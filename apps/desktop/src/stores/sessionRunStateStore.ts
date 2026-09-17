@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { RunStatus } from '@zclaudia/protocol/zclaudia';
+import type { SessionRunStatus } from '@zclaudia/shared/core/session';
 import { useRunStore } from './runStore';
 import { useInteractionStore } from './interactionStore';
 import { useOwnershipStore } from './ownershipStore';
@@ -9,7 +10,7 @@ import { usePromptRequestStore } from './promptRequestStore';
 import { useSessionsStore } from './sessionsStore';
 import { finalizeRunLifecycle } from '../services/message-handlers/run-finalization';
 
-export type SessionRunPhase = 'idle' | 'running' | 'waiting' | 'interrupted';
+export type SessionRunPhase = Exclude<SessionRunStatus, 'failed'>;
 
 export type SessionRunStateSource =
   | 'run_event'
