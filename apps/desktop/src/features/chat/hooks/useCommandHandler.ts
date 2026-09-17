@@ -5,16 +5,16 @@ import {
   legacyAliasToHostActionName,
   setClientActionContextFactory,
   type ClientActionContext,
-} from '../../features/chat/clientActions';
-import '../../features/chat/clientActionDefinitions';
+} from '../clientActions';
+import '../clientActionDefinitions';
 import { useCallback } from 'react';
-import { useProjectStore } from '../../stores/projectStore';
-import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
-import { useRunStore } from '../../stores/runStore';
-import { useSessionConfigStore } from '../../stores/sessionConfigStore';
-import { activatePanel } from '../../utils/openPanel';
-import * as api from '../../services/api';
-import { finalizeRunLifecycle } from '../../services/message-handlers/run-finalization';
+import { useProjectStore } from '../../../stores/projectStore';
+import { useLlmProfileMetaStore } from '../../../stores/llmProfileMetaStore';
+import { useRunStore } from '../../../stores/runStore';
+import { useSessionConfigStore } from '../../../stores/sessionConfigStore';
+import { activatePanel } from '../../../utils/openPanel';
+import * as api from '../../../services/api';
+import { finalizeRunLifecycle } from '../../../services/message-handlers/run-finalization';
 import type {
   CommandExecuteResponse,
   SlashCommand,

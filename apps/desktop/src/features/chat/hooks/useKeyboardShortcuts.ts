@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import { useTerminalStore } from '../../stores/terminalStore';
-import { useFileViewerStore } from '../../stores/fileViewerStore';
-import { usePluginStore } from '../../stores/pluginStore';
-import { activatePanel, isPanelActive } from '../../utils/openPanel';
+import { useTerminalStore } from '../../../stores/terminalStore';
+import { useFileViewerStore } from '../../../stores/fileViewerStore';
+import { usePluginStore } from '../../../stores/pluginStore';
+import { activatePanel, isPanelActive } from '../../../utils/openPanel';
 
 interface UseKeyboardShortcutsOptions {
   projectId: string | undefined;

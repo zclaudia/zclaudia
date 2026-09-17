@@ -20,23 +20,23 @@ import { usePermissionStore } from '../../stores/permissionStore';
 import { useDraftEditorStore } from '../../stores/draftEditorStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import { useChatSession } from '../../hooks/chat/useChatSession';
-import { uploadMessageAttachments, useSendMessage } from '../../hooks/chat/useSendMessage';
-import { useSendQueueConsumer } from '../../hooks/chat/useSendQueueConsumer';
+import { useChatSession } from './hooks/useChatSession';
+import { uploadMessageAttachments, useSendMessage } from './hooks/useSendMessage';
+import { useSendQueueConsumer } from './hooks/useSendQueueConsumer';
 import { useSendQueueStore, type QueueItem } from '../../stores/sendQueueStore';
-import { useCommandHandler } from '../../hooks/chat/useCommandHandler';
-import { useInvocableCatalog } from '../../hooks/chat/useInvocableCatalog';
+import { useCommandHandler } from './hooks/useCommandHandler';
+import { useInvocableCatalog } from './hooks/useInvocableCatalog';
 import {
   buildCanonicalInvocationSubmission,
   buildRawMessageSubmission,
-} from '../../hooks/chat/useInvocationHandler';
+} from './hooks/useInvocationHandler';
 import { hasClientAction } from './clientActions';
-import { useMessagePagination } from '../../hooks/chat/useMessagePagination';
-import { useSessionActions } from '../../hooks/chat/useSessionActions';
-import { usePlanStatus } from '../../hooks/chat/usePlanStatus';
-import { useKeyboardShortcuts } from '../../hooks/chat/useKeyboardShortcuts';
-import { useMobileViewport } from '../../hooks/chat/useMobileViewport';
-import { useSessionRoute } from '../../hooks/chat/useSessionRoute';
+import { useMessagePagination } from './hooks/useMessagePagination';
+import { useSessionActions } from './hooks/useSessionActions';
+import { usePlanStatus } from './hooks/usePlanStatus';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useMobileViewport } from './hooks/useMobileViewport';
+import { useSessionRoute } from './hooks/useSessionRoute';
 import type { ClientMessage, MessageAttachment } from '@zclaudia/shared';
 import { useProjectStore } from '../../stores/projectStore';
 import { useToastStore } from '../../stores/toastStore';

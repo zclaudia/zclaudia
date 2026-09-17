@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useProjectStore } from '../../stores/projectStore';
-import { useSupervisionStore } from '../../stores/supervisionStore';
-import * as api from '../../services/api';
-import { confirm } from '../../stores/confirmDialogStore';
+import { useProjectStore } from '../../../stores/projectStore';
+import { useSupervisionStore } from '../../../stores/supervisionStore';
+import * as api from '../../../services/api';
+import { confirm } from '../../../stores/confirmDialogStore';
 import type { MessageRole, Session } from '@zclaudia/shared';
 
 interface UsePlanStatusParams {

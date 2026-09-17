@@ -5,14 +5,14 @@ import type {
   MessageAttachment,
   MessageInput as MessageInputData,
 } from '@zclaudia/shared';
-import type { Attachment } from '../../features/chat/MessageInput';
-import type { MessageWithToolCalls } from '../../stores/chatMessageStore';
-import { useInteractionStore } from '../../stores/interactionStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { useToastStore } from '../../stores/toastStore';
-import { useSendQueueStore } from '../../stores/sendQueueStore';
-import { uploadFile } from '../../services/fileUpload';
-import * as api from '../../services/api';
+import type { Attachment } from '../MessageInput';
+import type { MessageWithToolCalls } from '../../../stores/chatMessageStore';
+import { useInteractionStore } from '../../../stores/interactionStore';
+import { useProjectStore } from '../../../stores/projectStore';
+import { useToastStore } from '../../../stores/toastStore';
+import { useSendQueueStore } from '../../../stores/sendQueueStore';
+import { uploadFile } from '../../../services/fileUpload';
+import * as api from '../../../services/api';
 
 const ATTACHMENT_PLACEHOLDER = '[Attachments]';
 

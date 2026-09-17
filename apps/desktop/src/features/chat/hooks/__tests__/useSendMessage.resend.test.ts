@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useSendMessage } from '../useSendMessage';
-import type { MessageWithToolCalls } from '../../../stores/chatMessageStore';
+import type { MessageWithToolCalls } from '../../../../stores/chatMessageStore';
 
 const SESSION = 'session-1';
 

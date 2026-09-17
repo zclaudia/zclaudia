@@ -30,7 +30,7 @@ import {
 } from './features/sidebar/drawerStage';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useServerLatencyMonitor } from './hooks/useServerLatencyMonitor';
-import { useActiveSessionStream } from './hooks/useActiveSessionStream';
+import { useActiveSessionStream } from './features/chat/hooks/useActiveSessionStream';
 import { useMainWindowGeometry } from './hooks/useMainWindowGeometry';
 import { useAgentInitialization } from './hooks/useAgentInitialization';
 import { useDeepLinkNavigation } from './hooks/useDeepLinkNavigation';

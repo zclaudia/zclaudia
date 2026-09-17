@@ -3,22 +3,22 @@ import { renderHook } from '@testing-library/react';
 import type { SlashCommand } from '@zclaudia/shared';
 import { useCommandHandler } from '../useCommandHandler';
 
-vi.mock('../../../services/api', async importOriginal => ({
+vi.mock('../../../../services/api', async importOriginal => ({
   ...(await importOriginal<object>()),
   executeCommand: vi.fn(),
 }));
 
-vi.mock('../../../services/goalActions', () => ({
+vi.mock('../../../../services/goalActions', () => ({
   activateGoal: vi.fn(),
 }));
 
-vi.mock('../../../services/api/goals', () => ({
+vi.mock('../../../../services/api/goals', () => ({
   pauseGoal: vi.fn(),
   resumeGoal: vi.fn(),
   clearGoal: vi.fn(),
 }));
 
-import * as api from '../../../services/api';
+import * as api from '../../../../services/api';
 
 function setup(commands: SlashCommand[]) {
   const addMessage = vi.fn();

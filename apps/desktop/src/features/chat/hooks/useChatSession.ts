@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
-import { useRunStore, type ToolCallState } from '../../stores/runStore';
-import { useChatMessageStore } from '../../stores/chatMessageStore';
-import { useSessionConfigStore } from '../../stores/sessionConfigStore';
-import { useSessionOverridesStore } from '../../stores/sessionOverridesStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
-import { useServerStore } from '../../stores/serverStore';
-import { useOwnershipStore } from '../../stores/ownershipStore';
+import { useRunStore, type ToolCallState } from '../../../stores/runStore';
+import { useChatMessageStore } from '../../../stores/chatMessageStore';
+import { useSessionConfigStore } from '../../../stores/sessionConfigStore';
+import { useSessionOverridesStore } from '../../../stores/sessionOverridesStore';
+import { useProjectStore } from '../../../stores/projectStore';
+import { useLlmProfileMetaStore } from '../../../stores/llmProfileMetaStore';
+import { useServerStore } from '../../../stores/serverStore';
+import { useOwnershipStore } from '../../../stores/ownershipStore';
 import { useProviderCapabilities } from './useProviderCapabilities';
-import type { MessageWithToolCalls } from '../../stores/chatMessageStore';
+import type { MessageWithToolCalls } from '../../../stores/chatMessageStore';
 import type { ContentBlock } from '@zclaudia/shared';
 
 const EMPTY_MESSAGES: MessageWithToolCalls[] = [];

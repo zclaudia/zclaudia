@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 
-vi.mock('../../../services/goalActions', () => ({ activateGoal: vi.fn() }));
-vi.mock('../../../services/api/goals', () => ({
+vi.mock('../../../../services/goalActions', () => ({ activateGoal: vi.fn() }));
+vi.mock('../../../../services/api/goals', () => ({
   pauseGoal: vi.fn(),
   resumeGoal: vi.fn(),
   clearGoal: vi.fn(),
 }));
 
-import { activateGoal } from '../../../services/goalActions';
-import { pauseGoal, resumeGoal } from '../../../services/api/goals';
+import { activateGoal } from '../../../../services/goalActions';
+import { pauseGoal, resumeGoal } from '../../../../services/api/goals';
 import { useCommandHandler } from '../useCommandHandler';
 
 function setup() {
@@ -57,7 +57,7 @@ describe('useCommandHandler /goal', () => {
   });
 
   it('routes the pause subcommand when a goal is active', async () => {
-    const { useGoalStore } = await import('../../../stores/goalStore');
+    const { useGoalStore } = await import('../../../../stores/goalStore');
     useGoalStore.setState({
       bySession: {
         s1: {
@@ -84,7 +84,7 @@ describe('useCommandHandler /goal', () => {
   });
 
   it('routes the resume subcommand when a goal is active', async () => {
-    const { useGoalStore } = await import('../../../stores/goalStore');
+    const { useGoalStore } = await import('../../../../stores/goalStore');
     useGoalStore.setState({
       bySession: {
         s1: {
@@ -111,7 +111,7 @@ describe('useCommandHandler /goal', () => {
   });
 
   it('treats pause as an objective when no goal is live', async () => {
-    const { useGoalStore } = await import('../../../stores/goalStore');
+    const { useGoalStore } = await import('../../../../stores/goalStore');
     useGoalStore.setState({ bySession: {} });
     const { handleCommand } = setup();
     await handleCommand('/goal', 'pause');

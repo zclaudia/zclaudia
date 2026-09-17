@@ -3,10 +3,10 @@ import {
   isSessionRunActive,
   useSessionRunStateStore,
   type SessionRunRecord,
-} from '../../stores/sessionRunStateStore';
-import { useSendQueueStore } from '../../stores/sendQueueStore';
-import { useToastStore } from '../../stores/toastStore';
-import type { Attachment } from '../../features/chat/MessageInput';
+} from '../../../stores/sessionRunStateStore';
+import { useSendQueueStore } from '../../../stores/sendQueueStore';
+import { useToastStore } from '../../../stores/toastStore';
+import type { Attachment } from '../MessageInput';
 
 interface UseSendQueueConsumerParams {
   sessionId: string;

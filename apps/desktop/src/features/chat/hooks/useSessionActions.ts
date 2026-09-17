@@ -1,12 +1,12 @@
 import { useCallback } from 'react';
-import { useProjectStore } from '../../stores/projectStore';
-import { useUIStore } from '../../stores/uiStore';
-import { useOwnershipStore } from '../../stores/ownershipStore';
-import { useToastStore } from '../../stores/toastStore';
-import * as api from '../../services/api';
+import { useProjectStore } from '../../../stores/projectStore';
+import { useUIStore } from '../../../stores/uiStore';
+import { useOwnershipStore } from '../../../stores/ownershipStore';
+import { useToastStore } from '../../../stores/toastStore';
+import * as api from '../../../services/api';
 import type { Session, Project } from '@zclaudia/shared';
-import { isDesktopTauri } from '../../utils/platform';
-import { openPopoutWindow, buildWindowTitle, getConnectionParams } from '../../utils/popoutWindow';
+import { isDesktopTauri } from '../../../utils/platform';
+import { openPopoutWindow, buildWindowTitle, getConnectionParams } from '../../../utils/popoutWindow';
 
 interface UseSessionActionsParams {
   sessionId: string;

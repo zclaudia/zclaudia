@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { InvocableDescriptor } from '@zclaudia/shared/providers';
-import { useInvocableCatalog } from '../../hooks/chat/useInvocableCatalog';
+import { useInvocableCatalog } from './hooks/useInvocableCatalog';
 
 /**
  * Invocable autocomplete (URIP design doc §16.2).

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useSendQueueConsumer } from '../useSendQueueConsumer';
-import { useSendQueueStore } from '../../../stores/sendQueueStore';
-import { useSessionRunStateStore } from '../../../stores/sessionRunStateStore';
+import { useSendQueueStore } from '../../../../stores/sendQueueStore';
+import { useSessionRunStateStore } from '../../../../stores/sessionRunStateStore';
 
 const SESSION = 'session-1';
 

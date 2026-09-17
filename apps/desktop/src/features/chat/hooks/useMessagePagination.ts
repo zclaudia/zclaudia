@@ -1,9 +1,9 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { useRunStore } from '../../stores/runStore';
-import { useChatMessageStore, type MessageWithToolCalls } from '../../stores/chatMessageStore';
-import { useFilePushStore } from '../../stores/filePushStore';
-import { useUIStore } from '../../stores/uiStore';
-import * as api from '../../services/api';
+import { useRunStore } from '../../../stores/runStore';
+import { useChatMessageStore, type MessageWithToolCalls } from '../../../stores/chatMessageStore';
+import { useFilePushStore } from '../../../stores/filePushStore';
+import { useUIStore } from '../../../stores/uiStore';
+import * as api from '../../../services/api';
 
 const MESSAGES_PER_PAGE = 50;
 const BOTTOM_REFRESH_LIMIT = 12;

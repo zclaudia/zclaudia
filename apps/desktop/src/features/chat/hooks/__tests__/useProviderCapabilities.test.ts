@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import * as api from '../../../services/api';
+import * as api from '../../../../services/api';
 import { useProviderCapabilities } from '../useProviderCapabilities';
-import { useProjectStore } from '../../../stores/projectStore';
-import { useLlmProfileMetaStore } from '../../../stores/llmProfileMetaStore';
-import { useAgentProfileMetaStore } from '../../../stores/agentProfileMetaStore';
-import { useServerStore } from '../../../stores/serverStore';
-import { useSessionConfigStore } from '../../../stores/sessionConfigStore';
+import { useProjectStore } from '../../../../stores/projectStore';
+import { useLlmProfileMetaStore } from '../../../../stores/llmProfileMetaStore';
+import { useAgentProfileMetaStore } from '../../../../stores/agentProfileMetaStore';
+import { useServerStore } from '../../../../stores/serverStore';
+import { useSessionConfigStore } from '../../../../stores/sessionConfigStore';
 
-vi.mock('../../../services/api', () => ({
+vi.mock('../../../../services/api', () => ({
   getProviderCommands: vi.fn(),
   getProviderTypeCommands: vi.fn(),
   getProviderCapabilities: vi.fn(),
@@ -19,7 +19,7 @@ vi.mock('../../../services/api', () => ({
 // useAgentForSession imports listAgentProfiles directly from
 // '../services/api/agent-profiles' (not the barrel). Mock it to avoid making
 // real network requests inside the agent store's loadAll().
-vi.mock('../../../services/api/agent-profiles', () => ({
+vi.mock('../../../../services/api/agent-profiles', () => ({
   listAgentProfiles: vi.fn().mockResolvedValue([]),
 }));
 

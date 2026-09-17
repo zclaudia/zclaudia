@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useFacadeStore } from '../../stores/facadeStore';
-import { useOwnershipStore } from '../../stores/ownershipStore';
-import { useServerStore } from '../../stores/serverStore';
-import { useChatMessageStore } from '../../stores/chatMessageStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { useFacadeStore } from '../../../stores/facadeStore';
+import { useOwnershipStore } from '../../../stores/ownershipStore';
+import { useServerStore } from '../../../stores/serverStore';
+import { useChatMessageStore } from '../../../stores/chatMessageStore';
+import { useProjectStore } from '../../../stores/projectStore';
 import {
   getControlPlaneMode,
   resolveCanonicalBackendId,
   resolveLocalBackendId,
-} from '../../utils/controlPlane';
+} from '../../../utils/controlPlane';
 import {
   getMobileBackendViewState,
   isMobileBackendUsable,
-} from '../../services/mobileConnectionState';
+} from '../../../services/mobileConnectionState';
 
 function getStreamKey(backendId: string, sessionId: string): string {
   return `${backendId}:${sessionId}`;

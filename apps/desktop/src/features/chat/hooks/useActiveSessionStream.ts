@@ -1,5 +1,5 @@
-import { useSelectionStore } from '../stores/selectionStore';
-import { useSessionRoute } from './chat/useSessionRoute';
+import { useSelectionStore } from '../../../stores/selectionStore';
+import { useSessionRoute } from './useSessionRoute';
 
 /**
  * Keeps the currently selected session subscribed to the facade run stream.
