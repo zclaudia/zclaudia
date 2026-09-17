@@ -88,6 +88,8 @@ function createMockService() {
     createFromTemplate: vi.fn().mockReturnValue(mockWorkflow),
     triggerWorkflow: vi.fn().mockResolvedValue(mockRun),
     getRuns: vi.fn().mockReturnValue([mockRun]),
+    getRunsByProject: vi.fn().mockReturnValue([mockRun]),
+    getAllRuns: vi.fn().mockReturnValue([mockRun]),
     getRun: vi.fn().mockReturnValue({ run: mockRun, stepRuns: [mockStepRun] }),
     cancelRun: vi.fn().mockReturnValue(true),
     approveStep: vi.fn().mockReturnValue(true),
@@ -486,6 +488,34 @@ describe('workflow routes', () => {
         throw new Error('runs fail');
       });
       const res = await request(app).get('/api/workflows/wf-1/runs');
+      expect(res.status).toBe(500);
+    });
+  });
+
+  // ── GET /api/workflow-runs ──
+
+  describe('GET /api/workflow-runs', () => {
+    it("lists a project's runs when projectId is given", async () => {
+      const res = await request(app).get('/api/workflow-runs?projectId=p1&limit=10');
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual([mockRun]);
+      expect(service.getRunsByProject).toHaveBeenCalledWith('p1', 10);
+      expect(service.getAllRuns).not.toHaveBeenCalled();
+    });
+
+    it('lists recent runs across every project when projectId is omitted', async () => {
+      const res = await request(app).get('/api/workflow-runs');
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual([mockRun]);
+      expect(service.getAllRuns).toHaveBeenCalledWith(50);
+      expect(service.getRunsByProject).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 on error', async () => {
+      service.getAllRuns.mockImplementation(() => {
+        throw new Error('list fail');
+      });
+      const res = await request(app).get('/api/workflow-runs');
       expect(res.status).toBe(500);
     });
   });

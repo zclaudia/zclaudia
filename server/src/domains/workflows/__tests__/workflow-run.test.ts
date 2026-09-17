@@ -161,4 +161,11 @@ describe('WorkflowRunRepository', () => {
       expect(mockDb.prepare().all).toHaveBeenCalledWith('p1', 50);
     });
   });
+
+  describe('findAll', () => {
+    it('queries every project with default limit', () => {
+      repo.findAll();
+      expect(mockDb.prepare().all).toHaveBeenCalledWith(50);
+    });
+  });
 });
