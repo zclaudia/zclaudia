@@ -12,7 +12,7 @@ import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { eagerSyncCurrentSession, recoverCurrentSessionTail } from '../sessionSync';
 import { finalizeRunLifecycle } from './run-finalization';
 import { getProjectsForBackend } from '../api/projects';
-import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../utils/controlPlane';
+import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../actions/controlPlane';
 import { parseBackendId } from '../../stores/gatewayStore';
 import { useBackgroundTaskStore } from '../../stores/backgroundTaskStore';
 import type { MessageHandlerContext } from './types';

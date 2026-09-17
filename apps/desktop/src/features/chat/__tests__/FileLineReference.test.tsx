@@ -15,7 +15,7 @@ vi.mock('../../../stores/fileViewerStore', () => ({
 }));
 
 const mockActivatePanel = vi.fn();
-vi.mock('../../../utils/openPanel', () => ({
+vi.mock('../../../actions/openPanel', () => ({
   activatePanel: (...args: unknown[]) => mockActivatePanel(...args),
 }));
 

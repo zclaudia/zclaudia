@@ -2,7 +2,7 @@ import type { ServerInfo, ApiResponse } from '@zclaudia/shared';
 
 import { resolveGatewayBackendUrl } from '../gatewayProxy';
 import { useServerStore } from '../../stores/serverStore';
-import { getControlPlaneMode, isLocalBackendId } from '../../utils/controlPlane';
+import { getControlPlaneMode, isLocalBackendId } from '../../actions/controlPlane';
 import { getBrowserShellBaseUrl } from '../../utils/browserShellRuntime';
 import { fetchApiForBackend, fetchLocalApi } from './base';
 

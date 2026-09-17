@@ -12,7 +12,7 @@ vi.mock('../../../stores/serverStore', () => ({
   },
 }));
 
-vi.mock('../../../utils/controlPlane', () => ({
+vi.mock('../../../actions/controlPlane', () => ({
   getControlPlaneMode: vi.fn(() => mockControlPlaneMode),
   isLocalBackendId: vi.fn(() => mockIsLocalBackendId),
 }));

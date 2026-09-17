@@ -15,7 +15,7 @@ import { useProjectStore } from '../stores/projectStore';
 import { useSelectionStore } from '../stores/selectionStore';
 import { useSessionRunStateStore } from '../stores/sessionRunStateStore';
 import * as api from './api';
-import { getControlPlaneMode, isLocalBackendId } from '../utils/controlPlane';
+import { getControlPlaneMode, isLocalBackendId } from '../actions/controlPlane';
 import { getBrowserShellBaseUrl } from '../utils/browserShellRuntime';
 import { findDeletedSessionIds, planDeltaSessionEvents } from './sessionSyncReconciliation';
 

@@ -1,7 +1,7 @@
 import { apiCall, apiCallVoid } from './unwrap';
 import { useServerStore } from '../../stores/serverStore';
 import { parseBackendId } from '../../stores/gatewayStore';
-import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../utils/controlPlane';
+import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../actions/controlPlane';
 
 export interface SearchResult {
   id: string;

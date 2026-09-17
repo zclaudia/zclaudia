@@ -15,7 +15,7 @@ import {
   getControlPlaneMode,
   resolveCanonicalBackendId,
   resolveLocalBackendId,
-} from '../utils/controlPlane';
+} from '../actions/controlPlane';
 import { useSelectionStore } from './selectionStore';
 import { useRightWorkspaceStore } from './rightWorkspaceStore';
 import type { ProjectDashboardView } from './selectionTypes';

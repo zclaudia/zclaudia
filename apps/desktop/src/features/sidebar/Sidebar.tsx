@@ -30,7 +30,7 @@ import { useFacadeStore } from '../../stores/facadeStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useGatewayStore } from '../../stores/gatewayStore';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
-import { resolveCanonicalBackendId } from '../../utils/controlPlane';
+import { resolveCanonicalBackendId } from '../../actions/controlPlane';
 import {
   getMobileBackendViewState,
   isMobileGatewayConnected,

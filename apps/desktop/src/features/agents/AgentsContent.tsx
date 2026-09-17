@@ -17,7 +17,7 @@ import { useFacadeStore } from '../../stores/facadeStore';
 import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
-import { resolveCanonicalBackendId } from '../../utils/controlPlane';
+import { resolveCanonicalBackendId } from '../../actions/controlPlane';
 import {
   createLlmProfileForBackend,
   createMcpServerForBackend,

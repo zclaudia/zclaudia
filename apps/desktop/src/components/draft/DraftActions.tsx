@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { Send, Trash2, ExternalLink } from 'lucide-react';
 import { useDraftEditorStore } from '../../stores/draftEditorStore';
 import { isDesktopTauri } from '../../utils/platform';
-import { openDraftInNewWindow } from '../../utils/openDraftWindow';
+import { openDraftInNewWindow } from '../../actions/openDraftWindow';
 import { MAX_CONTENT_BYTES } from './draftConstants';
 
 const ICON_BTN =

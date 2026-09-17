@@ -100,7 +100,7 @@ vi.mock('../../../stores/rightSidebarStore', () => ({
 
 // activatePanel('terminal') now routes to the session workspace on desktop.
 // Mock workspaceActions so we can assert the call without full workspace setup.
-vi.mock('../../../utils/workspaceActions', () => ({
+vi.mock('../../../actions/workspaceActions', () => ({
   openToolInWorkspace: (...args: unknown[]) => mockOpenToolInWorkspace(...args),
   closeToolInWorkspace: vi.fn(),
   useToolOpenState: vi.fn(() => false),

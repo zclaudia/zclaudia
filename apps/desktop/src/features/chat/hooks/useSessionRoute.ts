@@ -8,7 +8,7 @@ import {
   getControlPlaneMode,
   resolveCanonicalBackendId,
   resolveLocalBackendId,
-} from '../../../utils/controlPlane';
+} from '../../../actions/controlPlane';
 import {
   getMobileBackendViewState,
   isMobileBackendUsable,

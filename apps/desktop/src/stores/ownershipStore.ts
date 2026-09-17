@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { resolveCanonicalBackendId, resolveLocalBackendId } from '../utils/controlPlane';
+import { resolveCanonicalBackendId, resolveLocalBackendId } from '../actions/controlPlane';
 
 interface OwnershipState {
   sessionBackendIds: Record<string, string>;

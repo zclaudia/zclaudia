@@ -1,7 +1,7 @@
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useToastStore } from '../../stores/toastStore';
 import * as api from '../../services/api';
-import { activatePanel } from '../../utils/openPanel';
+import { activatePanel } from '../../actions/openPanel';
 import { FileSymbol } from '../../components/filesymbols';
 
 /**

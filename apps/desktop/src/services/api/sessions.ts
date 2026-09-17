@@ -30,7 +30,7 @@ export async function getSessionCompaction(
   );
 }
 import { useOwnershipStore } from '../../stores/ownershipStore';
-import { resolveSessionOwnerBackendId } from '../../utils/sessionOwnership';
+import { resolveSessionOwnerBackendId } from '../../actions/sessionOwnership';
 
 function getBackendIdForSession(sessionId: string): string | null {
   return resolveSessionOwnerBackendId(sessionId);

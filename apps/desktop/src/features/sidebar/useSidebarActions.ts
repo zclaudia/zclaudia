@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { isDesktopTauri } from '../../utils/platform';
-import { openPopoutWindow } from '../../utils/popoutWindow';
+import { openPopoutWindow } from '../../actions/popoutWindow';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';

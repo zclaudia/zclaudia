@@ -3,7 +3,7 @@ import { TOOL_ICONS } from './rightSidebarToolIcons';
 import { usePluginStore, selectPluginPanels } from '../stores/pluginStore';
 import { useChangesData } from './changes/useSessionChanges';
 import { useServerStore } from '../stores/serverStore';
-import { openToolInWorkspace } from '../utils/workspaceActions';
+import { openToolInWorkspace } from '../actions/workspaceActions';
 
 interface RightSidebarEmptyStateProps {
   sessionId: string;

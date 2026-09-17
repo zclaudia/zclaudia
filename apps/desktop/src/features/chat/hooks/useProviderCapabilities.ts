@@ -6,7 +6,7 @@ import { useServerStore } from '../../../stores/serverStore';
 import { useSessionConfigStore } from '../../../stores/sessionConfigStore';
 import * as api from '../../../services/api';
 import type { ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
-import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../../../utils/controlPlane';
+import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../../../actions/controlPlane';
 import { useAgentProfileMetaStore } from '../../../stores/agentProfileMetaStore';
 import { useAgentForSession } from '../../../hooks/useAgentForSession';
 

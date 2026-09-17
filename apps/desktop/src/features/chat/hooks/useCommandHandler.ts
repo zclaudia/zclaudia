@@ -12,7 +12,7 @@ import { useProjectStore } from '../../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../../stores/llmProfileMetaStore';
 import { useRunStore } from '../../../stores/runStore';
 import { useSessionConfigStore } from '../../../stores/sessionConfigStore';
-import { activatePanel } from '../../../utils/openPanel';
+import { activatePanel } from '../../../actions/openPanel';
 import * as api from '../../../services/api';
 import { finalizeRunLifecycle } from '../../../services/message-handlers/run-finalization';
 import type {

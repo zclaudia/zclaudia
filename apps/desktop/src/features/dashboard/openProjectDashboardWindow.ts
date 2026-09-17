@@ -1,4 +1,4 @@
-import { buildPopoutUrl, buildWindowTitle, getConnectionParams } from '../../utils/popoutWindow';
+import { buildPopoutUrl, buildWindowTitle, getConnectionParams } from '../../actions/popoutWindow';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 
 function dashboardWindowLabel(projectId: string): string {

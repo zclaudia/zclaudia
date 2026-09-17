@@ -1,7 +1,7 @@
 import type { BrowserPickedElement, ServerMessage } from '@zclaudia/shared';
 import { useBrowserStore } from './browserStore';
-import { openToolInWorkspace } from '../../utils/workspaceActions';
-import { isPanelAvailable } from '../../utils/openPanel';
+import { openToolInWorkspace } from '../../actions/workspaceActions';
+import { isPanelAvailable } from '../../actions/openPanel';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useRightWorkspaceStore, findPaneWithTool } from '../../stores/rightWorkspaceStore';
 import { useComposerStore } from '../../stores/composerStore';

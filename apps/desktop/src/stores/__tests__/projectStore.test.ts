@@ -24,7 +24,7 @@ vi.mock('../serverStore', () => ({
   },
 }));
 
-vi.mock('../../utils/controlPlane', () => ({
+vi.mock('../../actions/controlPlane', () => ({
   getControlPlaneMode: () => 'embedded-local',
   resolveLocalBackendId: () => 'local-backend-1',
   resolveCanonicalBackendId: (

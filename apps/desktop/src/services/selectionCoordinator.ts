@@ -6,9 +6,9 @@ import {
   getControlPlaneMode,
   resolveCanonicalBackendId,
   resolveLocalBackendId,
-} from '../utils/controlPlane';
+} from '../actions/controlPlane';
 import { isMobileBackendUsable } from './mobileConnectionState';
-import { resolveSessionOwnerBackendId } from '../utils/sessionOwnership';
+import { resolveSessionOwnerBackendId } from '../actions/sessionOwnership';
 
 export interface SelectSessionOptions {
   backendId?: string | null;

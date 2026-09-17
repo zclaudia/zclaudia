@@ -7,7 +7,7 @@ import {
 } from '../../stores/rightWorkspaceStore';
 import { usePluginStore } from '../../stores/pluginStore';
 import { iconForPanel } from '../rightSidebarToolIcons';
-import { closeTabInWorkspace } from '../../utils/workspaceActions';
+import { closeTabInWorkspace } from '../../actions/workspaceActions';
 import { ToolLauncherMenu } from './ToolLauncherMenu';
 import { PanelActions } from '../panels/PanelRenderer';
 import { useDragSplitStore } from './dragSplit';

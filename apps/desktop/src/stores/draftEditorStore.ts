@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { SessionDraft } from '@zclaudia/shared';
 import * as api from '../services/api';
 import { usePluginStore } from './pluginStore';
-import { activatePanel, deactivatePanel } from '../utils/openPanel';
+import { activatePanel, deactivatePanel } from '../actions/openPanel';
 
 // Generate a stable client ID per browser tab for lock identification
 const CLIENT_DEVICE_ID = crypto.randomUUID();

@@ -25,7 +25,7 @@ import { useWorkflowStore } from '../store';
 import { useProjectStore } from '../../../stores/projectStore';
 import type { Node, Edge } from '@xyflow/react';
 import { isDesktopTauri } from '../../../utils/platform';
-import { openPopoutWindow } from '../../../utils/popoutWindow';
+import { openPopoutWindow } from '../../../actions/popoutWindow';
 import { useOwnershipStore } from '../../../stores/ownershipStore';
 import { IconButton } from '../../../components/ui/Button';
 import { FormField } from '../../../components/ui/FormField';

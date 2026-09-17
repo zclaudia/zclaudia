@@ -1,7 +1,7 @@
 import { useState, useRef, useLayoutEffect, useEffect, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { openToolInWorkspace } from '../../utils/workspaceActions';
-import { useLauncherPanels } from '../../utils/openPanel';
+import { openToolInWorkspace } from '../../actions/workspaceActions';
+import { useLauncherPanels } from '../../actions/openPanel';
 import { useServerStore } from '../../stores/serverStore';
 import { iconForPanel } from '../rightSidebarToolIcons';
 

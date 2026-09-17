@@ -29,7 +29,7 @@ vi.mock('../../../stores/draftEditorStore', () => ({
     { getState: () => state }
   ),
 }));
-vi.mock('../../../utils/openDraftWindow', () => ({
+vi.mock('../../../actions/openDraftWindow', () => ({
   openDraftInNewWindow: (...a: unknown[]) => openDraftInNewWindow(...a),
 }));
 vi.mock('../../../utils/platform', () => ({ isDesktopTauri: () => true }));

@@ -8,7 +8,7 @@ import {
 import { FileSymbol } from '../../components/filesymbols';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { activatePanel } from '../../utils/openPanel';
+import { activatePanel } from '../../actions/openPanel';
 
 /**
  * Regex to match @file references in text.

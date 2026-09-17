@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import type { Session } from '@zclaudia/shared';
 import { useOwnershipStore } from './ownershipStore';
 import { useRightWorkspaceStore } from './rightWorkspaceStore';
-import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../utils/controlPlane';
+import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../actions/controlPlane';
 
 export interface RemoteSession extends Session {
   isActive: boolean; // Whether there's an active run
