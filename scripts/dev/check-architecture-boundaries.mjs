@@ -426,6 +426,39 @@ function assertDesktopServicesFeatureReexportBoundaries(repoRoot, failures, opti
   }
 }
 
+
+// desktop: utils/ must stay pure — no imports of stores, services, facades,
+// features, actions or UI layers. Side-effectful action modules live in actions/.
+const DESKTOP_UTILS_FORBIDDEN_TOP = [
+  'stores',
+  'services',
+  'facade',
+  'features',
+  'actions',
+  'components',
+  'app',
+  'contexts',
+  'plugins',
+];
+
+function assertDesktopUtilsPurity(repoRoot, failures) {
+  for (const relativePath of walk(repoRoot, 'apps/desktop/src/utils', isNonTestSourceFile)) {
+    const content = read(repoRoot, relativePath);
+    for (const source of extractImportSources(content)) {
+      if (!source.startsWith('.')) continue;
+      const target = resolveImport(repoRoot, relativePath, source);
+      if (!target) continue;
+      const rest = target.slice('apps/desktop/src/'.length);
+      const top = rest.split('/')[0];
+      if (DESKTOP_UTILS_FORBIDDEN_TOP.includes(top)) {
+        failures.push(
+          `${relativePath}: utils module imports ${top}/ (${target}); utils must stay pure — move side-effectful code to actions/ or services/`
+        );
+      }
+    }
+  }
+}
+
 function assertDesktopProviderMetaBoundaries(repoRoot, failures) {
   const desktopFiles = walk(
     repoRoot,
@@ -601,6 +634,7 @@ export function runArchitectureChecks(repoRoot = process.cwd(), options = {}) {
   const failures = [];
   assertServerRouteLikeFilesNoRawSql(repoRoot, failures);
   assertServerLayerBoundaries(repoRoot, failures, options);
+  assertDesktopUtilsPurity(repoRoot, failures);
   assertDesktopProviderMetaBoundaries(repoRoot, failures);
   assertDesktopSelectionStoreBoundaries(repoRoot, failures, options);
   assertDesktopServicesApiBoundaries(repoRoot, failures, options);

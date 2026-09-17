@@ -24,6 +24,7 @@ export default defineConfig({
     include: [
       'src/stores/**/*.test.ts',
       'src/utils/**/*.test.ts',
+      'src/actions/**/*.test.ts',
       'src/config/**/*.test.ts',
       'src/components/**/*.test.ts',
       'src/facade/**/*.test.ts',
