@@ -6,7 +6,6 @@ import { isInteractiveHorizontalDragStart, useHorizontalDrag } from '../hooks/us
 import {
   DRAWER_PEEK_WIDTH_PX,
   drawerExpandedWidth,
-  drawerStageBelow,
   drawerStagePosition,
   resolveDrawerStage,
   type DrawerStage,
