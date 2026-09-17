@@ -1,11 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { reconcileStaleLoadingRun, useSendMessage } from '../chat/useSendMessage';
-import { useInteractionStore } from '../../stores/interactionStore';
-import { useSendQueueStore } from '../../stores/sendQueueStore';
-import * as api from '../../services/api';
+import { reconcileStaleLoadingRun, useSendMessage } from '../useSendMessage';
+import { useInteractionStore } from '../../../../stores/interactionStore';
+import { useSendQueueStore } from '../../../../stores/sendQueueStore';
+import * as api from '../../../../services/api';
 
-vi.mock('../../services/api', () => ({
+vi.mock('../../../../services/api', () => ({
   getSessionRunState: vi.fn().mockResolvedValue({ isRunning: false }),
 }));
 

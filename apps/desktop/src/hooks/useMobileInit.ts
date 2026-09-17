@@ -3,7 +3,7 @@ import { useServerStore } from '../stores/serverStore';
 import { useGatewayStore } from '../stores/gatewayStore';
 import { useFacadeStore } from '../stores/facadeStore';
 import { useConnection } from '../contexts/ConnectionContext';
-import { isLocalBackendId } from '../utils/controlPlane';
+import { isLocalBackendId } from '../actions/controlPlane';
 import {
   getMobileBackendViewState,
   isMobileGatewayConnected,

@@ -1,7 +1,7 @@
 import { useLocalBackendId } from './useLocalBackendId';
 import { useServerStore } from '../stores/serverStore';
 import { useFacadeStore } from '../stores/facadeStore';
-import { isLegacyLocalBackendId } from '../utils/controlPlane';
+import { isLegacyLocalBackendId } from '../actions/controlPlane';
 
 export interface SettingsTargetBackend {
   /**

@@ -37,7 +37,7 @@ vi.mock('../../stores/sessionsStore', () => ({
   },
 }));
 
-vi.mock('../../utils/controlPlane', () => ({
+vi.mock('../../actions/controlPlane', () => ({
   getControlPlaneMode: () => 'gateway-direct',
   resolveLocalBackendId: () => 'local',
   resolveCanonicalBackendId: mockResolveCanonicalBackendId,
