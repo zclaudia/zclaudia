@@ -1,9 +1,20 @@
 # Automations 桌面应用 / Android 模拟器 UI E2E 测试计划
 
 创建日期：2026-09-16；更新日期：2026-09-17  
-状态：测试设计；已只读核实本机模拟器在线，尚未执行 UI 用例，本文没有 PASS 结果。  
+状态：已进入执行；历史结果及当前续跑状态见[执行报告](../reports/2026-09-17-automations-ui-e2e-run-report.md)。本文为用例设计，不单独宣称 PASS。
 依据：用户提供的桌面截图、当前工作区代码（HEAD `dd0af23b`，存在未提交改动）。执行时必须记录实际安装产物的版本，不能用 HEAD 代替产物身份。  
 确认平台：macOS 桌面应用 + 本机 Android 模拟器中的实际 APK。按用户要求，模拟器作为本轮移动端正式测试环境；实体手机不是本轮通过的前置条件。
+
+### 2026-09-17 当前候选版执行补充
+
+当前候选版为 `8af523f4`，已在 `a6d4c0af` 更换 Automations 范围选择界面。下文保留初始设计供追溯；执行时适用以下更新，详细证据见执行报告 §8–§9：
+
+- Backend / Project 在内容区通过筛选项选择，Automation 侧栏树已移除。A03 转为核对范围选择、列表计数与变更结果；旧树叶子分支标为已移除，不代表整个用例通过。
+- 多 Backend 的 All 范围按 Backend 分组；单 Backend 范围仍检查 Active / Disabled。A02 / A16 同时检查 All → 单 Backend → Project → All 的数据隔离。
+- Cancel / New 折叠会卸载当前 Create 表单，A08 重新记录实际草稿规则，不把旧报告的保留草稿行为作为固定预期。
+- B01 以现有正整数校验实现为基线，继续覆盖完整边界；A17 按新的逐 Backend 错误区域、重试和各写操作反馈验收。
+- 新 APK 已构建并保留数据安装；授权后已在实际 Tauri dev 壳与模拟器 APK 补跑，A15 跨端闭环通过。当前版本发现项目筛选陈旧、移动按钮热区重叠、非法 Cron 返回失败但落库等缺陷，发布门槛未通过。逐项结果、证据、未完成分支和清理记录见执行报告 §9。
+- B07 / A18 增加实际发现的 Android 横屏顶部安全区与深色系统状态栏图标颜色复验；B10 必须检查恢复网络后列表 Retry 是否同时恢复 Action / Workflow 目录。
 
 ## 1. 目标与范围
 
@@ -31,7 +42,7 @@ Activity、Workflows、System、Runs 仅验证导航和与 Automations 有关的
 | 卡片名称桌面单行省略、移动端最多两行；元数据允许换行 | 验证不覆盖按钮、不同任务仍可区分；允许卡片高度不同 |
 | Trigger 为 Manual / Interval / Cron / Once / Event；Action 来自服务端目录或 Workflow | 检查所有分支；两端目录相同是比较的前提，不能硬编码所有插件选项 |
 | 未指定 projectId 时服务端返回该 Backend 的全部 Automation | “无项目过滤”不等于“只含 Global”；卡片的 Global 表示项目归属，不能混淆 |
-| 系统 Automation 不允许普通修改 / 删除，但卡片目前仍渲染操作按钮 | 验收期望是 UI 明确表达限制；“点击无反应”不是通过结果 |
+| 系统 Automation 不允许普通修改 / 删除；当前候选版显示 System / Read-only，隐藏操作按钮 | D1 / 新 APK 已实际复验；以后版本仍检查无可执行操作与清楚限制，不沿用初版可点按钮的基线 |
 | 当前列表映射只有 idle / disabled，runCount 固定为 0，未映射 lastError | 不虚构已有运行中 / 成功 / 失败卡片 UI；运行闭环用 Runs 和真实记录证明，缺少操作反馈单独报问题 |
 | 页面通过加载和显式 Refresh 取数 | 本轮跨端一致性以另一端显式刷新完成为同步点，不默认已有实时同步 SLA |
 
@@ -123,7 +134,7 @@ API / fixture 仅用于准备数据、制造隔离故障和读取独立证据。
 | --- | --- | --- |
 | A01 入口与返回 | 从应用首页进入 Automations；切到其他 tab 再返回；桌面 Back to app / 移动端标题返回 | 页身份、导航选中、范围一致；无白屏；返回可继续使用应用；移动端无无意义双标题 |
 | A02 列表与范围 | S1：无项目过滤 → P1 → P2 → P0；核对卡片和计数 | 计数等于当前结果；Active / Disabled 分组正确；卡片 scope 与实际项目一致；空项目显示正常空态 |
-| A03 侧栏与主列表 | 展开项目树，选一条任务；再创建、启停、删除专用任务并重新查看树 | 高亮对象正确且可找到；树与主列表名称 / 状态 / 存在性一致；不得残留已删条目或选中错误 ID |
+| A03 范围与主列表同步 | 当前版使用 Backend / Project 筛选项；切范围，再创建、启停、删除专用任务并核对计数与结果 | 选中范围、卡片归属、计数和操作结果一致；不得残留旧范围或已删任务。旧侧栏任务叶子分支已移除 |
 | A04 新建基础路径 | New → 输入中文名称 → Manual → 专用无害 Activity → Create；再测 Workflow Action | 表单字段与选项一致；创建完成后表单收起，准确新增 1 条；名称、Action 与项目范围持久化正确 |
 | A05 五种 Trigger | 分别选择 Manual / Interval=60 / Cron=`0 9 * * *` / Once=将来时间 / Event=专用事件名，创建独立任务 | 仅显示相关输入；摘要、保存参数与所选一致；Once 两端对应同一时刻；保存后暂停定时测试任务避免背景干扰 |
 | A06 必填与错误 | 空白名称、Workflow 未选择、Activity 必填空值、Once 为空；补齐后重试 | 禁用或明确错误；不生成无效任务；错误不被键盘遮挡；修正后一次成功；状态两端一致 |
@@ -228,7 +239,7 @@ API / fixture 仅用于准备数据、制造隔离故障和读取独立证据。
 - [AutomationsTab：列表、表单和操作](../../apps/desktop/src/features/automation/AutomationsTab.tsx)
 - [AutomationContent：范围与移动标题](../../apps/desktop/src/features/automation/AutomationContent.tsx)
 - [automation-types：卡片映射](../../apps/desktop/src/features/automation/automation-types.tsx)
-- [AutomationTree：侧栏树与刷新](../../apps/desktop/src/features/automation/AutomationTree.tsx)
+- 原 AutomationTree 已在当前候选版移除；现见 [AutomationScope：范围筛选与分组](../../apps/desktop/src/features/automation/AutomationScope.tsx)
 - [SchemaForm：动态字段](../../apps/desktop/src/features/automation/SchemaForm.tsx)
 - [Button：图标热区](../../apps/desktop/src/components/ui/Button.tsx)、[Select：菜单与键盘](../../apps/desktop/src/components/ui/Select.tsx)
 - [App：移动导航与返回](../../apps/desktop/src/App.tsx)、[useMediaQuery：布局断点](../../apps/desktop/src/hooks/useMediaQuery.ts)

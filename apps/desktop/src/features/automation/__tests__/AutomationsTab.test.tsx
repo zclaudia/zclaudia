@@ -305,3 +305,125 @@ describe('Interval validation', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 });
+
+describe('Scope switches (E2E R01/C01)', () => {
+  it('refetches when the project scope changes, without a manual refresh', async () => {
+    const api = installApi('b1', async url =>
+      url.startsWith('/api/automations') ? [ALPHA] : []
+    );
+    const { rerender } = render(
+      <AutomationsTab scope={makeScope([makeBackend('b1')], { projectId: 'p1' })} />
+    );
+    await screen.findByText('Alpha');
+    expect(api.get).toHaveBeenCalledWith('/api/automations?projectId=p1');
+
+    rerender(<AutomationsTab scope={makeScope([makeBackend('b1')], { projectId: 'p2' })} />);
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/api/automations?projectId=p2'));
+  });
+
+  it('names the submit scope inside the create form', async () => {
+    installApi('b1', async url => (url.startsWith('/api/automations') ? [ALPHA] : []));
+    render(
+      <AutomationsTab
+        scope={makeScope([makeBackend('b1')], {
+          projectId: 'p1',
+          projects: new Map([['b1', [{ id: 'p1', name: 'P1' }]]]),
+        })}
+      />
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'New' }));
+    expect(await screen.findByText(/Saving to b1 · P1/)).toBeInTheDocument();
+  });
+
+  it('clears a draft when the project scope changes instead of re-targeting it', async () => {
+    installApi('b1', async url => (url.startsWith('/api/automations') ? [ALPHA] : []));
+    const { rerender } = render(
+      <AutomationsTab scope={makeScope([makeBackend('b1')], { projectId: 'p1' })} />
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'New' }));
+    fireEvent.change(await screen.findByPlaceholderText('Automation name'), {
+      target: { value: 'Typed in P1' },
+    });
+
+    rerender(<AutomationsTab scope={makeScope([makeBackend('b1')], { projectId: 'p2' })} />);
+    // Remounted form: the name field is empty again, so nothing typed under P1
+    // can be submitted into P2.
+    expect(await screen.findByPlaceholderText('Automation name')).toHaveValue('');
+  });
+});
+
+describe('Row action feedback (E2E R05)', () => {
+  it('ignores a second Run now click while the first is still in flight', async () => {
+    const api = installApi('b1', async url =>
+      url.startsWith('/api/automations') ? [ALPHA] : []
+    );
+    let resolveRun: (() => void) | undefined;
+    api.post.mockImplementation(
+      () => new Promise(resolve => (resolveRun = () => resolve({})))
+    );
+    render(<AutomationsTab scope={makeScope([makeBackend('b1')])} />);
+    const run = await screen.findByRole('button', { name: 'Run now' });
+
+    fireEvent.click(run);
+    expect(run).toBeDisabled();
+    fireEvent.click(run);
+    expect(api.post).toHaveBeenCalledTimes(1);
+
+    resolveRun?.();
+    await waitFor(() => expect(run).not.toBeDisabled());
+  });
+});
+
+describe('Long names (E2E R03)', () => {
+  it('unfolds the full name on tap and folds it back', async () => {
+    const long = `${'长'.repeat(60)}甲`;
+    installApi('b1', async url =>
+      url.startsWith('/api/automations') ? [{ ...ALPHA, name: long }] : []
+    );
+    render(<AutomationsTab scope={makeScope([makeBackend('b1')])} />);
+    const name = await screen.findByRole('button', { name: long });
+    expect(name.getAttribute('aria-expanded')).toBe('false');
+    expect(name.parentElement?.className).toContain('truncate');
+
+    fireEvent.click(name);
+    expect(name.getAttribute('aria-expanded')).toBe('true');
+    expect(name.parentElement?.className).toContain('whitespace-normal');
+
+    fireEvent.click(name);
+    expect(name.getAttribute('aria-expanded')).toBe('false');
+  });
+});
+
+describe('Create form catalog failures (E2E R06)', () => {
+  const stepTypes = [
+    { type: 'ai_prompt', name: 'AI Prompt', description: '', category: 'AI', source: 'activity' },
+  ];
+
+  it('explains the failure, blocks create, and recovers on retry', async () => {
+    const api = installApi('b1', async url => {
+      if (url.startsWith('/api/workflow-step-types')) throw new Error('HTTP 503');
+      return [];
+    });
+    render(<AutomationsTab scope={makeScope([makeBackend('b1')])} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'New' }));
+    expect(await screen.findByText(/Couldn't load the action types catalog/)).toBeInTheDocument();
+
+    // An action picked while the catalog was down must not reach the API.
+    fireEvent.change(await screen.findByPlaceholderText('Automation name'), {
+      target: { value: 'Blocked' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(
+      await screen.findByText(/action catalog didn't load/)
+    ).toBeInTheDocument();
+    expect(api.post).not.toHaveBeenCalled();
+
+    api.get.mockImplementation(async (url: string) =>
+      url.startsWith('/api/workflow-step-types') ? { success: true, data: stepTypes } : []
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() =>
+      expect(screen.queryByText(/Couldn't load the action types catalog/)).toBeNull()
+    );
+  });
+});

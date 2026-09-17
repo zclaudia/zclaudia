@@ -84,7 +84,11 @@ const RANGE_MS: Record<Exclude<UsageStatsRange, 'all'>, number> = {
   '7d': 7 * DAY_MS,
 };
 
-export function computeUsageStats(db: Database, range: UsageStatsRange = 'all'): UsageStatsPayload {
+export function computeUsageStats(
+  db: Database,
+  range: UsageStatsRange = 'all',
+  options: { skipTokenProjection?: boolean } = {}
+): UsageStatsPayload {
   const now = Date.now();
   const windowStartMs = range === 'all' ? 0 : now - RANGE_MS[range];
 
@@ -99,9 +103,11 @@ export function computeUsageStats(db: Database, range: UsageStatsRange = 'all'):
     range === 'all'
       ? count('SELECT COUNT(*) AS n FROM messages')
       : count('SELECT COUNT(*) AS n FROM messages WHERE created_at >= ?', windowStartMs);
-  const allTimeTokens = count(ASSISTANT_TOKENS_SUM_SQL);
+  const allTimeTokens = options.skipTokenProjection ? 0 : count(ASSISTANT_TOKENS_SUM_SQL);
   const totalTokens =
-    range === 'all' ? allTimeTokens : count(ASSISTANT_TOKENS_SUM_WINDOWED_SQL, windowStartMs);
+    options.skipTokenProjection || range === 'all'
+      ? allTimeTokens
+      : count(ASSISTANT_TOKENS_SUM_WINDOWED_SQL, windowStartMs);
 
   // Heatmap data is range-independent: always the full 182-day window.
   const activeDays = db
@@ -113,9 +119,9 @@ export function computeUsageStats(db: Database, range: UsageStatsRange = 'all'):
   const peakRow = db.prepare(PEAK_HOUR_SQL).get(windowStartMs) as
     | { hour: number; c: number }
     | undefined;
-  const favoriteRow = db.prepare(FAVORITE_MODEL_SQL).get(windowStartMs) as
-    | { model: string; total: number }
-    | undefined;
+  const favoriteRow = (
+    options.skipTokenProjection ? undefined : db.prepare(FAVORITE_MODEL_SQL).get(windowStartMs)
+  ) as { model: string; total: number } | undefined;
 
   return {
     sessions,
@@ -238,17 +244,22 @@ export function createUsageStatsRoutes(db: Database, opts: { ttlMs?: number } = 
       const timeZone = readTimeZone(req.query.timeZone);
       const asOf = readAsOf(req.query.asOf) ?? Date.now();
       const ledgerActive = usageLedger.accountingActive();
+      const includeDetails = req.query.include === 'details';
       // The ledger path is window-sensitive (timeZone/asOf): the cache key
       // must cover the full window identity, never just the range.
       const cacheKey = ledgerActive
-        ? `${range}|${timeZone ?? ''}|${readAsOf(req.query.asOf) ?? ''}`
+        ? `${range}|${timeZone ?? ''}|${readAsOf(req.query.asOf) ?? ''}|${includeDetails}`
         : range;
       const hit = cache.get(cacheKey);
       if (!hit || Date.now() - hit.at > ttlMs) {
-        const activity = computeUsageStats(db, range);
-        const data = ledgerActive
-          ? usageLedger.usageStatsPayload(range, activity, timeZone, asOf)
-          : activity;
+        const data = db.transaction(() => {
+          // Ledger totals replace the legacy projection; don't scan and parse
+          // assistant metadata merely to throw that work away.
+          const activity = computeUsageStats(db, range, { skipTokenProjection: ledgerActive });
+          return ledgerActive
+            ? usageLedger.usageStatsPayload(range, activity, timeZone, asOf, includeDetails)
+            : activity;
+        })();
         if (cache.size >= 64) cache.clear();
         cache.set(cacheKey, { data, at: Date.now() });
       }

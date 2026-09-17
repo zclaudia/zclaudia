@@ -532,7 +532,9 @@ function AppContent() {
 
   if (topLevelView.kind === 'settings') {
     return (
-      <div className="flex flex-col h-dvh bg-background text-foreground">
+      // Same root inset as the main layout: Android landscape renders this
+      // wrapper at md+ where no safe-top-spacer exists.
+      <div className="flex flex-col h-dvh bg-background text-foreground pt-[env(safe-area-inset-top,0px)] max-md:pt-0">
         <SettingsPanel
           isOpen={true}
           initialTab={topLevelView.initialTab}
@@ -545,10 +547,13 @@ function AppContent() {
 
   // --- Main render ---
   return (
-    <div className="flex flex-col h-dvh bg-background text-foreground">
+    <div className="flex flex-col h-dvh bg-background text-foreground pt-[env(safe-area-inset-top,0px)] max-md:pt-0">
       {/* Mobile keeps a full-width safe-area strip. On desktop the three columns
           run to y=0 and each owns its top strip, so the macOS traffic lights sit
-          inline in the sidebar header (cleared via left padding) instead. */}
+          inline in the sidebar header (cleared via left padding) instead. The
+          root inset above covers the desktop layout on Android edge-to-edge,
+          where landscape crosses the md breakpoint and the status bar would
+          otherwise paint over the sidebar header. */}
       {isMobile && (
         <div
           className={`safe-top-spacer bg-card flex-shrink-0 ${selectedSessionId && !isAgentExpanded && !isShellTopLevelView ? 'hidden' : ''}`}

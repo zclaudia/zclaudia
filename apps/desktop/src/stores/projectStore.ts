@@ -46,6 +46,7 @@ interface ProjectState {
   providerCapabilities: Record<string, ProviderCapabilities>;
 
   // Actions — projects
+  /** Replace the active backend's REST catalog, retaining other backends' projects. */
   setProjects: (projects: Project[]) => void;
   replaceProjectsForBackend: (backendId: string, projects: Project[]) => void;
   upsertProjectForBackend: (backendId: string, project: Project) => void;
@@ -93,14 +94,36 @@ export const useProjectStore = create<ProjectState>(set => ({
 
   setProjects: projects => {
     const activeBackendId = resolveOwnershipBackendId();
-    if (activeBackendId) {
-      useOwnershipStore.getState().removeProjectOwnersByBackend(activeBackendId);
-      useOwnershipStore.getState().setProjectOwners(
+    if (!activeBackendId) {
+      set({ projects });
+      return;
+    }
+    set(state => {
+      const ownership = useOwnershipStore.getState();
+      const incomingById = new Map(projects.map(project => [project.id, project]));
+      const next: Project[] = [];
+      // REST describes one backend, while this store also contains gateway
+      // projects. Replace in place so refreshes do not reorder other backends.
+      for (const existing of state.projects) {
+        const incoming = incomingById.get(existing.id);
+        if (incoming) {
+          // REST carries the full project, even when updatedAt matches a
+          // partial gateway snapshot. Always apply its fields.
+          next.push(incoming);
+          incomingById.delete(existing.id);
+        } else {
+          const ownerBackendId = ownership.getProjectBackendId(existing.id);
+          if (ownerBackendId && ownerBackendId !== activeBackendId) next.push(existing);
+        }
+      }
+      next.push(...incomingById.values());
+      ownership.removeProjectOwnersByBackend(activeBackendId);
+      ownership.setProjectOwners(
         projects.map(p => p.id),
         activeBackendId
       );
-    }
-    set({ projects });
+      return { projects: next };
+    });
   },
 
   replaceProjectsForBackend: (backendId, projects) =>

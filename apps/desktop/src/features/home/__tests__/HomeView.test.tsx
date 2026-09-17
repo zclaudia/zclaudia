@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import type { RemoteSession } from '../../../stores/sessionsStore';
 import { HomeView } from '../HomeView';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionsStore, LOCAL_BACKEND_KEY } from '../../../stores/sessionsStore';
 import { useOwnershipStore } from '../../../stores/ownershipStore';
 import { useFacadeStore } from '../../../stores/facadeStore';
+import { useServerStore } from '../../../stores/serverStore';
+import { syncBackendDataSnapshot } from '../../../facade/sync/backend-data-sync';
 
 const selectSessionOnBackend = vi.fn();
 vi.mock('../../../hooks/useSelectionCoordinator', () => ({
@@ -52,7 +55,8 @@ describe('HomeView', () => {
       projectBackendIds: {},
       taskOwners: {},
     });
-    useFacadeStore.setState({ localBackendId: null } as any);
+    useFacadeStore.setState({ localBackendId: null, backends: [], currentInstanceId: null });
+    useServerStore.setState({ activeServerId: 'local' });
   });
 
   it('renders nothing before the initial data load completes', () => {
@@ -184,6 +188,90 @@ describe('HomeView', () => {
     render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
     await waitFor(() => expect(generateSessionTitle).toHaveBeenCalled());
     expect(generateSessionTitle.mock.calls[0][1]).toBe('s1');
+  });
+
+  it('keeps remote Recent rows when the active backend REST load completes after its snapshot', () => {
+    useFacadeStore.setState({ localBackendId: 'local-a' });
+    useServerStore.setState({ activeServerId: 'local-a' });
+    syncBackendDataSnapshot({
+      type: 'backend_data_snapshot',
+      backendId: 'remote-b',
+      projects: [{ projectId: 'p2', name: 'Remote project', createdAt: 1, updatedAt: 1 }],
+      sessions: [
+        {
+          sessionId: 'remote-session',
+          projectId: 'p2',
+          title: 'Remote session',
+          runStatus: 'idle',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    });
+    render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
+    expect(screen.getByText('Remote session')).toBeTruthy();
+
+    act(() => {
+      // Apply the active backend's REST result, as useDataLoader does.
+      const store = useProjectStore.getState();
+      store.setProjects([
+        { id: 'p1', name: 'Local project', type: 'code', createdAt: 1, updatedAt: 1 },
+      ]);
+      store.mergeSessions([]);
+      store.setDataServerId('local-a');
+    });
+
+    expect(screen.getByText('Recent')).toBeTruthy();
+    expect(screen.getByText('Remote session')).toBeTruthy();
+    expect(screen.queryByText('Start a session or add a project to get going.')).toBeNull();
+    fireEvent.click(screen.getByText('Remote session'));
+    expect(selectSessionOnBackend).toHaveBeenCalledWith('remote-b', 'remote-session');
+  });
+
+  it('keeps exactly 10 DOM rows when sessions with the same id on different backends reorder', () => {
+    seedProject('p1', 'zclaudia');
+    const session = (id: string, updatedAt: number, name = id): RemoteSession => ({
+      id,
+      name,
+      projectId: 'p1',
+      type: 'regular',
+      createdAt: 1,
+      updatedAt,
+      isActive: false,
+    });
+    const others = Array.from({ length: 8 }, (_, i) => session(`unique-${i}`, 90 - i));
+    const store = useSessionsStore.getState();
+    store.setRemoteSessions('backend-a', [session('same-id', 100, 'Copy A'), ...others]);
+    store.setRemoteSessions('backend-b', [session('same-id', 99, 'Copy B')]);
+    const { container } = render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
+    expect(container.querySelectorAll('li')).toHaveLength(10);
+
+    act(() => {
+      store.setRemoteSessions('backend-a', [
+        session('same-id', 100, 'Copy A'),
+        ...others.map((s, i) => ({ ...s, updatedAt: 200 - i })),
+      ]);
+    });
+
+    expect(container.querySelectorAll('li')).toHaveLength(10);
+    expect(screen.getAllByText('Copy A')).toHaveLength(1);
+    expect(screen.getAllByText('Copy B')).toHaveLength(1);
+    fireEvent.click(screen.getByText('Copy A'));
+    expect(selectSessionOnBackend).toHaveBeenLastCalledWith('backend-a', 'same-id');
+    fireEvent.click(screen.getByText('Copy B'));
+    expect(selectSessionOnBackend).toHaveBeenLastCalledWith('backend-b', 'same-id');
+
+    act(() => {
+      store.setRemoteSessions('backend-a', [
+        ...others.map((s, i) => ({ ...s, updatedAt: 300 - i })),
+        session('new-1', 400),
+        session('new-2', 401),
+        session('new-3', 402),
+      ]);
+    });
+    expect(container.querySelectorAll('li')).toHaveLength(10);
+    expect(screen.queryByText('Copy A')).toBeNull();
+    expect(screen.queryByText('Copy B')).toBeNull();
   });
 
   it('does not request a title for sessions that already have a name', () => {

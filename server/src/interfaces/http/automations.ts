@@ -4,7 +4,9 @@
 
 import { Router, type Request, type Response } from 'express';
 import type { AutomationService } from '../../domains/automations/service.js';
+import { InvalidAutomationTriggerError } from '../../domains/automations/service.js';
 import type { AutomationAction, AutomationTrigger } from '@zclaudia/shared/features/automations';
+import { isValidCron } from '../../utils/cron.js';
 
 interface AutomationBody {
   name?: string;
@@ -15,15 +17,16 @@ interface AutomationBody {
   action?: AutomationAction;
 }
 
-function validate(body: AutomationBody): string | null {
-  if (!body.name?.trim()) return 'name is required';
-  if (!body.trigger?.type) return 'trigger.type is required';
-  if (!body.action?.kind) return 'action.kind is required';
-  if (body.action.kind !== 'activity' && body.action.kind !== 'workflow')
-    return "action.kind must be 'activity' or 'workflow'";
-  if (!body.action.ref?.trim()) return 'action.ref is required';
-  const t = body.trigger;
-  if (t.type === 'cron' && !t.cron?.trim()) return 'trigger.cron is required for cron triggers';
+/** Trigger-shape checks shared by POST (full body) and PATCH (present fields);
+ *  cron format is checked against the scheduler's own parser so a trigger that
+ *  passes here always schedules. */
+function validateTrigger(t: AutomationTrigger): string | null {
+  if (!t.type) return 'trigger.type is required';
+  if (t.type === 'cron') {
+    const cron = t.cron?.trim() ?? '';
+    if (!cron) return 'trigger.cron is required for cron triggers';
+    if (!isValidCron(cron)) return `trigger.cron is not a valid cron expression: ${t.cron}`;
+  }
   if (t.type === 'interval' && (!t.intervalMinutes || t.intervalMinutes < 1))
     return 'trigger.intervalMinutes must be >= 1';
   if (t.type === 'once' && typeof t.onceAt !== 'number')
@@ -32,12 +35,33 @@ function validate(body: AutomationBody): string | null {
   return null;
 }
 
+function validate(body: AutomationBody): string | null {
+  if (!body.name?.trim()) return 'name is required';
+  if (!body.trigger?.type) return 'trigger.type is required';
+  if (!body.action?.kind) return 'action.kind is required';
+  if (body.action.kind !== 'activity' && body.action.kind !== 'workflow')
+    return "action.kind must be 'activity' or 'workflow'";
+  if (!body.action.ref?.trim()) return 'action.ref is required';
+  return validateTrigger(body.trigger);
+}
+
 function fail(res: Response, code: number, message: string, errCode = 'VALIDATION_ERROR') {
   res.status(code).json({ success: false, error: { code: errCode, message } });
 }
 
 export function createAutomationRoutes(automationService: AutomationService): Router {
   const router = Router();
+
+  /** Malformed input (invalid trigger) is a client error; only unexpected
+   *  failures map to 500 — a persisted-but-reported-failed write must not
+   *  look retryable. */
+  const failOn = (res: Response, error: unknown) => {
+    if (error instanceof InvalidAutomationTriggerError) {
+      fail(res, 400, error.message);
+      return;
+    }
+    fail(res, 500, error instanceof Error ? error.message : String(error), 'INTERNAL_ERROR');
+  };
 
   router.post('/', (req: Request, res: Response) => {
     try {
@@ -54,7 +78,7 @@ export function createAutomationRoutes(automationService: AutomationService): Ro
       });
       res.status(201).json({ success: true, data: automation });
     } catch (error) {
-      fail(res, 500, error instanceof Error ? error.message : String(error), 'INTERNAL_ERROR');
+      failOn(res, error);
     }
   });
 
@@ -76,10 +100,14 @@ export function createAutomationRoutes(automationService: AutomationService): Ro
       if (body.enabled !== undefined) patch.enabled = body.enabled;
       if (body.trigger !== undefined) patch.trigger = body.trigger;
       if (body.action !== undefined) patch.action = body.action;
+      if (body.trigger) {
+        const err = validateTrigger(body.trigger);
+        if (err) return fail(res, 400, err);
+      }
       const automation = automationService.updateAutomation(req.params.id, patch);
       res.json({ success: true, data: automation });
     } catch (error) {
-      fail(res, 500, error instanceof Error ? error.message : String(error), 'INTERNAL_ERROR');
+      failOn(res, error);
     }
   });
 

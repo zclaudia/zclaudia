@@ -2,13 +2,13 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button, IconButton } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Tooltip } from '../../components/ui/Tooltip';
-import { Plus, RefreshCw, Play, Pause, Trash2, Zap, Shield, X } from 'lucide-react';
+import { Plus, RefreshCw, Play, Pause, Trash2, Zap, Shield, X, Loader2 } from 'lucide-react';
 import type { Automation, Workflow, WorkflowStepTypeMeta } from '@zclaudia/shared';
 import type { AutomationItem, AutomationBackend } from './automation-types';
 import { automationToItem } from './automation-types';
 import { Select } from '../../components/ui/Select';
 import { createAutomationApi, type AutomationApiType } from './useAutomationApi';
-import { useAutomationByBackend } from './useAutomationByBackend';
+import { useAutomationByBackend, type ByBackend } from './useAutomationByBackend';
 import {
   LoadingState,
   EmptyState,
@@ -19,7 +19,13 @@ import {
   ToneBadge,
   MetaSep,
 } from './AutomationSharedComponents';
-import { AutomationScopeChips, BackendGroups, ScopeChunk, projectLabel } from './AutomationScope';
+import {
+  AutomationScopeChips,
+  BackendGroups,
+  ScopeChunk,
+  projectLabel,
+  type ProjectInfoLite,
+} from './AutomationScope';
 import type { AutomationTabScope } from './AutomationContent';
 import type { Tone } from '../../components/ui/tone';
 import { SchemaForm, missingRequiredKeys } from './SchemaForm';
@@ -32,36 +38,52 @@ export function AutomationsTab({ scope }: { scope: AutomationTabScope }) {
   const { projectId } = scope;
   const projectQuery = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
 
-  const catalog = useAutomationByBackend<AutomationsCatalog>(scope.backends, async api => {
-    // Bindable workflows are global/system ones which a project-scoped list
-    // would exclude, so names come from the unscoped list.
-    const [automations, workflows] = await Promise.all([
-      api.get(`/api/automations${projectQuery}`).then((a: Automation[]) => a ?? []),
-      api.get('/api/workflows').catch(() => [] as Workflow[]),
-    ]);
-    const names = new Map((workflows as Workflow[]).map(w => [w.id, w.name]));
-    const items = automations
-      .map(a => automationToItem(a, names))
-      .sort((a, b) => (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0));
-    return { items };
-  });
+  const catalog = useAutomationByBackend<AutomationsCatalog>(
+    scope.backends,
+    async api => {
+      // Bindable workflows are global/system ones which a project-scoped list
+      // would exclude, so names come from the unscoped list.
+      const [automations, workflows] = await Promise.all([
+        api.get(`/api/automations${projectQuery}`).then((a: Automation[]) => a ?? []),
+        api.get('/api/workflows').catch(() => [] as Workflow[]),
+      ]);
+      const names = new Map((workflows as Workflow[]).map(w => [w.id, w.name]));
+      const items = automations
+        .map(a => automationToItem(a, names))
+        .sort((a, b) => (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0));
+      return { items };
+    },
+    // The fetcher closes over the project filter; without this dependency a
+    // scope switch kept rendering the previous scope's rows until Refresh.
+    [projectId]
+  );
   const total = [...catalog.data.values()].reduce((n, c) => n + c.items.length, 0);
 
   const [showCreate, setShowCreate] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  /** In-flight row actions, keyed `${itemId}:${action}` — the button shows it. */
+  const [pendingKeys, setPendingKeys] = useState<ReadonlySet<string>>(new Set());
 
   /** Run one mutation against the row's backend; a failure must never look
    *  like a successful no-op, so it lands in a banner and the list refetches. */
   const mutate = async (
+    key: string,
     backendId: string,
     label: string,
     fn: (api: AutomationApiType) => Promise<unknown>
   ) => {
+    setPendingKeys(prev => new Set(prev).add(key));
     try {
       await fn(createAutomationApi(backendId));
       setActionError(null);
     } catch (error) {
       setActionError(`${label}: ${error instanceof Error ? error.message : 'unknown error'}`);
+    } finally {
+      setPendingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
     }
     catalog.refresh();
   };
@@ -108,8 +130,12 @@ export function AutomationsTab({ scope }: { scope: AutomationTabScope }) {
       )}
 
       {showCreate && scope.backends.length > 0 && (
+        // Remounting on project scope change clears the draft with the scope:
+        // a draft typed under one project must not silently submit to another.
         <CreateAutomationForm
+          key={projectId ?? 'global'}
           backends={scope.backends}
+          projects={scope.projects}
           projectId={projectId}
           onCancel={() => setShowCreate(false)}
           onCreated={() => {
@@ -142,20 +168,22 @@ export function AutomationsTab({ scope }: { scope: AutomationTabScope }) {
               backend={backend}
               scope={scope}
               sections={!scope.grouped}
+              pendingKeys={pendingKeys}
               onToggle={item =>
                 mutate(
+                  `${item.id}:toggle`,
                   backend.backendId,
                   `Failed to ${item.enabled ? 'disable' : 'enable'} "${item.name}"`,
                   api => api.patch(`/api/automations/${item.id}`, { enabled: !item.enabled })
                 )
               }
               onTrigger={item =>
-                mutate(backend.backendId, `Failed to run "${item.name}"`, api =>
+                mutate(`${item.id}:run`, backend.backendId, `Failed to run "${item.name}"`, api =>
                   api.post(`/api/automations/${item.id}/trigger`)
                 )
               }
               onDelete={item =>
-                mutate(backend.backendId, `Failed to delete "${item.name}"`, api =>
+                mutate(`${item.id}:delete`, backend.backendId, `Failed to delete "${item.name}"`, api =>
                   api.del(`/api/automations/${item.id}`)
                 )
               }
@@ -172,6 +200,7 @@ function AutomationList({
   backend,
   scope,
   sections,
+  pendingKeys,
   onToggle,
   onTrigger,
   onDelete,
@@ -181,6 +210,8 @@ function AutomationList({
   scope: AutomationTabScope;
   /** Active / Disabled sections for one backend; a flat list under backend headers. */
   sections: boolean;
+  /** In-flight row actions, keyed `${itemId}:${action}`. */
+  pendingKeys: ReadonlySet<string>;
   onToggle: (item: AutomationItem) => void;
   onTrigger: (item: AutomationItem) => void;
   onDelete: (item: AutomationItem) => void;
@@ -190,6 +221,9 @@ function AutomationList({
       key={item.id}
       item={item}
       scopeLabel={projectLabel(scope.projects, backend.backendId, item.projectId)}
+      runPending={pendingKeys.has(`${item.id}:run`)}
+      togglePending={pendingKeys.has(`${item.id}:toggle`)}
+      deletePending={pendingKeys.has(`${item.id}:delete`)}
       onToggle={() => onToggle(item)}
       onTrigger={() => onTrigger(item)}
       onDelete={() => onDelete(item)}
@@ -215,11 +249,13 @@ function AutomationList({
 
 function CreateAutomationForm({
   backends,
+  projects,
   projectId,
   onCancel,
   onCreated,
 }: {
   backends: AutomationBackend[];
+  projects: ByBackend<ProjectInfoLite[]>;
   projectId?: string;
   onCancel: () => void;
   onCreated: () => void;
@@ -246,27 +282,51 @@ function CreateAutomationForm({
   const [createError, setCreateError] = useState<string | null>(null);
   const [stepTypes, setStepTypes] = useState<WorkflowStepTypeMeta[]>([]);
   const [actionConfig, setActionConfig] = useState<Record<string, unknown>>({});
+  const [submitting, setSubmitting] = useState(false);
+  /** The action/workflow catalogs failed to load; an empty picker must say
+   *  why instead of reading as "nothing to pick". Retried independently of
+   *  the list above. */
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  /** Bumped by the catalog Retry button. */
+  const [catalogNonce, setCatalogNonce] = useState(0);
 
   useEffect(() => {
-    // Fetch all workflows (unfiltered) for the picker: bindable workflows are global/system
-    // workflows (e.g. the seeded Auto-Commit), which /api/workflows?projectId=X would exclude.
-    api
-      .get('/api/workflows')
-      .then(setAvailableWorkflows)
-      .catch(() => setAvailableWorkflows([]));
-  }, [api]);
-
-  useEffect(() => {
-    api
-      .get('/api/workflow-step-types')
-      .then(
-        (res: { success?: boolean; data?: WorkflowStepTypeMeta[] } | WorkflowStepTypeMeta[]) => {
-          const data = Array.isArray(res) ? res : (res.data ?? []);
-          setStepTypes(data);
-        }
-      )
-      .catch(() => setStepTypes([]));
-  }, [api]);
+    let cancelled = false;
+    void Promise.allSettled([
+      api.get('/api/workflow-step-types'),
+      // All workflows (unfiltered): bindable workflows are global/system
+      // workflows (e.g. the seeded Auto-Commit), which /api/workflows?projectId=X
+      // would exclude.
+      api.get('/api/workflows'),
+    ]).then(([stepTypesRes, workflowsRes]) => {
+      if (cancelled) return;
+      if (stepTypesRes.status === 'fulfilled') {
+        const res = stepTypesRes.value as
+          | { success?: boolean; data?: WorkflowStepTypeMeta[] }
+          | WorkflowStepTypeMeta[];
+        setStepTypes(Array.isArray(res) ? res : (res.data ?? []));
+      } else {
+        setStepTypes([]);
+      }
+      if (workflowsRes.status === 'fulfilled') {
+        setAvailableWorkflows((workflowsRes.value as Workflow[]) ?? []);
+      } else {
+        setAvailableWorkflows([]);
+      }
+      const failed =
+        stepTypesRes.status === 'rejected' && workflowsRes.status === 'rejected'
+          ? 'action types and workflows'
+          : stepTypesRes.status === 'rejected'
+            ? 'action types'
+            : workflowsRes.status === 'rejected'
+              ? 'workflows'
+              : null;
+      setCatalogError(failed ? `Couldn't load the ${failed} catalog.` : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, catalogNonce]);
 
   const inlineActionOptions = useMemo(
     () =>
@@ -283,6 +343,7 @@ function CreateAutomationForm({
   const handleCreate = useCallback(async () => {
     if (!newName.trim()) return;
     if (newActionType === 'workflow' && !workflowRef) return;
+    if (submitting) return;
 
     let action:
       | { kind: 'workflow'; ref: string }
@@ -290,6 +351,16 @@ function CreateAutomationForm({
     if (newActionType === 'workflow') {
       action = { kind: 'workflow', ref: workflowRef };
     } else {
+      // An action picked while its catalog was down would be posted as an
+      // unknown ref; block it instead of shipping something that can never run.
+      if (catalogError) {
+        setCreateError("The action catalog didn't load — retry it, then pick the action again.");
+        return;
+      }
+      if (stepTypes.length > 0 && !selectedStepType) {
+        setCreateError(`Unknown action type: ${newActionType}`);
+        return;
+      }
       const missing = missingRequiredKeys(selectedStepType?.configSchema, actionConfig);
       if (missing.length) {
         setCreateError(`Missing required: ${missing.join(', ')}`);
@@ -319,6 +390,7 @@ function CreateAutomationForm({
     if (newTriggerType === 'event') trigger.event = newEvent;
 
     try {
+      setSubmitting(true);
       setCreateError(null);
       await api.post('/api/automations', {
         name: newName.trim(),
@@ -329,10 +401,13 @@ function CreateAutomationForm({
       onCreated();
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'Failed to create automation');
+    } finally {
+      setSubmitting(false);
     }
   }, [
     api,
     actionConfig,
+    catalogError,
     newActionType,
     newCron,
     newEvent,
@@ -343,11 +418,21 @@ function CreateAutomationForm({
     onCreated,
     projectId,
     selectedStepType,
+    stepTypes.length,
+    submitting,
     workflowRef,
   ]);
 
+  const targetBackend = backends.find(b => b.backendId === targetBackendId);
+
   return (
     <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+      {/* The submit scope stays visible so a draft's destination is never a
+          surprise (the project chips above own the scope, not this form). */}
+      <div className="text-2xs text-muted-foreground">
+        Saving to {targetBackend?.name ?? targetBackendId} ·{' '}
+        {projectLabel(projects, targetBackendId, projectId)}
+      </div>
       {backends.length > 1 && (
         <div className="flex flex-wrap items-center gap-1">
           <span className="text-xs text-muted-foreground">Backend</span>
@@ -453,6 +538,22 @@ function CreateAutomationForm({
           onChange={setActionConfig}
         />
       )}
+      {catalogError && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive"
+        >
+          <span>{catalogError}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCatalogNonce(n => n + 1)}
+            className="shrink-0"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
       {createError && <div className="text-xs text-destructive">{createError}</div>}
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onCancel} className="max-md:flex-1">
@@ -461,10 +562,13 @@ function CreateAutomationForm({
         <Button
           variant="primary"
           onClick={handleCreate}
-          disabled={!newName.trim() || (newActionType === 'workflow' && !workflowRef)}
+          disabled={
+            submitting || !newName.trim() || (newActionType === 'workflow' && !workflowRef)
+          }
           className="max-md:flex-1"
         >
-          Create
+          {submitting && <Loader2 size={13} className="animate-spin" />}
+          {submitting ? 'Creating…' : 'Create'}
         </Button>
       </div>
     </div>
@@ -476,12 +580,18 @@ function CreateAutomationForm({
 function AutomationCard({
   item,
   scopeLabel,
+  runPending,
+  togglePending,
+  deletePending,
   onToggle,
   onTrigger,
   onDelete,
 }: {
   item: AutomationItem;
   scopeLabel: string;
+  runPending: boolean;
+  togglePending: boolean;
+  deletePending: boolean;
   onToggle: () => void;
   onTrigger: () => void;
   onDelete: () => void;
@@ -494,12 +604,25 @@ function AutomationCard({
         : item.enabled
           ? 'success'
           : 'neutral';
+  // Long names only differ at the tail ("…场景甲" / "…场景乙"); tap the name
+  // to unfold the full text on both pointer and touch.
+  const [nameExpanded, setNameExpanded] = useState(false);
   return (
     <ListCard
       data-automation-card
       muted={!item.enabled}
       lead={<StatusDot tone={tone} pulse={item.status === 'running'} />}
-      title={item.name}
+      title={
+        <button
+          type="button"
+          onClick={() => setNameExpanded(v => !v)}
+          aria-expanded={nameExpanded}
+          className="min-w-0 rounded-xs text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          {item.name}
+        </button>
+      }
+      titleExpanded={nameExpanded}
       titleExtra={item.isSystem ? <ToneBadge tone="neutral">System</ToneBadge> : undefined}
       meta={
         <>
@@ -539,18 +662,41 @@ function AutomationCard({
         ) : (
           <>
             <Tooltip content="Run now">
-              <IconButton onClick={onTrigger} aria-label="Run now">
-                <Play size={12} />
+              <IconButton onClick={onTrigger} aria-label="Run now" disabled={runPending}>
+                {runPending ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Play size={12} />
+                )}
               </IconButton>
             </Tooltip>
             <Tooltip content={item.enabled ? 'Disable' : 'Enable'}>
-              <IconButton onClick={onToggle} aria-label={item.enabled ? 'Disable' : 'Enable'}>
-                {item.enabled ? <Pause size={12} /> : <Play size={12} />}
+              <IconButton
+                onClick={onToggle}
+                aria-label={item.enabled ? 'Disable' : 'Enable'}
+                disabled={togglePending}
+              >
+                {togglePending ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : item.enabled ? (
+                  <Pause size={12} />
+                ) : (
+                  <Play size={12} />
+                )}
               </IconButton>
             </Tooltip>
             <Tooltip content="Delete">
-              <IconButton onClick={onDelete} aria-label="Delete" className="hover:text-destructive">
-                <Trash2 size={12} />
+              <IconButton
+                onClick={onDelete}
+                aria-label="Delete"
+                disabled={deletePending}
+                className="hover:text-destructive"
+              >
+                {deletePending ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Trash2 size={12} />
+                )}
               </IconButton>
             </Tooltip>
           </>

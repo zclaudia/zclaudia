@@ -67,6 +67,29 @@ describe('UsageStatsStrip', () => {
     useServerStore.setState({ activeServerId: null });
   });
 
+  it('reuses the captured details across tab switches without querying newer totals', async () => {
+    const runtime = await getRuntimeUsage();
+    getRuntimeUsage.mockClear();
+    getUsageStats.mockResolvedValue({
+      ...payload,
+      details: {
+        models: { days: [], models: [], trackedSince: null, capturedAt: 1 },
+        runtime,
+      },
+    });
+    render(<UsageStatsStrip />);
+    await screen.findByText('Sessions');
+    fireEvent.click(screen.getByRole('button', { name: 'Models', exact: true }));
+    await screen.findByText(/No model data yet/);
+    fireEvent.click(screen.getByRole('button', { name: 'Runtimes', exact: true }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-testid="runtimes-view"]')).toBeTruthy()
+    );
+    expect(getModelStats).not.toHaveBeenCalled();
+    expect(getRuntimeUsage).not.toHaveBeenCalled();
+    expect(getUsageStats).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the numbers, heatmap, and fun line', async () => {
     getUsageStats.mockResolvedValue(payload);
     render(<UsageStatsStrip />);
@@ -264,7 +287,10 @@ describe('UsageStatsStrip', () => {
     render(<UsageStatsStrip />);
     await waitFor(() => expect(screen.getByText('241')).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: '7d' }));
-    expect(getUsageStats).toHaveBeenLastCalledWith(expect.anything(), '7d');
+    expect(getUsageStats).toHaveBeenLastCalledWith(expect.anything(), '7d', {
+      asOf: expect.any(Number),
+      includeDetails: true,
+    });
     // The previous range must not appear under the new range selection.
     expect(screen.queryByText('241')).toBeNull();
     resolveSecond({ ...payload, sessions: 9 });
@@ -299,7 +325,10 @@ describe('UsageStatsStrip', () => {
       useServerStore.setState({ activeServerId: 'remote-be-9' });
     });
     await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
-    expect(getUsageStats).toHaveBeenCalledWith('remote-be-9', 'all');
+    expect(getUsageStats).toHaveBeenCalledWith('remote-be-9', 'all', {
+      asOf: expect.any(Number),
+      includeDetails: true,
+    });
     expect(screen.queryByText(/Usage stats are unavailable/)).toBeNull();
   });
 
@@ -309,7 +338,10 @@ describe('UsageStatsStrip', () => {
     getUsageStats.mockResolvedValue(payload);
     render(<UsageStatsStrip />);
     await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
-    expect(getUsageStats).toHaveBeenCalledWith('remote-be-9', 'all');
+    expect(getUsageStats).toHaveBeenCalledWith('remote-be-9', 'all', {
+      asOf: expect.any(Number),
+      includeDetails: true,
+    });
   });
 
   it('shows the unavailable notice without fetching when no backend exists at all', async () => {

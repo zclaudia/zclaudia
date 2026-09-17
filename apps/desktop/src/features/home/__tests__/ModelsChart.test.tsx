@@ -79,7 +79,7 @@ describe('ModelsChart', () => {
     await waitFor(() => expect(getModelStats).toHaveBeenCalledTimes(1));
     rerender(<ModelsChart range="7d" />);
     await waitFor(() => expect(getModelStats).toHaveBeenCalledTimes(2));
-    expect(getModelStats).toHaveBeenLastCalledWith(expect.anything(), '7d');
+    expect(getModelStats).toHaveBeenLastCalledWith(expect.anything(), '7d', { asOf: undefined });
   });
 
   it('shows a compact unavailable notice on fetch failure instead of vanishing', async () => {
@@ -127,6 +127,6 @@ describe('ModelsChart', () => {
     getModelStats.mockResolvedValue(payload);
     render(<ModelsChart range="all" />);
     await waitFor(() => expect(screen.getByText('Fable 5')).toBeTruthy());
-    expect(getModelStats).toHaveBeenCalledWith('remote-be-9', 'all');
+    expect(getModelStats).toHaveBeenCalledWith('remote-be-9', 'all', { asOf: undefined });
   });
 });

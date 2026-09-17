@@ -169,7 +169,12 @@ describe('pumpClaudeStream context reporting', () => {
           {
             type: 'result',
             subtype,
-            usage: { input_tokens: 100, output_tokens: 20 },
+            usage: {
+              input_tokens: 100,
+              output_tokens: 20,
+              cache_read_input_tokens: 0,
+              cache_creation_input_tokens: 0,
+            },
           },
         ]),
         {} as never

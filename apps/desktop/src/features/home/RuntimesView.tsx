@@ -126,7 +126,15 @@ function tokensOrDash(value: number | null): string {
  * per-source coverage honestly: an unreachable backend is missing from "N/M
  * sources", never silently dropped.
  */
-export function RuntimesView({ range }: { range: UsageStatsRange }) {
+export function RuntimesView({
+  range,
+  asOf: requestedAsOf,
+  snapshots,
+}: {
+  range: UsageStatsRange;
+  asOf?: number;
+  snapshots?: Record<string, RuntimeUsagePayload | undefined>;
+}) {
   const targets = useStatsBackendTargets();
   const targetKey = targets.map(t => t.backendId).join(',');
   const [perBackend, setPerBackend] = useState<BackendRuntimeUsage[]>([]);
@@ -137,12 +145,17 @@ export function RuntimesView({ range }: { range: UsageStatsRange }) {
     setPerBackend([]);
     setLoaded(false);
     // One pinned snapshot instant for every backend in this merge.
-    const asOf = Date.now();
+    const asOf = requestedAsOf ?? Date.now();
     Promise.all(
       targets.map(target =>
-        getRuntimeUsage(target.backendId, range, { asOf })
-          .then(payload => ({ backendId: target.backendId, name: target.name, payload }))
-          .catch(() => null)
+        snapshots && !Object.hasOwn(snapshots, target.backendId)
+          ? Promise.resolve(null)
+          : (snapshots?.[target.backendId]
+              ? Promise.resolve(snapshots[target.backendId])
+              : getRuntimeUsage(target.backendId, range, { asOf })
+            )
+              .then(payload => ({ backendId: target.backendId, name: target.name, payload }))
+              .catch(() => null)
       )
     ).then(results => {
       if (cancelled) return;
@@ -154,7 +167,7 @@ export function RuntimesView({ range }: { range: UsageStatsRange }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetKey, range]);
+  }, [targetKey, range, requestedAsOf, snapshots]);
 
   const { merged, deduplicated } = useMemo(() => aggregateRuntimeUsage(perBackend), [perBackend]);
 

@@ -62,6 +62,20 @@ describe('POST /api/automations', () => {
       .send({ name: 'x', trigger: { type: 'manual' }, action: { kind: 'activity' } });
     expect(res.status).toBe(400);
   });
+
+  it('rejects a malformed cron with 400 before touching the service', async () => {
+    const svc = svcStub();
+    const res = await request(appWith(svc))
+      .post('/api/automations')
+      .send({
+        name: 'x',
+        trigger: { type: 'cron', cron: 'not-a-cron ' },
+        action: { kind: 'activity', ref: 'shell' },
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toContain('cron');
+    expect(svc.createAutomation).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/automations/:id/trigger', () => {
@@ -100,5 +114,14 @@ describe('PATCH /api/automations/:id', () => {
       'a1',
       expect.not.objectContaining({ systemKey: expect.anything() })
     );
+  });
+
+  it('rejects a malformed cron trigger with 400', async () => {
+    const svc = svcStub();
+    const res = await request(appWith(svc))
+      .patch('/api/automations/a1')
+      .send({ trigger: { type: 'cron', cron: 'nope' } });
+    expect(res.status).toBe(400);
+    expect(svc.updateAutomation).not.toHaveBeenCalled();
   });
 });

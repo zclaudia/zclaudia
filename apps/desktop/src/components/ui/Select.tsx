@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
+import { useAndroidBack } from '../../hooks/useAndroidBack';
 
 export interface SelectOption<T extends string = string> {
   value: T;
@@ -86,6 +87,17 @@ export function Select<T extends string = string>({
 
   const selected = useMemo(() => options.find(opt => opt.value === value), [options, value]);
   const sizing = SIZE_CLASSES[size];
+
+  // Android back closes the open menu before it escapes the shell — an open
+  // picker above a half-typed form must never cost the user their draft.
+  useAndroidBack(
+    () => {
+      setIsOpen(false);
+      triggerRef.current?.focus();
+    },
+    isOpen,
+    40
+  );
 
   const firstEnabled = useCallback(
     (from: number, dir: 1 | -1) => {

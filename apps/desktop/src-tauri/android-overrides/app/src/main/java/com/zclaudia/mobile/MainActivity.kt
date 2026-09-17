@@ -7,8 +7,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.webkit.JavascriptInterface
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 
@@ -58,6 +60,25 @@ class MainActivity : TauriActivity() {
     })
   }
 
+  /**
+   * Lets the web app keep the edge-to-edge system bar icons in sync with its
+   * own theme (light bars = dark icons). `enableEdgeToEdge` only picks the
+   * appearance once from the system setting, while the app theme lives in the
+   * WebView — a dark app theme on a light system setting left black icons on
+   * the dark background.
+   */
+  class SystemBarsBridge(private val activity: MainActivity) {
+    @JavascriptInterface
+    fun setLight(light: Boolean) {
+      activity.runOnUiThread {
+        val window = activity.window
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.isAppearanceLightStatusBars = light
+        controller.isAppearanceLightNavigationBars = light
+      }
+    }
+  }
+
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
@@ -88,7 +109,14 @@ class MainActivity : TauriActivity() {
       if (webView != null) {
         webView.addJavascriptInterface(FileHelper(this@MainActivity), "AndroidFiles")
         webView.addJavascriptInterface(NotificationBridge(), "AndroidNotifications")
+        webView.addJavascriptInterface(SystemBarsBridge(this@MainActivity), "AndroidSystemBars")
         dispatchPendingSelectionTarget(webView)
+        // ThemeContext applies the saved theme before this bridge exists; tell
+        // it to re-sync the system bars now that the bridge is reachable.
+        webView.evaluateJavascript(
+          "window.dispatchEvent(new Event('android-system-bars-ready'));",
+          null
+        )
         android.util.Log.i("MainActivity", "AndroidFiles bridge registered (attempt $attempt)")
       } else if (attempt < 20) {
         handler.postDelayed({ registerNativeBridgesWhenReady(attempt + 1) }, 100)

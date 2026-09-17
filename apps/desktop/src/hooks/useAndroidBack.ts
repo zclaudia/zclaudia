@@ -9,7 +9,9 @@ import { useEffect, useRef } from 'react';
  * behavior can continue.
  *
  * Priority guide (higher = runs first):
- *   30 — Settings content (back to tab list)
+ *   45 — Permission dialog decision
+ *   40 — Open Select menu (close the picker before anything underneath)
+ *   30 — Settings content (back to tab list) / Modal (close)
  *   20 — Settings / Agent panel (close overlay) / shell-mode escape (back to app)
  *   10 — Sidebar drawer (close drawer)
  */

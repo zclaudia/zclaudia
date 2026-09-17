@@ -100,6 +100,17 @@ export function aggregateUsageStats(
   const accounting = all.every(s => s.accounting)
     ? mergeAccounting(all.map(s => s.accounting).filter((s): s is AccountingSummary => !!s))
     : undefined;
+  // A shared capture includes complete model allocations from each dataset.
+  // Its global favorite can differ from the favorite on the busiest backend.
+  const modelTotals = all.every(s => s.details)
+    ? aggregateModelStats(all.flatMap(s => (s.details ? [s.details.models] : [])))
+    : null;
+  const favoriteModel = modelTotals
+    ? ([...modelTotals.models]
+        .filter(model => model.model !== 'Unknown')
+        .sort((a, b) => b.totalTokens - a.totalTokens || a.model.localeCompare(b.model))[0]
+        ?.model ?? null)
+    : heaviest.favoriteModel;
 
   return {
     sessions: all.reduce((n, s) => n + s.sessions, 0),
@@ -110,7 +121,7 @@ export function aggregateUsageStats(
     currentStreakDays: currentStreak(dates, today),
     longestStreakDays: longestStreak(inRange),
     peakHour: heaviest.peakHour,
-    favoriteModel: heaviest.favoriteModel,
+    favoriteModel,
     activeDays,
     capturedAt: Math.max(...all.map(s => s.capturedAt)),
     ...(accounting ? { accounting } : {}),

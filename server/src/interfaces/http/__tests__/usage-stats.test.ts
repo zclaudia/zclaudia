@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import Database from 'better-sqlite3';
+import { migration as usageLedgerMigration } from '../../../infra/storage/migrations/045_runtime_usage_records.js';
 import {
   computeUsageStats,
   computeStreak,
@@ -316,6 +317,25 @@ describe('GET /usage', () => {
     const second = await request(app).get('/api/stats/usage');
     expect(first.body.data.sessions).toBe(1);
     expect(second.body.data.sessions).toBe(1);
+  });
+
+  it('returns atomic detail views without reusing the overview-only cache entry', async () => {
+    db.exec(usageLedgerMigration.sql);
+    seedSession('s1');
+    const asOf = Date.now();
+    seedMessage('assistant', asOf - 1000, 500, { model: 'm', output: 100 });
+    const app = makeApp(60_000);
+    const query = `asOf=${asOf}&timeZone=Asia%2FShanghai`;
+    const overview = await request(app).get(`/api/stats/usage?${query}`);
+    expect(overview.body.data.details).toBeUndefined();
+    const res = await request(app).get(`/api/stats/usage?${query}&include=details`);
+    expect(res.status).toBe(200);
+    const { data } = res.body;
+    expect(data.totalTokens).toBe(500);
+    expect(data.details.runtime.totals.recordedTokens).toBe(500);
+    expect(data.details.runtime.asOf).toBe(asOf);
+    expect(data.details.models.models[0].totalTokens).toBe(500);
+    expect(data.details.models.datasetId).toBe(data.datasetId);
   });
 
   it('parses the range param and caches per range', async () => {

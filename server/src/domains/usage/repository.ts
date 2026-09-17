@@ -11,6 +11,7 @@ import type {
   RuntimeUsageIdentity,
   RuntimeUsageRecordStatus,
   StoredUsageRecord,
+  UsageStatsRecord,
 } from './types.js';
 import { FINALIZED_EXECUTION_STATES } from './types.js';
 
@@ -394,14 +395,17 @@ export class RuntimeUsageRepository {
 
   // === aggregation ===
 
-  selectWindowRows(startUtcMs: number, endUtcMs: number): StoredUsageRecord[] {
+  selectWindowRows(startUtcMs: number, endUtcMs: number): UsageStatsRecord[] {
     const rows = this.db
       .prepare(
-        `SELECT * FROM runtime_usage_records
+        `SELECT runtime_id, execution_state, accounted_at, usage_status,
+                input_uncached, cache_read, cache_write, output_tokens,
+                reasoning_output, total_tokens, model_breakdown_json, discrepancy
+         FROM runtime_usage_records
                 WHERE accounted_at >= ? AND accounted_at < ?`
       )
       .all(startUtcMs, endUtcMs) as Array<Record<string, unknown>>;
-    return rows.map(mapRow);
+    return rows.map(mapStatsRow);
   }
 
   /** Sum of known totals over FINALIZED rows (the default history total). */
@@ -451,7 +455,7 @@ function summarizeModelAllocation(allocation: {
 
 type RecordStatus = RuntimeUsageRecordStatus;
 
-function mapRow(row: Record<string, unknown>): StoredUsageRecord {
+function mapStatsRow(row: Record<string, unknown>): UsageStatsRecord {
   const tokens = {
     inputUncached: (row.input_uncached as number | null) ?? null,
     cacheRead: (row.cache_read as number | null) ?? null,
@@ -469,6 +473,18 @@ function mapRow(row: Record<string, unknown>): StoredUsageRecord {
       modelBreakdown = null;
     }
   }
+  return {
+    runtimeId: row.runtime_id as string,
+    executionState: row.execution_state as RuntimeUsageExecutionState,
+    accountedAt: (row.accounted_at as number | null) ?? null,
+    usageStatus: row.usage_status as RecordStatus,
+    tokens,
+    modelBreakdown,
+    discrepancy: (row.discrepancy as string | null) ?? null,
+  };
+}
+
+function mapRow(row: Record<string, unknown>): StoredUsageRecord {
   let checkpoint: StoredUsageRecord['checkpoint'] = null;
   if (typeof row.source_checkpoint_json === 'string') {
     try {
@@ -478,26 +494,20 @@ function mapRow(row: Record<string, unknown>): StoredUsageRecord {
     }
   }
   return {
+    ...mapStatsRow(row),
     invocationId: row.invocation_id as string,
     runId: row.run_id as string,
     sessionId: row.session_id as string,
     assistantMessageId: (row.assistant_message_id as string | null) ?? null,
-    runtimeId: row.runtime_id as string,
-    executionState: row.execution_state as RuntimeUsageExecutionState,
     startedAt: (row.started_at as number | null) ?? null,
     endedAt: (row.ended_at as number | null) ?? null,
-    accountedAt: (row.accounted_at as number | null) ?? null,
     updatedAt: row.updated_at as number,
-    usageStatus: row.usage_status as RecordStatus,
     reason: (row.reason as string | null) ?? null,
     revision: (row.revision as number) ?? 0,
     sourceKind: (row.source_kind as string | null) ?? null,
     ruleVersion: (row.rule_version as number | null) ?? null,
     includesSubagents: (row.includes_subagents as string | null) ?? null,
-    tokens,
     contextUsedTokens: (row.context_used_tokens as number | null) ?? null,
-    modelBreakdown,
-    discrepancy: (row.discrepancy as string | null) ?? null,
     checkpoint,
     legacyMessageId: (row.legacy_message_id as string | null) ?? null,
     accountingVersion: (row.accounting_version as number) ?? 1,

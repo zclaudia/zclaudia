@@ -238,7 +238,7 @@ function SessionGroup({
       <div className="px-2 text-[11px] font-medium text-muted-foreground">{label}</div>
       <ul className="mt-1">
         {rows.map(row => (
-          <li key={row.id}>
+          <li key={JSON.stringify([row.backendKey, row.id])}>
             <button
               onClick={() => onOpen(row)}
               className="w-full px-2 py-1.5 rounded-md text-left hover:bg-secondary transition-colors group"

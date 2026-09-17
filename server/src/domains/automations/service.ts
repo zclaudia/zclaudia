@@ -21,7 +21,7 @@ import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { AutomationRepository } from './repository.js';
 import { WorkflowRunRepository } from '../workflows/workflow-run-repository.js';
 import { newId } from '../../utils/uuid.js';
-import { computeNextCronRun } from '../../utils/cron.js';
+import { computeNextCronRun, isValidCron } from '../../utils/cron.js';
 import { pluginEvents } from '../../infra/events/index.js';
 import { SYSTEM_PERMISSION_AUTOMATION_KEY } from './templates.js';
 
@@ -54,6 +54,15 @@ export class ImmutableSystemAutomationError extends Error {
   constructor(message = 'System automation is immutable') {
     super(message);
     this.name = 'ImmutableSystemAutomationError';
+  }
+}
+
+/** A trigger that can never fire (e.g. a malformed cron). Rejected before any
+ *  write happens — persisting it used to return 500 while the row stayed. */
+export class InvalidAutomationTriggerError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidAutomationTriggerError';
   }
 }
 
@@ -129,6 +138,7 @@ export class AutomationService {
     isSystem?: boolean;
     systemKey?: string;
   }): Automation {
+    this.assertSchedulable(data.trigger);
     const automation = this.repo.create({
       projectId: data.projectId,
       name: data.name,
@@ -151,6 +161,14 @@ export class AutomationService {
   ): Automation {
     const existing = this.repo.findById(id);
     if (existing?.isSystem) throw new ImmutableSystemAutomationError();
+    // Validate the merged trigger up front — repo.update used to persist an
+    // invalid one and only then fail, leaving a broken row behind. A patch
+    // that disables the automation skips this: it must stay possible to
+    // disable a legacy row whose stored trigger is broken.
+    if (data.trigger) {
+      const staysEnabled = (data.enabled ?? existing?.enabled) !== false;
+      if (staysEnabled) this.assertSchedulable(data.trigger);
+    }
     const automation = this.repo.update(id, data);
     this.syncSchedule(automation);
     this.rebuildEventSubscriptions();
@@ -294,6 +312,17 @@ export class AutomationService {
     }
   }
 
+  /** Reject triggers that could never fire so they never reach the database.
+   *  Uses the same parser as the scheduler, so what passes here always
+   *  schedules. */
+  private assertSchedulable(trigger: AutomationTrigger): void {
+    if (trigger.type === 'cron' && !isValidCron(trigger.cron ?? '')) {
+      throw new InvalidAutomationTriggerError(
+        `Invalid cron expression: ${JSON.stringify(trigger.cron ?? '')}`
+      );
+    }
+  }
+
   private syncSchedule(automation: Automation): void {
     if (!automation.enabled) {
       this.nextRunByAutomation.delete(automation.id);
@@ -309,8 +338,18 @@ export class AutomationService {
     else this.nextRunByAutomation.set(automation.id, next);
   }
 
+  /** Null for anything that cannot fire. Malformed cron returns null instead of
+   *  throwing so a legacy bad row can't break startup or the tick loop — new
+   *  writes are already rejected by `assertSchedulable`. */
   private computeNextRun(t: AutomationTrigger): number | null {
-    if (t.type === 'cron' && t.cron) return computeNextCronRun(t.cron);
+    if (t.type === 'cron' && t.cron) {
+      try {
+        return computeNextCronRun(t.cron);
+      } catch (err) {
+        console.error(`[Automation] Unparseable cron ${JSON.stringify(t.cron)}:`, err);
+        return null;
+      }
+    }
     if (t.type === 'interval' && t.intervalMinutes)
       return Date.now() + t.intervalMinutes * 60 * 1000;
     if (t.type === 'once' && t.onceAt) return t.onceAt > Date.now() ? t.onceAt : null;

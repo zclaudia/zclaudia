@@ -147,13 +147,77 @@ describe('countersToBreakdown', () => {
 // === Claude ===
 
 function claudeAssistant(id: string, usage: Record<string, number>, subagent = false) {
-  return { messageId: id, isSubagent: subagent, usage };
+  return {
+    messageId: id,
+    isSubagent: subagent,
+    usage: { cache_read_input_tokens: 0, cache_creation_input_tokens: 0, ...usage },
+  };
 }
 
 describe('ClaudeUsageAccumulator', () => {
   let acc: ClaudeUsageAccumulator;
   beforeEach(() => {
     acc = new ClaudeUsageAccumulator();
+  });
+
+  it('preserves unreported categories as unknown instead of claiming complete usage', () => {
+    const result = acc.onResult({ errored: false, usage: { input_tokens: 7 } });
+    expect(result.tokens).toMatchObject({
+      inputUncached: 7,
+      output: null,
+      cacheRead: null,
+      cacheWrite: null,
+      total: null,
+    });
+    expect(result.status).toBe('partial');
+    expect(result.reason).toBe('incomplete_classification');
+  });
+
+  it('distinguishes an observed successful zero from an error placeholder', () => {
+    const usage = {
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+    };
+    expect(acc.onResult({ errored: false, usage }).status).toBe('complete');
+    expect(new ClaudeUsageAccumulator().onResult({ errored: true, usage }).status).toBe('missing');
+    expect(
+      new ClaudeUsageAccumulator().onResult({ errored: false, usage: {} }).tokens.total
+    ).toBeNull();
+  });
+
+  it('does not discard a known result total when modelUsage has no token counters', () => {
+    const result = acc.onResult({
+      errored: false,
+      usage: {
+        input_tokens: 100,
+        output_tokens: 20,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+      },
+      modelUsage: { m: {} },
+    });
+    expect(result.tokens.total).toBe(120);
+    expect(result.status).toBe('partial');
+    expect(result.models).toEqual([]);
+  });
+
+  it("does not let one complete model hide another model's incomplete classification", () => {
+    const result = acc.onResult({
+      errored: false,
+      modelUsage: {
+        a: {
+          inputTokens: 2,
+          outputTokens: 3,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 0,
+        },
+        b: { inputTokens: 9 },
+      },
+    });
+    expect(result.tokens.total).toBe(5); // only model a has a known total
+    expect(result.status).toBe('partial');
   });
 
   it('the same message ID observed twice counts once (replay + parallel emit)', () => {
@@ -200,8 +264,18 @@ describe('ClaudeUsageAccumulator', () => {
         cache_creation_input_tokens: 0,
       },
       modelUsage: {
-        'claude-sonnet-4-6': { inputTokens: 150, outputTokens: 30, cacheReadInputTokens: 1200 },
-        'claude-haiku-4-5': { inputTokens: 10, outputTokens: 5 },
+        'claude-sonnet-4-6': {
+          inputTokens: 150,
+          outputTokens: 30,
+          cacheReadInputTokens: 1200,
+          cacheCreationInputTokens: 0,
+        },
+        'claude-haiku-4-5': {
+          inputTokens: 10,
+          outputTokens: 5,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 0,
+        },
       },
     });
     expect(final.status).toBe('partial');
@@ -216,8 +290,20 @@ describe('ClaudeUsageAccumulator', () => {
   it('result.usage exceeding the model sum is kept with a discrepancy, not forced into a bucket', () => {
     const final = acc.onResult({
       errored: false,
-      usage: { input_tokens: 500, output_tokens: 50 },
-      modelUsage: { 'claude-sonnet-4-6': { inputTokens: 100, outputTokens: 10 } },
+      usage: {
+        input_tokens: 500,
+        output_tokens: 50,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+      },
+      modelUsage: {
+        'claude-sonnet-4-6': {
+          inputTokens: 100,
+          outputTokens: 10,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 0,
+        },
+      },
     });
     expect(final.tokens.total).toBe(550);
     expect(final.discrepancy).toContain('exceeds sum(modelUsage)');
@@ -227,7 +313,12 @@ describe('ClaudeUsageAccumulator', () => {
     acc.onAssistantUsage(claudeAssistant('msg_1', { input_tokens: 100, output_tokens: 10 }));
     const errored = acc.onResult({
       errored: true,
-      usage: { input_tokens: 100, output_tokens: 10 },
+      usage: {
+        input_tokens: 100,
+        output_tokens: 10,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+      },
     });
     expect(errored.final).toBe(true);
     expect(errored.status).toBe('partial');
@@ -287,6 +378,12 @@ describe('ClaudeUsageAccumulator', () => {
 // === Cursor ===
 
 describe('CursorUsageAccumulator', () => {
+  it('keeps cache-only evidence as partial with an unknown total', () => {
+    const result = new CursorUsageAccumulator().onResult({ cacheReadTokens: 100 });
+    expect(result.status).toBe('partial');
+    expect(result.tokens.cacheRead).toBe(100);
+    expect(result.tokens.total).toBeNull();
+  });
   it('a result without usage fields reports missing ("this version provides nothing")', () => {
     const final = new CursorUsageAccumulator().onResult(undefined);
     expect(final.status).toBe('missing');

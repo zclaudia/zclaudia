@@ -14,21 +14,29 @@ export interface UsageWindow {
 }
 
 const DAY_MS = 86_400_000;
+// Constructing an Intl formatter per ledger row dominates large-history queries.
+const formatters = new Map<string, Intl.DateTimeFormat>();
 
 function zonedParts(
   timeZone: string,
   ms: number
 ): { year: number; month: number; day: number; hour: number; minute: number; second: number } {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(new Date(ms));
+  let formatter = formatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour12: false,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    if (formatters.size >= 32) formatters.clear();
+    formatters.set(timeZone, formatter);
+  }
+  const parts = formatter.formatToParts(new Date(ms));
   const read = (type: string): number => Number(parts.find(p => p.type === type)?.value ?? '0');
   return {
     year: read('year'),

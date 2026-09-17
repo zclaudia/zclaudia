@@ -92,11 +92,42 @@ describe('projectStore', () => {
   });
 
   describe('projects', () => {
-    it('setProjects replaces projects array', () => {
+    it('setProjects loads the active backend projects', () => {
       const projects = [createProject({ id: 'p1' }), createProject({ id: 'p2' })];
       useProjectStore.getState().setProjects(projects);
 
       expect(useProjectStore.getState().projects).toEqual(projects);
+    });
+
+    it('setProjects preserves other backends and removes only missing active-backend projects', () => {
+      const local = createProject({ id: 'local-p1' });
+      const removed = createProject({ id: 'local-deleted' });
+      const remote = createProject({ id: 'remote-p1' });
+      useOwnershipStore.getState().setProjectOwners([local.id, removed.id], 'local');
+      useOwnershipStore.getState().setProjectOwner(remote.id, 'remote-1');
+      useProjectStore.setState({ projects: [local, remote, removed] });
+      const updated = { ...local, name: 'Updated', updatedAt: local.updatedAt + 1 };
+
+      useProjectStore.getState().setProjects([updated]);
+
+      expect(useProjectStore.getState().projects).toEqual([updated, remote]);
+      expect(useOwnershipStore.getState().getProjectBackendId(remote.id)).toBe('remote-1');
+      expect(useOwnershipStore.getState().getProjectBackendId(removed.id)).toBeNull();
+
+      useProjectStore.getState().setProjects([]);
+      expect(useProjectStore.getState().projects).toEqual([remote]);
+      expect(useOwnershipStore.getState().getProjectBackendId(local.id)).toBeNull();
+      expect(useOwnershipStore.getState().getProjectBackendId(remote.id)).toBe('remote-1');
+    });
+
+    it('setProjects hydrates REST fields even when a snapshot has the same updatedAt', () => {
+      const partial = createProject({ id: 'local-p1', updatedAt: 100 });
+      useProjectStore.getState().replaceProjectsForBackend('local', [partial]);
+      const full = { ...partial, rootPath: '/repo', isInternal: true };
+
+      useProjectStore.getState().setProjects([full]);
+
+      expect(useProjectStore.getState().projects).toEqual([full]);
     });
 
     it('replaceProjectsForBackend only replaces the target backend subset', () => {

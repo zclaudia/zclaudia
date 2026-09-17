@@ -11,6 +11,8 @@ export type UsageStatsRange = 'all' | '30d' | '7d';
 
 export interface UsageStatsPayload {
   datasetId?: string;
+  /** Optional atomic detail views, captured with Overview in one DB read transaction. */
+  details?: { models: ModelUsagePayload; runtime: RuntimeUsagePayload };
   /** Sessions created within the range (archived included). */
   sessions: number;
   /** Messages created within the range, any role. */

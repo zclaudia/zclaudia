@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 export type Theme = 'light' | 'light-cool' | 'dark-neutral' | 'dark-warm' | 'dark-cool' | 'system';
 export type ResolvedTheme = 'light' | 'light-cool' | 'dark-neutral' | 'dark-warm' | 'dark-cool';
@@ -51,6 +51,19 @@ function resolveTheme(theme: Theme): ResolvedTheme {
   return theme;
 }
 
+/**
+ * Android draws edge-to-edge, so the system bars sit on app content but the
+ * WebView cannot recolor their icons. MainActivity registers a tiny
+ * `AndroidSystemBars` JS bridge; light bars = dark icons, so dark themes must
+ * clear the light appearance. Best-effort: absent (non-Android) → no-op.
+ */
+function syncAndroidSystemBars(resolved: ResolvedTheme) {
+  const bridge = (
+    window as { AndroidSystemBars?: { setLight?: (light: boolean) => void } }
+  ).AndroidSystemBars;
+  bridge?.setLight?.(!isDarkTheme(resolved));
+}
+
 function applyThemeClasses(resolved: ResolvedTheme) {
   const root = document.documentElement;
   root.classList.remove('dark');
@@ -67,6 +80,8 @@ function applyThemeClasses(resolved: ResolvedTheme) {
   if (metaThemeColor) {
     metaThemeColor.setAttribute('content', THEME_META_COLORS[resolved]);
   }
+
+  syncAndroidSystemBars(resolved);
 }
 
 interface ThemeProviderProps {
@@ -90,6 +105,19 @@ export function ThemeProvider({ children, defaultTheme = 'system' }: ThemeProvid
   });
 
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(theme));
+
+  // The native bridge registers after first paint (it polls for the WebView),
+  // so re-sync when it announces readiness — otherwise the restored theme's
+  // first applyThemeClasses runs before AndroidSystemBars exists.
+  const resolvedRef = useRef(resolvedTheme);
+  useEffect(() => {
+    resolvedRef.current = resolvedTheme;
+  }, [resolvedTheme]);
+  useEffect(() => {
+    const resync = () => syncAndroidSystemBars(resolvedRef.current);
+    window.addEventListener('android-system-bars-ready', resync);
+    return () => window.removeEventListener('android-system-bars-ready', resync);
+  }, []);
 
   // Update resolved theme when theme changes
   useEffect(() => {

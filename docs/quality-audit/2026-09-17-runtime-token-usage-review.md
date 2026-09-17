@@ -48,3 +48,25 @@ shared 构建、server/desktop/agent-common 类型检查通过；Claude/Codex �
 3. **统一快照与性能**：三个视图已统一时区、时间范围及数据集去重，但仍分别请求自己的接口，并非一次共享 asOf 的原子 UI 快照；大规模账本仍需做查询计划与实际延迟验收。现有查询会取出窗口记录后在 JS 聚合。
 
 Codex 恢复会话的保守处理意味着第一条通知之前的消耗可能无法计入；计数器回退后无法证明属于新 epoch 的部分也不会继续累计。页面应将此显示为 partial/missing，直到实时基线/epoch 能力得到验证，不能据此宣称完整上报。
+
+## 用户要求继续修复后的进展（2026-09-17）
+
+以下更新覆盖上一节的相应待办，原始 Review 记录保留。
+
+- **统一快照已落地**：`/api/stats/usage?include=details` 在一个数据库读事务中返回 Overview、Models 和 Runtimes；一次账本读取供三个视图复用。前端切换标签不再读取更新后的另一份账本。失败的来源不会在切换标签后悄悄加入总量；旧服务端缺少 details 时仍使用兼容接口，并传递同一个 asOf。
+- **查询减负已落地**：账本仅选择统计字段，避免读取/解析原生 checkpoint；Overview 复用覆盖率聚合，All 不再重复 SUM；账本启用时跳过会被覆盖的旧 assistant metadata token/model 查询；时区格式化器使用有界缓存。
+- **缺失字段修复**：Claude 不再把缺少的 token 分类补成 0，分类不完整时总量未知，不能标 complete。某个模型缺字段也会让整体保持 partial；空 modelUsage 不再覆盖有效的 result.usage。没有先前证据的全零错误结果为 missing。Cursor 仅有缓存 token 时保留 partial 记录。
+- **展示与跨后端聚合**：手机摘要保留未知总量的“—”；有完整模型快照时 Favorite model 按跨后端模型合计计算，并排除 Unknown 分配桶。
+- **公共 SDK 源码已补齐，发布仍待完成**：在邻接仓库 `/Users/zhvala/SourceCode/zclaudia-plugin-sdk` 添加 `src/usage.ts`、导出契约及 `provider_usage_updated` 类型，附无 cast 的契约用例。SDK 类型检查、测试、构建和 npm pack dry-run 通过。未发布包、未改依赖版本；主项目仍安装 0.4.0，因此兼容桥接 cast 需在正式发布/升级后移除。
+
+本次定向测试共 **159 项通过**：server 46、agent-common 41、Claude 16、desktop 43、公共 SDK 13。server/desktop/agent-common 类型检查通过，shared 已构建；SDK 完整 check 通过。定向 ESLint 无 error（仍有既有 effect 更新状态和非空断言 warning）。全量 Desktop 类型检查曾遇到工作区另一组并行修改的临时错误，后续检查已通过；没有改写那组代码。
+
+新增可重复执行的隔离基准：
+
+```sh
+bash scripts/with-project-node.sh pnpm --filter @zclaudia/server exec tsx scripts/benchmark-runtime-usage.ts
+```
+
+本机内存 SQLite，100,000 条合成调用、365 天、3 个 runtime；每个范围连续测 3 次。7d 为 60–76 ms，30d 为 129–133 ms，All 为 1112–1177 ms。确认命中 `idx_runtime_usage_accounted_at` 范围索引，三个视图总量相等。此结果是统计查询基准，不包含 HTTP/网络、活动消息统计或生产数据库磁盘延迟；仍是 O(窗口记录数) 的 JS 聚合，不代表百万级历史的生产 SLA。
+
+**真实协议验收仍未完成**：本轮未发起真实模型请求，也未声称已验证 Claude streaming-input/子代理范围、Cursor ACP 消耗用量和 Codex counter epoch。仍需固定版本的脱敏原生 fixture；离线回归、SDK 类型和性能测试不能替代这些证据。未修改生产数据库，未提交、推送或发布。

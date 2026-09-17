@@ -24,6 +24,46 @@ function stats(over: Partial<UsageStatsPayload> = {}): UsageStatsPayload {
 }
 
 describe('aggregateUsageStats', () => {
+  it('chooses the favorite from combined model totals, excluding the Unknown bucket', () => {
+    const entries = [
+      {
+        id: 'a',
+        total: 1000,
+        favorite: 'a',
+        models: [
+          ['a', 60],
+          ['b', 40],
+          ['Unknown', 900],
+        ] as const,
+      },
+      { id: 'b', total: 90, favorite: 'b', models: [['b', 90]] as const },
+    ].map(entry => ({
+      backendId: entry.id,
+      name: entry.id,
+      stats: stats({
+        datasetId: entry.id,
+        totalTokens: entry.total,
+        favoriteModel: entry.favorite,
+        details: {
+          runtime: runtimePayload(entry.id),
+          models: {
+            datasetId: entry.id,
+            days: [],
+            trackedSince: null,
+            capturedAt: 1,
+            models: entry.models.map(([model, totalTokens]) => ({
+              model,
+              totalTokens,
+              inTokens: totalTokens,
+              outTokens: 0,
+              share: 0,
+            })),
+          },
+        },
+      }),
+    }));
+    expect(aggregateUsageStats(entries, '2026-09-17', 'all')?.favoriteModel).toBe('b');
+  });
   it('deduplicates the same dataset in Overview and Models', () => {
     const p = stats({ datasetId: 'db', totalTokens: 100 });
     expect(

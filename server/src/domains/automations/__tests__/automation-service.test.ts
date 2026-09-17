@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
-import { AutomationService } from '../service.js';
+import { AutomationService, InvalidAutomationTriggerError } from '../service.js';
 import { pluginEvents } from '../../../infra/events/index.js';
 import type { Workflow, WorkflowDefinition } from '@zclaudia/shared/features/workflows';
 import { SYSTEM_PERMISSION_AUTOMATION_KEY } from '../templates.js';
@@ -207,5 +207,78 @@ describe('AutomationService eventFilter', () => {
     await new Promise(r => setTimeout(r, 10));
     expect(engine.startRun).toHaveBeenCalledTimes(1);
     expect(engine.startRun.mock.calls[0][0].triggerSource).toBe('event');
+  });
+});
+
+describe('AutomationService trigger validation', () => {
+  function freshDb(): Database.Database {
+    const fresh = new Database(':memory:');
+    applyMigrations(fresh);
+    return fresh;
+  }
+
+  function svcOver(database: Database.Database) {
+    return new AutomationService(database, () => {}, fakeEngine() as any, fakeWorkflowLookup() as any);
+  }
+
+  it('rejects an invalid cron on create without persisting anything', () => {
+    const db = freshDb();
+    const svc = svcOver(db);
+    // Regression (E2E R07): an invalid cron used to persist the row enabled and
+    // then return 500 — the UI reported failure while the automation existed.
+    expect(() =>
+      svc.createAutomation({
+        name: 'bad cron',
+        enabled: true,
+        trigger: { type: 'cron', cron: 'not-a-cron ' },
+        action: { kind: 'activity', ref: 'shell' },
+      })
+    ).toThrow(InvalidAutomationTriggerError);
+    expect(svc.listAutomations()).toHaveLength(0);
+  });
+
+  it('rejects updating to an invalid cron and keeps the stored trigger', () => {
+    const db = freshDb();
+    const svc = svcOver(db);
+    const a = svc.createAutomation({
+      name: 'good cron',
+      trigger: { type: 'cron', cron: '0 9 * * *' },
+      action: { kind: 'activity', ref: 'shell' },
+    });
+
+    expect(() =>
+      svc.updateAutomation(a.id, { trigger: { type: 'cron', cron: 'nope' } })
+    ).toThrow(InvalidAutomationTriggerError);
+    expect(svc.getAutomation(a.id)?.trigger).toEqual({ type: 'cron', cron: '0 9 * * *' });
+  });
+
+  it('still disables a legacy automation whose stored trigger is broken', () => {
+    const db = freshDb();
+    const svc = svcOver(db);
+    const a = svc.createAutomation({
+      name: 'legacy',
+      trigger: { type: 'cron', cron: '0 9 * * *' },
+      action: { kind: 'activity', ref: 'shell' },
+    });
+    // Simulate a row written before validation existed.
+    db.prepare('UPDATE automations SET trigger = ? WHERE id = ?')
+      .run(JSON.stringify({ type: 'cron', cron: 'not-a-cron ' }), a.id);
+
+    const disabled = svc.updateAutomation(a.id, { enabled: false });
+    expect(disabled.enabled).toBe(false);
+  });
+
+  it('initializes without throwing over a legacy broken trigger', () => {
+    const db = freshDb();
+    const svc = svcOver(db);
+    const a = svc.createAutomation({
+      name: 'legacy enabled',
+      trigger: { type: 'cron', cron: '0 9 * * *' },
+      action: { kind: 'activity', ref: 'shell' },
+    });
+    db.prepare('UPDATE automations SET trigger = ? WHERE id = ?')
+      .run(JSON.stringify({ type: 'cron', cron: 'not-a-cron ' }), a.id);
+
+    expect(() => svc.initialize()).not.toThrow();
   });
 });

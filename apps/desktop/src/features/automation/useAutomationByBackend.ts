@@ -49,11 +49,15 @@ export interface ByBackend<T> {
  * `backends`, isolates failures per backend, and guards stale writes.
  *
  * `fetcher` need not be stable: the latest one is kept in a ref and the effect
- * is keyed on the backend id set, the store nonce, and the local nonce only.
+ * is keyed on the backend id set, the store nonce, the local nonce, and
+ * `deps` only. Anything `fetcher` closes over besides `backends` — e.g. the
+ * project filter — must be listed in `deps`, or a scope switch would keep
+ * rendering the previous scope's rows until a manual refresh.
  */
 export function useAutomationByBackend<T>(
   backends: AutomationBackend[],
-  fetcher: (api: AutomationApi, backendId: string) => Promise<T>
+  fetcher: (api: AutomationApi, backendId: string) => Promise<T>,
+  deps: readonly unknown[] = []
 ): ByBackend<T> {
   const storeNonce = useTopLevelViewStore(s => s.automationListRefreshNonce);
   const [localNonce, setLocalNonce] = useState(0);
@@ -73,6 +77,7 @@ export function useAutomationByBackend<T>(
     .map(b => b.backendId)
     .sort()
     .join(',');
+  const depsKey = JSON.stringify(deps);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,7 +108,7 @@ export function useAutomationByBackend<T>(
     return () => {
       cancelled = true;
     };
-  }, [idsKey, storeNonce, localNonce]);
+  }, [idsKey, depsKey, storeNonce, localNonce]);
 
   const refresh = useCallback(() => setLocalNonce(n => n + 1), []);
 

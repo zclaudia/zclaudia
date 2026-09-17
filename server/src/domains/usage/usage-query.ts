@@ -9,7 +9,7 @@ import type {
   UsageStatsPayload,
   UsageStatsRange,
 } from '@zclaudia/shared/core/usage-stats';
-import type { StoredUsageRecord } from './types.js';
+import type { UsageStatsRecord } from './types.js';
 import { IN_FLIGHT_EXECUTION_STATES, LEGACY_RUNTIME_ID } from './types.js';
 import { RuntimeUsageRepository } from './repository.js';
 import { isAccountingActive } from './legacy-migration.js';
@@ -53,7 +53,8 @@ export class UsageQueryService {
   runtimeUsagePayload(
     range: UsageStatsRange,
     timeZone?: string,
-    asOf = Date.now()
+    asOf = Date.now(),
+    snapshotRows?: UsageStatsRecord[]
   ): RuntimeUsagePayload {
     if (!this.available) {
       return {
@@ -85,7 +86,8 @@ export class UsageQueryService {
       };
     }
     const window = resolveUsageWindow(range, timeZone, asOf);
-    const rows = this.repository.selectWindowRows(window.startUtcMs, window.endUtcMs);
+    const rows =
+      snapshotRows ?? this.repository.selectWindowRows(window.startUtcMs, window.endUtcMs);
 
     const finalized = rows.filter(row => isFinalized(row.executionState));
     const inFlight = rows.filter(row => isInFlight(row.executionState));
@@ -155,7 +157,8 @@ export class UsageQueryService {
   accountingSummary(
     range: UsageStatsRange,
     timeZone?: string,
-    asOf = Date.now()
+    asOf = Date.now(),
+    snapshotRows?: UsageStatsRecord[]
   ): AccountingSummary {
     if (!this.available) {
       return {
@@ -171,7 +174,8 @@ export class UsageQueryService {
       };
     }
     const window = resolveUsageWindow(range, timeZone, asOf);
-    const rows = this.repository.selectWindowRows(window.startUtcMs, window.endUtcMs);
+    const rows =
+      snapshotRows ?? this.repository.selectWindowRows(window.startUtcMs, window.endUtcMs);
     const finalized = rows.filter(row => isFinalized(row.executionState));
     const inFlight = rows.filter(row => isInFlight(row.executionState));
     const eligible = finalized.filter(row => row.usageStatus !== 'legacy');
@@ -209,7 +213,8 @@ export class UsageQueryService {
       | 'activeDays'
     >,
     timeZone?: string,
-    asOf = Date.now()
+    asOf = Date.now(),
+    includeDetails = false
   ): UsageStatsPayload {
     if (!this.available) {
       return {
@@ -221,12 +226,12 @@ export class UsageQueryService {
       };
     }
     const window = resolveUsageWindow(range, timeZone, asOf);
-    const finalizedTotal = this.repository.sumFinalizedTotalTokens(
-      window.startUtcMs,
-      window.endUtcMs
-    );
-    const allTimeTotal = this.repository.sumFinalizedTotalTokens(0, asOf + 1);
-    const favorite = this.favoriteModel(window);
+    const rows = this.repository.selectWindowRows(window.startUtcMs, window.endUtcMs);
+    const accounting = this.accountingSummary(range, timeZone, asOf, rows);
+    const finalizedTotal = accounting.recordedTokens;
+    const allTimeTotal =
+      range === 'all' ? finalizedTotal : this.repository.sumFinalizedTotalTokens(0, asOf + 1);
+    const favorite = this.favoriteModel(rows);
     return {
       ...activity,
       datasetId: this.datasetId(),
@@ -234,7 +239,15 @@ export class UsageQueryService {
       favoriteModel: favorite,
       allTimeTokens: allTimeTotal ?? 0,
       capturedAt: Date.now(),
-      accounting: this.accountingSummary(range, timeZone, asOf),
+      accounting,
+      ...(includeDetails
+        ? {
+            details: {
+              models: this.modelUsagePayload(range, timeZone, asOf, rows),
+              runtime: this.runtimeUsagePayload(range, timeZone, asOf, rows),
+            },
+          }
+        : {}),
     };
   }
 
@@ -242,15 +255,16 @@ export class UsageQueryService {
   modelUsagePayload(
     range: UsageStatsRange,
     timeZone?: string,
-    asOf = Date.now()
+    asOf = Date.now(),
+    snapshotRows?: UsageStatsRecord[]
   ): ModelUsagePayload {
     if (!this.available) {
       return { days: [], models: [], trackedSince: null, capturedAt: Date.now() };
     }
     const window = resolveUsageWindow(range, timeZone, asOf);
-    const rows = this.repository
-      .selectWindowRows(window.startUtcMs, window.endUtcMs)
-      .filter(row => isFinalized(row.executionState));
+    const rows = (
+      snapshotRows ?? this.repository.selectWindowRows(window.startUtcMs, window.endUtcMs)
+    ).filter(row => isFinalized(row.executionState));
 
     const dayMap = new Map<string, Map<string, number>>();
     const totals = new Map<string, { total: number; output: number }>();
@@ -300,11 +314,9 @@ export class UsageQueryService {
     };
   }
 
-  private favoriteModel(window: UsageWindow): string | null {
+  private favoriteModel(snapshotRows: UsageStatsRecord[]): string | null {
     if (!this.available) return null;
-    const rows = this.repository
-      .selectWindowRows(window.startUtcMs, window.endUtcMs)
-      .filter(row => isFinalized(row.executionState));
+    const rows = snapshotRows.filter(row => isFinalized(row.executionState));
     const totals = new Map<string, number>();
     for (const row of rows) {
       for (const allocation of effectiveAllocations(row)) {
@@ -328,7 +340,7 @@ export class UsageQueryService {
  * the breakdown exceeds the total (unclear containment), the whole recorded
  * total goes to Unknown instead of double counting.
  */
-export function effectiveAllocations(row: StoredUsageRecord): Array<{
+export function effectiveAllocations(row: UsageStatsRecord): Array<{
   modelId: string | null;
   total: number;
   output: number | null;
@@ -350,23 +362,23 @@ export function effectiveAllocations(row: StoredUsageRecord): Array<{
   return result;
 }
 
-function inputSide(row: StoredUsageRecord): number | null {
+function inputSide(row: UsageStatsRecord): number | null {
   const { inputUncached, cacheRead, cacheWrite } = row.tokens;
   if (inputUncached === null || cacheRead === null || cacheWrite === null) return null;
   return (inputUncached ?? 0) + (cacheRead ?? 0) + (cacheWrite ?? 0);
 }
 
-function isFinalized(state: StoredUsageRecord['executionState']): boolean {
+function isFinalized(state: UsageStatsRecord['executionState']): boolean {
   return state !== 'not_started' && !isInFlight(state);
 }
 
-function isInFlight(state: StoredUsageRecord['executionState']): boolean {
+function isInFlight(state: UsageStatsRecord['executionState']): boolean {
   return (IN_FLIGHT_EXECUTION_STATES as readonly string[]).includes(state);
 }
 
 function buildRuntimeRows(
-  finalized: StoredUsageRecord[],
-  inFlight: StoredUsageRecord[]
+  finalized: UsageStatsRecord[],
+  inFlight: UsageStatsRecord[]
 ): RuntimeUsageRuntimeRow[] {
   interface RuntimeAgg {
     recordedKnown: boolean;
@@ -400,7 +412,7 @@ function buildRuntimeRows(
   });
   const aggregates = new Map<string, RuntimeAgg>();
 
-  const addRow = (row: StoredUsageRecord, isInFlightRow: boolean) => {
+  const addRow = (row: UsageStatsRecord, isInFlightRow: boolean) => {
     const key = row.usageStatus === 'legacy' ? LEGACY_RUNTIME_ID : row.runtimeId;
     const agg = aggregates.get(key) ?? emptyAgg();
     if (isInFlightRow) {
@@ -485,7 +497,7 @@ function runtimeLabel(runtimeId: string): string | null {
 }
 
 function buildSeries(
-  finalized: StoredUsageRecord[],
+  finalized: UsageStatsRecord[],
   window: UsageWindow
 ): RuntimeUsageSeriesPoint[] {
   const byDate = new Map<string, Map<string, number>>();

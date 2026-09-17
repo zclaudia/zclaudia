@@ -27,7 +27,15 @@ function formatDay(date: string): string {
 /** Per-model stacked daily usage. Same backend targeting and fetch semantics
  *  as the cards: shared stats backend, visible failure notice, stale data kept
  *  during range refetches. */
-export function ModelsChart({ range }: { range: UsageStatsRange }) {
+export function ModelsChart({
+  range,
+  asOf,
+  snapshots,
+}: {
+  range: UsageStatsRange;
+  asOf?: number;
+  snapshots?: Record<string, ModelUsagePayload | undefined>;
+}) {
   const targets = useStatsBackendTargets();
   const targetKey = targets.map(t => t.backendId).join(',');
   const isMobile = useIsMobile();
@@ -44,7 +52,15 @@ export function ModelsChart({ range }: { range: UsageStatsRange }) {
     }
     // Totalled across backends, matching the cards above; a backend that fails
     // drops out instead of failing the chart.
-    Promise.all(targets.map(target => getModelStats(target.backendId, range).catch(() => null)))
+    Promise.all(
+      targets.map(target =>
+        snapshots && !Object.hasOwn(snapshots, target.backendId)
+          ? Promise.resolve(null)
+          : snapshots?.[target.backendId]
+            ? Promise.resolve(snapshots[target.backendId])
+            : getModelStats(target.backendId, range, { asOf }).catch(() => null)
+      )
+    )
       .then(results => {
         if (cancelled) return;
         const usable = results.filter((r): r is ModelUsagePayload => r !== null);
@@ -59,7 +75,7 @@ export function ModelsChart({ range }: { range: UsageStatsRange }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetKey, range]);
+  }, [targetKey, range, asOf, snapshots]);
 
   const [expanded, setExpanded] = useState(false);
   const chart = useMemo(

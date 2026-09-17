@@ -226,6 +226,8 @@ checkpoint 只允许保存计数器、必要的原生标识和时间；不保存
 
 新增 `GET /api/stats/runtime-usage?range=all|30d|7d&timeZone=<IANA>&asOf=<epoch-ms>`，返回相同查询窗口下的：
 
+实现补充（2026-09-17）：首页通过 `GET /api/stats/usage?include=details&range=...&timeZone=...&asOf=...` 一次取得 Overview 及 `details.models`、`details.runtime`。服务端在同一数据库读事务内复用一次账本读取；客户端切换标签复用该响应。旧服务端没有 details 时保留原接口回退，并传递同一 asOf；旧服务端不承诺原子快照。asOf 是归属时间上界，不是历史账本版本回放。
+
 - schemaVersion、datasetId、asOf、timeZone、accountingSince、capturedAt。
 - totals：recordedTokens（无数值时为 null）、按 complete/partial/legacy 的已知 token 小计、activeRecordedTokens。
 - coverage：complete、partial、missing、eligibleFinalized、inFlight 调用数；legacyRecordCount 单列。

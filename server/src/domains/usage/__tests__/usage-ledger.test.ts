@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import type { RuntimeUsageSnapshot } from '@zclaudia/shared/core/runtime-usage';
 import { migration as usageLedgerMigration } from '../../../infra/storage/migrations/045_runtime_usage_records.js';
@@ -428,6 +428,41 @@ describe('usage query service', () => {
     seedRecord('future', { total: 200, accountedAt: asOf + 1 });
     expect(query.runtimeUsagePayload('all', 'UTC', asOf).totals.recordedTokens).toBe(100);
     expect(query.repo.sumFinalizedTotalTokens(0, asOf + 1)).toBe(100);
+  });
+
+  it('captures Overview, Models and Runtimes with one ledger scan and matching totals', () => {
+    const asOf = Date.now();
+    seedRecord('complete', {
+      total: 100,
+      accountedAt: asOf,
+      models: [{ modelId: 'm', total: 80, input: 70, output: 10 }],
+    });
+    seedRecord('partial', { status: 'partial', total: 25, accountedAt: asOf });
+    seedRecord('live', { state: 'running', total: 77, accountedAt: asOf });
+    seedRecord('future', { total: 999, accountedAt: asOf + 1 });
+    const scan = vi.spyOn(query.repo, 'selectWindowRows');
+    const payload = query.usageStatsPayload(
+      'all',
+      {
+        sessions: 0,
+        messages: 0,
+        activeDaysCount: 0,
+        currentStreakDays: 0,
+        longestStreakDays: 0,
+        peakHour: null,
+        activeDays: [],
+      },
+      'Asia/Shanghai',
+      asOf,
+      true
+    );
+    expect(scan).toHaveBeenCalledTimes(1);
+    expect(payload.totalTokens).toBe(125);
+    expect(payload.details?.runtime.totals.recordedTokens).toBe(125);
+    expect(payload.details?.models.models.reduce((n, m) => n + m.totalTokens, 0)).toBe(125);
+    expect(payload.details?.runtime.asOf).toBe(asOf);
+    expect(payload.details?.runtime.timeZone).toBe('Asia/Shanghai');
+    expect(payload.details?.models.datasetId).toBe(payload.datasetId);
   });
 
   it('does not add model allocations with unknown invocation totals to Models', () => {

@@ -75,22 +75,28 @@ export function RunsTab({ scope }: { scope: AutomationTabScope }) {
   const [selected, setSelected] = useState<{ backendId: string; runId: string } | null>(null);
   const projectQuery = scope.projectId ? `?projectId=${encodeURIComponent(scope.projectId)}` : '';
 
-  const catalog = useAutomationByBackend<RunsCatalog>(scope.backends, async api => {
-    // Runs are project-scoped, but the workflows they reference often are not
-    // (the built-in ones carry no projectId), so names come from the unscoped
-    // list plus the scoped one.
-    const [runs, scopedWorkflows, globalWorkflows] = await Promise.all([
-      api.get(`/api/workflow-runs${projectQuery}`).then((r: WorkflowRun[]) => r ?? []),
-      projectQuery
-        ? api.get(`/api/workflows${projectQuery}`).catch(() => [] as Workflow[])
-        : Promise.resolve([] as Workflow[]),
-      api.get('/api/workflows').catch(() => [] as Workflow[]),
-    ]);
-    const names = new Map<string, string>();
-    for (const w of [...globalWorkflows, ...scopedWorkflows] as Workflow[]) names.set(w.id, w.name);
-    const sorted = [...runs].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
-    return { runs: sorted, names };
-  });
+  const catalog = useAutomationByBackend<RunsCatalog>(
+    scope.backends,
+    async api => {
+      // Runs are project-scoped, but the workflows they reference often are not
+      // (the built-in ones carry no projectId), so names come from the unscoped
+      // list plus the scoped one.
+      const [runs, scopedWorkflows, globalWorkflows] = await Promise.all([
+        api.get(`/api/workflow-runs${projectQuery}`).then((r: WorkflowRun[]) => r ?? []),
+        projectQuery
+          ? api.get(`/api/workflows${projectQuery}`).catch(() => [] as Workflow[])
+          : Promise.resolve([] as Workflow[]),
+        api.get('/api/workflows').catch(() => [] as Workflow[]),
+      ]);
+      const names = new Map<string, string>();
+      for (const w of [...globalWorkflows, ...scopedWorkflows] as Workflow[]) names.set(w.id, w.name);
+      const sorted = [...runs].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
+      return { runs: sorted, names };
+    },
+    // The fetcher closes over the project filter — without it a scope switch
+    // kept the previous scope's runs until Refresh.
+    [scope.projectId]
+  );
   const total = [...catalog.data.values()].reduce((n, c) => n + c.runs.length, 0);
 
   if (selected) {

@@ -56,6 +56,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
  * Square ghost icon button. Replaces the hand-rolled
  * `p-1/p-1.5 rounded(-md) text-muted-foreground hover:…` recipes; hover fill is
  * standardized on bg-secondary (the documented chrome hover fill).
+ *
+ * Touch grows the button itself (`max-md:h-9`), never a negative-inset pseudo
+ * element: an invisible bleed made adjacent buttons' hit areas overlap, so a
+ * tap near Run's edge landed on its neighbor (Disable) instead.
  */
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
@@ -67,12 +71,13 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   { size = 'md', className = '', type = 'button', ...rest },
   ref
 ) {
-  const dim = size === 'sm' ? 'h-6 w-6' : 'h-7 w-7';
+  const dim =
+    size === 'sm' ? 'h-6 w-6 max-md:h-8 max-md:w-8' : 'h-7 w-7 max-md:h-9 max-md:w-9';
   return (
     <button
       ref={ref}
       type={type}
-      className={`${BASE} ${VARIANT.ghost} ${dim} shrink-0 relative before:absolute before:-inset-1.5 before:content-[''] md:before:content-none ${className}`.trim()}
+      className={`${BASE} ${VARIANT.ghost} ${dim} shrink-0 ${className}`.trim()}
       {...rest}
     />
   );

@@ -119,6 +119,9 @@ interface ListCardProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> {
   lead?: ReactNode;
   /** Row name; wraps to two lines below `md` where it is the only differentiator. */
   title: ReactNode;
+  /** Unfold `title` fully (wraps instead of truncate/clamp) — the tap-to-read
+   *  escape hatch for names that differ only in their clipped tail. */
+  titleExpanded?: boolean;
   /** Chips rendered right after the title (tone badges, `<code>` type ids). */
   titleExtra?: ReactNode;
   /** Second line: 12px muted chunks separated by `<MetaSep />`. Wraps as chunks. */
@@ -135,6 +138,7 @@ interface ListCardProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> {
 export function ListCard({
   lead,
   title,
+  titleExpanded = false,
   titleExtra,
   meta,
   trail,
@@ -164,7 +168,13 @@ export function ListCard({
       )}
       <span className={`flex min-w-0 flex-1 flex-col gap-0.5 ${muted ? 'opacity-60' : ''}`}>
         <span className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 truncate text-sm font-medium text-foreground max-md:line-clamp-2 max-md:whitespace-normal">
+          <span
+            className={`min-w-0 text-sm font-medium text-foreground ${
+              titleExpanded
+                ? 'whitespace-normal break-words'
+                : 'truncate max-md:line-clamp-2 max-md:whitespace-normal'
+            }`}
+          >
             {title}
           </span>
           {titleExtra}

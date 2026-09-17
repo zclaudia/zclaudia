@@ -51,7 +51,7 @@ function formatDayLabel(date: string): string {
 
 /** Card-based all-time/windowed usage stats, totalled across every online
  *  backend (subscriptions are additive, so usage is not an "active backend"
- *  concept). Renders nothing until the first load; keeps stale numbers during
+ *  concept). Renders nothing until the first load; clears the previous window during
  *  range refetches. On phones it collapses to a one-line summary. */
 export function UsageStatsStrip() {
   const isMobile = useIsMobile();
@@ -65,6 +65,18 @@ export function UsageStatsStrip() {
   // Tapped heatmap day, surfaced as an inline caption below the grid — the
   // touch-reachable counterpart to the desktop hover title.
   const [selectedDay, setSelectedDay] = useState<HeatmapCell | null>(null);
+  // Stored with the response; changing tabs reuses the same capture.
+  const [asOf, setAsOf] = useState<number>();
+  const modelSnapshots = useMemo(
+    () =>
+      Object.fromEntries(perBackend.map(entry => [entry.backendId, entry.stats.details?.models])),
+    [perBackend]
+  );
+  const runtimeSnapshots = useMemo(
+    () =>
+      Object.fromEntries(perBackend.map(entry => [entry.backendId, entry.stats.details?.runtime])),
+    [perBackend]
+  );
 
   useEffect(() => {
     setSelectedDay(null);
@@ -81,9 +93,10 @@ export function UsageStatsStrip() {
     }
     // One request per backend; a backend that fails drops out of the total
     // rather than failing the whole panel.
+    const captureAsOf = Date.now();
     Promise.all(
       targets.map(target =>
-        getUsageStats(target.backendId, range)
+        getUsageStats(target.backendId, range, { asOf: captureAsOf, includeDetails: true })
           .then(stats => ({ ...target, stats }))
           .catch(() => null)
       )
@@ -91,6 +104,7 @@ export function UsageStatsStrip() {
       .then(results => {
         if (cancelled) return;
         const usable = results.filter((r): r is BackendUsage => r !== null);
+        setAsOf(captureAsOf);
         setUnavailable(usable.length === 0);
         if (usable.length > 0) setPerBackend(usable);
       })
@@ -115,8 +129,7 @@ export function UsageStatsStrip() {
   );
 
   // With no payload to show, a failed (or impossible) fetch surfaces a compact
-  // notice instead of vanishing; once any payload has loaded, stale numbers
-  // stay up during range refetches and transient failures.
+  // notice instead of presenting a previous window as current.
   if (!stats) {
     if (unavailable) {
       return (
@@ -194,7 +207,9 @@ export function UsageStatsStrip() {
           <span className="min-w-0 truncate">
             {[
               `${stats.sessions.toLocaleString('en-US')} sessions`,
-              `${formatTokens(stats.totalTokens)} tokens`,
+              stats.accounting
+                ? `${stats.accounting.recordedTokens === null ? '—' : formatTokens(stats.accounting.recordedTokens)} recorded tokens`
+                : `${formatTokens(stats.totalTokens)} tokens`,
               perBackend.length > 1 ? `${perBackend.length} backends` : null,
             ]
               .filter(Boolean)
@@ -327,9 +342,9 @@ export function UsageStatsStrip() {
           {line && <div className="mt-3 text-xs text-muted-foreground/60">{line}</div>}
         </>
       ) : tab === 'models' ? (
-        <ModelsChart range={range} />
+        <ModelsChart range={range} asOf={asOf} snapshots={modelSnapshots} />
       ) : (
-        <RuntimesView range={range} />
+        <RuntimesView range={range} asOf={asOf} snapshots={runtimeSnapshots} />
       )}
     </div>
   );

@@ -19,18 +19,25 @@ export function localTimeZone(): string {
 /** Local-backend usage stats for the Home page panel. */
 export async function getUsageStats(
   backendId: string | null,
-  range: UsageStatsRange = 'all'
+  range: UsageStatsRange = 'all',
+  options: { asOf?: number; includeDetails?: boolean } = {}
 ): Promise<UsageStatsPayload> {
-  const suffix = `?${new URLSearchParams({ range, timeZone: localTimeZone() })}`;
+  const params = new URLSearchParams({ range, timeZone: localTimeZone() });
+  if (options.asOf !== undefined) params.set('asOf', String(options.asOf));
+  if (options.includeDetails) params.set('include', 'details');
+  const suffix = `?${params}`;
   return apiCallForBackend<UsageStatsPayload>(backendId, `/api/stats/usage${suffix}`);
 }
 
 /** Local-backend per-model usage for the Models tab. */
 export async function getModelStats(
   backendId: string | null,
-  range: UsageStatsRange = 'all'
+  range: UsageStatsRange = 'all',
+  options: { asOf?: number } = {}
 ): Promise<ModelUsagePayload> {
-  const suffix = `?${new URLSearchParams({ range, timeZone: localTimeZone() })}`;
+  const params = new URLSearchParams({ range, timeZone: localTimeZone() });
+  if (options.asOf !== undefined) params.set('asOf', String(options.asOf));
+  const suffix = `?${params}`;
   return apiCallForBackend<ModelUsagePayload>(backendId, `/api/stats/models${suffix}`);
 }
 

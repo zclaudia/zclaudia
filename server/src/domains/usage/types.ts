@@ -94,3 +94,15 @@ export interface StoredUsageRecord {
 
 /** Runtime ids used for buckets without a verified runtime descriptor. */
 export const LEGACY_RUNTIME_ID = 'legacy';
+
+/** Minimal analytics projection; native checkpoints never enter stats queries. */
+export type UsageStatsRecord = Pick<
+  StoredUsageRecord,
+  | 'runtimeId'
+  | 'executionState'
+  | 'accountedAt'
+  | 'usageStatus'
+  | 'tokens'
+  | 'modelBreakdown'
+  | 'discrepancy'
+>;

@@ -60,17 +60,20 @@ export interface ClaudeResultEvidence {
 }
 
 function breakdownFromClaudeUsage(usage: ClaudeAssistantUsage): UsageTokenBreakdown {
-  const inputUncached = usage.input_tokens ?? 0;
-  const cacheRead = usage.cache_read_input_tokens ?? 0;
-  const cacheWrite = usage.cache_creation_input_tokens ?? 0;
-  const output = usage.output_tokens ?? 0;
+  const inputUncached = usage.input_tokens ?? null;
+  const cacheRead = usage.cache_read_input_tokens ?? null;
+  const cacheWrite = usage.cache_creation_input_tokens ?? null;
+  const output = usage.output_tokens ?? null;
+  const known = [inputUncached, cacheRead, cacheWrite, output].filter(
+    (v): v is number => v !== null
+  );
   return {
     inputUncached,
     cacheRead,
     cacheWrite,
     output,
     reasoningOutput: null,
-    total: inputUncached + cacheRead + cacheWrite + output,
+    total: known.length === 4 ? known.reduce((sum, value) => sum + value, 0) : null,
   };
 }
 
@@ -98,7 +101,7 @@ export class ClaudeUsageAccumulator {
   onAssistantUsage(event: ClaudeAssistantUsageEvent): RuntimeUsageSnapshot | null {
     if (event.isSubagent) return null;
     const next = breakdownFromClaudeUsage(event.usage);
-    if (next.total === 0) return null;
+    if (!breakdownHasKnownValue(next)) return null;
 
     const key = event.messageId ?? `anon:${this.seenMessages.size}`;
     const previous = this.seenMessages.get(key);
@@ -148,7 +151,12 @@ export class ClaudeUsageAccumulator {
       tokens = modelSum;
       if (evidence.usage) {
         const resultUsage = breakdownFromClaudeUsage(evidence.usage);
-        if (resultUsage.total !== null && modelSum.total !== null) {
+        if (resultUsage.total !== null && modelSum.total === null) {
+          tokens = resultUsage;
+          discrepancy =
+            'modelUsage has no known total; retained result.usage without model allocation';
+          modelAllocations = [];
+        } else if (resultUsage.total !== null && modelSum.total !== null) {
           if (resultUsage.total > modelSum.total) {
             // The main-loop result claims more than the per-model records —
             // containment unclear: keep the reported total auditable and let
@@ -179,6 +187,24 @@ export class ClaudeUsageAccumulator {
       );
     if (!hasResultEvidence) tokens = this.accumulated;
 
+    const incompleteClassification =
+      [tokens.inputUncached, tokens.cacheRead, tokens.cacheWrite, tokens.output].some(
+        v => v === null
+      ) ||
+      modelAllocations.some(({ tokens: model }) =>
+        [model.inputUncached, model.cacheRead, model.cacheWrite, model.output].some(v => v === null)
+      );
+    // A zeroed error without earlier observations is a placeholder, not proof
+    // that no model request consumed tokens.
+    if (evidence.errored && !this.sawAnyUsage && tokens.total === 0) {
+      return missingUsageSnapshot(
+        'claude_result',
+        this.revision,
+        true,
+        'error_result_without_usage'
+      );
+    }
+
     if (!breakdownHasKnownValue(tokens)) {
       if (!this.sawAnyUsage) {
         return missingUsageSnapshot(
@@ -197,14 +223,19 @@ export class ClaudeUsageAccumulator {
       // ends the metered range, but completeness is only claimable for a
       // clean result — an error result's coverage of the executed range is
       // unproven.
-      status: evidence.errored || !hasResultEvidence || discrepancy ? 'partial' : 'complete',
+      status:
+        evidence.errored || !hasResultEvidence || discrepancy || incompleteClassification
+          ? 'partial'
+          : 'complete',
       reason: evidence.errored
         ? 'error_result'
         : !hasResultEvidence
           ? 'result_without_usage'
           : discrepancy
             ? 'uncertain_model_scope'
-            : undefined,
+            : incompleteClassification
+              ? 'incomplete_classification'
+              : undefined,
       discrepancy,
       tokens,
       models: modelAllocations,
@@ -535,7 +566,13 @@ export class CursorUsageAccumulator {
           (cacheWrite as number) +
           (output as number)
         : null);
-    if (total === null && inputUncached === null && output === null) {
+    if (
+      total === null &&
+      inputUncached === null &&
+      output === null &&
+      cacheRead === null &&
+      cacheWrite === null
+    ) {
       return missingUsageSnapshot('cursor_result', this.revision, true, 'not_reported');
     }
     return buildInvocationSnapshot({
