@@ -223,9 +223,15 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-muted-foreground">
-          {items.length} automation{items.length !== 1 ? 's' : ''}
-        </h2>
+        {/* Hide the count while the list is in an error state: a stale "0" next
+            to the error banner still reads as "the backend has no data" (A17). */}
+        {listError ? (
+          <h2 className="text-sm font-medium text-muted-foreground">…</h2>
+        ) : (
+          <h2 className="text-sm font-medium text-muted-foreground">
+            {items.length} automation{items.length !== 1 ? 's' : ''}
+          </h2>
+        )}
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowCreate(!showCreate)}

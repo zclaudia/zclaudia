@@ -211,6 +211,9 @@ describe('Failure feedback', () => {
     expect(await screen.findByText('Failed to load automations')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
     expect(screen.queryByText('No automations yet')).toBeNull();
+    // The count line must not read "0 automations" while the list is in error
+    // state — a stale zero still reads as "the backend has no data" (A17).
+    expect(screen.queryByText(/0 automations?/)).toBeNull();
   });
 
   it('shows an action error instead of failing silently when disable is rejected', async () => {
