@@ -3,7 +3,7 @@ import express from 'express';
 import type { Database } from 'better-sqlite3';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { ExecutorInstanceRepository } from './executor-instance-repository.js';
-import type { ExecutorService } from '../issue-orchestration/executor-service.js';
+import type { ExecutorServicePort } from './executor-port.js';
 import type { ExecutorType } from '@zclaudia/shared/features/executor';
 
 const ok = <T>(data: T): ApiResponse<T> => ({ success: true, data });
@@ -14,7 +14,7 @@ const err = (code: string, message: string): ApiResponse<never> => ({
 
 export interface ExecutorRoutesDeps {
   db: Database;
-  executorService: ExecutorService;
+  executorService: ExecutorServicePort;
 }
 
 export function createExecutorRoutes(deps: ExecutorRoutesDeps): Router {

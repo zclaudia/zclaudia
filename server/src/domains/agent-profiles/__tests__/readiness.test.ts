@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
-import { AgentProfileRepository } from '../../agent-profiles/repository.js';
+import { AgentProfileRepository } from '../repository.js';
 import { LlmProfileRepository } from '../../llm-profiles/repository.js';
-import { resolveAgentReadiness } from '../check.js';
+import { resolveAgentReadiness } from '../readiness.js';
 import { registerClaudeTestRuntime } from '../../../test/claude-runtime-fixture.js';
 
 // The claude runtime ships as a plugin; simulate it being active so its native

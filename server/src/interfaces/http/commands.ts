@@ -14,7 +14,7 @@ import type {
 import { LOCAL_COMMANDS } from '@zclaudia/shared/features/commands';
 import { commandRegistry, type CommandContext } from '../../application/commands/registry.js';
 import { ensureBuiltinCommandsRegistered } from '../../application/commands/init.js';
-import { resolveAgentForSession } from '../../domains/agent-profiles/agent-resolver.js';
+import { resolveAgentForSession } from '../../domains/sessions/agent-resolver.js';
 import { SessionRepository } from '../../domains/sessions/repository.js';
 
 // Ensure built-in commands are registered

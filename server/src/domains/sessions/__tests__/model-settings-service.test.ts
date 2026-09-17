@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { SessionModelSettingsService } from '../model-settings-service.js';
-import { resolveAgentForSession } from '../../agent-profiles/agent-resolver.js';
+import { resolveAgentForSession } from '../agent-resolver.js';
 import { SessionRuntimeBindingRepository } from '../runtime-binding-repository.js';
 import type { ProviderRegistryPort } from '../../../infra/providers/registry.js';
 

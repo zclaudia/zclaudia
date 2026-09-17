@@ -15,8 +15,8 @@ import type {
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { WorkflowRunRepository } from './workflow-run-repository.js';
 import { WorkflowStepRunRepository } from './workflow-step-run-repository.js';
-import { ProjectRepository } from '../projects/repository.js';
-import { resolveAgentForSession, NoAgentAvailableError } from '../agent-profiles/agent-resolver.js';
+import { resolveAgentForSession, NoAgentAvailableError } from '../sessions/agent-resolver.js';
+import type { ProjectLookupPort } from './ports/project-lookup.js';
 import { renderConfig, type RenderContext } from './template-renderer.js';
 import type {
   StepExecutorPort,
@@ -51,7 +51,7 @@ export interface RunTriggerContext {
 export class WorkflowEngine implements ApprovalPort {
   private runRepo: WorkflowRunRepository;
   private stepRunRepo: WorkflowStepRunRepository;
-  private projectRepo: ProjectRepository;
+  private projectLookup: ProjectLookupPort | null;
   private activeRuns = new Map<string, Set<string>>();
   private runEventPayloads = new Map<string, Record<string, unknown>>();
   private pendingApprovals = new Map<
@@ -70,11 +70,12 @@ export class WorkflowEngine implements ApprovalPort {
       message: ServerMessage | { type: string; [key: string]: unknown }
     ) => void,
     private stepExecutor: StepExecutorPort,
-    dispatcher?: EventDispatcher<WorkflowRunEvent>
+    dispatcher?: EventDispatcher<WorkflowRunEvent>,
+    projectLookup?: ProjectLookupPort
   ) {
     this.runRepo = new WorkflowRunRepository(db);
     this.stepRunRepo = new WorkflowStepRunRepository(db);
-    this.projectRepo = new ProjectRepository(db);
+    this.projectLookup = projectLookup ?? null;
     this.dispatcher = dispatcher ?? new EventDispatcher<WorkflowRunEvent>();
 
     // Register broadcastRunUpdate as a wildcard event handler
@@ -277,7 +278,7 @@ export class WorkflowEngine implements ApprovalPort {
       throw new Error(`Invalid workflow graph: ${validation.error}`);
     }
 
-    const project = projectId ? this.projectRepo.findById(projectId) : null;
+    const project = projectId && this.projectLookup ? this.projectLookup.findById(projectId) : null;
 
     const agg = WorkflowRunAggregate.start(
       definition,

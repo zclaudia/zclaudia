@@ -1,4 +1,4 @@
-import { resolveAgentForSession } from '../../../domains/agent-profiles/agent-resolver.js';
+import { resolveAgentForSession } from '../../../domains/sessions/agent-resolver.js';
 import { isPiAgentRuntime } from '@zclaudia/shared/core/agent-profile';
 import { newId } from '../../../utils/uuid.js';
 import { negotiateProfile } from '../../../infra/providers/pcp-negotiator.js';

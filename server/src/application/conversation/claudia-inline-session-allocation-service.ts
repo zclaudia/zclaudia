@@ -1,7 +1,7 @@
 import type { Database } from 'better-sqlite3';
 import type { BranchAction } from '@zclaudia/shared/wire/messages';
 import type { TaskCoordinationPort } from './task-coordination-port.js';
-import { resolveAgentForSession } from '../../domains/agent-profiles/agent-resolver.js';
+import { resolveAgentForSession } from '../../domains/sessions/agent-resolver.js';
 import { SessionRepository } from '../../domains/sessions/repository.js';
 
 type BranchCoordinator = Pick<

@@ -24,9 +24,9 @@ import { branchSessionAt, BranchError } from './branch-service.js';
 import { forkSession, ForkError } from './fork-service.js';
 import { buildContextGraph } from './context-graph-read.js';
 import { sendApiError } from '../../interfaces/http/response.js';
-import { NoAgentAvailableError } from '../agent-profiles/agent-resolver.js';
+import { NoAgentAvailableError } from './agent-resolver.js';
 import { requestSessionTitleGeneration } from '../../application/conversation/title/request-session-title.js';
-import { resolveAgentReadinessForSessionWithRuntimeCheck } from '../agent-readiness/check.js';
+import { resolveAgentReadinessForSessionWithRuntimeCheck } from './agent-readiness.js';
 import type { ActiveRun } from '../../application/conversation/transport/types.js';
 
 type ActiveRunsMap = Map<string, ActiveRun>;

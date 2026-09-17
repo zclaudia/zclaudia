@@ -2,16 +2,15 @@ import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import type { Database } from 'better-sqlite3';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
-import { AgentProfileRepository } from './repository.js';
+import { AgentProfileRepository } from '../agent-profiles/repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
-import { ProjectRepository } from '../projects/repository.js';
-import { resolveProfileEngineMode } from './engine-mode.js';
-import { runtimeRequiresLlmProfile } from './runtime-type-guard.js';
+import { resolveProfileEngineMode } from '../agent-profiles/engine-mode.js';
+import { runtimeRequiresLlmProfile } from '../agent-profiles/runtime-type-guard.js';
 import {
   applySessionModelSelection,
   readSessionModelSelection,
-} from '../sessions/model-settings-repository.js';
-import { SessionRuntimeBindingRepository } from '../sessions/runtime-binding-repository.js';
+} from './model-settings-repository.js';
+import { SessionRuntimeBindingRepository } from './runtime-binding-repository.js';
 
 export class NoAgentAvailableError extends Error {
   constructor() {
@@ -59,7 +58,6 @@ export interface ResolvedAgent {
 export function resolveAgentForSession(db: Database, opts: ResolveOptions): ResolvedAgent {
   const agentRepo = new AgentProfileRepository(db);
   const llmRepo = new LlmProfileRepository(db);
-  const projectRepo = new ProjectRepository(db);
 
   let agent: AgentProfileConfig | undefined;
 
@@ -73,8 +71,13 @@ export function resolveAgentForSession(db: Database, opts: ResolveOptions): Reso
   }
 
   if (!agent && opts.projectId) {
-    const project = projectRepo.findById(opts.projectId);
-    const projectDefaultId = project?.defaultAgentProfileId;
+    // Same query + row mapping as ProjectRepository.findById
+    // (SELECT * tolerates older fixtures without the column); done inline to
+    // avoid a sessions -> projects domain dependency.
+    const row = db.prepare('SELECT * FROM projects WHERE id = ?').get(opts.projectId) as
+      | { default_agent_profile_id?: string | null }
+      | undefined;
+    const projectDefaultId = row?.default_agent_profile_id || undefined;
     if (projectDefaultId) {
       agent = agentRepo.findById(projectDefaultId) ?? undefined;
       if (!agent) {

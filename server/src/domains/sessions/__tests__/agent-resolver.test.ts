@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { resolveAgentForSession, NoAgentAvailableError } from '../agent-resolver.js';
-import { AgentProfileRepository } from '../repository.js';
+import { AgentProfileRepository } from '../../agent-profiles/repository.js';
 import { LlmProfileRepository } from '../../llm-profiles/repository.js';
 import { ProjectRepository } from '../../projects/repository.js';
-import { SessionRuntimeBindingRepository } from '../../sessions/runtime-binding-repository.js';
+import { SessionRuntimeBindingRepository } from '../runtime-binding-repository.js';
 
 describe('resolveAgentForSession', () => {
   let db: Database.Database;

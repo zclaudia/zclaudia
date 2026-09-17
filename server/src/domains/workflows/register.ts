@@ -37,6 +37,7 @@ import {
 } from './step-executors/index.js';
 import type { ActivityRegistry } from '../activities/index.js';
 import type { PermissionBridgePort } from './ports/step-executor.js';
+import type { ProjectLookupPort } from './ports/project-lookup.js';
 import type { PermissionWorkflowResolver } from './permission-workflow-resolver.js';
 import { TaskRepository } from '../tasks/repository.js';
 import { TaskService } from '../tasks/task-service.js';
@@ -77,6 +78,8 @@ export interface WorkflowDomainDeps {
   taskExecutorRegistry?: TaskExecutorRegistry;
   activityRegistry?: ActivityRegistry;
   agentLoopRunner?: LightweightAgentRunner;
+  /** Project lookup for run root paths; supplied by the composition root. */
+  projectLookup?: ProjectLookupPort;
 }
 
 export interface WorkflowDomainResult {
@@ -138,7 +141,7 @@ export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomain
   }
 
   // -- Build engine --
-  const engine = new WorkflowEngine(db, broadcast, composite);
+  const engine = new WorkflowEngine(db, broadcast, composite, undefined, deps.projectLookup);
 
   // WaitStepExecutor needs the engine (which implements ApprovalPort)
   composite.register(new WaitStepExecutor(engine));

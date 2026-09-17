@@ -56,13 +56,6 @@ vi.mock('../workflow-step-run-repository.js', () => ({
     }
   },
 }));
-vi.mock('../../projects/repository.js', () => ({
-  ProjectRepository: class {
-    constructor() {
-      Object.assign(this, mockProjectRepo);
-    }
-  },
-}));
 vi.mock('../../sessions/repository.js', () => ({
   SessionRepository: class {
     constructor() {
@@ -132,7 +125,7 @@ function createEngineWithDb(mockDb: any, mockBroadcast: ReturnType<typeof vi.fn>
   composite.register(new ActivityStepExecutorAdapter(activityRegistry, mockAgentLoopRunner));
   composite.registerPlugin(new PluginStepExecutor(mockWorkflowStepRegistry as any));
 
-  const workflowEngine = new WorkflowEngine(mockDb, mockBroadcast, composite);
+  const workflowEngine = new WorkflowEngine(mockDb, mockBroadcast, composite, undefined, mockProjectRepo);
   composite.register(new WaitStepExecutor(workflowEngine));
   return workflowEngine;
 }

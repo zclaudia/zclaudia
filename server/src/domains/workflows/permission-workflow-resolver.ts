@@ -1,7 +1,6 @@
 import type { Workflow, WorkflowRun } from '@zclaudia/shared/features/workflows';
 import type { WorkflowService } from './service.js';
 import { WorkflowRepository } from './repository.js';
-import { ProjectRepository } from '../projects/repository.js';
 import type { Database } from 'better-sqlite3';
 
 export interface ResolvedPermissionWorkflow {
@@ -13,14 +12,12 @@ export interface ResolvedPermissionWorkflow {
 
 export class PermissionWorkflowResolver {
   private workflowRepo: WorkflowRepository;
-  private projectRepo: ProjectRepository;
 
   constructor(
     private db: Database,
     private workflowService: WorkflowService
   ) {
     this.workflowRepo = new WorkflowRepository(db);
-    this.projectRepo = new ProjectRepository(db);
   }
 
   private isUsableOverride(workflow: Workflow | null | undefined): workflow is Workflow {
@@ -29,8 +26,13 @@ export class PermissionWorkflowResolver {
 
   resolve(projectId?: string): ResolvedPermissionWorkflow {
     if (projectId) {
-      const project = this.projectRepo.findById(projectId);
-      const projectOverrideId = project?.permissionWorkflowOverrideId;
+      // Same query + row mapping as ProjectRepository.findById (SELECT *
+      // tolerates older fixtures without the column); done inline so this
+      // resolver does not depend on the projects domain.
+      const row = this.db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as
+        | { permission_workflow_override_id?: string | null }
+        | undefined;
+      const projectOverrideId = row?.permission_workflow_override_id || undefined;
       if (projectOverrideId) {
         const workflow = this.workflowRepo.findById(projectOverrideId);
         if (this.isUsableOverride(workflow)) {

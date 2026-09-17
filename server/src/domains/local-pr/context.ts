@@ -6,7 +6,7 @@ import { ProjectRepository } from '../projects/repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import { SessionRepository } from '../sessions/repository.js';
 import { SessionMessageRepository } from '../sessions/message-repository.js';
-import { resolveAgentForSession, NoAgentAvailableError } from '../agent-profiles/agent-resolver.js';
+import { resolveAgentForSession, NoAgentAvailableError } from '../sessions/agent-resolver.js';
 import type { LocalPRAiSessionPort } from './ports.js';
 import { WorktreeConfigRepository } from '../../infra/repositories/worktree-config.js';
 import { Mutex } from 'async-mutex';

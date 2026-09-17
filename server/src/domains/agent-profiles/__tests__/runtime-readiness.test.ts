@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { ManagedRuntimeResolution } from '@zclaudia/shared/plugins/managed-runtimes';
-import { configureRuntimeReadinessInspector, resolveAgentExecutionReadiness } from '../check.js';
+import { configureRuntimeReadinessInspector, resolveAgentExecutionReadiness } from '../readiness.js';
 import { registerClaudeTestRuntime } from '../../../test/claude-runtime-fixture.js';
 
 registerClaudeTestRuntime({ adapter: true });

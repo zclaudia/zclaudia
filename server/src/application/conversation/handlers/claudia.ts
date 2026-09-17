@@ -20,7 +20,7 @@ import type { NotificationService } from '../../../domains/notification-feed/ind
 import type { TaskCoordinationPort } from '../../../application/conversation/task-coordination-port.js';
 import type { WebSocket } from 'ws';
 import { sendMessage } from '../transport/broadcast.js';
-import { NoAgentAvailableError } from '../../../domains/agent-profiles/agent-resolver.js';
+import { NoAgentAvailableError } from '../../../domains/sessions/agent-resolver.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
 import { ProjectRepository } from '../../../domains/projects/repository.js';

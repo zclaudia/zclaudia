@@ -8,7 +8,7 @@ import { resolveProjectMemoryDir } from '../../../utils/memory-paths.js';
 import {
   NoAgentAvailableError,
   resolveAgentForSession,
-} from '../../agent-profiles/agent-resolver.js';
+} from '../../sessions/agent-resolver.js';
 import { LlmProfileRepository } from '../../llm-profiles/repository.js';
 import type {
   WorkflowAgentRuntime,

@@ -5,7 +5,7 @@ import type {
   SessionModelSettings,
   SessionModelSelection,
 } from '@zclaudia/shared/core/runtime-capabilities';
-import { resolveAgentForSession } from '../agent-profiles/agent-resolver.js';
+import { resolveAgentForSession } from './agent-resolver.js';
 import {
   readSessionModelSelection,
   writeSessionModelSelection,

@@ -16,8 +16,8 @@ import {
 import {
   resolveAgentReadinessWithRuntimeCheck,
   resolveAgentExecutionReadiness,
-} from '../agent-readiness/check.js';
-import { resolveAgentProfileRecordStatus } from '../agent-readiness/record-status.js';
+} from './readiness.js';
+import { resolveAgentProfileRecordStatus } from './record-status.js';
 import { isValidRuntimeType, runtimeRequiresLlmProfile } from './runtime-type-guard.js';
 import {
   validateEngineModeConfiguration,
