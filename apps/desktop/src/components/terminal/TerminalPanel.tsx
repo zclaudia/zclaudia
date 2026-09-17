@@ -8,7 +8,11 @@ import { useServerStore } from '../../stores/serverStore';
 import { XTerminal } from './XTerminal';
 import { terminalRegistry } from '../../services/terminal/TerminalRegistry';
 import { isDesktopTauri } from '../../utils/platform';
-import { openPopoutWindow, buildWindowTitle, getConnectionParams } from '../../actions/popoutWindow';
+import {
+  openPopoutWindow,
+  buildWindowTitle,
+  getConnectionParams,
+} from '../../actions/popoutWindow';
 
 /** Quick-send keys for mobile toolbar */
 const QUICK_KEYS: { label: string; data: string }[] = [

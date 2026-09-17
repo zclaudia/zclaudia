@@ -372,8 +372,7 @@ export async function inspectExecutable(
       executablePath,
       compatibilityState: 'probe-failed',
       message:
-        versionResult.error ||
-        `Version command exited with status ${String(versionResult.code)}.`,
+        versionResult.error || `Version command exited with status ${String(versionResult.code)}.`,
     };
   }
   const version = parseVersion(`${versionResult.stdout}\n${versionResult.stderr}`, descriptor);
@@ -417,10 +416,7 @@ export async function runAuthProbe(
   });
   if (result.error && result.code === null) return 'probe-failed';
   const output = `${result.stdout}\n${result.stderr}`;
-  if (
-    probe.unauthenticatedPattern &&
-    new RegExp(probe.unauthenticatedPattern, 'm').test(output)
-  ) {
+  if (probe.unauthenticatedPattern && new RegExp(probe.unauthenticatedPattern, 'm').test(output)) {
     return 'auth-required';
   }
   const successCodes = probe.successExitCodes ?? [0];

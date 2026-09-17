@@ -19,10 +19,7 @@ import {
   findActualString,
   findWhitespaceMatch,
 } from '../edit-match.js';
-import {
-  buildFileStateErrorDescriptor,
-  buildMutationStateDescriptor,
-} from '../file-state.js';
+import { buildFileStateErrorDescriptor, buildMutationStateDescriptor } from '../file-state.js';
 import { recordFileBackup } from '../file-history.js';
 import { runWithFileWriteLock } from '../file-write-lock.js';
 import {

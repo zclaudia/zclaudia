@@ -1,6 +1,10 @@
 import type Database from 'better-sqlite3';
 import type { AgentReadiness } from '@zclaudia/shared/core/agent-readiness';
-import { NoAgentAvailableError, resolveAgentForSession, type ResolveOptions } from './agent-resolver.js';
+import {
+  NoAgentAvailableError,
+  resolveAgentForSession,
+  type ResolveOptions,
+} from './agent-resolver.js';
 import {
   readinessForResolvedAgent,
   resolveAgentExecutionReadiness,

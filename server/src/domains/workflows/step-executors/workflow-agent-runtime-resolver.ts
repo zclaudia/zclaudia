@@ -5,10 +5,7 @@ import { buildMemoryContext } from '../../../application/conversation/context/me
 import { workspaceService } from '../../../application/services/workspace.js';
 import { resolveUserHooks } from '../../../application/conversation/runtime/resolve-user-hooks.js';
 import { resolveProjectMemoryDir } from '../../../utils/memory-paths.js';
-import {
-  NoAgentAvailableError,
-  resolveAgentForSession,
-} from '../../sessions/agent-resolver.js';
+import { NoAgentAvailableError, resolveAgentForSession } from '../../sessions/agent-resolver.js';
 import { LlmProfileRepository } from '../../llm-profiles/repository.js';
 import type {
   WorkflowAgentRuntime,

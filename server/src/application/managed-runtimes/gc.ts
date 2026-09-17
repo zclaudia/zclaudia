@@ -51,12 +51,16 @@ export async function collectGarbage(options: {
       withFileTypes: true,
     }).catch(() => []);
     for (const versionDir of versionDirs.filter(entry => entry.isDirectory())) {
-      const platformDirs = await readdir(
-        path.join(storeDir, runtimeDir.name, versionDir.name),
-        { withFileTypes: true }
-      ).catch(() => []);
+      const platformDirs = await readdir(path.join(storeDir, runtimeDir.name, versionDir.name), {
+        withFileTypes: true,
+      }).catch(() => []);
       for (const platformDir of platformDirs.filter(entry => entry.isDirectory())) {
-        const candidate = path.resolve(storeDir, runtimeDir.name, versionDir.name, platformDir.name);
+        const candidate = path.resolve(
+          storeDir,
+          runtimeDir.name,
+          versionDir.name,
+          platformDir.name
+        );
         if (referenced.has(candidate)) continue;
         const storeRoot = path.resolve(storeDir);
         if (!candidate.startsWith(`${storeRoot}${path.sep}`)) continue;

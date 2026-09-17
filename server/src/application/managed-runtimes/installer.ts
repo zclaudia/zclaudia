@@ -134,8 +134,7 @@ export async function stageFreshInstall(options: {
         candidate.artifact.signature.publicKey,
         Buffer.from(candidate.artifact.signature.value, 'base64')
       );
-      if (!signatureVerified)
-        throw new Error('Managed runtime signature verification failed');
+      if (!signatureVerified) throw new Error('Managed runtime signature verification failed');
     }
     let provenanceVerified: boolean | undefined;
     if (candidate.artifact.provenance) {

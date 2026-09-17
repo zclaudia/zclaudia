@@ -34,7 +34,12 @@ export async function readInstallation(options: {
   version: string;
   platform: ManagedRuntimePlatformKey;
 }): Promise<StoredInstallation | undefined> {
-  const root = runtimeStoreDir(options.storeDir, options.runtime, options.version, options.platform);
+  const root = runtimeStoreDir(
+    options.storeDir,
+    options.runtime,
+    options.version,
+    options.platform
+  );
   const record = await readJson<InstallationRecord>(path.join(root, INSTALLATION_FILE));
   if (
     !record ||
@@ -113,8 +118,7 @@ export function artifactCandidate(
     !requestedVersion && managed.recommendedVersion
       ? versions.find(entry => entry.version === managed.recommendedVersion)
       : undefined;
-  const selected =
-    recommended ?? versions.sort((a, b) => compareVersions(b.version, a.version))[0];
+  const selected = recommended ?? versions.sort((a, b) => compareVersions(b.version, a.version))[0];
   const artifact = selected?.artifacts[platform];
   return selected && artifact
     ? {

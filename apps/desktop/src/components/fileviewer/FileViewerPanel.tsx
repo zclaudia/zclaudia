@@ -40,7 +40,11 @@ import { MarkdownFileContent } from './MarkdownFileContent';
 import { FileSymbol } from '../filesymbols';
 import { matchesByLine, findContentMatches, type ContentMatch } from './contentSearch';
 import { isDesktopTauri } from '../../utils/platform';
-import { openPopoutWindow, buildWindowTitle, getConnectionParams } from '../../actions/popoutWindow';
+import {
+  openPopoutWindow,
+  buildWindowTitle,
+  getConnectionParams,
+} from '../../actions/popoutWindow';
 import { useProjectStore } from '../../stores/projectStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 

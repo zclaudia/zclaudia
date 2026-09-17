@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { InvocableCatalogSnapshot, InvocableDescriptor } from '@zclaudia/shared/providers';
 import { fetchApiForBackend } from '../../../services/api/base';
-import { invocableCatalogKey, useInvocableCatalogStore } from '../../../stores/invocableCatalogStore';
+import {
+  invocableCatalogKey,
+  useInvocableCatalogStore,
+} from '../../../stores/invocableCatalogStore';
 
 /**
  * Session invocable catalog hook (URIP design doc §16).

@@ -294,7 +294,10 @@ function resolveImport(repoRoot, fromFile, source) {
   ].filter(Boolean);
 
   for (const candidate of candidates) {
-    if (existsSync(path.join(repoRoot, candidate)) && statSync(path.join(repoRoot, candidate)).isFile()) {
+    if (
+      existsSync(path.join(repoRoot, candidate)) &&
+      statSync(path.join(repoRoot, candidate)).isFile()
+    ) {
       return candidate;
     }
   }
@@ -380,7 +383,8 @@ const DESKTOP_FEATURE_FILE_PATTERN = /^apps\/desktop\/src\/features\/([^/]+)\//;
 const DESKTOP_FEATURE_TARGET_PATTERN = /^apps\/desktop\/src\/features\/([^/]+)\//;
 
 function assertDesktopFeatureImportBoundaries(repoRoot, failures, options) {
-  const allowlist = options.desktopFeatureImportAllowlist ?? DEFAULT_DESKTOP_FEATURE_IMPORT_ALLOWLIST;
+  const allowlist =
+    options.desktopFeatureImportAllowlist ?? DEFAULT_DESKTOP_FEATURE_IMPORT_ALLOWLIST;
 
   for (const relativePath of walk(repoRoot, 'apps/desktop/src/features', isNonTestSourceFile)) {
     const ownFeature = relativePath.match(DESKTOP_FEATURE_FILE_PATTERN)?.[1];
@@ -406,7 +410,8 @@ function assertDesktopFeatureImportBoundaries(repoRoot, failures, options) {
 function assertDesktopServicesFeatureReexportBoundaries(repoRoot, failures, options) {
   const allowlist =
     options.desktopServicesReexportAllowlist ?? DEFAULT_DESKTOP_SERVICES_REEXPORT_ALLOWLIST;
-  const reExportPattern = /export\s+(?:\*(?:\s+as\s+[\w$]+)?|\{[^}]*\})\s+from\s*['"](?<source>[^'"]+)['"]/g;
+  const reExportPattern =
+    /export\s+(?:\*(?:\s+as\s+[\w$]+)?|\{[^}]*\})\s+from\s*['"](?<source>[^'"]+)['"]/g;
 
   for (const relativePath of walk(repoRoot, 'apps/desktop/src/services', isNonTestSourceFile)) {
     const content = read(repoRoot, relativePath);
@@ -425,7 +430,6 @@ function assertDesktopServicesFeatureReexportBoundaries(repoRoot, failures, opti
     }
   }
 }
-
 
 // desktop: utils/ must stay pure — no imports of stores, services, facades,
 // features, actions or UI layers. Side-effectful action modules live in actions/.
@@ -491,7 +495,8 @@ function assertDesktopProviderMetaBoundaries(repoRoot, failures) {
     },
     {
       pattern: /useProjectStore\.getState\(\)\.setProviderCapabilities\b/,
-      message: 'Do not write providerCapabilities through projectStore; use providerMetaStore instead.',
+      message:
+        'Do not write providerCapabilities through projectStore; use providerMetaStore instead.',
     },
   ];
 
@@ -539,7 +544,8 @@ function assertDesktopSelectionStoreBoundaries(repoRoot, failures, options) {
     },
     {
       pattern: /useProjectStore\.getState\(\)\.dashboardViews\b/,
-      message: 'Do not read dashboardViews from projectStore.getState(); use selectionStore instead.',
+      message:
+        'Do not read dashboardViews from projectStore.getState(); use selectionStore instead.',
     },
   ];
 
