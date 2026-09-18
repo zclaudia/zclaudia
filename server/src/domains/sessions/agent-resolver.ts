@@ -45,6 +45,9 @@ export interface ResolveOptions {
 export interface ResolvedAgent {
   agent: AgentProfileConfig;
   llm: LlmProfileConfig | undefined;
+  /** Which precedence tier produced the agent (design §默认 agent, P0).
+   *  'session-bound' means the session already carried a binding. */
+  source?: 'explicit' | 'project-default' | 'global-default' | 'session-bound';
 }
 
 /**
@@ -60,10 +63,13 @@ export function resolveAgentForSession(db: Database, opts: ResolveOptions): Reso
   const llmRepo = new LlmProfileRepository(db);
 
   let agent: AgentProfileConfig | undefined;
+  let source: ResolvedAgent['source'] = 'global-default';
 
   if (opts.explicitAgentId) {
     agent = agentRepo.findById(opts.explicitAgentId) ?? undefined;
-    if (!agent) {
+    if (agent) {
+      source = 'explicit';
+    } else {
       console.warn(
         `[agent-resolver] explicit agent_profile_id ${opts.explicitAgentId} not found, falling back`
       );
@@ -80,7 +86,9 @@ export function resolveAgentForSession(db: Database, opts: ResolveOptions): Reso
     const projectDefaultId = row?.default_agent_profile_id || undefined;
     if (projectDefaultId) {
       agent = agentRepo.findById(projectDefaultId) ?? undefined;
-      if (!agent) {
+      if (agent) {
+        source = 'project-default';
+      } else {
         console.warn(
           `[agent-resolver] project default agent_profile_id ${projectDefaultId} not found, falling back to global default`
         );
@@ -90,6 +98,9 @@ export function resolveAgentForSession(db: Database, opts: ResolveOptions): Reso
 
   if (!agent) {
     agent = agentRepo.findDefault();
+    if (agent) {
+      source = 'global-default';
+    }
   }
 
   if (!agent) {
@@ -108,6 +119,7 @@ export function resolveAgentForSession(db: Database, opts: ResolveOptions): Reso
       llmProfileId: binding.llmProfileId,
       cliPath: binding.configuredCliPath ?? undefined,
     };
+    source = 'session-bound';
   }
 
   // LLM binding resolution.
@@ -149,5 +161,5 @@ export function resolveAgentForSession(db: Database, opts: ResolveOptions): Reso
   if (opts.sessionId && !opts.ignoreModelSelection) {
     agent = applySessionModelSelection(agent, readSessionModelSelection(db, opts.sessionId));
   }
-  return { agent, llm };
+  return { agent, llm, source };
 }

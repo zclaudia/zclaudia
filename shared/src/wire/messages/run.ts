@@ -339,6 +339,10 @@ export interface AgentStartMessage {
 export interface AgentCancelMessage {
   type: 'agent_cancel';
   sessionId: string;
+  /** Target run (P0 身份契约). When present, the server verifies the session's
+   *  active run still has this id — a late cancel must not kill a newer run
+   *  that reused the session. */
+  runId?: string;
 }
 
 export interface StopBackgroundTaskMessage {

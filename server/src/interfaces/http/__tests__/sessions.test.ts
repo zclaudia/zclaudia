@@ -583,6 +583,33 @@ describe('sessions routes', () => {
       ).run('s1', 'project-1', 'Test Session', now, now);
     });
 
+    it('returns a recoverable snapshot for only the requested session', async () => {
+      activeRuns.set('own', {
+        sessionId: 's1',
+        phase: 'running',
+        fullContent: 'Partial answer',
+        assistantMessageId: 'assistant-1',
+        startedAt: 123,
+        eventSeq: 7,
+      });
+      activeRuns.set('other', { sessionId: 's2', phase: 'running', fullContent: 'Other answer' });
+      const res = await request(app).get('/api/sessions/s1/messages');
+      expect(res.status).toBe(200);
+      expect(res.body.data.activeRun).toEqual({
+        runId: 'own',
+        content: 'Partial answer',
+        assistantMessageId: 'assistant-1',
+        startedAt: 123,
+        seq: 7,
+        phase: 'running',
+      });
+      activeRuns.delete('own');
+      db.prepare("UPDATE sessions SET last_run_status = 'interrupted' WHERE id = ?").run('s1');
+      const recovered = await request(app).get('/api/sessions/s1/messages');
+      expect(recovered.body.data.activeRun).toBeNull();
+      expect(recovered.body.data.lastRunStatus).toBe('interrupted');
+    });
+
     it('returns messages with pagination info', async () => {
       const now = Date.now();
       db.prepare(
@@ -710,7 +737,7 @@ describe('sessions routes', () => {
       const res = await request(app).get('/api/sessions/s1/messages');
 
       expect(res.status).toBe(200);
-      expect(res.body.data.activeRun).toEqual({ runId: 'run-1' });
+      expect(res.body.data.activeRun).toEqual({ runId: 'run-1', phase: 'running' });
     });
 
     it('does not return activeRun for completed or background runs', async () => {

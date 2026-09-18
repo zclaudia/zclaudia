@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useMemo, useCallback, lazy, Suspense } fro
 import { Sidebar } from './features/sidebar/Sidebar';
 import { NotificationsModal } from './features/sidebar/NotificationsModal';
 import { SidebarCollapsedBar } from './features/sidebar/SidebarCollapsedBar';
+import { ClaudiaReturnLink } from './features/claudia/ClaudiaReturnLink';
 import { SessionChatLayout } from './features/chat/SessionChatLayout';
 import { HomeView } from './features/home/HomeView';
 import { MobileSetup } from './components/setup/MobileSetup';
@@ -68,6 +69,9 @@ const AgentsContent = lazy(() =>
 );
 const PluginsContent = lazy(() =>
   import('./features/plugins/PluginsContent').then(m => ({ default: m.PluginsContent }))
+);
+const ClaudiaContent = lazy(() =>
+  import('./features/claudia/ClaudiaChat').then(m => ({ default: m.ClaudiaChat }))
 );
 
 // Stable empty list handed to the agents-mode catalog hooks while their tab is
@@ -169,7 +173,9 @@ function AppContent() {
         ? 'Agents'
         : topLevelView.kind === 'plugins'
           ? 'Extensions'
-          : null;
+          : topLevelView.kind === 'claudia'
+            ? 'Claudia'
+            : null;
   const isShellTopLevelView = shellModeTitle !== null;
 
   const {
@@ -604,6 +610,10 @@ function AppContent() {
               <Suspense fallback={<LazyFallback />}>
                 <PluginsContent />
               </Suspense>
+            ) : topLevelView.kind === 'claudia' ? (
+              <Suspense fallback={<LazyFallback />}>
+                <ClaudiaContent />
+              </Suspense>
             ) : dashboardProject ? (
               <Suspense fallback={<LazyFallback />}>
                 <ProjectDashboard
@@ -621,16 +631,21 @@ function AppContent() {
                 />
               </Suspense>
             ) : selectedSessionId ? (
-              <SessionChatLayout
-                key={selectedSessionId}
-                sessionId={selectedSessionId}
-                onOpenSidebar={() => setSidebarOpen(true)}
-                onReturnToDashboard={projectId => {
-                  selectProjectRoute(projectId);
-                  selectSession(null);
-                  setDashboardProjectId(projectId);
-                }}
-              />
+              <div className="flex h-full min-h-0 flex-col">
+                <ClaudiaReturnLink sessionId={selectedSessionId} isMobile={isMobile} />
+                <div className="flex-1 min-h-0">
+                  <SessionChatLayout
+                    key={selectedSessionId}
+                    sessionId={selectedSessionId}
+                    onOpenSidebar={() => setSidebarOpen(true)}
+                    onReturnToDashboard={projectId => {
+                      selectProjectRoute(projectId);
+                      selectSession(null);
+                      setDashboardProjectId(projectId);
+                    }}
+                  />
+                </div>
+              </div>
             ) : (
               <HomeView
                 onNewSession={() => {

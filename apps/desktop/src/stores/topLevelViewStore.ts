@@ -10,6 +10,7 @@ import { normalizePluginsTab } from '../features/plugins/plugins-types';
 
 export type TopLevelView =
   | { kind: 'app' }
+  | { kind: 'claudia' }
   | { kind: 'settings'; initialTab?: SettingsTab }
   | { kind: 'automations'; tab: AutomationTab; projectId?: string }
   | { kind: 'agents'; tab: AgentsTab }
@@ -27,6 +28,8 @@ interface TopLevelViewState {
   agentsRefreshNonce: number;
   agentsBackendFilter: 'all' | string;
   openSettings: (initialTab?: SettingsTab) => void;
+  /** Open the in-app Claudia destination (desktop). Mobile keeps its overlay. */
+  openClaudia: () => void;
   openAutomations: (opts?: OpenAutomationsOptions) => void;
   setAutomationTab: (tab: AutomationTab) => void;
   setAutomationProjectFilter: (projectId?: string) => void;
@@ -57,6 +60,7 @@ export const useTopLevelViewStore = create<TopLevelViewState>(set => ({
     set({
       view: initialTab ? { kind: 'settings', initialTab } : { kind: 'settings' },
     }),
+  openClaudia: () => set({ view: { kind: 'claudia' } }),
   openAutomations: opts =>
     set(state => ({
       view: {

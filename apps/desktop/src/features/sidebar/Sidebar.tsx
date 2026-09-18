@@ -150,6 +150,7 @@ export function Sidebar({
   const internalDrawerPanelRef = useRef<HTMLDivElement>(null);
   const mobileDrawerPanelRef = drawerPanelRef ?? internalDrawerPanelRef;
   const data = useSidebarData();
+  const topLevelViewKind = useTopLevelViewStore(s => s.view.kind);
   const {
     sessions,
     visibleProjects,
@@ -991,6 +992,17 @@ export function Sidebar({
           <SidebarNav
             onHome={onHome}
             isHomeActive={isHomeActive}
+            onOpenClaudia={() => useTopLevelViewStore.getState().openClaudia()}
+            isClaudiaActive={isClaudiaExpanded || topLevelViewKind === 'claudia'}
+            claudiaStatus={
+              hasClaudiaPermissionPending
+                ? 'permission'
+                : hasClaudiaUnread
+                  ? 'unread'
+                  : hasClaudiaRunning
+                    ? 'running'
+                    : null
+            }
             onOpenAutomations={onOpenAutomations}
             automationMode={
               automationMode

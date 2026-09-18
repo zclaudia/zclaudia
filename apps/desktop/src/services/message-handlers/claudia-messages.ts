@@ -1,185 +1,225 @@
 /**
- * Claudia task and inline response message handlers.
+ * Claudia message handlers (P0).
+ *
+ * Every handler normalizes the transport serverId to a canonical backend id
+ * and updates ONLY that backend's slice — snapshots and late events for one
+ * backend must never touch another backend's state (design §backend 归属与隔离).
  */
 import type { ServerMessage } from '@zclaudia/shared';
 import { useClaudiaStore } from '../../stores/claudiaStore';
 import { useToastStore } from '../../stores/toastStore';
+import { parseBackendId } from '../../stores/gatewayStore';
+import { resolveCanonicalBackendId } from '../../actions/controlPlane';
+
+/** Canonical backend id for a transport connection (never the raw serverId). */
+function canonicalBackendId(serverId: string): string {
+  return resolveCanonicalBackendId(parseBackendId(serverId)) ?? serverId;
+}
 
 export function handleClaudiaMessage(msg: ServerMessage, serverId: string): boolean {
   switch (msg.type) {
-    case 'claudia_task_created': {
-      const taskMsg = msg as import('@zclaudia/shared').ClaudiaTaskCreatedMessage;
-      const claudiaStore = useClaudiaStore.getState();
-      const optimistic = claudiaStore.tasks.find(t => t.id === taskMsg.clientRequestId);
-      if (optimistic) {
-        claudiaStore.removeTask(taskMsg.clientRequestId);
-        claudiaStore.addTask({
-          ...optimistic,
-          id: taskMsg.taskId,
-          sessionId: taskMsg.sessionId || null,
-          branchId: taskMsg.branchId || null,
-          branchAction: taskMsg.branchAction,
-          contextReset: taskMsg.contextReset,
-          title: taskMsg.title,
-          status: taskMsg.status,
-          updatedAt: Date.now(),
-        });
-      } else {
-        claudiaStore.addTask({
-          id: taskMsg.taskId,
-          sessionId: taskMsg.sessionId || null,
-          branchId: taskMsg.branchId || null,
-          branchAction: taskMsg.branchAction,
-          contextReset: taskMsg.contextReset,
-          input: '',
-          title: taskMsg.title,
-          status: taskMsg.status,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-      }
-      if (taskMsg.branchAction !== 'forked') {
-        claudiaStore.setActiveBranchId(taskMsg.projectId, taskMsg.branchId);
-      }
+    case 'claudia_request_accepted': {
+      const accepted = msg as import('@zclaudia/shared').ClaudiaRequestAcceptedMessage;
+      const backendId = canonicalBackendId(serverId);
+      const store = useClaudiaStore.getState();
+      store.ensureSlice(backendId);
+      store.acceptRun(backendId, accepted.clientRequestId, {
+        projectId: accepted.projectId,
+        branchId: accepted.branchId,
+        sessionId: accepted.sessionId,
+        runId: accepted.runId,
+        branchAction: accepted.branchAction,
+        contextReset: accepted.contextReset,
+        agentProfileId: accepted.agentProfileId,
+        agentProfileSource: accepted.agentProfileSource,
+        workingDirectory: accepted.workingDirectory,
+        replay: accepted.replay,
+        userMessageId: accepted.userMessageId,
+        assistantMessageId: accepted.assistantMessageId,
+      });
+      return true;
+    }
+
+    case 'claudia_request_rejected': {
+      const rejected = msg as import('@zclaudia/shared').ClaudiaRequestRejectedMessage;
+      const backendId = canonicalBackendId(serverId);
+      const store = useClaudiaStore.getState();
+      store.ensureSlice(backendId);
+      store.rejectRun(backendId, rejected.clientRequestId, rejected.code, rejected.error, {
+        projectId: rejected.projectId,
+        sessionId: rejected.sessionId,
+        runId: rejected.runId,
+      });
       return true;
     }
 
     case 'claudia_task_snapshot': {
-      const snapshotMsg = msg as import('@zclaudia/shared').ClaudiaTaskSnapshotMessage;
-      const snapshotStore = useClaudiaStore.getState();
-      const snapshotTasks = [...snapshotMsg.tasks]
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .map(t => ({ ...t, branchId: t.branchId ?? null }));
-      snapshotStore.setTasks(snapshotTasks);
-      snapshotStore.setActiveBranchIds(
-        Object.fromEntries(
-          snapshotMsg.activeBranches.map(state => [state.projectId, state.branchId])
-        )
+      const snapshot = msg as import('@zclaudia/shared').ClaudiaTaskSnapshotMessage;
+      const backendId = canonicalBackendId(serverId);
+      const store = useClaudiaStore.getState();
+      store.ensureSlice(backendId);
+      // Snapshot replaces only this backend's legacy task references.
+      store.setTasks(
+        backendId,
+        [...snapshot.tasks]
+          .sort((a, b) => b.createdAt - a.createdAt)
+          .map(t => ({ ...t, branchId: t.branchId ?? null }))
       );
       return true;
     }
 
     case 'claudia_message_delta': {
-      const inlineDelta = msg as import('@zclaudia/shared').ClaudiaMessageDeltaMessage;
+      const delta = msg as import('@zclaudia/shared').ClaudiaMessageDeltaMessage;
+      const backendId = canonicalBackendId(serverId);
       useClaudiaStore
         .getState()
-        .appendInlineDelta(inlineDelta.clientRequestId, inlineDelta.content);
+        .appendRunDelta(backendId, delta.clientRequestId, delta.content, delta.seq);
       return true;
     }
 
     case 'claudia_message_completed': {
-      const inlineCompleted = msg as import('@zclaudia/shared').ClaudiaMessageCompletedMessage;
+      const completed = msg as import('@zclaudia/shared').ClaudiaMessageCompletedMessage;
+      const backendId = canonicalBackendId(serverId);
       useClaudiaStore
         .getState()
-        .completeInline(inlineCompleted.clientRequestId, inlineCompleted.responseText);
+        .completeRun(backendId, completed.clientRequestId, completed.responseText, {
+          sessionId: completed.sessionId,
+          runId: completed.runId,
+        });
       return true;
     }
 
     case 'claudia_message_failed': {
-      const inlineFailed = msg as import('@zclaudia/shared').ClaudiaMessageFailedMessage;
-      useClaudiaStore.getState().failInline(inlineFailed.clientRequestId, inlineFailed.error);
+      const failed = msg as import('@zclaudia/shared').ClaudiaMessageFailedMessage;
+      const backendId = canonicalBackendId(serverId);
+      useClaudiaStore.getState().failRun(backendId, failed.clientRequestId, failed.error, {
+        sessionId: failed.sessionId,
+        runId: failed.runId,
+      });
       return true;
     }
 
+    // Legacy promoted-task messages (protocol kept for old servers/clients).
     case 'claudia_message_promoted': {
-      const inlinePromoted = msg as import('@zclaudia/shared').ClaudiaMessagePromotedMessage;
-      const claudiaForPromotion = useClaudiaStore.getState();
-      const inline = claudiaForPromotion.inlineResponses.find(
-        r => r.clientRequestId === inlinePromoted.clientRequestId
+      const promoted = msg as import('@zclaudia/shared').ClaudiaMessagePromotedMessage;
+      const backendId = canonicalBackendId(serverId);
+      const store = useClaudiaStore.getState();
+      const inline = store.slices[backendId]?.runs.find(
+        run => run.clientRequestId === promoted.clientRequestId
       );
-      claudiaForPromotion.promoteInline(inlinePromoted.clientRequestId, inlinePromoted.taskId);
-      claudiaForPromotion.addTask({
-        id: inlinePromoted.taskId,
-        sessionId: inlinePromoted.sessionId,
-        branchId: inlinePromoted.branchId || null,
-        branchAction: inlinePromoted.branchAction,
-        contextReset: inlinePromoted.contextReset,
-        input: inline?.input || '',
-        title: (inline?.input || '').replace(/\s+/g, ' ').trim().slice(0, 80),
+      store.startRun(backendId, {
+        clientRequestId: promoted.clientRequestId,
+        input: inline?.input ?? '',
+        projectId: promoted.projectId,
+        threadId: promoted.branchId ?? null,
         status: 'running',
-        createdAt: inline?.createdAt || Date.now(),
+        sessionId: promoted.sessionId,
+        branchAction: promoted.branchAction,
+        contextReset: promoted.contextReset,
+        createdAt: inline?.createdAt ?? Date.now(),
         updatedAt: Date.now(),
       });
-      if (inlinePromoted.branchId && inlinePromoted.branchAction !== 'forked') {
-        claudiaForPromotion.setActiveBranchId(inlinePromoted.projectId, inlinePromoted.branchId);
-      }
-      if (inline?.streamingText) {
-        claudiaForPromotion.appendStreamingText(inlinePromoted.taskId, inline.streamingText);
+      return true;
+    }
+
+    case 'claudia_task_created': {
+      const created = msg as import('@zclaudia/shared').ClaudiaTaskCreatedMessage;
+      const backendId = canonicalBackendId(serverId);
+      const store = useClaudiaStore.getState();
+      store.ensureSlice(backendId);
+      const optimistic = store.slices[backendId]?.tasks.find(t => t.id === created.clientRequestId);
+      if (optimistic) {
+        store.removeTask(backendId, created.clientRequestId);
+        store.addTask(backendId, {
+          ...optimistic,
+          id: created.taskId,
+          sessionId: created.sessionId || null,
+          branchId: created.branchId || null,
+          branchAction: created.branchAction,
+          contextReset: created.contextReset,
+          title: created.title,
+          status: created.status,
+          updatedAt: Date.now(),
+        });
+      } else {
+        store.addTask(backendId, {
+          id: created.taskId,
+          sessionId: created.sessionId || null,
+          branchId: created.branchId || null,
+          branchAction: created.branchAction,
+          contextReset: created.contextReset,
+          input: '',
+          title: created.title,
+          status: created.status,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
       }
       return true;
     }
 
     case 'claudia_task_delta': {
-      const deltaMsg = msg as import('@zclaudia/shared').ClaudiaTaskDeltaMessage;
-      useClaudiaStore.getState().appendStreamingText(deltaMsg.taskId, deltaMsg.content);
+      // Legacy task streaming — the read-only task reference renders final
+      // response text only, so the delta is intentionally not projected.
       return true;
     }
 
     case 'claudia_task_update': {
-      const updateMsg = msg as import('@zclaudia/shared').ClaudiaTaskUpdateMessage;
-      const claudiaStoreForUpdate = useClaudiaStore.getState();
-      const existing = claudiaStoreForUpdate.tasks.find(t => t.id === updateMsg.taskId);
+      const update = msg as import('@zclaudia/shared').ClaudiaTaskUpdateMessage;
+      const backendId = canonicalBackendId(serverId);
+      const store = useClaudiaStore.getState();
+      store.ensureSlice(backendId);
+      const existing = store.slices[backendId]?.tasks.find(t => t.id === update.taskId);
       if (!existing) {
-        claudiaStoreForUpdate.addTask({
-          id: updateMsg.taskId,
-          sessionId: updateMsg.sessionId || null,
-          branchId: updateMsg.branchId || null,
-          branchAction: updateMsg.branchAction,
-          contextReset: updateMsg.contextReset,
-          input: updateMsg.input || '',
-          title: updateMsg.title || updateMsg.input || 'Claudia Task',
-          status: updateMsg.status,
-          createdAt: updateMsg.createdAt || Date.now(),
-          updatedAt: updateMsg.updatedAt || Date.now(),
-          ...(updateMsg.summary ? { summary: updateMsg.summary } : {}),
-          ...(updateMsg.error ? { error: updateMsg.error } : {}),
-          ...(updateMsg.responseText !== undefined ? { responseText: updateMsg.responseText } : {}),
-          ...(updateMsg.toolCount != null ? { toolCount: updateMsg.toolCount } : {}),
+        store.addTask(backendId, {
+          id: update.taskId,
+          sessionId: update.sessionId || null,
+          branchId: update.branchId || null,
+          branchAction: update.branchAction,
+          contextReset: update.contextReset,
+          input: update.input || '',
+          title: update.title || update.input || 'Claudia Task',
+          status: update.status,
+          createdAt: update.createdAt || Date.now(),
+          updatedAt: update.updatedAt || Date.now(),
+          ...(update.summary ? { summary: update.summary } : {}),
+          ...(update.error ? { error: update.error } : {}),
+          ...(update.responseText !== undefined ? { responseText: update.responseText } : {}),
+          ...(update.toolCount != null ? { toolCount: update.toolCount } : {}),
         });
-        if (
-          updateMsg.status === 'completed' ||
-          updateMsg.status === 'failed' ||
-          updateMsg.status === 'cancelled'
-        ) {
-          claudiaStoreForUpdate.clearStreamingText(updateMsg.taskId);
-        }
         return true;
       }
-
-      claudiaStoreForUpdate.updateTask(updateMsg.taskId, {
-        status: updateMsg.status,
-        ...(updateMsg.sessionId ? { sessionId: updateMsg.sessionId } : {}),
-        ...(updateMsg.branchId ? { branchId: updateMsg.branchId } : {}),
-        ...(updateMsg.branchAction ? { branchAction: updateMsg.branchAction } : {}),
-        ...(updateMsg.contextReset !== undefined ? { contextReset: updateMsg.contextReset } : {}),
-        ...(updateMsg.input ? { input: updateMsg.input } : {}),
-        ...(updateMsg.title ? { title: updateMsg.title } : {}),
-        ...(updateMsg.createdAt ? { createdAt: updateMsg.createdAt } : {}),
-        ...(updateMsg.updatedAt ? { updatedAt: updateMsg.updatedAt } : {}),
-        ...(updateMsg.summary ? { summary: updateMsg.summary } : {}),
-        ...(updateMsg.error ? { error: updateMsg.error } : {}),
-        ...(updateMsg.responseText !== undefined ? { responseText: updateMsg.responseText } : {}),
-        ...(updateMsg.toolCount != null ? { toolCount: updateMsg.toolCount } : {}),
+      store.updateTask(backendId, update.taskId, {
+        status: update.status,
+        ...(update.sessionId ? { sessionId: update.sessionId } : {}),
+        ...(update.branchId ? { branchId: update.branchId } : {}),
+        ...(update.branchAction ? { branchAction: update.branchAction } : {}),
+        ...(update.contextReset !== undefined ? { contextReset: update.contextReset } : {}),
+        ...(update.input ? { input: update.input } : {}),
+        ...(update.title ? { title: update.title } : {}),
+        ...(update.createdAt ? { createdAt: update.createdAt } : {}),
+        ...(update.updatedAt ? { updatedAt: update.updatedAt } : {}),
+        ...(update.summary ? { summary: update.summary } : {}),
+        ...(update.error ? { error: update.error } : {}),
+        ...(update.responseText !== undefined ? { responseText: update.responseText } : {}),
+        ...(update.toolCount != null ? { toolCount: update.toolCount } : {}),
       });
       if (
-        updateMsg.status === 'completed' ||
-        updateMsg.status === 'failed' ||
-        updateMsg.status === 'cancelled'
+        update.status === 'completed' ||
+        update.status === 'failed' ||
+        update.status === 'cancelled'
       ) {
-        claudiaStoreForUpdate.clearStreamingText(updateMsg.taskId);
-      }
-      if (updateMsg.status === 'completed' || updateMsg.status === 'failed') {
-        const taskTitle = existing?.title || updateMsg.title || updateMsg.input || 'Claudia task';
+        const taskTitle = existing.title || update.title || update.input || 'Claudia task';
         useToastStore.getState().add({
           title: taskTitle,
           message:
-            updateMsg.status === 'completed'
-              ? updateMsg.summary?.slice(0, 100) || 'Task completed'
-              : updateMsg.error?.slice(0, 100) || 'Task failed',
-          type: updateMsg.status === 'completed' ? 'success' : 'error',
-          icon: updateMsg.status === 'completed' ? 'task' : 'error',
+            update.status === 'completed'
+              ? update.summary?.slice(0, 100) || 'Task completed'
+              : update.error?.slice(0, 100) || 'Task failed',
+          type: update.status === 'completed' ? 'success' : 'error',
+          icon: update.status === 'completed' ? 'task' : 'error',
           initiator: 'claudia',
-          sessionId: existing?.sessionId ?? updateMsg.sessionId ?? undefined,
+          sessionId: existing.sessionId ?? update.sessionId ?? undefined,
           serverId,
         });
       }

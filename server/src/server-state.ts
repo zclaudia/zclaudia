@@ -241,6 +241,16 @@ export class ServerState {
     };
     return {
       allocateBranch: opts => alloc.allocateBranch(opts),
+      findBranch: branchId => {
+        const branch = alloc.findById(branchId);
+        if (!branch) return null;
+        return {
+          id: branch.id,
+          hostProjectId: branch.hostProjectId,
+          activeSessionId: branch.activeSessionId,
+        };
+      },
+      createBranch: opts => ({ id: alloc.createBranch(opts).id }),
       allocateForContinue: opts => alloc.allocateForContinue(opts),
       setActiveBranchId: (hostProjectId, branchId) =>
         alloc.setActiveBranchId(hostProjectId, branchId),
