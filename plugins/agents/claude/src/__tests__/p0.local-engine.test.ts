@@ -225,7 +225,9 @@ describe.skipIf(!engineBinary)('P0 local engine probe (claude sdk, real engine b
     for await (const event of runClaudeAgent('Reply with exactly: ok', options)) {
       events.push(event);
       if (event.type === 'init' && event.sessionId) sessionId = event.sessionId;
-      if (event.type === 'assistant' && event.content) assistantText += event.content;
+      if ((event.type === 'assistant' || event.type === 'assistant_delta') && event.content) {
+        assistantText += event.content;
+      }
     }
     return { events, sessionId, assistantText };
   }
@@ -290,7 +292,11 @@ describe.skipIf(!engineBinary)('P0 local engine probe (claude sdk, real engine b
 
       expect(events.some(event => event.type === 'init' && event.sessionId)).toBe(true);
       expect(
-        events.some(event => event.type === 'assistant' && event.content?.includes('PROBE_TURN_'))
+        events.some(
+          event =>
+            (event.type === 'assistant' || event.type === 'assistant_delta') &&
+            event.content?.includes('PROBE_TURN_')
+        )
       ).toBe(true);
 
       const messagesRequests = fixture.requests

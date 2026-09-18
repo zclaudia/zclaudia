@@ -123,6 +123,20 @@ describe('run reducer', () => {
     ]);
   });
 
+  it('starts a new thinking block once the previous one is signed', () => {
+    const run = buildRun();
+
+    applyRunDomainEvent(run, event('assistant.thinkingDelta', { content: 'first' }));
+    applyRunDomainEvent(run, event('assistant.thinkingDelta', { signature: 'sig-1' }));
+    applyRunDomainEvent(run, event('assistant.thinkingDelta', { content: 'second' }));
+    applyRunDomainEvent(run, event('assistant.thinkingDelta', { signature: 'sig-2' }));
+
+    expect(run.thinkingBlocks).toEqual([
+      { text: 'first', signature: 'sig-1' },
+      { text: 'second', signature: 'sig-2' },
+    ]);
+  });
+
   it('tracks background task blockers and recomputes phase', () => {
     const run = buildRun();
 

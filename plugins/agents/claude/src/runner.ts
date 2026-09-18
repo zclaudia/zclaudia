@@ -82,6 +82,9 @@ export async function* runClaudeAgent(
     abortController,
     spawnClaudeCodeProcess: processOwner.spawnClaudeCodeProcess,
     systemPrompt: { type: 'preset', preset: 'claude_code' },
+    // Token-level streaming: partial `stream_event` messages become
+    // assistant_delta / thinking_delta so the host renders text as it arrives.
+    includePartialMessages: true,
   };
 
   if (options.sessionId) sdkOptions.resume = options.sessionId;
@@ -182,6 +185,7 @@ async function* runClaudeSdkAgent(
     // settings stay isolated; the host still owns the SDK connection.
     settingSources: ['project', 'local'],
     systemPrompt: { type: 'preset', preset: 'claude_code' },
+    includePartialMessages: true,
     // Keep transcripts on disk so provider sessions can be resumed later.
     persistSession: true,
     settings: {
@@ -344,6 +348,11 @@ export async function* pumpClaudeStream(
   const planModeTools = new Map<string, 'EnterPlanMode' | 'ExitPlanMode'>();
   let initSystemInfo: SystemInfo | undefined;
   let lastCallContextTokens: number | undefined;
+  // With includePartialMessages the text/thinking of a main-loop API call
+  // arrives twice: as `stream_event` deltas and again inside the complete
+  // `assistant` message. Once any delta of the current call has been
+  // forwarded, the complete message only contributes its tool_use blocks.
+  let streamedCurrentMessage = false;
   // Usage accounting (runtime usage design §5.1): assistant usage is deduped
   // by message id and streamed to the host as cumulative invocation
   // snapshots; the SDK result settles the invocation.
@@ -410,7 +419,13 @@ export async function* pumpClaudeStream(
       }
 
       const transformed = transformClaudeSdkMessage(message);
-      const events = Array.isArray(transformed) ? transformed : [transformed];
+      let events = Array.isArray(transformed) ? transformed : [transformed];
+      if (isMainLoopMessage(message, 'stream_event')) {
+        if (events.some(isStreamedContentEvent)) streamedCurrentMessage = true;
+      } else if (isMainLoopMessage(message, 'assistant')) {
+        if (streamedCurrentMessage) events = events.filter(e => !isStreamedContentEvent(e));
+        streamedCurrentMessage = false;
+      }
       for (const event of events) {
         if (event.type === 'init' && event.sessionId) {
           options.onSessionId?.(event.sessionId);
@@ -470,6 +485,20 @@ export async function* pumpClaudeStream(
 
 function numberOf(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+/** True for a top-level (non sub-agent) SDK message of the given type. */
+function isMainLoopMessage(message: unknown, type: 'assistant' | 'stream_event'): boolean {
+  const msg = message as { type?: unknown; parent_tool_use_id?: unknown };
+  return msg?.type === type && msg.parent_tool_use_id == null;
+}
+
+function isStreamedContentEvent(event: ProviderRuntimeEvent): boolean {
+  return (
+    event.type === 'assistant' ||
+    event.type === 'assistant_delta' ||
+    event.type === 'thinking_delta'
+  );
 }
 
 function readClaudeModelUsage(modelUsage: Record<string, Record<string, unknown>> | undefined):
@@ -556,6 +585,13 @@ export function transformClaudeSdkMessage(
     return [];
   }
 
+  if (msg.type === 'stream_event') {
+    // Sub-agent streams run in their own context; only their tool_use /
+    // tool_result blocks are surfaced (via the complete messages).
+    if (msg.parent_tool_use_id != null) return [];
+    return transformClaudeStreamEvent(msg.event);
+  }
+
   if (msg.type === 'tool_progress') {
     return {
       type: 'tool_activity',
@@ -587,6 +623,12 @@ export function transformClaudeSdkMessage(
         events.push({
           type: 'assistant',
           content: truncateUtf8(block.text, DEFAULT_DELTA_BYTES),
+        });
+      } else if (block.type === 'thinking' && typeof block.thinking === 'string') {
+        events.push({
+          type: 'thinking_delta',
+          thinkingContent: truncateUtf8(block.thinking, DEFAULT_DELTA_BYTES),
+          thinkingSignature: typeof block.signature === 'string' ? block.signature : undefined,
         });
       } else if (block.type === 'tool_use') {
         events.push({
@@ -663,5 +705,32 @@ export function transformClaudeSdkMessage(
     };
   }
 
+  return [];
+}
+
+/**
+ * Raw Messages API stream event (SDK `stream_event`, main loop only) →
+ * provider deltas. Text and thinking stream; tool_use input (`input_json_delta`)
+ * is only surfaced once complete via the `assistant` message, and
+ * redacted_thinking carries nothing renderable.
+ */
+export function transformClaudeStreamEvent(event: unknown): ProviderRuntimeEvent[] {
+  const ev = event as { type?: unknown; delta?: Record<string, unknown> } | undefined;
+  if (ev?.type !== 'content_block_delta' || !ev.delta || typeof ev.delta !== 'object') return [];
+  const delta = ev.delta;
+  if (delta.type === 'text_delta' && typeof delta.text === 'string' && delta.text) {
+    return [{ type: 'assistant_delta', content: truncateUtf8(delta.text, DEFAULT_DELTA_BYTES) }];
+  }
+  if (delta.type === 'thinking_delta' && typeof delta.thinking === 'string' && delta.thinking) {
+    return [
+      {
+        type: 'thinking_delta',
+        thinkingContent: truncateUtf8(delta.thinking, DEFAULT_DELTA_BYTES),
+      },
+    ];
+  }
+  if (delta.type === 'signature_delta' && typeof delta.signature === 'string' && delta.signature) {
+    return [{ type: 'thinking_delta', thinkingSignature: delta.signature }];
+  }
   return [];
 }

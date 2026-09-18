@@ -52,7 +52,9 @@ function applyThinkingDelta(
 ): void {
   activeRun.thinkingBlocks ??= [];
   let current = activeRun.thinkingBlocks[activeRun.thinkingBlocks.length - 1];
-  if (!current && delta.content) {
+  // A signature closes a block: providers (Claude, pi) send it as the last
+  // delta of a thinking span, so content arriving afterwards starts a new one.
+  if (delta.content && (!current || current.signature)) {
     current = { text: '' };
     activeRun.thinkingBlocks.push(current);
   }
