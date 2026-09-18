@@ -114,15 +114,79 @@ export interface ClaudiaMessageMessage {
   contextProjectIds?: string[];
   primaryContextProjectId?: string;
   llmProfileId?: string;
+  /** Explicitly selected agent profile for a new conversation (P0 §默认 agent).
+   *  Absent/undefined = use the project default → global default chain. The
+   *  server must NOT silently fall back when an explicit id is unusable. */
+  agentProfileId?: string;
   activeBranchId?: string; // Current active branch for reuse/fork decision
   forceNewBranch?: boolean; // Force create new branch (new conversation)
+}
+
+// How the server resolved the agent profile that backs a Claudia session/request.
+export type ClaudiaAgentProfileSource =
+  | 'explicit'
+  | 'project-default'
+  | 'global-default'
+  | 'session-bound';
+
+// Server → Client: accepted run receipt (P0 身份契约). Sent after the target
+// session passed admission and the request record was persisted — carries the
+// stable identity the UI binds to before any body text arrives.
+export interface ClaudiaRequestAcceptedMessage {
+  type: 'claudia_request_accepted';
+  userMessageId?: string;
+  assistantMessageId?: string;
+  clientRequestId: string;
+  projectId: string;
+  branchId: string;
+  sessionId: string;
+  runId: string;
+  branchAction: BranchAction;
+  contextReset?: boolean;
+  /** Agent profile actually bound server-side; may differ from an explicit pick. */
+  agentProfileId: string;
+  agentProfileSource: ClaudiaAgentProfileSource;
+  workingDirectory?: string;
+  /** True when this receipt replays a previously accepted request (idempotent retry). */
+  replay?: boolean;
+}
+
+export type ClaudiaRequestRejectionCode =
+  | 'SESSION_BUSY'
+  | 'DUPLICATE_CONFLICT'
+  | 'PROJECT_NOT_FOUND'
+  | 'CONTEXT_PROJECT_NOT_FOUND'
+  | 'NO_AGENT_AVAILABLE'
+  | 'AGENT_UNAVAILABLE'
+  | 'INPUT_TOO_LARGE'
+  | 'RUN_START_FAILED'
+  | 'THREAD_NOT_FOUND';
+
+// Server → Client: structured start rejection (P0 身份契约). The client stops
+// its submitting state and keeps the draft; no run or task was created unless
+// the code says the request was already accepted (see DUPLICATE_CONFLICT).
+export interface ClaudiaRequestRejectedMessage {
+  type: 'claudia_request_rejected';
+  clientRequestId: string;
+  code: ClaudiaRequestRejectionCode;
+  error: string;
+  projectId?: string;
+  branchId?: string;
+  /** Target session the request was bound to when rejected. */
+  sessionId?: string;
+  /** Current run occupying the session (code === 'SESSION_BUSY'). */
+  runId?: string;
 }
 
 // Server → Client: streaming text for inline response
 export interface ClaudiaMessageDeltaMessage {
   type: 'claudia_message_delta';
+  seq?: number;
   clientRequestId: string;
   content: string;
+  /** Run identity — stable across the whole reply (P0 身份契约). */
+  sessionId?: string;
+  runId?: string;
 }
 
 // Server → Client: inline response completed (no tool use, fast)
@@ -130,6 +194,8 @@ export interface ClaudiaMessageCompletedMessage {
   type: 'claudia_message_completed';
   clientRequestId: string;
   responseText: string;
+  sessionId?: string;
+  runId?: string;
 }
 
 // Server → Client: inline response failed before promotion
@@ -137,6 +203,9 @@ export interface ClaudiaMessageFailedMessage {
   type: 'claudia_message_failed';
   clientRequestId: string;
   error: string;
+  sessionId?: string;
+  runId?: string;
+  code?: ClaudiaRequestRejectionCode | string;
 }
 
 // Server → Client: inline response promoted to background task
@@ -162,6 +231,8 @@ export type ClaudiaServerMessage =
   | ClaudiaTaskSnapshotMessage
   | ClaudiaTaskUpdateMessage
   | ClaudiaTaskDeltaMessage
+  | ClaudiaRequestAcceptedMessage
+  | ClaudiaRequestRejectedMessage
   | ClaudiaMessageDeltaMessage
   | ClaudiaMessageCompletedMessage
   | ClaudiaMessageFailedMessage

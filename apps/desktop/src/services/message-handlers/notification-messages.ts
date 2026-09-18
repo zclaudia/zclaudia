@@ -2,7 +2,7 @@
  * Notification feed message handlers.
  */
 import type { ServerMessage } from '@zclaudia/shared';
-import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../utils/controlPlane';
+import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../actions/controlPlane';
 import { parseBackendId } from '../../stores/gatewayStore';
 
 function resolveOwnerBackendId(backendId: string | null, serverId: string): string {

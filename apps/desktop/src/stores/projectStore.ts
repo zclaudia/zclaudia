@@ -15,18 +15,12 @@ import {
   getControlPlaneMode,
   resolveCanonicalBackendId,
   resolveLocalBackendId,
-} from '../utils/controlPlane';
+} from '../actions/controlPlane';
 import { useSelectionStore } from './selectionStore';
 import { useRightWorkspaceStore } from './rightWorkspaceStore';
+import type { ProjectDashboardView } from './selectionTypes';
 
-export type ProjectDashboardView =
-  | 'home'
-  | 'tasks'
-  | 'local-prs'
-  | 'issues'
-  | 'spec'
-  | 'supervisor'
-  | 'git';
+export type { ProjectDashboardView };
 
 interface ProjectState {
   projects: Project[];

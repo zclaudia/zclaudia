@@ -3,7 +3,7 @@ import { Check, X, Lock, AlertTriangle, Bot, FileText } from 'lucide-react';
 import { usePermissionStore, type PermissionRequest } from '../../stores/permissionStore';
 import { PermissionDetailView } from '../../components/permission/PermissionDetailView';
 import { isDesktopTauri } from '../../utils/platform';
-import { buildPopoutUrl, openPopoutWindow } from '../../utils/popoutWindow';
+import { buildPopoutUrl, openPopoutWindow } from '../../actions/popoutWindow';
 
 interface InlinePermissionRequestProps {
   request: PermissionRequest;

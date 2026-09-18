@@ -168,7 +168,7 @@ vi.mock('../../stores/projectStore', () => ({
   },
 }));
 
-vi.mock('../../utils/controlPlane', () => ({
+vi.mock('../../actions/controlPlane', () => ({
   getControlPlaneMode: () => mockControlPlaneMode,
   isLocalBackendId: (id: string | null | undefined) => id === 'server-1' || id === 'local',
   resolveLocalBackendId: () => 'server-1',

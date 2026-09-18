@@ -6,7 +6,7 @@ import { useFacadeStore } from '../stores/facadeStore';
  * The authoritative source is `facadeStore.localBackendId` (delivered by the
  * backend facade snapshot). While the facade has not synced yet, fall back to
  * the backend entry flagged as this running instance / local channel. This
- * mirrors the imperative `resolveLocalBackendId()` in `utils/controlPlane`,
+ * mirrors the imperative `resolveLocalBackendId()` in `actions/controlPlane`,
  * but subscribes to the store so components re-render once the id arrives.
  *
  * Returns null when this device has no local backend (e.g. mobile). Settings

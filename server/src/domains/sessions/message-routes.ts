@@ -17,7 +17,18 @@ import { listCompactions, type SessionCompaction } from './compaction-tree-read.
 import { applyMessagePageBudget } from './message-page-budget.js';
 import type { RunPhase } from '../../application/conversation/runtime/active-run-phase.js';
 /** Minimal shape — avoids depending on application/conversation types */
-type ActiveRunsMap = Map<string, { sessionId?: string; phase: RunPhase; sessionType?: string }>;
+type ActiveRunsMap = Map<
+  string,
+  {
+    sessionId?: string;
+    phase: RunPhase;
+    sessionType?: string;
+    fullContent?: string;
+    assistantMessageId?: string;
+    startedAt?: number;
+    eventSeq?: number;
+  }
+>;
 
 /**
  * Wrap a stored compaction row as a synthetic system-role Message whose
@@ -139,7 +150,17 @@ export function mountMessageRoutes(
       );
 
       const activeRunId = findForegroundActiveRunIdForSession(activeRuns, req.params.id);
-      const activeRun = activeRunId ? { runId: activeRunId } : null;
+      const running = activeRunId ? activeRuns.get(activeRunId) : undefined;
+      const activeRun = activeRunId
+        ? {
+            runId: activeRunId,
+            content: running?.fullContent,
+            assistantMessageId: running?.assistantMessageId,
+            startedAt: running?.startedAt,
+            seq: running?.eventSeq,
+            phase: running?.phase,
+          }
+        : null;
       const messageVersion = sessionRepo.getMessageVersion(req.params.id);
 
       res.json({
@@ -155,6 +176,7 @@ export function mountMessageRoutes(
             messageVersion,
           },
           activeRun,
+          lastRunStatus: sessionRepo.findById(req.params.id)?.lastRunStatus ?? null,
         },
       });
     } catch (error) {

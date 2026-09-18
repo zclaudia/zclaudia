@@ -15,12 +15,12 @@ vi.mock('../changes/useSessionChanges', () => ({
 vi.mock('../../stores/serverStore', () => ({
   useServerStore: (selector: any) => selector({ activeServerId: 'local' }),
 }));
-vi.mock('../../utils/workspaceActions', () => ({
+vi.mock('../../actions/workspaceActions', () => ({
   openToolInWorkspace: vi.fn(),
 }));
 
 import { RightSidebarEmptyState } from '../RightSidebarEmptyState';
-import { openToolInWorkspace } from '../../utils/workspaceActions';
+import { openToolInWorkspace } from '../../actions/workspaceActions';
 
 beforeEach(() => {
   cleanup();

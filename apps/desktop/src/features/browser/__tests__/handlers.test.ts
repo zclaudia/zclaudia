@@ -9,10 +9,10 @@ const uiMocks = vi.hoisted(() => ({
   openToolInWorkspace: vi.fn(),
   isPanelAvailable: vi.fn(() => true),
 }));
-vi.mock('../../../utils/workspaceActions', () => ({
+vi.mock('../../../actions/workspaceActions', () => ({
   openToolInWorkspace: uiMocks.openToolInWorkspace,
 }));
-vi.mock('../../../utils/openPanel', () => ({
+vi.mock('../../../actions/openPanel', () => ({
   isPanelAvailable: uiMocks.isPanelAvailable,
 }));
 

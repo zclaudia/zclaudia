@@ -1,8 +1,8 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useSelectionStore } from '../../stores/selectionStore';
-import { openToolInWorkspace } from '../../utils/workspaceActions';
-import { isPanelAvailable } from '../../utils/openPanel';
+import { openToolInWorkspace } from '../../actions/workspaceActions';
+import { isPanelAvailable } from '../../actions/openPanel';
 
 const HTTP_RE = /^https?:\/\//i;
 

@@ -1,6 +1,7 @@
 import type { Database } from 'better-sqlite3';
 import type { ExecutorInput, ExecutorStatus, IExecutor } from '@zclaudia/shared/features/executor';
 import { type ExecutorRegistry, ExecutorInstanceRepository } from '../executor/index.js';
+import type { ExecutorServicePort } from '../executor/executor-port.js';
 import { type EventDispatcher } from '../supervision/event-dispatcher.js';
 import type { IssueDomainEvent } from './events.js';
 
@@ -16,7 +17,7 @@ export interface ExecutorServiceDeps {
  * `executor.status_changed` event when it changes. The propagator (Task 3)
  * consumes these to recompute sub-issue status.
  */
-export class ExecutorService {
+export class ExecutorService implements ExecutorServicePort {
   private repo: ExecutorInstanceRepository;
 
   constructor(private deps: ExecutorServiceDeps) {

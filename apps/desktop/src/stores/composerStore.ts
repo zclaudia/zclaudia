@@ -1,17 +1,7 @@
 import { create } from 'zustand';
+import type { SessionDraft } from '../types/composer';
 
-export interface DraftAttachment {
-  id: string;
-  type: 'image' | 'file';
-  name: string;
-  data: string;
-  mimeType: string;
-}
-
-export interface SessionDraft {
-  content: string;
-  attachments: DraftAttachment[];
-}
+export type { DraftAttachment, SessionDraft } from '../types/composer';
 
 interface ComposerState {
   // Input drafts per session (preserved across session switches)

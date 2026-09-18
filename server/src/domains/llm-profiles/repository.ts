@@ -8,7 +8,7 @@ import type {
 } from '@zclaudia/shared/core/llm-profile';
 import { resolveLlmProfileStatus } from '@zclaudia/shared/core/record-status-resolvers';
 import { newId } from '../../utils/uuid.js';
-import { hasLlmCredential } from '../agent-readiness/credential.js';
+import { hasLlmCredential } from './credential.js';
 import { validateLlmProtocols } from '@zclaudia/shared/core/llm-profile';
 
 export class LlmProfileRepository extends BaseRepository<

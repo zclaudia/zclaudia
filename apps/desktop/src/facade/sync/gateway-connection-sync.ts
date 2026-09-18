@@ -4,7 +4,7 @@ import { useGatewayStore } from '../../stores/gatewayStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useServerStore } from '../../stores/serverStore';
 import { cleanupServerSyncState } from '../../services/messageHandler';
-import { isLegacyLocalBackendId } from '../../utils/controlPlane';
+import { isLegacyLocalBackendId } from '../../actions/controlPlane';
 import { clearAutoOpenFailures, scheduleAutoOpenBackends } from './state';
 
 export function syncSnapshotToGatewayStore(

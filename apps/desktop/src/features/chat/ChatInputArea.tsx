@@ -23,7 +23,7 @@ import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useDraftEditorStore } from '../../stores/draftEditorStore';
 import { useComposerStore } from '../../stores/composerStore';
-import { activatePanel, usePanelIsActive, useLauncherPanels } from '../../utils/openPanel';
+import { activatePanel, usePanelIsActive, useLauncherPanels } from '../../actions/openPanel';
 import { iconForPanel } from '../../components/rightSidebarToolIcons';
 import * as api from '../../services/api';
 import { useAgentForSession } from '../../hooks/useAgentForSession';

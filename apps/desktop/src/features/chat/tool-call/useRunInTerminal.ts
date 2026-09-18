@@ -4,7 +4,7 @@ import { useServerStore } from '../../../stores/serverStore';
 import { useSelectionStore } from '../../../stores/selectionStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useTerminalStore } from '../../../stores/terminalStore';
-import { activatePanel } from '../../../utils/openPanel';
+import { activatePanel } from '../../../actions/openPanel';
 
 /**
  * Host capability: paste a command into the project's remote terminal.

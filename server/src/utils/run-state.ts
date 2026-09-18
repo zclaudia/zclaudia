@@ -1,3 +1,4 @@
+import type { SessionRunStatus } from '@zclaudia/shared/core/session';
 import {
   isTerminalPhase,
   type RunPhase,
@@ -59,7 +60,7 @@ export function hasAnyActiveRunForSession(
 }
 
 /** Gateway wire status for one session. */
-export type GatewaySessionRunStatus = 'idle' | 'running' | 'waiting' | 'failed';
+export type GatewaySessionRunStatus = Exclude<SessionRunStatus, 'interrupted'>;
 
 /**
  * What the gateway should report for a session.

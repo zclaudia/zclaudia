@@ -3,9 +3,9 @@
  */
 import type { ServerMessage } from '@zclaudia/shared';
 import { usePluginStore } from '../../stores/pluginStore';
-import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../utils/controlPlane';
+import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../actions/controlPlane';
 import { parseBackendId } from '../../stores/gatewayStore';
-import { activatePanel, isPanelAvailable } from '../../utils/openPanel';
+import { activatePanel, isPanelAvailable } from '../../actions/openPanel';
 
 function resolveOwnerBackendId(backendId: string | null, serverId: string): string {
   const rawBackendId = backendId || parseBackendId(serverId) || serverId;

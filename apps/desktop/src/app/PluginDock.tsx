@@ -74,7 +74,7 @@ export function PluginWindowButtons() {
 
   const openWindow = async (panel: (typeof pluginPanels)[0]) => {
     try {
-      const { openPluginWindow } = await import('../utils/pluginWindow');
+      const { openPluginWindow } = await import('../actions/pluginWindow');
       await openPluginWindow({
         pluginId: panel.pluginId,
         panelId: panel.id,

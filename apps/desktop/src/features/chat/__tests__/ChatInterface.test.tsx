@@ -258,7 +258,7 @@ vi.mock('../../../hooks/useMediaQuery', () => ({
   useIsMobile: () => false,
 }));
 
-vi.mock('../../../hooks/chat/useSessionRoute', () => ({
+vi.mock('../hooks/useSessionRoute', () => ({
   useSessionRoute: (sessionId: string) => {
     const serverState = useServerStore.getState();
     const ownershipState = useOwnershipStore.getState();
@@ -278,7 +278,7 @@ vi.mock('../../../hooks/chat/useSessionRoute', () => ({
   },
 }));
 
-vi.mock('../../../hooks/chat/useMessagePagination', () => ({
+vi.mock('../hooks/useMessagePagination', () => ({
   useMessagePagination: ({ sessionId }: { sessionId: string }) => {
     let stable = paginationHookState.get(sessionId);
     if (!stable) {
@@ -308,7 +308,7 @@ vi.mock('../../../hooks/chat/useMessagePagination', () => ({
   },
 }));
 
-vi.mock('../../../hooks/chat/useProviderCapabilities', () => ({
+vi.mock('../hooks/useProviderCapabilities', () => ({
   useProviderCapabilities: ({ sessionId }: { sessionId: string }) => {
     const projectState = useProjectStore.getState();
     const currentSession = projectState.sessions.find(session => session.id === sessionId);
@@ -339,7 +339,7 @@ vi.mock('../../../hooks/chat/useProviderCapabilities', () => ({
   },
 }));
 
-vi.mock('../../../hooks/chat/usePlanStatus', () => ({
+vi.mock('../hooks/usePlanStatus', () => ({
   usePlanStatus: () => planStatusHookState,
 }));
 

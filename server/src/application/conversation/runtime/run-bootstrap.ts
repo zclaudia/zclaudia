@@ -29,7 +29,7 @@ import { resolveProviderCwd } from '../../../utils/provider-cwd.js';
 import { providerRegistry } from '../../../infra/providers/registry.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
 import type { TraceRecorder } from '../../../utils/provider-trace.js';
-import { resolveAgentForSession } from '../../../domains/agent-profiles/agent-resolver.js';
+import { resolveAgentForSession } from '../../../domains/sessions/agent-resolver.js';
 import { PhaseEmitter, isTerminalPhase } from './active-run-phase.js';
 import { attachRunPhaseDomainEventEmitter } from './run-phase-domain-events.js';
 import {

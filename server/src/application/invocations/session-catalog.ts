@@ -16,7 +16,7 @@ import type {
   RuntimeInvocableRecord,
 } from '@zclaudia/shared/providers';
 import { InvocationError } from '@zclaudia/shared/providers';
-import { resolveAgentForSession } from '../../domains/agent-profiles/agent-resolver.js';
+import { resolveAgentForSession } from '../../domains/sessions/agent-resolver.js';
 import { normalizedProfileEngineMode } from '../../domains/agent-profiles/engine-mode.js';
 import type { ProviderRegistryPort } from '../../infra/providers/registry.js';
 import { getBackendRouteId } from '../../infra/push/notification-context.js';

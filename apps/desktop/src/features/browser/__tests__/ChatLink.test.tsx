@@ -16,10 +16,10 @@ vi.mock('../../../stores/selectionStore', () => ({
   useSelectionStore: (sel: (s: { selectedSessionId: string | null }) => unknown) =>
     sel({ selectedSessionId: mocks.selectedSessionId }),
 }));
-vi.mock('../../../utils/workspaceActions', () => ({
+vi.mock('../../../actions/workspaceActions', () => ({
   openToolInWorkspace: mocks.openToolInWorkspace,
 }));
-vi.mock('../../../utils/openPanel', () => ({
+vi.mock('../../../actions/openPanel', () => ({
   isPanelAvailable: mocks.isPanelAvailable,
 }));
 

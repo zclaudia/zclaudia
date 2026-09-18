@@ -236,7 +236,8 @@ export async function handleClientMessage(
         ctx.activeRuns,
         ctx.cancelRun,
         db,
-        ctx.taskCoordination
+        ctx.taskCoordination,
+        message.runId
       );
       break;
 

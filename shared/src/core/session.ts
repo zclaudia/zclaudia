@@ -1,5 +1,18 @@
 // Session Types
 
+/**
+ * Base union for every session-run status variant in the codebase. Derive
+ * narrower views with `Exclude` instead of hand-writing sibling unions that
+ * drift apart:
+ * - persisted `Session.lastRunStatus` -> `SessionLastRunStatus` (no `idle`)
+ * - gateway wire status -> `Exclude<SessionRunStatus, 'interrupted'>`
+ * - desktop live phase -> `Exclude<SessionRunStatus, 'failed'>` (settlement
+ *   arrives via run events, not the phase union)
+ */
+export type SessionRunStatus = 'idle' | 'running' | 'waiting' | 'failed' | 'interrupted';
+
+export type SessionLastRunStatus = Exclude<SessionRunStatus, 'idle'>;
+
 export type SessionType = 'regular' | 'background' | 'agent';
 
 export interface Session {
@@ -34,7 +47,7 @@ export interface Session {
   /** Live states (`running`, `waiting`) plus how the last run settled.
    *  `failed` persists until the next run starts; `interrupted` is written by
    *  state recovery for runs that were in flight when the server stopped. */
-  lastRunStatus?: 'running' | 'waiting' | 'failed' | 'interrupted' | null;
+  lastRunStatus?: SessionLastRunStatus | null;
   /** Cross-session fork lineage: the session this was forked from (SP-A). NULL once the source is deleted. */
   forkedFromSessionId?: string;
   /** The source tree entry id this session was forked at (SP-A). */

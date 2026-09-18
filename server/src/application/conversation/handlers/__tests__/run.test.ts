@@ -1,6 +1,6 @@
 // server/src/application/conversation/handlers/__tests__/run.test.ts
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { handleRunSteer } from '../run.js';
+import { handleAgentCancel, handleRunSteer } from '../run.js';
 import type { ActiveRun } from '../../transport/types.js';
 
 function makeClient() {
@@ -321,5 +321,24 @@ describe('handleRunSteer — persistence', () => {
     // Second id is bumped one ms past the first so the PRIMARY KEY can't collide.
     expect(ids[0]).toBe('steer-r1-1000');
     expect(ids[1]).toBe('steer-r1-1001');
+  });
+});
+
+describe('run-bound Claudia cancellation', () => {
+  it('does not cancel a newer run occupying the same session', async () => {
+    const { client, sent } = makeClient();
+    const cancel = vi.fn();
+    const runs = new Map([['new-run', { sessionId: 's1', phase: 'running' } as ActiveRun]]);
+    await handleAgentCancel(client, 's1', runs, cancel, {} as never, undefined, 'old-run');
+    expect(cancel).not.toHaveBeenCalled();
+    expect(sent).toContainEqual(expect.objectContaining({ code: 'RUN_NO_LONGER_ACTIVE' }));
+  });
+
+  it('cancels the matching run while awaiting permission', async () => {
+    const { client } = makeClient();
+    const cancel = vi.fn();
+    const runs = new Map([['run', { sessionId: 's1', phase: 'awaiting_permission' } as ActiveRun]]);
+    await handleAgentCancel(client, 's1', runs, cancel, {} as never, undefined, 'run');
+    expect(cancel).toHaveBeenCalledWith('run');
   });
 });

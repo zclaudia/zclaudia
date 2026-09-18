@@ -6,6 +6,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { WorkflowEngine } from '../engine.js';
+import { ProjectRepository } from '../../projects/repository.js';
 import { CompositeStepExecutor } from '../step-executors/composite-executor.js';
 import { ConditionStepExecutor, ActivityStepExecutorAdapter } from '../step-executors/index.js';
 import { ActivityRegistry } from '../../activities/index.js';
@@ -69,7 +70,7 @@ describe('AI auto-commit end-to-end', () => {
     composite.register(new ConditionStepExecutor());
     composite.register(new ActivityStepExecutorAdapter(registry, { run: async () => ({}) } as any));
 
-    engine = new WorkflowEngine(db, () => {}, composite);
+    engine = new WorkflowEngine(db, () => {}, composite, undefined, new ProjectRepository(db));
   });
 
   afterEach(() => {

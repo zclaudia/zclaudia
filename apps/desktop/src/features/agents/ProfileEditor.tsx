@@ -1,29 +1,19 @@
 import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Check } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import type {
   AgentProfileConfig,
-  ThinkingLevel,
   LlmProfileConfig,
   McpServerConfig,
   McpServerStatus,
-  ToolName,
-  ToolSelection,
-  SkillSelection,
-  SkillRef,
   SkillSource,
-  SkillExecutionSelection,
-  SkillExecutionMode,
-  SkillForkToolPolicy,
 } from '@zclaudia/shared';
 import {
   BUILTIN_TOOL_SETS,
   BUILTIN_TOOL_METADATA,
-  builtinToolRef,
-  defaultToolSelection,
+  defaultSkillSelection,
   legacyEnabledToolsToSelection,
   resolveToolSelection,
-  defaultSkillSelection,
   skillRefKey,
 } from '@zclaudia/shared';
 import {
@@ -33,7 +23,7 @@ import {
 } from '@zclaudia/shared/core/profile-config-descriptor';
 import * as api from '../../services/api';
 import { useRuntimeDescriptorStore } from '../../stores/runtimeDescriptorStore';
-import { EditorSection, EditorRow, FieldLabel } from './ui/EditorSection';
+import { EditorSection, EditorRow } from './ui/EditorSection';
 import { EditorTabs } from './ui/EditorTabs';
 import type { EditorTab } from './ui/EditorTabs';
 import { useProfileAutosave } from './useProfileAutosave';
@@ -43,12 +33,33 @@ import type { ActionsMenuAction } from './ui/ActionsMenu';
 import { useIsMounted } from '../../hooks/useIsMounted';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { Checkbox } from '../../components/ui/Checkbox';
-import { FIELD_CLASS_LG } from '../../components/ui/Input';
-
-/** First few tool names of a set, as a one-line hint under/next to its label. */
-function toolSetPreview(tools: readonly string[]): string {
-  return tools.slice(0, 4).join(', ') + (tools.length > 4 ? '...' : '');
-}
+import { CapabilityNote } from './profile-editor/CapabilityNote';
+import { MultimodalFallbackSection } from './profile-editor/MultimodalFallbackSection';
+import { ModelDeclarationWarning } from './profile-editor/ModelDeclarationWarning';
+import { ModelSelector } from './profile-editor/ModelSelector';
+import { LlmProfileSelector } from './profile-editor/LlmProfileSelector';
+import { ThinkingLevelSelector } from './profile-editor/ThinkingLevelSelector';
+import type { ThinkingLevelOption } from './profile-editor/ThinkingLevelSelector';
+import { RuntimeSelector } from './profile-editor/RuntimeSelector';
+import type { RuntimeOption } from './profile-editor/RuntimeSelector';
+import { useToolSetSelection } from './profile-editor/useToolSetSelection';
+import { useSkillSelection } from './profile-editor/useSkillSelection';
+import type {
+  SkillDefaultModeOption,
+  SkillForkToolPolicyOption,
+} from './profile-editor/useSkillSelection';
+import {
+  EDITABLE_BUILTIN_TOOL_SET_IDS,
+  externalProviderLabel,
+  externalToolRefLabel,
+  fallbackModelValidForProfile,
+  formatPinnedExternalToolCount,
+  mcpTrustSummaryLabels,
+  skillRefFor,
+  toolSetPreview,
+  unavailableDescriptor,
+} from './profile-editor/derive';
+import { FIELD_CLASS, MONO_FIELD_CLASS } from './profile-editor/styles';
 
 /**
  * Parent must remount this component per identity — key it by
@@ -68,147 +79,7 @@ export interface ProfileEditorProps {
   headerActions?: ActionsMenuAction[];
 }
 
-type ThinkingLevelOption = '' | ThinkingLevel;
-/** Runtime type is an open string set — plugins can register additional runtimes. */
-type RuntimeOption = string;
-type SkillDefaultModeOption = 'default' | SkillExecutionMode;
-type SkillForkToolPolicyOption = 'default' | SkillForkToolPolicy;
-
-/** Fallback descriptor for a runtime the active backend does not currently provide
- *  (e.g. its plugin is not installed/active). Keeps the editor renderable instead of crashing. */
-function unavailableDescriptor(runtime: string): ProfileConfigDescriptor {
-  return {
-    runtime,
-    label: runtime,
-    enabled: false,
-    model: { kind: 'none', multimodalFallback: false, thinkingLevel: 'off' },
-    hasCliPath: false,
-    capabilities: { tools: 'unsupported', providers: 'unsupported', skills: 'unsupported' },
-    authNote: `Runtime "${runtime}" is not available on this backend. Enable the plugin that provides it.`,
-  };
-}
-
-/** Comfortable-density variant of the app's single field grammar (ui/Input). */
-const FIELD_CLASS = FIELD_CLASS_LG;
-const MONO_FIELD_CLASS = `${FIELD_CLASS} font-mono`;
-/**
- * Dropdown surface for the custom selectors below.
- *
- * Anchored to the trigger's right edge with a minimum width instead of simply
- * matching it: the triggers sit in a ~176px column at phone width, which is
- * plenty for the current value but far too narrow to browse full model ids in.
- * Growing leftwards keeps the panel on screen (the column's right edge is one
- * page gutter from the viewport edge).
- */
-const SELECT_POPOVER_CLASS =
-  'absolute right-0 top-full mt-1 min-w-[min(20rem,calc(100vw-2.5rem))] md:left-0 md:min-w-0 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden';
-
 export const NAME_PLACEHOLDER = 'e.g., Default Coding Agent';
-
-const THINKING_LEVEL_OPTIONS: { value: ThinkingLevelOption; label: string }[] = [
-  { value: '', label: 'Auto' },
-  { value: 'off', label: 'off' },
-  { value: 'minimal', label: 'minimal' },
-  { value: 'low', label: 'low' },
-  { value: 'medium', label: 'medium' },
-  { value: 'high', label: 'high' },
-  { value: 'xhigh', label: 'xhigh' },
-];
-
-type BuiltinToolSetId = keyof typeof BUILTIN_TOOL_SETS;
-
-const EDITABLE_BUILTIN_TOOL_SET_IDS = (Object.keys(BUILTIN_TOOL_SETS) as BuiltinToolSetId[]).filter(
-  setId => setId !== 'all-builtin'
-);
-
-type LlmProfileModelEntry = NonNullable<LlmProfileConfig['models']>[number];
-
-function modelSupportsVision(entry: LlmProfileModelEntry): boolean {
-  return entry.inputModalities?.includes('image') ?? false;
-}
-
-function visionCapableModels(profile: LlmProfileConfig | undefined): LlmProfileModelEntry[] {
-  return (profile?.models ?? []).filter(modelSupportsVision);
-}
-
-function fallbackModelValidForProfile(
-  model: string,
-  profile: LlmProfileConfig | undefined
-): boolean {
-  const trimmed = model.trim();
-  if (!trimmed) return false;
-  const models = profile?.models;
-  if (!models || models.length === 0) return true;
-  return models.some(entry => entry.modelId === trimmed && modelSupportsVision(entry));
-}
-
-function isBuiltinRefForTools(
-  ref: ToolSelection['include'][number],
-  tools: readonly ToolName[]
-): boolean {
-  return ref.source === 'builtin' && tools.includes(ref.name);
-}
-
-function removeBuiltinRefsForTools(
-  refs: ToolSelection['include'],
-  tools: readonly ToolName[]
-): ToolSelection['include'] {
-  return refs.filter(ref => !isBuiltinRefForTools(ref, tools));
-}
-
-function deriveCustomizedToolSetIds(selection: ToolSelection): BuiltinToolSetId[] {
-  return EDITABLE_BUILTIN_TOOL_SET_IDS.filter(setId => {
-    const set = BUILTIN_TOOL_SETS[setId];
-    const hasFullSet = selection.sets.some(
-      selected => selected.source === 'builtin' && selected.id === setId
-    );
-    if (hasFullSet) return false;
-    return (
-      selection.include.some(ref => isBuiltinRefForTools(ref, set.tools)) ||
-      selection.exclude.some(ref => isBuiltinRefForTools(ref, set.tools))
-    );
-  });
-}
-
-function externalProviderLabel(provider: NonNullable<ToolSelection['providers']>[number]): string {
-  if (provider.source === 'mcp') return `mcp/${provider.serverId}`;
-  return provider.providerId
-    ? `plugin/${provider.pluginId}/${provider.providerId}`
-    : `plugin/${provider.pluginId}`;
-}
-
-function externalToolRefLabel(ref: ToolSelection['include'][number]): string | undefined {
-  if (ref.source === 'mcp') return `mcp/${ref.server}/${ref.tool}`;
-  if (ref.source === 'plugin') return `plugin/${ref.pluginId}/${ref.toolId}`;
-  return undefined;
-}
-
-function formatPinnedExternalToolCount(count: number): string {
-  return `${count} pinned external ${count === 1 ? 'tool' : 'tools'}`;
-}
-
-function CapabilityNote({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="rounded-lg border border-border/60 bg-background/55 p-3">
-      <p className="text-sm font-medium text-foreground">{title}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{body}</p>
-    </div>
-  );
-}
-
-function mcpTrustSummaryLabels(server: McpServerConfig): string[] {
-  const policy = server.trustPolicy;
-  const labels = [
-    `trust ${policy?.trustLevel ?? 'untrusted'}`,
-    `default ${policy?.defaultRiskAction ?? 'ask'}`,
-    `readonly hints ${policy?.trustReadOnlyHint ? 'trusted' : 'untrusted'}`,
-  ];
-  for (const level of ['low', 'medium', 'high'] as const) {
-    const action = policy?.riskActions?.[level];
-    if (action) labels.push(`${level} ${action}`);
-  }
-  return labels;
-}
 
 export function ProfileEditor({
   backendId,
@@ -240,17 +111,35 @@ export function ProfileEditor({
   const [formFallbackModel, setFormFallbackModel] = useState('');
   const [formFallbackOpen, setFormFallbackOpen] = useState(false);
   const [formSystemPrompt, setFormSystemPrompt] = useState('');
-  const [formToolSelection, setFormToolSelection] = useState<ToolSelection>(defaultToolSelection);
-  const [formSkillSelection, setFormSkillSelection] =
-    useState<SkillSelection>(defaultSkillSelection);
-  const [formSkillExecution, setFormSkillExecution] = useState<SkillExecutionSelection>({
-    overrides: [],
-  });
+  const {
+    formToolSelection,
+    customizedToolSetIds,
+    expandedToolSetIds,
+    applySelection: applyToolSelection,
+    toggleToolSetExpanded,
+    toggleToolSet,
+    toggleToolSetCustomize,
+    toggleCustomTool,
+    mcpProviderSelected,
+    toggleMcpProvider,
+  } = useToolSetSelection();
+  const {
+    formSkillSelection,
+    formSkillExecution,
+    applySelection: applySkillSelection,
+    skillSourceEnabled,
+    toggleSkillSource,
+    skillVisibility,
+    setSkillVisibility,
+    togglePinnedSkill,
+    skillExecutionOverrideFor,
+    setSkillDefaultMode,
+    setSkillForkToolPolicy,
+    toggleSkillAllowedMode,
+  } = useSkillSelection();
   const [formThinkingLevel, setFormThinkingLevel] = useState<ThinkingLevelOption>('');
   const [formIsDefault, setFormIsDefault] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [customizedToolSetIds, setCustomizedToolSetIds] = useState<BuiltinToolSetId[]>([]);
-  const [expandedToolSetIds, setExpandedToolSetIds] = useState<BuiltinToolSetId[]>([]);
   const isMobile = useIsMobile();
   // On a phone the Prompt tab owns the whole screen, so the collapsed one-line
   // preview would waste it; start expanded there. Desktop keeps the preview
@@ -334,11 +223,11 @@ export function ProfileEditor({
     setFormSystemPrompt(agent.systemPrompt);
     const nextToolSelection =
       agent.toolSelection ?? legacyEnabledToolsToSelection(agent.enabledTools);
-    setFormToolSelection(nextToolSelection);
-    setFormSkillSelection(agent.skillSelection ?? defaultSkillSelection);
-    setFormSkillExecution(agent.skillExecution ?? { overrides: [] });
-    setCustomizedToolSetIds(deriveCustomizedToolSetIds(nextToolSelection));
-    setExpandedToolSetIds([]);
+    applyToolSelection(nextToolSelection);
+    applySkillSelection(
+      agent.skillSelection ?? defaultSkillSelection,
+      agent.skillExecution ?? { overrides: [] }
+    );
     setFormThinkingLevel((agent.thinkingLevel ?? '') as ThinkingLevelOption);
     setFormIsDefault(agent.isDefault ?? false);
     setFormError(null);
@@ -349,231 +238,6 @@ export function ProfileEditor({
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.id]);
-
-  const toggleToolSetExpanded = (setId: BuiltinToolSetId) => {
-    setExpandedToolSetIds(current =>
-      current.includes(setId) ? current.filter(id => id !== setId) : [...current, setId]
-    );
-  };
-
-  const toggleToolSet = (setId: keyof typeof BUILTIN_TOOL_SETS) => {
-    setFormToolSelection(current => {
-      const set = BUILTIN_TOOL_SETS[setId];
-      const exists = current.sets.some(set => set.source === 'builtin' && set.id === setId);
-      return {
-        ...current,
-        sets: exists
-          ? current.sets.filter(set => !(set.source === 'builtin' && set.id === setId))
-          : [...current.sets, { source: 'builtin', id: setId }],
-        include: removeBuiltinRefsForTools(current.include, set.tools),
-        exclude: removeBuiltinRefsForTools(current.exclude, set.tools),
-      };
-    });
-    setCustomizedToolSetIds(current => current.filter(id => id !== setId));
-  };
-
-  const toggleToolSetCustomize = (setId: BuiltinToolSetId) => {
-    const set = BUILTIN_TOOL_SETS[setId];
-    const customActive = customizedToolSetIds.includes(setId);
-    if (customActive) {
-      setCustomizedToolSetIds(current => current.filter(id => id !== setId));
-      setFormToolSelection(current => ({
-        ...current,
-        include: removeBuiltinRefsForTools(current.include, set.tools),
-        exclude: removeBuiltinRefsForTools(current.exclude, set.tools),
-      }));
-      return;
-    }
-
-    setCustomizedToolSetIds(current => [...current.filter(id => id !== setId), setId]);
-    setExpandedToolSetIds(current => (current.includes(setId) ? current : [...current, setId]));
-    setFormToolSelection(current => {
-      const fullSetActive = current.sets.some(
-        selected => selected.source === 'builtin' && selected.id === setId
-      );
-      const currentlyResolved = new Set(resolveToolSelection(current).builtinTools);
-      const selectedTools = fullSetActive
-        ? set.tools
-        : set.tools.filter(tool => currentlyResolved.has(tool));
-      return {
-        ...current,
-        sets: current.sets.filter(
-          selected => !(selected.source === 'builtin' && selected.id === setId)
-        ),
-        include: [
-          ...removeBuiltinRefsForTools(current.include, set.tools),
-          ...selectedTools.map(builtinToolRef),
-        ],
-        exclude: removeBuiltinRefsForTools(current.exclude, set.tools),
-      };
-    });
-  };
-
-  const toggleCustomTool = (setId: BuiltinToolSetId, tool: ToolName) => {
-    const set = BUILTIN_TOOL_SETS[setId];
-    const ref = builtinToolRef(tool);
-    setFormToolSelection(current => {
-      const include = current.include.filter(
-        item => !(item.source === 'builtin' && item.name === tool)
-      );
-      const selected = current.include.some(
-        item => item.source === 'builtin' && item.name === tool
-      );
-      return {
-        ...current,
-        sets: current.sets.filter(
-          selectedSet => !(selectedSet.source === 'builtin' && selectedSet.id === setId)
-        ),
-        include: selected ? include : [...include, ref],
-        exclude: removeBuiltinRefsForTools(current.exclude, set.tools),
-      };
-    });
-    setCustomizedToolSetIds(current => (current.includes(setId) ? current : [...current, setId]));
-  };
-
-  const mcpProviderSelected = (serverName: string) =>
-    (formToolSelection.providers ?? []).some(
-      provider => provider.source === 'mcp' && provider.serverId === serverName
-    );
-
-  const toggleMcpProvider = (serverName: string) => {
-    setFormToolSelection(current => {
-      const providers = current.providers ?? [];
-      const selected = providers.some(
-        provider => provider.source === 'mcp' && provider.serverId === serverName
-      );
-      return {
-        ...current,
-        providers: selected
-          ? providers.filter(
-              provider => !(provider.source === 'mcp' && provider.serverId === serverName)
-            )
-          : [...providers, { source: 'mcp', serverId: serverName }],
-      };
-    });
-  };
-
-  const skillSourceEnabled = (source: SkillSource) =>
-    (formSkillSelection.providers ?? []).some(provider => provider.source === source);
-
-  const toggleSkillSource = (source: SkillSource) => {
-    setFormSkillSelection(current => {
-      const providers = current.providers ?? [];
-      return {
-        ...current,
-        providers: providers.some(provider => provider.source === source)
-          ? providers.filter(provider => provider.source !== source)
-          : [...providers, { source } as NonNullable<SkillSelection['providers']>[number]],
-      };
-    });
-  };
-
-  const skillRefFor = (skill: api.WorkspaceSkillInfo): SkillRef => ({
-    source: skill.source ?? 'workspace',
-    id: skill.id,
-  });
-
-  const skillVisibility = (skill: api.WorkspaceSkillInfo): 'default' | 'include' | 'exclude' => {
-    const key = skillRefKey(skillRefFor(skill));
-    if ((formSkillSelection.exclude ?? []).some(ref => skillRefKey(ref) === key)) return 'exclude';
-    if ((formSkillSelection.include ?? []).some(ref => skillRefKey(ref) === key)) return 'include';
-    return 'default';
-  };
-
-  const setSkillVisibility = (
-    skill: api.WorkspaceSkillInfo,
-    visibility: 'default' | 'include' | 'exclude'
-  ) => {
-    const ref = skillRefFor(skill);
-    const key = skillRefKey(ref);
-    setFormSkillSelection(current => ({
-      ...current,
-      include:
-        visibility === 'include'
-          ? [...(current.include ?? []).filter(item => skillRefKey(item) !== key), ref]
-          : (current.include ?? []).filter(item => skillRefKey(item) !== key),
-      exclude:
-        visibility === 'exclude'
-          ? [...(current.exclude ?? []).filter(item => skillRefKey(item) !== key), ref]
-          : (current.exclude ?? []).filter(item => skillRefKey(item) !== key),
-      pinned:
-        visibility === 'exclude'
-          ? (current.pinned ?? []).filter(item => skillRefKey(item) !== key)
-          : current.pinned,
-    }));
-  };
-
-  const togglePinnedSkill = (skill: api.WorkspaceSkillInfo) => {
-    const ref = skillRefFor(skill);
-    const key = skillRefKey(ref);
-    setFormSkillSelection(current => {
-      const pinned = current.pinned ?? [];
-      const selected = pinned.some(item => skillRefKey(item) === key);
-      return {
-        ...current,
-        pinned: selected ? pinned.filter(item => skillRefKey(item) !== key) : [...pinned, ref],
-      };
-    });
-  };
-
-  const skillExecutionOverrideFor = (skill: api.WorkspaceSkillInfo) => {
-    const key = skillRefKey(skillRefFor(skill));
-    return (formSkillExecution.overrides ?? []).find(override => skillRefKey(override.ref) === key);
-  };
-
-  const updateSkillExecutionOverride = (
-    skill: api.WorkspaceSkillInfo,
-    patch: Partial<NonNullable<SkillExecutionSelection['overrides']>[number]>
-  ) => {
-    const ref = skillRefFor(skill);
-    const key = skillRefKey(ref);
-    setFormSkillExecution(current => {
-      const existing = (current.overrides ?? []).find(
-        override => skillRefKey(override.ref) === key
-      );
-      const next = {
-        ...existing,
-        ref,
-        ...patch,
-      };
-      const normalized = {
-        ref,
-        ...(next.allowedModes && next.allowedModes.length > 0
-          ? { allowedModes: next.allowedModes }
-          : {}),
-        ...(next.defaultMode ? { defaultMode: next.defaultMode } : {}),
-        ...(next.forkToolPolicy ? { forkToolPolicy: next.forkToolPolicy } : {}),
-      };
-      const hasPolicy = Boolean(
-        normalized.allowedModes || normalized.defaultMode || normalized.forkToolPolicy
-      );
-      const others = (current.overrides ?? []).filter(
-        override => skillRefKey(override.ref) !== key
-      );
-      return { overrides: hasPolicy ? [...others, normalized] : others };
-    });
-  };
-
-  const setSkillDefaultMode = (skill: api.WorkspaceSkillInfo, mode: SkillDefaultModeOption) => {
-    updateSkillExecutionOverride(skill, { defaultMode: mode === 'default' ? undefined : mode });
-  };
-
-  const setSkillForkToolPolicy = (
-    skill: api.WorkspaceSkillInfo,
-    policy: SkillForkToolPolicyOption
-  ) => {
-    updateSkillExecutionOverride(skill, {
-      forkToolPolicy: policy === 'default' ? undefined : policy,
-    });
-  };
-
-  const toggleSkillAllowedMode = (skill: api.WorkspaceSkillInfo, mode: SkillExecutionMode) => {
-    const current = skillExecutionOverrideFor(skill)?.allowedModes ?? [];
-    const selected = current.includes(mode);
-    updateSkillExecutionOverride(skill, {
-      allowedModes: selected ? current.filter(item => item !== mode) : [...current, mode],
-    });
-  };
 
   const descriptors = useRuntimeDescriptorStore(s => s.getDescriptors(backendId));
   const descriptorFor = useCallback(
@@ -1586,469 +1250,6 @@ export function ProfileEditor({
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function MultimodalFallbackSection({
-  llmProfiles,
-  profileId,
-  model,
-  onProfileChange,
-  onModelChange,
-  onRemove,
-  onFlush,
-}: {
-  llmProfiles: LlmProfileConfig[];
-  profileId: string;
-  model: string;
-  onProfileChange: (id: string) => void;
-  onModelChange: (v: string) => void;
-  onRemove: () => void;
-  onFlush: () => void;
-}) {
-  const fallbackProfile = llmProfiles.find(p => p.id === profileId);
-  const declaredModels = fallbackProfile?.models ?? [];
-  const hasDeclaredModels = declaredModels.length > 0;
-  const visionModels = visionCapableModels(fallbackProfile);
-  const modelValue =
-    hasDeclaredModels && !visionModels.some(entry => entry.modelId === model) ? '' : model;
-  return (
-    <>
-      <div className="divide-y divide-border/60">
-        <EditorRow
-          title="Fallback LLM Profile"
-          control={
-            <div className="w-48 md:w-56">
-              <select
-                aria-label="Fallback LLM Profile"
-                value={profileId}
-                onChange={event => onProfileChange(event.target.value)}
-                onBlur={onFlush}
-                className={FIELD_CLASS}
-              >
-                <option value="">None</option>
-                {llmProfiles.map(profile => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          }
-        />
-
-        {profileId && hasDeclaredModels && (
-          <EditorRow
-            title="Fallback Model"
-            description="Must support image input"
-            control={
-              <div className="w-48 md:w-56">
-                <select
-                  aria-label="Fallback Model"
-                  value={modelValue}
-                  onChange={event => onModelChange(event.target.value)}
-                  onBlur={onFlush}
-                  disabled={visionModels.length === 0}
-                  className={`${FIELD_CLASS} disabled:opacity-50`}
-                >
-                  <option value="">Select a Vision-capable model</option>
-                  {visionModels.map(entry => {
-                    const label = entry.displayName || entry.modelId;
-                    return (
-                      <option key={entry.modelId} value={entry.modelId}>
-                        {label === entry.modelId ? label : `${label} (${entry.modelId})`}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            }
-          />
-        )}
-
-        {profileId && !hasDeclaredModels && (
-          <EditorRow
-            title="Fallback Model"
-            description="Must support image input"
-            control={
-              <div className="w-48 md:w-56">
-                <input
-                  type="text"
-                  aria-label="Fallback Model"
-                  value={model}
-                  onChange={event => onModelChange(event.target.value)}
-                  onBlur={onFlush}
-                  placeholder="model id"
-                  className={MONO_FIELD_CLASS}
-                />
-              </div>
-            }
-          />
-        )}
-
-        <EditorRow
-          title={
-            <span className="text-xs text-muted-foreground">
-              {profileId ? 'Vision fallback enabled' : 'No fallback selected'}
-            </span>
-          }
-          control={
-            <button
-              type="button"
-              onClick={onRemove}
-              className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Remove fallback
-            </button>
-          }
-        />
-      </div>
-
-      {profileId && hasDeclaredModels && visionModels.length === 0 && (
-        <p className="mx-4 mb-4 text-xs text-warning">
-          No Vision-capable models declared on this LLM profile.
-        </p>
-      )}
-    </>
-  );
-}
-
-/**
- * Soft warning shown beneath the model input when the agent profile's selected
- * model id is not declared on the bound LLM profile's `models` list. We skip
- * the warning when the LLM profile is missing, its `models` list is undefined
- * or empty (backwards-compat / undeclared profile), or the model input is
- * blank.
- */
-function ModelDeclarationWarning({
-  formModel,
-  llmProfile,
-}: {
-  formModel: string;
-  llmProfile: LlmProfileConfig | undefined;
-}) {
-  const trimmed = formModel.trim();
-  if (!trimmed) return null;
-  const models = llmProfile?.models;
-  if (!models || models.length === 0) return null;
-  const known = models.some(m => m.modelId === trimmed);
-  if (known) return null;
-  return (
-    <p className="text-xs text-warning mt-1">
-      This model is not declared on the selected LLM profile. The agent will work but will fall back
-      to pi-ai registry defaults for context window / max tokens.
-    </p>
-  );
-}
-
-/**
- * F2: Model is now a dropdown rather than a free-text input. The valid set
- * comes from the bound LLM profile's `models` list, which the LlmProfileManager
- * now requires at least one of. We still render a degraded state for legacy
- * profiles created before the requirement, so historical agent profiles don't
- * break when their bound LLM profile has no models declared.
- */
-function ModelSelector({
-  value,
-  onChange,
-  llmProfile,
-  hideLabel = false,
-  'aria-label': ariaLabel,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  llmProfile: LlmProfileConfig | undefined;
-  hideLabel?: boolean;
-  'aria-label'?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  const models = llmProfile?.models ?? [];
-  const hasModels = models.length > 0;
-  const selectedEntry = models.find(m => m.modelId === value);
-  const displayLabel = selectedEntry
-    ? selectedEntry.displayName || selectedEntry.modelId
-    : value
-      ? value
-      : hasModels
-        ? 'Select a model'
-        : 'No models available — declare models on the LLM profile';
-
-  return (
-    <div ref={ref} className="relative">
-      {!hideLabel && <FieldLabel>Model *</FieldLabel>}
-      <button
-        type="button"
-        onClick={() => hasModels && setOpen(!open)}
-        disabled={!hasModels}
-        aria-label={ariaLabel}
-        className={`${FIELD_CLASS} flex items-center justify-between text-left font-mono disabled:cursor-not-allowed disabled:opacity-50`}
-      >
-        <span className="truncate">{displayLabel}</span>
-        <ChevronDown
-          size={14}
-          className={`text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && hasModels && (
-        <div className={`${SELECT_POPOVER_CLASS} max-h-72 overflow-y-auto`}>
-          {models.map(m => {
-            const label = m.displayName || m.modelId;
-            return (
-              <button
-                key={m.modelId}
-                type="button"
-                onClick={() => {
-                  onChange(m.modelId);
-                  setOpen(false);
-                }}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                  m.modelId === value
-                    ? 'text-primary font-medium bg-muted/40'
-                    : 'text-foreground hover:bg-secondary/80'
-                }`}
-              >
-                <span className="w-4 flex-shrink-0">
-                  {m.modelId === value && <Check size={14} strokeWidth={2.5} />}
-                </span>
-                <span className="font-mono truncate">{label}</span>
-                {label !== m.modelId && (
-                  <span className="ml-auto text-[10px] text-muted-foreground font-mono">
-                    {m.modelId}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function LlmProfileSelector({
-  value,
-  onChange,
-  profiles,
-  hideLabel = false,
-  'aria-label': ariaLabel,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  profiles: LlmProfileConfig[];
-  hideLabel?: boolean;
-  'aria-label'?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  const selected = profiles.find(p => p.id === value);
-
-  return (
-    <div ref={ref} className="relative">
-      {!hideLabel && <FieldLabel>LLM Profile *</FieldLabel>}
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-label={ariaLabel}
-        className={`${FIELD_CLASS} flex items-center justify-between text-left`}
-      >
-        <span>
-          {selected
-            ? selected.name
-            : profiles.length === 0
-              ? 'No LLM profiles available'
-              : 'Select an LLM profile'}
-        </span>
-        <ChevronDown
-          size={14}
-          className={`text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && profiles.length > 0 && (
-        <div className={SELECT_POPOVER_CLASS}>
-          {profiles.map(p => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => {
-                onChange(p.id);
-                setOpen(false);
-              }}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                p.id === value
-                  ? 'text-primary font-medium bg-muted/40'
-                  : 'text-foreground hover:bg-secondary/80'
-              }`}
-            >
-              <span className="w-4 flex-shrink-0">
-                {p.id === value && <Check size={14} strokeWidth={2.5} />}
-              </span>
-              <span className="truncate">{p.name}</span>
-              {p.isDefault && (
-                <span className="ml-auto px-1.5 py-0.5 bg-muted/60 text-primary text-[10px] rounded-md">
-                  Default
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ThinkingLevelSelector({
-  value,
-  onChange,
-  hideLabel = false,
-  'aria-label': ariaLabel,
-}: {
-  value: ThinkingLevelOption;
-  onChange: (v: ThinkingLevelOption) => void;
-  hideLabel?: boolean;
-  'aria-label'?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  const selected = THINKING_LEVEL_OPTIONS.find(o => o.value === value);
-
-  return (
-    <div ref={ref} className="relative">
-      {!hideLabel && <FieldLabel>Thinking Level</FieldLabel>}
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-label={ariaLabel}
-        className={`${FIELD_CLASS} flex items-center justify-between text-left`}
-      >
-        <span>{selected?.label ?? 'Auto'}</span>
-        <ChevronDown
-          size={14}
-          className={`text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && (
-        <div className={SELECT_POPOVER_CLASS}>
-          {THINKING_LEVEL_OPTIONS.map(opt => (
-            <button
-              key={opt.value || 'auto'}
-              type="button"
-              onClick={() => {
-                onChange(opt.value);
-                setOpen(false);
-              }}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                opt.value === value
-                  ? 'text-primary font-medium bg-muted/40'
-                  : 'text-foreground hover:bg-secondary/80'
-              }`}
-            >
-              <span className="w-4 flex-shrink-0">
-                {opt.value === value && <Check size={14} strokeWidth={2.5} />}
-              </span>
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RuntimeSelector({
-  value,
-  onChange,
-  options,
-  'aria-label': ariaLabel,
-}: {
-  value: RuntimeOption;
-  onChange: (v: RuntimeOption) => void;
-  options: ProfileConfigDescriptor[];
-  'aria-label'?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  const selected = options.find(o => o.runtime === value);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-label={ariaLabel}
-        className={`${FIELD_CLASS} flex items-center justify-between text-left`}
-      >
-        <span>{selected?.label ?? value}</span>
-        <ChevronDown
-          size={14}
-          className={`text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && (
-        <div className={SELECT_POPOVER_CLASS}>
-          {options.map(opt => (
-            <button
-              key={opt.runtime}
-              type="button"
-              onClick={() => {
-                onChange(opt.runtime);
-                setOpen(false);
-              }}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                opt.runtime === value
-                  ? 'text-primary font-medium bg-muted/40'
-                  : 'text-foreground hover:bg-secondary/80'
-              }`}
-            >
-              <span className="w-4 flex-shrink-0">
-                {opt.runtime === value && <Check size={14} strokeWidth={2.5} />}
-              </span>
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

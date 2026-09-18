@@ -212,6 +212,8 @@ const messageDispatcher = createMessageDispatcher<ServerMessage, MessageDispatch
   {
     types: [
       'claudia_task_created',
+      'claudia_request_accepted',
+      'claudia_request_rejected',
       'claudia_task_snapshot',
       'claudia_message_delta',
       'claudia_message_completed',

@@ -30,7 +30,7 @@ export function resolveStatsBackendId(input: {
 export function useStatsBackendId(): string | null {
   const localBackendId = useFacadeStore(s => s.localBackendId);
   const activeBackendId = useServerStore(s => s.activeServerId);
-  // Mirrors getControlPlaneMode() (utils/controlPlane.ts), but subscribed so a
+  // Mirrors getControlPlaneMode() (actions/controlPlane.ts), but subscribed so a
   // mode flip re-renders the stats panel instead of leaving it stale.
   const hasLocalControlPlane = useGatewayStore(s => !(s.directGatewayUrl && s.directGatewaySecret));
   return resolveStatsBackendId({ hasLocalControlPlane, localBackendId, activeBackendId });

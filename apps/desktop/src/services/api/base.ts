@@ -8,7 +8,7 @@ import {
   isLocalBackendId,
   resolveCanonicalBackendId,
   resolveLocalBackendId,
-} from '../../utils/controlPlane';
+} from '../../actions/controlPlane';
 import { getBrowserShellBaseUrl } from '../../utils/browserShellRuntime';
 import { fetchWithRuntimeInitializationRetry } from './runtime-initialization-retry';
 

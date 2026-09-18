@@ -2,7 +2,7 @@ import type { ServerInfo, ApiResponse } from '@zclaudia/shared';
 
 import { resolveGatewayBackendUrl } from '../gatewayProxy';
 import { useServerStore } from '../../stores/serverStore';
-import { getControlPlaneMode, isLocalBackendId } from '../../utils/controlPlane';
+import { getControlPlaneMode, isLocalBackendId } from '../../actions/controlPlane';
 import { getBrowserShellBaseUrl } from '../../utils/browserShellRuntime';
 import { fetchApiForBackend, fetchLocalApi } from './base';
 
@@ -80,16 +80,8 @@ export async function ensureAgent(): Promise<{ projectId: string; sessionId: str
   return result.data;
 }
 
-export interface AgentConfig {
-  id?: number;
-  enabled: boolean;
-  projectId: string | null;
-  sessionId: string | null;
-  llmProfileId: string | null;
-  permissionWorkflowOverrideId: string | null;
-  permissionPolicy: string | null;
-  hooks?: string | null;
-}
+export type { AgentConfig } from '@zclaudia/shared/wire/agent';
+import type { AgentConfig } from '@zclaudia/shared/wire/agent';
 
 export async function getAgentConfig(backendId?: string | null): Promise<AgentConfig> {
   // Explicit backend id targets that backend; otherwise fall back to the

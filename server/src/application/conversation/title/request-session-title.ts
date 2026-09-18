@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { SessionRepository } from '../../../domains/sessions/repository.js';
-import { resolveAgentForSession } from '../../../domains/agent-profiles/agent-resolver.js';
+import { resolveAgentForSession } from '../../../domains/sessions/agent-resolver.js';
 import { maybeGenerateSessionTitle, type TitleGenerateInput } from './session-title-service.js';
 
 export interface RequestSessionTitleDeps {

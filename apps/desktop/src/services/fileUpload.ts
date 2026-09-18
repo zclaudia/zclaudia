@@ -1,5 +1,5 @@
 import { useServerStore } from '../stores/serverStore';
-import { getControlPlaneMode, isLocalBackendId } from '../utils/controlPlane';
+import { getControlPlaneMode, isLocalBackendId } from '../actions/controlPlane';
 
 import { getBaseUrl, getAuthHeaders, activeServerSupports } from './api';
 

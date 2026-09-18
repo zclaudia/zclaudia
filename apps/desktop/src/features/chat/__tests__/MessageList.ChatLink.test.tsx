@@ -62,13 +62,13 @@ vi.mock('../../../stores/serverStore', () => ({
   }),
 }));
 
-vi.mock('../../../utils/workspaceActions', () => ({
+vi.mock('../../../actions/workspaceActions', () => ({
   openToolInWorkspace: mocks.openToolInWorkspace,
   closeToolInWorkspace: vi.fn(),
   useToolOpenState: vi.fn(() => false),
 }));
 
-vi.mock('../../../utils/openPanel', () => ({
+vi.mock('../../../actions/openPanel', () => ({
   isPanelAvailable: mocks.isPanelAvailable,
   activatePanel: vi.fn(),
 }));

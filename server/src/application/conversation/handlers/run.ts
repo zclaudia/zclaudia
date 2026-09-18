@@ -190,19 +190,37 @@ export async function handleAgentCancel(
   activeRuns: Map<string, ActiveRun>,
   cancelRun: (runId: string) => void,
   db: ReturnType<typeof initDatabase>,
-  taskCoordination?: Pick<TaskCoordinationPort, 'cancelCanonicalAgentTask'>
+  taskCoordination?: Pick<TaskCoordinationPort, 'cancelCanonicalAgentTask'>,
+  requestRunId?: string
 ): Promise<void> {
   let cancelled = false;
+  let activeRunId: string | null = null;
 
   for (const [runId, run] of activeRuns.entries()) {
     if (run.sessionId === sessionId && !isTerminalPhase(run.phase)) {
-      cancelRun(runId);
-      cancelled = true;
+      activeRunId = runId;
       break;
     }
   }
 
-  if (!cancelled && taskCoordination) {
+  // A cancel bound to a run must not hit a newer run that reused the session:
+  // if the target run already finished (or a different run is active), report
+  // instead of cancelling the wrong one.
+  if (requestRunId && activeRunId !== requestRunId) {
+    sendMessage(client.ws, {
+      type: 'error',
+      code: 'RUN_NO_LONGER_ACTIVE',
+      message: `Run ${requestRunId} is no longer active on session ${sessionId}`,
+    } as ErrorMessage);
+    return;
+  }
+
+  if (activeRunId) {
+    cancelRun(activeRunId);
+    cancelled = true;
+  }
+
+  if (!cancelled && !requestRunId && taskCoordination) {
     const canonicalTaskId = new TaskRepository(
       db as unknown as Database
     ).findLatestClaudiaAgentTaskId(sessionId);

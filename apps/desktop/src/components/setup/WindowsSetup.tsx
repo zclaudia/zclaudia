@@ -24,7 +24,7 @@ import {
   LEGACY_LOCAL_SERVER_ID,
   resolveCanonicalBackendId,
   resolveLocalBackendId,
-} from '../../utils/controlPlane';
+} from '../../actions/controlPlane';
 
 type SetupPath = 'choose' | 'wsl' | 'gateway' | 'manual';
 

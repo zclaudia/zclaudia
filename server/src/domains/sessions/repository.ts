@@ -2,7 +2,7 @@ import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type { Session } from '@zclaudia/shared/core/session';
 import { newId } from '../../utils/uuid.js';
-import { resolveAgentForSession } from '../agent-profiles/agent-resolver.js';
+import { resolveAgentForSession } from './agent-resolver.js';
 
 export class SessionRepository extends BaseRepository<
   Session,

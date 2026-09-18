@@ -347,6 +347,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     taskExecutorRegistry,
     activityRegistry,
     agentLoopRunner: sharedAgentLoopRunner,
+    projectLookup: new ProjectRepository(db),
   });
   const permissionWorkflowResolver = new PermissionWorkflowResolver(db, workflowService);
   permissionWorkflowResolverRef.current = permissionWorkflowResolver;

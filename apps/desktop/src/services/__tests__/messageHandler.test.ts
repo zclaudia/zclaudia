@@ -209,7 +209,7 @@ vi.mock('../../stores/pluginStore', () => ({
   usePluginStore: { getState: () => mockPluginStore },
   getEffectivePlacement: (...args: any[]) => mockGetEffectivePlacement(...args),
 }));
-vi.mock('../../utils/workspaceActions', () => ({
+vi.mock('../../actions/workspaceActions', () => ({
   openToolInWorkspace: (...args: any[]) => mockOpenToolInWorkspace(...args),
   closeToolInWorkspace: (...args: any[]) => mockCloseToolInWorkspace(...args),
 }));

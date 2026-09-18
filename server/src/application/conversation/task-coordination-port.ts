@@ -1,5 +1,12 @@
 import type { BranchAction } from '@zclaudia/shared/wire/messages';
 
+/** Branch record subset the Claudia P0 target resolution needs. */
+export interface CoordinationBranchView {
+  id: string;
+  hostProjectId: string;
+  activeSessionId: string | null;
+}
+
 export interface TaskCoordinationPort {
   allocateBranch(opts: {
     hostProjectId: string;
@@ -13,6 +20,10 @@ export interface TaskCoordinationPort {
     action: 'reused' | 'forked' | 'created';
     contextReset?: boolean;
   };
+  /** Look up an existing discussion thread (branch) without allocating. */
+  findBranch(branchId: string): CoordinationBranchView | null;
+  /** Create a new thread (P0 new-topic path). Session is attached later. */
+  createBranch(opts: { hostProjectId: string; title: string }): { id: string };
   allocateForContinue(opts: {
     taskBranchId: string | null;
     hostProjectId: string;

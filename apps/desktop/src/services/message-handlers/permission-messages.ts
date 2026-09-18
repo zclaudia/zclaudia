@@ -8,20 +8,26 @@ import type {
 } from '@zclaudia/shared';
 import type { MessageHandlerContext } from './types';
 import { useClaudiaStore } from '../../stores/claudiaStore';
+import { parseBackendId } from '../../stores/gatewayStore';
+import { resolveCanonicalBackendId } from '../../actions/controlPlane';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { usePermissionStore } from '../../stores/permissionStore';
 import { usePromptRequestStore } from '../../stores/promptRequestStore';
 import { useToastStore } from '../../stores/toastStore';
 
 function updateClaudiaTaskStatusBySessionId(
+  serverId: string,
   sessionId: string | undefined,
   status: ClaudiaTaskStatus
 ): void {
   if (!sessionId) return;
+  const backendId = resolveCanonicalBackendId(parseBackendId(serverId)) ?? serverId;
   const claudiaStore = useClaudiaStore.getState();
-  const task = claudiaStore.tasks.find(current => current.sessionId === sessionId);
+  const task = claudiaStore.slices[backendId]?.tasks.find(
+    current => current.sessionId === sessionId
+  );
   if (!task) return;
-  claudiaStore.updateTask(task.id, { status, updatedAt: Date.now() });
+  claudiaStore.updateTask(backendId, task.id, { status, updatedAt: Date.now() });
 }
 
 function buildAIReviewToastMessage(aiMsg: AIReviewCompletedMessage): string | undefined {
@@ -70,7 +76,7 @@ export function handlePermissionMessage(msg: ServerMessage, ctx: MessageHandlerC
         workflowMode: permMsg.workflowMode,
         workflowRunId: permMsg.workflowRunId,
       });
-      updateClaudiaTaskStatusBySessionId(permMsg.sessionId, 'waiting');
+      updateClaudiaTaskStatusBySessionId(ctx.serverId, permMsg.sessionId, 'waiting');
       useToastStore.getState().add({
         title: 'Permission required',
         message: `${permMsg.toolName} needs approval`,
@@ -84,14 +90,14 @@ export function handlePermissionMessage(msg: ServerMessage, ctx: MessageHandlerC
 
     case 'permission_resolved': {
       const resolvedMsg = msg as PermissionResolvedMessage;
-      updateClaudiaTaskStatusBySessionId(resolvedMsg.sessionId, 'running');
+      updateClaudiaTaskStatusBySessionId(ctx.serverId, resolvedMsg.sessionId, 'running');
       usePermissionStore.getState().clearRequestById(resolvedMsg.requestId);
       return true;
     }
 
     case 'permission_auto_resolved': {
       const autoMsg = msg as PermissionAutoResolvedMessage;
-      updateClaudiaTaskStatusBySessionId(autoMsg.sessionId, 'running');
+      updateClaudiaTaskStatusBySessionId(ctx.serverId, autoMsg.sessionId, 'running');
       const autoResolveToast = buildAIReviewAutoResolveToastMessage(autoMsg);
       if (autoResolveToast) {
         useToastStore.getState().add({

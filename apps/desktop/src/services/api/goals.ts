@@ -1,6 +1,6 @@
 import type { Goal } from '@zclaudia/shared';
 import { apiCallForBackend } from './unwrap';
-import { resolveSessionOwnerBackendId } from '../../utils/sessionOwnership';
+import { resolveSessionOwnerBackendId } from '../../actions/sessionOwnership';
 
 export interface SetGoalRequest {
   objective: string;

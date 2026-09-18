@@ -2,25 +2,13 @@ import { Router, type Request, type Response } from 'express';
 import type Database from 'better-sqlite3';
 import { newId } from '../../utils/uuid.js';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
+import type { AgentConfig } from '@zclaudia/shared/wire/agent';
 import { normalizeToUnifiedPolicy } from '@zclaudia/shared/interaction/permissions';
 import { parseUserHooks } from '@zclaudia/shared/interaction/user-hooks';
 import { toolRegistry } from '../../application/plugins/tool-registry.js';
 import { getDiscoveredSkills } from '../../application/plugins/skill-tools.js';
 import { CONTEXT_TEMPLATES } from '../../application/conversation/context/types.js';
 import { validateAIReviewProviderId } from '../../application/conversation/agent/delegation/provider-validation.js';
-
-interface AgentConfig {
-  id: number;
-  enabled: boolean;
-  projectId: string | null;
-  sessionId: string | null;
-  llmProfileId: string | null;
-  permissionWorkflowOverrideId: string | null;
-  permissionPolicy: string | null;
-  hooks: string | null;
-  createdAt: number;
-  updatedAt: number;
-}
 
 interface AgentConfigRow {
   id: number;

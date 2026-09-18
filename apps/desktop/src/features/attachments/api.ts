@@ -1,6 +1,6 @@
 import type { Attachment, AttachmentCount, AttachmentOwnerKind } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
-import { getControlPlaneMode, isLocalBackendId } from '../../utils/controlPlane';
+import { getControlPlaneMode, isLocalBackendId } from '../../actions/controlPlane';
 import { apiCall } from '../../services/api/unwrap';
 import { getBaseUrl, getAuthHeaders } from '../../services/api';
 import { readFileAsBase64, type UploadProgress } from '../../services/fileUpload';
