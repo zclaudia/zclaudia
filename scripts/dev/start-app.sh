@@ -128,10 +128,38 @@ validate_browser_port
 info "Mode: $MODE"
 
 # --- Kill stale processes ---
+stop_dev_instance() {
+  [[ "$(uname -s)" == "Darwin" ]] || return 0
+
+  # macOS single-instance detection is keyed by the bundle identifier, not the
+  # executable path. A dev .app launched outside cargo survives the path-based
+  # cleanup below and makes the new Tauri process exit successfully at startup.
+  local identifier socket pids pid
+  identifier=$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).identifier.replace(/[.-]/g, "_")' \
+    "$PROJECT_ROOT/apps/desktop/src-tauri/tauri.dev.conf.json")
+  socket="/tmp/${identifier}_si.sock"
+  pids=$(lsof -t "$socket" 2>/dev/null || true)
+  [[ -n "$pids" ]] || return 0
+
+  info "Stopping existing dev app (PID: $pids)..."
+  # Only target owners of the dev identifier's socket; production has its own.
+  while read -r pid; do
+    kill "$pid" 2>/dev/null || true
+  done <<< "$pids"
+  for _ in $(seq 1 5); do
+    if ! lsof -t "$socket" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  die "Existing dev app still owns $socket. Quit Claudia Dev and retry."
+}
+
 kill_stale() {
   info "Stopping stale dev processes..."
   pgrep -f "tauri.dev.conf.json" | xargs -r kill 2>/dev/null || true
   pgrep -f "target/debug/zclaudia" | xargs -r kill 2>/dev/null || true
+  stop_dev_instance
   pkill -f "server/dist/index.js" 2>/dev/null || true
   pkill -f "binaries/node.*server/dist/index.js" 2>/dev/null || true
   pkill -f "tsx watch src/index.ts" 2>/dev/null || true
@@ -279,7 +307,12 @@ start_tauri() {
   # Run in foreground (not exec) so trap cleanup fires on exit
   run_pnpm exec tauri dev --config src-tauri/tauri.dev.conf.json &
   TAURI_PID=$!
-  wait "$TAURI_PID" || true
+  local status=0
+  wait "$TAURI_PID" || status=$?
+  if [[ "$status" != "0" ]]; then
+    warn "Tauri dev exited with status $status"
+  fi
+  return "$status"
 }
 
 # ============================================================
