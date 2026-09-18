@@ -92,6 +92,83 @@ describe('MobileSetup', () => {
     });
   });
 
+  it('does not fake a connecting state when the saved gateway is connected but has no backends', () => {
+    vi.useFakeTimers();
+    try {
+      useGatewayStore.setState({
+        directGatewayUrl: 'https://gateway.example.com',
+        directGatewaySecret: 'secret-1',
+      } as any);
+      useFacadeStore.setState({ connectionState: 'connected', backends: [] });
+
+      render(<MobileSetup />);
+
+      const button = screen.getByRole('button', { name: 'Connected' });
+      expect(button).toBeDisabled();
+      expect(screen.getByText('Gateway connected. Waiting for backends...')).toBeInTheDocument();
+
+      fireEvent.click(button);
+      act(() => {
+        vi.advanceTimersByTime(16_000);
+      });
+
+      expect(useFacadeStore.getState().connectionState).toBe('connected');
+      expect(screen.queryByText(/Connection timed out/)).not.toBeInTheDocument();
+      expect(screen.getByText('Gateway connected. Waiting for backends...')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('re-enables Connect once the saved gateway config is edited', () => {
+    useGatewayStore.setState({
+      directGatewayUrl: 'https://gateway.example.com',
+      directGatewaySecret: 'secret-1',
+    } as any);
+    useFacadeStore.setState({ connectionState: 'connected', backends: [] });
+
+    render(<MobileSetup />);
+    expect(screen.getByRole('button', { name: 'Connected' })).toBeDisabled();
+
+    fireEvent.change(screen.getByPlaceholderText('http://gateway.example.com:3200'), {
+      target: { value: 'https://other.example.com' },
+    });
+
+    expect(screen.getByRole('button', { name: 'Connect' })).toBeEnabled();
+  });
+
+  it('retries the saved gateway through the facade instead of overwriting its state', async () => {
+    const forceReconnect = vi.fn(() => {
+      useFacadeStore.setState({ connectionState: 'reconnecting', connectionError: null });
+    });
+    useGatewayStore.setState({
+      directGatewayUrl: 'https://gateway.example.com',
+      directGatewaySecret: 'secret-1',
+    } as any);
+    useFacadeStore.setState({
+      facade: { forceReconnect } as any,
+      connectionState: 'error',
+      connectionError: 'connection_error (url: wss://gateway.example.com)',
+      backends: [],
+    });
+
+    const { rerender } = render(<MobileSetup />);
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+    expect(forceReconnect).toHaveBeenCalledTimes(1);
+    expect(useFacadeStore.getState().connectionState).toBe('reconnecting');
+    expect(screen.queryByText(/connection_error/)).not.toBeInTheDocument();
+    expect(screen.getByText('Connecting...')).toBeInTheDocument();
+
+    await act(async () => {
+      useFacadeStore.setState({ connectionState: 'connected' });
+    });
+    rerender(<MobileSetup />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Connected' })).toBeDisabled();
+    });
+  });
+
   it('renders the mobile debug panel when mobileDebug=1 is present', () => {
     window.history.pushState({}, '', '/?mobileDebug=1');
 

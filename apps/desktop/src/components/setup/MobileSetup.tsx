@@ -9,6 +9,7 @@ import {
   getVisibleMobileBackends,
   isMobileGatewayConnected,
 } from '../../services/mobileConnectionState';
+import { normalizeGatewayUrl } from '../../utils/gatewayUrl';
 
 function shouldShowMobileDebug(): boolean {
   if (typeof window === 'undefined') return false;
@@ -78,20 +79,17 @@ export function MobileSetup() {
 
   useEffect(() => clearConnectTimers, []);
 
-  const handleConnect = () => {
-    const url = gatewayUrl.trim();
-    const secret = gatewaySecret.trim();
+  const { showLocalBackend } = useGatewayStore();
+  const isGatewayConnected = isMobileGatewayConnected(facadeConnectionState);
+  const onlineBackends = getVisibleMobileBackends(backends, currentInstanceId, showLocalBackend);
+  /** The form still holds the persisted config, i.e. the gateway the facade is already using. */
+  const isSavedGatewayConfig =
+    !!directGatewayUrl &&
+    normalizeGatewayUrl(gatewayUrl) === directGatewayUrl &&
+    gatewaySecret.trim() === (directGatewaySecret ?? '');
+  const isAlreadyConnected = isSavedGatewayConfig && isGatewayConnected;
 
-    if (!url || !secret) {
-      setError('Please enter both Gateway URL and Secret');
-      return;
-    }
-
-    setError(null);
-    setConnecting(true);
-    useFacadeStore.setState({ connectionState: 'connecting', connectionError: null });
-
-    setDirectGatewayConfig(url, secret);
+  const startConnectTimers = () => {
     clearConnectTimers();
 
     connectIntervalRef.current = window.setInterval(() => {
@@ -110,6 +108,36 @@ export function MobileSetup() {
     }, 15000);
   };
 
+  const handleConnect = () => {
+    const url = gatewayUrl.trim();
+    const secret = gatewaySecret.trim();
+
+    if (!url || !secret) {
+      setError('Please enter both Gateway URL and Secret');
+      return;
+    }
+
+    setError(null);
+
+    if (isSavedGatewayConfig) {
+      // Same gateway as the live facade: the facade owns that connection and
+      // useBackendFacade will not rebuild it. Faking a 'connecting' state here
+      // would never be corrected — the facade only publishes on state changes,
+      // so with zero backends the timeout below would fire with a bogus error.
+      if (isGatewayConnected) return;
+      setConnecting(true);
+      startConnectTimers();
+      useFacadeStore.getState().facade?.forceReconnect?.();
+      return;
+    }
+
+    setConnecting(true);
+    useFacadeStore.setState({ connectionState: 'connecting', connectionError: null });
+
+    setDirectGatewayConfig(url, secret);
+    startConnectTimers();
+  };
+
   const handleBackendSelect = (backend: BackendSnapshot) => {
     if (backend.runtimeState === 'offline') return;
     const serverId = backend.backendId;
@@ -118,9 +146,6 @@ export function MobileSetup() {
     connectServer(serverId);
   };
 
-  const { showLocalBackend } = useGatewayStore();
-  const isGatewayConnected = isMobileGatewayConnected(facadeConnectionState);
-  const onlineBackends = getVisibleMobileBackends(backends, currentInstanceId, showLocalBackend);
   const showDebug = debugVisible;
 
   const handleLogoTap = () => {
@@ -294,7 +319,9 @@ export function MobileSetup() {
           {/* Connect button */}
           <button
             onClick={handleConnect}
-            disabled={connecting || !gatewayUrl.trim() || !gatewaySecret.trim()}
+            disabled={
+              connecting || isAlreadyConnected || !gatewayUrl.trim() || !gatewaySecret.trim()
+            }
             className="w-full py-3 bg-muted/60 hover:bg-muted text-foreground rounded-xl
                      font-medium text-sm transition-colors
                      disabled:opacity-50 disabled:cursor-not-allowed"
@@ -318,6 +345,8 @@ export function MobileSetup() {
                 </svg>
                 Connecting...
               </span>
+            ) : isAlreadyConnected ? (
+              'Connected'
             ) : (
               'Connect'
             )}
