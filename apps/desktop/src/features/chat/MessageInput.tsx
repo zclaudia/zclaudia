@@ -1,39 +1,33 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { KeyboardEvent, ClipboardEvent, ChangeEvent } from 'react';
-import {
-  ArrowUp,
-  Paperclip,
-  X,
-  Square,
-  File as FileIcon,
-  ChevronRight,
-  Plus,
-  FolderClosed,
-} from 'lucide-react';
-import { Icon } from '../../components/ui/Icon';
-import { FileSymbol } from '../../components/filesymbols';
+import { ArrowUp, Paperclip, Square, Plus } from 'lucide-react';
 import type { SlashCommand, FileEntry, SkillRef } from '@zclaudia/shared';
-import { skillRefKey, validateMessageAttachmentFiles } from '@zclaudia/shared';
+import { skillRefKey } from '@zclaudia/shared';
 import * as api from '../../services/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import { useComposerStore, type SessionDraft } from '../../stores/composerStore';
+import { useComposerStore } from '../../stores/composerStore';
 import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useAgentForSession } from '../../hooks/useAgentForSession';
-import type { WorkspaceSkillInfo } from '../../services/api/workspace-skills';
-import { downscaleImageFile } from '../attachments/downscale-image';
-import { SlashMenu, type SlashSuggestion } from './SlashMenu';
 import type { InvocableDescriptor } from '@zclaudia/shared/providers';
-import { PinnedSkillChips } from './PinnedSkillChips';
 import { RichTextarea, type RichTextareaHandle } from 'rich-textarea';
+import { SlashMenu, type SlashSuggestion } from './SlashMenu';
+import { PinnedSkillChips } from './PinnedSkillChips';
 import { renderSkillTokens, deleteTokenAt, type TokenInteraction } from './SkillTokenRenderer';
+import { MentionMenu } from './MentionMenu';
+import { AttachmentPreviewList } from './AttachmentPreviewList';
+import { useComposerDraft } from './hooks/useComposerDraft';
+import { useMentionState, initialMentionState } from './hooks/useMentionState';
+import { useAttachmentPicker } from './hooks/useAttachmentPicker';
+import { useImeComposition } from './hooks/useImeComposition';
+import { useViewportHeight } from './hooks/useViewportHeight';
+import { useWorkspaceSkills } from './hooks/useWorkspaceSkills';
+import { useSlashSuggestions } from './hooks/useSlashSuggestions';
+import { useDuplicateSendGuard } from './hooks/useDuplicateSendGuard';
+import type { Attachment } from './types';
 
-export interface Attachment {
-  id: string;
-  type: 'image' | 'file';
-  name: string;
-  data: string; // base64 data URL
-  mimeType: string;
-}
+// Canonical home of the composer's Attachment type; re-exported here for
+// backwards compatibility with existing importers.
+export type { Attachment } from './types';
 
 interface MessageInputProps {
   sessionId: string; // Session ID for draft persistence
@@ -63,53 +57,9 @@ interface MessageInputProps {
   mobileToolbarSlot?: React.ReactNode; // Extra buttons rendered in mobile action row
 }
 
-// State for @ mention feature
-interface MentionState {
-  isActive: boolean;
-  triggerIndex: number;
-  query: string;
-  currentPath: string;
-  entries: FileEntry[];
-  selectedIndex: number;
-  isLoading: boolean;
-  hasError: boolean;
-}
-
-const initialMentionState: MentionState = {
-  isActive: false,
-  triggerIndex: -1,
-  query: '',
-  currentPath: '',
-  entries: [],
-  selectedIndex: 0,
-  isLoading: false,
-  hasError: false,
-};
-
-const DRAFT_PERSIST_DEBOUNCE_MS = 300;
 const COLLAPSED_CONTROL_SIZE_PX = 48;
 const EXPANDED_INPUT_DEFAULT_HEIGHT_PX = 160;
 const EXPANDED_INPUT_MIN_HEIGHT_PX = 120;
-const DUPLICATE_SEND_GUARD_MS = 400;
-
-// Format file size
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-};
-
-// Simple debounce function
-function debounce<T extends (...args: Parameters<T>) => void>(
-  fn: T,
-  delay: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), delay);
-  };
-}
 
 export function MessageInput({
   sessionId,
@@ -130,83 +80,62 @@ export function MessageInput({
   initialAttachments,
   mobileToolbarSlot,
 }: MessageInputProps) {
-  const getAvailableViewportHeight = useCallback(() => {
-    if (typeof window === 'undefined') return 800;
-    return window.visualViewport?.height ?? window.innerHeight;
-  }, []);
   const isMobile = useIsMobile();
-  const setDraft = useComposerStore(s => s.setDraft);
   const clearDraft = useComposerStore(s => s.clearDraft);
   const { agent } = useAgentForSession(sessionId);
   const [value, setValue] = useState('');
   const [hoveredTokenStart, setHoveredTokenStart] = useState<number | null>(null);
   const [deleteZoneHovered, setDeleteZoneHovered] = useState(false);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [showCommands, setShowCommands] = useState(false);
   // Canonical invocation selection (URIP §16.2): the descriptor picked from the
   // catalog list. Validated against the typed text at send time; cleared when
   // editing moves away from its trigger.
   const selectedInvocableRef = useRef<InvocableDescriptor | undefined>(undefined);
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
-  const [workspaceSkills, setWorkspaceSkills] = useState<WorkspaceSkillInfo[]>([]);
-  const [mentionState, setMentionState] = useState<MentionState>(initialMentionState);
-  const [isComposing, setIsComposing] = useState(false); // Track IME composition state
-  const [availableViewportHeight, setAvailableViewportHeight] = useState(
-    getAvailableViewportHeight
-  );
-  const expandedInputMaxHeight = Math.max(
-    EXPANDED_INPUT_MIN_HEIGHT_PX,
-    Math.min(Math.floor(availableViewportHeight * 0.4), 320)
-  );
-  const expandedInputHeight = Math.min(EXPANDED_INPUT_DEFAULT_HEIGHT_PX, expandedInputMaxHeight);
 
   const textareaRef = useRef<RichTextareaHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
   const mentionListRef = useRef<HTMLDivElement>(null);
-  const compositionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const draftPersistTimeoutRef = useRef<number | null>(null);
-  const pendingDraftValueRef = useRef('');
-  const pendingDraftAttachmentsRef = useRef<Attachment[]>([]);
-  const lastSubmissionRef = useRef<{ key: string; at: number } | null>(null);
 
-  const getPendingDraft = useCallback(
-    (): SessionDraft => ({
-      content: pendingDraftValueRef.current,
-      attachments: pendingDraftAttachmentsRef.current,
-    }),
-    []
+  // Composer plumbing, each in a focused hook (see features/chat/hooks):
+  const availableViewportHeight = useViewportHeight();
+  const { isComposing, handleCompositionStart, handleCompositionEnd } = useImeComposition();
+  const {
+    pendingDraftValueRef,
+    pendingDraftAttachmentsRef,
+    scheduleDraftPersistence,
+    clearDraftPersistence,
+  } = useComposerDraft(sessionId);
+  const { workspaceSkills, loadWorkspaceSkills } = useWorkspaceSkills();
+  const {
+    mentionState,
+    setMentionState,
+    detectMention,
+    parseQuery,
+    fetchEntries,
+    debouncedFetchEntries,
+  } = useMentionState(mentionListRef);
+  const {
+    attachments,
+    setAttachments,
+    attachmentError,
+    addFilesAsAttachments,
+    handleFileSelect,
+    removeAttachment,
+    clearAttachments,
+  } = useAttachmentPicker({
+    fileInputRef,
+    pendingAttachmentsRef: pendingDraftAttachmentsRef,
+    scheduleDraftPersistence,
+  });
+  const { isDuplicateSubmission, recordSubmission, clearSubmission } = useDuplicateSendGuard();
+
+  const expandedInputMaxHeight = Math.max(
+    EXPANDED_INPUT_MIN_HEIGHT_PX,
+    Math.min(Math.floor(availableViewportHeight * 0.4), 320)
   );
-
-  const flushDraftPersistence = useCallback(() => {
-    if (draftPersistTimeoutRef.current) {
-      clearTimeout(draftPersistTimeoutRef.current);
-      draftPersistTimeoutRef.current = null;
-    }
-
-    setDraft(sessionId, getPendingDraft());
-  }, [getPendingDraft, sessionId, setDraft]);
-
-  const clearDraftPersistence = useCallback(() => {
-    if (draftPersistTimeoutRef.current) {
-      clearTimeout(draftPersistTimeoutRef.current);
-      draftPersistTimeoutRef.current = null;
-    }
-    pendingDraftValueRef.current = '';
-    pendingDraftAttachmentsRef.current = [];
-  }, []);
-
-  const scheduleDraftPersistence = useCallback(() => {
-    if (draftPersistTimeoutRef.current) {
-      clearTimeout(draftPersistTimeoutRef.current);
-    }
-
-    draftPersistTimeoutRef.current = window.setTimeout(() => {
-      draftPersistTimeoutRef.current = null;
-      setDraft(sessionId, getPendingDraft());
-    }, DRAFT_PERSIST_DEBOUNCE_MS);
-  }, [getPendingDraft, sessionId, setDraft]);
+  const expandedInputHeight = Math.min(EXPANDED_INPUT_DEFAULT_HEIGHT_PX, expandedInputMaxHeight);
 
   // Update value and persist draft to store
   const updateValue = useCallback(
@@ -235,63 +164,6 @@ export function MessageInput({
       pendingDraftAttachmentsRef.current = initialAttachments;
     }
   }, [initialAttachments]);
-
-  // Cleanup composition timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (compositionTimeoutRef.current) {
-        clearTimeout(compositionTimeoutRef.current);
-      }
-      if (draftPersistTimeoutRef.current) {
-        flushDraftPersistence();
-      }
-    };
-  }, [flushDraftPersistence]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const updateViewportHeight = () => {
-      setAvailableViewportHeight(getAvailableViewportHeight());
-    };
-
-    const viewport = window.visualViewport;
-    updateViewportHeight();
-
-    window.addEventListener('resize', updateViewportHeight);
-    viewport?.addEventListener('resize', updateViewportHeight);
-    viewport?.addEventListener('scroll', updateViewportHeight);
-
-    return () => {
-      window.removeEventListener('resize', updateViewportHeight);
-      viewport?.removeEventListener('resize', updateViewportHeight);
-      viewport?.removeEventListener('scroll', updateViewportHeight);
-    };
-  }, [getAvailableViewportHeight]);
-
-  const loadWorkspaceSkills = useCallback(async () => {
-    try {
-      const result = await api.getWorkspaceSkillsResult();
-      setWorkspaceSkills(result.skills ?? []);
-    } catch {
-      setWorkspaceSkills([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .getWorkspaceSkillsResult()
-      .then(result => {
-        if (!cancelled) setWorkspaceSkills(result.skills ?? []);
-      })
-      .catch(() => {
-        if (!cancelled) setWorkspaceSkills([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Ids of currently-known skills — used to decide which `/name` tokens in the
   // textarea get highlighted (only real skills, not arbitrary `/path` text).
@@ -341,138 +213,13 @@ export function MessageInput({
   );
   const pinnedKeys = useMemo(() => new Set(pinnedRefs.map(ref => skillRefKey(ref))), [pinnedRefs]);
 
-  // Filter commands based on input (memoized to avoid O(n) filter on every render)
-  const slashSuggestions = useMemo<SlashSuggestion[]>(() => {
-    if (!value.startsWith('/') || value.includes(' ')) return [];
-    const query = value.toLowerCase();
-    const skillSuggestions: SlashSuggestion[] = workspaceSkills
-      .filter(skill => skill.eligible !== false && skill.metadata?.userInvocable !== false)
-      .filter(skill => `/${skill.id}`.toLowerCase().startsWith(query))
-      .map((skill): SlashSuggestion => {
-        const ref: SkillRef = { source: skill.source ?? 'workspace', id: skill.id };
-        return {
-          index: 0, // reassigned below after ordering
-          type: 'skill',
-          value: `/${skill.id}`,
-          description: skill.metadata?.whenToUse || skill.description,
-          argumentHint: skill.metadata?.argumentHint || skill.metadata?.arguments?.join(' '),
-          usageCount: skill.usage?.count,
-          source: skill.source ?? 'workspace',
-          mode: skill.execution?.defaultMode,
-          pinned: pinnedKeys.has(skillRefKey(ref)),
-          skillRef: ref,
-        };
-      });
-    const commandSuggestions: SlashSuggestion[] = commands
-      .filter(cmd => cmd.command.toLowerCase().startsWith(query))
-      .map(
-        (cmd): SlashSuggestion => ({
-          index: 0,
-          type: 'command',
-          value: cmd.command,
-          description: cmd.description,
-        })
-      );
-    // URIP catalog items (§16.2): canonical entries from the session's
-    // invocable catalog, matched by display trigger or alias. Selecting one
-    // records the canonical ID while the composer keeps the editable text.
-    const invocableSuggestionsList: SlashSuggestion[] = (invocableSuggestions?.(value) ?? []).map(
-      (descriptor): SlashSuggestion => ({
-        index: 0,
-        type: 'invocable',
-        value: descriptor.displayTrigger,
-        description: descriptor.description || descriptor.label,
-        argumentHint: descriptor.argumentHint,
-        invocable: descriptor,
-      })
-    );
-    // Order: catalog invocables, then pinned skills, then remaining skills by
-    // usage desc, then commands. Reassign contiguous indices so keyboard-nav +
-    // scroll-into-view stay aligned across the visual groups rendered by SlashMenu.
-    return [...invocableSuggestionsList, ...skillSuggestions, ...commandSuggestions]
-      .sort((a, b) => {
-        const pa = a.type === 'skill' && a.pinned ? 1 : 0;
-        const pb = b.type === 'skill' && b.pinned ? 1 : 0;
-        if (pa !== pb) return pb - pa;
-        if (a.type !== 'skill' || b.type !== 'skill') return 0;
-        const ua = a.usageCount ?? 0;
-        const ub = b.usageCount ?? 0;
-        return ub - ua;
-      })
-      .map((s, index) => ({ ...s, index }));
-  }, [value, commands, workspaceSkills, pinnedKeys, invocableSuggestions]);
-
-  // Detect @ mention in text
-  const detectMention = useCallback(
-    (text: string, cursorPos: number): { triggerIndex: number; query: string } | null => {
-      // Find the last @ before cursor that's not preceded by a non-space character
-      for (let i = cursorPos - 1; i >= 0; i--) {
-        const char = text[i];
-        if (char === '@') {
-          // Check if @ is at start or preceded by whitespace
-          if (i === 0 || /\s/.test(text[i - 1])) {
-            return {
-              triggerIndex: i,
-              query: text.substring(i + 1, cursorPos),
-            };
-          }
-          break;
-        }
-        // Stop if we hit whitespace (except within the path)
-        if (char === ' ' || char === '\n' || char === '\t') {
-          break;
-        }
-      }
-      return null;
-    },
-    []
-  );
-
-  // Parse query into path components
-  const parseQuery = useCallback((query: string) => {
-    const pathParts = query.split('/');
-    const currentPath = pathParts.slice(0, -1).join('/');
-    const searchQuery = pathParts[pathParts.length - 1];
-    return { currentPath, searchQuery };
-  }, []);
-
-  // Fetch directory entries with debouncing
-  const fetchEntries = useCallback(
-    async (
-      projectRootPath: string,
-      relativePath: string,
-      query: string,
-      resolvedBackendId?: string | null
-    ) => {
-      if (!projectRootPath) return;
-
-      setMentionState(prev => ({ ...prev, isLoading: true, hasError: false }));
-
-      try {
-        const result = await api.listDirectory({
-          projectRoot: projectRootPath,
-          relativePath,
-          query,
-          maxResults: 20,
-          backendId: resolvedBackendId,
-        });
-
-        setMentionState(prev => ({
-          ...prev,
-          entries: result.entries,
-          isLoading: false,
-          selectedIndex: 0,
-        }));
-      } catch (error) {
-        console.error('Failed to fetch directory listing:', error);
-        setMentionState(prev => ({ ...prev, entries: [], isLoading: false, hasError: true }));
-      }
-    },
-    []
-  );
-
-  // Debounced fetch
-  const debouncedFetchEntries = useMemo(() => debounce(fetchEntries, 150), [fetchEntries]);
+  const slashSuggestions = useSlashSuggestions({
+    value,
+    commands,
+    workspaceSkills,
+    pinnedKeys,
+    invocableSuggestions,
+  });
 
   // Auto-resize: grow from one line up to a cap, then scroll. Bidirectional —
   // resetting height to 'auto' before measuring lets it shrink as content is
@@ -537,18 +284,6 @@ export function MessageInput({
       }
     }
   }, [selectedCommandIndex, showCommands]);
-
-  // Scroll selected mention into view
-  useEffect(() => {
-    if (mentionState.isActive && mentionListRef.current) {
-      const selectedElement = mentionListRef.current.querySelector(
-        `[data-index="${mentionState.selectedIndex}"]`
-      ) as HTMLElement;
-      if (selectedElement?.scrollIntoView) {
-        selectedElement.scrollIntoView({ block: 'nearest' });
-      }
-    }
-  }, [mentionState.selectedIndex, mentionState.isActive]);
 
   // Handle input change with @ detection
   const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -780,75 +515,6 @@ export function MessageInput({
     }
   };
 
-  const readFileAsAttachment = async (file: File): Promise<void> => {
-    if (file.type.startsWith('image/')) {
-      file = await downscaleImageFile(file);
-    }
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const attachment: Attachment = {
-          id: crypto.randomUUID(),
-          type: file.type.startsWith('image/') ? 'image' : 'file',
-          name: file.name,
-          data: reader.result as string,
-          mimeType: file.type,
-        };
-        setAttachments(prev => {
-          const nextAttachments = [...prev, attachment];
-          pendingDraftAttachmentsRef.current = nextAttachments;
-          scheduleDraftPersistence();
-          return nextAttachments;
-        });
-        resolve();
-      };
-      reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const addFilesAsAttachments = async (files: File[]): Promise<void> => {
-    const validation = validateMessageAttachmentFiles(files, {
-      existingCount: pendingDraftAttachmentsRef.current.length,
-    });
-
-    if (validation.rejected.length > 0) {
-      setAttachmentError(validation.rejected.map(issue => issue.message).join(' '));
-    } else {
-      setAttachmentError(null);
-    }
-
-    for (const file of validation.accepted) {
-      try {
-        await readFileAsAttachment(file);
-        setAttachmentError(null);
-      } catch {
-        setAttachmentError(`Failed to read "${file.name}".`);
-      }
-    }
-  };
-
-  const handleFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    await addFilesAsAttachments(Array.from(files));
-
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const removeAttachment = (id: string) => {
-    setAttachments(prev => {
-      const nextAttachments = prev.filter(a => a.id !== id);
-      pendingDraftAttachmentsRef.current = nextAttachments;
-      scheduleDraftPersistence();
-      return nextAttachments;
-    });
-  };
-
   const handleSend = async () => {
     if (disabled) return;
 
@@ -857,15 +523,10 @@ export function MessageInput({
       text: trimmedValue,
       attachments: attachments.map(attachment => attachment.id),
     });
-    const lastSubmission = lastSubmissionRef.current;
 
     // Guard against duplicate mobile taps / synthetic click re-entry before
     // React clears the local input state.
-    if (
-      lastSubmission &&
-      lastSubmission.key === submissionKey &&
-      Date.now() - lastSubmission.at < DUPLICATE_SEND_GUARD_MS
-    ) {
+    if (isDuplicateSubmission(submissionKey)) {
       return;
     }
 
@@ -880,23 +541,21 @@ export function MessageInput({
       if (trimmedValue === trigger || trimmedValue.startsWith(`${trigger} `)) {
         const invokeArgs =
           trimmedValue === trigger ? '' : trimmedValue.slice(trigger.length + 1).trim();
-        lastSubmissionRef.current = { key: submissionKey, at: Date.now() };
+        recordSubmission(submissionKey);
         const sent = await onCanonicalInvocation(
           selected,
           invokeArgs,
           attachments.length > 0 ? attachments : undefined
         );
         if (!sent) {
-          lastSubmissionRef.current = null;
+          clearSubmission();
           return;
         }
         selectedInvocableRef.current = undefined;
         clearDraftPersistence();
         setValue('');
         clearDraft(sessionId);
-        setAttachments([]);
-        setAttachmentError(null);
-        pendingDraftAttachmentsRef.current = [];
+        clearAttachments();
         return;
       }
       // Edited away from the trigger: the selection no longer matches.
@@ -921,7 +580,7 @@ export function MessageInput({
       const isPluginCommand = command.includes(':') && !!agent && !isReservedNamespace;
 
       if (onCommand && (isKnownCommand || isPluginCommand)) {
-        lastSubmissionRef.current = { key: submissionKey, at: Date.now() };
+        recordSubmission(submissionKey);
         clearDraftPersistence();
         onCommand(command, args);
         setValue('');
@@ -932,7 +591,7 @@ export function MessageInput({
 
     // Send message with attachments
     if (trimmedValue || attachments.length > 0) {
-      lastSubmissionRef.current = { key: submissionKey, at: Date.now() };
+      recordSubmission(submissionKey);
       clearDraftPersistence();
       onSend(trimmedValue, attachments.length > 0 ? attachments : undefined);
       if (trimmedValue.startsWith('/')) {
@@ -940,9 +599,7 @@ export function MessageInput({
       }
       setValue('');
       clearDraft(sessionId);
-      setAttachments([]);
-      setAttachmentError(null);
-      pendingDraftAttachmentsRef.current = [];
+      clearAttachments();
     }
   };
 
@@ -1033,9 +690,7 @@ export function MessageInput({
             if (!sent) return;
             setValue('');
             clearDraft(sessionId);
-            setAttachments([]);
-            setAttachmentError(null);
-            pendingDraftAttachmentsRef.current = [];
+            clearAttachments();
           }}
           className="absolute bottom-full left-0 mb-1 z-10 rounded-full border border-border bg-popover px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
         >
@@ -1053,66 +708,16 @@ export function MessageInput({
 
       {/* @ Mention suggestions dropdown */}
       {mentionState.isActive && (
-        <div
+        <MentionMenu
           ref={mentionListRef}
-          className="absolute bottom-full left-0 right-0 mb-1 bg-card border border-border rounded-lg shadow-lg overflow-y-auto max-h-64 z-10"
-        >
-          {/* Breadcrumb navigation */}
-          {mentionState.currentPath && (
-            <div className="px-4 py-2 border-b border-border text-sm text-muted-foreground flex items-center gap-1 flex-wrap">
-              <button onClick={() => navigateToPath('')} className="hover:text-foreground">
-                root
-              </button>
-              {mentionState.currentPath.split('/').map((part, idx, arr) => (
-                <span key={idx} className="flex items-center gap-1">
-                  <span className="text-muted-foreground/50">/</span>
-                  <button
-                    onClick={() => navigateToPath(arr.slice(0, idx + 1).join('/'))}
-                    className="hover:text-foreground"
-                  >
-                    {part}
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          {mentionState.isLoading ? (
-            <div className="px-4 py-3 text-muted-foreground text-sm">Loading...</div>
-          ) : mentionState.hasError ? (
-            <div className="px-4 py-3 text-destructive text-sm">
-              Failed to list files — check server connection
-            </div>
-          ) : mentionState.entries.length === 0 ? (
-            <div className="px-4 py-3 text-muted-foreground text-sm">No files found</div>
-          ) : (
-            mentionState.entries.map((entry, index) => (
-              <button
-                key={entry.path}
-                data-index={index}
-                onClick={() => selectMentionEntry(entry)}
-                className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-muted ${
-                  index === mentionState.selectedIndex ? 'bg-muted' : ''
-                }`}
-              >
-                {entry.type === 'directory' ? (
-                  <Icon icon={FolderClosed} size={16} className="text-muted-foreground" />
-                ) : (
-                  <FileSymbol name={entry.name} size={16} />
-                )}
-                <span className="flex-1 truncate">{entry.name}</span>
-                {entry.type === 'directory' && (
-                  <ChevronRight size={14} className="text-muted-foreground" />
-                )}
-                {entry.size !== undefined && (
-                  <span className="text-xs text-muted-foreground">
-                    {formatFileSize(entry.size)}
-                  </span>
-                )}
-              </button>
-            ))
-          )}
-        </div>
+          currentPath={mentionState.currentPath}
+          entries={mentionState.entries}
+          selectedIndex={mentionState.selectedIndex}
+          isLoading={mentionState.isLoading}
+          hasError={mentionState.hasError}
+          onSelect={selectMentionEntry}
+          onNavigate={navigateToPath}
+        />
       )}
 
       {attachmentError && (
@@ -1125,44 +730,7 @@ export function MessageInput({
       )}
 
       {/* Attachments preview */}
-      {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-2 p-2 bg-muted rounded-lg">
-          {attachments.map(attachment => (
-            <div
-              key={attachment.id}
-              className="relative group bg-secondary rounded-lg overflow-hidden"
-            >
-              {attachment.type === 'image' ? (
-                <img
-                  src={attachment.data}
-                  alt={attachment.name}
-                  className="h-20 w-auto max-w-32 object-cover"
-                />
-              ) : (
-                <div className="h-20 w-32 flex items-center justify-center p-2">
-                  <div className="text-center">
-                    <FileIcon
-                      size={32}
-                      strokeWidth={1.5}
-                      className="mx-auto text-muted-foreground"
-                    />
-                    <span className="text-xs text-muted-foreground truncate block mt-1">
-                      {attachment.name}
-                    </span>
-                  </div>
-                </div>
-              )}
-              <button
-                onClick={() => removeAttachment(attachment.id)}
-                className="absolute top-1 right-1 w-7 h-7 md:w-6 md:h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity before:absolute before:-inset-2 before:content-[''] md:before:content-none"
-                aria-label={`Remove attachment ${attachment.name}`}
-              >
-                <X size={12} strokeWidth={2} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      <AttachmentPreviewList attachments={attachments} onRemove={removeAttachment} />
 
       {/* Input area */}
       {isMobile ? (
@@ -1175,19 +743,8 @@ export function MessageInput({
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            onCompositionStart={() => {
-              if (compositionTimeoutRef.current) {
-                clearTimeout(compositionTimeoutRef.current);
-                compositionTimeoutRef.current = null;
-              }
-              setIsComposing(true);
-            }}
-            onCompositionEnd={() => {
-              compositionTimeoutRef.current = setTimeout(() => {
-                setIsComposing(false);
-                compositionTimeoutRef.current = null;
-              }, 50);
-            }}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
             disabled={disabled}
             placeholder={placeholder}
             spellCheck={false}
@@ -1298,19 +855,8 @@ export function MessageInput({
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              onCompositionStart={() => {
-                if (compositionTimeoutRef.current) {
-                  clearTimeout(compositionTimeoutRef.current);
-                  compositionTimeoutRef.current = null;
-                }
-                setIsComposing(true);
-              }}
-              onCompositionEnd={() => {
-                compositionTimeoutRef.current = setTimeout(() => {
-                  setIsComposing(false);
-                  compositionTimeoutRef.current = null;
-                }, 50);
-              }}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
               disabled={disabled}
               placeholder={placeholder}
               spellCheck={false}
