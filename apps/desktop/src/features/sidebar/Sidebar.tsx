@@ -6,13 +6,6 @@ import {
   type CSSProperties,
   type RefObject,
 } from 'react';
-import { createPortal } from 'react-dom';
-import { ProjectSettings } from '../settings';
-import { PluginPermissionDialog } from '../../components/permission/PluginPermissionDialog';
-import { SortableList, SortableItem } from '../../components/SortableList';
-
-import { useSearchSidebar } from './useSearchSidebar';
-import { groupSessionsByWorktree as groupSessionsByWorktreeFn } from './worktreeGrouping';
 import { SidebarTopBar } from './SidebarTopBar';
 import { SidebarNav } from './SidebarNav';
 import type { AutomationTab } from '../automation/automation-types';
@@ -21,9 +14,9 @@ import type { PluginsTab } from '../plugins/plugins-types';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SearchModal } from './SearchModal';
 import { ProjectListItem } from './ProjectListItem';
-import { NewSessionModal } from './NewSessionModal';
 import { BackendRow } from './BackendRow';
-import { useProjectStore } from '../../stores/projectStore';
+import { SortableList, SortableItem } from '../../components/SortableList';
+import { useSearchSidebar } from './useSearchSidebar';
 import { useOnlineBackends } from './onlineBackends';
 import { useBackendConnectionLifecycle } from './useBackendConnectionLifecycle';
 import { useFacadeStore } from '../../stores/facadeStore';
@@ -31,52 +24,24 @@ import { useServerStore } from '../../stores/serverStore';
 import { useGatewayStore } from '../../stores/gatewayStore';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
 import { resolveCanonicalBackendId } from '../../actions/controlPlane';
-import {
-  getMobileBackendViewState,
-  isMobileGatewayConnected,
-} from '../../services/mobileConnectionState';
+import { getMobileBackendViewState } from '../../services/mobileConnectionState';
 import { useSidebarExpansionStore } from '../../stores/sidebarExpansionStore';
-import { NewProjectModal } from './NewProjectModal';
 import { SidebarFooter } from './SidebarFooter';
 import { useSidebarData } from './useSidebarData';
 import { useSidebarActions } from './useSidebarActions';
 import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
-import { useSidebarWidthStore, SIDEBAR_WIDTH_LIMITS } from '../../stores/sidebarWidthStore';
-import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
+import { SIDEBAR_WIDTH_LIMITS } from '../../stores/sidebarWidthStore';
 import { useHomeQuickActionsStore } from '../../stores/homeQuickActionsStore';
-import { AgentRequiredDialog } from '../agent';
-import type { AgentReadinessReason } from '@zclaudia/shared/core/agent-readiness';
 import type { SettingsTab } from '../settings';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
-
-import * as api from '../../services/api';
-import type { GitWorktree } from '@zclaudia/shared';
-import type { WorktreeGroup } from './worktreeGrouping';
-import { runWithToast } from '../git';
-import { confirm } from '../../stores/confirmDialogStore';
-
-/** Keyboard resize step, in px, for the sidebar's resize handle. */
-const RESIZE_KEY_STEP_PX = 16;
-
-const AGENT_READINESS_REASONS = new Set<AgentReadinessReason>([
-  'no_agent',
-  'no_llm_profile',
-  'no_credential',
-  'no_model',
-  'runtime_unavailable',
-  'runtime_missing',
-  'runtime_incompatible',
-  'runtime_auth_required',
-  'runtime_check_failed',
-]);
-
-function agentReadinessReasonFromDetails(details: unknown): AgentReadinessReason | undefined {
-  if (!details || typeof details !== 'object') return undefined;
-  const reason = (details as { reason?: unknown }).reason;
-  return typeof reason === 'string' && AGENT_READINESS_REASONS.has(reason as AgentReadinessReason)
-    ? (reason as AgentReadinessReason)
-    : undefined;
-}
+import { claudiaSidebarStatus, computeContextMenuPosition, getNoBackendsMessage } from './derive';
+import { useMobileDrawerFocus } from './useMobileDrawerFocus';
+import { useSidebarResize } from './useSidebarResize';
+import { useProjectWorktrees } from './useProjectWorktrees';
+import { useAgentGate } from './useAgentGate';
+import { useNewProjectForm } from './useNewProjectForm';
+import { useNewSessionModal } from './useNewSessionModal';
+import { SidebarPortaledModals } from './SidebarPortaledModals';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -147,8 +112,12 @@ export function Sidebar({
   searchOpen: searchOpenProp,
   onSearchOpenChange,
 }: SidebarProps) {
-  const internalDrawerPanelRef = useRef<HTMLDivElement>(null);
-  const mobileDrawerPanelRef = drawerPanelRef ?? internalDrawerPanelRef;
+  const { panelRef: mobileDrawerPanelRef, handleDrawerKeyDown } = useMobileDrawerFocus({
+    isMobile,
+    isOpen,
+    onClose,
+    drawerPanelRef,
+  });
   const data = useSidebarData();
   const topLevelViewKind = useTopLevelViewStore(s => s.view.kind);
   const {
@@ -208,25 +177,33 @@ export function Sidebar({
 
   // --- Local state ---
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const [showNewProjectForm, setShowNewProjectForm] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectRootPath, setNewProjectRootPath] = useState('');
-  const [newProjectBackendId, setNewProjectBackendId] = useState<string | null>(null);
-  const [creatingProject, setCreatingProject] = useState(false);
-  const [newSessionRequest, setNewSessionRequest] = useState<{
-    projectId: string | null;
-    pickerEnabled: boolean;
-  } | null>(null);
-  const [newSessionName, setNewSessionName] = useState('');
-  const [newSessionAgentProfileId, setNewSessionAgentProfileId] = useState<string>('');
+  const newProject = useNewProjectForm(onlineBackends);
+  const {
+    name: newProjectName,
+    setName: setNewProjectName,
+    rootPath: newProjectRootPath,
+    setRootPath: setNewProjectRootPath,
+    backendId: newProjectBackendId,
+    setBackendId: setNewProjectBackendId,
+    setCreating: setCreatingProject,
+    setShow: setShowNewProjectForm,
+  } = newProject;
+  const newSession = useNewSessionModal();
+  const {
+    setName: setNewSessionName,
+    setAgentProfileId: setNewSessionAgentProfileId,
+    setRequest: setNewSessionRequest,
+  } = newSession;
   const [contextMenuProject, setContextMenuProject] = useState<string | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
-  const refreshReadiness = useAgentReadinessStore(s => s.refresh);
-  const [agentDialogReason, setAgentDialogReason] = useState<AgentReadinessReason | undefined>(
-    undefined
-  );
-  const [agentDialogOpen, setAgentDialogOpen] = useState(false);
+  const {
+    agentDialogOpen,
+    agentDialogReason,
+    setAgentDialogOpen,
+    runAfterAgentGate,
+    handleAgentNotReady,
+  } = useAgentGate({ isConnected });
   const search = useSearchSidebar();
   // Controlled-or-uncontrolled search popover state.
   const [internalSearchOpen, setInternalSearchOpen] = useState(false);
@@ -240,74 +217,23 @@ export function Sidebar({
   );
 
   // Resizable width (desktop) — mirrors the right sidebar's drag handle.
-  const sidebarWidth = useSidebarWidthStore(s => s.widthPx);
-  const setSidebarWidth = useSidebarWidthStore(s => s.setWidth);
-  const resizeDragging = useRef(false);
-  const resizeStartX = useRef(0);
-  const resizeStartWidth = useRef(0);
-  const resizeCleanupRef = useRef<(() => void) | null>(null);
-  useEffect(() => () => resizeCleanupRef.current?.(), []);
-  const onResizeStart = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
-      e.preventDefault();
-      resizeDragging.current = true;
-      resizeStartX.current = 'touches' in e ? e.touches[0].clientX : e.clientX;
-      resizeStartWidth.current = useSidebarWidthStore.getState().widthPx;
-      const onMove = (ev: MouseEvent | TouchEvent) => {
-        if (!resizeDragging.current) return;
-        const clientX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX;
-        // Handle is on the right edge: dragging right widens the sidebar.
-        setSidebarWidth(resizeStartWidth.current + (clientX - resizeStartX.current));
-      };
-      const cleanup = () => {
-        resizeDragging.current = false;
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-        document.removeEventListener('touchmove', onMove);
-        document.removeEventListener('touchend', onUp);
-        resizeCleanupRef.current = null;
-      };
-      const onUp = () => cleanup();
-      resizeCleanupRef.current = cleanup;
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
-      document.addEventListener('touchmove', onMove);
-      document.addEventListener('touchend', onUp);
-    },
-    [setSidebarWidth]
-  );
-  // Keyboard resize: the handle sits on the right edge, so ArrowRight widens
-  // the sidebar and ArrowLeft narrows it — same direction as dragging the
-  // handle. Reuses the store's setWidth, which applies the same clamp as drag.
-  const onResizeKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        setSidebarWidth(useSidebarWidthStore.getState().widthPx + RESIZE_KEY_STEP_PX);
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        setSidebarWidth(useSidebarWidthStore.getState().widthPx - RESIZE_KEY_STEP_PX);
-      }
-    },
-    [setSidebarWidth]
-  );
-  const [expandedWorktrees, setExpandedWorktrees] = useState<Set<string>>(new Set());
-  const [regularSessionsCollapsed, setRegularSessionsCollapsed] = useState<Set<string>>(new Set());
-  const [worktreesByProject, setWorktreesByProject] = useState<Map<string, GitWorktree[]>>(
-    new Map()
-  );
+  const { sidebarWidth, onResizeStart, onResizeKeyDown } = useSidebarResize();
 
-  // Fetch agent readiness whenever the connection is established.
-  useEffect(() => {
-    if (isConnected) void refreshReadiness();
-  }, [isConnected, refreshReadiness]);
-
-  // Default the new-project backend to the first online backend when the form opens.
-  useEffect(() => {
-    if (showNewProjectForm && !newProjectBackendId && onlineBackends.length > 0) {
-      setNewProjectBackendId(onlineBackends[0].backendId);
-    }
-  }, [showNewProjectForm, newProjectBackendId, onlineBackends]);
+  // Worktree grouping + removal flows for the project tree.
+  const {
+    worktreesByProject,
+    expandedWorktrees,
+    toggleWorktree,
+    regularSessionsCollapsed,
+    toggleRegularSessions,
+    handleDeleteWorktree,
+  } = useProjectWorktrees({
+    expandedProjects,
+    selectedSessionId,
+    visibleSessions,
+    visibleProjects,
+    sessionsByProject,
+  });
 
   // Focus the search input when the desktop search popover opens.
   useEffect(() => {
@@ -315,15 +241,6 @@ export function Sidebar({
     const id = setTimeout(() => search.searchInputRef.current?.focus(), 0);
     return () => clearTimeout(id);
   }, [searchOpen, search.searchInputRef]);
-
-  const refreshProjectWorktrees = useCallback(async (projectId: string) => {
-    try {
-      const worktrees = await api.getProjectWorktrees(projectId);
-      setWorktreesByProject(prev => new Map(prev).set(projectId, worktrees));
-    } catch {
-      setWorktreesByProject(prev => new Map(prev).set(projectId, []));
-    }
-  }, []);
 
   // --- Agent profile dropdown source ---
   // Lazily load agent profiles for the new-session dropdown.
@@ -338,15 +255,6 @@ export function Sidebar({
   }, [agentLoaded, agentLoading, loadAllAgents]);
   // Exclude read-only agents — they're frozen and not selectable for new sessions.
   const agents = Object.values(agentProfiles).filter(a => a.status !== 'readonly');
-  const allProjects = useProjectStore(s => s.projects);
-  const newSessionProject = newSessionRequest?.projectId
-    ? (allProjects.find(p => p.id === newSessionRequest.projectId) ?? null)
-    : null;
-
-  const showAgentRequiredDialog = useCallback((reason: AgentReadinessReason | undefined) => {
-    setAgentDialogReason(reason);
-    setAgentDialogOpen(true);
-  }, []);
 
   // --- Actions ---
   const actions = useSidebarActions({
@@ -371,92 +279,14 @@ export function Sidebar({
     setContextMenuProject,
     newProjectName,
     newProjectRootPath,
-    newSessionName,
-    newSessionAgentProfileId,
-    onAgentNotReady: details => {
-      showAgentRequiredDialog(agentReadinessReasonFromDetails(details));
-      void refreshReadiness();
-    },
+    newSessionName: newSession.name,
+    newSessionAgentProfileId: newSession.agentProfileId,
+    onAgentNotReady: handleAgentNotReady,
   });
 
   const settingsProject = settingsProjectId
     ? visibleProjects.find(p => p.id === settingsProjectId) || null
     : null;
-
-  // --- Worktree logic ---
-  useEffect(() => {
-    for (const projectId of expandedProjects) {
-      if (!worktreesByProject.has(projectId)) {
-        refreshProjectWorktrees(projectId).catch(() => {});
-      }
-    }
-  }, [expandedProjects, worktreesByProject, refreshProjectWorktrees]);
-
-  const getWorktreeGroupsForProject = useCallback(
-    (projectId: string): WorktreeGroup[] => {
-      const projectSessions = sessionsByProject.get(projectId) || [];
-      const project = visibleProjects.find(p => p.id === projectId);
-      const worktrees = worktreesByProject.get(projectId) || [];
-      return groupSessionsByWorktreeFn(projectSessions, project?.rootPath, worktrees);
-    },
-    [sessionsByProject, visibleProjects, worktreesByProject]
-  );
-
-  const toggleWorktree = useCallback((key: string) => {
-    setExpandedWorktrees(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!selectedSessionId) return;
-    const session = visibleSessions.find(s => s.id === selectedSessionId);
-    if (!session) return;
-    const groups = getWorktreeGroupsForProject(session.projectId);
-    if (groups.length === 0) return;
-    for (const group of groups) {
-      if (group.sessions.some(s => s.id === selectedSessionId)) {
-        const wtKey = `${session.projectId}:${group.key}`;
-        setExpandedWorktrees(prev => {
-          if (prev.has(wtKey)) return prev;
-          return new Set(prev).add(wtKey);
-        });
-        break;
-      }
-    }
-  }, [selectedSessionId, visibleSessions, getWorktreeGroupsForProject]);
-
-  const toggleRegularSessions = useCallback((projectId: string) => {
-    setRegularSessionsCollapsed(prev => {
-      const next = new Set(prev);
-      if (next.has(projectId)) next.delete(projectId);
-      else next.add(projectId);
-      return next;
-    });
-  }, []);
-
-  const handleDeleteWorktree = useCallback(
-    async (projectId: string, worktreePath: string, branchName?: string) => {
-      const label = branchName || worktreePath;
-      const confirmed = await confirm({
-        title: 'Remove worktree?',
-        message: `This deletes the directory at "${worktreePath}" and the local branch "${label}". This cannot be undone.`,
-        confirmLabel: 'Remove',
-        destructive: true,
-      });
-      if (!confirmed) return;
-
-      const result = await runWithToast(`Remove worktree '${label}'`, projectId, () =>
-        api.deleteProjectWorktree(projectId, worktreePath)
-      );
-      if (result === null) return;
-      await refreshProjectWorktrees(projectId);
-    },
-    [refreshProjectWorktrees]
-  );
 
   const toggleProject = (projectId: string) => {
     const newExpanded = new Set(expandedProjects);
@@ -471,91 +301,13 @@ export function Sidebar({
   const openContextMenu = (e: React.MouseEvent, _type: 'project', id: string) => {
     e.stopPropagation();
     // Anchor to the trigger, not the click point — the menu should hang off the
-    // row like a standard dropdown. Vertically it drops below the button; the
-    // ⋯ button isn't the row's rightmost element (a "+" sits after it), so
-    // right-align to the row's edge instead so the menu is flush, not inset.
+    // row like a standard dropdown (see computeContextMenuPosition for the
+    // flip/clamp rules).
     const btn = e.currentTarget.getBoundingClientRect();
     const row = (e.currentTarget.parentElement ?? e.currentTarget).getBoundingClientRect();
-    const menuWidth = isMobile ? 176 : 144;
-    const menuHeight = isMobile ? 104 : 60;
-    const viewportW = window.innerWidth;
-    const viewportH = window.innerHeight;
-    const margin = 8;
-
-    let top = btn.bottom + 4;
-    if (top + menuHeight > viewportH - margin) {
-      top = btn.top - menuHeight - 4;
-    }
-    top = Math.max(margin, Math.min(top, viewportH - menuHeight - margin));
-
-    let left = row.right - menuWidth;
-    left = Math.max(margin, Math.min(left, viewportW - menuWidth - margin));
-
-    setContextMenuPos({ top, left });
+    setContextMenuPos(computeContextMenuPosition(btn, row, isMobile));
     setContextMenuProject(contextMenuProject === id ? null : id);
   };
-
-  // Mobile drawer is a modal dialog: move focus into it on open so keyboard
-  // and screen-reader users land inside instead of on whatever was focused
-  // behind the (still-mounted) app.
-  useEffect(() => {
-    if (isMobile && isOpen) {
-      mobileDrawerPanelRef.current?.focus();
-    }
-  }, [isMobile, isOpen, mobileDrawerPanelRef]);
-
-  // Escape closes the drawer; Tab/Shift+Tab is trapped within the panel so
-  // keyboard focus can't leak out to the visually-hidden app behind the scrim.
-  const handleDrawerKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose?.();
-        return;
-      }
-      if (e.key !== 'Tab') return;
-      const focusable = mobileDrawerPanelRef.current?.querySelectorAll<HTMLElement>(
-        'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
-      );
-      if (!focusable || focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else if (document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    },
-    [onClose, mobileDrawerPanelRef]
-  );
-
-  // Returns true if creation may proceed; otherwise opens the guidance dialog.
-  // Refresh when readiness is unknown or currently unusable so first-load/null
-  // readiness cannot fail open, while known-good state keeps the UI instant.
-  const ensureAgentGate = useCallback(async (): Promise<boolean> => {
-    await refreshReadiness();
-    const latest = useAgentReadinessStore.getState().readiness;
-    if (latest?.usable !== false) return true;
-    showAgentRequiredDialog(latest.reason);
-    return false;
-  }, [refreshReadiness, showAgentRequiredDialog]);
-
-  const runAfterAgentGate = useCallback(
-    (action: () => void | Promise<void>, options?: { forceRefresh?: boolean }) => {
-      if (!options?.forceRefresh && useAgentReadinessStore.getState().readiness?.usable === true) {
-        void action();
-        return;
-      }
-      void ensureAgentGate().then(ok => {
-        if (ok) void action();
-      });
-    },
-    [ensureAgentGate]
-  );
 
   // Home-page quick actions: the Sidebar owns the new-session modal and the
   // inline new-project form, so Home requests them through the bridge store.
@@ -631,12 +383,11 @@ export function Sidebar({
     </SortableList>
   );
 
-  const noBackendsMessage = (() => {
-    if (isMobile && !directGatewayUrl) return 'Gateway not configured';
-    if (isMobile && !isMobileGatewayConnected(facadeConnectionState))
-      return 'Connecting to gateway...';
-    return 'No backends online';
-  })();
+  const noBackendsMessage = getNoBackendsMessage({
+    isMobile,
+    directGatewayUrl,
+    facadeConnectionState,
+  });
 
   const renderProjectList = () => (
     <>
@@ -689,90 +440,29 @@ export function Sidebar({
   );
 
   const renderPortaledModals = () => (
-    <>
-      {!!settingsProjectId &&
-        createPortal(
-          <ProjectSettings
-            project={settingsProject}
-            isOpen={!!settingsProjectId}
-            onClose={() => setSettingsProjectId(null)}
-          />,
-          document.body
-        )}
-      {agentDialogOpen &&
-        createPortal(
-          <AgentRequiredDialog
-            open={agentDialogOpen}
-            reason={agentDialogReason}
-            onClose={() => setAgentDialogOpen(false)}
-            onConfigure={destination => {
-              setAgentDialogOpen(false);
-              // Every readiness destination lives in the Agents shell mode now
-              // (providers deep-link included) — no settings fallback.
-              useTopLevelViewStore.getState().openAgents(destination.tab);
-            }}
-          />,
-          document.body
-        )}
-      {createPortal(<PluginPermissionDialog />, document.body)}
-      {newSessionRequest && (
-        <NewSessionModal
-          open
-          onClose={() => {
-            setNewSessionRequest(null);
-            setNewSessionName('');
-            setNewSessionAgentProfileId('');
-          }}
-          project={newSessionProject}
-          projects={allProjects.filter(p => !p.isInternal)}
-          showProjectPicker={newSessionRequest.pickerEnabled}
-          onProjectChange={projectId => {
-            setNewSessionRequest(r => (r ? { ...r, projectId } : r));
-          }}
-          agents={agents}
-          name={newSessionName}
-          onNameChange={setNewSessionName}
-          agentProfileId={newSessionAgentProfileId}
-          onAgentProfileIdChange={setNewSessionAgentProfileId}
-          onCreate={() => {
-            if (!newSessionProject) return;
-            runAfterAgentGate(() => actions.handleCreateSession(newSessionProject.id), {
-              forceRefresh: true,
-            });
-          }}
-          isConnected={isConnected}
-          isMobile={isMobile}
-        />
-      )}
-      {showNewProjectForm && (
-        <NewProjectModal
-          open
-          onClose={() => {
-            setShowNewProjectForm(false);
-            setNewProjectName('');
-            setNewProjectRootPath('');
-            setNewProjectBackendId(null);
-          }}
-          name={newProjectName}
-          onNameChange={setNewProjectName}
-          rootPath={newProjectRootPath}
-          onRootPathChange={setNewProjectRootPath}
-          onCreate={agentProfileId =>
-            actions.handleCreateProject(newProjectBackendId, agentProfileId)
-          }
-          creatingProject={creatingProject}
-          isConnected={isConnected}
-          isMobile={isMobile}
-          backends={onlineBackends.map(b => ({
-            backendId: b.backendId,
-            name: b.name,
-            online: b.online,
-          }))}
-          selectedBackendId={newProjectBackendId}
-          onSelectedBackendIdChange={setNewProjectBackendId}
-        />
-      )}
-    </>
+    <SidebarPortaledModals
+      settingsProjectId={settingsProjectId}
+      settingsProject={settingsProject}
+      onClearSettingsProject={() => setSettingsProjectId(null)}
+      agentDialogOpen={agentDialogOpen}
+      agentDialogReason={agentDialogReason}
+      onCloseAgentDialog={() => setAgentDialogOpen(false)}
+      newSession={newSession}
+      agents={agents}
+      runAfterAgentGate={runAfterAgentGate}
+      onCreateSession={actions.handleCreateSession}
+      newProject={newProject}
+      onCreateProject={agentProfileId =>
+        actions.handleCreateProject(newProjectBackendId, agentProfileId)
+      }
+      backends={onlineBackends.map(b => ({
+        backendId: b.backendId,
+        name: b.name,
+        online: b.online,
+      }))}
+      isConnected={isConnected}
+      isMobile={isMobile}
+    />
   );
 
   // Mobile: keep the overlay drawer mounted offscreen so an opening drag can
@@ -835,15 +525,11 @@ export function Sidebar({
               onClose?.();
             }}
             isClaudiaActive={isClaudiaExpanded}
-            claudiaStatus={
-              hasClaudiaPermissionPending
-                ? 'permission'
-                : hasClaudiaUnread
-                  ? 'unread'
-                  : hasClaudiaRunning
-                    ? 'running'
-                    : null
-            }
+            claudiaStatus={claudiaSidebarStatus({
+              hasPermissionPending: hasClaudiaPermissionPending,
+              hasUnread: hasClaudiaUnread,
+              hasRunning: hasClaudiaRunning,
+            })}
             onOpenAutomations={
               onOpenAutomations
                 ? () => {
@@ -994,15 +680,11 @@ export function Sidebar({
             isHomeActive={isHomeActive}
             onOpenClaudia={() => useTopLevelViewStore.getState().openClaudia()}
             isClaudiaActive={isClaudiaExpanded || topLevelViewKind === 'claudia'}
-            claudiaStatus={
-              hasClaudiaPermissionPending
-                ? 'permission'
-                : hasClaudiaUnread
-                  ? 'unread'
-                  : hasClaudiaRunning
-                    ? 'running'
-                    : null
-            }
+            claudiaStatus={claudiaSidebarStatus({
+              hasPermissionPending: hasClaudiaPermissionPending,
+              hasUnread: hasClaudiaUnread,
+              hasRunning: hasClaudiaRunning,
+            })}
             onOpenAutomations={onOpenAutomations}
             automationMode={
               automationMode
