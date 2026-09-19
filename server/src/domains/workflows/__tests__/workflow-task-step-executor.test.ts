@@ -5,7 +5,7 @@ import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../tasks/repository.js';
 import { TaskService } from '../../tasks/task-service.js';
 import { TaskExecutorRegistry } from '../../tasks/executors/registry.js';
-import type { TaskExecutor } from '../../tasks/executors/types.js';
+import type { TaskExecutor } from '../../../utils/task-executor-types.js';
 import { TaskWorkflowStepExecutor } from '../step-executors/task-executor.js';
 
 describe('TaskWorkflowStepExecutor', () => {

@@ -5,7 +5,7 @@ import type { TaskRecord, TaskStatus } from '@zclaudia/shared/core/task';
 
 import { type TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
-import type { TaskExecutorUpdate } from '../../../domains/tasks/executors/types.js';
+import type { TaskExecutorUpdate } from '../../../utils/task-executor-types.js';
 import { killProcessTree } from './bash-runner.js';
 import { pidAlive, resolveDataDir } from '../../../domains/tasks/executors/command-executor.js';
 import * as sandbox from './sandbox.js';

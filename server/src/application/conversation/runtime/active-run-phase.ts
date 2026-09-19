@@ -3,69 +3,19 @@
  * `completed: boolean` + `pendingPermissions.size > 0` + `abortController.aborted`
  * + `pendingBackgroundTasks > 0` checks with a single explicit field.
  *
+ * The pure phase vocabulary (RunPhase, isTerminalPhase, isValidTransition)
+ * lives in utils/run-phase.ts so lower layers can share it; re-exported here
+ * for existing consumers.
+ *
  * Transitions are validated. In development NODE_ENV, invalid transitions
  * throw so test runs catch state-machine bugs early. In production they
  * warn and refuse the transition (a partially-shut-down run shouldn't
  * crash the process).
  */
-export type RunPhase =
-  | 'running' // active turn: agent emitting deltas / tool calls
-  | 'awaiting_permission' // permission request enqueued, waiting for user
-  | 'awaiting_followup' // pendingBackgroundTasks > 0, pi will emit follow-up
-  | 'cancelling' // user abort triggered, cleanup pending
-  | 'finalizing' // final assistant snapshot is being persisted/published
-  | 'completed' // terminal: normal completion (success)
-  | 'cancelled' // terminal: user-initiated cancel, cleanup OK
-  | 'failed'; // terminal: error termination (provider / runtime / cleanup-itself-errored)
+import { isTerminalPhase, isValidTransition, type RunPhase } from '../../../utils/run-phase.js';
 
-export const TERMINAL_PHASES: ReadonlySet<RunPhase> = new Set(['completed', 'cancelled', 'failed']);
-
-export function isTerminalPhase(p: RunPhase): boolean {
-  return TERMINAL_PHASES.has(p);
-}
-
-/**
- * Valid transitions table. Design:
- * - 'running' is the hub (can go to any other phase)
- * - awaiting_* states can return to running, swap, or terminate
- * - 'cancelling' only goes to 'cancelled' (normal) or 'failed' (cleanup errored)
- * - terminal states are sinks
- */
-const VALID_TRANSITIONS: Record<RunPhase, ReadonlyArray<RunPhase>> = {
-  running: [
-    'awaiting_permission',
-    'awaiting_followup',
-    'cancelling',
-    'finalizing',
-    'completed',
-    'failed',
-  ],
-  awaiting_permission: [
-    'running',
-    'awaiting_followup',
-    'cancelling',
-    'finalizing',
-    'completed',
-    'failed',
-  ],
-  awaiting_followup: [
-    'running',
-    'awaiting_permission',
-    'cancelling',
-    'finalizing',
-    'completed',
-    'failed',
-  ],
-  cancelling: ['cancelled', 'failed'],
-  finalizing: ['completed', 'failed'],
-  completed: [],
-  cancelled: [],
-  failed: [],
-};
-
-export function isValidTransition(from: RunPhase, to: RunPhase): boolean {
-  return VALID_TRANSITIONS[from].includes(to);
-}
+export { isTerminalPhase, isValidTransition, TERMINAL_PHASES } from '../../../utils/run-phase.js';
+export type { RunPhase } from '../../../utils/run-phase.js';
 
 type PhaseListener = (next: RunPhase, prev: RunPhase) => void;
 

@@ -4,7 +4,7 @@ import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permi
 
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
-import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
+import type { TaskExecutor } from '../../../utils/task-executor-types.js';
 import {
   agentToolParameters,
   errorResult,

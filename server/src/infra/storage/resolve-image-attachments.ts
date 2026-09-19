@@ -1,5 +1,5 @@
 import type { MessageAttachment } from '@zclaudia/shared/core/message';
-import type { StoredFile } from '../../../infra/storage/fileStore.js';
+import type { StoredFile } from './fileStore.js';
 
 /** Minimal interface consumed by resolveImageAttachments — satisfied by FileStore. */
 export interface ImageFileSource {

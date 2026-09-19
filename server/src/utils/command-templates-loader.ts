@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import matter from 'gray-matter';
-import { loadSourcedPromptTemplates, type PromptTemplate } from '@earendil-works/pi-agent-core';
-import type { ExecutionEnv } from '../../infra/execution-env.js';
+import {
+  loadSourcedPromptTemplates,
+  type ExecutionEnv,
+  type PromptTemplate,
+} from '@earendil-works/pi-agent-core';
 
 /** Where a discovered command template came from. App-defined; pi treats it opaquely. */
 export type CommandSource = 'user' | 'project' | 'plugin';

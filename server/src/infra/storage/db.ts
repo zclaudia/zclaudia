@@ -3,8 +3,7 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 import { migrations, applyPendingMigrations } from './migrations/index.js';
-import { ensureDefaultAgentProfile } from '../../domains/agent-profiles/ensure-default-agent-profile.js';
-import { backfillProtectedMcpOAuthCredentials } from '../services/mcp-oauth-credential-protector.js';
+import { backfillProtectedMcpOAuthCredentials } from '../../utils/mcp-oauth-credential-protector.js';
 import { withDevAutoReset } from './dev-db-recovery.js';
 
 const DEFAULT_DB_DIR = process.env.ZCLAUDIA_DATA_DIR
@@ -29,11 +28,6 @@ export function initDatabase(dbDir: string = DEFAULT_DB_DIR): Database.Database 
     prepare: prepareSchema,
     close: closeForReset,
   });
-
-  // Seed the default agent profile (no-op if one already exists, or if no
-  // LlmProfile exists yet — in which case the user will need to create one
-  // before they can spawn sessions).
-  ensureDefaultAgentProfile(db);
 
   return db;
 }

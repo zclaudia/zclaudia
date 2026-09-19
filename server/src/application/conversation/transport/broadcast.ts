@@ -5,7 +5,7 @@ import type {
   RunHealthStatus,
 } from '@zclaudia/shared/wire/messages';
 import { resolvePluginPlatform } from '@zclaudia/shared/plugin-types';
-import { detectLoop } from '../../../loop-detection.js';
+import { detectLoop } from '../../../utils/loop-detection.js';
 import { pluginLoader } from '../../../application/plugins/index.js';
 import {
   permissionManager as pluginPermissionManager,

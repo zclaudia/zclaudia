@@ -20,7 +20,7 @@ import {
 } from './llm-profile-deletion-service.js';
 import { fetchModelsForProfile } from './models-fetch.js';
 import { probeModel } from './models-probe.js';
-import { resolveContextWindow } from '../../application/conversation/compaction/context-windows.js';
+import { resolveContextWindow } from '../../infra/providers/pi-runtime/context-windows.js';
 
 const VALID_PROVIDER_TYPES: readonly string[] = LLM_PROVIDER_TYPES;
 const VALID_MODEL_DIALECTS: readonly string[] = LLM_MODEL_DIALECTS;

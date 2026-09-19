@@ -1,12 +1,12 @@
 import * as path from 'path';
 import * as os from 'os';
 import type { SlashCommand } from '@zclaudia/shared/features/commands';
-import { type ExecutionEnv } from '../infra/execution-env.js';
+import type { ExecutionEnv } from '@earendil-works/pi-agent-core';
 import {
   loadAllCommandTemplates,
   type CommandTemplateLoadInput,
   type SourcedPromptTemplate,
-} from '../application/plugins/command-templates-loader.js';
+} from './command-templates-loader.js';
 
 /**
  * Scans for slash command templates across three sources:

@@ -4,7 +4,7 @@ import type {
   McpOAuthCredentials,
   McpServerConfig,
 } from '@zclaudia/shared/core/mcp';
-import { discoverMcpOAuthConfig } from './mcp-oauth-discovery.js';
+import { discoverMcpOAuthConfig } from '../../utils/mcp-oauth-discovery.js';
 
 export type McpOAuthStartResult =
   | { sessionId: string; method: 'browser'; authUrl: string; expiresAt: number }

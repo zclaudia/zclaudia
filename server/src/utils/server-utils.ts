@@ -1,5 +1,5 @@
 import * as path from 'path';
-import type { SystemInfo } from '../infra/providers/types.js';
+import type { SystemInfo } from '@zclaudia/shared/providers';
 
 // Commands that can be handled using system info from init message
 export const SYSTEM_INFO_COMMANDS = ['/status'];

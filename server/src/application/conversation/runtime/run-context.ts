@@ -6,7 +6,7 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import { builtinAgentPluginForRuntime } from '@zclaudia/shared/plugins/builtin-agents';
 import type { ToolName } from '@zclaudia/shared/core/tools';
-import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
+import type { TaskExecutor } from '../../../utils/task-executor-types.js';
 import {
   buildSkillDirectoryHint,
   toolRegistry as pluginToolRegistry,

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { createAutomationRoutes } from '../automations.js';
+import { createAutomationRoutes } from '../routes.js';
 
 function svcStub() {
   const created: any[] = [];

@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { resolveDataDir } from '../domains/tasks/executors/command-executor.js';
+import { resolveDataDir } from './data-dir.js';
 
 /** Per-project memory directory: <dataDir>/memory/<projectId> */
 export function resolveProjectMemoryDir(projectId: string): string {

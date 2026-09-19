@@ -5,7 +5,7 @@ import Database from 'better-sqlite3';
 import { createMcpServerRoutes } from '../mcp-servers.js';
 import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
 import { mcpInventoryCache } from '../../../utils/mcp-inventory-cache.js';
-import { unprotectMcpOAuthCredentials } from '../../../infra/services/mcp-oauth-credential-protector.js';
+import { unprotectMcpOAuthCredentials } from '../../../utils/mcp-oauth-credential-protector.js';
 
 describe('mcp-servers routes', () => {
   let app: express.Express;

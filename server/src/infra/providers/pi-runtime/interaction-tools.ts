@@ -4,7 +4,7 @@ import {
   MAX_TODO_CONTENT_CHARS,
   MAX_TODO_ITEMS,
   validateTodoItems,
-} from '../../../application/conversation/interactions/todo-normalizer.js';
+} from '../../../utils/todo-normalizer.js';
 import type { PermissionCallback } from '../types.js';
 import {
   agentToolParameters,

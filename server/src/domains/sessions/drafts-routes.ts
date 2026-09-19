@@ -5,7 +5,7 @@ import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { SessionDraft } from '@zclaudia/shared/core/session';
 import { SessionDraftRepository } from './draft-repository.js';
 import { SessionRepository } from './repository.js';
-import { sendApiError } from '../../interfaces/http/response.js';
+import { sendApiError } from '../../utils/http-response.js';
 
 export function createSessionDraftRoutes(db: Database.Database): Router {
   const router = Router();

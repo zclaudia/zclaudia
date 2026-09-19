@@ -9,7 +9,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import { systemTaskRegistry } from './system-task-registry.js';
+import { systemTaskRegistry } from '../../infra/services/system-task-registry.js';
 
 const WORKSPACE_DIR = process.env.ZCLAUDIA_DATA_DIR
   ? path.resolve(process.env.ZCLAUDIA_DATA_DIR, 'workspace')

@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { newId } from '../../utils/uuid.js';
-import { systemTaskRegistry } from '../../application/services/system-task-registry.js';
+import { systemTaskRegistry } from '../services/system-task-registry.js';
 import { resolveEnvCredential } from './env-credential.js';
 
 let tempFileCleanupTimer: ReturnType<typeof setInterval> | null = null;

@@ -8,7 +8,7 @@ import {
   type StreamFn,
 } from '@earendil-works/pi-agent-core';
 import type { ProviderRuntimeEvent, RunOptions } from '../types.js';
-import { CodexOAuthError } from '../../../domains/llm-profiles/codex-oauth-errors.js';
+import { CodexOAuthError } from '../../../utils/codex-oauth-errors.js';
 import type { AgentHooksOutput } from './agent-hooks.js';
 import { AsyncQueue } from './async-queue.js';
 import type { BuiltModel } from './build-model.js';

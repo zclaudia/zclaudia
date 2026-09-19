@@ -4,7 +4,7 @@ import { existsSync, statSync } from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { persistSessionSandboxDomain } from '../../../application/conversation/agent/permission-memory.js';
+import { persistSessionSandboxDomain } from './sandbox-network-memory.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
 import {

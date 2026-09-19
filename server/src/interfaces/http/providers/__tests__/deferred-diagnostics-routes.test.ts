@@ -2,7 +2,7 @@ import express from 'express';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 import { createDeferredDiagnosticsRoutes } from '../deferred-diagnostics-routes.js';
-import { scheduleDeferredDiagnostics } from '../write-lifecycle.js';
+import { scheduleDeferredDiagnostics } from '../../../../infra/providers/pi-runtime/write-lifecycle.js';
 
 describe('deferred diagnostics routes', () => {
   it('returns completed deferred diagnostics by id', async () => {

@@ -4,7 +4,7 @@ import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
 import { buildModel, modelEntryFor } from '../../../infra/providers/pi-runtime/build-model.js';
-import type { ResolvedImage } from './resolve-image-attachments.js';
+import type { ResolvedImage } from '../../../infra/storage/resolve-image-attachments.js';
 
 export interface MultimodalFallbackResolution {
   agentProfile: AgentProfileConfig;

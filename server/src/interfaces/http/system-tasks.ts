@@ -5,7 +5,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { SystemTaskInfo } from '@zclaudia/shared/features/system-tasks';
-import { systemTaskRegistry } from '../../application/services/system-task-registry.js';
+import { systemTaskRegistry } from '../../infra/services/system-task-registry.js';
 
 export function createSystemTaskRoutes(): Router {
   const router = Router();

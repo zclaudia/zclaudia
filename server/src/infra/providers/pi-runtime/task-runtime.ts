@@ -1,6 +1,6 @@
 import type { TaskRecord } from '@zclaudia/shared/core/task';
 
-import type { TaskExecutorUpdate } from '../../../domains/tasks/executors/types.js';
+import type { TaskExecutorUpdate } from '../../../utils/task-executor-types.js';
 import type { ToolContent } from './tool-common.js';
 
 export type TaskToolResult = {

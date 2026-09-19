@@ -15,7 +15,11 @@ import { newId } from '../../../utils/uuid.js';
 import http from 'http';
 import { toolRegistry } from '../../../application/plugins/index.js';
 import { interactionDispatcher } from './interaction-dispatcher.js';
-import { MAX_TODO_CONTENT_CHARS, MAX_TODO_ITEMS, validateTodoItems } from './todo-normalizer.js';
+import {
+  MAX_TODO_CONTENT_CHARS,
+  MAX_TODO_ITEMS,
+  validateTodoItems,
+} from '../../../utils/todo-normalizer.js';
 import { trackAndAutoComplete } from './todo-state-tracker.js';
 import type {
   TodoUpdateInteractionMessage,

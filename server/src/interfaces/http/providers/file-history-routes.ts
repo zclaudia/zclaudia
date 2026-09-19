@@ -1,5 +1,8 @@
 import { Router, type Request, type Response } from 'express';
-import { getFileBackup, restoreFileBackup } from './file-history.js';
+import {
+  getFileBackup,
+  restoreFileBackup,
+} from '../../../infra/providers/pi-runtime/file-history.js';
 
 export function createFileHistoryRoutes(): Router {
   const router = Router();

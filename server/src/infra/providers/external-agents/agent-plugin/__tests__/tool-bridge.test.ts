@@ -27,7 +27,7 @@ describe('agent plugin tool bridge', () => {
       zclaudiaSessionId: 'session-1',
     });
 
-    expect(buildMcpBridgeEntryMock).toHaveBeenCalledWith(3100, 'session-1');
+    expect(buildMcpBridgeEntryMock).toHaveBeenCalledWith(3100, 'session-1', undefined, []);
     expect(entry).toEqual({
       command: 'node',
       args: ['mcp-bridge.js'],

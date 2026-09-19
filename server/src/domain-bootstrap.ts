@@ -9,68 +9,68 @@ import type Database from 'better-sqlite3';
 import type { WebSocket } from 'ws';
 import { join } from 'node:path';
 import type { SessionType } from '@zclaudia/shared/core/session';
-import type { initDatabase } from '../infra/storage/db.js';
-import { serverState } from '../server-state.js';
-import { resolveDataDir } from '../utils/data-dir.js';
-import type { RunStartMessage } from './conversation/runtime/run-bootstrap.js';
-import type { RunStartHandler } from '../server-setup.js';
-import { createFilesRoutes } from '../interfaces/http/files.js';
-import { createCommandsRoutes } from '../interfaces/http/commands.js';
-import { createAgentRoutes } from '../interfaces/http/agent.js';
-import { createClaudiaRoutes } from '../interfaces/http/claudia.js';
-import { createDelegationRoutes } from '../interfaces/http/delegation.js';
-import type { NotificationService } from '../domains/notification-feed/index.js';
-import type { ProcessSupervisor } from '../infra/services/process-supervisor.js';
-import { systemTaskRegistry } from '../application/services/system-task-registry.js';
-import type { SupervisorService } from '../domains/supervision/index.js';
-import type { NotificationSender } from '../infra/push/notification-sender.js';
-import { registerInteractionTools } from '../application/conversation/interactions/interaction-tools.js';
-import { registerAgentTools } from '../application/conversation/agent-tools/index.js';
-import { pluginEvents } from '../infra/events/index.js';
-import { localOnlyMiddleware } from '../interfaces/http/middleware/local-only.js';
-import { sendMessage } from '../application/conversation/transport/broadcast.js';
-import { getNextOffset } from '../application/conversation/runtime/run-lifecycle.js';
+import type { initDatabase } from './infra/storage/db.js';
+import { serverState } from './server-state.js';
+import { resolveDataDir } from './utils/data-dir.js';
+import type { RunStartMessage } from './application/conversation/runtime/run-bootstrap.js';
+import type { RunStartHandler } from './server-setup.js';
+import { createFilesRoutes } from './interfaces/http/files.js';
+import { createCommandsRoutes } from './interfaces/http/commands.js';
+import { createAgentRoutes } from './interfaces/http/agent.js';
+import { createClaudiaRoutes } from './interfaces/http/claudia.js';
+import { createDelegationRoutes } from './interfaces/http/delegation.js';
+import type { NotificationService } from './domains/notification-feed/index.js';
+import type { ProcessSupervisor } from './infra/services/process-supervisor.js';
+import { systemTaskRegistry } from './infra/services/system-task-registry.js';
+import type { SupervisorService } from './domains/supervision/index.js';
+import type { NotificationSender } from './infra/push/notification-sender.js';
+import { registerInteractionTools } from './application/conversation/interactions/interaction-tools.js';
+import { registerAgentTools } from './application/conversation/agent-tools/index.js';
+import { pluginEvents } from './infra/events/index.js';
+import { localOnlyMiddleware } from './interfaces/http/middleware/local-only.js';
+import { sendMessage } from './application/conversation/transport/broadcast.js';
+import { getNextOffset } from './application/conversation/runtime/run-lifecycle.js';
 import {
   createVirtualClient,
   type ConnectedClient,
   type ActiveRun,
-} from '../application/conversation/transport/types.js';
-import { registerInteractionDomain } from '../application/conversation/interactions/register.js';
-import type { GatewayState } from '../infra/gateway/gateway-state.js';
-import { createDomainPorts } from './bootstrap/domain-ports.js';
-import { registerFeatureDomains } from './bootstrap/feature-domains.js';
-import { recordActivity } from './conversation/memory/activity-log.js';
-import { compactionCircuitBreaker } from './conversation/compaction/circuit-breaker.js';
-import { registerPlatformRoutes } from './bootstrap/platform-routes.js';
-import { TaskExecutorRegistry } from '../domains/tasks/executors/registry.js';
-import { AgentTaskExecutor } from '../domains/tasks/executors/agent-executor.js';
-import { CommandTaskExecutor } from '../domains/tasks/executors/command-executor.js';
-import { reconcileUnresumableTasks } from '../domains/tasks/executors/reconcile-stale-tasks.js';
-import { TaskRepository } from '../domains/tasks/repository.js';
-import { createAgentTaskRunner } from './orchestration/agent-task-runner.js';
-import { SessionRepository } from '../domains/sessions/index.js';
-import type { TaskExecutor } from '../domains/tasks/executors/types.js';
-import type { AgentTaskRunnerDeps } from './orchestration/agent-task-runner.js';
-import type { PermissionBridge } from './conversation/agent/permission-bridge.js';
-import type { PermissionWorkflowResolver } from '../domains/workflows/index.js';
-import type { MetaWorkflowService } from '../domains/meta-workflow/service.js';
-import { ensureSandboxInitialized } from '../infra/providers/pi-runtime/sandbox.js';
-import { EvalTaskRuntime } from '../infra/providers/pi-runtime/eval-task-runtime.js';
+} from './application/conversation/transport/types.js';
+import { registerInteractionDomain } from './application/conversation/interactions/register.js';
+import type { GatewayState } from './infra/gateway/gateway-state.js';
+import { createDomainPorts } from './application/bootstrap/domain-ports.js';
+import { registerFeatureDomains } from './feature-domains.js';
+import { recordActivity } from './application/conversation/memory/activity-log.js';
+import { compactionCircuitBreaker } from './application/conversation/compaction/circuit-breaker.js';
+import { registerPlatformRoutes } from './platform-routes.js';
+import { TaskExecutorRegistry } from './domains/tasks/executors/registry.js';
+import { AgentTaskExecutor } from './domains/tasks/executors/agent-executor.js';
+import { CommandTaskExecutor } from './domains/tasks/executors/command-executor.js';
+import { reconcileUnresumableTasks } from './domains/tasks/executors/reconcile-stale-tasks.js';
+import { TaskRepository } from './domains/tasks/repository.js';
+import { createAgentTaskRunner } from './application/orchestration/agent-task-runner.js';
+import { SessionRepository } from './domains/sessions/index.js';
+import type { TaskExecutor } from './utils/task-executor-types.js';
+import type { AgentTaskRunnerDeps } from './application/orchestration/agent-task-runner.js';
+import type { PermissionBridge } from './application/conversation/agent/permission-bridge.js';
+import type { PermissionWorkflowResolver } from './domains/workflows/index.js';
+import type { MetaWorkflowService } from './domains/meta-workflow/service.js';
+import { ensureSandboxInitialized } from './infra/providers/pi-runtime/sandbox.js';
+import { EvalTaskRuntime } from './infra/providers/pi-runtime/eval-task-runtime.js';
 import {
   GoalRepository,
   GoalService,
   GoalEvaluator,
   GoalCoordinator,
   recoverActiveGoals,
-} from '../domains/goals/index.js';
-import type { GoalEventPublisher } from '../domains/goals/types.js';
-import { createGoalRoutes } from '../domains/goals/routes.js';
-import { AnthropicEvaluatorPort } from '../domains/goals/ports/anthropic-evaluator-port.js';
-import { SqliteTranscriptPort } from '../domains/goals/ports/sqlite-transcript-port.js';
+} from './domains/goals/index.js';
+import type { GoalEventPublisher } from './domains/goals/types.js';
+import { createGoalRoutes } from './domains/goals/routes.js';
+import { AnthropicEvaluatorPort } from './domains/goals/ports/anthropic-evaluator-port.js';
+import { SqliteTranscriptPort } from './domains/goals/ports/sqlite-transcript-port.js';
 import {
   ContinueTurnPortImpl,
   type ContinueTurnDeps,
-} from '../domains/goals/ports/continue-turn-port.js';
+} from './domains/goals/ports/continue-turn-port.js';
 import type {
   GoalStateChangedMessage,
   GoalEvaluatorVerdictMessage,
@@ -259,7 +259,7 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     getProcessSupervisor: () => processSupervisor,
   });
 
-  import('../application/conversation/agent-tools/browser.js').then(m =>
+  import('./application/conversation/agent-tools/browser.js').then(m =>
     m.registerBrowserTool({
       getBrowserManager: () => serverState.browserManager,
       broadcastAgentActivity: (sessionId, active) =>

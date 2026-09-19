@@ -1,5 +1,5 @@
 import type { ContinueTurnPort } from '../coordinator.js';
-import type { ConnectedClient } from '../../../application/conversation/transport/types.js';
+import type { ConnectedClient } from '../../../utils/connected-client.js';
 import { newId } from '../../../utils/uuid.js';
 
 /**

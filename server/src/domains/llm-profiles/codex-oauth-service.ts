@@ -1,6 +1,6 @@
 import { Mutex } from 'async-mutex';
 import type { LlmProfileConfig, CodexOAuthCredentials } from '@zclaudia/shared/core/llm-profile';
-import { CodexOAuthError } from './codex-oauth-errors.js';
+import { CodexOAuthError } from '../../utils/codex-oauth-errors.js';
 import {
   codexOAuth,
   expiresSoon,

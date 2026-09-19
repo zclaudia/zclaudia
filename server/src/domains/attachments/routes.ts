@@ -9,7 +9,7 @@ import type {
   AttachmentCount,
   AttachmentOwnerKind,
 } from '@zclaudia/shared/features/attachment';
-import { sendApiError } from '../../interfaces/http/response.js';
+import { sendApiError } from '../../utils/http-response.js';
 import { isValidOwnerKind } from './kind-detector.js';
 import { checkOwnerAccess } from './access-control.js';
 import type { AttachmentService } from './service.js';

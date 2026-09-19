@@ -12,11 +12,12 @@ import type {
 import type { Request as CorrelatedRequest } from '@zclaudia/shared/wire/correlation';
 import { ALL_SERVER_FEATURES, type GatewayBackendInfo } from '@zclaudia/shared/core/server';
 import { initDatabase } from './infra/storage/db.js';
+import { ensureDefaultAgentProfile } from './domains/agent-profiles/ensure-default-agent-profile.js';
 import { initFileStore } from './infra/storage/fileStore.js';
 import { initAttachmentStore } from './infra/storage/attachmentStore.js';
 import { initWorkspace } from './application/services/workspace.js';
 import type { GatewayConfig, GatewayStatus } from './interfaces/http/gateway.js';
-import { TerminalManager } from './terminal-manager.js';
+import { TerminalManager } from './infra/terminal-manager.js';
 import { generateKeyPair, getPublicKeyPem } from './utils/crypto.js';
 import { GatewayNotificationSender } from './infra/push/notification-sender.js';
 import { ClaudiaBranchService } from './application/orchestration/claudia-branch-service.js';
@@ -125,6 +126,11 @@ export async function createServer(
   agentRuntimesReady = !options.deferAgentRuntimes;
   // Initialize database
   const db = initDatabase();
+  // Seed the default agent profile (no-op if one already exists, or if no
+  // LlmProfile exists yet — in which case the user will need to create one
+  // before they can spawn sessions). Composition root owns the business seed
+  // so infra/storage/db.ts stays generic.
+  ensureDefaultAgentProfile(db);
   serverState.database = db;
   serverState.branchAllocator = new ClaudiaBranchService(db);
 

@@ -1,4 +1,3 @@
-import { type WebSocket } from 'ws';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { ToolCall, ContentBlock, ThinkingBlock } from '@zclaudia/shared/core/message';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
@@ -20,13 +19,12 @@ import type { ProcessMonitor } from '../../../utils/process-monitor.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
 import type { RunPhase, PhaseEmitter as PhaseEmitterType } from '../runtime/active-run-phase.js';
 
-export interface ConnectedClient {
-  id: string;
-  ws: WebSocket;
-  isAlive: boolean;
-  isLocal: boolean; // Whether this is a localhost connection
-  authenticated: boolean; // Whether the client has been authenticated
-}
+// ConnectedClient / MessageSender / createVirtualClient live in
+// utils/connected-client.ts (shared by every layer); re-exported here so
+// existing transport consumers keep their import sites.
+export type { ConnectedClient, MessageSender } from '../../../utils/connected-client.js';
+export { createVirtualClient } from '../../../utils/connected-client.js';
+import type { ConnectedClient } from '../../../utils/connected-client.js';
 
 export interface PendingPermissionRequest {
   toolName: string;
@@ -219,9 +217,7 @@ export interface ActiveRun
     RunSteeringState {}
 
 // Message sender interface for abstraction
-export interface MessageSender {
-  send: (message: ServerMessage) => void;
-}
+// (defined in utils/connected-client.ts, re-exported above)
 
 // DEFAULT_PERMISSION_POLICY removed — use DEFAULT_UNIFIED_POLICY from '@zclaudia/shared' instead.
 // PERMISSION_TIMEOUT_POLICIES removed — timeout logic is now handled by the permission workflow template.
@@ -230,20 +226,3 @@ export const MAX_SESSION_RESET_RETRIES = 1;
 export const MAX_OVERFLOW_RETRIES = 1;
 
 export const PERIODIC_SAVE_INTERVAL_MS = 5000;
-
-// Create a virtual client for Gateway-forwarded messages
-export function createVirtualClient(clientId: string, sender: MessageSender): ConnectedClient {
-  return {
-    id: clientId,
-    ws: {
-      readyState: 1, // WebSocket.OPEN
-      send: (data: string) => {
-        const message = JSON.parse(data);
-        sender.send(message);
-      },
-    } as WebSocket,
-    isAlive: true,
-    isLocal: false,
-    authenticated: true,
-  };
-}

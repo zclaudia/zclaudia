@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { TaskExecutorRegistry } from '../executors/registry.js';
-import type { TaskExecutor } from '../executors/types.js';
+import type { TaskExecutor } from '../../../utils/task-executor-types.js';
 
 function makeExecutor(type: TaskExecutor['type']): TaskExecutor {
   return {

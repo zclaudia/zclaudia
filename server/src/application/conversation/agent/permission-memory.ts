@@ -1,26 +1,29 @@
 /**
  * Permission decision persistence — session-level remembered decisions
  * and project-level allowed outside-workspace roots.
+ *
+ * Sandbox network-grant helpers live in
+ * infra/providers/pi-runtime/sandbox-network-memory.ts; re-exported here for
+ * existing import sites.
  */
 import type { RememberedDecision } from './permission-evaluator.js';
-import {
-  formatNetworkGrantKey,
-  type SandboxGrant,
-} from '../../../infra/providers/pi-runtime/sandbox-execution/index.js';
 import { buildRememberKey } from './permission-evaluator.js';
+
+export {
+  loadSessionSandboxDomains,
+  persistSessionSandboxDomain,
+  persistSessionSandboxGrant,
+  loadSessionSandboxGrantKeys,
+} from '../../../infra/providers/pi-runtime/sandbox-network-memory.js';
+export type { SandboxMemoryDb } from '../../../infra/providers/pi-runtime/sandbox-network-memory.js';
+import type { SandboxMemoryDb } from '../../../infra/providers/pi-runtime/sandbox-network-memory.js';
+
+/** Backwards-compatible alias for the shared prepared-statement DB shape. */
+export type PermissionMemoryDb = SandboxMemoryDb;
 
 export interface PermissionMemoryRow {
   remember_key: string;
   decision: RememberedDecision;
-}
-
-export interface PermissionMemoryDb {
-  prepare: (sql: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- better-sqlite3 Statement uses variadic params and returns row types vary by query
-    all: (...args: any[]) => Array<Record<string, unknown>>;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    run: (...args: any[]) => unknown;
-  };
 }
 
 export interface OutsideWorkspaceMemoryRow {
@@ -81,77 +84,5 @@ export function persistProjectAllowedOutsideWorkspaceRoots(
   `);
   for (const root of roots) {
     stmt.run(projectId, root, now, now);
-  }
-}
-
-/** Remember-key namespace for Phase B1 session network grants. */
-const SANDBOX_NETWORK_KEY_PREFIX = 'sandbox:network:';
-
-/**
- * Load the session's granted sandbox network domains (Phase B1).
- * Defensive: a DB error (e.g. an incomplete/missing `permission_memories` table)
- * must not crash an agent run — degrade to "no grants".
- */
-export function loadSessionSandboxDomains(db: PermissionMemoryDb, sessionId: string): string[] {
-  try {
-    const rows = db
-      .prepare(
-        "SELECT remember_key FROM permission_memories WHERE session_id = ? AND remember_key LIKE 'sandbox:network:%' AND decision = 'allow'"
-      )
-      .all(sessionId);
-    return rows
-      .map(row => (row.remember_key as string).slice(SANDBOX_NETWORK_KEY_PREFIX.length))
-      .filter(host => host.length > 0);
-  } catch (err) {
-    console.warn('[sandbox] failed to load session network grants; treating as none:', err);
-    return [];
-  }
-}
-
-/** Persist a session network grant (Phase B1). Idempotent per (session, host). */
-export function persistSessionSandboxDomain(
-  db: PermissionMemoryDb,
-  sessionId: string,
-  host: string
-): void {
-  const now = Date.now();
-  db.prepare(
-    `
-    INSERT INTO permission_memories (session_id, remember_key, decision, created_at, updated_at)
-    VALUES (?, ?, 'allow', ?, ?)
-    ON CONFLICT(session_id, remember_key)
-    DO UPDATE SET decision = 'allow', updated_at = excluded.updated_at
-  `
-  ).run(sessionId, SANDBOX_NETWORK_KEY_PREFIX + host, now, now);
-}
-
-export function persistSessionSandboxGrant(
-  db: PermissionMemoryDb,
-  sessionId: string,
-  grant: SandboxGrant
-): void {
-  if (grant.type !== 'network') return;
-  const now = Date.now();
-  db.prepare(
-    `
-    INSERT INTO permission_memories (session_id, remember_key, decision, created_at, updated_at)
-    VALUES (?, ?, 'allow', ?, ?)
-    ON CONFLICT(session_id, remember_key)
-    DO UPDATE SET decision = 'allow', updated_at = excluded.updated_at
-  `
-  ).run(sessionId, `sandbox:${formatNetworkGrantKey(grant)}`, now, now);
-}
-
-export function loadSessionSandboxGrantKeys(db: PermissionMemoryDb, sessionId: string): string[] {
-  try {
-    const rows = db
-      .prepare(
-        "SELECT remember_key FROM permission_memories WHERE session_id = ? AND remember_key LIKE 'sandbox:network:%' AND decision = 'allow'"
-      )
-      .all(sessionId);
-    return rows.map(row => row.remember_key as string);
-  } catch (err) {
-    console.warn('[sandbox] failed to load session structured grants; treating as none:', err);
-    return [];
   }
 }

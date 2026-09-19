@@ -4,7 +4,7 @@ import {
   backfillProtectedMcpOAuthCredentials,
   protectMcpOAuthCredentials,
   unprotectMcpOAuthCredentials,
-} from '../mcp-oauth-credential-protector.js';
+} from '../../../utils/mcp-oauth-credential-protector.js';
 
 function createDb(): Database.Database {
   const db = new Database(':memory:');

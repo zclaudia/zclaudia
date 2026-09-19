@@ -15,7 +15,7 @@
 import { mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
-import { resolveDataDir } from '../../../domains/tasks/executors/command-executor.js';
+import { resolveDataDir } from '../../../utils/data-dir.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ContentBlock = { type: string; text?: string; [k: string]: any };

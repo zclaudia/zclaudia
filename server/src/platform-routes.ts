@@ -2,24 +2,24 @@ import type { Express, Request, RequestHandler, Response } from 'express';
 import { request as httpRequest } from 'http';
 import { request as httpsRequest } from 'https';
 import { pipeline } from 'stream';
-import type { initDatabase } from '../../infra/storage/db.js';
-import { createMcpServerRoutes } from '../../interfaces/http/mcp-servers.js';
+import type { initDatabase } from './infra/storage/db.js';
+import { createMcpServerRoutes } from './interfaces/http/mcp-servers.js';
 import {
   handleMcpRequest,
   handleMcpSse,
   handleMcpSessionClose,
   getMcpServerInfo,
-} from '../../interfaces/mcp/mcp-server.js';
-import { createSystemStatsRoutes } from '../../interfaces/http/system-stats.js';
-import { createDebugRoutes } from '../../interfaces/http/debug.js';
-import { createSystemTaskRoutes } from '../../interfaces/http/system-tasks.js';
-import { createWorkspaceRoutes } from '../../interfaces/http/workspace.js';
-import { createGatewayRouter } from '../../interfaces/http/gateway.js';
-import { createWebSearchConfigRoutes } from '../../interfaces/http/web-search.js';
-import { createUsageStatsRoutes } from '../../interfaces/http/usage-stats.js';
-import type { ProcessSupervisor } from '../../infra/services/process-supervisor.js';
-import type { GatewayState } from '../../infra/gateway/gateway-state.js';
-import { getGatewayClient } from '../../infra/gateway/gateway-instance.js';
+} from './interfaces/mcp/mcp-server.js';
+import { createSystemStatsRoutes } from './interfaces/http/system-stats.js';
+import { createDebugRoutes } from './interfaces/http/debug.js';
+import { createSystemTaskRoutes } from './interfaces/http/system-tasks.js';
+import { createWorkspaceRoutes } from './interfaces/http/workspace.js';
+import { createGatewayRouter } from './interfaces/http/gateway.js';
+import { createWebSearchConfigRoutes } from './interfaces/http/web-search.js';
+import { createUsageStatsRoutes } from './interfaces/http/usage-stats.js';
+import type { ProcessSupervisor } from './infra/services/process-supervisor.js';
+import type { GatewayState } from './infra/gateway/gateway-state.js';
+import { getGatewayClient } from './infra/gateway/gateway-instance.js';
 
 interface RegisterPlatformRoutesDeps {
   app: Express;
@@ -29,7 +29,7 @@ interface RegisterPlatformRoutesDeps {
   processSupervisor: ProcessSupervisor;
   gateway: GatewayState;
   getServerPort: () => number | null;
-  permissionWorkflowResolver?: import('../../domains/workflows/index.js').PermissionWorkflowResolver;
+  permissionWorkflowResolver?: import('./domains/workflows/index.js').PermissionWorkflowResolver;
 }
 
 export function registerPlatformRoutes(deps: RegisterPlatformRoutesDeps): void {

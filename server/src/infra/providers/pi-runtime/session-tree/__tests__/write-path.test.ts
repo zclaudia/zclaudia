@@ -69,8 +69,7 @@ describe('write-path builders', () => {
 
   it('usage survives the tree round-trip and is readable for the compaction threshold', async () => {
     const { Session: _S } = await import('@earendil-works/pi-agent-core');
-    const { lastAssistantPromptTokens } =
-      await import('../../../../../application/conversation/compaction/context-estimate.js');
+    const { lastAssistantPromptTokens } = await import('../../../../../utils/context-estimate.js');
     const db = makeSessionDb();
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
     appendMessagesToTree(

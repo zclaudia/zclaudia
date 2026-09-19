@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { loadMcpServersFromDb } from '../mcp-config.js';
-import { protectMcpOAuthCredentials } from '../../infra/services/mcp-oauth-credential-protector.js';
+import { protectMcpOAuthCredentials } from '../mcp-oauth-credential-protector.js';
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');

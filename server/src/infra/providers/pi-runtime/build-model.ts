@@ -12,7 +12,7 @@ import {
   type RegistryHit,
 } from './registry-search.js';
 import { refreshIfNeeded } from '../../../domains/llm-profiles/codex-oauth-service.js';
-import { getLlmProfileWriter } from '../../../domains/llm-profiles/repository-registry.js';
+import { getLlmProfileWriter } from '../../../utils/llm-profile-registry.js';
 import { resolveEnvModel } from './env-model.js';
 import { providerIdFor } from './models-registry.js';
 

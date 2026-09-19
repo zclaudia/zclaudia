@@ -20,7 +20,7 @@ import {
 import { resolveDataDir, sweepStaleLogs } from '../../../utils/data-dir.js';
 import { type TaskRepository } from '../repository.js';
 import { TaskService } from '../task-service.js';
-import type { TaskExecutor, TaskExecutorUpdate } from './types.js';
+import type { TaskExecutor, TaskExecutorUpdate } from '../../../utils/task-executor-types.js';
 
 const TERMINAL: ReadonlySet<TaskStatus> = new Set(['completed', 'failed', 'stopped']);
 

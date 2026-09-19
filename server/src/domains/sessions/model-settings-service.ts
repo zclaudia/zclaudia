@@ -5,13 +5,29 @@ import type {
   SessionModelSettings,
   SessionModelSelection,
 } from '@zclaudia/shared/core/runtime-capabilities';
+import type { ManagedRuntimeResolution } from '@zclaudia/shared/plugins/managed-runtimes';
 import { resolveAgentForSession } from './agent-resolver.js';
 import {
   readSessionModelSelection,
   writeSessionModelSelection,
 } from './model-settings-repository.js';
 import type { ProviderRegistryPort } from '../../infra/providers/registry.js';
-import { managedRuntimeService } from '../../application/managed-runtimes/service.js';
+
+/**
+ * Structural slice of the application's managed-runtime service used for
+ * model discovery. Injected so this domain module does not import the
+ * application layer.
+ */
+export interface ManagedRuntimeResolverPort {
+  resolveForRuntime(
+    runtime: string,
+    options: {
+      explicitPath?: string;
+      headless?: boolean;
+      allowAutoInstall?: boolean;
+    }
+  ): Promise<ManagedRuntimeResolution | undefined>;
+}
 
 export class ModelSettingsError extends Error {
   constructor(
@@ -41,7 +57,8 @@ export class SessionModelSettingsService {
   constructor(
     private readonly db: Database.Database,
     private readonly registry: ProviderRegistryPort,
-    private readonly isRunning: (sessionId: string) => boolean
+    private readonly isRunning: (sessionId: string) => boolean,
+    private readonly managedRuntimes: ManagedRuntimeResolverPort
   ) {}
 
   private context(sessionId: string) {
@@ -136,7 +153,7 @@ export class SessionModelSettingsService {
         const abort = new AbortController();
         const timer = setTimeout(() => abort.abort(), 15_000);
         try {
-          const managed = await managedRuntimeService.resolveForRuntime(runtimeType, {
+          const managed = await this.managedRuntimes.resolveForRuntime(runtimeType, {
             explicitPath: agent.cliPath,
             headless: true,
             allowAutoInstall: false,

@@ -21,7 +21,7 @@ import { loadMcpServersFromDb } from '../../../utils/mcp-config.js';
 import type { McpServerRuntimeConfig } from '../../../utils/mcp-config.js';
 import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
 import { mcpInventoryCache } from '../../../utils/mcp-inventory-cache.js';
-import { resolveDataDir } from '../../../domains/tasks/executors/command-executor.js';
+import { resolveDataDir } from '../../../utils/data-dir.js';
 import { sweepPersistedStore } from './tool-result-store.js';
 import { agentToolParameters } from './tool-common.js';
 

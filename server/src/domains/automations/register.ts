@@ -14,7 +14,7 @@ import {
   type AutomationEnginePort,
   type AutomationWorkflowLookupPort,
 } from './service.js';
-import { createAutomationRoutes } from '../../interfaces/http/automations.js';
+import { createAutomationRoutes } from './routes.js';
 
 export interface AutomationsDomainDeps {
   db: ReturnType<typeof initDatabase>;

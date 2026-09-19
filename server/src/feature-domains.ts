@@ -1,13 +1,13 @@
-import type { Express, RequestHandler } from 'express';
+import { Router, type Express, type RequestHandler } from 'express';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
-import type { initDatabase } from '../../infra/storage/db.js';
-import type { ConnectedClient, ActiveRun } from '../conversation/transport/types.js';
-import { sendMessage } from '../conversation/transport/broadcast.js';
+import type { initDatabase } from './infra/storage/db.js';
+import type { ConnectedClient, ActiveRun } from './application/conversation/transport/types.js';
+import { sendMessage } from './application/conversation/transport/broadcast.js';
 import {
   registerProjectsDomain,
   ProjectRepository,
   type ProjectChangeEvent,
-} from '../../domains/projects/index.js';
+} from './domains/projects/index.js';
 import {
   registerSessionsDomain,
   SessionRepository,
@@ -16,17 +16,21 @@ import {
   buildTaskPlannedSessionPatch,
   buildTaskUnlockedSessionPatch,
   type SessionEventPublisherPort,
-} from '../../domains/sessions/index.js';
-import {
-  registerLlmProfilesDomain,
-  LlmProfileRepository,
-} from '../../domains/llm-profiles/index.js';
-import { registerLlmProfileRepository } from '../../domains/llm-profiles/repository-registry.js';
-import { CodexOAuthSessionManager } from '../../domains/llm-profiles/codex-oauth-session.js';
-import { createLlmProfileOauthRouter } from '../../interfaces/http/llm-profile-oauth.js';
-import { registerAgentProfilesDomain } from '../../domains/agent-profiles/index.js';
-import { registerRuntimeRoutes } from '../../infra/providers/runtime-routes.js';
-import { registerNotificationDomain } from '../../domains/notification-feed/index.js';
+} from './domains/sessions/index.js';
+import { requestSessionTitleGeneration } from './application/conversation/title/request-session-title.js';
+import { registerLlmProfilesDomain, LlmProfileRepository } from './domains/llm-profiles/index.js';
+import { registerLlmProfileRepository } from './domains/llm-profiles/repository-registry.js';
+import { CodexOAuthSessionManager } from './domains/llm-profiles/codex-oauth-session.js';
+import { createLlmProfileOauthRouter } from './interfaces/http/llm-profile-oauth.js';
+import { registerAgentProfilesDomain } from './domains/agent-profiles/index.js';
+import { pluginLoader } from './application/plugins/loader.js';
+import { registerRuntimeRoutes } from './interfaces/http/providers/runtime-routes.js';
+import { mountSessionInvocableRoutes } from './interfaces/http/session-invocables.js';
+import { buildSessionCatalogRequest } from './application/invocations/session-catalog.js';
+import { providerRegistry } from './infra/providers/registry.js';
+import { createManagedRuntimeRoutes } from './application/managed-runtimes/routes.js';
+import { managedRuntimeService } from './application/managed-runtimes/service.js';
+import { registerNotificationDomain } from './domains/notification-feed/index.js';
 import {
   registerSupervisionDomain,
   type SupervisorService,
@@ -34,15 +38,15 @@ import {
   type SupervisionProjectPort,
   type SupervisionSessionPort,
   type SupervisionSessionModelPort,
-} from '../../domains/supervision/index.js';
+} from './domains/supervision/index.js';
 import {
   registerLocalPRDomain,
   type LocalPRAiSessionPort,
   type LocalPRSchedulingPort,
-} from '../../domains/local-pr/index.js';
-import { registerLocalIssueDomain } from '../../domains/local-issues/index.js';
-import { registerTurnSummaryDomain } from '../../domains/turn-summaries/index.js';
-import { registerAttachmentDomain } from '../../domains/attachments/index.js';
+} from './domains/local-pr/index.js';
+import { registerLocalIssueDomain } from './domains/local-issues/index.js';
+import { registerTurnSummaryDomain } from './domains/turn-summaries/index.js';
+import { registerAttachmentDomain } from './domains/attachments/index.js';
 import {
   registerWorkflowDomain,
   WorkflowRunRepository,
@@ -50,27 +54,34 @@ import {
   type WorkflowEngine,
   type WorkflowAiRunPort,
   type WorkflowSchedulingPort,
-} from '../../domains/workflows/index.js';
-import { PermissionWorkflowResolver } from '../../domains/workflows/index.js';
-import { registerMetaWorkflow } from '../../domains/meta-workflow/register.js';
-import type { MetaWorkflowService } from '../../domains/meta-workflow/service.js';
-import { createWorktreeAllocatorFromSupervisor } from './meta-workflow-allocator.js';
-import { registerPluginsDomain } from '../plugins/register.js';
-import { toolRegistry, workflowStepRegistry, workflowTriggerRegistry } from '../plugins/index.js';
-import { registerAutomationsDomain } from '../../domains/automations/index.js';
-import type { NotificationSender } from '../../infra/push/notification-sender.js';
-import type { NotificationService } from '../../domains/notification-feed/index.js';
-import { PermissionBridge } from '../conversation/agent/permission-bridge.js';
-import { recomputePhase, computeBlockers } from '../conversation/runtime/active-run-phase.js';
-import type { WorkflowRunEvent } from '../../domains/workflows/run-events.js';
+} from './domains/workflows/index.js';
+import { PermissionWorkflowResolver } from './domains/workflows/index.js';
+import { registerMetaWorkflow } from './domains/meta-workflow/register.js';
+import type { MetaWorkflowService } from './domains/meta-workflow/service.js';
+import { createWorktreeAllocatorFromSupervisor } from './application/bootstrap/meta-workflow-allocator.js';
+import { registerPluginsDomain } from './application/plugins/register.js';
+import {
+  toolRegistry,
+  workflowStepRegistry,
+  workflowTriggerRegistry,
+} from './application/plugins/index.js';
+import { registerAutomationsDomain } from './domains/automations/index.js';
+import type { NotificationSender } from './infra/push/notification-sender.js';
+import type { NotificationService } from './domains/notification-feed/index.js';
+import { PermissionBridge } from './application/conversation/agent/permission-bridge.js';
+import {
+  recomputePhase,
+  computeBlockers,
+} from './application/conversation/runtime/active-run-phase.js';
+import type { WorkflowRunEvent } from './domains/workflows/run-events.js';
 import {
   ExecutorRegistry,
   ManualAdapter,
   ExecutorInstanceRepository,
-} from '../../domains/executor/index.js';
-import { ClassicAdapter } from '../../domains/executor/adapters/classic-adapter.js';
-import { MetaWorkflowAdapter } from '../../domains/executor/adapters/meta-workflow-adapter.js';
-import { SpecChangeRepository } from '../../domains/spec-change/spec-change-repository.js';
+} from './domains/executor/index.js';
+import { ClassicAdapter } from './domains/executor/adapters/classic-adapter.js';
+import { MetaWorkflowAdapter } from './domains/executor/adapters/meta-workflow-adapter.js';
+import { SpecChangeRepository } from './domains/spec-change/spec-change-repository.js';
 import {
   SpecChangeService,
   ArchiveService,
@@ -79,27 +90,27 @@ import {
   BootstrapReviewService,
   SpecChangeDraftingService,
   BootstrapScanRepository,
-} from '../../domains/openspec/index.js';
-import { BootstrapCandidateRepository } from '../../domains/openspec/repositories/bootstrap-candidate-repository.js';
+} from './domains/openspec/index.js';
+import { BootstrapCandidateRepository } from './domains/openspec/repositories/bootstrap-candidate-repository.js';
 import {
   registerIssueOrchestration,
   type IssueOrchestration,
-} from '../../domains/issue-orchestration/index.js';
-import { createCorpusRoutes } from '../../domains/openspec/routes/corpus-routes.js';
-import { createSpecChangeRoutes } from '../../domains/openspec/routes/spec-change-routes.js';
-import { createBootstrapRoutes } from '../../domains/openspec/routes/bootstrap-routes.js';
-import { createExecutorRoutes } from '../../domains/executor/routes.js';
-import { createIssueRoutes } from '../../domains/issue-orchestration/routes.js';
-import { createEpicRoutes } from '../../domains/epics/routes.js';
-import { EpicService } from '../../domains/epics/service.js';
-import { type TaskExecutorRegistry } from '../../domains/tasks/executors/registry.js';
+} from './domains/issue-orchestration/index.js';
+import { createCorpusRoutes } from './domains/openspec/routes/corpus-routes.js';
+import { createSpecChangeRoutes } from './domains/openspec/routes/spec-change-routes.js';
+import { createBootstrapRoutes } from './domains/openspec/routes/bootstrap-routes.js';
+import { createExecutorRoutes } from './domains/executor/routes.js';
+import { createIssueRoutes } from './domains/issue-orchestration/routes.js';
+import { createEpicRoutes } from './domains/epics/routes.js';
+import { EpicService } from './domains/epics/service.js';
+import { type TaskExecutorRegistry } from './domains/tasks/executors/registry.js';
 import {
   ActivityRegistry,
   GitCommitActivity,
   GitStageActivity,
   GenerateCommitMessageActivity,
-} from '../../domains/activities/index.js';
-import { LightweightAgentRunner } from '../../infra/providers/pi-runtime/agent-loop/index.js';
+} from './domains/activities/index.js';
+import { LightweightAgentRunner } from './infra/providers/pi-runtime/agent-loop/index.js';
 
 interface RegisterFeatureDomainsDeps {
   db: ReturnType<typeof initDatabase>;
@@ -186,7 +197,27 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     activityRegistry,
     agentLoopRunner: sharedAgentLoopRunner,
   });
-  registerSessionsDomain({ app, authMiddleware, db, activeRuns, sessionEvents });
+  registerSessionsDomain({
+    app,
+    authMiddleware,
+    db,
+    activeRuns,
+    sessionEvents,
+    requestTitleGeneration: requestSessionTitleGeneration,
+    managedRuntimes: managedRuntimeService,
+  });
+  // URIP session invocable catalog (§15.1): host actions + runtime + portable
+  // entries composed per session. Snapshot building wires to the live session
+  // context as runtime adapters publish catalogs; the routes exist now so the
+  // desktop consumes session-scoped catalogs, never provider-type ones.
+  // (Mounted here — the composition root — so the sessions domain does not
+  // import the interfaces/application layers.)
+  const sessionInvocablesRouter = Router();
+  mountSessionInvocableRoutes(sessionInvocablesRouter, db, {
+    buildRequest: (database, sessionId) =>
+      buildSessionCatalogRequest(database, sessionId, providerRegistry),
+  });
+  app.use('/api/sessions', authMiddleware, sessionInvocablesRouter);
   registerLlmProfilesDomain({ app, authMiddleware, db });
 
   // Wire the LlmProfileRepository into the registry so build-model.ts can
@@ -210,7 +241,21 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     createLlmProfileOauthRouter(llmProfileRepo, codexOauthSessions)
   );
 
-  registerAgentProfilesDomain({ app, authMiddleware, localOnlyMiddleware, db });
+  registerAgentProfilesDomain({
+    app,
+    authMiddleware,
+    db,
+    // Built-in plugin runtime contributions (claude ships as a plugin); read
+    // via the loader here in the composition root, evaluated per request.
+    builtinRuntimeContributions: () =>
+      pluginLoader
+        .getPlugins()
+        .filter(plugin => pluginLoader.isBuiltin(plugin.manifest.id))
+        .flatMap(plugin => plugin.manifest.contributes?.agentRuntimes ?? []),
+  });
+  // Managed runtime routes stay mounted here (composition root) so the
+  // agent-profiles domain does not import the application layer.
+  app.use('/api/managed-runtimes', authMiddleware, createManagedRuntimeRoutes(localOnlyMiddleware));
   registerRuntimeRoutes({ app, authMiddleware, db, toolRegistry });
 
   const { notificationService: notificationsService } = registerNotificationDomain({

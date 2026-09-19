@@ -15,7 +15,7 @@ import { SessionMessageRepository } from './message-repository.js';
 import { SessionRepository } from './repository.js';
 import { listCompactions, type SessionCompaction } from './compaction-tree-read.js';
 import { applyMessagePageBudget } from './message-page-budget.js';
-import type { RunPhase } from '../../application/conversation/runtime/active-run-phase.js';
+import type { RunPhase } from '../../utils/run-phase.js';
 /** Minimal shape — avoids depending on application/conversation types */
 type ActiveRunsMap = Map<
   string,

@@ -35,7 +35,9 @@ beforeEach(() => {
     ],
   }));
   const registry = { get: () => ({ discoverModels }) } as unknown as ProviderRegistryPort;
-  service = new SessionModelSettingsService(db, registry, () => busy);
+  service = new SessionModelSettingsService(db, registry, () => busy, {
+    resolveForRuntime: async () => undefined,
+  });
 });
 afterEach(() => db.close());
 

@@ -1,7 +1,7 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { ToolName } from '@zclaudia/shared/core/tools';
 import type { PermissionCallback, RunOptions } from '../types.js';
-import { loadSessionSandboxDomains } from '../../../application/conversation/agent/permission-memory.js';
+import { loadSessionSandboxDomains } from './sandbox-network-memory.js';
 import { buildAgentHooks } from './agent-hooks.js';
 import { PendingArgOverrides } from './pending-arg-overrides.js';
 import {

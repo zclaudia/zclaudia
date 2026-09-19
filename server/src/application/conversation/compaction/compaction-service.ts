@@ -11,7 +11,7 @@ import {
 import {
   compactionTriggerThreshold,
   estimateContextTokensForThreshold,
-} from './context-estimate.js';
+} from '../../../utils/context-estimate.js';
 import { summarizeChunked, summaryChunkBudget } from './chunked-summary.js';
 import type { Usage } from '@earendil-works/pi-ai';
 import type { Database } from 'better-sqlite3';
@@ -21,7 +21,7 @@ import { SqliteSessionStorage } from '../../../infra/providers/pi-runtime/sessio
 import { buildModel, modelEntryFor } from '../../../infra/providers/pi-runtime/build-model.js';
 import { modelsFor } from '../../../infra/providers/pi-runtime/models-registry.js';
 import { newId } from '../../../utils/uuid.js';
-import { resolveContextWindow } from './context-windows.js';
+import { resolveContextWindow } from '../../../infra/providers/pi-runtime/context-windows.js';
 import { compactionCircuitBreaker } from './circuit-breaker.js';
 
 // Compaction reads and advances a session tree leaf. Serialize every entry

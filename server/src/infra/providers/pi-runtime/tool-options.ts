@@ -2,7 +2,7 @@ import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
 import type { ToolName } from '@zclaudia/shared/core/tools';
-import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
+import type { TaskExecutor } from '../../../utils/task-executor-types.js';
 import type { PermissionCallback } from '../message-types.js';
 import {
   createCommandDiagnosticsProvider,

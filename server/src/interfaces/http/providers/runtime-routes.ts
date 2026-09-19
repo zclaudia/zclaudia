@@ -2,10 +2,10 @@ import { Router, type Request, type Response } from 'express';
 import type { Express, RequestHandler } from 'express';
 import type Database from 'better-sqlite3';
 import { isPiAgentRuntime } from '@zclaudia/shared/core/agent-profile';
-import { mountCapabilityRoutes } from '../../interfaces/http/provider-capabilities.js';
-import { mountCommandRoutes } from '../../interfaces/http/provider-commands.js';
-import { createDeferredDiagnosticsRoutes } from './pi-runtime/deferred-diagnostics-routes.js';
-import { createFileHistoryRoutes } from './pi-runtime/file-history-routes.js';
+import { mountCapabilityRoutes } from '../provider-capabilities.js';
+import { mountCommandRoutes } from '../provider-commands.js';
+import { createDeferredDiagnosticsRoutes } from './deferred-diagnostics-routes.js';
+import { createFileHistoryRoutes } from './file-history-routes.js';
 import { createContextUsageRoutes } from './context-usage-routes.js';
 
 /**

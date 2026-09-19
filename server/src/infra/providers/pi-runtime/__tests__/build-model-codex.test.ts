@@ -4,7 +4,7 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 vi.mock('../../../../domains/llm-profiles/codex-oauth-service.js', () => ({
   refreshIfNeeded: vi.fn(),
 }));
-vi.mock('../../../../domains/llm-profiles/repository-registry.js', () => ({
+vi.mock('../../../../utils/llm-profile-registry.js', () => ({
   getLlmProfileWriter: vi.fn(() => ({ updateOAuthCredentials: vi.fn() })),
 }));
 

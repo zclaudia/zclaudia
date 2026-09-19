@@ -1,10 +1,7 @@
 import type { TaskRecord, TaskResult, TaskStatus } from '@zclaudia/shared/core/task';
 
-import type {
-  AgentRunnerTask,
-  AgentTaskRunner,
-} from '../../../application/orchestration/agent-task-runner.js';
-import type { TaskExecutor, TaskExecutorUpdate } from './types.js';
+import type { AgentRunnerTask, AgentTaskRunner } from './agent-runner-contract.js';
+import type { TaskExecutor, TaskExecutorUpdate } from '../../../utils/task-executor-types.js';
 
 function metadataRecord(task: TaskRecord): Record<string, unknown> {
   return task.metadata ?? {};

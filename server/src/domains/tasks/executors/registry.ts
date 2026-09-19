@@ -1,6 +1,6 @@
 import type { TaskType } from '@zclaudia/shared/core/task';
 
-import type { TaskExecutor } from './types.js';
+import type { TaskExecutor } from '../../../utils/task-executor-types.js';
 
 export class TaskExecutorRegistry {
   private readonly executors = new Map<TaskType, TaskExecutor>();

@@ -1,11 +1,15 @@
 import type { SessionRunStatus } from '@zclaudia/shared/core/session';
-import {
-  isTerminalPhase,
-  type RunPhase,
-} from '../application/conversation/runtime/active-run-phase.js';
+import { isTerminalPhase, type RunPhase } from './run-phase.js';
 
-type RunLike = {
+/**
+ * Structural slice of the application's ActiveRun that run-state predicates
+ * need. Lower layers (infra gateway sync, domain routes) can type their
+ * run maps with this view instead of importing the application runtime.
+ */
+export type RunLike = {
+  runId?: string;
   sessionId?: string;
+  clientId?: string;
   phase: RunPhase;
   sessionType?: string;
 };

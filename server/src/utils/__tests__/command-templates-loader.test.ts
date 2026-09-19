@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { loadAllCommandTemplates } from '../command-templates-loader.js';
-import { createExecutionEnv } from '../../../infra/execution-env.js';
+import { createExecutionEnv } from '../../infra/execution-env.js';
 
 describe('loadAllCommandTemplates', () => {
   let tmpRoot: string;

@@ -8,7 +8,7 @@ import type {
   ErrorMessage,
   BrowserEngineStatusMessage,
 } from '@zclaudia/shared/wire/messages';
-import type { TerminalManager } from '../../../terminal-manager.js';
+import type { TerminalManager } from '../../../infra/terminal-manager.js';
 import type { ProcessMonitor } from '../../../utils/process-monitor.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
 import type { ConnectedClient, ActiveRun } from './types.js';

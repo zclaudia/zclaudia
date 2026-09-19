@@ -4,7 +4,7 @@
  * Encapsulates the mutable gateway status and connector/disconnector callbacks
  * that were previously closured inside setupRoutesAndServices().
  */
-import type { GatewayConfig, GatewayStatus } from '../../interfaces/http/gateway.js';
+import type { GatewayConfig, GatewayStatus } from './gateway-types.js';
 import type { GatewayBackendInfo } from '@zclaudia/shared';
 
 export interface GatewayState {

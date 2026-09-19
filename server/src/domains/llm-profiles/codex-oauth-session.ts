@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { AuthEvent, AuthPrompt, ProviderAuthInteraction } from '@earendil-works/pi-ai';
 import type { CodexOAuthCredentials } from '@zclaudia/shared/core/llm-profile';
-import { CodexOAuthError, type CodexOAuthErrorCode } from './codex-oauth-errors.js';
+import { CodexOAuthError, type CodexOAuthErrorCode } from '../../utils/codex-oauth-errors.js';
 import {
   CODEX_LOGIN_METHOD,
   codexOAuth,

@@ -7,7 +7,7 @@ import type { ToolName } from '@zclaudia/shared/core/tools';
 import type Database from 'better-sqlite3';
 import type { ProviderEventNormalizer } from './provider-normalizer.js';
 import type { PermissionCallback, ProviderRuntimeEvent } from './message-types.js';
-import type { TaskExecutor } from '../../domains/tasks/executors/types.js';
+import type { TaskExecutor } from '../../utils/task-executor-types.js';
 import type {
   ExternalToolRuntimeState,
   SkillRuntimeState,

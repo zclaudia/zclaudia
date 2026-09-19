@@ -8,37 +8,24 @@ import {
   type AgentWorktree,
 } from '../../utils/agent-worktrees.js';
 import { ClaudiaBranchService } from './claudia-branch-service.js';
+import type {
+  AgentRunnerTask,
+  AgentTaskRunCallbacks,
+  AgentTaskRunner,
+} from '../../domains/tasks/executors/agent-runner-contract.js';
+
+// Runner contract types are owned by the tasks domain; re-exported here for
+// existing import sites.
+export type {
+  AgentRunnerTask,
+  AgentTaskRunCallbacks,
+  AgentTaskRunner,
+} from '../../domains/tasks/executors/agent-runner-contract.js';
 
 const VIRTUAL_CLIENT_TIMEOUT_MS = 30 * 60 * 1000;
 
 export interface VirtualClient {
   readonly id: string;
-}
-
-export interface AgentRunnerTask {
-  id: string;
-  parentTaskId: string | null;
-  projectId: string | null;
-  sessionId: string | null;
-  branchId: string | null;
-  contextTemplate: string;
-  status: string;
-  task: string;
-  externalId: string | null;
-  canonicalTaskId?: string;
-  initiator: 'system' | 'claudia';
-  llmProfileId?: string;
-  permissionOverride?: Partial<
-    import('@zclaudia/shared/interaction/permissions').UnifiedPermissionPolicy
-  >;
-  /** Parent workspace root; the subagent runs here unless isolated. */
-  cwd?: string | null;
-  /** 'worktree': run in an ephemeral git worktree of cwd (removed when clean). */
-  isolation?: 'worktree' | null;
-  retryCount: number;
-  maxRetries: number;
-  createdAt: number;
-  updatedAt: number;
 }
 
 export interface AgentTaskRunnerDeps {
@@ -58,17 +45,6 @@ export interface AgentTaskRunnerDeps {
   getClients: () => Map<string, VirtualClient>;
   createSession: (opts: { projectId: string | null; name: string; type: string }) => { id: string };
   sessionExists: (id: string) => boolean;
-}
-
-export interface AgentTaskRunCallbacks {
-  onStarted: (sessionId: string) => void;
-  onDelta?: (content: string) => void;
-  onCompleted: (result: { resultSummary: string; responseText: string; toolCount: number }) => void;
-  onFailed: (errorSummary: string) => void;
-}
-
-export interface AgentTaskRunner {
-  run(task: AgentRunnerTask, callbacks: AgentTaskRunCallbacks): void;
 }
 
 export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunner {

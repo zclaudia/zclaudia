@@ -4,7 +4,7 @@ import { lookup } from 'dns/promises';
 import type { LookupFunction } from 'net';
 import { Agent } from 'undici';
 
-import { getWebSearchProviderConfig } from '../../../domains/web-search/config.js';
+import { getWebSearchProviderConfig } from '../../../utils/web-search-config.js';
 import { isPrivateOrReservedIp } from '../../../utils/ip-guard.js';
 import { extractPdfText } from './rich-read.js';
 import { htmlToMarkdown, stripHtmlToText, shouldExtractAsHtml } from './web-extract.js';

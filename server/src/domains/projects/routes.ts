@@ -22,7 +22,7 @@ import {
   isProjectValidationError,
 } from './model.js';
 import { resolveAgentReadinessForSessionWithRuntimeCheck } from '../sessions/agent-readiness.js';
-import { sendApiError } from '../../interfaces/http/response.js';
+import { sendApiError } from '../../utils/http-response.js';
 
 export type ProjectChangeEvent =
   | { type: 'project_upsert'; project: Project }

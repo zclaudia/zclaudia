@@ -7,7 +7,7 @@ import type Database from 'better-sqlite3';
 import type { PermissionRequest } from '@zclaudia/shared/interaction/permissions';
 import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
 import type { BackgroundTaskUpdateMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
-import type { ResolvedImage } from './resolve-image-attachments.js';
+import type { ResolvedImage } from '../../../infra/storage/resolve-image-attachments.js';
 import { buildRunContext } from './run-context.js';
 import { persistAssistantTerminalSnapshot } from './run-terminal-snapshot.js';
 import { upsertAssistantMessage } from './run-lifecycle.js';
@@ -22,7 +22,7 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { ToolName } from '@zclaudia/shared/core/tools';
 import type { PermissionDecision } from '../../../infra/providers/types.js';
-import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
+import type { TaskExecutor } from '../../../utils/task-executor-types.js';
 import { persistMcpInstructionsDeltaForSession } from './mcp-instructions-delta.js';
 import {
   executePreparedDirectSkillInvocation,

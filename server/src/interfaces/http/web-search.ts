@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { Database } from 'better-sqlite3';
 import type { UpdateWebSearchConfigRequest } from '@zclaudia/shared/core/server';
-import { getWebSearchConfigView, updateWebSearchConfig } from '../../domains/web-search/config.js';
+import { getWebSearchConfigView, updateWebSearchConfig } from '../../utils/web-search-config.js';
 import { sendApiError } from './response.js';
 
 function validateSearxngBaseUrl(value: unknown): string | null | undefined {

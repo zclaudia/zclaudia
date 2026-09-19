@@ -66,8 +66,8 @@ export interface GatewayClientConfig {
 
 import type { Database as BetterDatabase } from 'better-sqlite3';
 type Database = BetterDatabase;
-import type { ActiveRun } from '../../application/conversation/transport/types.js';
-type ActiveRunsMap = Map<string, ActiveRun>;
+import type { RunLike } from '../../utils/run-state.js';
+type ActiveRunsMap = Map<string, RunLike>;
 type BackendMessageHandler = (backendId: string, message: ClientMessage) => Promise<void> | void;
 type BackendClosedHandler = (backendId: string) => void;
 type GenericEventHandler = (...args: unknown[]) => void;

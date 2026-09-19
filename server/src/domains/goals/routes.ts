@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { sendApiError } from '../../interfaces/http/response.js';
+import { sendApiError } from '../../utils/http-response.js';
 import type { GoalService } from './service.js';
 
 export function createGoalRoutes(

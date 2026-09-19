@@ -3,8 +3,8 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import type { AutomationService } from '../../domains/automations/service.js';
-import { InvalidAutomationTriggerError } from '../../domains/automations/service.js';
+import type { AutomationService } from './service.js';
+import { InvalidAutomationTriggerError } from './service.js';
 import type { AutomationAction, AutomationTrigger } from '@zclaudia/shared/features/automations';
 import { isValidCron } from '../../utils/cron.js';
 

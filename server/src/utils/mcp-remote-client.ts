@@ -3,7 +3,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { execFile } from 'node:child_process';
 import type { McpOAuthConfig, McpOAuthCredentials } from '@zclaudia/shared/core/mcp';
-import { discoverMcpOAuthConfig } from '../domains/mcp/mcp-oauth-discovery.js';
+import { discoverMcpOAuthConfig } from './mcp-oauth-discovery.js';
 import type {
   McpPromptDefinition,
   McpPromptResult,

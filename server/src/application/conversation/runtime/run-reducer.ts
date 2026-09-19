@@ -1,4 +1,4 @@
-import { generateToolSignature } from '../../../loop-detection.js';
+import { generateToolSignature } from '../../../utils/loop-detection.js';
 import type { ActiveRun } from '../transport/types.js';
 import { computeBlockers, recomputePhase } from './active-run-phase.js';
 import type { RunDomainEvent } from './run-domain-events.js';

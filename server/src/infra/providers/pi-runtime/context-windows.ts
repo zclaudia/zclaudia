@@ -1,7 +1,4 @@
-import {
-  tryGetRegistryModel,
-  findInRegistryCrossProvider,
-} from '../../../infra/providers/pi-runtime/registry-search.js';
+import { tryGetRegistryModel, findInRegistryCrossProvider } from './registry-search.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { ContextWindowSource } from '@zclaudia/shared/wire/messages/core';
 

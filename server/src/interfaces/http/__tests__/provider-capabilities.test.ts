@@ -1,7 +1,7 @@
 import express from 'express';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
-import { registerRuntimeRoutes } from '../../../infra/providers/runtime-routes.js';
+import { registerRuntimeRoutes } from '../providers/runtime-routes.js';
 
 function makeApp() {
   const app = express();

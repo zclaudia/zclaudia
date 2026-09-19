@@ -1,7 +1,6 @@
 import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { toolRegistry } from '../application/plugins/tool-registry.js';
 
 export interface McpBridgeLaunchConfig {
   command: string;
@@ -15,19 +14,30 @@ export interface McpBridgeServerEntry {
 }
 
 /**
+ * Structural slice of the plugin tool-registry entries the bridge cares
+ * about. Passed in by the caller (application layer) so this module stays
+ * layer-neutral instead of importing the registry directly.
+ */
+export interface McpBridgeToolRef {
+  id?: string;
+  name?: string;
+}
+
+/**
  * Build the standard 'claudia-plugins' MCP bridge server entry.
  * Returns null if no bridge tools are registered.
  *
  * @param serverPort - Local server port for the bridge URL
  * @param sessionId - Session ID (direct env var) or undefined
  * @param sessionIdFile - Session ID file path (for providers that load MCP once at startup)
+ * @param bridgeTools - Registered bridge tools (e.g. toolRegistry.getBridgeTools())
  */
 export function buildMcpBridgeEntry(
   serverPort: number,
   sessionId?: string,
-  sessionIdFile?: string
+  sessionIdFile?: string,
+  bridgeTools: readonly McpBridgeToolRef[] = []
 ): McpBridgeServerEntry | null {
-  const bridgeTools = toolRegistry.getBridgeTools();
   if (bridgeTools.length === 0) return null;
 
   const launch = resolveMcpBridgeLaunchConfig();

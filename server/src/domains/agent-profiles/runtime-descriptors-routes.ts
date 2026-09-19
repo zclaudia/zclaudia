@@ -7,8 +7,8 @@ import {
   type EngineModeSummary,
   type ProfileConfigDescriptor,
 } from '@zclaudia/shared/core/profile-config-descriptor';
+import type { AgentRuntimeContribution } from '@zclaudia/shared/providers';
 import { runtimeDescriptorRegistry } from '../../infra/providers/runtime-descriptor-registry.js';
-import { pluginLoader } from '../../application/plugins/loader.js';
 import { providerRegistry } from '../../infra/providers/registry.js';
 
 export interface AgentRuntimeSummary {
@@ -32,17 +32,23 @@ export interface AgentRuntimeSummary {
   engineModes?: EngineModeSummary[];
 }
 
-export function createRuntimeDescriptorRoutes(): Router {
+export interface RuntimeDescriptorRoutesDeps {
+  /**
+   * Agent runtime descriptors contributed by built-in plugins. Supplied by
+   * the composition root (which reads the plugin loader) so this domain
+   * module does not import the application layer. Evaluated per request.
+   */
+  builtinRuntimeContributions?: () => AgentRuntimeContribution[];
+}
+
+export function createRuntimeDescriptorRoutes(deps: RuntimeDescriptorRoutesDeps = {}): Router {
   const router = Router();
 
   router.get('/', (_req: Request, res: Response) => {
     try {
       const descriptors = new Map(runtimeDescriptorRegistry.list().map(d => [d.type, d]));
-      for (const plugin of pluginLoader.getPlugins()) {
-        if (!pluginLoader.isBuiltin(plugin.manifest.id)) continue;
-        for (const descriptor of plugin.manifest.contributes?.agentRuntimes ?? []) {
-          if (!descriptors.has(descriptor.type)) descriptors.set(descriptor.type, descriptor);
-        }
+      for (const descriptor of deps.builtinRuntimeContributions?.() ?? []) {
+        if (!descriptors.has(descriptor.type)) descriptors.set(descriptor.type, descriptor);
       }
       const data: AgentRuntimeSummary[] = [...descriptors.values()].map(d => {
         const base: AgentRuntimeSummary = {

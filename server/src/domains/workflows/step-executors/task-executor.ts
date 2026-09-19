@@ -2,7 +2,7 @@ import type { TaskType } from '@zclaudia/shared/core/task';
 import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 
 import type { TaskExecutorRegistry } from '../../tasks/executors/registry.js';
-import type { TaskExecutorUpdate } from '../../tasks/executors/types.js';
+import type { TaskExecutorUpdate } from '../../../utils/task-executor-types.js';
 import type { TaskService } from '../../tasks/task-service.js';
 import type { StepContext, StepExecutorPort, StepResult } from '../ports/step-executor.js';
 

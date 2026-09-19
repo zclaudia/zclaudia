@@ -21,7 +21,7 @@ import {
   toCodexCredentials,
   toOAuthCredential,
 } from '../../../domains/llm-profiles/codex-oauth-pi.js';
-import { getLlmProfileWriter } from '../../../domains/llm-profiles/repository-registry.js';
+import { getLlmProfileWriter } from '../../../utils/llm-profile-registry.js';
 
 /**
  * pi 0.84 moved request auth behind a `Models` registry: `stream()` resolves

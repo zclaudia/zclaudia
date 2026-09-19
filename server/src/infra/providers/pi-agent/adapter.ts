@@ -41,9 +41,9 @@ import {
   resolveImagesInMessages,
 } from '../pi-runtime/session-tree/route-a-postprocess.js';
 import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
-import { resolveContextWindow } from '../../../application/conversation/compaction/context-windows.js';
-import { historyTokenBudget } from '../../../application/conversation/compaction/context-estimate.js';
-import { resolveImageAttachments } from '../../../application/conversation/runtime/resolve-image-attachments.js';
+import { resolveContextWindow } from '../pi-runtime/context-windows.js';
+import { historyTokenBudget } from '../../../utils/context-estimate.js';
+import { resolveImageAttachments } from '../../storage/resolve-image-attachments.js';
 import { getFileStore } from '../../storage/fileStore.js';
 
 const manifest: PCPProviderManifest = {

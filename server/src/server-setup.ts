@@ -29,7 +29,7 @@ import type { ConnectedClient, ActiveRun } from './application/conversation/tran
 import type { RunStartMessage } from './application/conversation/runtime/run-bootstrap.js';
 import type { createRouter } from './interfaces/websocket/index.js';
 import { createGatewayState } from './infra/gateway/gateway-state.js';
-import { bootstrapDomains } from './application/domain-bootstrap.js';
+import { bootstrapDomains } from './domain-bootstrap.js';
 import {
   buildAppSelectionClickUrl,
   getBackendDisplayName,
@@ -39,7 +39,7 @@ import { registerTaskSettlementNotifier } from './application/conversation/runti
 import type { PermissionBridge } from './application/conversation/agent/permission-bridge.js';
 import type { PermissionWorkflowResolver } from './domains/workflows/index.js';
 import type { MetaWorkflowService } from './domains/meta-workflow/service.js';
-import type { TaskExecutor } from './domains/tasks/executors/types.js';
+import type { TaskExecutor } from './utils/task-executor-types.js';
 import type { GoalCoordinator } from './domains/goals/coordinator.js';
 import type { GoalService } from './domains/goals/service.js';
 

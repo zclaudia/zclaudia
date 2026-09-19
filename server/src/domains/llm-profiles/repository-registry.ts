@@ -1,23 +1,18 @@
+/**
+ * Compatibility shim — the registry/writer implementation lives in
+ * utils/llm-profile-registry.ts (neutral layer) so infra provider code
+ * (build-model, models-registry) can persist OAuth credentials without
+ * importing this domain.
+ */
 import type { LlmProfileRepository } from './repository.js';
-import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
-import type { OAuthCredentialsWriter } from './codex-oauth-service.js';
+import { registerLlmProfileWriter } from '../../utils/llm-profile-registry.js';
 
-let registered: LlmProfileRepository | null = null;
+export type {
+  LlmProfileWriterRepo,
+  OAuthCredentialsWriter,
+} from '../../utils/llm-profile-registry.js';
+export { getLlmProfileWriter } from '../../utils/llm-profile-registry.js';
 
 export function registerLlmProfileRepository(repo: LlmProfileRepository): void {
-  registered = repo;
-}
-
-export function getLlmProfileWriter(): OAuthCredentialsWriter {
-  if (!registered) {
-    throw new Error(
-      'LlmProfileRepository not registered (forgot to call registerLlmProfileRepository on boot?)'
-    );
-  }
-  const repo = registered;
-  return {
-    updateOAuthCredentials(profileId, creds) {
-      repo.update(profileId, { oauthCredentials: creds } as Partial<LlmProfileConfig>);
-    },
-  };
+  registerLlmProfileWriter(repo);
 }

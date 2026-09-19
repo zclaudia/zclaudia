@@ -11,6 +11,7 @@ import {
   DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME,
 } from '../../infra/providers/external-agents/agent-plugin/tool-bridge.js';
 import { getZClaudiaToolCatalog, type AgentToolCatalog } from './tool-catalog.js';
+import { toolRegistry } from './tool-registry.js';
 
 const PORTABLE_BRIDGE_PACKAGE = '@zclaudia/agent-tool-bridge';
 
@@ -132,6 +133,9 @@ export class AgentToolBridgeHostManager {
     const config = await this.createLegacyEntry({
       serverPort: request.serverPort,
       zclaudiaSessionId: request.sessionId,
+      // Evaluated here (application layer) so the legacy factory stays
+      // layer-neutral; same call time as the previous in-factory lookup.
+      bridgeTools: toolRegistry.getBridgeTools(),
     });
     return config
       ? {

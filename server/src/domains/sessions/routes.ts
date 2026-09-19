@@ -3,8 +3,10 @@ import type Database from 'better-sqlite3';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { Message } from '@zclaudia/shared/core/message';
 import type { Session } from '@zclaudia/shared/core/session';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { SessionModelSettingsService, ModelSettingsError } from './model-settings-service.js';
-import { capabilitiesForSession } from '../../interfaces/http/provider-capabilities.js';
+import type { ManagedRuntimeResolverPort } from './model-settings-service.js';
+import { capabilitiesForSession } from '../../utils/runtime-capabilities.js';
 import { providerRegistry } from '../../infra/providers/registry.js';
 import { SessionRepository } from './repository.js';
 import { getCompactionById } from './compaction-tree-read.js';
@@ -23,18 +25,30 @@ import {
 import { branchSessionAt, BranchError } from './branch-service.js';
 import { forkSession, ForkError } from './fork-service.js';
 import { buildContextGraph } from './context-graph-read.js';
-import { sendApiError } from '../../interfaces/http/response.js';
+import { sendApiError } from '../../utils/http-response.js';
 import { NoAgentAvailableError } from './agent-resolver.js';
-import { requestSessionTitleGeneration } from '../../application/conversation/title/request-session-title.js';
 import { resolveAgentReadinessForSessionWithRuntimeCheck } from './agent-readiness.js';
-import type { ActiveRun } from '../../application/conversation/transport/types.js';
+import type { RunLike } from '../../utils/run-state.js';
 
-type ActiveRunsMap = Map<string, ActiveRun>;
+type ActiveRunsMap = Map<string, RunLike>;
+
+/**
+ * Fire-and-forget title generation request (backed by the application title
+ * service). Injected by the composition root so this domain module does not
+ * import the application layer.
+ */
+export type SessionTitleGenerationRequester = (input: {
+  db: Database.Database;
+  sessionId: string;
+  broadcast: (msg: ServerMessage) => void;
+}) => void;
 
 export function createSessionRoutes(
   db: Database.Database,
   activeRuns: ActiveRunsMap,
-  sessionEvents?: SessionEventPublisherPort
+  sessionEvents?: SessionEventPublisherPort,
+  requestTitleGeneration?: SessionTitleGenerationRequester,
+  managedRuntimes?: ManagedRuntimeResolverPort
 ): Router {
   const router = Router();
   const repo = new SessionRepository(db);
@@ -47,8 +61,14 @@ export function createSessionRoutes(
   const exportService = new SessionExportService(db);
   const queryService = new SessionQueryService(db, activeRuns);
 
-  const modelSettings = new SessionModelSettingsService(db, providerRegistry, sessionId =>
-    hasAnyActiveRunForSession(activeRuns, sessionId)
+  const modelSettings = new SessionModelSettingsService(
+    db,
+    providerRegistry,
+    sessionId => hasAnyActiveRunForSession(activeRuns, sessionId),
+    managedRuntimes ?? {
+      // Discovery without a resolver treats managed runtimes as unavailable.
+      resolveForRuntime: async () => undefined,
+    }
   );
   router.get('/:id/capabilities', async (req, res) => {
     try {
@@ -414,7 +434,7 @@ export function createSessionRoutes(
   // service re-checks eligibility and lands the result via a sessions_updated
   // broadcast, so this returns 202 immediately regardless of the outcome.
   router.post('/:id/generate-title', (req: Request, res: Response) => {
-    requestSessionTitleGeneration({
+    requestTitleGeneration?.({
       db,
       sessionId: req.params.id,
       broadcast: msg => {

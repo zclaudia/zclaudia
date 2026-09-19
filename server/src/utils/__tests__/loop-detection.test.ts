@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateToolSignature, detectLoop } from '../loop-detection';
+import { generateToolSignature, detectLoop } from '../loop-detection.js';
 
 describe('generateToolSignature', () => {
   describe('Bash commands', () => {

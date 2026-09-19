@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CodexOAuthError, codexOAuthErrorToHttpStatus } from '../codex-oauth-errors.js';
+import { CodexOAuthError, codexOAuthErrorToHttpStatus } from '../../../utils/codex-oauth-errors.js';
 
 describe('CodexOAuthError', () => {
   it('exposes code and message', () => {

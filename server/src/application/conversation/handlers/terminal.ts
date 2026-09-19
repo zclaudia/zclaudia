@@ -6,7 +6,7 @@ import type {
   TerminalDetachMessage,
   TerminalAttachMessage,
 } from '@zclaudia/shared/wire/messages';
-import type { TerminalManager } from '../../../terminal-manager.js';
+import type { TerminalManager } from '../../../infra/terminal-manager.js';
 import type { ConnectedClient } from '../transport/types.js';
 import { sendMessage } from '../transport/broadcast.js';
 import type { initDatabase } from '../../../infra/storage/db.js';

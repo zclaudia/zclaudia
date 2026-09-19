@@ -18,7 +18,7 @@ import { newId } from '../../utils/uuid.js';
 import {
   protectMcpOAuthCredentials,
   unprotectMcpOAuthCredentials,
-} from './mcp-oauth-credential-protector.js';
+} from '../../utils/mcp-oauth-credential-protector.js';
 import { resolveMcpServerStatus } from '@zclaudia/shared/core/record-status-resolvers';
 
 export interface McpServerRow {

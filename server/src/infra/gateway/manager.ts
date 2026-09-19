@@ -1,6 +1,7 @@
 import * as os from 'os';
-import { ALL_SERVER_FEATURES } from '@zclaudia/shared/core/server';
-import type { ServerMessage } from '@zclaudia/shared/wire/messages';
+import { ALL_SERVER_FEATURES, type GatewayBackendInfo } from '@zclaudia/shared/core/server';
+import type { ServerMessage, ClientMessage } from '@zclaudia/shared/wire/messages';
+import type { StateHeartbeatMessage } from '@zclaudia/shared/wire/messages';
 import type { SessionItem, ProjectItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
 import { GatewayClient, type GatewayClientConfig } from './gateway-client.js';
 import { setGatewayClient } from './gateway-instance.js';
@@ -10,9 +11,10 @@ import { StandaloneBackendFacadeProvider } from './standalone-provider.js';
 import type { LocalBackendHandler } from './embedded-adapter.js';
 import type { FacadeWsHub } from './ws-hub.js';
 import type Database from 'better-sqlite3';
-import type { GatewayConfig } from '../../interfaces/http/gateway.js';
-import type { ServerContext } from '../../server.js';
+import type { GatewayConfig } from './gateway-types.js';
 import { resolveSessionRunStatus } from '../../utils/run-state.js';
+import type { RunLike } from '../../utils/run-state.js';
+import type { ConnectedClient } from '../../utils/connected-client.js';
 import {
   parsePersistedMessageContent,
   parsePersistedMessageMetadata,
@@ -25,12 +27,25 @@ type FacadeProvider = {
   getWsHub(): FacadeWsHub;
 };
 
-import type {
-  ActiveRun,
-  ConnectedClient as WsConnectedClient,
-} from '../../application/conversation/transport/types.js';
+type ActiveRunsMap = Map<string, RunLike>;
 
-type ActiveRunsMap = Map<string, ActiveRun>;
+/**
+ * Narrow structural slice of the root ServerContext that the gateway manager
+ * needs. Defined locally so infra does not import the composition root; the
+ * full ServerContext satisfies it structurally.
+ */
+export interface GatewayServerContext {
+  db: Database.Database;
+  terminalManager: { detachClient(clientId: string): void };
+  browserManager: { detachClient(clientId: string): void };
+  handleMessage: (client: ConnectedClient, message: ClientMessage) => Promise<void>;
+  getStateHeartbeat: () => StateHeartbeatMessage;
+  updateGatewayConnected: (connected: boolean) => void;
+  updateGatewayBackendId: (backendId: string | null) => void;
+  updateGatewayIdentity: (instanceId: string, deviceId: string) => void;
+  updateDiscoveredBackends: (backends: GatewayBackendInfo[]) => void;
+  setFacadeHub: (hub: FacadeWsHub | null) => void;
+}
 
 /** DB row shape for session message catch-up queries. */
 interface MessageCatchUpRow {
@@ -45,13 +60,13 @@ interface MessageCatchUpRow {
 
 export interface GatewayManagerDeps {
   db: Database.Database;
-  serverContext: ServerContext;
+  serverContext: GatewayServerContext;
   activeRuns: ActiveRunsMap;
-  connectedClients: Map<string, WsConnectedClient>;
+  connectedClients: Map<string, ConnectedClient>;
   createVirtualClient: (
     channelId: string,
     transport: { send: (msg: ServerMessage) => void }
-  ) => WsConnectedClient;
+  ) => ConnectedClient;
   cancelRun: (runId: string) => void;
   host: string;
 }
@@ -59,14 +74,14 @@ export interface GatewayManagerDeps {
 export class GatewayManager {
   private gatewayClient: GatewayClient | null = null;
   private facadeProvider: FacadeProvider | null = null;
-  private virtualClients = new Map<string, WsConnectedClient>();
+  private virtualClients = new Map<string, ConnectedClient>();
   private actualPort = 0;
   private syncInterval: ReturnType<typeof setInterval> | null = null;
 
   private readonly db: Database.Database;
-  private readonly serverContext: ServerContext;
+  private readonly serverContext: GatewayServerContext;
   private readonly activeRuns: ActiveRunsMap;
-  private readonly connectedClients: Map<string, WsConnectedClient>;
+  private readonly connectedClients: Map<string, ConnectedClient>;
   private readonly createVirtualClient: GatewayManagerDeps['createVirtualClient'];
   private readonly cancelRun: GatewayManagerDeps['cancelRun'];
   private readonly host: string;

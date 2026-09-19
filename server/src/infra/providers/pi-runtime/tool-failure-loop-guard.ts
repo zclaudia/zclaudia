@@ -1,4 +1,4 @@
-import { generateToolSignature } from '../../../loop-detection.js';
+import { generateToolSignature } from '../../../utils/loop-detection.js';
 import type { BashOutputDiagnostic } from './bash-output.js';
 
 export const TOOL_FAILURE_HARD_LIMIT = 3;

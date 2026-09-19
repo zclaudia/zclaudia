@@ -11,7 +11,7 @@ import {
 
 // We import the class via initFileStore + getFileStore to construct a real instance
 // with an in-memory SQLite DB and a temp dir on disk.
-import { initFileStore, getFileStore } from '../../../../infra/storage/fileStore.js';
+import { initFileStore, getFileStore } from '../fileStore.js';
 
 // Silence FileStore console output during tests
 import { vi } from 'vitest';

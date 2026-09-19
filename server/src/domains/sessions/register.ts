@@ -1,11 +1,8 @@
 import type { Express, RequestHandler } from 'express';
 import type Database from 'better-sqlite3';
-import { Router } from 'express';
-import { createSessionRoutes } from './routes.js';
+import { createSessionRoutes, type SessionTitleGenerationRequester } from './routes.js';
+import type { ManagedRuntimeResolverPort } from './model-settings-service.js';
 import { createSessionDraftRoutes } from './drafts-routes.js';
-import { mountSessionInvocableRoutes } from '../../interfaces/http/session-invocables.js';
-import { buildSessionCatalogRequest } from '../../application/invocations/session-catalog.js';
-import { providerRegistry } from '../../infra/providers/registry.js';
 import type { SessionEventPublisherPort } from './session-event-port.js';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- sessions domain treats this as opaque; concrete type lives in application/conversation
 type ActiveRunsMap = Map<string, any>;
@@ -16,21 +13,30 @@ export interface SessionsDomainDeps {
   db: Database.Database;
   activeRuns: ActiveRunsMap;
   sessionEvents?: SessionEventPublisherPort;
+  /** Fire-and-forget title generation (application title service), injected
+   *  by the composition root so the domain stays layer-clean. */
+  requestTitleGeneration?: SessionTitleGenerationRequester;
+  /** Managed-runtime resolver (application managed-runtime service), injected
+   *  by the composition root so the domain stays layer-clean. */
+  managedRuntimes?: ManagedRuntimeResolverPort;
 }
 
 export function registerSessionsDomain(deps: SessionsDomainDeps): void {
   const { app, authMiddleware, db, activeRuns, sessionEvents } = deps;
 
-  app.use('/api/sessions', authMiddleware, createSessionRoutes(db, activeRuns, sessionEvents));
+  app.use(
+    '/api/sessions',
+    authMiddleware,
+    createSessionRoutes(
+      db,
+      activeRuns,
+      sessionEvents,
+      deps.requestTitleGeneration,
+      deps.managedRuntimes
+    )
+  );
   app.use('/api/sessions', authMiddleware, createSessionDraftRoutes(db));
-  // URIP session invocable catalog (§15.1): host actions + runtime + portable
-  // entries composed per session. Snapshot building wires to the live session
-  // context as runtime adapters publish catalogs; the routes exist now so the
-  // desktop consumes session-scoped catalogs, never provider-type ones.
-  const invocablesRouter = Router();
-  mountSessionInvocableRoutes(invocablesRouter, db, {
-    buildRequest: (database, sessionId) =>
-      buildSessionCatalogRequest(database, sessionId, providerRegistry),
-  });
-  app.use('/api/sessions', authMiddleware, invocablesRouter);
+  // NOTE: the URIP session invocable catalog routes (§15.1) are mounted by the
+  // composition root (feature-domains.ts) right after this call — they depend
+  // on the interfaces/application layers and must not be imported from here.
 }

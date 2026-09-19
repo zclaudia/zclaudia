@@ -1,10 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { LlmProfileRepository } from '../../domains/llm-profiles/repository.js';
 import type { CodexOAuthSessionManager } from '../../domains/llm-profiles/codex-oauth-session.js';
-import {
-  CodexOAuthError,
-  codexOAuthErrorToHttpStatus,
-} from '../../domains/llm-profiles/codex-oauth-errors.js';
+import { CodexOAuthError, codexOAuthErrorToHttpStatus } from '../../utils/codex-oauth-errors.js';
 import { fetchCodexModels } from '../../domains/llm-profiles/codex-models.js';
 
 function handleCodexError(res: Response, err: unknown): void {

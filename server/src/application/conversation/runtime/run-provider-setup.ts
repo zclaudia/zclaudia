@@ -4,7 +4,7 @@ import {
   resolveImageAttachments,
   resolveFileAttachments,
   type ResolvedImage,
-} from './resolve-image-attachments.js';
+} from '../../../infra/storage/resolve-image-attachments.js';
 import { getFileStore } from '../../../infra/storage/fileStore.js';
 import { createPermissionCallback } from './run-permissions.js';
 import { resolveUserHooks } from './resolve-user-hooks.js';

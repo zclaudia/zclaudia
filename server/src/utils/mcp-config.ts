@@ -11,7 +11,7 @@ import {
   normalizeMcpOAuthConfig,
   normalizeMcpServerTransport,
 } from '@zclaudia/shared/core/mcp';
-import { unprotectMcpOAuthCredentials } from '../infra/services/mcp-oauth-credential-protector.js';
+import { unprotectMcpOAuthCredentials } from './mcp-oauth-credential-protector.js';
 
 export interface McpStdioServerConfig {
   type?: 'stdio';

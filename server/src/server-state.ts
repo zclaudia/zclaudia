@@ -29,7 +29,7 @@ import type { GoalService } from './domains/goals/service.js';
 import type { FacadeWsHub } from './infra/gateway/ws-hub.js';
 import type { TaskCoordinationPort } from './application/conversation/task-coordination-port.js';
 import type { SessionSyncPort } from './application/conversation/session-sync-port.js';
-import type { TaskExecutor } from './domains/tasks/executors/types.js';
+import type { TaskExecutor } from './utils/task-executor-types.js';
 import type { MessageHandlerContext } from './application/conversation/transport/message-handler.js';
 import type { RunHandlerContext } from './application/conversation/runtime/run-handler.js';
 import type { ConnectedClient, ActiveRun } from './application/conversation/transport/types.js';

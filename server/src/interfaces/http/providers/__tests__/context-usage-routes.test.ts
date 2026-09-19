@@ -6,7 +6,7 @@ import {
   captureContextSnapshot,
   clearContextSnapshots,
   recordContextUsage,
-} from '../context-snapshot.js';
+} from '../../../../infra/providers/context-snapshot.js';
 
 function makeApp(deps?: Parameters<typeof createContextUsageRoutes>[0]) {
   const app = express();

@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import * as path from 'path';
 import { tmpdir } from 'os';
 import { describe, expect, it } from 'vitest';
-import { recordFileBackup } from '../file-history.js';
+import { recordFileBackup } from '../../../../infra/providers/pi-runtime/file-history.js';
 import { createFileHistoryRoutes } from '../file-history-routes.js';
 
 describe('file history routes', () => {

@@ -10,7 +10,7 @@ import type {
   InteractionPromptMessage,
   TodoUpdateInteractionMessage,
 } from '@zclaudia/shared/interaction/forms';
-import { validateTodoItems } from './todo-normalizer.js';
+import { validateTodoItems } from '../../../utils/todo-normalizer.js';
 
 // ============================================
 // TodoWrite → interaction_todo_update

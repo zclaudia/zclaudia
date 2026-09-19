@@ -1,5 +1,8 @@
 import { Router, type Request, type Response } from 'express';
-import { computeContextUsage, getContextSnapshot } from './context-snapshot.js';
+import {
+  computeContextUsage,
+  getContextSnapshot,
+} from '../../../infra/providers/context-snapshot.js';
 
 export interface ContextUsageRoutesDeps {
   /**

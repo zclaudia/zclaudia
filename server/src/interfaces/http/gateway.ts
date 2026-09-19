@@ -1,39 +1,10 @@
 import { Router, type Request, type Response } from 'express';
 import type { Database } from 'better-sqlite3';
-import type { GatewayBackendInfo } from '@zclaudia/shared/core/server';
 
-export interface GatewayConfig {
-  id: number;
-  enabled: boolean;
-  gatewayUrl: string | null;
-  /**
-   * Legacy API/storage field name (DB column: gateway_secret). The value is
-   * a gateway-issued peer credential (zgd_/zgb_/zga_); the name predates the
-   * credential split and is kept as a compatibility boundary.
-   */
-  gatewaySecret: string | null;
-  backendName: string | null;
-  gatewayBackendId: string | null;
-  registerAsBackend: boolean;
-  proxyUrl?: string | null;
-  proxyUsername?: string | null;
-  proxyPassword?: string | null;
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface GatewayStatus {
-  enabled: boolean;
-  connected: boolean;
-  gatewayBackendId: string | null;
-  gatewayUrl: string | null;
-  gatewaySecret: string | null;
-  backendName: string | null;
-  registerAsBackend: boolean;
-  discoveredBackends: GatewayBackendInfo[];
-  instanceId?: string;
-  currentDeviceId?: string;
-}
+// Config/status shapes live with the infra gateway module; re-exported here
+// for existing import sites.
+export type { GatewayConfig, GatewayStatus } from '../../infra/gateway/gateway-types.js';
+import type { GatewayConfig, GatewayStatus } from '../../infra/gateway/gateway-types.js';
 
 interface GatewayConfigRow {
   id: number;

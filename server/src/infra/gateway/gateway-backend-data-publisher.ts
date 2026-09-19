@@ -5,10 +5,10 @@ import type {
 import { RESOURCES_TOPIC } from '@zclaudia/protocol/transport';
 import type { ProjectItem, SessionItem } from '@zclaudia/protocol/zclaudia';
 import type { Database as BetterDatabase } from 'better-sqlite3';
-import type { ActiveRun } from '../../application/conversation/transport/types.js';
+import type { RunLike } from '../../utils/run-state.js';
 import { resolveSessionRunStatus } from '../../utils/run-state.js';
 
-type ActiveRunsMap = Map<string, ActiveRun>;
+type ActiveRunsMap = Map<string, RunLike>;
 type BackendDataMessage = BackendResourceSnapshotMessage | BackendResourceEventMessage;
 
 export interface GatewayBackendDataPublisherOptions {

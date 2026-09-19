@@ -21,7 +21,7 @@ import { prepareProviderRun } from './run-provider-setup.js';
 import { finalizeRun, handleRunException } from './run-recovery.js';
 import { setPhase } from './active-run-phase.js';
 import { persistAssistantTerminalSnapshot } from './run-terminal-snapshot.js';
-import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
+import type { TaskExecutor } from '../../../utils/task-executor-types.js';
 import type { PermissionBridge } from '../agent/permission-bridge.js';
 import type { PermissionWorkflowResolver } from '../../../domains/workflows/index.js';
 

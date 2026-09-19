@@ -34,7 +34,7 @@ import {
   normalizeMcpServerTrustPolicy,
   type McpServerTrustPolicy,
 } from '@zclaudia/shared/core/mcp';
-import { unprotectMcpOAuthCredentials } from '../../../infra/services/mcp-oauth-credential-protector.js';
+import { unprotectMcpOAuthCredentials } from '../../../utils/mcp-oauth-credential-protector.js';
 import { mcpInventoryCache } from '../../../utils/mcp-inventory-cache.js';
 import { isBashLikeTool, isSudoCommand } from '../../../utils/server-utils.js';
 import { isReadOnlyTool, normalizeToolName } from '@zclaudia/shared/core/tools';

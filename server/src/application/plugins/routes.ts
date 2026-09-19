@@ -11,7 +11,7 @@ import {
 import multer from 'multer';
 import { PluginManagementError, PluginManagementService } from './management-service.js';
 import { PluginFrontendError, PluginFrontendService } from './frontend-service.js';
-import { sendApiError } from '../../interfaces/http/response.js';
+import { sendApiError } from '../../utils/http-response.js';
 import {
   PluginPackageError,
   pluginPackageService,

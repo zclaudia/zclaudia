@@ -1,7 +1,7 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 
-import { persistSessionSandboxDomain } from '../../../application/conversation/agent/permission-memory.js';
+import { persistSessionSandboxDomain } from './sandbox-network-memory.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
 import type { PermissionCallback } from '../types.js';

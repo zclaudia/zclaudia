@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { getDeferredDiagnosticsResult } from './write-lifecycle.js';
+import { getDeferredDiagnosticsResult } from '../../../infra/providers/pi-runtime/write-lifecycle.js';
 
 export function createDeferredDiagnosticsRoutes(): Router {
   const router = Router();
