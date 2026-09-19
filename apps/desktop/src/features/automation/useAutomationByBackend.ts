@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
-import { selectAgentsBackends } from '../agents/selectAgentsBackends';
+import { selectAgentsBackends } from '../agents';
 import { createAutomationApi, type AutomationApi } from './useAutomationApi';
 import type { AutomationBackend } from './automation-types';
 

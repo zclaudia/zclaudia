@@ -9,7 +9,7 @@ import { PlanStatusBar } from './PlanStatusBar';
 import { SessionHeader } from './SessionHeader';
 import { BackgroundTaskPanel } from '../../components/BackgroundTaskPanel';
 import { DraftLockPrompt } from '../../components/draft/DraftLockPrompt';
-import { TaskCardStrip } from '../supervision/components/TaskCardStrip';
+import { TaskCardStrip } from '../supervision';
 import { forkSession, branchSession } from '../../services/api';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useComposerStore, type SessionDraft } from '../../stores/composerStore';

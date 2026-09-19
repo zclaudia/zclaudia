@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Globe, FolderOpen } from 'lucide-react';
 import type { Project } from '@zclaudia/shared';
-import { FilterChips } from '../agents/ui/FilterChips';
+import { FilterChips } from '../agents';
 import { Button } from '../../components/ui/Button';
 import { TONE_DOT } from '../../components/ui/tone';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';

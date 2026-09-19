@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useMemo, useState, type ComponentProps } from 'react';
-import { MessageInput, type Attachment } from '../chat/MessageInput';
+import { MessageInput, InlinePermissionRequest, type Attachment } from '../chat';
 import { useClaudiaStore } from '../../stores/claudiaStore';
 import type {
   ClaudiaFeedMessage,
@@ -21,7 +21,6 @@ import { parseBackendId } from '../../stores/gatewayStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useComposerStore } from '../../stores/composerStore';
 import { resolveCanonicalBackendId } from '../../actions/controlPlane';
-import { InlinePermissionRequest } from '../chat/InlinePermissionRequest';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type {
   AgentCancelMessage,

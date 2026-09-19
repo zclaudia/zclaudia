@@ -9,7 +9,7 @@ import {
   sendEvaluateImpact,
   sendCascadeRerun,
 } from '../api.js';
-import { WorkflowRunViewer } from '../../workflows/components/WorkflowRunViewer.js';
+import { WorkflowRunViewer } from '../../workflows';
 
 interface Props {
   projectId: string;

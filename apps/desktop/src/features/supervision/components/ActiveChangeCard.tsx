@@ -5,7 +5,7 @@ import type {
   ProjectChange,
   SupervisionTask,
 } from '@zclaudia/shared';
-import { LegacyBadge } from '../../openspec/components/LegacyBadge.js';
+import { LegacyBadge } from '../../openspec';
 import { changeStatusLabel, getNextAction } from './supervisor-utils';
 import { SECTION_LABEL } from '../../../components/ui/typography';
 

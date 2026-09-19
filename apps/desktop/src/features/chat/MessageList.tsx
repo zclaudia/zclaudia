@@ -24,7 +24,7 @@ import { FilePushCard } from './FilePushNotification';
 import { FilePreviewModal } from './FilePreviewModal';
 import { CompactionMarkerCard } from './CompactionMarkerCard';
 import { ContextUsageCard } from './ContextUsageCard';
-import { ChatLink } from '../browser/ChatLink';
+import { ChatLink } from '../browser';
 import type { MessageWithToolCalls } from '../../stores/chatMessageStore';
 import type { ToolCallState } from '../../stores/runStore';
 import type { ContentBlock } from '@zclaudia/shared';

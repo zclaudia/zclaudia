@@ -26,3 +26,4 @@ export { SortableAttachmentThumbnail } from './components/SortableAttachmentThum
 export { ImageLightbox } from './components/ImageLightbox';
 
 export { formatFileSize, attachmentKindFromMime, filesFromDataTransfer } from './utils';
+export { downscaleImageFile } from './downscale-image';

@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent, type RefObject } from 'react';
 import { validateMessageAttachmentFiles } from '@zclaudia/shared';
-import { downscaleImageFile } from '../../attachments/downscale-image';
+import { downscaleImageFile } from '../../attachments';
 import type { Attachment } from '../types';
 
 interface UseAttachmentPickerOptions {

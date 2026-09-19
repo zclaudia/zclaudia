@@ -145,76 +145,14 @@ const DEFAULT_SERVER_LAYER_VIOLATION_ALLOWLIST = new Set([
 // desktop: a store file may not import another store file (cross-store
 // coordination belongs in services/consumers, shared types in a types module).
 const DEFAULT_DESKTOP_STORE_IMPORT_ALLOWLIST = new Set([
-  'apps/desktop/src/stores/chatMessageStore.ts -> apps/desktop/src/stores/runStore.ts',
-  'apps/desktop/src/stores/draftEditorStore.ts -> apps/desktop/src/stores/pluginStore.ts',
-  'apps/desktop/src/stores/fileViewerStore.ts -> apps/desktop/src/stores/pluginStore.ts',
-  'apps/desktop/src/stores/llmProfileMetaStore.ts -> apps/desktop/src/stores/serverStore.ts',
-  'apps/desktop/src/stores/projectStore.ts -> apps/desktop/src/stores/gatewayStore.ts',
-  'apps/desktop/src/stores/projectStore.ts -> apps/desktop/src/stores/llmProfileMetaStore.ts',
-  'apps/desktop/src/stores/projectStore.ts -> apps/desktop/src/stores/ownershipStore.ts',
-  'apps/desktop/src/stores/projectStore.ts -> apps/desktop/src/stores/rightWorkspaceStore.ts',
-  'apps/desktop/src/stores/projectStore.ts -> apps/desktop/src/stores/runStore.ts',
-  'apps/desktop/src/stores/projectStore.ts -> apps/desktop/src/stores/selectionStore.ts',
-  'apps/desktop/src/stores/projectStore.ts -> apps/desktop/src/stores/serverStore.ts',
-  'apps/desktop/src/stores/rightWorkspaceStore.ts -> apps/desktop/src/stores/panelInstance.ts',
-  'apps/desktop/src/stores/runStore.ts -> apps/desktop/src/stores/chatMessageStore.ts',
-  'apps/desktop/src/stores/runStore.ts -> apps/desktop/src/stores/sessionConfigStore.ts',
-  'apps/desktop/src/stores/runtimeDescriptorStore.ts -> apps/desktop/src/stores/serverStore.ts',
-  'apps/desktop/src/stores/sessionsStore.ts -> apps/desktop/src/stores/ownershipStore.ts',
-  'apps/desktop/src/stores/sessionsStore.ts -> apps/desktop/src/stores/rightWorkspaceStore.ts',
-  'apps/desktop/src/stores/terminalStore.ts -> apps/desktop/src/stores/pluginStore.ts',
-  'apps/desktop/src/stores/terminalStore.ts -> apps/desktop/src/stores/serverStore.ts',
+  // Cleared 2026-09-18: store-to-store imports are banned outright;
+  // cross-store coordination lives in services/*-coordination.ts.
 ]);
 
 // desktop: a file inside features/<name>/ may not import features/<other>/.
 const DEFAULT_DESKTOP_FEATURE_IMPORT_ALLOWLIST = new Set([
-  'apps/desktop/src/features/agent/readiness-copy.ts -> features/agents',
-  'apps/desktop/src/features/automation/AutomationScope.tsx -> features/agents',
-  'apps/desktop/src/features/automation/AutomationWorkflowDetail.tsx -> features/workflows',
-  'apps/desktop/src/features/automation/RunsTab.tsx -> features/workflows',
-  'apps/desktop/src/features/automation/useAutomationByBackend.ts -> features/agents',
-  'apps/desktop/src/features/changes/SummarySection.tsx -> features/local-issues',
-  'apps/desktop/src/features/chat/ChatInterface.tsx -> features/supervision',
-  'apps/desktop/src/features/chat/EmptySessionOverview.tsx -> features/git',
-  'apps/desktop/src/features/chat/InteractionItem.tsx -> features/local-issues',
-  'apps/desktop/src/features/chat/MessageInput.tsx -> features/attachments',
-  'apps/desktop/src/features/chat/MessageList.tsx -> features/browser',
-  'apps/desktop/src/features/chat/SessionChatLayout.tsx -> features/git',
-  'apps/desktop/src/features/claudia/ClaudiaChat.tsx -> features/chat',
-  'apps/desktop/src/features/dashboard/DashboardHome.tsx -> features/git',
-  'apps/desktop/src/features/dashboard/DashboardHome.tsx -> features/local-issues',
-  'apps/desktop/src/features/dashboard/DashboardHome.tsx -> features/local-pr',
-  'apps/desktop/src/features/dashboard/DashboardHome.tsx -> features/supervision',
-  'apps/desktop/src/features/dashboard/DashboardHome.tsx -> features/workflows',
-  'apps/desktop/src/features/dashboard/ProjectDashboard.tsx -> features/automation',
-  'apps/desktop/src/features/dashboard/ProjectDashboard.tsx -> features/chat',
-  'apps/desktop/src/features/dashboard/ProjectDashboard.tsx -> features/git',
-  'apps/desktop/src/features/dashboard/ProjectDashboard.tsx -> features/local-issues',
-  'apps/desktop/src/features/dashboard/ProjectDashboard.tsx -> features/local-pr',
-  'apps/desktop/src/features/dashboard/ProjectDashboard.tsx -> features/openspec',
-  'apps/desktop/src/features/dashboard/ProjectDashboard.tsx -> features/supervision',
-  'apps/desktop/src/features/local-issues/components/CreateIssueDialog.tsx -> features/attachments',
-  'apps/desktop/src/features/local-issues/components/LocalIssueCard.tsx -> features/attachments',
-  'apps/desktop/src/features/local-issues/components/LocalIssueDetailView.tsx -> features/attachments',
-  'apps/desktop/src/features/local-issues/components/LocalIssuesPanel.tsx -> features/attachments',
-  'apps/desktop/src/features/meta-workflow/components/MetaWorkflowPanel.tsx -> features/openspec',
-  'apps/desktop/src/features/meta-workflow/components/PhaseDetailScreen.tsx -> features/workflows',
-  'apps/desktop/src/features/permissions/AIReviewLogsWindow.tsx -> features/workflows',
-  'apps/desktop/src/features/plugins/PluginsContent.tsx -> features/settings',
-  'apps/desktop/src/features/settings/PermissionSettings.tsx -> features/workflows',
-  'apps/desktop/src/features/settings/ProjectSettings.tsx -> features/workflows',
-  'apps/desktop/src/features/sidebar/Sidebar.tsx -> features/agent',
-  'apps/desktop/src/features/sidebar/Sidebar.tsx -> features/agents',
-  'apps/desktop/src/features/sidebar/Sidebar.tsx -> features/automation',
-  'apps/desktop/src/features/sidebar/Sidebar.tsx -> features/git',
-  'apps/desktop/src/features/sidebar/Sidebar.tsx -> features/plugins',
-  'apps/desktop/src/features/sidebar/Sidebar.tsx -> features/settings',
-  'apps/desktop/src/features/sidebar/SidebarNav.tsx -> features/agents',
-  'apps/desktop/src/features/sidebar/SidebarNav.tsx -> features/automation',
-  'apps/desktop/src/features/sidebar/SidebarNav.tsx -> features/plugins',
-  'apps/desktop/src/features/supervision/components/ActiveChangeCard.tsx -> features/openspec',
-  'apps/desktop/src/features/supervision/components/SupervisorWorkspacePanel.tsx -> features/meta-workflow',
-  'apps/desktop/src/features/supervision/components/SupervisorWorkspacePanel.tsx -> features/openspec',
+  // Cleared 2026-09-18: cross-feature imports must target the other
+  // feature's public entry (index.ts / api.ts / *-types.ts).
 ]);
 
 // desktop: services/** may not re-export feature APIs (directly or through a
@@ -382,6 +320,15 @@ function assertDesktopStoreImportBoundaries(repoRoot, failures, options) {
 const DESKTOP_FEATURE_FILE_PATTERN = /^apps\/desktop\/src\/features\/([^/]+)\//;
 const DESKTOP_FEATURE_TARGET_PATTERN = /^apps\/desktop\/src\/features\/([^/]+)\//;
 
+// A feature's public surface: its curated index.ts, its HTTP api.ts, and
+// <feature>-types.ts(x) contract files. Cross-feature imports may only
+// target these; reaching into components/store/hooks of another feature is
+// a violation.
+function isFeaturePublicEntry(target) {
+  const basename = path.posix.basename(target);
+  return basename === 'index.ts' || basename === 'api.ts' || /-types\.tsx?$/.test(basename);
+}
+
 function assertDesktopFeatureImportBoundaries(repoRoot, failures, options) {
   const allowlist =
     options.desktopFeatureImportAllowlist ?? DEFAULT_DESKTOP_FEATURE_IMPORT_ALLOWLIST;
@@ -396,6 +343,7 @@ function assertDesktopFeatureImportBoundaries(repoRoot, failures, options) {
       if (!target) continue;
       const targetFeature = target.match(DESKTOP_FEATURE_TARGET_PATTERN)?.[1];
       if (!targetFeature || targetFeature === ownFeature) continue;
+      if (isFeaturePublicEntry(target)) continue;
 
       const key = `${relativePath} -> features/${targetFeature}`;
       if (allowlist.has(key)) continue;

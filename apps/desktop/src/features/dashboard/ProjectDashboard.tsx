@@ -2,17 +2,18 @@ import { useEffect, useCallback, useState } from 'react';
 import type { SupervisionTask } from '@zclaudia/shared';
 import { ArrowLeft } from 'lucide-react';
 import * as api from '../../services/api';
-import { useSupervisionStore } from '../../features/supervision/store';
-import { TaskBoard } from '../../features/supervision/components/TaskBoard';
-import { ContextBrowser } from '../../features/supervision/components/ContextBrowser';
-import { CheckpointFeed } from '../../features/supervision/components/CheckpointFeed';
-import { SupervisorWorkspacePanel } from '../../features/supervision/components/SupervisorWorkspacePanel';
-import { SessionChatLayout } from '../../features/chat/SessionChatLayout';
-import { LocalPRsPanel } from '../../features/local-pr/components/LocalPRsPanel';
-import { LocalIssuesPanel } from '../../features/local-issues/components/LocalIssuesPanel';
-import { useLocalIssueStore } from '../../features/local-issues/store';
-import { GitPanel } from '../../features/git/components/GitPanel';
-import { OpenSpecPanel } from '../../features/openspec/components/OpenSpecPanel';
+import {
+  useSupervisionStore,
+  TaskBoard,
+  ContextBrowser,
+  CheckpointFeed,
+  SupervisorWorkspacePanel,
+} from '../supervision';
+import { SessionChatLayout } from '../chat';
+import { LocalPRsPanel } from '../local-pr';
+import { LocalIssuesPanel, useLocalIssueStore } from '../local-issues';
+import { GitPanel } from '../git';
+import { OpenSpecPanel } from '../openspec';
 import { DashboardHome } from './DashboardHome';
 import { useSelectionStore } from '../../stores/selectionStore';
 import type { OpenAutomationsOptions } from '../automation/automation-types';

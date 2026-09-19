@@ -2,7 +2,7 @@ import { useEffect, useMemo, type ReactNode } from 'react';
 import { GitBranch, FileDiff, Compass, Target } from 'lucide-react';
 import type { SlashCommand } from '@zclaudia/shared';
 import * as api from '../../services/api';
-import { useGitStore, selectStatus, selectLog } from '../git/store';
+import { useGitStore, selectStatus, selectLog } from '../git';
 
 /** Loads git status + latest commit for the empty-session snapshot/chips.
  * Reuses the git store cache; fetch errors are swallowed (non-git dirs

@@ -2,12 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, ArrowLeft, ChevronRight, History } from 'lucide-react';
 import type { Workflow, WorkflowDefinition, WorkflowRun, WorkflowStepRun } from '@zclaudia/shared';
 import { normalizeWorkflowDefinition } from '@zclaudia/shared';
-import {
-  RunStatusBadge,
-  formatDuration,
-  runStatusTone,
-} from '../workflows/components/RunComponents';
-import { RunStepList } from '../workflows/components/RunStepList';
+import { RunStatusBadge, RunStepList, formatDuration, runStatusTone } from '../workflows';
 import { Button, IconButton } from '../../components/ui/Button';
 import { Tooltip } from '../../components/ui/Tooltip';
 import { createAutomationApi, type AutomationApiType } from './useAutomationApi';
@@ -89,7 +84,8 @@ export function RunsTab({ scope }: { scope: AutomationTabScope }) {
         api.get('/api/workflows').catch(() => [] as Workflow[]),
       ]);
       const names = new Map<string, string>();
-      for (const w of [...globalWorkflows, ...scopedWorkflows] as Workflow[]) names.set(w.id, w.name);
+      for (const w of [...globalWorkflows, ...scopedWorkflows] as Workflow[])
+        names.set(w.id, w.name);
       const sorted = [...runs].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
       return { runs: sorted, names };
     },

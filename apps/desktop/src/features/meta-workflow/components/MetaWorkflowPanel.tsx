@@ -4,7 +4,7 @@ import { useMetaWorkflowStore } from '../store.js';
 import { INITIAL_VIEW_STATE } from '../view-state.js';
 import * as api from '../api.js';
 import { listLegacyMetaWorkflowRunIds } from '../../openspec/api.js';
-import { LegacyBadge } from '../../openspec/components/LegacyBadge.js';
+import { LegacyBadge } from '../../openspec';
 import { RequirementsScreen } from './RequirementsScreen.js';
 import { PhaseGraphScreen } from './PhaseGraphScreen.js';
 import { PhaseBoardScreen } from './PhaseBoardScreen.js';

@@ -17,7 +17,7 @@ import { usePluginStore, selectPluginPanels } from '../../stores/pluginStore';
 import { fetchAndSyncPlugins, setPluginActive } from '../../services/api';
 import { Modal } from '../../components/ui/Modal';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import { WebSearchSettings } from '../settings/WebSearchSettings';
+import { WebSearchSettings } from '../settings';
 import { PluginDirsManager } from './PluginDirsManager';
 import { PluginsBrowseView } from './PluginsBrowseView';
 import type { PluginCardModel } from './plugins-types';

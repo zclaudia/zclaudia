@@ -4,7 +4,7 @@ import type { TurnSummary } from '@zclaudia/shared';
 import { useSummaryStore } from '../../stores/summaryStore';
 import { useToastStore } from '../../stores/toastStore';
 import { timeAgo } from '../../utils/timeAgo';
-import { CreateIssueDialog } from '../local-issues/components/CreateIssueDialog';
+import { CreateIssueDialog } from '../local-issues';
 import {
   buildIssueFromSummary,
   hasOpenIssues,

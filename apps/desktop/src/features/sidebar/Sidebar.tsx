@@ -7,7 +7,7 @@ import {
   type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { ProjectSettings } from '../settings/ProjectSettings';
+import { ProjectSettings } from '../settings';
 import { PluginPermissionDialog } from '../../components/permission/PluginPermissionDialog';
 import { SortableList, SortableItem } from '../../components/SortableList';
 
@@ -44,15 +44,15 @@ import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useSidebarWidthStore, SIDEBAR_WIDTH_LIMITS } from '../../stores/sidebarWidthStore';
 import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
 import { useHomeQuickActionsStore } from '../../stores/homeQuickActionsStore';
-import { AgentRequiredDialog } from '../agent/AgentRequiredDialog';
+import { AgentRequiredDialog } from '../agent';
 import type { AgentReadinessReason } from '@zclaudia/shared/core/agent-readiness';
-import type { SettingsTab } from '../settings/settingsTabDefs';
+import type { SettingsTab } from '../settings';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 
 import * as api from '../../services/api';
 import type { GitWorktree } from '@zclaudia/shared';
 import type { WorktreeGroup } from './worktreeGrouping';
-import { runWithToast } from '../git/runWithToast';
+import { runWithToast } from '../git';
 import { confirm } from '../../stores/confirmDialogStore';
 
 /** Keyboard resize step, in px, for the sidebar's resize handle. */

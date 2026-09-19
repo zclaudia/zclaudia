@@ -10,7 +10,7 @@ import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import { useGitStore } from '../git/store';
+import { useGitStore } from '../git';
 
 interface SessionChatLayoutProps {
   sessionId: string;

@@ -14,8 +14,7 @@ import { ActiveChangeCard } from './ActiveChangeCard';
 import { RecentChangesPanel } from './RecentChangesPanel';
 import { AllChangesPanel } from './AllChangesPanel';
 import { WorkspaceDocsPanel } from './WorkspaceDocsPanel';
-import { NewRunDropdown } from '../../meta-workflow/components/NewRunDropdown.js';
-import { MetaWorkflowPanel } from '../../meta-workflow/components/MetaWorkflowPanel.js';
+import { NewRunDropdown, MetaWorkflowPanel } from '../../meta-workflow';
 import { listLegacyClassicChangeIds } from '../../openspec/api.js';
 import {
   type ContextDocumentPreview,

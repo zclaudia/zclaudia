@@ -8,11 +8,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, RefreshCw, Bot } from 'lucide-react';
 import type { WorkflowRun, WorkflowStepRun } from '@zclaudia/shared';
-import {
-  StepStatusIcon,
-  RunStatusBadge,
-  formatDuration,
-} from '../workflows/components/RunComponents';
+import { StepStatusIcon, RunStatusBadge, formatDuration } from '../workflows';
 
 interface AIReviewLogsWindowProps {
   runId: string;

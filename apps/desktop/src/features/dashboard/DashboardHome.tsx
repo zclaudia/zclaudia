@@ -13,11 +13,11 @@ import {
 } from 'lucide-react';
 import type { Automation } from '@zclaudia/shared';
 import { useProjectStore } from '../../stores/projectStore';
-import { useSupervisionStore } from '../../features/supervision/store';
-import { useLocalPRStore } from '../../features/local-pr/store';
-import { useLocalIssueStore } from '../../features/local-issues/store';
-import { useWorkflowStore } from '../../features/workflows/store';
-import { useGitStore } from '../../features/git/store';
+import { useSupervisionStore } from '../supervision';
+import { useLocalPRStore } from '../local-pr';
+import { useLocalIssueStore } from '../local-issues';
+import { useWorkflowStore } from '../workflows';
+import { useGitStore } from '../git';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { apiCallForBackend } from '../../services/api/unwrap';
 import type { DashboardView } from './ProjectDashboard';

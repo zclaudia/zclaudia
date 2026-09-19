@@ -26,7 +26,7 @@ import type {
 } from '@zclaudia/shared';
 import { ACTIONABLE_LABEL, extractDefaultTitleFromPlan } from '@zclaudia/shared';
 import { useConnection } from '../../contexts/ConnectionContext';
-import { useLocalIssueStore } from '../local-issues/store';
+import { useLocalIssueStore } from '../local-issues';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useInteractionStore } from '../../stores/interactionStore';
