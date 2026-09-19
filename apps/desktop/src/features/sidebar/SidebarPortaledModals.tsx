@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import type { Project } from '@zclaudia/shared';
+import type { Project } from '@zclaudia/shared/core/project';
 import type { AgentReadinessReason } from '@zclaudia/shared/core/agent-readiness';
 import { ProjectSettings } from '../settings';
 import { PluginPermissionDialog } from '../../components/permission/PluginPermissionDialog';

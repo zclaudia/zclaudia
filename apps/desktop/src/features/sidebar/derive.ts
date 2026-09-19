@@ -1,7 +1,7 @@
 // Pure derivation helpers for the Sidebar: agent-readiness reason parsing,
 // empty-backend-tree messaging, context-menu positioning, and the Claudia
 // nav badge status. No React, no component state.
-import type { BackendConnectionState } from '@zclaudia/shared';
+import type { BackendConnectionState } from '@zclaudia/shared/facade/types';
 import type { AgentReadinessReason } from '@zclaudia/shared/core/agent-readiness';
 import { isMobileGatewayConnected } from '../../services/mobileConnectionState';
 

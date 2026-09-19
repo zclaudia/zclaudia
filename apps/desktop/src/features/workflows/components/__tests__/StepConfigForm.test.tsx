@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import { StepConfigForm } from '../StepConfigForm';
 import { useWorkflowStore } from '../../store';
-import type { WorkflowNodeDef } from '@zclaudia/shared';
+import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 
 vi.mock('../../store', () => ({
   useWorkflowStore: Object.assign(

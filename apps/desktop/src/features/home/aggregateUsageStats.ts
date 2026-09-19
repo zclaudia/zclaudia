@@ -5,7 +5,7 @@ import type {
   UsageActiveDay,
   UsageStatsPayload,
   UsageStatsRange,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/core/usage-stats';
 
 export interface BackendUsage {
   backendId: string;

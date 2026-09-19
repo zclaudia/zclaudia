@@ -7,7 +7,7 @@ import type {
   WorkflowDefinition,
   WorkflowStepTypeMeta,
   WorkflowTriggerSourceMeta,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/features/workflows';
 import {
   listWorkflows,
   listAllWorkflows,

@@ -9,12 +9,10 @@
 // mirror selectionStore. The mirroring subscriptions are registered from
 // projectStore (so they exist as soon as the store module loads) but resolve
 // the other stores here.
-import type {
-  LlmProfileConfig,
-  ProviderCapabilities,
-  Session,
-  SlashCommand,
-} from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
+import type { Session } from '@zclaudia/shared/core/session';
+import type { SlashCommand } from '@zclaudia/shared/features/commands';
 import {
   getControlPlaneMode,
   resolveCanonicalBackendId,

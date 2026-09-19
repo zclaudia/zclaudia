@@ -2,7 +2,7 @@
  * Helper functions for filtering sessions and projects
  */
 
-import type { Session } from '@zclaudia/shared';
+import type { Session } from '@zclaudia/shared/core/session';
 import type { FilterState } from '../types/filter';
 
 export function filterSessions(sessions: Session[], filterState: FilterState): Session[] {

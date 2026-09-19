@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, RefreshCw, Bot } from 'lucide-react';
-import type { WorkflowRun, WorkflowStepRun } from '@zclaudia/shared';
+import type { WorkflowRun, WorkflowStepRun } from '@zclaudia/shared/features/workflows';
 import { StepStatusIcon, RunStatusBadge, formatDuration } from '../workflows';
 
 interface AIReviewLogsWindowProps {

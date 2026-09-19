@@ -15,8 +15,8 @@ import type {
   WorkflowNodeDef,
   WorkflowEdgeDef,
   WorkflowDefinition,
-} from '@zclaudia/shared';
-import { normalizeWorkflowDefinition } from '@zclaudia/shared';
+} from '@zclaudia/shared/features/workflows';
+import { normalizeWorkflowDefinition } from '@zclaudia/shared/features/workflows';
 import { StepConfigForm } from './StepConfigForm';
 import { NodePalette } from './NodePalette';
 import { NLWorkflowGenerator } from './NLWorkflowGenerator';

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { UnifiedPermissionPolicy } from '@zclaudia/shared';
+import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
 
 interface SessionOverridesState {
   // Permission policy override per session (user-selected policy, null = use project default)

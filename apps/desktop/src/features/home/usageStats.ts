@@ -1,4 +1,4 @@
-import type { UsageActiveDay } from '@zclaudia/shared';
+import type { UsageActiveDay } from '@zclaudia/shared/core/usage-stats';
 
 export interface HeatmapCell {
   date: string;

@@ -1,4 +1,5 @@
-import type { ApiResponse, ServerFeature } from '@zclaudia/shared';
+import type { ApiResponse } from '@zclaudia/shared/core/api';
+import type { ServerFeature } from '@zclaudia/shared/core/server';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 

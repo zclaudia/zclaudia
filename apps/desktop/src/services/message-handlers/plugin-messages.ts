@@ -1,7 +1,7 @@
 /**
  * Plugin lifecycle message handlers.
  */
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { usePluginStore } from '../../stores/pluginStore';
 import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../actions/controlPlane';
 import { parseBackendId } from '../../stores/gatewayStore';
@@ -93,7 +93,8 @@ export function handlePluginMessage(
     }
 
     case 'plugin_notification': {
-      const pluginMsg = msg as import('@zclaudia/shared').PluginNotificationMessage;
+      const pluginMsg =
+        msg as import('@zclaudia/shared/wire/messages/plugins').PluginNotificationMessage;
       import('../../stores/notificationFeedStore').then(m =>
         m.useNotificationFeedStore.getState().upsertItem({
           id: `plugin-${pluginMsg.pluginId}-${Date.now()}`,

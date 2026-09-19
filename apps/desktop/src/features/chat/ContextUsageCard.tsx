@@ -1,5 +1,5 @@
 import { Gauge } from 'lucide-react';
-import type { ContextUsagePayload } from '@zclaudia/shared';
+import type { ContextUsagePayload } from '@zclaudia/shared/core/message';
 import { formatTokens } from '../../utils/formatTokens';
 import { SECTION_LABEL } from '../../components/ui/typography';
 

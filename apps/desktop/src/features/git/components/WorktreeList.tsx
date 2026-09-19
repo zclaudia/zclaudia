@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GitBranch as BranchIcon, Plus, RefreshCw, Shield, Trash2 } from 'lucide-react';
-import type { GitWorktree } from '@zclaudia/shared';
+import type { GitWorktree } from '@zclaudia/shared/core/project';
 import * as api from '../../../services/api';
 import { useGitStore, selectStatus } from '../store';
 import { runWithToast } from '../runWithToast';

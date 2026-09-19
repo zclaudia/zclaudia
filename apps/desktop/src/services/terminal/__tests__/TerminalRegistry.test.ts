@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ITheme } from '@xterm/xterm';
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { createTerminalRegistry } from '../TerminalRegistry';
 import type { TerminalControllerDeps } from '../TerminalController';
 

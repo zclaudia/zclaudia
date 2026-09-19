@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
-import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared';
+import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared/core/mcp';
 
 import { useMcpServersByBackend } from '../useMcpServersByBackend';
 import type { AgentsBackend } from '../agents-types';

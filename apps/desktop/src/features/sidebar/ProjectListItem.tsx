@@ -16,7 +16,7 @@ import { WorktreeGroupItem } from './WorktreeGroupItem';
 import { ProjectWorkspaceItem } from './ProjectWorkspaceItem';
 import { groupSessionsByWorktree } from './worktreeGrouping';
 import { SortableList, SortableItem } from '../../components/SortableList';
-import type { Session } from '@zclaudia/shared';
+import type { Session } from '@zclaudia/shared/core/session';
 import type { ProjectListItemProps } from './types';
 
 function normalizePath(p: string): string {
@@ -255,15 +255,9 @@ export function ProjectListItem({
             {project.name}
           </span>
           {isExpanded ? (
-            <ChevronDown
-              className={`${glyphClass} text-muted-foreground`}
-              strokeWidth={1.75}
-            />
+            <ChevronDown className={`${glyphClass} text-muted-foreground`} strokeWidth={1.75} />
           ) : (
-            <ChevronRight
-              className={`${glyphClass} text-muted-foreground`}
-              strokeWidth={1.75}
-            />
+            <ChevronRight className={`${glyphClass} text-muted-foreground`} strokeWidth={1.75} />
           )}
         </button>
         {/* Supervisor phase — shown at rest, yields to the hover actions */}

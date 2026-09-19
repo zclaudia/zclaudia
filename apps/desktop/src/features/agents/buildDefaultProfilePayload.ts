@@ -1,9 +1,6 @@
-import type { LlmProfileConfig } from '@zclaudia/shared';
-import {
-  resolveToolSelection,
-  defaultToolSelection,
-  defaultSkillSelection,
-} from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import { defaultSkillSelection } from '@zclaudia/shared/core/skills';
+import { resolveToolSelection, defaultToolSelection } from '@zclaudia/shared/core/tools';
 import {
   defaultEngineModeFor,
   type ProfileConfigDescriptor,

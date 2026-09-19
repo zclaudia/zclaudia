@@ -1,5 +1,5 @@
 import { Check, ChevronDown, RotateCcw } from 'lucide-react';
-import type { BrowserDeviceEmulation } from '@zclaudia/shared';
+import type { BrowserDeviceEmulation } from '@zclaudia/shared/wire/messages/browser';
 import { Button, IconButton } from '../../components/ui/Button';
 import { DropdownMenu } from '../../components/ui/DropdownMenu';
 import { DEVICE_PRESETS, toEmulation } from './devicePresets';

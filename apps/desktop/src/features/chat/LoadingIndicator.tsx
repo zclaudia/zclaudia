@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { RunHealthStatus } from '@zclaudia/shared';
+import type { RunHealthStatus } from '@zclaudia/shared/wire/messages/core';
 import { BrandMark } from '../../components/BrandMark';
 import type { RunRetryStatus } from '../../stores/runStore';
 

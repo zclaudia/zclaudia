@@ -16,7 +16,7 @@ import {
   ShieldCheck,
   ShieldAlert,
 } from 'lucide-react';
-import type { BuiltinWorkflowStepType } from '@zclaudia/shared';
+import type { BuiltinWorkflowStepType } from '@zclaudia/shared/features/workflows';
 import { useWorkflowStore } from '../../store';
 
 const STEP_ICONS: Record<BuiltinWorkflowStepType, React.ReactNode> = {

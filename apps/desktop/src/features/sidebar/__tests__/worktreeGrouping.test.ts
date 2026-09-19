@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { groupSessionsByWorktree } from '../worktreeGrouping';
-import type { Session, GitWorktree } from '@zclaudia/shared';
+import type { GitWorktree } from '@zclaudia/shared/core/project';
+import type { Session } from '@zclaudia/shared/core/session';
 
 function makeSession(overrides: Partial<Session> = {}): Session {
   return {

@@ -1,4 +1,4 @@
-import type { ContextGraph, GraphNode } from '@zclaudia/shared';
+import type { ContextGraph, GraphNode } from '@zclaudia/shared/core/context-graph';
 
 export interface LayoutNode {
   nodeId: string;

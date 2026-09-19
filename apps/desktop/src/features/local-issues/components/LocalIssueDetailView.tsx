@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pencil, RotateCcw, Trash2, X, Paperclip, Zap } from 'lucide-react';
-import type { LocalIssue } from '@zclaudia/shared';
-import { ACTIONABLE_LABEL } from '@zclaudia/shared';
+import type { LocalIssue } from '@zclaudia/shared/features/local-issue';
+import { ACTIONABLE_LABEL } from '@zclaudia/shared/features/local-issue';
 import { useLocalIssueStore } from '../store';
 import { SECTION_LABEL } from '../../../components/ui/typography';
 import { AttachmentList, useAttachments, useAttachmentCount } from '../../attachments';

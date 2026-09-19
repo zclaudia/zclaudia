@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, ArrowLeft, ChevronRight, History } from 'lucide-react';
-import type { Workflow, WorkflowDefinition, WorkflowRun, WorkflowStepRun } from '@zclaudia/shared';
-import { normalizeWorkflowDefinition } from '@zclaudia/shared';
+import type {
+  Workflow,
+  WorkflowDefinition,
+  WorkflowRun,
+  WorkflowStepRun,
+} from '@zclaudia/shared/features/workflows';
+import { normalizeWorkflowDefinition } from '@zclaudia/shared/features/workflows';
 import { RunStatusBadge, RunStepList, formatDuration, runStatusTone } from '../workflows';
 import { Button, IconButton } from '../../components/ui/Button';
 import { Tooltip } from '../../components/ui/Tooltip';

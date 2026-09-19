@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ContextWindowSource } from '@zclaudia/shared';
+import type { ContextWindowSource } from '@zclaudia/shared/wire/messages/core';
 import { resolveContextWindowPreviewForBackend } from '../../../services/api';
 import type { LlmProfilePreviewInput } from '../../../services/api';
 

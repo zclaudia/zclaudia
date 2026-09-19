@@ -4,7 +4,7 @@ import type {
   ProjectChange,
   SupervisionTask,
   ProjectAgent,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/features/supervision';
 
 interface SupervisionState {
   // Project-level supervision (V2)

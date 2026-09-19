@@ -5,7 +5,7 @@
  * keeping domain-specific logic co-located with the domain module.
  */
 
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { useLocalPRStore } from './store';
 
 /**

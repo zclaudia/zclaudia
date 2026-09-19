@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import type { ModelUsagePayload, RuntimeUsagePayload, UsageStatsPayload } from '@zclaudia/shared';
+import type {
+  ModelUsagePayload,
+  RuntimeUsagePayload,
+  UsageStatsPayload,
+} from '@zclaudia/shared/core/usage-stats';
 import {
   aggregateUsageStats,
   aggregateModelStats,

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Sparkles, X } from 'lucide-react';
-import type { SkillRef } from '@zclaudia/shared';
-import { skillRefKey } from '@zclaudia/shared';
+import type { SkillRef } from '@zclaudia/shared/core/skills';
+import { skillRefKey } from '@zclaudia/shared/core/skills';
 import type { WorkspaceSkillInfo } from '../../services/api/workspace-skills';
 
 /**

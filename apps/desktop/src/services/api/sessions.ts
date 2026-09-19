@@ -1,4 +1,5 @@
-import type { Session, Message } from '@zclaudia/shared';
+import type { Message } from '@zclaudia/shared/core/message';
+import type { Session } from '@zclaudia/shared/core/session';
 import { fetchApiForBackend } from './base';
 import { apiCall, apiCallForBackend, apiCallVoid, apiCallVoidForBackend } from './unwrap';
 
@@ -69,7 +70,7 @@ export async function createSession(data: {
   projectId: string;
   name?: string;
   agentProfileId?: string;
-  type?: import('@zclaudia/shared').SessionType;
+  type?: import('@zclaudia/shared/core/session').SessionType;
   parentSessionId?: string;
   workingDirectory?: string;
 }): Promise<Session> {
@@ -266,7 +267,9 @@ export async function getSessionModelSettings(
   discover: boolean | 'refresh' = false,
   signal?: AbortSignal
 ) {
-  return apiCallForBackend<import('@zclaudia/shared').SessionModelSettings>(
+  return apiCallForBackend<
+    import('@zclaudia/shared/core/runtime-capabilities').SessionModelSettings
+  >(
     getBackendIdForSession(sessionId),
     `/api/sessions/${sessionId}/model-settings${discover ? `?discover=${discover}` : ''}`,
     { signal }
@@ -275,22 +278,18 @@ export async function getSessionModelSettings(
 
 export async function saveSessionModelSettings(
   sessionId: string,
-  selection: import('@zclaudia/shared').SessionModelSelection
+  selection: import('@zclaudia/shared/core/runtime-capabilities').SessionModelSelection
 ) {
-  return apiCallForBackend<import('@zclaudia/shared').SessionModelSettings>(
-    getBackendIdForSession(sessionId),
-    `/api/sessions/${sessionId}/model-settings`,
-    {
-      method: 'PUT',
-      body: JSON.stringify(selection),
-    }
-  );
+  return apiCallForBackend<
+    import('@zclaudia/shared/core/runtime-capabilities').SessionModelSettings
+  >(getBackendIdForSession(sessionId), `/api/sessions/${sessionId}/model-settings`, {
+    method: 'PUT',
+    body: JSON.stringify(selection),
+  });
 }
 
 export async function getSessionCapabilities(sessionId: string, options?: RequestInit) {
-  return apiCallForBackend<import('@zclaudia/shared').ProviderCapabilities>(
-    getBackendIdForSession(sessionId),
-    `/api/sessions/${sessionId}/capabilities`,
-    options
-  );
+  return apiCallForBackend<
+    import('@zclaudia/shared/core/runtime-capabilities').ProviderCapabilities
+  >(getBackendIdForSession(sessionId), `/api/sessions/${sessionId}/capabilities`, options);
 }

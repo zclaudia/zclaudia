@@ -15,7 +15,7 @@ import {
   type InstalledPlugin,
   type UIExtension,
 } from '../pluginStore';
-import type { PluginManifest } from '@zclaudia/shared';
+import type { PluginManifest } from '@zclaudia/shared/plugins/manifest';
 
 // Helper to create a test plugin
 function createTestPlugin(overrides: Partial<InstalledPlugin> = {}): InstalledPlugin {

@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useProjectStore } from '../stores/projectStore';
-import type { Project } from '@zclaudia/shared';
+import type { Project } from '@zclaudia/shared/core/project';
 import * as api from '../services/api';
 
 /**

@@ -1,5 +1,6 @@
 import type { InvocableDescriptor, InvocationRequest } from '@zclaudia/shared/providers';
-import type { MessageAttachment, UnifiedPermissionPolicy } from '@zclaudia/shared';
+import type { MessageAttachment } from '@zclaudia/shared/core/message';
+import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
 
 /**
  * Canonical invocation submission (URIP design doc §16.3).

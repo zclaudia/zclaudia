@@ -1,4 +1,5 @@
-import type { BackendConnectionState, BackendSnapshot, GatewayBackendInfo } from '@zclaudia/shared';
+import type { GatewayBackendInfo } from '@zclaudia/shared/core/server';
+import type { BackendConnectionState, BackendSnapshot } from '@zclaudia/shared/facade/types';
 import { getMobileBackendViewState } from '../../services/mobileConnectionState';
 import type { MobileBackendViewState } from '../../services/mobileConnectionState';
 import { SECTION_LABEL } from '../../components/ui/typography';

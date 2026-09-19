@@ -1,4 +1,4 @@
-import type { ServerGatewayConfig, ServerGatewayStatus } from '@zclaudia/shared';
+import type { ServerGatewayConfig, ServerGatewayStatus } from '@zclaudia/shared/core/server';
 import { fetchLocalApi } from './base';
 
 /**

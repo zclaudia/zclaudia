@@ -1,4 +1,4 @@
-import type { ClientMessage } from '@zclaudia/shared';
+import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 
 /** Dependencies for resolving a message's target backend. */
 export interface MessageTargetResolver {

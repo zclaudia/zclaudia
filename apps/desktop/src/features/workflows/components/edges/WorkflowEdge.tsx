@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
-import type { WorkflowEdgeType } from '@zclaudia/shared';
+import type { WorkflowEdgeType } from '@zclaudia/shared/features/workflows';
 
 const EDGE_STYLES: Record<
   WorkflowEdgeType,

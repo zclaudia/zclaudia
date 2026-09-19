@@ -1,4 +1,4 @@
-import type { ProjectChange } from '@zclaudia/shared';
+import type { ProjectChange } from '@zclaudia/shared/features/supervision';
 import { changeStatusLabel, type PreviewDocTarget } from './supervisor-utils';
 
 interface RecentChangesPanelProps {

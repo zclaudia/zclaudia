@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useId } from 'react';
-import type { Goal } from '@zclaudia/shared';
-import { GOAL_DEFAULTS } from '@zclaudia/shared';
+import type { Goal } from '@zclaudia/shared/features/goal';
+import { GOAL_DEFAULTS } from '@zclaudia/shared/features/goal';
 import { trapTab } from '../utils/focusTrap';
 
 interface GoalDialogProps {

@@ -1,4 +1,4 @@
-import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared';
+import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared/core/mcp';
 import type {
   McpOAuthConfig,
   McpOAuthCredentials,

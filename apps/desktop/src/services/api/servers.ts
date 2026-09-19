@@ -1,4 +1,5 @@
-import type { ServerInfo, ApiResponse } from '@zclaudia/shared';
+import type { ApiResponse } from '@zclaudia/shared/core/api';
+import type { ServerInfo } from '@zclaudia/shared/core/server';
 
 import { resolveGatewayBackendUrl } from '../gatewayProxy';
 import { useServerStore } from '../../stores/serverStore';

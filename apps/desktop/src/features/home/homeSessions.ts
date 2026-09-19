@@ -1,4 +1,5 @@
-import type { Project, Session } from '@zclaudia/shared';
+import type { Project } from '@zclaudia/shared/core/project';
+import type { Session } from '@zclaudia/shared/core/session';
 import { LOCAL_BACKEND_KEY, type RemoteSession } from '../../stores/sessionsStore';
 
 export interface HomeSessionRow {

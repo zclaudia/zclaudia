@@ -1,4 +1,4 @@
-import type { BrowserInputEvent } from '@zclaudia/shared';
+import type { BrowserInputEvent } from '@zclaudia/shared/wire/messages/browser';
 
 interface ModifierKeys {
   altKey: boolean;

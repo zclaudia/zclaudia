@@ -1,4 +1,4 @@
-import type { TaskStatus } from '@zclaudia/shared';
+import type { TaskStatus } from '@zclaudia/shared/features/supervision';
 
 // Collapse the fine-grained supervision lifecycle onto the theme's semantic
 // tokens. The label text carries the exact state; color carries the category

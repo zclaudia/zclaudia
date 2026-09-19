@@ -2,11 +2,11 @@ import type {
   LlmProfileConfig,
   LlmProfileCompat,
   LlmProfileModelEntry,
-  ProviderCapabilities,
-  SlashCommand,
-  ContextWindowSource,
   CacheRetentionSetting,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/core/llm-profile';
+import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
+import type { SlashCommand } from '@zclaudia/shared/features/commands';
+import type { ContextWindowSource } from '@zclaudia/shared/wire/messages/core';
 import {
   fetchApi,
   fetchApiForBackend,

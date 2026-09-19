@@ -15,14 +15,10 @@ import { useSessionConfigStore } from '../../../stores/sessionConfigStore';
 import { activatePanel } from '../../../actions/openPanel';
 import * as api from '../../../services/api';
 import { finalizeRunLifecycle } from '../../../services/message-handlers/run-finalization';
-import type {
-  CommandExecuteResponse,
-  SlashCommand,
-  Session,
-  Project,
-  MessageRole,
-  MessageMetadata,
-} from '@zclaudia/shared';
+import type { MessageRole, MessageMetadata } from '@zclaudia/shared/core/message';
+import type { Project } from '@zclaudia/shared/core/project';
+import type { Session } from '@zclaudia/shared/core/session';
+import type { CommandExecuteResponse, SlashCommand } from '@zclaudia/shared/features/commands';
 
 interface UseCommandHandlerParams {
   sessionId: string;

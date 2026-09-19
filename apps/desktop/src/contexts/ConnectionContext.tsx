@@ -8,7 +8,7 @@ import { usePromptRequestStore } from '../stores/promptRequestStore';
 import { useServerStore } from '../stores/serverStore';
 import { useGatewayStore } from '../stores/gatewayStore';
 import { encryptCredential, isEncryptionAvailable } from '../utils/crypto';
-import type { ClientMessage } from '@zclaudia/shared';
+import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 
 interface ConnectionContextValue {
   // Active server operations (backward compatible)

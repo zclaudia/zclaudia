@@ -4,7 +4,8 @@ import { useUIStore } from '../../../stores/uiStore';
 import { useOwnershipStore } from '../../../stores/ownershipStore';
 import { useToastStore } from '../../../stores/toastStore';
 import * as api from '../../../services/api';
-import type { Session, Project } from '@zclaudia/shared';
+import type { Project } from '@zclaudia/shared/core/project';
+import type { Session } from '@zclaudia/shared/core/session';
 import { isDesktopTauri } from '../../../utils/platform';
 import {
   openPopoutWindow,

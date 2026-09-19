@@ -1,11 +1,11 @@
+import type { ClaudiaTaskStatus } from '@zclaudia/shared/wire/messages/claudia';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import type {
   AIReviewCompletedMessage,
-  ClaudiaTaskStatus,
   PermissionAutoResolvedMessage,
   PermissionRequestMessage,
   PermissionResolvedMessage,
-  ServerMessage,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/wire/messages/permissions';
 import type { MessageHandlerContext } from './types';
 import { useClaudiaStore } from '../../stores/claudiaStore';
 import { parseBackendId } from '../../stores/gatewayStore';

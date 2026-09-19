@@ -1,4 +1,4 @@
-import type { LlmProfileConfig } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 
 /**
  * Soft warning shown beneath the model input when the agent profile's selected

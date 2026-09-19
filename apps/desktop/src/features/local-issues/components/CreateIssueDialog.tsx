@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import type { Attachment, LocalIssue, LocalIssuePriority } from '@zclaudia/shared';
+import type { Attachment } from '@zclaudia/shared/features/attachment';
+import type { LocalIssue, LocalIssuePriority } from '@zclaudia/shared/features/local-issue';
 import { useLocalIssueStore } from '../store';
 import { useAndroidBack } from '../../../hooks/useAndroidBack';
 import { Select } from '../../../components/ui/Select';

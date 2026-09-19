@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { InteractionMessage } from '@zclaudia/shared';
+import type { InteractionMessage } from '@zclaudia/shared/interaction/forms';
 import type { InteractionResolvedReason } from '@zclaudia/shared/interaction/forms';
 
 interface InteractionState {

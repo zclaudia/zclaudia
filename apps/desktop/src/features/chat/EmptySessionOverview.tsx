@@ -1,6 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from 'react';
 import { GitBranch, FileDiff, Compass, Target } from 'lucide-react';
-import type { SlashCommand } from '@zclaudia/shared';
+import type { SlashCommand } from '@zclaudia/shared/features/commands';
 import * as api from '../../services/api';
 import { useGitStore, selectStatus, selectLog } from '../git';
 

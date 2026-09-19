@@ -6,7 +6,7 @@
 // store — this is cheap and gives us guaranteed consistency without depending
 // on the event payload carrying every field the UI needs.
 
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { useOpenSpecStore } from './store';
 import * as api from './api';
 import { handleBootstrapEvent } from './ws-handlers';

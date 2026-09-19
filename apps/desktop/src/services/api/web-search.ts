@@ -1,4 +1,4 @@
-import type { UpdateWebSearchConfigRequest, WebSearchConfig } from '@zclaudia/shared';
+import type { UpdateWebSearchConfigRequest, WebSearchConfig } from '@zclaudia/shared/core/server';
 import { fetchApi } from './base';
 
 export async function getWebSearchConfig(): Promise<WebSearchConfig> {

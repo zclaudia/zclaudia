@@ -5,7 +5,7 @@ import type {
   BranchAction,
   ClaudiaAgentProfileSource,
   ClaudiaTaskStatus,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/wire/messages/claudia';
 
 const LAST_VIEWED_KEY = 'claudia-last-viewed-at';
 

@@ -1,5 +1,5 @@
 import { apiCall } from './unwrap';
-import type { ContextUsagePayload } from '@zclaudia/shared';
+import type { ContextUsagePayload } from '@zclaudia/shared/core/message';
 
 export type SessionContextUsage =
   /**

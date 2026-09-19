@@ -1,4 +1,4 @@
-import type { Goal } from '@zclaudia/shared';
+import type { Goal } from '@zclaudia/shared/features/goal';
 import { setGoal, clearGoal } from './api/goals';
 import { useGoalStore } from '../stores/goalStore';
 

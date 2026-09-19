@@ -1,7 +1,7 @@
 import { GripVertical } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { Attachment } from '@zclaudia/shared';
+import type { Attachment } from '@zclaudia/shared/features/attachment';
 import { AttachmentThumbnail } from './AttachmentThumbnail';
 
 interface SortableAttachmentThumbnailProps {

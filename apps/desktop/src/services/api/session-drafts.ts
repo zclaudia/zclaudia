@@ -1,4 +1,4 @@
-import type { SessionDraft } from '@zclaudia/shared';
+import type { SessionDraft } from '@zclaudia/shared/core/session';
 import { fetchApiForBackend } from './base';
 import { apiCallForBackend, apiCallVoidForBackend } from './unwrap';
 import { useOwnershipStore } from '../../stores/ownershipStore';

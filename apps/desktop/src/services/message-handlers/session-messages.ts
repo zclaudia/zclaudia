@@ -1,4 +1,4 @@
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSystemTaskStore } from '../../stores/systemTaskStore';
 

@@ -1,5 +1,5 @@
 import { AnsiUp } from 'ansi_up';
-import type { InteractionPromptMessage } from '@zclaudia/shared';
+import type { InteractionPromptMessage } from '@zclaudia/shared/interaction/forms';
 import type { ToolSemantic } from '@zclaudia/agent-transcript-kit';
 import {
   isTodoTool,

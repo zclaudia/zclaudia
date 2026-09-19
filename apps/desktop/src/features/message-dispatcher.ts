@@ -1,4 +1,4 @@
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { handleLocalPRMessage } from './local-pr/handlers';
 import { handleLocalIssueMessage } from './local-issues/handlers';
 import { handleWorkflowMessage } from './workflows/handlers';

@@ -9,7 +9,8 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { PluginManifest, ServerFeature } from '@zclaudia/shared';
+import type { ServerFeature } from '@zclaudia/shared/core/server';
+import type { PluginManifest } from '@zclaudia/shared/plugins/manifest';
 
 const BUILTIN_PANEL_ID_ALIASES: Record<string, string> = {
   'agent-feed': 'notifications',

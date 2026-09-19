@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SessionModelSettings } from '@zclaudia/shared';
+import type { SessionModelSettings } from '@zclaudia/shared/core/runtime-capabilities';
 import { SessionModelSelector } from '../SessionModelSelector';
 import { getSessionModelSettings, saveSessionModelSettings } from '../../../services/api/sessions';
 

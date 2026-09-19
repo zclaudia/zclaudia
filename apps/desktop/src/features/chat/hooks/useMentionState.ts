@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
-import type { FileEntry } from '@zclaudia/shared';
+import type { FileEntry } from '@zclaudia/shared/files';
 import * as api from '../../../services/api';
 
 /** State for the @ mention feature. */

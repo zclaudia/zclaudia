@@ -203,7 +203,8 @@ import type { SkillsByBackend } from '../useSkillsByBackend';
 import type { McpServersByBackend } from '../useMcpServersByBackend';
 import type { LlmProfilesByBackend } from '../useLlmProfilesByBackend';
 import type { WorkspaceSkillInfo, SkillLoadDiagnostic } from '../../../services/api';
-import type { LlmProfileConfig, McpServerConfig, McpServerStatus } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared/core/mcp';
 
 function makeProfile(id: string, name = id): AgentProfileConfig {
   return {

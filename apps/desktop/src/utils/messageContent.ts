@@ -1,4 +1,4 @@
-import type { MessageInput } from '@zclaudia/shared';
+import type { MessageInput } from '@zclaudia/shared/core/message';
 
 /**
  * User messages may arrive serialized as `MessageInput` JSON

@@ -9,7 +9,9 @@
  * LLM-profile data and runtime provider metadata.
  */
 import { create } from 'zustand';
-import type { LlmProfileConfig, ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
+import type { SlashCommand } from '@zclaudia/shared/features/commands';
 import { getActiveServerId } from '../services/active-backend-coordination';
 
 export interface CodexOAuthSessionState {

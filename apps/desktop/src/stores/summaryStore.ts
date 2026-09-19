@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { TurnSummary } from '@zclaudia/shared';
+import type { TurnSummary } from '@zclaudia/shared/features/turn-summary';
 import { listTurnSummaries, generateTurnSummary } from '../services/api/turn-summaries';
 
 type TurnKey = `${string}:${string}`;

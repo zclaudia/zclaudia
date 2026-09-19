@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useFacadeStore } from '../../stores/facadeStore';
-import type { SdkVersionReport } from '@zclaudia/shared';
+import type { SdkVersionReport } from '@zclaudia/shared/core/server';
 import * as api from '../../services/api';
 import { SettingsGroup, SettingsRow } from './ui/SettingsGroup';
 

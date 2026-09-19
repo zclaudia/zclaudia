@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GOAL_DEFAULTS } from '@zclaudia/shared';
-import type { Goal } from '@zclaudia/shared';
+import { GOAL_DEFAULTS } from '@zclaudia/shared/features/goal';
+import type { Goal } from '@zclaudia/shared/features/goal';
 
 vi.mock('../api/goals', () => ({
   setGoal: vi.fn(),

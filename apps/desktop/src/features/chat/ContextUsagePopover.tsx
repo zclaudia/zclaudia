@@ -9,7 +9,7 @@ import {
   type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
-import type { ContextUsagePayload } from '@zclaudia/shared';
+import type { ContextUsagePayload } from '@zclaudia/shared/core/message';
 import { getSessionContextUsage } from '../../services/api';
 import { ContextUsageCard } from './ContextUsageCard';
 import { formatTokens } from '../../utils/formatTokens';

@@ -1,11 +1,9 @@
 import { create } from 'zustand';
-import type {
-  Project,
-  Session,
-  SlashCommand,
-  LlmProfileConfig,
-  ProviderCapabilities,
-} from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { Project } from '@zclaudia/shared/core/project';
+import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
+import type { Session } from '@zclaudia/shared/core/session';
+import type { SlashCommand } from '@zclaudia/shared/features/commands';
 import {
   applyProviderCapabilities,
   applyProviderCommands,

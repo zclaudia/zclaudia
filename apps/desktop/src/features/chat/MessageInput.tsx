@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { KeyboardEvent, ClipboardEvent, ChangeEvent } from 'react';
 import { ArrowUp, Paperclip, Square, Plus } from 'lucide-react';
-import type { SlashCommand, FileEntry, SkillRef } from '@zclaudia/shared';
-import { skillRefKey } from '@zclaudia/shared';
+import type { SkillRef } from '@zclaudia/shared/core/skills';
+import type { SlashCommand } from '@zclaudia/shared/features/commands';
+import type { FileEntry } from '@zclaudia/shared/files';
+import { skillRefKey } from '@zclaudia/shared/core/skills';
 import * as api from '../../services/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useComposerStore } from '../../stores/composerStore';

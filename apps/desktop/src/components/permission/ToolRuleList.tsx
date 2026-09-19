@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { AgentPermissionRule } from '@zclaudia/shared';
-import { parseToolRule, formatToolRule } from '@zclaudia/shared';
+import type { AgentPermissionRule } from '@zclaudia/shared/interaction/permissions';
+import { parseToolRule, formatToolRule } from '@zclaudia/shared/interaction/tool-rule-syntax';
 
 const GROUPS: Array<{ action: AgentPermissionRule['action']; label: string; hint: string }> = [
   { action: 'approve', label: 'Allow', hint: 'Auto-approved without prompting' },

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import type { WorkflowDefinition, WorkflowStepRun } from '@zclaudia/shared';
+import type { WorkflowDefinition, WorkflowStepRun } from '@zclaudia/shared/features/workflows';
 import { RunStepList } from '../RunStepList';
 
 function stepRun(over: Partial<WorkflowStepRun> = {}): WorkflowStepRun {

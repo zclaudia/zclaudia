@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MessageSquare, Pencil, Trash2, X, Check, Loader2 } from 'lucide-react';
-import type { LocalIssueComment } from '@zclaudia/shared';
+import type { LocalIssueComment } from '@zclaudia/shared/features/local-issue';
 import { useLocalIssueCommentStore } from '../comments-store';
 import { IssueMarkdown } from './IssueMarkdown';
 import { timeAgo } from '../../../utils/timeAgo';

@@ -3,7 +3,7 @@ import type {
   DirectoryListingResponse,
   FileContentResponse,
   FileStatResponse,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/files';
 import { apiCall, apiCallForBackend } from './unwrap';
 
 export async function browseDirectories(params: {

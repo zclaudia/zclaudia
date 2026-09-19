@@ -1,7 +1,8 @@
 // Shared run types. Kept in a dedicated module so runStore, chatMessageStore
 // and the run coordination services can share them without importing each
 // other (stores/ helper modules are the sanctioned sharing point).
-import type { ToolEffect, ToolSemantic } from '@zclaudia/shared';
+import type { ToolEffect } from '@zclaudia/shared/core/message';
+import type { ToolSemantic } from '@zclaudia/shared/wire/messages/run';
 
 // Tool call state for displaying in the UI
 export interface ToolCallState {

@@ -1,4 +1,4 @@
-import type { LlmProfileConfig } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { EditorRow } from '../ui/EditorSection';
 import { visionCapableModels } from './derive';
 import { FIELD_CLASS, MONO_FIELD_CLASS } from './styles';

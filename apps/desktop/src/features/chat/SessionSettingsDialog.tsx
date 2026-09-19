@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SessionModelSettings } from '@zclaudia/shared';
+import type { SessionModelSettings } from '@zclaudia/shared/core/runtime-capabilities';
 import { Modal } from '../../components/ui/Modal';
 import { getSessionModelSettings } from '../../services/api/sessions';
 import { useSessionOverridesStore } from '../../stores/sessionOverridesStore';

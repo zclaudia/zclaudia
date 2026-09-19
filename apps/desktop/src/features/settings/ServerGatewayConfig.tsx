@@ -6,7 +6,10 @@ import {
   connectServerToGateway,
   disconnectServerFromGateway,
 } from '../../services/api';
-import type { ServerGatewayConfig as GatewayConfig, ServerGatewayStatus } from '@zclaudia/shared';
+import type {
+  ServerGatewayConfig as GatewayConfig,
+  ServerGatewayStatus,
+} from '@zclaudia/shared/core/server';
 import { useGatewayStore, shouldShowNonCurrentInstanceBackend } from '../../stores/gatewayStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 

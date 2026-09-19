@@ -1,4 +1,4 @@
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { invocableCatalogKey, useInvocableCatalogStore } from '../../stores/invocableCatalogStore';
 import { dispatchClientActionFromWire } from '../../features/chat/clientActions';

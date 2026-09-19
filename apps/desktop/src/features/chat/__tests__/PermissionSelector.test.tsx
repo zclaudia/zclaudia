@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PermissionSelector } from '../PermissionSelector';
-import type { UnifiedPermissionPolicy } from '@zclaudia/shared';
+import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
 
 describe('PermissionSelector', () => {
   const defaultOverride: Partial<UnifiedPermissionPolicy> = {

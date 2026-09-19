@@ -6,7 +6,7 @@
  * and store mapping cleanup on exit. This handler only logs failed open attempts and tells
  * the dispatcher whether the message was a terminal_* one (so unrelated logs aren't double-counted).
  */
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { terminalRegistry } from '../terminal/TerminalRegistry';
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Loader2 } from 'lucide-react';
-import type { FileEntry } from '@zclaudia/shared';
+import type { FileEntry } from '@zclaudia/shared/files';
 import * as api from '../../services/api';
 import { FileSymbol } from '../filesymbols';
 

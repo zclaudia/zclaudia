@@ -1,4 +1,4 @@
-import type { LocalPR } from '@zclaudia/shared';
+import type { LocalPR } from '@zclaudia/shared/features/local-pr';
 import { apiCall } from '../../services/api/unwrap';
 
 export async function listLocalPRs(projectId: string): Promise<LocalPR[]> {

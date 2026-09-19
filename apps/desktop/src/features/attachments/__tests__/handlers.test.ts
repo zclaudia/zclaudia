@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { Attachment } from '@zclaudia/shared';
+import type { Attachment } from '@zclaudia/shared/features/attachment';
 import { handleAttachmentMessage } from '../handlers';
 import { useAttachmentsStore } from '../store';
 

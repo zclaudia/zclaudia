@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getProjectMemoryDir } from '../../services/api/memory';
 import { listDirectory, getFileContent } from '../../services/api/files';
 import { useOwnershipStore } from '../../stores/ownershipStore';
-import type { FileEntry } from '@zclaudia/shared';
+import type { FileEntry } from '@zclaudia/shared/files';
 
 interface MemoryPanelProps {
   projectId?: string;

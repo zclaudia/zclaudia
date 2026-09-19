@@ -16,7 +16,7 @@ vi.mock('../../store', () => ({
 }));
 
 import { CreateTaskDialog } from '../CreateTaskDialog';
-import type { SupervisionTask } from '@zclaudia/shared';
+import type { SupervisionTask } from '@zclaudia/shared/features/supervision';
 
 function makeTask(overrides: Partial<SupervisionTask> = {}): SupervisionTask {
   return {

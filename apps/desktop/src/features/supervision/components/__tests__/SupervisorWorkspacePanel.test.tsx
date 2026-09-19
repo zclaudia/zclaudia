@@ -7,7 +7,7 @@ import type {
   ProjectAgent,
   ProjectChange,
   SupervisionTask,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/features/supervision';
 
 const mockGetActiveProjectChange = vi.fn();
 const mockGetChangeExecutionPlan = vi.fn();

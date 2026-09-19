@@ -8,7 +8,7 @@
  * agent profile → LLM profile chain without re-querying the server per render.
  */
 import { create } from 'zustand';
-import type { AgentProfileConfig } from '@zclaudia/shared';
+import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import { listAgentProfiles } from '../services/api/agent-profiles';
 
 interface AgentProfileMetaState {

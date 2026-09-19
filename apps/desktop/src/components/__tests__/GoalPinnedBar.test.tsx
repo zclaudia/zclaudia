@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import type { Goal } from '@zclaudia/shared';
+import type { Goal } from '@zclaudia/shared/features/goal';
 import { GoalPinnedBar } from '../GoalPinnedBar';
 
 function makeGoal(over: Partial<Goal> = {}): Goal {

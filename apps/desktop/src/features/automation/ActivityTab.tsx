@@ -7,7 +7,7 @@
  * (and by backend under "All"). No create/edit/delete.
  */
 import { RefreshCw, Repeat, Sparkles, GitBranch, Blocks, type LucideIcon } from 'lucide-react';
-import type { WorkflowStepTypeMeta } from '@zclaudia/shared';
+import type { WorkflowStepTypeMeta } from '@zclaudia/shared/features/workflows';
 import { IconButton } from '../../components/ui/Button';
 import { Tooltip } from '../../components/ui/Tooltip';
 import {

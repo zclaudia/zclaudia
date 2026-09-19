@@ -8,7 +8,7 @@ import {
   SquareDashedMousePointer,
   X,
 } from 'lucide-react';
-import type { BrowserPageState } from '@zclaudia/shared';
+import type { BrowserPageState } from '@zclaudia/shared/wire/messages/browser';
 
 interface Props {
   state: BrowserPageState | null;

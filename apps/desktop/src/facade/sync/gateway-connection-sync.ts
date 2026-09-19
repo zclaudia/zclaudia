@@ -1,4 +1,5 @@
-import type { BackendFacadeEvent, ServerFeature } from '@zclaudia/shared';
+import type { ServerFeature } from '@zclaudia/shared/core/server';
+import type { BackendFacadeEvent } from '@zclaudia/shared/facade/types';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useGatewayStore } from '../../stores/gatewayStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';

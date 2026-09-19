@@ -1,5 +1,5 @@
-import type { LlmModelDialect } from '@zclaudia/shared';
-import { LLM_MODEL_DIALECTS } from '@zclaudia/shared';
+import type { LlmModelDialect } from '@zclaudia/shared/core/llm-profile';
+import { LLM_MODEL_DIALECTS } from '@zclaudia/shared/core/llm-profile';
 import type { LlmProfilePreviewInput } from '../../../services/api';
 import { validateModelDraftRow, type ModelRowDraft } from '../llmProfileModelDraft';
 import { DIALECT_LABELS } from './derive';

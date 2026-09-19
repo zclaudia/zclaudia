@@ -1,5 +1,5 @@
 import { Loader2, RefreshCw, Server } from 'lucide-react';
-import type { SystemTaskInfo } from '@zclaudia/shared';
+import type { SystemTaskInfo } from '@zclaudia/shared/features/system-tasks';
 import { formatInterval } from './automation-types';
 import { IconButton } from '../../components/ui/Button';
 import { Tooltip } from '../../components/ui/Tooltip';

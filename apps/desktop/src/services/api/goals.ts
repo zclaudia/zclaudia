@@ -1,4 +1,4 @@
-import type { Goal } from '@zclaudia/shared';
+import type { Goal } from '@zclaudia/shared/features/goal';
 import { apiCallForBackend } from './unwrap';
 import { resolveSessionOwnerBackendId } from '../../actions/sessionOwnership';
 

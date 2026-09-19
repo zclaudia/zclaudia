@@ -1,4 +1,8 @@
-import type { WorkflowDefinition, WorkflowEdgeDef, WorkflowNodeDef } from '@zclaudia/shared';
+import type {
+  WorkflowDefinition,
+  WorkflowEdgeDef,
+  WorkflowNodeDef,
+} from '@zclaudia/shared/features/workflows';
 
 /**
  * Flattens a workflow graph into the reading order a phone can show.

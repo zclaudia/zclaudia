@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type { ITheme } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import type { ClientMessage } from '@zclaudia/shared';
+import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useEnsureTerminalController } from '../../services/terminal/useTerminalController';

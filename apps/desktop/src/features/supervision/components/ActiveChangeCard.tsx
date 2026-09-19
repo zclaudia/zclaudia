@@ -4,7 +4,7 @@ import type {
   ExecutionGateDecision,
   ProjectChange,
   SupervisionTask,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/features/supervision';
 import { LegacyBadge } from '../../openspec';
 import { changeStatusLabel, getNextAction } from './supervisor-utils';
 import { SECTION_LABEL } from '../../../components/ui/typography';

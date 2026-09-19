@@ -1,4 +1,4 @@
-import type { Project, GitWorktree, WorktreeConfig } from '@zclaudia/shared';
+import type { Project, GitWorktree, WorktreeConfig } from '@zclaudia/shared/core/project';
 import { fetchApiForBackend } from './base';
 import { apiCall, apiCallForBackend, apiCallVoid, apiCallVoidForBackend } from './unwrap';
 import { useOwnershipStore } from '../../stores/ownershipStore';

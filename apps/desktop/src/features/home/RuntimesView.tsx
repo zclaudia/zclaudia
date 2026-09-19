@@ -3,7 +3,7 @@ import type {
   RuntimeUsagePayload,
   RuntimeUsageRuntimeRow,
   UsageStatsRange,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/core/usage-stats';
 import { getRuntimeUsage } from '../../services/api';
 import { useStatsBackendTargets } from './statsBackend';
 import { aggregateRuntimeUsage, type BackendRuntimeUsage } from './aggregateUsageStats';

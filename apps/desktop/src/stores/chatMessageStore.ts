@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, ContentBlock } from '@zclaudia/shared';
+import type { Message, ContentBlock } from '@zclaudia/shared/core/message';
 import type { ToolCallState } from './runTypes';
 import { hydrateMessagesForDisplay } from '../services/message-hydration';
 

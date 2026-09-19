@@ -1,7 +1,7 @@
 /**
  * Notification feed message handlers.
  */
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../actions/controlPlane';
 import { parseBackendId } from '../../stores/gatewayStore';
 
@@ -19,7 +19,8 @@ export function handleNotificationMessage(
 ): boolean {
   switch (msg.type) {
     case 'notification_update': {
-      const { item } = msg as import('@zclaudia/shared').NotificationUpdateMessage;
+      const { item } =
+        msg as import('@zclaudia/shared/wire/messages/notification-feed').NotificationUpdateMessage;
       const ownerBackendId = resolveOwnerBackendId(backendId, serverId);
       import('../../stores/notificationFeedStore').then(m =>
         m.useNotificationFeedStore.getState().upsertItem({
@@ -48,7 +49,8 @@ export function handleNotificationMessage(
     }
 
     case 'notification_list': {
-      const feedMsg = msg as import('@zclaudia/shared').NotificationListMessage;
+      const feedMsg =
+        msg as import('@zclaudia/shared/wire/messages/notification-feed').NotificationListMessage;
       const ownerBackendId = resolveOwnerBackendId(backendId, serverId);
       import('../../stores/notificationFeedStore').then(m => {
         m.useNotificationFeedStore.getState().setFeedList(
@@ -67,7 +69,8 @@ export function handleNotificationMessage(
     }
 
     case 'notification_read': {
-      const readMsg = msg as import('@zclaudia/shared').NotificationReadMessage;
+      const readMsg =
+        msg as import('@zclaudia/shared/wire/messages/notification-feed').NotificationReadMessage;
       import('../../stores/notificationFeedStore').then(m => {
         if (readMsg.itemIds.length === 0) {
           m.useNotificationFeedStore.getState().markAllRead(readMsg.readAt);

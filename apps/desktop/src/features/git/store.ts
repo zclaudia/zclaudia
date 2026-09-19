@@ -5,7 +5,7 @@ import type {
   GitBranch,
   GitCommit,
   GitStash,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/core/project';
 
 interface GitState {
   // Per-project worktrees

@@ -1,4 +1,6 @@
-import type { Session, GitWorktree, Project, AgentProfileConfig } from '@zclaudia/shared';
+import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
+import type { GitWorktree, Project } from '@zclaudia/shared/core/project';
+import type { Session } from '@zclaudia/shared/core/session';
 import type { SearchSidebarState } from './useSearchSidebar';
 
 /** Agent profile meta shape used within sidebar (subset of full agent profile) */

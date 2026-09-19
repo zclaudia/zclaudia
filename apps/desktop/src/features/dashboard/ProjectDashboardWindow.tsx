@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Project } from '@zclaudia/shared';
+import type { Project } from '@zclaudia/shared/core/project';
 import * as api from '../../services/api';
 import { WindowContextBar } from '../../components/window/WindowContextBar';
 import { useProjectStore } from '../../stores/projectStore';

@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useId } from 'react';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { Project } from '@zclaudia/shared/core/project';
+import type { Workflow } from '@zclaudia/shared/features/workflows';
 import type {
-  Project,
-  LlmProfileConfig,
   UnifiedPermissionPolicy,
   PermissionCategory,
   CategoryAction,
   CategoryProfile,
-  Workflow,
-  UserHookDefinition,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/interaction/permissions';
+import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useProjectStore } from '../../stores/projectStore';

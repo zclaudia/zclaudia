@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import type { LocalIssue } from '@zclaudia/shared';
+import type { LocalIssue } from '@zclaudia/shared/features/local-issue';
 import type * as AttachmentsModule from '../../attachments';
 
 const mockCreate = vi.fn().mockResolvedValue({

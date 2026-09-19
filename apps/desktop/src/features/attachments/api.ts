@@ -1,4 +1,8 @@
-import type { Attachment, AttachmentCount, AttachmentOwnerKind } from '@zclaudia/shared';
+import type {
+  Attachment,
+  AttachmentCount,
+  AttachmentOwnerKind,
+} from '@zclaudia/shared/features/attachment';
 import { useServerStore } from '../../stores/serverStore';
 import { getControlPlaneMode, isLocalBackendId } from '../../actions/controlPlane';
 import { apiCall } from '../../services/api/unwrap';

@@ -14,7 +14,7 @@ import type {
   BackendFacadeSnapshot,
   BackendSnapshot,
   SessionStreamSnapshot,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/facade/types';
 
 interface FacadeState {
   // Facade instance (set once during initialization)

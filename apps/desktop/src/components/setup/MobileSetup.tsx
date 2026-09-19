@@ -4,7 +4,7 @@ import { useGatewayStore } from '../../stores/gatewayStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useConnection } from '../../contexts/ConnectionContext';
-import type { BackendSnapshot } from '@zclaudia/shared';
+import type { BackendSnapshot } from '@zclaudia/shared/facade/types';
 import {
   getVisibleMobileBackends,
   isMobileGatewayConnected,

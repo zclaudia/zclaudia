@@ -1,4 +1,4 @@
-import type { StateHeartbeatMessage } from '@zclaudia/shared';
+import type { StateHeartbeatMessage } from '@zclaudia/shared/wire/messages/core';
 import { useRunStore } from '../../stores/runStore';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
@@ -16,7 +16,7 @@ import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../actions/
 import { parseBackendId } from '../../stores/gatewayStore';
 import { useBackgroundTaskStore } from '../../stores/backgroundTaskStore';
 import type { MessageHandlerContext } from './types';
-import type { InteractionPromptMessage } from '@zclaudia/shared';
+import type { InteractionPromptMessage } from '@zclaudia/shared/interaction/forms';
 
 function resolveOwnerBackendId(backendId: string | null, serverId: string): string {
   const rawBackendId = backendId || parseBackendId(serverId) || serverId;
@@ -28,7 +28,7 @@ function resolveOwnerBackendId(backendId: string | null, serverId: string): stri
 function buildProviderPromptInteraction(prompt: {
   requestId: string;
   sessionId: string;
-  questions: import('@zclaudia/shared').AskUserQuestionItem[];
+  questions: import('@zclaudia/shared/interaction/forms').AskUserQuestionItem[];
 }): InteractionPromptMessage {
   return {
     type: 'interaction_prompt',

@@ -8,7 +8,7 @@
  */
 
 import { create } from 'zustand';
-import type { ServerFeature } from '@zclaudia/shared';
+import type { ServerFeature } from '@zclaudia/shared/core/server';
 import type { ControlPlaneMode } from '../actions/controlPlane';
 
 export type ConnectionQuality = 'good' | 'degraded';

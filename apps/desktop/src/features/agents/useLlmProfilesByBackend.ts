@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { LlmProfileConfig } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { listLlmProfilesForBackend } from '../../services/api';
 import { useCatalogByBackend } from './useCatalogByBackend';
 import type { AgentsBackend } from './agents-types';

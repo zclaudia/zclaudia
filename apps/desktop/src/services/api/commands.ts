@@ -1,9 +1,12 @@
-import type { CommandExecuteRequest, CommandExecuteResponse } from '@zclaudia/shared';
+import type {
+  CommandExecuteRequest,
+  CommandExecuteResponse,
+} from '@zclaudia/shared/features/commands';
 import { apiCall } from './unwrap';
 
 export interface CommandListResponse {
-  builtin: import('@zclaudia/shared').SlashCommand[];
-  custom: import('@zclaudia/shared').SlashCommand[];
+  builtin: import('@zclaudia/shared/features/commands').SlashCommand[];
+  custom: import('@zclaudia/shared/features/commands').SlashCommand[];
   count: number;
 }
 

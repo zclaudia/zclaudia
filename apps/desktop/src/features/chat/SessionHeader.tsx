@@ -26,7 +26,9 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { Session, Project, SystemInfo, SessionRuntimeEngine } from '@zclaudia/shared';
+import type { Project } from '@zclaudia/shared/core/project';
+import type { Session, SessionRuntimeEngine } from '@zclaudia/shared/core/session';
+import type { SystemInfo } from '@zclaudia/shared/wire/messages/core';
 import { useServerStore } from '../../stores/serverStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';

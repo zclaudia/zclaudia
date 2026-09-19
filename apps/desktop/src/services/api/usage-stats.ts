@@ -4,7 +4,7 @@ import type {
   RuntimeUsagePayload,
   UsageStatsPayload,
   UsageStatsRange,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/core/usage-stats';
 
 /** The device's IANA zone, shared with every backend so merged views bucket
  *  calendar days identically (runtime usage design §8). */

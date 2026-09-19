@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { SupervisionTask } from '@zclaudia/shared';
+import type { SupervisionTask } from '@zclaudia/shared/features/supervision';
 import * as api from '../../../services/api';
 import { useSupervisionStore } from '../store';
 import { useAndroidBack } from '../../../hooks/useAndroidBack';

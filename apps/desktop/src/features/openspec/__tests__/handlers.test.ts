@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { handleOpenSpecMessage } from '../handlers';
 import { useOpenSpecStore } from '../store';
 import * as api from '../api';
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 
 describe('handleOpenSpecMessage', () => {
   beforeEach(() => {

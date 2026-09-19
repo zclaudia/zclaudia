@@ -1,4 +1,4 @@
-import type { LlmModelDialect, LlmProfileModelEntry } from '@zclaudia/shared';
+import type { LlmModelDialect, LlmProfileModelEntry } from '@zclaudia/shared/core/llm-profile';
 
 /**
  * Draft shape used by the Models repeater. We keep contextWindow / maxTokens as

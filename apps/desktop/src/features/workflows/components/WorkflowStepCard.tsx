@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronRight, Loader2 } from 'lucide-react';
-import type { WorkflowStepRun } from '@zclaudia/shared';
+import type { WorkflowStepRun } from '@zclaudia/shared/features/workflows';
 import { getStepIcon } from './nodes/StepNode';
 import { StepStatusIcon, formatDuration } from './RunComponents';
 

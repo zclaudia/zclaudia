@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ExternalLink, Trash2, GitBranch, Lock, MoreHorizontal } from 'lucide-react';
-import type { Session } from '@zclaudia/shared';
+import type { Session } from '@zclaudia/shared/core/session';
 import { TONE_BADGE, TONE_TEXT, type Tone } from '../../components/ui/tone';
 
 interface SessionItemProps {

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { canPersistGatewaySecret, useGatewayStore, shouldShowBackend } from '../gatewayStore';
 import { useFacadeStore } from '../facadeStore';
-import type { GatewayBackendInfo } from '@zclaudia/shared';
+import type { GatewayBackendInfo } from '@zclaudia/shared/core/server';
 
 describe('gatewayStore', () => {
   beforeEach(() => {

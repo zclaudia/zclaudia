@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { WebSearchConfig, WebSearchConfigSource } from '@zclaudia/shared';
+import type { WebSearchConfig, WebSearchConfigSource } from '@zclaudia/shared/core/server';
 import { getWebSearchConfig, updateWebSearchConfig } from '../../services/api';
 
 function sourceLabel(source: WebSearchConfigSource): string {

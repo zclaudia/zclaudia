@@ -23,8 +23,11 @@ import type {
   InteractionPromptField,
   ApprovalInteractionMessage,
   PlanReviewInteractionMessage,
-} from '@zclaudia/shared';
-import { ACTIONABLE_LABEL, extractDefaultTitleFromPlan } from '@zclaudia/shared';
+} from '@zclaudia/shared/interaction/forms';
+import {
+  ACTIONABLE_LABEL,
+  extractDefaultTitleFromPlan,
+} from '@zclaudia/shared/features/local-issue';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useLocalIssueStore } from '../local-issues';
 import { useProjectStore } from '../../stores/projectStore';

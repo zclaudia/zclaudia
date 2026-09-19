@@ -1,4 +1,6 @@
-import type { SlashCommand, Session, Project } from '@zclaudia/shared';
+import type { Project } from '@zclaudia/shared/core/project';
+import type { Session } from '@zclaudia/shared/core/session';
+import type { SlashCommand } from '@zclaudia/shared/features/commands';
 import { DESKTOP_HOST_ACTIONS } from '@zclaudia/shared/features/host-actions';
 
 /**

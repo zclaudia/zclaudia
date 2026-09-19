@@ -13,7 +13,7 @@
  * connection stays alive by calling facade.forceReconnect() on resume/online.
  */
 
-import type { BackendFacade } from '@zclaudia/shared';
+import type { BackendFacade } from '@zclaudia/shared/facade/types';
 import { useServerStore } from '../stores/serverStore';
 
 const HEALTH_PROBE_INTERVAL_MS = 25_000;

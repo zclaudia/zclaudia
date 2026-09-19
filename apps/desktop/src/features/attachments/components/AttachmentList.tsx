@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Attachment, AttachmentOwnerKind } from '@zclaudia/shared';
+import type { Attachment, AttachmentOwnerKind } from '@zclaudia/shared/features/attachment';
 import {
   DndContext,
   PointerSensor,

@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent, type RefObject } from 'react';
-import { validateMessageAttachmentFiles } from '@zclaudia/shared';
+import { validateMessageAttachmentFiles } from '@zclaudia/shared/core/attachment-validation';
 import { downscaleImageFile } from '../../attachments';
 import type { Attachment } from '../types';
 

@@ -1,5 +1,5 @@
 import { CheckCircle2, Loader2, Square } from 'lucide-react';
-import type { ToolEffect } from '@zclaudia/shared';
+import type { ToolEffect } from '@zclaudia/shared/core/message';
 import type { ToolSemantic } from '@zclaudia/agent-transcript-kit';
 import { type ToolCallState } from '../../../stores/runStore';
 import { CodeViewer } from '../../../components/renderers/CodeViewer';

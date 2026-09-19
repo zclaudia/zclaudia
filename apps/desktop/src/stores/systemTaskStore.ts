@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SystemTaskInfo } from '@zclaudia/shared';
+import type { SystemTaskInfo } from '@zclaudia/shared/features/system-tasks';
 import { fetchLocalApi } from '../services/api';
 
 interface SystemTaskState {

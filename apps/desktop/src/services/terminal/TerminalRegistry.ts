@@ -7,7 +7,7 @@
  * only one of which holds ownership at any moment (enforced by `terminal_attach`).
  */
 
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { TerminalController, type TerminalControllerDeps } from './TerminalController';
 
 class TerminalRegistryImpl {

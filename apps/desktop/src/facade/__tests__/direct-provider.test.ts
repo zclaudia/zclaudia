@@ -35,11 +35,22 @@ vi.mock('../direct-adapter', () => ({
   },
 }));
 
-vi.mock('@zclaudia/shared', async () => {
-  const actual = await vi.importActual<typeof import('@zclaudia/shared')>('@zclaudia/shared');
+vi.mock('@zclaudia/shared/facade/constants', async () => {
+  const actual = await vi.importActual<typeof import('@zclaudia/shared/facade/constants')>(
+    '@zclaudia/shared/facade/constants'
+  );
   return {
     ...actual,
     DEFAULT_GC_INTERVAL: 1000,
+  };
+});
+
+vi.mock('@zclaudia/shared/facade/runtime-core', async () => {
+  const actual = await vi.importActual<typeof import('@zclaudia/shared/facade/runtime-core')>(
+    '@zclaudia/shared/facade/runtime-core'
+  );
+  return {
+    ...actual,
     BackendFacadeRuntimeCore: class MockRuntimeCore {
       start = startMock;
       stop = stopMock;

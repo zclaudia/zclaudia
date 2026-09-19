@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { GatewayBackendInfo, BackendSnapshot } from '@zclaudia/shared';
+import type { GatewayBackendInfo } from '@zclaudia/shared/core/server';
+import type { BackendSnapshot } from '@zclaudia/shared/facade/types';
 import { isTauri } from '../utils/platform';
 import { normalizeGatewayUrl } from '../utils/gatewayUrl';
 

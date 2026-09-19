@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import type { AgentProfileConfig, LlmProfileConfig } from '@zclaudia/shared';
+import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 
 import { useAgentForSession } from '../useAgentForSession';
 import { useProjectStore } from '../../stores/projectStore';

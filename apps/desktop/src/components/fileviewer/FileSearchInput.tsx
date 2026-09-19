@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search } from 'lucide-react';
 import * as api from '../../services/api';
-import type { FileEntry } from '@zclaudia/shared';
+import type { FileEntry } from '@zclaudia/shared/files';
 import { FileSymbol } from '../filesymbols';
 
 interface FileSearchInputProps {

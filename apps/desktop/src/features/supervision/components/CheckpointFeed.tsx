@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
-import type { SupervisionLog } from '@zclaudia/shared';
+import type { SupervisionLog } from '@zclaudia/shared/features/supervision';
 import * as api from '../../../services/api';
 import { useSupervisionStore } from '../store';
 

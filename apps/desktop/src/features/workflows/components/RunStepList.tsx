@@ -1,4 +1,4 @@
-import type { WorkflowDefinition, WorkflowStepRun } from '@zclaudia/shared';
+import type { WorkflowDefinition, WorkflowStepRun } from '@zclaudia/shared/features/workflows';
 import { WorkflowStepCard } from './WorkflowStepCard';
 
 /**

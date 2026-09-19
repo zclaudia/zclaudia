@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { BrowserInputEvent } from '@zclaudia/shared';
+import type { BrowserInputEvent } from '@zclaudia/shared/wire/messages/browser';
 import { mapKey, mapPointer, mapWheel } from './inputMapping';
 
 interface Props {

@@ -13,7 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import type { WorkflowStepRun } from '@zclaudia/shared';
+import type { WorkflowStepRun } from '@zclaudia/shared/features/workflows';
 import { TONE_BADGE, type Tone } from '../../../components/ui/tone';
 
 export function StepStatusIcon({ status }: { status: string }) {

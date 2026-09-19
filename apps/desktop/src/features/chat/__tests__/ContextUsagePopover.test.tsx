@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import type { ContextUsagePayload } from '@zclaudia/shared';
+import type { ContextUsagePayload } from '@zclaudia/shared/core/message';
 import { StrictModeTestWrapper } from '../../../test/StrictModeTestWrapper';
 import { ContextUsagePopover } from '../ContextUsagePopover';
 

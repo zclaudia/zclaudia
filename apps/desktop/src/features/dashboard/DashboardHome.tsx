@@ -11,7 +11,7 @@ import {
   ExternalLink,
   FileText,
 } from 'lucide-react';
-import type { Automation } from '@zclaudia/shared';
+import type { Automation } from '@zclaudia/shared/features/automations';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSupervisionStore } from '../supervision';
 import { useLocalPRStore } from '../local-pr';

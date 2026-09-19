@@ -28,7 +28,7 @@
  */
 
 import { useState, useRef, useMemo } from 'react';
-import type { LlmProfileConfig, LlmProfileCompat } from '@zclaudia/shared';
+import type { LlmProfileConfig, LlmProfileCompat } from '@zclaudia/shared/core/llm-profile';
 import { resolveLlmProfileProtocols } from '@zclaudia/shared/core/llm-profile';
 import {
   createLlmProfileForBackend,

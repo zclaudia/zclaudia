@@ -9,7 +9,7 @@ import type {
   SupervisorConfig,
   SupervisionTask,
   SupervisionLog,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/features/supervision';
 import { fetchApi } from './base';
 import { apiCall, apiCallVoid } from './unwrap';
 

@@ -4,8 +4,8 @@ import type {
   ExecutionGateDecision,
   ProjectAgent,
   ProjectChange,
-} from '@zclaudia/shared';
-import type { ClientMessage } from '@zclaudia/shared';
+} from '@zclaudia/shared/features/supervision';
+import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 import * as api from '../../../services/api';
 import { useConnection } from '../../../contexts/ConnectionContext';
 import { useSupervisionStore } from '../store';

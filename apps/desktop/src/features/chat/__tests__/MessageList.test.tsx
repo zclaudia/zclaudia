@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
 import type { MessageWithToolCalls } from '../../../stores/chatMessageStore';
 import type { ToolCallState } from '../../../stores/runStore';
-import type { ContentBlock } from '@zclaudia/shared';
+import type { ContentBlock } from '@zclaudia/shared/core/message';
 import { StrictModeTestWrapper } from '../../../test/StrictModeTestWrapper';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────

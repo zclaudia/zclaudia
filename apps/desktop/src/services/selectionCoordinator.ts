@@ -16,8 +16,8 @@ export interface SelectSessionOptions {
 
 interface SelectionCoordinatorDeps {
   activeServerId: string | null;
-  connectionState: import('@zclaudia/shared').BackendConnectionState;
-  backends: import('@zclaudia/shared').BackendSnapshot[];
+  connectionState: import('@zclaudia/shared/facade/types').BackendConnectionState;
+  backends: import('@zclaudia/shared/facade/types').BackendSnapshot[];
   connectServer: (backendId: string) => void;
   schedule?: (callback: () => void) => void;
 }

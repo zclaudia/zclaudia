@@ -1,4 +1,4 @@
-import type { GraphNode } from '@zclaudia/shared';
+import type { GraphNode } from '@zclaudia/shared/core/context-graph';
 import type { LayoutModel, LayoutNode } from './layout';
 import { glyphFor } from './nodeGlyphs';
 

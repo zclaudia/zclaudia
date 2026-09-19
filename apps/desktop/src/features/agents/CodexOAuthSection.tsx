@@ -16,7 +16,7 @@ import {
   type CodexModelEntry,
 } from '../../services/api';
 import { isLocalBackendId } from '../../actions/controlPlane';
-import type { LlmProfileConfig, LlmProfileModelEntry } from '@zclaudia/shared';
+import type { LlmProfileConfig, LlmProfileModelEntry } from '@zclaudia/shared/core/llm-profile';
 
 interface Props {
   backendId: string;

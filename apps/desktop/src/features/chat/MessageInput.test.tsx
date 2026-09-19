@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MessageInput } from './MessageInput';
-import type { SlashCommand } from '@zclaudia/shared';
+import type { SlashCommand } from '@zclaudia/shared/features/commands';
 
 // Mock hooks
 let mockIsMobile = false;

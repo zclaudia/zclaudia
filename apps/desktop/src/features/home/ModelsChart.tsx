@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ModelUsagePayload, UsageStatsRange } from '@zclaudia/shared';
+import type { ModelUsagePayload, UsageStatsRange } from '@zclaudia/shared/core/usage-stats';
 import { getModelStats } from '../../services/api';
 import { useStatsBackendTargets } from './statsBackend';
 import { aggregateModelStats } from './aggregateUsageStats';

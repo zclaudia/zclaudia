@@ -9,7 +9,7 @@ import { InteractionItem } from './InteractionItem';
 import type { MessageWithToolCalls, PaginationInfo } from '../../stores/chatMessageStore';
 import type { ToolCallState, RunHealth, RunRetryStatus } from '../../stores/runStore';
 import type { PermissionRequest } from '../../stores/permissionStore';
-import type { ContentBlock } from '@zclaudia/shared';
+import type { ContentBlock } from '@zclaudia/shared/core/message';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { isPlanProposalTool } from './tool-call/toolClassifiers';
 

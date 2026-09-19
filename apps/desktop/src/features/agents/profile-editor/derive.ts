@@ -1,13 +1,10 @@
 // Pure derivation helpers for the agent profile editor: model-capability lookups,
 // tool-set selection analysis, and display labels. No React, no state.
-import type {
-  LlmProfileConfig,
-  McpServerConfig,
-  SkillRef,
-  ToolName,
-  ToolSelection,
-} from '@zclaudia/shared';
-import { BUILTIN_TOOL_SETS } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { McpServerConfig } from '@zclaudia/shared/core/mcp';
+import type { SkillRef } from '@zclaudia/shared/core/skills';
+import type { ToolName, ToolSelection } from '@zclaudia/shared/core/tools';
+import { BUILTIN_TOOL_SETS } from '@zclaudia/shared/core/tools';
 import type { ProfileConfigDescriptor } from '@zclaudia/shared/core/profile-config-descriptor';
 import type { WorkspaceSkillInfo } from '../../../services/api';
 

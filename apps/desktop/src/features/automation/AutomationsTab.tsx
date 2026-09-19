@@ -3,7 +3,8 @@ import { Button, IconButton } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Tooltip } from '../../components/ui/Tooltip';
 import { Plus, RefreshCw, Play, Pause, Trash2, Zap, Shield, X, Loader2 } from 'lucide-react';
-import type { Automation, Workflow, WorkflowStepTypeMeta } from '@zclaudia/shared';
+import type { Automation } from '@zclaudia/shared/features/automations';
+import type { Workflow, WorkflowStepTypeMeta } from '@zclaudia/shared/features/workflows';
 import type { AutomationItem, AutomationBackend } from './automation-types';
 import { automationToItem } from './automation-types';
 import { Select } from '../../components/ui/Select';
@@ -183,8 +184,11 @@ export function AutomationsTab({ scope }: { scope: AutomationTabScope }) {
                 )
               }
               onDelete={item =>
-                mutate(`${item.id}:delete`, backend.backendId, `Failed to delete "${item.name}"`, api =>
-                  api.del(`/api/automations/${item.id}`)
+                mutate(
+                  `${item.id}:delete`,
+                  backend.backendId,
+                  `Failed to delete "${item.name}"`,
+                  api => api.del(`/api/automations/${item.id}`)
                 )
               }
             />
@@ -562,9 +566,7 @@ function CreateAutomationForm({
         <Button
           variant="primary"
           onClick={handleCreate}
-          disabled={
-            submitting || !newName.trim() || (newActionType === 'workflow' && !workflowRef)
-          }
+          disabled={submitting || !newName.trim() || (newActionType === 'workflow' && !workflowRef)}
           className="max-md:flex-1"
         >
           {submitting && <Loader2 size={13} className="animate-spin" />}
@@ -663,11 +665,7 @@ function AutomationCard({
           <>
             <Tooltip content="Run now">
               <IconButton onClick={onTrigger} aria-label="Run now" disabled={runPending}>
-                {runPending ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <Play size={12} />
-                )}
+                {runPending ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
               </IconButton>
             </Tooltip>
             <Tooltip content={item.enabled ? 'Disable' : 'Enable'}>

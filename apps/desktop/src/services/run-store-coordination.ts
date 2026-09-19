@@ -1,7 +1,7 @@
 // Cross-store effects of run lifecycle transitions in runStore. The store's
 // actions delegate here so runStore stays a plain state container (stores must
 // not import other stores; services coordinate them).
-import type { ContentBlock } from '@zclaudia/shared';
+import type { ContentBlock } from '@zclaudia/shared/core/message';
 import { useChatMessageStore, findLastAssistantMessageIndex } from '../stores/chatMessageStore';
 import type { ToolCallState } from '../stores/runTypes';
 import { useSessionConfigStore } from '../stores/sessionConfigStore';

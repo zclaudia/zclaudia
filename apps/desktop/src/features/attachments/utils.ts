@@ -1,4 +1,4 @@
-import type { AttachmentKind } from '@zclaudia/shared';
+import type { AttachmentKind } from '@zclaudia/shared/features/attachment';
 
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

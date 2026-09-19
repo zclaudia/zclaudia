@@ -17,7 +17,11 @@ import {
 import '@xyflow/react/dist/style.css';
 import { StepNode } from './nodes/StepNode';
 import { WorkflowEdge } from './edges/WorkflowEdge';
-import type { WorkflowNodeDef, WorkflowEdgeDef, WorkflowEdgeType } from '@zclaudia/shared';
+import type {
+  WorkflowNodeDef,
+  WorkflowEdgeDef,
+  WorkflowEdgeType,
+} from '@zclaudia/shared/features/workflows';
 
 // ── Type converters ───────────────────────────────────────
 

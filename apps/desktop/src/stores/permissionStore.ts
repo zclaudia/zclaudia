@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AIReviewResult } from '@zclaudia/shared';
+import type { AIReviewResult } from '@zclaudia/shared/interaction/permissions';
 
 export type { AIReviewResult };
 

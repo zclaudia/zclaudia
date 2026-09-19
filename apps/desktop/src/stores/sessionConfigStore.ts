@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { SystemInfo, UsageInfo, ContextWindowSource } from '@zclaudia/shared';
+import type { UsageInfo } from '@zclaudia/shared/core/message';
+import type { SystemInfo, ContextWindowSource } from '@zclaudia/shared/wire/messages/core';
 
 export interface CompactionNotice {
   sessionId: string;

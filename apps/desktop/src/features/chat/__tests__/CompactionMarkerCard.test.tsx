@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import type { CompactionMarker } from '@zclaudia/shared';
+import type { CompactionMarker } from '@zclaudia/shared/core/message';
 import { CompactionMarkerCard } from '../CompactionMarkerCard';
 
 function makeMarker(overrides: Partial<CompactionMarker> = {}): CompactionMarker {

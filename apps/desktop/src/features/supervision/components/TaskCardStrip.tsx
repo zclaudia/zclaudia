@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Pencil, Eye, RotateCw, Play, X, Clock } from 'lucide-react';
-import type { SupervisionTask, TaskStatus } from '@zclaudia/shared';
+import type { SupervisionTask, TaskStatus } from '@zclaudia/shared/features/supervision';
 import { TONE_BADGE, TONE_DOT, type Tone } from '../../../components/ui/tone';
 import { useSupervisionStore } from '../store';
 import { useProjectStore } from '../../../stores/projectStore';

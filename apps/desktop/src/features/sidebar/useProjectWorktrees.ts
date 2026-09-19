@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { GitWorktree, Project, Session } from '@zclaudia/shared';
+import type { GitWorktree, Project } from '@zclaudia/shared/core/project';
+import type { Session } from '@zclaudia/shared/core/session';
 import * as api from '../../services/api';
 import { runWithToast } from '../git';
 import { confirm } from '../../stores/confirmDialogStore';

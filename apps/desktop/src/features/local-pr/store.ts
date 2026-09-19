@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { LocalPR } from '@zclaudia/shared';
+import type { LocalPR } from '@zclaudia/shared/features/local-pr';
 import {
   listLocalPRs,
   createLocalPR,

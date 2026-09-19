@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { LocalIssueComment } from '@zclaudia/shared';
+import type { LocalIssueComment } from '@zclaudia/shared/features/local-issue';
 import {
   listIssueComments,
   createIssueComment,

@@ -1,4 +1,4 @@
-import type { ApiResponse } from '@zclaudia/shared';
+import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { RecordStatus } from '@zclaudia/shared/core/record-status';
 import { fetchLocalApi, fetchApiForBackend } from './base';
 export interface WorkspaceSkillInfo {

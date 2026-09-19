@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Goal, EvaluatorVerdictKind } from '@zclaudia/shared';
+import type { Goal, EvaluatorVerdictKind } from '@zclaudia/shared/features/goal';
 
 interface GoalSlot {
   goal: Goal | null;

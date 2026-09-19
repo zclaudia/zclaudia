@@ -1,4 +1,4 @@
-import type { ContentBlock } from '@zclaudia/shared';
+import type { ContentBlock } from '@zclaudia/shared/core/message';
 import { useRunStore } from '../../stores/runStore';
 import { flushDeltaForRun } from './delta-buffer';
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import type { LocalIssue } from '@zclaudia/shared';
+import type { LocalIssue } from '@zclaudia/shared/features/local-issue';
 
 const mockLoadIssues = vi.fn().mockResolvedValue(undefined);
 const mockUseAttachmentCounts = vi.fn();

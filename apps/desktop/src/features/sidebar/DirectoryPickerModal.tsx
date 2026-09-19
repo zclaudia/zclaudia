@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowUp, ChevronRight, Folder, Loader2 } from 'lucide-react';
-import type { DirectoryBrowseEntry } from '@zclaudia/shared';
+import type { DirectoryBrowseEntry } from '@zclaudia/shared/files';
 import { browseDirectories } from '../../services/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { Button } from '../../components/ui/Button';

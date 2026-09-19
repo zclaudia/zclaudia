@@ -1,4 +1,4 @@
-import type { BrowserDeviceEmulation } from '@zclaudia/shared';
+import type { BrowserDeviceEmulation } from '@zclaudia/shared/wire/messages/browser';
 
 /**
  * Mobile device presets for the browser panel's device-emulation mode.

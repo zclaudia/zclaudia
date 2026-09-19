@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Loader2, RefreshCw, ChevronRight, Workflow as WorkflowIcon } from 'lucide-react';
-import type { Workflow, WorkflowTemplate } from '@zclaudia/shared';
+import type { Workflow, WorkflowTemplate } from '@zclaudia/shared/features/workflows';
 import { categoryTone } from './automation-types';
 import type { AutomationBackend } from './automation-types';
 import { Button, IconButton } from '../../components/ui/Button';

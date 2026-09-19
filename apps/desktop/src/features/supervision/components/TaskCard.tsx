@@ -1,4 +1,4 @@
-import type { SupervisionTask } from '@zclaudia/shared';
+import type { SupervisionTask } from '@zclaudia/shared/features/supervision';
 import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import * as api from '../../../services/api';
 import { useSupervisionStore } from '../store';

@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useProjectStore } from '../projectStore';
 import { useOwnershipStore } from '../ownershipStore';
 import { useSelectionStore } from '../selectionStore';
-import type { Project, Session } from '@zclaudia/shared';
+import type { Project } from '@zclaudia/shared/core/project';
+import type { Session } from '@zclaudia/shared/core/session';
 
 const mockSetActiveServer = vi.fn();
 const mockServerStoreState = {

@@ -1,5 +1,5 @@
 import { CornerDownRight, AlertTriangle, RotateCcw } from 'lucide-react';
-import type { WorkflowDefinition, WorkflowNodeDef } from '@zclaudia/shared';
+import type { WorkflowDefinition, WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 import { buildWorkflowOutline, type WorkflowOutlineRow } from '../workflowOutline';
 import { WorkflowStepCard } from './WorkflowStepCard';
 import { SECTION_LABEL } from '../../../components/ui/typography';

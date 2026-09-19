@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { BackendSnapshot } from '@zclaudia/shared';
+import type { BackendSnapshot } from '@zclaudia/shared/facade/types';
 import { useFacadeStore } from '../../stores/facadeStore';
 import type { AgentsBackend } from './agents-types';
 

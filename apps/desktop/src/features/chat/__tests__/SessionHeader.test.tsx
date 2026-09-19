@@ -42,7 +42,8 @@ const mockRightSidebarState = {
 };
 
 import { SessionHeader } from '../SessionHeader';
-import type { Session, Project } from '@zclaudia/shared';
+import type { Project } from '@zclaudia/shared/core/project';
+import type { Session } from '@zclaudia/shared/core/session';
 
 // Minimal valid props
 const baseSession: Session = {

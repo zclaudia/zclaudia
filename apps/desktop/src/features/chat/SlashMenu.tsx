@@ -1,6 +1,6 @@
 import { forwardRef, useMemo } from 'react';
 import { Pin, PinOff, Sparkles, Terminal, Bookmark, Zap } from 'lucide-react';
-import type { SkillRef } from '@zclaudia/shared';
+import type { SkillRef } from '@zclaudia/shared/core/skills';
 import type { InvocableDescriptor } from '@zclaudia/shared/providers';
 import { SECTION_LABEL } from '../../components/ui/typography';
 

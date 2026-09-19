@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
-import type { SlashCommand, SkillRef } from '@zclaudia/shared';
-import { skillRefKey } from '@zclaudia/shared';
+import type { SkillRef } from '@zclaudia/shared/core/skills';
+import type { SlashCommand } from '@zclaudia/shared/features/commands';
+import { skillRefKey } from '@zclaudia/shared/core/skills';
 import type { InvocableDescriptor } from '@zclaudia/shared/providers';
 import type { WorkspaceSkillInfo } from '../../../services/api/workspace-skills';
 import type { SlashSuggestion } from '../SlashMenu';

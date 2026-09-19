@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useMemo } from 'react';
-import type { ClientMessage } from '@zclaudia/shared';
+import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 import { useServerStore } from '../stores/serverStore';
 import { useGatewayConnection } from './useGatewayConnection';
 import { useFacadeStore } from '../stores/facadeStore';

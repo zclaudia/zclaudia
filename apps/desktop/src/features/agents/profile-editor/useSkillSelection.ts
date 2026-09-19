@@ -5,8 +5,8 @@ import type {
   SkillForkToolPolicy,
   SkillSelection,
   SkillSource,
-} from '@zclaudia/shared';
-import { defaultSkillSelection, skillRefKey } from '@zclaudia/shared';
+} from '@zclaudia/shared/core/skills';
+import { defaultSkillSelection, skillRefKey } from '@zclaudia/shared/core/skills';
 import type { WorkspaceSkillInfo } from '../../../services/api';
 import { skillRefFor } from './derive';
 

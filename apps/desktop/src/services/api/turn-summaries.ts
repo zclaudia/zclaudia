@@ -2,7 +2,7 @@ import type {
   TurnSummary,
   GenerateTurnSummaryRequest,
   GenerateTurnSummaryResponse,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/features/turn-summary';
 import { apiCallForBackend } from './unwrap';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 

@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState } from 'react';
-import type { SupervisionTask } from '@zclaudia/shared';
+import type { SupervisionTask } from '@zclaudia/shared/features/supervision';
 import { ArrowLeft } from 'lucide-react';
 import * as api from '../../services/api';
 import {

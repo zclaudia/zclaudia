@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import type { Workflow } from '@zclaudia/shared';
+import type { Workflow } from '@zclaudia/shared/features/workflows';
 import { WorkflowMobileView } from '../WorkflowMobileView';
 
 function workflow(over: Partial<Workflow> = {}): Workflow {

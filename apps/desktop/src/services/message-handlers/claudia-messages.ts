@@ -5,7 +5,7 @@
  * and updates ONLY that backend's slice — snapshots and late events for one
  * backend must never touch another backend's state (design §backend 归属与隔离).
  */
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { useClaudiaStore } from '../../stores/claudiaStore';
 import { useToastStore } from '../../stores/toastStore';
 import { parseBackendId } from '../../stores/gatewayStore';
@@ -19,7 +19,8 @@ function canonicalBackendId(serverId: string): string {
 export function handleClaudiaMessage(msg: ServerMessage, serverId: string): boolean {
   switch (msg.type) {
     case 'claudia_request_accepted': {
-      const accepted = msg as import('@zclaudia/shared').ClaudiaRequestAcceptedMessage;
+      const accepted =
+        msg as import('@zclaudia/shared/wire/messages/claudia').ClaudiaRequestAcceptedMessage;
       const backendId = canonicalBackendId(serverId);
       const store = useClaudiaStore.getState();
       store.ensureSlice(backendId);
@@ -41,7 +42,8 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
     }
 
     case 'claudia_request_rejected': {
-      const rejected = msg as import('@zclaudia/shared').ClaudiaRequestRejectedMessage;
+      const rejected =
+        msg as import('@zclaudia/shared/wire/messages/claudia').ClaudiaRequestRejectedMessage;
       const backendId = canonicalBackendId(serverId);
       const store = useClaudiaStore.getState();
       store.ensureSlice(backendId);
@@ -54,7 +56,8 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
     }
 
     case 'claudia_task_snapshot': {
-      const snapshot = msg as import('@zclaudia/shared').ClaudiaTaskSnapshotMessage;
+      const snapshot =
+        msg as import('@zclaudia/shared/wire/messages/claudia').ClaudiaTaskSnapshotMessage;
       const backendId = canonicalBackendId(serverId);
       const store = useClaudiaStore.getState();
       store.ensureSlice(backendId);
@@ -69,7 +72,8 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
     }
 
     case 'claudia_message_delta': {
-      const delta = msg as import('@zclaudia/shared').ClaudiaMessageDeltaMessage;
+      const delta =
+        msg as import('@zclaudia/shared/wire/messages/claudia').ClaudiaMessageDeltaMessage;
       const backendId = canonicalBackendId(serverId);
       useClaudiaStore
         .getState()
@@ -78,7 +82,8 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
     }
 
     case 'claudia_message_completed': {
-      const completed = msg as import('@zclaudia/shared').ClaudiaMessageCompletedMessage;
+      const completed =
+        msg as import('@zclaudia/shared/wire/messages/claudia').ClaudiaMessageCompletedMessage;
       const backendId = canonicalBackendId(serverId);
       useClaudiaStore
         .getState()
@@ -90,7 +95,8 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
     }
 
     case 'claudia_message_failed': {
-      const failed = msg as import('@zclaudia/shared').ClaudiaMessageFailedMessage;
+      const failed =
+        msg as import('@zclaudia/shared/wire/messages/claudia').ClaudiaMessageFailedMessage;
       const backendId = canonicalBackendId(serverId);
       useClaudiaStore.getState().failRun(backendId, failed.clientRequestId, failed.error, {
         sessionId: failed.sessionId,
@@ -101,7 +107,8 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
 
     // Legacy promoted-task messages (protocol kept for old servers/clients).
     case 'claudia_message_promoted': {
-      const promoted = msg as import('@zclaudia/shared').ClaudiaMessagePromotedMessage;
+      const promoted =
+        msg as import('@zclaudia/shared/wire/messages/claudia').ClaudiaMessagePromotedMessage;
       const backendId = canonicalBackendId(serverId);
       const store = useClaudiaStore.getState();
       const inline = store.slices[backendId]?.runs.find(
@@ -123,7 +130,8 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
     }
 
     case 'claudia_task_created': {
-      const created = msg as import('@zclaudia/shared').ClaudiaTaskCreatedMessage;
+      const created =
+        msg as import('@zclaudia/shared/wire/messages/claudia').ClaudiaTaskCreatedMessage;
       const backendId = canonicalBackendId(serverId);
       const store = useClaudiaStore.getState();
       store.ensureSlice(backendId);
@@ -165,7 +173,8 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
     }
 
     case 'claudia_task_update': {
-      const update = msg as import('@zclaudia/shared').ClaudiaTaskUpdateMessage;
+      const update =
+        msg as import('@zclaudia/shared/wire/messages/claudia').ClaudiaTaskUpdateMessage;
       const backendId = canonicalBackendId(serverId);
       const store = useClaudiaStore.getState();
       store.ensureSlice(backendId);

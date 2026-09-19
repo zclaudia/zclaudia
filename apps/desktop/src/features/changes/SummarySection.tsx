@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CirclePlus, Loader2, RefreshCw, Sparkles } from 'lucide-react';
-import type { TurnSummary } from '@zclaudia/shared';
+import type { TurnSummary } from '@zclaudia/shared/features/turn-summary';
 import { useSummaryStore } from '../../stores/summaryStore';
 import { useToastStore } from '../../stores/toastStore';
 import { timeAgo } from '../../utils/timeAgo';

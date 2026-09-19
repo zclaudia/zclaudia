@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { LocalPRCard } from '../components/LocalPRCard';
-import type { LocalPR } from '@zclaudia/shared';
+import type { LocalPR } from '@zclaudia/shared/features/local-pr';
 
 vi.mock('../../../hooks/useMediaQuery', () => ({
   useIsMobile: () => false,

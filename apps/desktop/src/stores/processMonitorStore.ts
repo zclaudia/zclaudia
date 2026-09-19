@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ProcessCleanupResultMessage } from '@zclaudia/shared';
+import type { ProcessCleanupResultMessage } from '@zclaudia/shared/wire/messages/run';
 
 interface ProcessMonitorState {
   lastCleanupResult: ProcessCleanupResultMessage | null;

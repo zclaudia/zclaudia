@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { LocalIssue, LocalIssueStatus } from '@zclaudia/shared';
+import type { LocalIssue, LocalIssueStatus } from '@zclaudia/shared/features/local-issue';
 import {
   listLocalIssues,
   createLocalIssue,

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { LlmProfileConfig } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 
 interface Props {
   profile: LlmProfileConfig;

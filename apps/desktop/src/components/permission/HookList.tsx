@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { parseToolRule, type UserHookDefinition } from '@zclaudia/shared';
+import { parseToolRule } from '@zclaudia/shared/interaction/tool-rule-syntax';
+import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
 
 interface HookListProps {
   hooks: UserHookDefinition[];

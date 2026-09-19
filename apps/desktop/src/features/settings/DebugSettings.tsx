@@ -1,4 +1,4 @@
-import type { ClientMessage } from '@zclaudia/shared';
+import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 import { SettingsGroup } from './ui/SettingsGroup';
 import { CrashReportsSection } from './debug/CrashReportsSection';
 import { ManagedProcessesSection } from './debug/ManagedProcessesSection';

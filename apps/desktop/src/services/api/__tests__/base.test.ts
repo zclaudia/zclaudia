@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { ServerFeature } from '@zclaudia/shared';
+import type { ServerFeature } from '@zclaudia/shared/core/server';
 import { backendSupports } from '../base';
 import { useServerStore } from '../../../stores/serverStore';
 import { useFacadeStore } from '../../../stores/facadeStore';

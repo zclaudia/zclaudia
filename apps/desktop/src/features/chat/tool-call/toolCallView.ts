@@ -1,4 +1,4 @@
-import type { ToolEffect } from '@zclaudia/shared';
+import type { ToolEffect } from '@zclaudia/shared/core/message';
 import type { ToolCallView } from '@zclaudia/agent-transcript-kit';
 import type { ToolCallState } from '../../../stores/runStore';
 

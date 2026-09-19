@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ContextUsageCard, formatTokenCount } from './ContextUsageCard';
-import type { ContextUsagePayload } from '@zclaudia/shared';
+import type { ContextUsagePayload } from '@zclaudia/shared/core/message';
 
 function makePayload(overrides?: Partial<ContextUsagePayload>): ContextUsagePayload {
   return {

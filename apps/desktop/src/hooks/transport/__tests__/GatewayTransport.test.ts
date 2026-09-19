@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GatewayTransport } from '../GatewayTransport';
-import type { ClientMessage, ServerMessage } from '@zclaudia/shared';
+import type { ClientMessage, ServerMessage } from '@zclaudia/shared/wire/messages/index';
 
 const storeMocks = vi.hoisted(() => ({
   clearBackendSessions: vi.fn(),

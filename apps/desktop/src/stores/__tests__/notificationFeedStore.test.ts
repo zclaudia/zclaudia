@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useNotificationFeedStore } from '../notificationFeedStore';
-import { EMPTY_NOTIFICATION_UNREAD_COUNTS_BY_TAB } from '@zclaudia/shared';
+import { EMPTY_NOTIFICATION_UNREAD_COUNTS_BY_TAB } from '@zclaudia/shared/features/notification-feed';
 
 describe('notificationFeedStore', () => {
   beforeEach(() => {

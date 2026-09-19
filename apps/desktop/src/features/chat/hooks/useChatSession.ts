@@ -9,7 +9,7 @@ import { useServerStore } from '../../../stores/serverStore';
 import { useOwnershipStore } from '../../../stores/ownershipStore';
 import { useProviderCapabilities } from './useProviderCapabilities';
 import type { MessageWithToolCalls } from '../../../stores/chatMessageStore';
-import type { ContentBlock } from '@zclaudia/shared';
+import type { ContentBlock } from '@zclaudia/shared/core/message';
 
 const EMPTY_MESSAGES: MessageWithToolCalls[] = [];
 const EMPTY_TOOL_CALLS: ToolCallState[] = [];

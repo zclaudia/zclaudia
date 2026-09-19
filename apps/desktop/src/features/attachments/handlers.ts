@@ -1,4 +1,4 @@
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { useAttachmentsStore } from './store';
 
 export function handleAttachmentMessage(msg: ServerMessage): boolean {

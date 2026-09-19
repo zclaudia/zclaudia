@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
-import type { ThinkingLevel } from '@zclaudia/shared';
+import type { ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import { FieldLabel } from '../ui/EditorSection';
 import { FIELD_CLASS, SELECT_POPOVER_CLASS } from './styles';
 

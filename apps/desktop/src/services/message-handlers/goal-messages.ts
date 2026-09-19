@@ -1,4 +1,4 @@
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { useGoalStore } from '../../stores/goalStore';
 
 export function handleGoalMessage(msg: ServerMessage): boolean {

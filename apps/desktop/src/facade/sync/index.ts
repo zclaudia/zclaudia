@@ -1,4 +1,4 @@
-import type { BackendFacadeEvent } from '@zclaudia/shared';
+import type { BackendFacadeEvent } from '@zclaudia/shared/facade/types';
 import {
   syncBackendDataEvent,
   syncBackendDataSnapshot,

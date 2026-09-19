@@ -4,7 +4,7 @@ import {
   classifyNotificationItemTab,
   type NotificationItem,
   type NotificationUnreadCountsByTab,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/features/notification-feed';
 
 function deriveUnreadCount(items: NotificationItem[]): number {
   return items.reduce((count, item) => count + (item.readAt ? 0 : 1), 0);

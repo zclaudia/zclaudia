@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { GitWorktree } from '@zclaudia/shared';
+import type { GitWorktree } from '@zclaudia/shared/core/project';
 import * as api from '../../services/api';
 import { SelectorTrigger } from './SelectorTrigger';
 import { SECTION_LABEL } from '../../components/ui/typography';

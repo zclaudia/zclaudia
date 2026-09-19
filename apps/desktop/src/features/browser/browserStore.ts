@@ -4,7 +4,7 @@ import type {
   BrowserDeviceEmulation,
   BrowserNetworkEntry,
   BrowserPageState,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/wire/messages/browser';
 
 export interface BrowserSessionView {
   state: BrowserPageState | null;

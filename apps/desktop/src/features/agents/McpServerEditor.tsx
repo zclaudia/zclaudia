@@ -46,7 +46,7 @@ import { FormField } from '../../components/ui/FormField';
 import { Input, FIELD_CLASS } from '../../components/ui/Input';
 import { Toggle } from '../../components/ui/Toggle';
 import { confirm } from '../../stores/confirmDialogStore';
-import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared';
+import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared/core/mcp';
 import type {
   McpRiskAction,
   McpServerTransport,

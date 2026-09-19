@@ -1,4 +1,9 @@
-import type { GitWorktreeStatus, GitBranch, GitCommit, GitStash } from '@zclaudia/shared';
+import type {
+  GitWorktreeStatus,
+  GitBranch,
+  GitCommit,
+  GitStash,
+} from '@zclaudia/shared/core/project';
 import { apiCallForBackend, apiCallVoidForBackend } from './unwrap';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 

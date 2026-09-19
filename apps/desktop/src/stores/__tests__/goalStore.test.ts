@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useGoalStore } from '../goalStore';
-import type { Goal } from '@zclaudia/shared';
+import type { Goal } from '@zclaudia/shared/features/goal';
 
 function makeGoal(overrides: Partial<Goal> = {}): Goal {
   return {

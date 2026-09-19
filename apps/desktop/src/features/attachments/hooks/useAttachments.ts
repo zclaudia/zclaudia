@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react';
-import type { Attachment, AttachmentOwnerKind } from '@zclaudia/shared';
+import type { Attachment, AttachmentOwnerKind } from '@zclaudia/shared/features/attachment';
 import { useAttachmentsStore, ownerKey } from '../store';
 import type { UploadAttachmentOptions } from '../api';
 

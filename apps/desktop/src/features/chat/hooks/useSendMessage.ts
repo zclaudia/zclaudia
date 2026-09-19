@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type {
-  UnifiedPermissionPolicy,
-  ClientMessage,
   MessageAttachment,
   MessageInput as MessageInputData,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/core/message';
+import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
+import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 import type { Attachment } from '../MessageInput';
 import type { MessageWithToolCalls } from '../../../stores/chatMessageStore';
 import { useInteractionStore } from '../../../stores/interactionStore';

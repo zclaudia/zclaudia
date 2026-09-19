@@ -1,4 +1,5 @@
-import type { Permission, PluginManifest } from '@zclaudia/shared';
+import type { PluginManifest } from '@zclaudia/shared/plugins/manifest';
+import type { Permission } from '@zclaudia/shared/plugins/permissions';
 import { fetchLocalApi } from './base';
 import { ApiError } from './unwrap';
 

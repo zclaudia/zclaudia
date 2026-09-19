@@ -1,4 +1,5 @@
-import type { Project, Automation } from '@zclaudia/shared';
+import type { Project } from '@zclaudia/shared/core/project';
+import type { Automation } from '@zclaudia/shared/features/automations';
 import type { Tone } from '../../components/ui/tone';
 
 export type AutomationTab = 'automations' | 'activity' | 'workflows' | 'runs' | 'system';

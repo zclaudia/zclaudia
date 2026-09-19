@@ -1,4 +1,4 @@
-import type { Goal } from '@zclaudia/shared';
+import type { Goal } from '@zclaudia/shared/features/goal';
 import { Target, Pause, Play, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 interface GoalPinnedBarProps {

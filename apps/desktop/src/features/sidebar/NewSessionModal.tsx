@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { Project } from '@zclaudia/shared';
+import type { Project } from '@zclaudia/shared/core/project';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';

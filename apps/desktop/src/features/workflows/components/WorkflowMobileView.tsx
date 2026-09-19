@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Loader2, Play, Monitor } from 'lucide-react';
-import type { Workflow } from '@zclaudia/shared';
-import { normalizeWorkflowDefinition } from '@zclaudia/shared';
+import type { Workflow } from '@zclaudia/shared/features/workflows';
+import { normalizeWorkflowDefinition } from '@zclaudia/shared/features/workflows';
 import { WorkflowStepList } from './WorkflowStepList';
 
 /**

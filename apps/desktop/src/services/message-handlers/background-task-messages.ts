@@ -1,4 +1,4 @@
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import type { MessageDispatchContext } from './types';
 import { useBackgroundTaskStore } from '../../stores/backgroundTaskStore';
 import type { BackgroundTask } from '../../stores/backgroundTaskStore';

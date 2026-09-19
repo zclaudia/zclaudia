@@ -1,4 +1,5 @@
-import type { LocalPR, LocalPRStatus, ExecutionState, LlmProfileConfig } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { LocalPR, LocalPRStatus, ExecutionState } from '@zclaudia/shared/features/local-pr';
 import {
   GitMerge,
   XCircle,

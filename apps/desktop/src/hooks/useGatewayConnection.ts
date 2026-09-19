@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useCallback, useMemo } from 'react';
-import type { ClientMessage } from '@zclaudia/shared';
+import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 import { useGatewayStore } from '../stores/gatewayStore';
 import { getServerGatewayStatus } from '../services/api';
 import { useFacadeStore } from '../stores/facadeStore';

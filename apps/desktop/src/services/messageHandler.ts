@@ -18,7 +18,8 @@
  *  - run-messages.ts — run/chat streaming lifecycle
  */
 
-import type { ServerMessage, StateHeartbeatMessage } from '@zclaudia/shared';
+import type { StateHeartbeatMessage } from '@zclaudia/shared/wire/messages/core';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { useRunStore } from '../stores/runStore';
 import { dispatchFeatureMessage } from '../features/message-dispatcher';
 import { recoverCurrentSessionTail } from './sessionSync';

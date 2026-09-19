@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useProjectStore } from '../stores/projectStore';
-import type { Session } from '@zclaudia/shared';
+import type { Session } from '@zclaudia/shared/core/session';
 import * as api from '../services/api';
 
 /**

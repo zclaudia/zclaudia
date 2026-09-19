@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MessageInput } from '../MessageInput';
-import { MAX_MESSAGE_ATTACHMENT_BYTES } from '@zclaudia/shared';
-import type { SlashCommand } from '@zclaudia/shared';
+import { MAX_MESSAGE_ATTACHMENT_BYTES } from '@zclaudia/shared/core/attachment-validation';
+import type { SlashCommand } from '@zclaudia/shared/features/commands';
 
 // Mock hooks
 // `/ns:command` is only dispatched as a plugin command when the composer can

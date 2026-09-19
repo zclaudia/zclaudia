@@ -1,4 +1,4 @@
-import type { Message } from '@zclaudia/shared';
+import type { Message } from '@zclaudia/shared/core/message';
 import type { MessageWithToolCalls } from '../stores/chatMessageStore';
 
 /**

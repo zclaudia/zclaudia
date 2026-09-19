@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Copy, RefreshCw } from 'lucide-react';
-import type { GitWorktree } from '@zclaudia/shared';
+import type { GitWorktree } from '@zclaudia/shared/core/project';
 import * as api from '../../../services/api';
 import { useGitStore, selectStatus } from '../store';
 import { SyncButtons } from './SyncButtons';

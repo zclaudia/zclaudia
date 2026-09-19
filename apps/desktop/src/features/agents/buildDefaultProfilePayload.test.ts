@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { LlmProfileConfig } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { ProfileConfigDescriptor } from '@zclaudia/shared/core/profile-config-descriptor';
 import { buildDefaultProfilePayload } from './buildDefaultProfilePayload';
 

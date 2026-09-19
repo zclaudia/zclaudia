@@ -22,12 +22,10 @@ import { useFacadeStore } from '../../stores/facadeStore';
 import { useComposerStore } from '../../stores/composerStore';
 import { resolveCanonicalBackendId } from '../../actions/controlPlane';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
-import type {
-  AgentCancelMessage,
-  ClientMessage,
-  Message,
-  ClaudiaMessageMessage,
-} from '@zclaudia/shared';
+import type { Message } from '@zclaudia/shared/core/message';
+import type { ClaudiaMessageMessage } from '@zclaudia/shared/wire/messages/claudia';
+import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
+import type { AgentCancelMessage } from '@zclaudia/shared/wire/messages/run';
 
 type ProfileSourceLabel =
   | 'Explicit selection'

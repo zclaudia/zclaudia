@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, CircleX } from 'lucide-react';
-import type { BrowserNetworkEntry } from '@zclaudia/shared';
+import type { BrowserNetworkEntry } from '@zclaudia/shared/wire/messages/browser';
 
 interface Props {
   entries: BrowserNetworkEntry[];

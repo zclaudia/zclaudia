@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-import type { Workflow } from '@zclaudia/shared';
+import type { Workflow } from '@zclaudia/shared/features/workflows';
 import { ConnectionProvider } from '../../../contexts/ConnectionContext';
 import { useServerStore } from '../../../stores/serverStore';
 import { useFacadeStore } from '../../../stores/facadeStore';

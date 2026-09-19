@@ -1,4 +1,5 @@
-import type { Permission, PluginPlatform } from '@zclaudia/shared';
+import type { PluginPlatform } from '@zclaudia/shared/plugins/manifest';
+import type { Permission } from '@zclaudia/shared/plugins/permissions';
 import { apiCall } from './unwrap';
 import { usePluginStore } from '../../stores/pluginStore';
 import type { InstalledPlugin } from '../../stores/pluginStore';

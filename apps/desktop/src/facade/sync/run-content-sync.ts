@@ -1,4 +1,4 @@
-import type { BackendFacadeEvent } from '@zclaudia/shared';
+import type { BackendFacadeEvent } from '@zclaudia/shared/facade/types';
 import type { SessionMessage } from '@zclaudia/protocol/zclaudia';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useFacadeStore } from '../../stores/facadeStore';
@@ -6,7 +6,7 @@ import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useToastStore } from '../../stores/toastStore';
 import { handleServerMessage } from '../../services/messageHandler';
 import { getFacadeServerRuns } from './state';
-import type { MessageMetadata } from '@zclaudia/shared';
+import type { MessageMetadata } from '@zclaudia/shared/core/message';
 
 export function forwardRunEvent(event: Extract<BackendFacadeEvent, { type: 'run_event' }>): void {
   const { backendId, event: serverEvent } = event;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
-import type { GraphNode } from '@zclaudia/shared';
+import type { GraphNode } from '@zclaudia/shared/core/context-graph';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';

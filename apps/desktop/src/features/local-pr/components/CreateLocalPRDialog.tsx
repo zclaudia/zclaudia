@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { GitWorktree } from '@zclaudia/shared';
+import type { GitWorktree } from '@zclaudia/shared/core/project';
 import { X } from 'lucide-react';
 import { useLocalPRStore } from '../store';
 import { listLocalPRs } from '../api';

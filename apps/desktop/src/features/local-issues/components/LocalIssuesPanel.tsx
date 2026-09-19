@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
-import type { LocalIssueStatus } from '@zclaudia/shared';
-import { ACTIONABLE_LABEL } from '@zclaudia/shared';
+import type { LocalIssueStatus } from '@zclaudia/shared/features/local-issue';
+import { ACTIONABLE_LABEL } from '@zclaudia/shared/features/local-issue';
 import { useLocalIssueStore } from '../store';
 import { useAttachmentCounts } from '../../attachments';
 import { LocalIssueCard } from './LocalIssueCard';

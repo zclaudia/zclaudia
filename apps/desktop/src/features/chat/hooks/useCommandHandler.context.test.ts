@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useCommandHandler } from './useCommandHandler';
-import type { SlashCommand } from '@zclaudia/shared';
+import type { SlashCommand } from '@zclaudia/shared/features/commands';
 
 vi.mock('../../../services/api', async importOriginal => ({
   ...(await importOriginal<object>()),

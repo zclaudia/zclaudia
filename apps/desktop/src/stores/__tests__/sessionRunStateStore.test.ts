@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Session } from '@zclaudia/shared';
+import type { Session } from '@zclaudia/shared/core/session';
 import { useRunStore } from '../runStore';
 import { useSessionConfigStore } from '../sessionConfigStore';
 import { useOwnershipStore } from '../ownershipStore';

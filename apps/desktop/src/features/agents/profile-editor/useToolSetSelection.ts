@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import type { ToolName, ToolSelection } from '@zclaudia/shared';
+import type { ToolName, ToolSelection } from '@zclaudia/shared/core/tools';
 import {
   BUILTIN_TOOL_SETS,
   builtinToolRef,
   defaultToolSelection,
   resolveToolSelection,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/core/tools';
 import {
   deriveCustomizedToolSetIds,
   removeBuiltinRefsForTools,

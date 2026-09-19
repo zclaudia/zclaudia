@@ -1,4 +1,5 @@
-import type { Session, GitWorktree } from '@zclaudia/shared';
+import type { GitWorktree } from '@zclaudia/shared/core/project';
+import type { Session } from '@zclaudia/shared/core/session';
 
 export interface WorktreeGroup {
   key: string; // workingDirectory path or '__root__'

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Attachment } from '@zclaudia/shared';
+import type { Attachment } from '@zclaudia/shared/features/attachment';
 
 vi.mock('../api', () => ({
   listAttachments: vi.fn(),

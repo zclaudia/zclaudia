@@ -1,4 +1,5 @@
-import type { BrowserPickedElement, ServerMessage } from '@zclaudia/shared';
+import type { BrowserPickedElement } from '@zclaudia/shared/wire/messages/browser';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { useBrowserStore } from './browserStore';
 import { openToolInWorkspace } from '../../actions/workspaceActions';
 import { isPanelAvailable } from '../../actions/openPanel';

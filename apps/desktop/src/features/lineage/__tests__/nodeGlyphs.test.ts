@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { GraphNode } from '@zclaudia/shared';
+import type { GraphNode } from '@zclaudia/shared/core/context-graph';
 import { glyphFor, laneColor, LANE_PALETTE } from '../nodeGlyphs';
 
 function g(p: Partial<GraphNode>): GraphNode {

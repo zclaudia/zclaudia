@@ -11,8 +11,8 @@ import type {
   BackendFacade,
   BackendFacadeEvent,
   BackendFacadeSnapshot,
-  ClientMessage,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/facade/types';
+import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 
 // ============================================================================
 // EmbeddedFacadeClient

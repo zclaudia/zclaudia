@@ -1,4 +1,4 @@
-import type { BackendConnectionState, BackendSnapshot } from '@zclaudia/shared';
+import type { BackendConnectionState, BackendSnapshot } from '@zclaudia/shared/facade/types';
 import { shouldShowNonCurrentInstanceBackend } from '../stores/gatewayStore';
 
 export type MobileBackendViewState =

@@ -13,7 +13,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { SystemInfo } from '@zclaudia/shared';
+import type { SystemInfo } from '@zclaudia/shared/wire/messages/core';
 
 interface SystemInfoPanelProps {
   systemInfo: SystemInfo;

@@ -1,4 +1,4 @@
-import type { NotificationItem as NotificationItemData } from '@zclaudia/shared';
+import type { NotificationItem as NotificationItemData } from '@zclaudia/shared/features/notification-feed';
 import { Bot, Clock, X, Zap, type LucideIcon } from 'lucide-react';
 import { useNotificationFeedStore } from '../../stores/notificationFeedStore';
 import { useConnection } from '../../contexts/ConnectionContext';

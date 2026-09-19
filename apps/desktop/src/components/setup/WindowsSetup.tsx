@@ -19,7 +19,7 @@ import { useGatewayStore, shouldShowNonCurrentInstanceBackend } from '../../stor
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { open } from '@tauri-apps/plugin-shell';
-import type { BackendSnapshot } from '@zclaudia/shared';
+import type { BackendSnapshot } from '@zclaudia/shared/facade/types';
 import {
   LEGACY_LOCAL_SERVER_ID,
   resolveCanonicalBackendId,

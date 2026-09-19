@@ -1,8 +1,8 @@
 // Pure derivation helpers for the LLM profile editor: provider-type option
 // metadata, dialect labels, reserved header keys, and model-draft serialization.
 // No React, no state.
-import type { LlmModelDialect, LlmProfileModelEntry } from '@zclaudia/shared';
-import { LLM_PROVIDER_TYPES } from '@zclaudia/shared';
+import type { LlmModelDialect, LlmProfileModelEntry } from '@zclaudia/shared/core/llm-profile';
+import { LLM_PROVIDER_TYPES } from '@zclaudia/shared/core/llm-profile';
 import { draftsToEntries, type ModelRowDraft } from '../llmProfileModelDraft';
 
 /** Request-header keys managed by the API-key layer; the freeform header map rejects them. */

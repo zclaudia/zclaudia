@@ -1,4 +1,4 @@
-import type { LocalIssue, LocalIssueComment } from '@zclaudia/shared';
+import type { LocalIssue, LocalIssueComment } from '@zclaudia/shared/features/local-issue';
 import { apiCall } from '../../services/api/unwrap';
 
 export async function listLocalIssues(projectId: string): Promise<LocalIssue[]> {

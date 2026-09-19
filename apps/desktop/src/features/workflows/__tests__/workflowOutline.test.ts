@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import type { WorkflowDefinition, WorkflowEdgeDef, WorkflowNodeDef } from '@zclaudia/shared';
+import type {
+  WorkflowDefinition,
+  WorkflowEdgeDef,
+  WorkflowNodeDef,
+} from '@zclaudia/shared/features/workflows';
 import { buildWorkflowOutline, edgeLabel } from '../workflowOutline';
 
 function node(id: string, name = id): WorkflowNodeDef {

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
 import * as api from '../../../services/api';
 import type { SimulateAIReviewResponse } from '../../../services/api/debug';
-import type { LlmProfileConfig } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { Select } from '../../../components/ui/Select';
 import { SettingsRow } from '../ui/SettingsGroup';
 

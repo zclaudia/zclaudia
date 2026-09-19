@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { BackendSnapshot } from '@zclaudia/shared';
+import type { BackendSnapshot } from '@zclaudia/shared/facade/types';
 
 /**
  * State bundle for the "new project" modal: visibility, name, root path,

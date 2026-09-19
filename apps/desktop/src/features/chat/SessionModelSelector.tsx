@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { createPortal } from 'react-dom';
 import { trapTab } from '../../utils/focusTrap';
 import { ChevronDown, Cpu, RefreshCw } from 'lucide-react';
-import type { SessionModelSettings, ThinkingLevel } from '@zclaudia/shared';
+import type { ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
+import type { SessionModelSettings } from '@zclaudia/shared/core/runtime-capabilities';
 import { getSessionModelSettings, saveSessionModelSettings } from '../../services/api/sessions';
 import { SelectorTrigger } from './SelectorTrigger';
 import { Button } from '../../components/ui/Button';

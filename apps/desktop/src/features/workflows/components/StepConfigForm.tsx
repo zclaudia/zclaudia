@@ -2,7 +2,7 @@ import type {
   WorkflowNodeDef,
   WorkflowStepOnError,
   BuiltinWorkflowStepType,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/features/workflows';
 import { useWorkflowStore } from '../store';
 import { JsonSchemaConfigForm } from './JsonSchemaConfigForm';
 import { Select } from '../../../components/ui/Select';

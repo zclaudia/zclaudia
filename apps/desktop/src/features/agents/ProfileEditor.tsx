@@ -1,21 +1,17 @@
 import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
-import type {
-  AgentProfileConfig,
-  LlmProfileConfig,
-  McpServerConfig,
-  McpServerStatus,
-  SkillSource,
-} from '@zclaudia/shared';
+import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared/core/mcp';
+import type { SkillSource } from '@zclaudia/shared/core/skills';
+import { defaultSkillSelection, skillRefKey } from '@zclaudia/shared/core/skills';
 import {
   BUILTIN_TOOL_SETS,
   BUILTIN_TOOL_METADATA,
-  defaultSkillSelection,
   legacyEnabledToolsToSelection,
   resolveToolSelection,
-  skillRefKey,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/core/tools';
 import {
   defaultEngineModeFor,
   resolveProfileConfigDescriptor,

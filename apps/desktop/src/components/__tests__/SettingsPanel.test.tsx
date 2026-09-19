@@ -142,27 +142,6 @@ vi.mock('../../services/logger', () => ({
   getLogCount: vi.fn().mockReturnValue(42),
   clearLogs: vi.fn(),
 }));
-// Mock shared
-vi.mock('@zclaudia/shared', async importOriginal => {
-  const mod = await importOriginal<Record<string, any>>();
-  return {
-    ...mod,
-    DEFAULT_NOTIFICATION_CONFIG: {
-      enabled: false,
-      ntfyUrl: 'https://ntfy.sh',
-      ntfyTopic: '',
-      events: {
-        permissionRequest: true,
-        promptRequest: true,
-        runCompleted: false,
-        runFailed: false,
-        supervisionUpdate: false,
-        backgroundPermission: false,
-        processLeak: true,
-      },
-    },
-  };
-});
 
 import { SettingsPanel } from '../../features/settings/SettingsPanel';
 import { useServerStore } from '../../stores/serverStore';

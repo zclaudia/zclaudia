@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, CircleX, TriangleAlert } from 'lucide-react';
-import type { BrowserConsoleEntry } from '@zclaudia/shared';
+import type { BrowserConsoleEntry } from '@zclaudia/shared/wire/messages/browser';
 
 interface Props {
   entries: BrowserConsoleEntry[];

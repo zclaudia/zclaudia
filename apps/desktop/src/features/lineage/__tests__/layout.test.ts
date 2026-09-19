@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ContextGraph, GraphNode } from '@zclaudia/shared';
+import type { ContextGraph, GraphNode } from '@zclaudia/shared/core/context-graph';
 import { computeLayout, MARGIN_X, MARGIN_TOP, ROW_GAP } from '../layout';
 
 function node(

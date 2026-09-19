@@ -17,7 +17,7 @@ import type {
   CategoryAction,
   PermissionCategory,
   CategoryProfile,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/interaction/permissions';
 import { SelectorTrigger } from './SelectorTrigger';
 
 interface PermissionSelectorProps {

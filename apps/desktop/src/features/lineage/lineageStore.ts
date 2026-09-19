@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ContextGraph } from '@zclaudia/shared';
+import type { ContextGraph } from '@zclaudia/shared/core/context-graph';
 import { fetchContextGraph } from '../../services/api/context-graph';
 import { useToastStore } from '../../stores/toastStore';
 

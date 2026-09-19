@@ -1,4 +1,4 @@
-import type { ContextGraph } from '@zclaudia/shared';
+import type { ContextGraph } from '@zclaudia/shared/core/context-graph';
 import { apiCall, apiCallForBackend } from './unwrap';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 

@@ -6,13 +6,14 @@
  *
  */
 
-import { BackendFacadeRuntimeCore, DEFAULT_GC_INTERVAL } from '@zclaudia/shared';
+import { DEFAULT_GC_INTERVAL } from '@zclaudia/shared/facade/constants';
+import { BackendFacadeRuntimeCore } from '@zclaudia/shared/facade/runtime-core';
 import type {
   BackendFacade,
   BackendFacadeEvent,
   BackendFacadeSnapshot,
-  ClientMessage,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/facade/types';
+import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 import { DirectGatewayAdapter } from './direct-adapter';
 
 export class DirectBackendFacadeProvider implements BackendFacade {

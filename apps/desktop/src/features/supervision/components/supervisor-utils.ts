@@ -1,4 +1,4 @@
-import type { ProjectChange } from '@zclaudia/shared';
+import type { ProjectChange } from '@zclaudia/shared/features/supervision';
 
 export interface ContextDocumentPreview {
   id: string;

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { File, FileText, Film, Music, X, Download } from 'lucide-react';
-import type { Attachment } from '@zclaudia/shared';
+import type { Attachment } from '@zclaudia/shared/features/attachment';
 import { useAttachmentSrc } from '../hooks/useAttachmentSrc';
 import { formatFileSize } from '../utils';
 

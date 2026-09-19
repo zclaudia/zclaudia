@@ -1,6 +1,7 @@
 import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { AgentProfileConfig, LlmProfileConfig } from '@zclaudia/shared';
+import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';

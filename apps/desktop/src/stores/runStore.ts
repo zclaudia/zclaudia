@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import type { ContentBlock, RunHealthStatus, ToolEffect, ToolSemantic } from '@zclaudia/shared';
+import type { ContentBlock, ToolEffect } from '@zclaudia/shared/core/message';
+import type { RunHealthStatus } from '@zclaudia/shared/wire/messages/core';
+import type { ToolSemantic } from '@zclaudia/shared/wire/messages/run';
 import type {
   AssistantTurnItem,
   ToolCallView,

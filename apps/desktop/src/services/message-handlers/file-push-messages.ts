@@ -1,4 +1,4 @@
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import type { MessageHandlerContext } from './types';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useFilePushStore } from '../../stores/filePushStore';

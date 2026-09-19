@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SessionDraft } from '@zclaudia/shared';
+import type { SessionDraft } from '@zclaudia/shared/core/session';
 import * as api from '../services/api';
 import { setBuiltinPanelVisibility } from '../services/panel-visibility-coordination';
 import { activatePanel, deactivatePanel } from '../actions/openPanel';

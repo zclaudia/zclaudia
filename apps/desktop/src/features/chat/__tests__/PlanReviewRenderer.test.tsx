@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import type { PlanReviewInteractionMessage } from '@zclaudia/shared';
+import type { PlanReviewInteractionMessage } from '@zclaudia/shared/interaction/forms';
 import { ChatActionsProvider } from '../ChatActionsContext';
 import { useInteractionStore } from '../../../stores/interactionStore';
 import { useSessionConfigStore } from '../../../stores/sessionConfigStore';

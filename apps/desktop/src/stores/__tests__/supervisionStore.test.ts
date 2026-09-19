@@ -5,7 +5,7 @@ import type {
   ProjectAgent,
   ProjectChange,
   SupervisionTask,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/features/supervision';
 
 // Helper to create mock task
 function makeTask(overrides: Partial<SupervisionTask> = {}): SupervisionTask {

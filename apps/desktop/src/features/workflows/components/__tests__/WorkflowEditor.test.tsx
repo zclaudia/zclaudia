@@ -83,7 +83,7 @@ vi.mock('../WorkflowGraphEditor', () => ({
 }));
 
 // Mock shared utilities
-vi.mock('@zclaudia/shared', () => ({
+vi.mock('@zclaudia/shared/features/workflows', () => ({
   normalizeWorkflowDefinition: (definition: unknown) => definition,
 }));
 

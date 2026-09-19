@@ -1,4 +1,4 @@
-import type { BackendFacadeEvent } from '@zclaudia/shared';
+import type { BackendFacadeEvent } from '@zclaudia/shared/facade/types';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';

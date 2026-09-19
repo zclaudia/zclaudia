@@ -9,16 +9,19 @@ import { useSettingsTargetBackend } from '../../hooks/useSettingsTargetBackend';
 import { TargetBackendBanner, NoTargetBackendNotice } from './ui/TargetBackendNotice';
 import { isMacOS } from '../../utils/platform';
 import { Select } from '../../components/ui/Select';
+import type { Workflow } from '@zclaudia/shared/features/workflows';
 import type {
   UnifiedPermissionPolicy,
   CategoryAction,
   PermissionCategory,
   GlobalGuards,
   AIReviewConfig,
-  Workflow,
-  UserHookDefinition,
-} from '@zclaudia/shared';
-import { DEFAULT_UNIFIED_POLICY, normalizeToUnifiedPolicy } from '@zclaudia/shared';
+} from '@zclaudia/shared/interaction/permissions';
+import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
+import {
+  DEFAULT_UNIFIED_POLICY,
+  normalizeToUnifiedPolicy,
+} from '@zclaudia/shared/interaction/permissions';
 import { ToolRuleList } from '../../components/permission/ToolRuleList';
 import { HookList } from '../../components/permission/HookList';
 import { SettingsGroup, SettingsRow } from './ui/SettingsGroup';

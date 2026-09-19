@@ -1,4 +1,7 @@
-import type { NotificationItem, NotificationStatus } from '@zclaudia/shared';
+import type {
+  NotificationItem,
+  NotificationStatus,
+} from '@zclaudia/shared/features/notification-feed';
 import type { Tone } from '../ui/tone';
 
 /**

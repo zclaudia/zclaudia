@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Plus } from 'lucide-react';
-import type { SupervisionTask, TaskStatus } from '@zclaudia/shared';
+import type { SupervisionTask, TaskStatus } from '@zclaudia/shared/features/supervision';
 import { TaskCard } from './TaskCard';
 import { TaskDetail } from './TaskDetail';
 import { CreateTaskDialog } from './CreateTaskDialog';

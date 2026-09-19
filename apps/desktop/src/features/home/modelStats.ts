@@ -1,4 +1,4 @@
-import type { ModelUsageDay } from '@zclaudia/shared';
+import type { ModelUsageDay } from '@zclaudia/shared/core/usage-stats';
 
 export interface ModelChartBar {
   date: string;

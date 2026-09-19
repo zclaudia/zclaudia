@@ -27,10 +27,10 @@ import { ContextUsageCard } from './ContextUsageCard';
 import { ChatLink } from '../browser';
 import type { MessageWithToolCalls } from '../../stores/chatMessageStore';
 import type { ToolCallState } from '../../stores/runStore';
-import type { ContentBlock } from '@zclaudia/shared';
+import type { ContentBlock } from '@zclaudia/shared/core/message';
 import { useFilePushStore, type FilePushItem } from '../../stores/filePushStore';
 import { downloadFile } from '../../services/fileUpload';
-import type { MessageAttachment } from '@zclaudia/shared';
+import type { MessageAttachment } from '@zclaudia/shared/core/message';
 import {
   extractThinking,
   logSuspiciousMarkdownRender,

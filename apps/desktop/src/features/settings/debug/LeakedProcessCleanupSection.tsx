@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useProcessMonitorStore } from '../../../stores/processMonitorStore';
-import type { ClientMessage } from '@zclaudia/shared';
+import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 import { SettingsRow } from '../ui/SettingsGroup';
 
 interface LeakedProcessCleanupSectionProps {

@@ -10,7 +10,10 @@ import { DeviceBar } from './DeviceBar';
 import { ConsoleStrip } from './ConsoleStrip';
 import { NetworkStrip } from './NetworkStrip';
 import { DEFAULT_PRESET_ID, DEVICE_PRESETS, toEmulation } from './devicePresets';
-import type { BrowserDeviceEmulation, BrowserInputEvent } from '@zclaudia/shared';
+import type {
+  BrowserDeviceEmulation,
+  BrowserInputEvent,
+} from '@zclaudia/shared/wire/messages/browser';
 
 const RESIZE_DEBOUNCE_MS = 200;
 

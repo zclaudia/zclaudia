@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Archive, ChevronRight } from 'lucide-react';
-import type { CompactionMarker } from '@zclaudia/shared';
+import type { CompactionMarker } from '@zclaudia/shared/core/message';
 import { SECTION_LABEL } from '../../components/ui/typography';
 
 interface CompactionMarkerCardProps {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { listLlmProfilesForBackend } from '../../services/api';
 import { fetchApiForBackend } from '../../services/api/base';
-import type { LlmProfileConfig } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useSettingsTargetBackend } from '../../hooks/useSettingsTargetBackend';
 import { TargetBackendBanner, NoTargetBackendNotice } from './ui/TargetBackendNotice';

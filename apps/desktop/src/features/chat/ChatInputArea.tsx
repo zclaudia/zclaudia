@@ -27,7 +27,10 @@ import { activatePanel, usePanelIsActive, useLauncherPanels } from '../../action
 import { iconForPanel } from '../../components/rightSidebarToolIcons';
 import * as api from '../../services/api';
 import { useAgentForSession } from '../../hooks/useAgentForSession';
-import type { UnifiedPermissionPolicy, SlashCommand, Session, Project } from '@zclaudia/shared';
+import type { Project } from '@zclaudia/shared/core/project';
+import type { Session } from '@zclaudia/shared/core/session';
+import type { SlashCommand } from '@zclaudia/shared/features/commands';
+import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
 import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
 import type { SessionDraft } from '../../stores/composerStore';
 
@@ -68,7 +71,7 @@ interface ChatInputAreaProps {
     latestInputTokens?: number;
     latestOutputTokens?: number;
     contextWindow?: number;
-    contextWindowSource?: import('@zclaudia/shared').ContextWindowSource;
+    contextWindowSource?: import('@zclaudia/shared/wire/messages/core').ContextWindowSource;
     contextWindowMatchedProvider?: string;
     cacheReadTokens?: number;
     cacheWriteTokens?: number;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import type { RuntimeUsagePayload } from '@zclaudia/shared';
+import type { RuntimeUsagePayload } from '@zclaudia/shared/core/usage-stats';
 import { RuntimesView } from '../RuntimesView';
 
 const { getRuntimeUsage } = vi.hoisted(() => ({ getRuntimeUsage: vi.fn() }));

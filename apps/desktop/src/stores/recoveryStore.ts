@@ -4,7 +4,7 @@ import type {
   BackendFacadeMode,
   BackendFacadeSnapshot,
   BackendRuntimeState,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/facade/types';
 
 export type RecoveryCoordinatorStatus = 'ready' | 'background' | 'recovering' | 'error';
 export type TransportStatus =

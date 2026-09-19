@@ -2,7 +2,7 @@
  * Sessions Store - manages remote sessions from connected backends
  */
 import { create } from 'zustand';
-import type { Session } from '@zclaudia/shared';
+import type { Session } from '@zclaudia/shared/core/session';
 import {
   clearSessionOwnership,
   forgetSession,

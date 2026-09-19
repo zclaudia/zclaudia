@@ -2,7 +2,7 @@
  * Supervision domain message handlers.
  */
 
-import type { ServerMessage } from '@zclaudia/shared';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { useSupervisionStore } from './store';
 
 /**

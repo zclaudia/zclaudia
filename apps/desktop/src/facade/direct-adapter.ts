@@ -14,7 +14,7 @@ import type {
   FacadeAdapterEventBus,
   FacadeAdapterQueries,
   FacadeRuntimeGatewayAdapter,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/facade/adapter';
 import { GatewayTransport } from '../hooks/transport/GatewayTransport';
 import type { GatewayTransportConfig } from '../hooks/transport/GatewayTransport';
 import { normalizeGatewayUrl } from '../utils/gatewayUrl';

@@ -9,7 +9,7 @@
  * - Content catch-up for disconnect recovery
  */
 
-import type { ClientMessage, ServerMessage } from '@zclaudia/shared';
+import type { ClientMessage, ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import type {
   BackendPresenceV4 as BackendPresence,
   BackendServerMessage,

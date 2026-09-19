@@ -9,7 +9,8 @@
  * on first read.
  */
 import { useEffect } from 'react';
-import type { AgentProfileConfig, LlmProfileConfig } from '@zclaudia/shared';
+import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { useProjectStore } from '../stores/projectStore';
 import { useAgentProfileMetaStore } from '../stores/agentProfileMetaStore';
 import { useLlmProfileMetaStore } from '../stores/llmProfileMetaStore';

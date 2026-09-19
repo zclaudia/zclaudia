@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
-import type { Attachment } from '@zclaudia/shared';
+import type { Attachment } from '@zclaudia/shared/features/attachment';
 import { useAttachmentSrc } from '../hooks/useAttachmentSrc';
 
 interface ImageLightboxProps {

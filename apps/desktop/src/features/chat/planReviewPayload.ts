@@ -1,4 +1,4 @@
-import type { PlanTodoItem } from '@zclaudia/shared';
+import type { PlanTodoItem } from '@zclaudia/shared/interaction/forms';
 import { normalizeToolInput } from './tool-call/toolFormatters';
 
 export function normalizePlanTodoStatus(raw: unknown): PlanTodoItem['status'] {

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared';
+import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared/core/mcp';
 import { getMcpServersForBackend, getMcpServerStatusesForBackend } from '../../services/api';
 import { useCatalogByBackend } from './useCatalogByBackend';
 import type { AgentsBackend } from './agents-types';

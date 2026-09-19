@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import type { BackendFacade, BackendFacadeEvent } from '@zclaudia/shared';
+import type { BackendFacade, BackendFacadeEvent } from '@zclaudia/shared/facade/types';
 import { useFacadeStore } from '../stores/facadeStore';
 import { EmbeddedFacadeClient } from '../facade/embedded-facade-client';
 import { DirectBackendFacadeProvider } from '../facade/direct-provider';

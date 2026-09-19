@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import type { AttachmentOwnerKind } from '@zclaudia/shared';
+import type { AttachmentOwnerKind } from '@zclaudia/shared/features/attachment';
 import { useAttachmentsStore, ownerKey } from '../store';
 
 /**

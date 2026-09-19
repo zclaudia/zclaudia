@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import type { GitWorktreeStatus, GitCommit, SlashCommand } from '@zclaudia/shared';
+import type { GitWorktreeStatus, GitCommit } from '@zclaudia/shared/core/project';
+import type { SlashCommand } from '@zclaudia/shared/features/commands';
 import { useGitStore } from '../../git/store';
 import { EmptySessionSnapshot, EmptySessionChips } from '../EmptySessionOverview';
 

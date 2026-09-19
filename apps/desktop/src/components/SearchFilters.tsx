@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { SearchFilters as Filters, SearchScope } from '../services/api';
-import type { Session } from '@zclaudia/shared';
+import type { Session } from '@zclaudia/shared/core/session';
 import { Select } from './ui/Select';
 
 interface SearchFiltersProps {

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import type { LocalPRStatus, GitWorktree, WorktreeConfig } from '@zclaudia/shared';
+import type { GitWorktree, WorktreeConfig } from '@zclaudia/shared/core/project';
+import type { LocalPRStatus } from '@zclaudia/shared/features/local-pr';
 import { GitBranch, GitPullRequest, Loader2, Plus } from 'lucide-react';
 import { useLocalPRStore } from '../store';
 import { precheckLocalPRCreation } from '../api';

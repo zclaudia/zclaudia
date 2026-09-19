@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 import { ChevronRight, FolderClosed } from 'lucide-react';
-import type { FileEntry } from '@zclaudia/shared';
+import type { FileEntry } from '@zclaudia/shared/files';
 import { Icon } from '../../components/ui/Icon';
 import { FileSymbol } from '../../components/filesymbols';
 

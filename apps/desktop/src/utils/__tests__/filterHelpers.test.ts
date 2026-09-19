@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { filterSessions } from '../filterHelpers.js';
-import type { Session } from '@zclaudia/shared';
+import type { Session } from '@zclaudia/shared/core/session';
 import type { FilterState } from '../../types/filter';
 
 describe('utils/filterHelpers', () => {

@@ -11,7 +11,7 @@
 import { Terminal, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import type { ClientMessage, ServerMessage } from '@zclaudia/shared';
+import type { ClientMessage, ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import {
   type DetachReason,
   type TerminalLifecycleState,

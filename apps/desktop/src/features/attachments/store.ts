@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Attachment, AttachmentOwnerKind } from '@zclaudia/shared';
+import type { Attachment, AttachmentOwnerKind } from '@zclaudia/shared/features/attachment';
 import {
   listAttachments,
   listAttachmentCounts,

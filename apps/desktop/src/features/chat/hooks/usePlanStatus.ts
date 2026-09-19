@@ -3,7 +3,8 @@ import { useProjectStore } from '../../../stores/projectStore';
 import { useSupervisionStore } from '../../../stores/supervisionStore';
 import * as api from '../../../services/api';
 import { confirm } from '../../../stores/confirmDialogStore';
-import type { MessageRole, Session } from '@zclaudia/shared';
+import type { MessageRole } from '@zclaudia/shared/core/message';
+import type { Session } from '@zclaudia/shared/core/session';
 
 interface UsePlanStatusParams {
   sessionId: string;

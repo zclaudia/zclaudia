@@ -1,6 +1,6 @@
-import type { LocalIssue } from '@zclaudia/shared';
+import type { LocalIssue } from '@zclaudia/shared/features/local-issue';
 import { Paperclip, ChevronRight, Zap } from 'lucide-react';
-import { ACTIONABLE_LABEL } from '@zclaudia/shared';
+import { ACTIONABLE_LABEL } from '@zclaudia/shared/features/local-issue';
 import { useAttachmentCount } from '../../attachments';
 
 const PRIORITY_COLORS: Record<string, string> = {

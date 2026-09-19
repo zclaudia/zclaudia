@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Clock, Lock, TriangleAlert } from 'lucide-react';
-import { parseToolRule, suggestRuleForRequest } from '@zclaudia/shared';
+import {
+  parseToolRule,
+  suggestRuleForRequest,
+} from '@zclaudia/shared/interaction/tool-rule-syntax';
 import { PermissionDetailView } from './PermissionDetailView';
 
 interface PermissionRequest {

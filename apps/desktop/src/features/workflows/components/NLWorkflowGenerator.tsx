@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Sparkles, Loader2, AlertTriangle, RotateCcw } from 'lucide-react';
-import type { WorkflowDefinition } from '@zclaudia/shared';
+import type { WorkflowDefinition } from '@zclaudia/shared/features/workflows';
 import { generateWorkflowFromNL, refineGeneratedWorkflow } from '../api';
 
 interface NLWorkflowGeneratorProps {

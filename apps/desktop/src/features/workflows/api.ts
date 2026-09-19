@@ -6,7 +6,7 @@ import type {
   WorkflowTemplate,
   WorkflowStepTypeMeta,
   WorkflowTriggerSourceMeta,
-} from '@zclaudia/shared';
+} from '@zclaudia/shared/features/workflows';
 import { apiCall, apiCallForBackend, apiCallVoid } from '../../services/api/unwrap';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 
