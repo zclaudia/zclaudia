@@ -21,31 +21,25 @@
  * profile list view (the Agents tree replaces it), modal chrome, readOnly
  * mode, useLlmProfileMetaStore / useAgentReadinessStore syncing, and alert()
  * error surfacing (inline errors instead).
+ *
+ * Presentational subcomponents and pure helpers live in ./llm-profile-editor/
+ * (ModelsSection / ModelRow / the fetch picker / the provider selector, the
+ * test-model and context-window-resolve hooks, and the derive/styles modules).
  */
 
-import { useState, useEffect, useRef, useMemo, useId } from 'react';
-import { ChevronDown, Check, AlertTriangle } from 'lucide-react';
-import { FIELD_CLASS_LG } from '../../components/ui/Input';
-import type {
-  LlmProfileConfig,
-  LlmProfileCompat,
-  ContextWindowSource,
-  LlmModelDialect,
-} from '@zclaudia/shared';
-import { LLM_PROVIDER_TYPES, LLM_MODEL_DIALECTS } from '@zclaudia/shared';
+import { useState, useRef, useMemo } from 'react';
+import type { LlmProfileConfig, LlmProfileCompat } from '@zclaudia/shared';
 import { resolveLlmProfileProtocols } from '@zclaudia/shared/core/llm-profile';
 import {
   createLlmProfileForBackend,
   updateLlmProfileForBackend,
   fetchModelsForLlmProfilePreviewForBackend,
-  probeLlmProfileModelPreviewForBackend,
-  resolveContextWindowPreviewForBackend,
 } from '../../services/api';
 import type { LlmProfilePreviewInput } from '../../services/api';
 import { CodexOAuthSection } from './CodexOAuthSection';
 import { FormField } from '../../components/ui/FormField';
 import { Input } from '../../components/ui/Input';
-import { EditorSection, EditorRow, FieldLabel } from './ui/EditorSection';
+import { EditorSection, EditorRow } from './ui/EditorSection';
 import { EditorTabs } from './ui/EditorTabs';
 import type { EditorTab } from './ui/EditorTabs';
 import { ProfileHeader } from './ui/ProfileHeader';
@@ -59,27 +53,16 @@ import {
   validateModelDraftRow,
   type ModelRowDraft,
 } from './llmProfileModelDraft';
-
-const RESERVED_HEADER_KEYS = new Set(['authorization', 'content-type', 'host']);
-
-/** Field styling shared with the agent profile editor (ProfileEditor).
- *  Comfortable-density variant of the app's single field grammar (ui/Input). */
-const FIELD_CLASS = FIELD_CLASS_LG;
-const MONO_FIELD_CLASS = `${FIELD_CLASS} font-mono`;
-/** Compact variant for the dense model-row grid; append a border-color class. */
-const MODEL_FIELD_BASE =
-  'w-full rounded-md border bg-background/70 px-2 py-1.5 text-sm text-foreground shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
-
-/** Human-readable labels for the per-model dialect override select. */
-const DIALECT_LABELS: Record<LlmModelDialect, string> = {
-  moonshotai: 'Moonshot (Kimi)',
-  deepseek: 'DeepSeek',
-  zai: 'GLM (Z.ai)',
-  together: 'Together',
-  openrouter: 'OpenRouter',
-  xai: 'Grok (xAI)',
-  openai: 'OpenAI (standard)',
-};
+import { ModelsSection } from './llm-profile-editor/ModelsSection';
+import { FetchModelsPickerDialog } from './llm-profile-editor/FetchModelsPickerDialog';
+import { ProviderTypeSelector } from './llm-profile-editor/ProviderTypeSelector';
+import { useModelTestState } from './llm-profile-editor/useModelTestState';
+import {
+  RESERVED_HEADER_KEYS,
+  PROVIDER_TYPE_LABELS,
+  serializeModelEntries,
+} from './llm-profile-editor/derive';
+import { FIELD_CLASS, MONO_FIELD_CLASS } from './llm-profile-editor/styles';
 
 export const LLM_NAME_PLACEHOLDER = 'e.g., Local ZClaudia Agent';
 
@@ -141,7 +124,6 @@ export function LlmProfileEditor({
     selected: Set<string>;
   } | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const testStatusTimersRef = useRef<Map<string, number>>(new Map());
   /**
    * The persisted identity this editor targets. Starts as the profile prop's
    * id (edit mode) or null (create mode) — but a create-mode save performed by
@@ -151,27 +133,6 @@ export function LlmProfileEditor({
    * duplicate.
    */
   const savedIdRef = useRef<string | null>(profile?.id ?? null);
-
-  useEffect(() => {
-    const timers = testStatusTimersRef.current;
-    return () => {
-      for (const t of timers.values()) window.clearTimeout(t);
-      timers.clear();
-    };
-  }, []);
-
-  /**
-   * Serialize the model drafts into wire entries, stripping fields that don't
-   * apply to the current provider type. Anthropic profiles have no dialect
-   * select in the UI, so a dialect chosen under a previous provider type must
-   * not silently keep forcing openai-compat request shaping — drop it at the
-   * serialize boundary (draftsToEntries itself stays provider-agnostic).
-   */
-  const serializeModelEntries = () => {
-    const entries = draftsToEntries(formModels);
-    if (formProviderType !== 'anthropic') return entries;
-    return entries.map(({ dialect: _dialect, ...rest }) => rest);
-  };
 
   /**
    * Build a `LlmProfilePreviewInput` snapshot of the *current form state* for
@@ -203,7 +164,7 @@ export function LlmProfileEditor({
       baseUrl: formBaseUrl.trim() || undefined,
       apiKey: formApiKey.trim() || undefined,
       requestHeaders: requestHeadersObj,
-      models: serializeModelEntries(),
+      models: serializeModelEntries(formModels, formProviderType),
     };
   };
 
@@ -388,7 +349,7 @@ export function LlmProfileEditor({
         setFormModelsSaveError(modelsSaveError);
         return null;
       }
-      const modelsArr = isCodexProvider ? [] : serializeModelEntries();
+      const modelsArr = isCodexProvider ? [] : serializeModelEntries(formModels, formProviderType);
       // F2: a profile with no declared models is no longer accepted. Agent
       // profiles consume `llmProfile.models` to choose which model id to send
       // and to resolve the context window — saving an empty list silently
@@ -456,6 +417,13 @@ export function LlmProfileEditor({
     },
   });
 
+  const { probeModel, clearTestStatusTimer } = useModelTestState({
+    backendId,
+    formModels,
+    setFormModels,
+    buildPreviewInput: buildPreviewInputFromForm,
+  });
+
   const addEmptyModelRow = () => {
     if (formModelsSaveError) setFormModelsSaveError(null);
     setFormModels(rows => [
@@ -478,33 +446,13 @@ export function LlmProfileEditor({
     setFormModels(rows => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   };
 
-  const updateModelRowByUid = (rowUid: string, patch: Partial<ModelRowDraft>) => {
-    setFormModels(rows => rows.map(r => (r.rowUid === rowUid ? { ...r, ...patch } : r)));
-  };
-
   const removeModelRow = (index: number) => {
     if (formModelsSaveError) setFormModelsSaveError(null);
     const row = formModels[index];
     if (row) {
-      const t = testStatusTimersRef.current.get(row.rowUid);
-      if (t != null) {
-        window.clearTimeout(t);
-        testStatusTimersRef.current.delete(row.rowUid);
-      }
+      clearTestStatusTimer(row.rowUid);
     }
     setFormModels(rows => rows.filter((_, i) => i !== index));
-  };
-
-  const scheduleClearTestStatus = (rowUid: string) => {
-    const existing = testStatusTimersRef.current.get(rowUid);
-    if (existing != null) window.clearTimeout(existing);
-    const id = window.setTimeout(() => {
-      testStatusTimersRef.current.delete(rowUid);
-      setFormModels(rows =>
-        rows.map(r => (r.rowUid === rowUid ? { ...r, testStatus: undefined } : r))
-      );
-    }, 6000);
-    testStatusTimersRef.current.set(rowUid, id);
   };
 
   const handleFetchModels = async () => {
@@ -559,30 +507,6 @@ export function LlmProfileEditor({
       ]);
     }
     setFetchPicker(null);
-  };
-
-  const handleProbeModel = async (index: number) => {
-    const row = formModels[index];
-    const modelId = row?.modelId.trim();
-    if (!row || !modelId) return;
-    const rowUid = row.rowUid;
-    // F2: probe-preview accepts the form draft so we can Test before saving.
-    updateModelRowByUid(rowUid, { testStatus: { kind: 'running' } });
-    try {
-      const previewInput = buildPreviewInputFromForm();
-      const result = await probeLlmProfileModelPreviewForBackend(backendId, previewInput, modelId);
-      if (result.ok) {
-        updateModelRowByUid(rowUid, { testStatus: { kind: 'ok', latencyMs: result.latencyMs } });
-      } else {
-        updateModelRowByUid(rowUid, { testStatus: { kind: 'fail', error: result.error } });
-      }
-    } catch (err) {
-      updateModelRowByUid(rowUid, {
-        testStatus: { kind: 'fail', error: err instanceof Error ? err.message : String(err) },
-      });
-    } finally {
-      scheduleClearTestStatus(rowUid);
-    }
   };
 
   /**
@@ -801,7 +725,7 @@ export function LlmProfileEditor({
                       onUpdate={updateModelRow}
                       onRemove={removeModelRow}
                       onFetch={handleFetchModels}
-                      onProbe={handleProbeModel}
+                      onProbe={probeModel}
                       buildPreviewInput={buildPreviewInputFromForm}
                     />
                   </EditorSection>
@@ -821,8 +745,8 @@ export function LlmProfileEditor({
                         if (formRequestHeadersError) setFormRequestHeadersError(null);
                       }}
                       placeholder={`{
-"X-Org-Id": "abc",
-"User-Agent": "ZClaudia/1.0"
+	"X-Org-Id": "abc",
+	"User-Agent": "ZClaudia/1.0"
 }`}
                       rows={5}
                       aria-label="Request Headers (JSON)"
@@ -858,9 +782,9 @@ export function LlmProfileEditor({
                         if (formCompatError) setFormCompatError(null);
                       }}
                       placeholder={`{
-"supportsDeveloperRole": false,
-"supportsReasoningEffort": true,
-"supportsStrictMode": false
+	"supportsDeveloperRole": false,
+	"supportsReasoningEffort": true,
+	"supportsStrictMode": false
 }`}
                       rows={5}
                       aria-label="Compat JSON"
@@ -899,781 +823,6 @@ export function LlmProfileEditor({
           onCancel={() => setFetchPicker(null)}
           onConfirm={confirmFetchPicker}
         />
-      )}
-    </div>
-  );
-}
-
-const PROVIDER_TYPE_LABELS: Record<string, string> = {
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  'openai-codex': 'OpenAI Codex (ChatGPT Plus/Pro)',
-};
-
-const PROVIDER_TYPE_OPTIONS: { value: string; label: string }[] = LLM_PROVIDER_TYPES.map(value => ({
-  value,
-  label: PROVIDER_TYPE_LABELS[value] ?? value,
-}));
-
-interface ModelsSectionProps {
-  backendId: string;
-  models: ModelRowDraft[];
-  providerType: string;
-  fetching: boolean;
-  fetchError: string | null;
-  saveError: string | null;
-  onAdd: () => void;
-  onUpdate: (index: number, patch: Partial<ModelRowDraft>) => void;
-  onRemove: (index: number) => void;
-  onFetch: () => void;
-  onProbe: (index: number) => void;
-  /**
-   * Build a snapshot of the *current* form draft for the F3 resolve-preview
-   * call. Each ModelRow uses this to ask the server "what context window
-   * would the runtime resolve for my modelId if I left the override blank?".
-   */
-  buildPreviewInput: () => LlmProfilePreviewInput;
-}
-
-function ModelsSection({
-  backendId,
-  models,
-  providerType,
-  fetching,
-  fetchError,
-  saveError,
-  onAdd,
-  onUpdate,
-  onRemove,
-  onFetch,
-  onProbe,
-  buildPreviewInput,
-}: ModelsSectionProps) {
-  // F2: Fetch/Test now hit the preview endpoints, so neither needs the profile
-  // to be saved or the form to be pristine. The only remaining hard gate is
-  // providerType (the preview validator requires it).
-  const fetchDisabledReason = !providerType ? 'Pick a provider type first' : undefined;
-  const fetchDisabled = !providerType || fetching;
-  return (
-    <div>
-      {/* Right-aligned from md up; below md they share the full width instead of
-          floating against an empty gutter. */}
-      <div className="mb-2 flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={onFetch}
-          disabled={fetchDisabled}
-          title={fetchDisabledReason}
-          className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary disabled:opacity-50 max-md:flex-1 max-md:py-2"
-        >
-          {fetching ? 'Fetching…' : 'Fetch from /models'}
-        </button>
-        <button
-          type="button"
-          onClick={onAdd}
-          className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary max-md:flex-1 max-md:py-2"
-        >
-          + Add model
-        </button>
-      </div>
-      {fetchError && <p className="mb-2 text-xs text-destructive">{fetchError}</p>}
-      {saveError && <p className="mb-2 text-xs text-destructive">{saveError}</p>}
-      {models.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          No models declared. Add at least one model entry before saving — agent profiles bound to
-          this LLM profile pick their model id from this list.
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {models.map((row, idx) => (
-            <ModelRow
-              key={row.rowUid}
-              backendId={backendId}
-              index={idx}
-              row={row}
-              allRows={models}
-              providerType={providerType}
-              onChange={patch => onUpdate(idx, patch)}
-              onRemove={() => onRemove(idx)}
-              onProbe={() => onProbe(idx)}
-              buildPreviewInput={buildPreviewInput}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface ModelRowProps {
-  backendId: string;
-  index: number;
-  row: ModelRowDraft;
-  allRows: ModelRowDraft[];
-  providerType: string;
-  onChange: (patch: Partial<ModelRowDraft>) => void;
-  onRemove: () => void;
-  onProbe: () => void;
-  buildPreviewInput: () => LlmProfilePreviewInput;
-}
-
-interface ResolvedPreviewState {
-  status: 'idle' | 'loading' | 'ok' | 'error';
-  value?: number;
-  source?: ContextWindowSource;
-  /**
-   * Cross-provider matched pi-ai provider id when `source === 'pi_ai_registry'`.
-   * Lets the helper text annotate e.g. "from registry (deepseek)" when an
-   * OpenAI-compat profile borrows a registered model id from another provider.
-   */
-  matchedProvider?: string;
-}
-
-function ModelRow({
-  backendId,
-  index,
-  row,
-  allRows,
-  providerType,
-  onChange,
-  onRemove,
-  onProbe,
-  buildPreviewInput,
-}: ModelRowProps) {
-  const errs = validateModelDraftRow(row, allRows, index);
-  const isRunning = row.testStatus?.kind === 'running';
-  const testDisabled = !providerType || isRunning || !row.modelId.trim() || !!errs.modelId;
-  const testDisabledReason = !providerType
-    ? 'Pick a provider type first'
-    : !row.modelId.trim()
-      ? 'Enter a model id first'
-      : errs.modelId
-        ? `Fix model id (${errs.modelId}) first`
-        : undefined;
-
-  // F3: when contextWindow is left blank, ask the server what the runtime would
-  // resolve for this modelId so users see "if you save this row blank, X via
-  // Y" inline. Debounced so a fast typer doesn't fan out a request per
-  // keystroke; a version counter ensures stale responses don't overwrite the
-  // freshest result.
-  const [resolved, setResolved] = useState<ResolvedPreviewState>({ status: 'idle' });
-  const requestIdRef = useRef(0);
-  const debounceTimerRef = useRef<number | null>(null);
-
-  const modelIdInput = row.modelId.trim();
-  const contextOverrideEmpty = !row.contextWindowStr.trim();
-  const helperEligible = !!providerType && !!modelIdInput && contextOverrideEmpty && !errs.modelId;
-
-  // The Auto option's label annotates what the runtime would detect from the
-  // existing context-window preview resolution (when it happens to have run
-  // and matched a provider with a known dialect label). This piggybacks on
-  // the resolve-preview call already fired below for the contextWindow
-  // helper — no separate fetch. `DIALECT_LABELS[...]` is looked up (not just
-  // `matchedProvider` truthiness) because matches like 'anthropic' have no
-  // dialect label and must fall back to plain "Auto".
-  const detectedDialectLabel =
-    resolved.status === 'ok' && resolved.matchedProvider
-      ? (DIALECT_LABELS as Record<string, string | undefined>)[resolved.matchedProvider]
-      : undefined;
-  const autoDialectLabel = detectedDialectLabel
-    ? `Auto — detected: ${detectedDialectLabel}`
-    : 'Auto';
-
-  useEffect(() => {
-    // Clear any pending debounce on every input change (in-flight responses
-    // are neutralized by the request-id staleness guard below). If we're no
-    // longer eligible (override filled, modelId cleared, etc.) just reset to
-    // idle — the UI hides the helper text in those cases.
-    if (debounceTimerRef.current !== null) {
-      window.clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
-    if (!helperEligible) {
-      // Don't surface stale results when the helper isn't applicable.
-      if (resolved.status !== 'idle') setResolved({ status: 'idle' });
-      return;
-    }
-
-    const myRequestId = ++requestIdRef.current;
-    setResolved({ status: 'loading' });
-
-    debounceTimerRef.current = window.setTimeout(() => {
-      debounceTimerRef.current = null;
-      const previewInput = buildPreviewInput();
-      // Self-edit guard: strip the current row's own contextWindow override
-      // (it's empty by the helperEligible gate, but also strip the entry's
-      // maxTokens / displayName aren't relevant — we only need to neutralize
-      // contextWindow). This way `resolveContextWindow` walks past the
-      // profile_entry layer for *this* model id and reports what the next
-      // layer (pi_ai_registry / openai_compat_default / fallback) would supply.
-      const sanitizedModels = (previewInput.models ?? []).map(entry => {
-        if (entry.modelId !== modelIdInput) return entry;
-        const { contextWindow: _omitContextWindow, ...rest } = entry;
-        void _omitContextWindow;
-        return rest;
-      });
-
-      resolveContextWindowPreviewForBackend(backendId, {
-        ...previewInput,
-        models: sanitizedModels,
-        modelId: modelIdInput,
-      })
-        .then(data => {
-          if (myRequestId !== requestIdRef.current) return; // stale
-          setResolved({
-            status: 'ok',
-            value: data.value,
-            source: data.source,
-            matchedProvider: data.matchedProvider,
-          });
-        })
-        .catch(() => {
-          if (myRequestId !== requestIdRef.current) return; // stale
-          setResolved({ status: 'error' });
-        });
-    }, 300);
-
-    return () => {
-      if (debounceTimerRef.current !== null) {
-        window.clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
-      }
-    };
-    // We intentionally depend on the inputs that drive the request shape.
-    // buildPreviewInput is recreated on every parent render — that's fine
-    // because the debounce + version guard makes redundant calls safe.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [helperEligible, modelIdInput, providerType, backendId, row.displayName, row.maxTokensStr]);
-
-  // Clean up on unmount (covers row removal too).
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current !== null) window.clearTimeout(debounceTimerRef.current);
-    };
-  }, []);
-
-  return (
-    <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-        <div>
-          <input
-            type="text"
-            value={row.modelId}
-            onChange={e => onChange({ modelId: e.target.value })}
-            placeholder="model id (e.g. claude-opus-4-7)"
-            aria-label="model id"
-            className={`${MODEL_FIELD_BASE} font-mono ${errs.modelId ? 'border-destructive' : 'border-border/70'}`}
-          />
-          {errs.modelId && (
-            <p className="text-[10px] text-destructive mt-0.5">
-              {errs.modelId === 'duplicate'
-                ? 'duplicate model id in this profile'
-                : 'model id is required'}
-            </p>
-          )}
-        </div>
-        <input
-          type="text"
-          value={row.displayName}
-          onChange={e => onChange({ displayName: e.target.value })}
-          placeholder="display name (optional)"
-          aria-label="display name"
-          className={`${MODEL_FIELD_BASE} border-border/70`}
-        />
-        <div>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={row.contextWindowStr}
-            onChange={e => onChange({ contextWindowStr: e.target.value })}
-            placeholder="context window (optional)"
-            aria-label="context window"
-            className={`${MODEL_FIELD_BASE} font-mono ${errs.contextWindow ? 'border-destructive' : 'border-border/70'}`}
-          />
-          {errs.contextWindow && (
-            <p className="text-[10px] text-destructive mt-0.5">
-              contextWindow {errs.contextWindow}
-            </p>
-          )}
-          <ResolvedContextWindowHint
-            state={resolved}
-            eligible={helperEligible}
-            modelId={modelIdInput}
-          />
-        </div>
-        <div>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={row.maxTokensStr}
-            onChange={e => onChange({ maxTokensStr: e.target.value })}
-            placeholder="max tokens (optional)"
-            aria-label="max tokens"
-            className={`${MODEL_FIELD_BASE} font-mono ${errs.maxTokens ? 'border-destructive' : 'border-border/70'}`}
-          />
-          {errs.maxTokens && (
-            <p className="text-[10px] text-destructive mt-0.5">maxTokens {errs.maxTokens}</p>
-          )}
-        </div>
-      </div>
-      {/* Below md this is three stacked bands rather than one line: the settings
-          read as label-left / control-right like every other row in the editor,
-          and the actions get a divided footer. Left as a single line from md up,
-          where the row has the width for it. */}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="flex min-w-0 flex-col gap-1 md:flex-row md:flex-wrap md:items-center md:gap-x-3">
-          <ModelTestStatus status={row.testStatus} />
-          <label className="flex cursor-pointer items-center justify-between gap-1.5 text-[11px] text-muted-foreground max-md:py-1 md:justify-start">
-            {/* Control trails the label below md and leads it from md up, so the
-                desktop reading order ("[x] Vision") is unchanged. */}
-            <input
-              type="checkbox"
-              checked={row.supportsImage}
-              onChange={e =>
-                onChange({ supportsImage: e.target.checked, inputModalitiesTouched: true })
-              }
-              aria-label={`model ${row.modelId.trim() || index + 1} supports image input`}
-              className="order-last h-3.5 w-3.5 rounded border-border md:order-none"
-            />
-            Vision
-          </label>
-          {providerType !== 'anthropic' && (
-            <label className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground max-md:py-1">
-              <span className="flex-shrink-0">Dialect</span>
-              <select
-                value={row.dialect}
-                onChange={e => onChange({ dialect: e.target.value as '' | LlmModelDialect })}
-                aria-label={`dialect for model ${row.modelId.trim() || index + 1}`}
-                className={`min-w-0 flex-1 rounded-md border bg-background/70 px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 md:max-w-[15rem] md:flex-none ${
-                  row.dialect ? 'border-primary/50' : 'border-border/70'
-                }`}
-              >
-                <option value="">{autoDialectLabel}</option>
-                {LLM_MODEL_DIALECTS.map(d => (
-                  <option key={d} value={d}>
-                    {DIALECT_LABELS[d]}
-                  </option>
-                ))}
-              </select>
-              <fieldset className="space-y-1 mt-2">
-                <legend className="text-xs text-muted-foreground">Supported thinking levels</legend>
-                <p className="text-[11px] text-muted-foreground">
-                  Select only levels supported by this model connection. Leave empty if unknown.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {(['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const).map(level => (
-                    <label key={level} className="flex items-center gap-1 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={row.thinkingLevels?.includes(level) ?? false}
-                        onChange={e =>
-                          onChange({
-                            thinkingLevels: e.target.checked
-                              ? [...(row.thinkingLevels ?? []), level]
-                              : (row.thinkingLevels ?? []).filter(x => x !== level),
-                          })
-                        }
-                      />
-                      {level}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              {row.dialect && (
-                <span className="flex-shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
-                  forced
-                </span>
-              )}
-            </label>
-          )}
-        </div>
-        <div className="flex items-center gap-2 max-md:border-t max-md:border-border/60 max-md:pt-2 md:gap-1">
-          <button
-            type="button"
-            onClick={onProbe}
-            disabled={testDisabled}
-            title={testDisabledReason}
-            className="rounded-md border border-border/70 bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary disabled:opacity-50 max-md:flex-1 max-md:py-2"
-          >
-            {isRunning ? 'Testing…' : 'Test'}
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            title="Remove model"
-            className="rounded-md border border-border/70 bg-background/70 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 max-md:flex-1 max-md:py-2"
-          >
-            Remove
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Helper text shown directly beneath the contextWindow input, explaining
- * (when the user hasn't typed an override) which value + source the runtime
- * would resolve. Fallback rendering uses an amber AlertTriangle to make
- * "we don't actually know" visually distinct from "we have a sourced value".
- */
-function ResolvedContextWindowHint({
-  state,
-  eligible,
-  modelId,
-}: {
-  state: ResolvedPreviewState;
-  eligible: boolean;
-  /**
-   * The current row's modelId (already trimmed). Only used by the
-   * openai_compat_default warning, which calls it out by name so the user
-   * sees *which* id failed to match the registry.
-   */
-  modelId: string;
-}) {
-  if (!eligible) return null;
-  if (state.status === 'idle') return null;
-  if (state.status === 'loading') {
-    return <p className="text-[10px] text-muted-foreground mt-0.5">Resolving…</p>;
-  }
-  if (state.status === 'error') {
-    return <p className="text-[10px] text-muted-foreground mt-0.5">—</p>;
-  }
-  // 'ok'
-  if (state.value == null || state.source == null) return null;
-  const formatted = state.value.toLocaleString();
-  switch (state.source) {
-    case 'profile_entry':
-      // Theoretically unreachable because we strip our own override before
-      // calling — leave a sane label in case a *different* row declares the
-      // same modelId (rare; still informative).
-      return (
-        <p className="text-[10px] text-muted-foreground mt-0.5">
-          Using {formatted} via this profile's override
-        </p>
-      );
-    case 'pi_ai_registry':
-      // F4: registry hits can come from a cross-provider sweep (e.g. running
-      // `deepseek-v4` through an openai-compat proxy resolves to provider
-      // `deepseek`). Annotate parenthetically when matchedProvider is set so
-      // users see which provider's spec we adopted. Per UX, never expose
-      // "pi-ai" in user-facing copy.
-      return (
-        <p className="text-[10px] text-muted-foreground mt-0.5">
-          Using {formatted} from registry
-          {state.matchedProvider ? ` (${state.matchedProvider})` : ''}
-        </p>
-      );
-    case 'openai_compat_default':
-      // F4: openai-compat proxies hand back a 128k literal when nothing in
-      // the registry matched the model id. Surface this as a distinct amber
-      // warning so users can tell "we guessed 128k for compat" apart from
-      // "we got a real spec from the registry".
-      return (
-        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 flex items-start gap-1">
-          <AlertTriangle size={11} className="shrink-0 mt-0.5" aria-hidden="true" />
-          <span>
-            Using {formatted} default for openai-compat. No registry match for "{modelId}" — declare
-            contextWindow above or use a known model id.
-          </span>
-        </p>
-      );
-    case 'fallback':
-      return (
-        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 flex items-start gap-1">
-          <AlertTriangle size={11} className="shrink-0 mt-0.5" aria-hidden="true" />
-          <span>
-            Falls back to {formatted} — no spec found. Declare contextWindow above or add to LLM
-            profile.
-          </span>
-        </p>
-      );
-    default:
-      return null;
-  }
-}
-
-function ModelTestStatus({ status }: { status: ModelRowDraft['testStatus'] }) {
-  if (!status) return <span className="text-[11px] text-muted-foreground" />;
-  if (status.kind === 'running')
-    return <span className="text-[11px] text-muted-foreground">Probing…</span>;
-  if (status.kind === 'ok')
-    return (
-      <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
-        ✓ {status.latencyMs} ms
-      </span>
-    );
-  return (
-    <span className="text-[11px] text-destructive truncate max-w-[280px]" title={status.error}>
-      ✗ {status.error}
-    </span>
-  );
-}
-
-interface FetchModelsPickerDialogProps {
-  candidates: string[];
-  selected: Set<string>;
-  onToggle: (id: string) => void;
-  onSelectAll: () => void;
-  onSelectNone: () => void;
-  onCancel: () => void;
-  onConfirm: () => void;
-}
-
-function FetchModelsPickerDialog({
-  candidates,
-  selected,
-  onToggle,
-  onSelectAll,
-  onSelectNone,
-  onCancel,
-  onConfirm,
-}: FetchModelsPickerDialogProps) {
-  const titleId = useId();
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  // Focus the first control (the close button) when the dialog mounts, and
-  // wire Escape to close it — the backdrop-click close (below) stays as is.
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onCancel]);
-
-  // Trap Tab/Shift+Tab focus within the dialog so keyboard users can't tab
-  // out into the (visually obscured but still-present) editor behind it.
-  const handleTrapKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'Tab') return;
-    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-    if (!focusable || focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (e.shiftKey) {
-      if (document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      }
-    } else if (document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  };
-
-  return (
-    <>
-      <div className="fixed inset-0 bg-black/60 z-[60]" onClick={onCancel} />
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        onKeyDown={handleTrapKeyDown}
-        className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[480px] md:max-h-[70vh] bg-card rounded-lg shadow-xl z-[60] flex flex-col border border-border"
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h3 id={titleId} className="text-sm font-semibold">
-            Import models from /models
-          </h3>
-          <button
-            ref={closeButtonRef}
-            onClick={onCancel}
-            className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-            aria-label="Close picker"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border text-xs text-muted-foreground">
-          <span>
-            {candidates.length} candidates — {selected.size} selected
-          </span>
-          <div className="flex gap-2">
-            <button onClick={onSelectAll} className="hover:text-foreground">
-              All
-            </button>
-            <button onClick={onSelectNone} className="hover:text-foreground">
-              None
-            </button>
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto px-2 py-2">
-          {candidates.map(id => (
-            <label
-              key={id}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-secondary cursor-pointer"
-            >
-              <input
-                type="checkbox"
-                checked={selected.has(id)}
-                onChange={() => onToggle(id)}
-                className="rounded-md border-border bg-secondary"
-              />
-              <span className="text-sm font-mono">{id}</span>
-            </label>
-          ))}
-        </div>
-        <div className="flex gap-2 p-3 border-t border-border">
-          <button
-            onClick={onConfirm}
-            disabled={selected.size === 0}
-            className="flex-1 px-3 py-2 bg-muted/60 text-foreground hover:bg-muted rounded-md text-sm font-medium disabled:opacity-50"
-          >
-            Add {selected.size} model{selected.size === 1 ? '' : 's'}
-          </button>
-          <button
-            onClick={onCancel}
-            className="flex-1 px-3 py-2 bg-secondary hover:bg-secondary/80 rounded-md text-sm font-medium"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function ProviderTypeSelector({
-  value,
-  onChange,
-  hideLabel = false,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  hideLabel?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const ref = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  // Roving focus: whenever the popup opens (or the active option changes via
-  // arrow keys), move DOM focus onto that option so screen readers announce
-  // it and further arrow/Enter/Escape keydowns land on the listbox.
-  useEffect(() => {
-    if (open) optionRefs.current[activeIndex]?.focus();
-  }, [open, activeIndex]);
-
-  const selectedIndex = PROVIDER_TYPE_OPTIONS.findIndex(o => o.value === value);
-  const selected = PROVIDER_TYPE_OPTIONS[selectedIndex];
-
-  const openList = () => {
-    setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
-    setOpen(true);
-  };
-
-  const closeList = () => {
-    setOpen(false);
-    triggerRef.current?.focus();
-  };
-
-  const selectOption = (index: number) => {
-    const opt = PROVIDER_TYPE_OPTIONS[index];
-    if (!opt) return;
-    onChange(opt.value);
-    closeList();
-  };
-
-  const handleTriggerKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      openList();
-    } else if (e.key === 'Escape' && open) {
-      e.preventDefault();
-      closeList();
-    }
-  };
-
-  const handleOptionKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setActiveIndex(i => Math.min(i + 1, PROVIDER_TYPE_OPTIONS.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setActiveIndex(i => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      selectOption(index);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      closeList();
-    }
-  };
-
-  return (
-    <div ref={ref} className="relative">
-      {!hideLabel && <FieldLabel>Provider Type</FieldLabel>}
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => (open ? setOpen(false) : openList())}
-        onKeyDown={handleTriggerKeyDown}
-        className={`${FIELD_CLASS} flex items-center justify-between text-left`}
-      >
-        <span>{selected?.label ?? value}</span>
-        <ChevronDown
-          size={14}
-          className={`text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && (
-        <div
-          role="listbox"
-          aria-label="Provider Type"
-          className="absolute right-0 top-full mt-1 min-w-full w-max max-w-[19rem] bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden"
-        >
-          {PROVIDER_TYPE_OPTIONS.map((opt, index) => (
-            <button
-              key={opt.value}
-              ref={el => {
-                optionRefs.current[index] = el;
-              }}
-              type="button"
-              role="option"
-              aria-selected={opt.value === value}
-              tabIndex={-1}
-              onClick={() => selectOption(index)}
-              onKeyDown={e => handleOptionKeyDown(e, index)}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left whitespace-nowrap transition-colors ${
-                opt.value === value
-                  ? 'text-primary font-medium bg-muted/40'
-                  : 'text-foreground hover:bg-secondary/80'
-              }`}
-            >
-              <span className="w-4 flex-shrink-0">
-                {opt.value === value && <Check size={14} strokeWidth={2.5} />}
-              </span>
-              {opt.label}
-            </button>
-          ))}
-        </div>
       )}
     </div>
   );
