@@ -21,7 +21,7 @@ import {
   buildProjectPatch,
   isProjectValidationError,
 } from './model.js';
-import { resolveAgentReadinessForSessionWithRuntimeCheck } from '../agent-readiness/check.js';
+import { resolveAgentReadinessForSessionWithRuntimeCheck } from '../sessions/agent-readiness.js';
 import { sendApiError } from '../../interfaces/http/response.js';
 
 export type ProjectChangeEvent =

@@ -12,7 +12,7 @@ import {
 import type { ActiveRun } from '../../application/conversation/transport/types.js';
 import { pluginEvents } from '../../infra/events/index.js';
 import { permissionManager as pluginPermissionManager } from './permissions.js';
-import { configureRuntimeReadinessInspector } from '../../domains/agent-readiness/check.js';
+import { configureRuntimeReadinessInspector } from '../../domains/agent-profiles/readiness.js';
 import { managedRuntimeService } from '../managed-runtimes/service.js';
 import { configureBundledRuntimeResolver } from '../../infra/agents/bundled-runtime-resources.js';
 import { builtinAgentPluginForRuntime } from '@zclaudia/shared/plugins/builtin-agents';
