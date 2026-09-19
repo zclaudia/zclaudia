@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { SessionDraft } from '@zclaudia/shared';
 import * as api from '../services/api';
-import { usePluginStore } from './pluginStore';
+import { setBuiltinPanelVisibility } from '../services/panel-visibility-coordination';
 import { activatePanel, deactivatePanel } from '../actions/openPanel';
 
 // Generate a stable client ID per browser tab for lock identification
@@ -67,12 +67,12 @@ async function saveDraftToServer(sessionId: string, content: string): Promise<Se
 }
 
 function showDraftPanel() {
-  usePluginStore.getState().updatePanelVisibility('draft', true);
+  setBuiltinPanelVisibility('draft', true);
   activatePanel('draft');
 }
 
 function hideDraftPanel() {
-  usePluginStore.getState().updatePanelVisibility('draft', false);
+  setBuiltinPanelVisibility('draft', false);
   // Reset active tab in the bottom panel so toolbar buttons update immediately.
   // For right placement, sidebar collapses on its own once the panel is hidden.
   deactivatePanel('draft');

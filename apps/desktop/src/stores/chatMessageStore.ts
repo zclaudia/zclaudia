@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Message, ContentBlock } from '@zclaudia/shared';
-import type { ToolCallState } from './runStore';
+import type { ToolCallState } from './runTypes';
 import { hydrateMessagesForDisplay } from '../services/message-hydration';
 
 export interface PaginationInfo {

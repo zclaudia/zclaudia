@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { usePluginStore } from './pluginStore';
+import { setBuiltinPanelVisibility } from '../services/panel-visibility-coordination';
 
 const CACHE_MAX = 30;
 const TREE_WIDTH_MIN = 160;
@@ -141,7 +141,7 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
       markdownSourceView: false,
     }));
     // Show file viewer panel in bottom panel
-    usePluginStore.getState().updatePanelVisibility('file-viewer', true);
+    setBuiltinPanelVisibility('file-viewer', true);
   },
 
   setContent: (content: string, mtimeMs?: number) => {
@@ -177,7 +177,7 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
       inFileSearchQuery: '',
     });
     // Hide file viewer panel in bottom panel
-    usePluginStore.getState().updatePanelVisibility('file-viewer', false);
+    setBuiltinPanelVisibility('file-viewer', false);
   },
 
   backToTree: () => {
@@ -197,7 +197,7 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   togglePanel: () => {
     const next = !get().isOpen;
     set({ isOpen: next });
-    usePluginStore.getState().updatePanelVisibility('file-viewer', next);
+    setBuiltinPanelVisibility('file-viewer', next);
   },
 
   setShowTree: (show: boolean) => set({ showTree: show }),

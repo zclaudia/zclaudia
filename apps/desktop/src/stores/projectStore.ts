@@ -6,18 +6,27 @@ import type {
   LlmProfileConfig,
   ProviderCapabilities,
 } from '@zclaudia/shared';
-import { useRunStore } from './runStore';
-import { useLlmProfileMetaStore } from './llmProfileMetaStore';
-import { useServerStore } from './serverStore';
-import { useOwnershipStore } from './ownershipStore';
-import { parseBackendId } from './gatewayStore';
 import {
-  getControlPlaneMode,
-  resolveCanonicalBackendId,
-  resolveLocalBackendId,
-} from '../actions/controlPlane';
-import { useSelectionStore } from './selectionStore';
-import { useRightWorkspaceStore } from './rightWorkspaceStore';
+  applyProviderCapabilities,
+  applyProviderCommands,
+  applyProvidersToMetaStore,
+  assignSessionOwners,
+  getProjectOwnerBackendId,
+  getProviderMetaSnapshot,
+  getSelectionSnapshot,
+  pushDashboardView,
+  pushSelectedProject,
+  pushSelectedSession,
+  recordProjectOwner,
+  recordProjectOwners,
+  releaseProjectOwner,
+  releaseProjectOwnersForBackend,
+  resolveOwnershipBackendId,
+  sessionHasForegroundRun,
+  subscribeLegacyProviderSync,
+  subscribeLegacySelectionSync,
+} from '../services/project-store-coordination';
+import { forgetSession } from '../services/session-ownership-coordination';
 import type { ProjectDashboardView } from './selectionTypes';
 
 export type { ProjectDashboardView };
@@ -93,7 +102,6 @@ export const useProjectStore = create<ProjectState>(set => ({
       return;
     }
     set(state => {
-      const ownership = useOwnershipStore.getState();
       const incomingById = new Map(projects.map(project => [project.id, project]));
       const next: Project[] = [];
       // REST describes one backend, while this store also contains gateway
@@ -106,13 +114,13 @@ export const useProjectStore = create<ProjectState>(set => ({
           next.push(incoming);
           incomingById.delete(existing.id);
         } else {
-          const ownerBackendId = ownership.getProjectBackendId(existing.id);
+          const ownerBackendId = getProjectOwnerBackendId(existing.id);
           if (ownerBackendId && ownerBackendId !== activeBackendId) next.push(existing);
         }
       }
       next.push(...incomingById.values());
-      ownership.removeProjectOwnersByBackend(activeBackendId);
-      ownership.setProjectOwners(
+      releaseProjectOwnersForBackend(activeBackendId);
+      recordProjectOwners(
         projects.map(p => p.id),
         activeBackendId
       );
@@ -122,9 +130,8 @@ export const useProjectStore = create<ProjectState>(set => ({
 
   replaceProjectsForBackend: (backendId, projects) =>
     set(state => {
-      const ownership = useOwnershipStore.getState();
       const acceptedProjects = projects.filter(project => {
-        const ownerBackendId = ownership.getProjectBackendId(project.id);
+        const ownerBackendId = getProjectOwnerBackendId(project.id);
         if (ownerBackendId && ownerBackendId !== backendId) {
           console.warn(
             `[ProjectStore] Ignoring project snapshot collision for ${project.id}: owner=${ownerBackendId} incoming=${backendId}`
@@ -137,7 +144,7 @@ export const useProjectStore = create<ProjectState>(set => ({
 
       // Shallow equality short-circuit: same set + same updatedAt for this backend
       const currentBackendProjects = state.projects.filter(
-        project => ownership.getProjectBackendId(project.id) === backendId
+        project => getProjectOwnerBackendId(project.id) === backendId
       );
       if (
         currentBackendProjects.length === acceptedProjects.length &&
@@ -158,7 +165,7 @@ export const useProjectStore = create<ProjectState>(set => ({
       const seen = new Set<string>();
       const next: Project[] = [];
       for (const existing of state.projects) {
-        const ownerBackendId = ownership.getProjectBackendId(existing.id);
+        const ownerBackendId = getProjectOwnerBackendId(existing.id);
         if (ownerBackendId === backendId || acceptedById.has(existing.id)) {
           const incoming = acceptedById.get(existing.id);
           if (!incoming) continue; // owned by this backend but no longer present in snapshot — drop
@@ -173,8 +180,8 @@ export const useProjectStore = create<ProjectState>(set => ({
         next.push(mergeProjectPreservingFields(undefined, project));
       }
 
-      ownership.removeProjectOwnersByBackend(backendId);
-      ownership.setProjectOwners(
+      releaseProjectOwnersForBackend(backendId);
+      recordProjectOwners(
         acceptedProjects.map(project => project.id),
         backendId
       );
@@ -183,8 +190,7 @@ export const useProjectStore = create<ProjectState>(set => ({
 
   upsertProjectForBackend: (backendId, project) =>
     set(state => {
-      const ownership = useOwnershipStore.getState();
-      const existingOwnerBackendId = ownership.getProjectBackendId(project.id);
+      const existingOwnerBackendId = getProjectOwnerBackendId(project.id);
 
       if (existingOwnerBackendId && existingOwnerBackendId !== backendId) {
         console.warn(
@@ -193,7 +199,7 @@ export const useProjectStore = create<ProjectState>(set => ({
         return state;
       }
 
-      ownership.setProjectOwner(project.id, backendId);
+      recordProjectOwner(project.id, backendId);
       const existingIndex = state.projects.findIndex(
         existingProject => existingProject.id === project.id
       );
@@ -217,12 +223,11 @@ export const useProjectStore = create<ProjectState>(set => ({
 
   removeProjectForBackend: (backendId, projectId) =>
     set(state => {
-      const ownership = useOwnershipStore.getState();
-      if (ownership.getProjectBackendId(projectId) !== backendId) {
+      if (getProjectOwnerBackendId(projectId) !== backendId) {
         return state;
       }
 
-      ownership.removeProjectOwner(projectId);
+      releaseProjectOwner(projectId);
       return {
         projects: state.projects.filter(project => project.id !== projectId),
         sessions: state.sessions.filter(session => session.projectId !== projectId),
@@ -239,7 +244,7 @@ export const useProjectStore = create<ProjectState>(set => ({
     set(state => {
       const activeBackendId = resolveOwnershipBackendId();
       if (activeBackendId) {
-        useOwnershipStore.getState().setProjectOwner(project.id, activeBackendId);
+        recordProjectOwner(project.id, activeBackendId);
       }
       // Dedup by id: WebSocket project_upsert may have already added this project
       // before the HTTP response returned (race window common with remote backends
@@ -260,7 +265,7 @@ export const useProjectStore = create<ProjectState>(set => ({
 
   deleteProject: id =>
     set(state => {
-      useOwnershipStore.getState().removeProjectOwner(id);
+      releaseProjectOwner(id);
       return {
         projects: state.projects.filter(p => p.id !== id),
         sessions: state.sessions.filter(s => s.projectId !== id),
@@ -285,13 +290,13 @@ export const useProjectStore = create<ProjectState>(set => ({
   // ── Session actions ──
 
   setSessions: sessions => {
-    assignSessionOwnersForSessions(sessions);
+    assignSessionOwners(sessions);
     set({ sessions });
   },
 
   mergeSessions: incoming =>
     set(state => {
-      assignSessionOwnersForSessions(incoming);
+      assignSessionOwners(incoming);
       const merged = incoming.map(s => {
         const existing = state.sessions.find(e => e.id === s.id);
         if (!existing) {
@@ -308,14 +313,8 @@ export const useProjectStore = create<ProjectState>(set => ({
           };
         }
 
-        if (existing.isActive && incomingIsActive === false) {
-          const chat = useRunStore.getState();
-          const hasForegroundRun = Object.entries(chat.activeRuns).some(
-            ([runId, sid]) => sid === s.id && !chat.backgroundRunIds.has(runId)
-          );
-          if (hasForegroundRun) {
-            return { ...s, isActive: true };
-          }
+        if (existing.isActive && incomingIsActive === false && sessionHasForegroundRun(s.id)) {
+          return { ...s, isActive: true };
         }
 
         return { ...s, isActive: incomingIsActive };
@@ -325,7 +324,7 @@ export const useProjectStore = create<ProjectState>(set => ({
 
   addSession: session =>
     set(state => {
-      assignSessionOwnersForSessions([session]);
+      assignSessionOwners([session]);
       return { sessions: [...state.sessions, session] };
     }),
 
@@ -336,8 +335,7 @@ export const useProjectStore = create<ProjectState>(set => ({
 
   deleteSession: id =>
     set(state => {
-      useOwnershipStore.getState().removeSessionOwner(id);
-      useRightWorkspaceStore.getState().removeSession(id);
+      forgetSession(id);
       return {
         sessions: state.sessions.filter(s => s.id !== id),
         selectedSessionId: state.selectedSessionId === id ? null : state.selectedSessionId,
@@ -380,9 +378,7 @@ export const useProjectStore = create<ProjectState>(set => ({
   // ── Provider actions (synced to llmProfileMetaStore) ──
 
   setProviders: providers => {
-    const getState = (useServerStore as { getState?: () => { activeServerId?: string | null } })
-      .getState;
-    useLlmProfileMetaStore.getState().setProviders(providers, getState?.().activeServerId);
+    applyProvidersToMetaStore(providers);
   },
 
   setDataServerId: serverId => set({ dataServerId: serverId }),
@@ -394,7 +390,7 @@ export const useProjectStore = create<ProjectState>(set => ({
       if (state.selectedProjectId === id) {
         return state;
       }
-      useSelectionStore.getState().setSelectedProjectId(id);
+      pushSelectedProject(id);
       return { selectedProjectId: id };
     }),
 
@@ -406,8 +402,7 @@ export const useProjectStore = create<ProjectState>(set => ({
 
       const session = state.sessions.find(s => s.id === id);
       const nextSelectedProjectId = projectId ?? session?.projectId ?? state.selectedProjectId;
-      useSelectionStore.getState().setSelectedSessionId(id);
-      useSelectionStore.getState().setSelectedProjectId(nextSelectedProjectId);
+      pushSelectedSession(id, nextSelectedProjectId);
 
       return {
         selectedSessionId: id,
@@ -417,7 +412,7 @@ export const useProjectStore = create<ProjectState>(set => ({
 
   setDashboardView: (projectId, view) =>
     set(state => {
-      useSelectionStore.getState().setDashboardView(projectId, view);
+      pushDashboardView(projectId, view);
       return {
         dashboardViews: {
           ...state.dashboardViews,
@@ -429,106 +424,37 @@ export const useProjectStore = create<ProjectState>(set => ({
   // ── Provider metadata (synced to llmProfileMetaStore) ──
 
   setProviderCommands: (llmProfileId, commands) => {
-    useLlmProfileMetaStore.getState().setProviderCommands(llmProfileId, commands);
+    applyProviderCommands(llmProfileId, commands);
   },
 
   setProviderCapabilities: (llmProfileId, capabilities) => {
-    useLlmProfileMetaStore.getState().setProviderCapabilities(llmProfileId, capabilities);
+    applyProviderCapabilities(llmProfileId, capabilities);
   },
 }));
 
 function syncLegacyProviderSnapshot(activeServerId?: string | null): void {
-  const providerMetaState = useLlmProfileMetaStore.getState();
+  const snapshot = getProviderMetaSnapshot(activeServerId);
   useProjectStore.setState({
-    providers: providerMetaState.getProviders(activeServerId),
-    providerCommands: providerMetaState.providerCommands,
-    providerCapabilities: providerMetaState.providerCapabilities,
+    providers: snapshot.providers,
+    providerCommands: snapshot.providerCommands,
+    providerCapabilities: snapshot.providerCapabilities,
   });
 }
 
 function syncSelectionSnapshot(): void {
-  const selectionState = useSelectionStore.getState();
+  const snapshot = getSelectionSnapshot();
   useProjectStore.setState({
-    selectedProjectId: selectionState.selectedProjectId,
-    selectedSessionId: selectionState.selectedSessionId,
-    dashboardViews: selectionState.dashboardViews,
+    selectedProjectId: snapshot.selectedProjectId,
+    selectedSessionId: snapshot.selectedSessionId,
+    dashboardViews: snapshot.dashboardViews,
   });
 }
 
-const providerMetaSubscribe = (
-  useLlmProfileMetaStore as typeof useLlmProfileMetaStore & {
-    subscribe?: (listener: () => void) => () => void;
-  }
-).subscribe;
-
-providerMetaSubscribe?.(() => {
-  syncLegacyProviderSnapshot(useServerStore.getState().activeServerId);
-});
-
-const serverStoreSubscribe = (
-  useServerStore as typeof useServerStore & {
-    subscribe?: (
-      listener: (
-        state: ReturnType<typeof useServerStore.getState>,
-        prevState: ReturnType<typeof useServerStore.getState>
-      ) => void
-    ) => () => void;
-  }
-).subscribe;
-
-serverStoreSubscribe?.((state, prevState) => {
-  if (state.activeServerId !== prevState.activeServerId) {
-    syncLegacyProviderSnapshot(state.activeServerId);
-  }
-});
-
-const selectionStoreSubscribe = (
-  useSelectionStore as typeof useSelectionStore & {
-    subscribe?: (listener: () => void) => () => void;
-  }
-).subscribe;
-
-selectionStoreSubscribe?.(() => {
-  syncSelectionSnapshot();
-});
-
-function resolveOwnershipBackendId(): string | null {
-  const activeServerId = useServerStore.getState().activeServerId ?? null;
-  if (!activeServerId) return null;
-
-  const parsedBackendId = parseBackendId(activeServerId) ?? activeServerId;
-  if (getControlPlaneMode() !== 'embedded-local') {
-    return parsedBackendId;
-  }
-
-  return resolveCanonicalBackendId(parsedBackendId, resolveLocalBackendId() ?? parsedBackendId);
-}
-
-function resolveOwnershipBackendIdForSession(session: Session): string | null {
-  const ownership = useOwnershipStore.getState();
-  const projectOwnerBackendId = ownership.getProjectBackendId(session.projectId);
-  if (projectOwnerBackendId) {
-    return projectOwnerBackendId;
-  }
-  return resolveOwnershipBackendId();
-}
-
-function assignSessionOwnersForSessions(sessions: Session[]): void {
-  const ownership = useOwnershipStore.getState();
-  const grouped = new Map<string, string[]>();
-
-  for (const session of sessions) {
-    const backendId = resolveOwnershipBackendIdForSession(session);
-    if (!backendId) continue;
-    const list = grouped.get(backendId) ?? [];
-    list.push(session.id);
-    grouped.set(backendId, list);
-  }
-
-  for (const [backendId, sessionIds] of grouped) {
-    ownership.setSessionOwners(sessionIds, backendId);
-  }
-}
+// Mirror llmProviderMeta/selection updates into the legacy compatibility
+// fields above. The subscriptions are resolved through (and registered by)
+// the coordination service so this store never imports the other stores.
+subscribeLegacyProviderSync(syncLegacyProviderSnapshot);
+subscribeLegacySelectionSync(syncSelectionSnapshot);
 
 function mergeProjectPreservingFields(existing: Project | undefined, incoming: Project): Project {
   if (!existing) return incoming;

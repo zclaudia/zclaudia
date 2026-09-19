@@ -10,7 +10,7 @@
  */
 import { create } from 'zustand';
 import type { LlmProfileConfig, ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
-import { useServerStore } from './serverStore';
+import { getActiveServerId } from '../services/active-backend-coordination';
 
 export interface CodexOAuthSessionState {
   sessionId: string;
@@ -39,9 +39,7 @@ const EMPTY_PROVIDERS: LlmProfileConfig[] = [];
 
 function resolveBackendId(backendId?: string | null): string | null {
   if (backendId) return backendId;
-  const getState = (useServerStore as { getState?: () => { activeServerId?: string | null } })
-    .getState;
-  return getState?.().activeServerId ?? null;
+  return getActiveServerId();
 }
 
 export const useLlmProfileMetaStore = create<LlmProfileMetaState>((set, get) => ({

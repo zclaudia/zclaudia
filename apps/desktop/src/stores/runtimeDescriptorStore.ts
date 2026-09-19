@@ -8,7 +8,7 @@
  */
 import { create } from 'zustand';
 import type { ProfileConfigDescriptor } from '@zclaudia/shared/core/profile-config-descriptor';
-import { useServerStore } from './serverStore';
+import { getActiveServerId } from '../services/active-backend-coordination';
 
 interface RuntimeDescriptorState {
   byBackend: Record<string, ProfileConfigDescriptor[]>;
@@ -21,9 +21,7 @@ const EMPTY: ProfileConfigDescriptor[] = [];
 
 function resolveBackendId(backendId?: string | null): string | null {
   if (backendId) return backendId;
-  const getState = (useServerStore as { getState?: () => { activeServerId?: string | null } })
-    .getState;
-  return getState?.().activeServerId ?? null;
+  return getActiveServerId();
 }
 
 export const useRuntimeDescriptorStore = create<RuntimeDescriptorState>((set, get) => ({

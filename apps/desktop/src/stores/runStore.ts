@@ -11,25 +11,14 @@ import {
   initialTranscriptState,
   orderedToolCalls,
 } from '@zclaudia/agent-transcript-kit';
-import { useSessionConfigStore } from './sessionConfigStore';
-import { useChatMessageStore, findLastAssistantMessageIndex } from './chatMessageStore';
+import {
+  applyRunFinalizationToChatMessage,
+  clearSessionRuntimeMode,
+  type RunFinalizationSnapshot,
+} from '../services/run-store-coordination';
+import type { ToolCallState } from './runTypes';
 
-// Tool call state for displaying in the UI
-export interface ToolCallState {
-  id: string; // tool_use_id
-  toolName: string;
-  toolInput: unknown;
-  status: 'running' | 'completed' | 'error';
-  result?: unknown;
-  isError?: boolean;
-  activity?: string; // Subagent activity text (e.g. "Reading file X...")
-  /**
-   * Provider-declared semantic category (e.g. `'plan_proposal'`). Lets the
-   * UI pick a renderer without string-matching provider-specific tool names.
-   */
-  semantic?: ToolSemantic;
-  effect?: ToolEffect;
-}
+export type { ToolCallState };
 
 // Run health info from server heartbeat
 export interface RunHealth {
@@ -117,18 +106,9 @@ interface RunState {
   // present it wins over locally accumulated deltas (which may have lost a
   // tail frame in transit). `final.sessionId` lets the terminal event apply
   // even when run tracking was already torn down (e.g. by a heartbeat that
-  // raced ahead of run_completed).
-  finalizeRunToMessage: (
-    runId: string,
-    final?: {
-      sessionId?: string;
-      assistantMessageId?: string;
-      messageVersion?: number;
-      content?: string;
-      contentBlocks?: ContentBlock[];
-      error?: string;
-    }
-  ) => void;
+  // raced ahead of run_completed). The chat-message write itself lives in
+  // services/run-store-coordination so this store stays self-contained.
+  finalizeRunToMessage: (runId: string, final?: RunFinalizationSnapshot) => void;
 
   // Getters
   isSessionLoading: (sessionId: string) => boolean;
@@ -281,7 +261,7 @@ export const useRunStore = create<RunState>((set, get) => ({
         runRetryStatus: remainingRetry,
       };
     });
-    if (sessionId) useSessionConfigStore.getState().clearRuntimeMode(sessionId);
+    if (sessionId) clearSessionRuntimeMode(sessionId);
   },
 
   updateRunHealth: (runId, health) =>
@@ -399,53 +379,13 @@ export const useRunStore = create<RunState>((set, get) => ({
     const assistantMessageId = final?.assistantMessageId ?? get().assistantMessageIds[runId];
     const runHistory = get().toolCallsHistory[runId] || [];
     const blocks = get().runContentBlocks[runId] || [];
-    useChatMessageStore.setState(state => {
-      const sessionMessages = state.messages[sessionId] || [];
-      if (sessionMessages.length === 0) return state;
-      // Legacy events without an assistantMessageId may only use the old
-      // last-assistant fallback while the run is still actively tracked. A
-      // late terminal event for an old run must never overwrite a newer run.
-      const assistantIdx = assistantMessageId
-        ? sessionMessages.findIndex(message => message.id === assistantMessageId)
-        : trackedSessionId
-          ? findLastAssistantMessageIndex(sessionMessages)
-          : -1;
-      if (assistantIdx === -1) return state;
-      const assistantMessage = sessionMessages[assistantIdx];
-      const existingToolCalls = assistantMessage.toolCalls || [];
-      const toolCalls =
-        runHistory.length >= existingToolCalls.length ? [...runHistory] : existingToolCalls;
-      const existingBlocks = assistantMessage.contentBlocks || [];
-      const contentBlocks = final?.contentBlocks?.length
-        ? [...final.contentBlocks]
-        : blocks.length >= existingBlocks.length
-          ? [...blocks]
-          : existingBlocks;
-      let content = final?.content !== undefined ? final.content : assistantMessage.content;
-      if (final?.error && !content.includes(`**Error:** ${final.error}`)) {
-        content += `\n\n**Error:** ${final.error}`;
-      }
-      const updatedMessages = [
-        ...sessionMessages.slice(0, assistantIdx),
-        { ...assistantMessage, content, toolCalls, contentBlocks },
-        ...sessionMessages.slice(assistantIdx + 1),
-      ];
-      const existingPagination = state.pagination[sessionId];
-      const pagination =
-        final?.messageVersion != null
-          ? {
-              ...state.pagination,
-              [sessionId]: {
-                ...(existingPagination ?? { total: sessionMessages.length, hasMore: false }),
-                messageVersion: Math.max(
-                  final.messageVersion,
-                  existingPagination?.messageVersion ?? 0
-                ),
-                isLoadingMore: false,
-              },
-            }
-          : state.pagination;
-      return { messages: { ...state.messages, [sessionId]: updatedMessages }, pagination };
+    applyRunFinalizationToChatMessage({
+      sessionId,
+      trackedSessionId,
+      assistantMessageId,
+      runHistory,
+      blocks,
+      final,
     });
   },
 

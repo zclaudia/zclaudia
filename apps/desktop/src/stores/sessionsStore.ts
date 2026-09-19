@@ -3,8 +3,13 @@
  */
 import { create } from 'zustand';
 import type { Session } from '@zclaudia/shared';
-import { useOwnershipStore } from './ownershipStore';
-import { useRightWorkspaceStore } from './rightWorkspaceStore';
+import {
+  clearSessionOwnership,
+  forgetSession,
+  forgetSessionOwnersForBackend,
+  recordSessionOwner,
+  reassignSessionOwnersForBackend,
+} from '../services/session-ownership-coordination';
 import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../actions/controlPlane';
 
 export interface RemoteSession extends Session {
@@ -66,10 +71,9 @@ export const useSessionsStore = create<SessionsState>(set => ({
   setRemoteSessions: (backendId: string, sessions: RemoteSession[]) => {
     // Note: caller (backend_data_snapshot handler) already checks sessionsChanged
     // before calling this method, so no duplicate diff check needed here.
-    useOwnershipStore.getState().removeSessionOwnersByBackend(backendId);
-    useOwnershipStore.getState().setSessionOwners(
-      sessions.map(s => s.id),
-      backendId
+    reassignSessionOwnersForBackend(
+      backendId,
+      sessions.map(s => s.id)
     );
     set(state => {
       const newMap = new Map(state.remoteSessions);
@@ -93,10 +97,9 @@ export const useSessionsStore = create<SessionsState>(set => ({
     session: RemoteSession
   ) => {
     if (eventType === 'deleted') {
-      useOwnershipStore.getState().removeSessionOwner(session.id);
-      useRightWorkspaceStore.getState().removeSession(session.id);
+      forgetSession(session.id);
     } else {
-      useOwnershipStore.getState().setSessionOwner(session.id, backendId);
+      recordSessionOwner(session.id, backendId);
     }
     set(state => {
       const newMap = new Map(state.remoteSessions);
@@ -227,7 +230,7 @@ export const useSessionsStore = create<SessionsState>(set => ({
   },
 
   clearBackendSessions: (backendId: string) => {
-    useOwnershipStore.getState().removeSessionOwnersByBackend(backendId);
+    forgetSessionOwnersForBackend(backendId);
     set(state => {
       const newMap = new Map(state.remoteSessions);
       newMap.delete(backendId);
@@ -241,7 +244,7 @@ export const useSessionsStore = create<SessionsState>(set => ({
   },
 
   clearAllSessions: () => {
-    useOwnershipStore.getState().clearSessionOwners();
+    clearSessionOwnership();
     set({
       remoteSessions: new Map(),
       activeSessionIdsByBackend: new Map(),

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { usePluginStore } from './pluginStore';
-import { useServerStore } from './serverStore';
+import { getActiveServerId } from '../services/active-backend-coordination';
+import { setBuiltinPanelVisibility } from '../services/panel-visibility-coordination';
 
 export function getTerminalScopeKey(
   projectId: string,
@@ -43,10 +43,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   ctrlActive: {},
   poppedOutTerminals: {},
   openTerminal: (projectId: string, backendId) => {
-    const scopeKey = getTerminalScopeKey(
-      projectId,
-      backendId ?? useServerStore.getState().activeServerId
-    );
+    const scopeKey = getTerminalScopeKey(projectId, backendId ?? getActiveServerId());
     const existing = get().terminals[scopeKey];
     if (existing) return existing;
     const terminalId = crypto.randomUUID();
@@ -72,19 +69,14 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   },
 
   setDrawerOpen: (projectId: string, open: boolean, backendId) => {
-    const scopeKey = getTerminalScopeKey(
-      projectId,
-      backendId ?? useServerStore.getState().activeServerId
-    );
+    const scopeKey = getTerminalScopeKey(projectId, backendId ?? getActiveServerId());
     set(state => ({ drawerOpen: { ...state.drawerOpen, [scopeKey]: open } }));
-    // Sync terminal panel visibility in pluginStore
-    usePluginStore.getState().updatePanelVisibility('terminal', open);
+    // Sync terminal panel visibility in pluginStore (via coordination service)
+    setBuiltinPanelVisibility('terminal', open);
   },
 
   isDrawerOpen: (projectId: string, backendId) =>
-    !!get().drawerOpen[
-      getTerminalScopeKey(projectId, backendId ?? useServerStore.getState().activeServerId)
-    ],
+    !!get().drawerOpen[getTerminalScopeKey(projectId, backendId ?? getActiveServerId())],
 
   toggleCtrl: (terminalId: string) =>
     set(state => ({
@@ -108,9 +100,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   },
 
   getTerminalId: (projectId: string, backendId) =>
-    get().terminals[
-      getTerminalScopeKey(projectId, backendId ?? useServerStore.getState().activeServerId)
-    ],
+    get().terminals[getTerminalScopeKey(projectId, backendId ?? getActiveServerId())],
 
   markReady: (terminalId: string) => {
     const ready = get().readyTerminals;
