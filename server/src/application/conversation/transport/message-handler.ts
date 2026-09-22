@@ -55,7 +55,6 @@ import {
   handleAgentCancel,
   handleRunSteer,
 } from '../handlers/run.js';
-import { requestBackgroundForCommand } from '../../../infra/providers/pi-runtime/inflight-bash-registry.js';
 import { broadcastRunMessage } from './broadcast.js';
 import {
   handleClaudiaMessage,
@@ -265,7 +264,32 @@ export async function handleClientMessage(
       break;
 
     case 'background_running_command': {
-      const conversion = requestBackgroundForCommand(message.sessionId, message.toolUseId);
+      // Routed through the session's runtime adapter: only adapters that own
+      // the executing process (and announced `backgroundable` on the tool_use)
+      // can convert. Anything else degrades to an explicit error instead of a
+      // silent no-op.
+      const activeRun = findActiveRunForSession(ctx.activeRuns, message.sessionId);
+      const adapter =
+        activeRun?.providerType && ctx.providerRegistry
+          ? ctx.providerRegistry.get(activeRun.providerType)
+          : undefined;
+      if (!activeRun) {
+        sendMessage(client.ws, {
+          type: 'error',
+          code: 'NO_INFLIGHT_COMMAND',
+          message: 'No foreground command is currently running for this session.',
+        } as ErrorMessage);
+        break;
+      }
+      if (!adapter?.requestBackgroundForToolCall) {
+        sendMessage(client.ws, {
+          type: 'error',
+          code: 'BACKGROUND_UNSUPPORTED',
+          message: `The ${activeRun.providerType ?? 'current'} runtime cannot move running commands to the background.`,
+        } as ErrorMessage);
+        break;
+      }
+      const conversion = adapter.requestBackgroundForToolCall(message.sessionId, message.toolUseId);
       if (!conversion.ok) {
         sendMessage(client.ws, {
           type: 'error',
@@ -628,4 +652,15 @@ function sendInvocationResolution(
     sessionId,
     result,
   } as never);
+}
+
+/** The session's live (non-terminal) run, if any. */
+function findActiveRunForSession(
+  activeRuns: Map<string, ActiveRun>,
+  sessionId: string
+): ActiveRun | undefined {
+  for (const run of activeRuns.values()) {
+    if (run.sessionId === sessionId && !isTerminalPhase(run.phase)) return run;
+  }
+  return undefined;
 }

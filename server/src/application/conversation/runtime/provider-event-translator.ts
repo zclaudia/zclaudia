@@ -50,6 +50,7 @@ export function translateProviderRuntimeEvent(
             input: event.toolInput,
             semantic: event.toolSemantic,
             effect: event.toolEffect,
+            ...(event.toolBackgroundable ? { backgroundable: true } : {}),
           },
           { toolUseId: event.toolUseId }
         ),

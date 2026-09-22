@@ -8,6 +8,8 @@ export interface TranslateContext {
   model: string;
   cwd: string;
   permissionMode?: string;
+  /** Tool names whose calls are announced as `toolBackgroundable`. */
+  backgroundableTools?: ReadonlySet<string>;
 }
 
 export function translateEvent(

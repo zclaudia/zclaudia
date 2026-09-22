@@ -1,9 +1,10 @@
-import { useMemo, memo } from 'react';
+import { useEffect, useMemo, memo } from 'react';
 import { type ToolCallState } from '../../stores/runStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { usePromptRequestStore } from '../../stores/promptRequestStore';
+import { useBackgroundRequestStore } from '../../stores/backgroundRequestStore';
 import { InteractionItem } from './InteractionItem';
 import { isPlanProposalTool, isInteractionTool } from './tool-call/toolClassifiers';
 import {
@@ -75,16 +76,27 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
 
     return undefined;
   });
+  // Offered only on calls the runtime announced as backgroundable: the server
+  // converts through the session's adapter, and runtimes that execute the
+  // command out of the host's reach (claude/codex/cursor) never announce it.
   const onSendToBackground = useMemo(() => {
-    if (!selectedSessionId) return undefined;
+    if (!selectedSessionId || !toolCall.backgroundable) return undefined;
     return () => {
+      useBackgroundRequestStore.getState().markRequested(selectedSessionId, toolCall.id);
       sendMessage({
         type: 'background_running_command',
         sessionId: selectedSessionId,
         toolUseId: toolCall.id,
       });
     };
-  }, [selectedSessionId, sendMessage, toolCall.id]);
+  }, [selectedSessionId, sendMessage, toolCall.id, toolCall.backgroundable]);
+  // The kit locks its button while a request is in flight; the host owns that
+  // state so a declined request (surfaced as a toast) unlocks it for a retry.
+  const backgroundRequested = useBackgroundRequestStore(s => toolCall.id in s.pending);
+  const settled = toolCall.status !== 'running';
+  useEffect(() => {
+    if (settled) useBackgroundRequestStore.getState().clear(toolCall.id);
+  }, [settled, toolCall.id]);
 
   // Host shape → kit shape at the connected boundary: the card below is a pure
   // kit-typed renderer, while stores and persisted history keep their own
@@ -112,6 +124,7 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
     <ToolCallCard
       toolCall={view}
       onSendToBackground={onSendToBackground}
+      backgroundRequested={onSendToBackground ? backgroundRequested : undefined}
       runInTerminal={runInTerminal}
     />
   );

@@ -12,12 +12,18 @@ import {
   externalToolKey,
 } from './external-tools.js';
 import { buildActiveSkillContext, buildSkillCatalog, buildSkillMetaTools } from './skills.js';
+import { isBashBackgroundConvertible } from './bash-tool.js';
 import { buildTools } from './tool-bridge.js';
 
 export interface PiRunToolBundle {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tools: AgentTool<any>[];
   visibleToolNames: string[];
+  /**
+   * Tools whose running calls can be moved to a background task on user
+   * request (announced as `toolBackgroundable` on their tool_use events).
+   */
+  backgroundableToolNames: string[];
   externalProviderCatalog: string;
   skillCatalog: string;
   activeSkillContext: string;
@@ -131,9 +137,18 @@ export function buildPiRunToolBundle(input: {
     abortSignal: options.abortController?.signal,
   });
 
+  const bashConvertible =
+    effectiveTools.includes('Bash') &&
+    isBashBackgroundConvertible({
+      db: options.db,
+      sessionId: options.claudiaSessionId,
+      sandboxReadOnly: isPlanMode,
+    });
+
   return {
     tools,
     visibleToolNames: tools.map(tool => tool.name),
+    backgroundableToolNames: bashConvertible ? ['Bash'] : [],
     externalProviderCatalog,
     skillCatalog,
     activeSkillContext,

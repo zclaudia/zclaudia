@@ -99,6 +99,11 @@ export interface RunOptions {
   } | null;
 }
 
+/** Outcome of `ProviderAdapter.requestBackgroundForToolCall`. */
+export type BackgroundConversionResult =
+  | { ok: true; command: string }
+  | { ok: false; reason: string };
+
 /** Agent runtime adapter interface. */
 export interface ProviderAdapter {
   discoverModels?: (
@@ -143,6 +148,15 @@ export interface ProviderAdapter {
 
   /** Stop a specific background task. Returns true if processes were actually killed. */
   stopTask?(sessionId: string, taskId: string): Promise<boolean | void>;
+
+  /**
+   * Move a running foreground tool call into a background task ("free the
+   * session"). Only adapters that own the executing process implement this,
+   * and only for calls they announced with `toolBackgroundable`. Without
+   * toolUseId the session's oldest in-flight command is converted. The tool
+   * call then resolves through the adapter's normal event flow.
+   */
+  requestBackgroundForToolCall?(sessionId: string, toolUseId?: string): BackgroundConversionResult;
 
   /** Get CLI subprocess PID for a session (if available) */
   getCliPid?(sessionId: string): number | undefined;

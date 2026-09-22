@@ -154,3 +154,30 @@ describe('provider-event-translator', () => {
     ]);
   });
 });
+
+describe('provider-event-translator tool backgroundable affordance', () => {
+  it('projects toolBackgroundable onto tool.started only when the adapter set it', () => {
+    const flagged = translateProviderRuntimeEvent({
+      ...base,
+      event: {
+        type: 'tool_use',
+        toolUseId: 'tool-bg',
+        toolName: 'Bash',
+        toolInput: { command: 'sleep 30' },
+        toolBackgroundable: true,
+      },
+    });
+    expect(flagged[0]?.payload).toEqual({
+      toolUseId: 'tool-bg',
+      toolName: 'Bash',
+      input: { command: 'sleep 30' },
+      backgroundable: true,
+    });
+
+    const plain = translateProviderRuntimeEvent({
+      ...base,
+      event: { type: 'tool_use', toolUseId: 'tool-fg', toolName: 'Bash', toolInput: {} },
+    });
+    expect(plain[0]?.payload).not.toHaveProperty('backgroundable');
+  });
+});

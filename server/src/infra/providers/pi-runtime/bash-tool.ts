@@ -105,6 +105,17 @@ export interface BashBridgeToolOptions {
   bashAutoBackgroundMs?: number;
 }
 
+/**
+ * Whether foreground Bash calls built with these options can be moved to a
+ * background task on user request. This is the single source of truth for
+ * the `toolBackgroundable` affordance announced on tool_use AND for the
+ * in-flight registry gate below, so the UI never offers a conversion the
+ * tool cannot perform (no task store, read-only sandbox, no session).
+ */
+export function isBashBackgroundConvertible(options?: BashBridgeToolOptions): boolean {
+  return !!options?.db && options?.sandboxReadOnly !== true && !!options?.sessionId;
+}
+
 export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOptions): AgentTool {
   const DEFAULT_TIMEOUT_SEC = 120;
   const MAX_TIMEOUT_SEC = 600;
@@ -381,7 +392,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         ? (options?.bashAutoBackgroundMs ?? DEFAULT_AUTO_BACKGROUND_MS) || undefined
         : undefined;
 
-      const canBackgroundConvert = !!options?.db && options?.sandboxReadOnly !== true;
+      const canBackgroundConvert = isBashBackgroundConvertible(options);
       const manualBackground = canBackgroundConvert ? new AbortController() : undefined;
       const runForegroundBash = async (bashOpts: BashRunOptions) => {
         const unregisterInflight =

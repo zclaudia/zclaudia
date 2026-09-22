@@ -289,6 +289,8 @@ export interface ToolEventPayload {
   input?: unknown;
   semantic?: ToolSemantic;
   effect?: ToolEffect;
+  /** Runtime can move this running call to a background task on request. */
+  backgroundable?: boolean;
 }
 
 export interface BackgroundTaskPayload {

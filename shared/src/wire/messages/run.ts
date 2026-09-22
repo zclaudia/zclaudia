@@ -197,6 +197,13 @@ export interface ToolUseMessage {
   semantic?: ToolSemantic;
   /** Provider-normalized side effect; common UI consumes this instead of provider tool names. */
   effect?: ToolEffect;
+  /**
+   * Runtime-declared affordance: while this call is running, the runtime can
+   * move it into a background task on request (`background_running_command`).
+   * Only runtimes that own the executing process set it; the UI offers
+   * "Send to background" solely on calls carrying it.
+   */
+  backgroundable?: boolean;
   seq?: number;
 }
 
@@ -354,9 +361,12 @@ export interface StopBackgroundTaskMessage {
   taskCommand?: string;
 }
 
-// Move a currently-running foreground Bash command into a background task
-// (Client → Server). Without toolUseId, the session's oldest in-flight
-// foreground command is converted.
+// Move a currently-running foreground command into a background task
+// (Client → Server). Only tool calls announced with `backgroundable` can be
+// converted; the session's active runtime adapter performs the handoff.
+// Without toolUseId, the session's oldest in-flight foreground command is
+// converted. Failures come back as `error` with code NO_INFLIGHT_COMMAND or
+// BACKGROUND_UNSUPPORTED.
 export interface BackgroundRunningCommandMessage {
   type: 'background_running_command';
   sessionId: string;

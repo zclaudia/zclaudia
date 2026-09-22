@@ -25,6 +25,7 @@ import {
   type TranslateContext,
 } from '../pi-runtime/index.js';
 import { createPiInvocations, preparePortableSkillTurn } from '../pi-runtime/invocations.js';
+import { requestBackgroundForCommand } from '../pi-runtime/inflight-bash-registry.js';
 import type { RuntimeTurnInput } from '@zclaudia/shared/providers';
 import { InvocationError } from '@zclaudia/shared/providers';
 import { resolveEnvModel } from '../pi-runtime/env-model.js';
@@ -103,6 +104,11 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
   readonly policy = policy;
   /** URIP runtime catalog (§14.4): ZClaudia portable skills under /skill:. */
   readonly invocations = createPiInvocations();
+
+  /** Pi runs Bash in-process, so a running foreground command can be adopted as a task. */
+  requestBackgroundForToolCall(sessionId: string, toolUseId?: string) {
+    return requestBackgroundForCommand(sessionId, toolUseId);
+  }
 
   async *startTurn(
     input: RuntimeTurnInput,
@@ -238,6 +244,9 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
       isPlanMode,
       permissionCallback: onPermission,
     });
+    // Announce on tool_use which calls this adapter can move to the background,
+    // so the UI offers the action only where requestBackgroundForToolCall works.
+    ctx.backgroundableTools = new Set(toolBundle.backgroundableToolNames);
 
     // 4. Yield init now (after we know contextWindow + effective tools).
     yield {

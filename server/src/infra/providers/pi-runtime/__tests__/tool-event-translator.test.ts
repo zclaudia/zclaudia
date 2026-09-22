@@ -305,3 +305,29 @@ describe('translateToolEvent', () => {
     expect(out).toEqual({ type: 'tool_activity', toolUseId: 't1', toolName: 'bash', content: '' });
   });
 });
+
+describe('translateToolEvent backgroundable affordance', () => {
+  const messageEnd = {
+    type: 'message_end',
+    message: {
+      role: 'assistant',
+      content: [
+        { type: 'toolCall', id: 'b1', name: 'Bash', arguments: { command: 'sleep 30' } },
+        { type: 'toolCall', id: 'r1', name: 'Read', arguments: { file_path: '/x' } },
+      ],
+    },
+  } as any;
+
+  it('flags tool_use for tools the run announced as backgroundable', () => {
+    const out = translateToolEvent(messageEnd, { ...ctx, backgroundableTools: new Set(['Bash']) });
+    expect(out).toEqual([
+      expect.objectContaining({ toolUseId: 'b1', toolBackgroundable: true }),
+      expect.not.objectContaining({ toolBackgroundable: true }),
+    ]);
+  });
+
+  it('flags nothing when the context announces no backgroundable tools', () => {
+    const out = translateToolEvent(messageEnd, ctx) as any[];
+    expect(out.every(e => !('toolBackgroundable' in e))).toBe(true);
+  });
+});

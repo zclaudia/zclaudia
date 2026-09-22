@@ -2,11 +2,13 @@
  * Process-global registry of foreground Bash commands currently executing.
  *
  * Lets the UI convert a synchronous command the agent is waiting on into a
- * background task ("free the session"): the WebSocket handler looks up the
- * session's in-flight command and fires its requestBackground trigger, which
- * resolves the tool call through the same handoff/adopt path as the
- * auto-background timer.
+ * background task ("free the session"): the Pi adapter's
+ * `requestBackgroundForToolCall` looks up the session's in-flight command and
+ * fires its requestBackground trigger, which resolves the tool call through
+ * the same handoff/adopt path as the auto-background timer. Pi-internal: the
+ * transport reaches it only through the adapter port.
  */
+import type { BackgroundConversionResult } from '../types.js';
 
 export interface InflightForegroundCommand {
   sessionId: string;
@@ -57,7 +59,7 @@ export function listInflightForegroundCommands(sessionId: string): InflightForeg
 export function requestBackgroundForCommand(
   sessionId: string,
   toolUseId?: string
-): { ok: true; command: string } | { ok: false; reason: string } {
+): BackgroundConversionResult {
   sweepStaleEntries(Date.now());
   const sessionCommands = commandsBySession.get(sessionId);
   if (!sessionCommands || sessionCommands.size === 0) {

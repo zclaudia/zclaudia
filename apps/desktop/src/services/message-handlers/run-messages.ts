@@ -265,7 +265,8 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
           msg.toolName,
           msg.toolInput,
           msg.semantic,
-          msg.effect
+          msg.effect,
+          msg.backgroundable
         );
       } else if (msg.runId) {
         console.warn(`[${logTag}] tool_use for untracked run ${msg.runId}`);

@@ -11,11 +11,14 @@ import type { ToolCallState } from '../../../stores/runStore';
  * sources funnel through here rather than each renderer learning the store's
  * field names.
  *
- * ToolEffect is zclaudia-specific (the kit has no slot for it), so it rides
- * the open `ext` slot the kit provides for exactly this.
+ * ToolEffect and the backgroundable affordance are zclaudia-specific (the kit
+ * has no slot for them), so they ride the open `ext` slot the kit provides
+ * for exactly this.
  */
 export interface ToolCallViewExt {
   effect?: ToolEffect;
+  /** Runtime can move this running call to a background task on request. */
+  backgroundable?: boolean;
 }
 
 export function toToolCallView(toolCall: ToolCallState): ToolCallView {
@@ -34,7 +37,14 @@ export function toToolCallView(toolCall: ToolCallState): ToolCallView {
     result: toolCall.result,
     semantic: toolCall.semantic,
     summary: toolCall.activity,
-    ...(toolCall.effect ? { ext: { effect: toolCall.effect } satisfies ToolCallViewExt } : {}),
+    ...(toolCall.effect || toolCall.backgroundable
+      ? {
+          ext: {
+            ...(toolCall.effect ? { effect: toolCall.effect } : {}),
+            ...(toolCall.backgroundable ? { backgroundable: true } : {}),
+          } satisfies ToolCallViewExt,
+        }
+      : {}),
   };
 }
 

@@ -233,3 +233,22 @@ describe('wire projector', () => {
     ).toEqual([]);
   });
 });
+
+describe('wire projector tool backgroundable affordance', () => {
+  it('carries backgroundable onto tool_use only when the domain event has it', () => {
+    const [flagged] = projectRunDomainEventToWireMessages(
+      event('tool.started', {
+        toolUseId: 'tool-bg',
+        toolName: 'Bash',
+        input: { command: 'sleep 30' },
+        backgroundable: true,
+      })
+    );
+    expect(flagged).toMatchObject({ type: 'tool_use', toolUseId: 'tool-bg', backgroundable: true });
+
+    const [plain] = projectRunDomainEventToWireMessages(
+      event('tool.started', { toolUseId: 'tool-fg', toolName: 'Bash', input: {} })
+    );
+    expect(plain).not.toHaveProperty('backgroundable');
+  });
+});

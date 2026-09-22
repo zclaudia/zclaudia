@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import Database from 'better-sqlite3';
 
 import type { McpToolRef } from '@zclaudia/shared/core/tools';
+import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import type { ExternalToolRuntimeState } from '../external-tools.js';
 import { buildPiRunToolBundle } from '../run-tools.js';
 
@@ -84,5 +86,67 @@ describe('buildPiRunToolBundle abortSignal wiring (P1-10)', () => {
     const bundle = buildWithAbort(abortController);
     abortController.abort();
     await expect(bundle.hooks.shouldStopAfterTurn!({} as never)).resolves.toBe(true);
+  });
+});
+
+describe('buildPiRunToolBundle backgroundable tool announcement', () => {
+  function buildWith(input: {
+    db?: Database.Database;
+    sessionId?: string;
+    isPlanMode: boolean;
+    tools: string[];
+  }) {
+    return buildPiRunToolBundle({
+      options: {
+        cwd: '/tmp',
+        db: input.db,
+        claudiaSessionId: input.sessionId,
+      } as never,
+      effectiveTools: input.tools as never,
+      supportsVision: false,
+      isPlanMode: input.isPlanMode,
+      permissionCallback: async () => ({ behavior: 'allow' as const }),
+    });
+  }
+
+  function memoryDb(): Database.Database {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    return db;
+  }
+
+  it('announces Bash when a task store and session exist outside plan mode', () => {
+    const db = memoryDb();
+    try {
+      const bundle = buildWith({ db, sessionId: 's1', isPlanMode: false, tools: ['Bash', 'Read'] });
+      expect(bundle.backgroundableToolNames).toEqual(['Bash']);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('announces nothing in plan mode (read-only sandbox cannot adopt a task)', () => {
+    const db = memoryDb();
+    try {
+      const bundle = buildWith({ db, sessionId: 's1', isPlanMode: true, tools: ['Bash'] });
+      expect(bundle.backgroundableToolNames).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('announces nothing without a task store or when Bash is not enabled', () => {
+    expect(
+      buildWith({ sessionId: 's1', isPlanMode: false, tools: ['Bash'] }).backgroundableToolNames
+    ).toEqual([]);
+    const db = memoryDb();
+    try {
+      expect(
+        buildWith({ db, sessionId: 's1', isPlanMode: false, tools: ['Read'] })
+          .backgroundableToolNames
+      ).toEqual([]);
+    } finally {
+      db.close();
+    }
   });
 });
