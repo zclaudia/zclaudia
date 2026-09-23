@@ -49,6 +49,7 @@ import { reconcileUnresumableTasks } from '../domains/tasks/executors/reconcile-
 import { TaskRepository } from '../domains/tasks/repository.js';
 import { createAgentTaskRunner } from './orchestration/agent-task-runner.js';
 import { SessionRepository } from '../domains/sessions/index.js';
+import type { AutomationService } from '../domains/automations/service.js';
 import type { TaskExecutor } from '../domains/tasks/executors/types.js';
 import type { AgentTaskRunnerDeps } from './orchestration/agent-task-runner.js';
 import type { PermissionBridge } from './conversation/agent/permission-bridge.js';
@@ -108,6 +109,7 @@ export interface BootstrapResult {
   permissionBridge: PermissionBridge;
   cancelWorkflowRun: (runId: string) => void;
   permissionWorkflowResolver: PermissionWorkflowResolver;
+  automationService: AutomationService;
   metaWorkflowService: MetaWorkflowService;
   agentTaskExecutor: TaskExecutor;
   goalCoordinator: GoalCoordinator;
@@ -219,6 +221,7 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     permissionBridge,
     cancelWorkflowRun,
     permissionWorkflowResolver,
+    automationService,
     metaWorkflowService,
   } = registerFeatureDomains({
     db,
@@ -282,6 +285,8 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
           projectId: opts.projectId,
           name: opts.name,
           type: opts.type as SessionType,
+          ...(opts.agentProfileId ? { agentProfileId: opts.agentProfileId } : {}),
+          ...(opts.parentSessionId ? { parentSessionId: opts.parentSessionId } : {}),
         });
       },
       sessionExists: id => !!sessionRepo.findById(id),
@@ -449,6 +454,7 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     permissionBridge,
     cancelWorkflowRun,
     permissionWorkflowResolver,
+    automationService,
     metaWorkflowService,
     agentTaskExecutor,
     goalCoordinator,

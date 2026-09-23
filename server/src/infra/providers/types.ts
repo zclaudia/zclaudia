@@ -13,11 +13,68 @@ import type {
   SkillRuntimeState,
   ToolExecutionObserver,
 } from './pi-runtime/index.js';
+import type { LanguageServerPort } from './language-server-port.js';
+
+export type {
+  LanguageServerInfo,
+  LanguageServerPort,
+  LspQueryAction,
+  LspQueryRequest,
+  LspQueryResult,
+} from './language-server-port.js';
 
 /** Handle exposed to the application after pi Agent construction, for mid-run steering. */
 export interface SteerHandle {
   /** Push a user AgentMessage into the live pi Agent's steering queue. */
   steer: (message: AgentMessage) => void;
+}
+
+/**
+ * Narrow automation CRUD port for the Cron* tools, adapted from the
+ * automations domain service by server-state. Project scoping and the
+ * system-row guard are enforced by the tools, not the port.
+ */
+export interface AutomationPort {
+  list(projectId?: string): import('@zclaudia/shared/features/automations').Automation[];
+  get(id: string): import('@zclaudia/shared/features/automations').Automation | null;
+  create(data: {
+    projectId?: string;
+    name: string;
+    description?: string;
+    enabled?: boolean;
+    trigger: import('@zclaudia/shared/features/automations').AutomationTrigger;
+    action: import('@zclaudia/shared/features/automations').AutomationAction;
+  }): import('@zclaudia/shared/features/automations').Automation;
+  update(
+    id: string,
+    data: Partial<
+      Omit<
+        import('@zclaudia/shared/features/automations').Automation,
+        'id' | 'projectId' | 'createdAt'
+      >
+    >
+  ): import('@zclaudia/shared/features/automations').Automation;
+  delete(id: string): void;
+}
+
+/**
+ * Application-owned channel for delivering text into another session's run.
+ * Implemented over the active-run registry (see
+ * application/conversation/runtime/subagent-messenger.ts); consumed by the
+ * SendMessage / RespondToCoordinator tools.
+ */
+export interface SubagentMessenger {
+  /**
+   * Inject `text` into the live run of `sessionId` as a user message
+   * (persisted + broadcast like a UI steer). `not_ready` means a run exists
+   * but its agent has not registered a steer handle yet.
+   */
+  steer(sessionId: string, text: string): { delivery: 'steered' | 'no_active_run' | 'not_ready' };
+  /**
+   * Inject `text` as a system notice into the live run without persisting
+   * it, or queue it for the session's next run when nothing is live.
+   */
+  notify(sessionId: string, text: string): { delivery: 'steered' | 'queued' };
 }
 
 // Re-export core provider message types (shared across all providers)
@@ -54,6 +111,12 @@ export interface RunOptions {
   >;
   db?: Database.Database; // Database for loading ZClaudia-managed MCP servers
   agentTaskExecutor?: TaskExecutor;
+  /** Cross-session delivery port for SendMessage / RespondToCoordinator. */
+  subagentMessenger?: SubagentMessenger;
+  /** Automation CRUD port for the Cron* tools (absent = tools not registered). */
+  automationPort?: AutomationPort;
+  /** Language-server port for LSPTool (absent or no server for cwd = tool not registered). */
+  languageServerPort?: LanguageServerPort;
   /** Resolved LLM profile to drive buildModel. If undefined, buildModel falls back to env. */
   llmProfileConfig?: LlmProfileConfig;
   /** Full agent profile resolved by run-bootstrap (for tracing / future). */

@@ -4,6 +4,7 @@ import { BUILTIN_TOOL_FACTORIES } from './tool-catalog.js';
 import { buildEffectiveToolOptions, type ToolBridgeOptions } from './tool-options.js';
 import { withToolExecutionObserver, withToolName } from './tool-execution-observer.js';
 import { withPendingArgOverrides } from './pending-arg-overrides.js';
+import { hasLanguageServers } from '../language-server-port.js';
 
 export { ALL_TOOL_NAMES, type ToolName };
 export type { ToolBridgeOptions } from './tool-options.js';
@@ -40,6 +41,11 @@ export function buildTools(cwd: string, options?: ToolBridgeOptions): AgentTool<
     if (seen.has(name)) continue;
     seen.add(name);
     if (name === 'Memory' && !effectiveOptions.memoryDir) continue;
+    // LSPTool only exists when a language server is configured for this
+    // workspace; a tool that can never answer would only mislead the model.
+    if (name === 'LSPTool' && !hasLanguageServers(effectiveOptions.languageServerPort, cwd)) {
+      continue;
+    }
     const override = overrides.get(name);
     const tool = override
       ? withToolName(override, name, override.label ?? name)

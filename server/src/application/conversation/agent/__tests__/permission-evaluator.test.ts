@@ -158,20 +158,35 @@ describe('classify', () => {
     }
   });
 
-  it('should classify safe bash commands as shellSafe', () => {
-    const safeCmds = [
-      'ls -la',
-      'cat file.txt',
-      'npm install',
-      'npm test',
-      'git status',
-      'git diff',
-      'tsc --noEmit',
-      'node script.js',
-    ];
+  it('should classify safe but unprovable bash commands as shellSafe', () => {
+    const safeCmds = ['npm install', 'npm test', 'tsc --noEmit', 'node script.js', 'ls > out.txt'];
     for (const cmd of safeCmds) {
       expect(classify('Bash', { command: cmd }, cmd)).toBe('shellSafe' as PermissionCategory);
     }
+  });
+
+  it('should downgrade provably read-only bash commands to fileRead', () => {
+    const readOnlyCmds = [
+      'ls -la',
+      'cat file.txt',
+      'git status',
+      'git diff',
+      'git log --oneline -5',
+      'rg -n TODO src | head',
+      'find . -name "*.ts"',
+    ];
+    for (const cmd of readOnlyCmds) {
+      expect(classify('Bash', { command: cmd }, cmd)).toBe('fileRead' as PermissionCategory);
+    }
+  });
+
+  it('keeps destructive and network precedence over the read-only downgrade', () => {
+    // `git pull` is arguably read-only for the index but touches the network.
+    expect(classify('Bash', { command: 'git fetch origin' }, '')).toBe('networkOps');
+    expect(classify('Bash', { command: 'git pull' }, '')).toBe('networkOps');
+    expect(classify('Bash', { command: 'rm -rf /tmp/x' }, '')).toBe('destructiveOps');
+    // Provably read-only, but the dangerous pattern list wins.
+    expect(classify('Bash', { command: 'cat x | sudo tee y' }, '')).toBe('destructiveOps');
   });
 
   it('should classify network bash commands as networkOps', () => {
@@ -254,7 +269,8 @@ describe('classify', () => {
   });
 
   it('should fall back to detail string when command not in toolInput', () => {
-    expect(classify('Bash', {}, 'ls -la')).toBe('shellSafe' as PermissionCategory);
+    expect(classify('Bash', {}, 'ls -la')).toBe('fileRead' as PermissionCategory);
+    expect(classify('Bash', {}, 'npm test')).toBe('shellSafe' as PermissionCategory);
     expect(classify('Bash', {}, 'curl https://example.com')).toBe(
       'networkOps' as PermissionCategory
     );
@@ -397,9 +413,41 @@ describe('PermissionEvaluator', () => {
       const policy = makePolicy({
         profile: makeProfile({ shellSafe: 'ask' }),
       });
-      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext())).toBe(
+      expect(
+        evaluator.evaluate('Bash', { command: 'npm test' }, 'npm test', policy, makeContext())
+      ).toBe('escalate');
+    });
+
+    it('provably read-only bash auto-approves under shellSafe ask (fileRead downgrade)', () => {
+      const policy = makePolicy({
+        profile: makeProfile({ shellSafe: 'ask', fileRead: 'auto-approve' }),
+      });
+      for (const cmd of ['ls -la', 'git status', 'rg TODO src']) {
+        expect(evaluator.evaluate('Bash', { command: cmd }, cmd, policy, makeContext())).toBe(
+          'approve'
+        );
+      }
+      // fileRead is what governs it now, so tightening fileRead re-prompts.
+      const strict = makePolicy({ profile: makeProfile({ shellSafe: 'ask', fileRead: 'ask' }) });
+      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', strict, makeContext())).toBe(
         'escalate'
       );
+    });
+
+    it('read-only bash still hits the sensitive-file guard', () => {
+      const policy = makePolicy({
+        profile: makeProfile({ shellSafe: 'auto-approve', fileRead: 'auto-approve' }),
+        globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: false },
+      });
+      expect(
+        evaluator.evaluate(
+          'Bash',
+          { command: 'cat /home/user/.ssh/id_rsa' },
+          'cat /home/user/.ssh/id_rsa',
+          policy,
+          makeContext()
+        )
+      ).toBe('escalate');
     });
 
     it('networkOps block returns deny', () => {
@@ -478,8 +526,8 @@ describe('PermissionEvaluator', () => {
       expect(
         evaluator.evaluate(
           'Bash',
-          { command: 'ls' },
-          'ls',
+          { command: 'npm test' },
+          'npm test',
           policy,
           makeContext({ sessionType: 'agent' })
         )
@@ -748,9 +796,15 @@ describe('PermissionEvaluator', () => {
         customRules: [{ toolName: 'Bash', pattern: 'npm\\s+test', action: 'approve' }],
         profile: makeProfile({ shellSafe: 'ask' }),
       });
-      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext())).toBe(
-        'escalate'
-      );
+      expect(
+        evaluator.evaluate(
+          'Bash',
+          { command: 'npm run build' },
+          'npm run build',
+          policy,
+          makeContext()
+        )
+      ).toBe('escalate');
     });
 
     it('should skip invalid regex gracefully', () => {
@@ -1597,10 +1651,10 @@ describe('narrowPolicy', () => {
     const narrowed = narrowPolicy(parent, {
       profile: makeProfile({ shellSafe: 'auto-approve' }),
     });
-    // Widening attempt ignored: ls still escalates instead of auto-approving.
-    expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', narrowed, makeContext())).toBe(
-      'escalate'
-    );
+    // Widening attempt ignored: npm test still escalates instead of auto-approving.
+    expect(
+      evaluator.evaluate('Bash', { command: 'npm test' }, 'npm test', narrowed, makeContext())
+    ).toBe('escalate');
   });
 });
 

@@ -39,6 +39,7 @@ import { registerTaskSettlementNotifier } from './application/conversation/runti
 import type { PermissionBridge } from './application/conversation/agent/permission-bridge.js';
 import type { PermissionWorkflowResolver } from './domains/workflows/index.js';
 import type { MetaWorkflowService } from './domains/meta-workflow/service.js';
+import type { AutomationService } from './domains/automations/service.js';
 import type { TaskExecutor } from './domains/tasks/executors/types.js';
 import type { GoalCoordinator } from './domains/goals/coordinator.js';
 import type { GoalService } from './domains/goals/service.js';
@@ -85,6 +86,7 @@ export interface SetupResult {
   permissionWorkflowResolver?: PermissionWorkflowResolver;
   metaWorkflowService?: MetaWorkflowService;
   agentTaskExecutor?: TaskExecutor;
+  automationService?: AutomationService;
   goalCoordinator?: GoalCoordinator;
   goalService?: GoalService;
   /** Cleanup function: call when WebSocket server closes */
@@ -170,6 +172,7 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
     permissionWorkflowResolver,
     metaWorkflowService,
     agentTaskExecutor,
+    automationService,
     goalCoordinator,
     goalService,
   } = bootstrapDomains({
@@ -251,6 +254,7 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
     permissionWorkflowResolver,
     metaWorkflowService,
     agentTaskExecutor,
+    automationService,
     goalCoordinator,
     goalService,
     onWssClose,

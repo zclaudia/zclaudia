@@ -208,3 +208,286 @@ describe('task bridge tools', () => {
     }
   });
 });
+
+describe('Agent subagent_type and session linkage', () => {
+  function seedProfile(db: Database.Database, id: string, name: string, status = 'active') {
+    db.prepare(
+      `INSERT INTO agent_profiles (id, name, description, runtime_type, llm_profile_id, system_prompt, enabled_tools, is_default, status, source, created_at, updated_at)
+       VALUES (?, ?, ?, 'pi', NULL, '', '[]', 0, ?, 'user', ?, ?)`
+    ).run(id, name, `${name} profile`, status, Date.now(), Date.now());
+  }
+
+  function executorReturning(sessionId: string) {
+    const start = vi.fn(async (task: { id: string }) => ({
+      executorRef: { providerType: 'test', taskId: task.id },
+      sessionId,
+    }));
+    return {
+      start,
+      wait: vi.fn(async () => ({ status: 'completed', result: {} })),
+      stop: vi.fn(async () => ({ status: 'stopped', result: {} })),
+    };
+  }
+
+  it('lists active profiles in the description and resolves by name or id', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    try {
+      seedProfile(db, 'prof-explore', 'Explore');
+      seedProfile(db, 'prof-old', 'Legacy', 'readonly');
+      const executor = executorReturning('child-1');
+      const tool = createAgentTool(
+        '/tmp',
+        'session-1',
+        'run-1',
+        db,
+        undefined,
+        executor as never
+      ) as any;
+      expect(tool.description).toContain('Explore: Explore profile');
+      expect(tool.description).not.toContain('Legacy');
+
+      const byName = await tool.execute('a1', { prompt: 'x', subagent_type: 'explore' });
+      expect(JSON.parse(byName.content[0].text)).toMatchObject({
+        ok: true,
+        agentProfileId: 'prof-explore',
+        sessionId: 'child-1',
+      });
+      const byId = await tool.execute('a2', { prompt: 'x', subagent_type: 'prof-explore' });
+      expect(JSON.parse(byId.content[0].text)).toMatchObject({ agentProfileId: 'prof-explore' });
+      const task = executor.start.mock.calls[0][0] as { metadata: Record<string, unknown> };
+      expect(task.metadata.agentProfileId).toBe('prof-explore');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('rejects unknown or non-active subagent_type without launching', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    try {
+      seedProfile(db, 'prof-old', 'Legacy', 'readonly');
+      const executor = executorReturning('child-1');
+      const tool = createAgentTool(
+        '/tmp',
+        'session-1',
+        'run-1',
+        db,
+        undefined,
+        executor as never
+      ) as any;
+      const res = await tool.execute('a1', { prompt: 'x', subagent_type: 'Legacy' });
+      expect(res.details).toMatchObject({ ok: false, error: 'unknown_subagent_type' });
+      expect(executor.start).not.toHaveBeenCalled();
+      const empty = await tool.execute('a2', { prompt: 'x', subagent_type: '   ' });
+      expect(empty.details).toMatchObject({ ok: false, error: 'invalid_subagent_type' });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('persists the sub-agent session id on the task row', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    try {
+      const executor = executorReturning('child-9');
+      const tool = createAgentTool(
+        '/tmp',
+        'session-1',
+        'run-1',
+        db,
+        undefined,
+        executor as never
+      ) as any;
+      const res = await tool.execute('a1', { prompt: 'x' });
+      const { taskId } = JSON.parse(res.content[0].text);
+      const row = new TaskRepository(db).findById(taskId);
+      expect(row?.sessionId).toBe('child-9');
+      expect(row?.status).toBe('running');
+    } finally {
+      db.close();
+    }
+  });
+});
+
+describe('SendMessage', () => {
+  function setup() {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    const service = new TaskService(new TaskRepository(db));
+    const steer = vi.fn(() => ({ delivery: 'steered' as const }));
+    const notify = vi.fn(() => ({ delivery: 'steered' as const }));
+    const messenger = { steer, notify };
+    const start = vi.fn(async (task: { id: string }) => ({
+      executorRef: { providerType: 'test', taskId: task.id },
+      sessionId: 'child-1',
+    }));
+    const executor = {
+      start,
+      wait: vi.fn(async () => ({ status: 'completed', result: {} })),
+      stop: vi.fn(async () => ({ status: 'stopped', result: {} })),
+    };
+    const tool = taskTools.createSendMessageTool({
+      cwd: '/tmp',
+      sessionId: 'parent',
+      runId: 'run-1',
+      db,
+      permissionOverride: { profile: { fileWrite: 'ask' } } as never,
+      agentTaskExecutor: executor as never,
+      messenger,
+    }) as any;
+    const child = service.createTask({
+      type: 'agent',
+      title: 'child',
+      parentSessionId: 'parent',
+      metadata: { prompt: 'p', cwd: '/tmp', projectId: 'proj', agentProfileId: 'prof-x' },
+    });
+    service.startTask(child.id, { sessionId: 'child-1' });
+    return { db, service, steer, notify, start, tool, child };
+  }
+
+  it('steers a running sub-agent with a coordinator-tagged message', async () => {
+    const { db, steer, tool, child } = setup();
+    try {
+      const res = await tool.execute('s1', { task_id: child.id, message: 'focus on tests' });
+      expect(JSON.parse(res.content[0].text)).toMatchObject({
+        ok: true,
+        taskId: child.id,
+        delivery: 'steered',
+        sessionId: 'child-1',
+      });
+      expect(steer).toHaveBeenCalledWith('child-1', '[Message from coordinator]\nfocus on tests');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('resumes a finished sub-agent on the same session in the background', async () => {
+    const { db, service, start, tool, child } = setup();
+    try {
+      service.completeTask(child.id, { text: 'done' });
+      const res = await tool.execute('s2', { task_id: child.id, message: 'one more thing' });
+      const body = JSON.parse(res.content[0].text);
+      expect(body).toMatchObject({
+        ok: true,
+        delivery: 'resumed_background',
+        resumedFromTaskId: child.id,
+        sessionId: 'child-1',
+      });
+      expect(start).toHaveBeenCalledTimes(1);
+      const resumed = start.mock.calls[0][0] as { metadata: Record<string, unknown> };
+      expect(resumed.metadata).toMatchObject({
+        sessionId: 'child-1',
+        resumedFromTaskId: child.id,
+        agentProfileId: 'prof-x',
+        cwd: '/tmp',
+        projectId: 'proj',
+      });
+      expect(resumed.metadata.prompt).toBe('[Message from coordinator]\none more thing');
+      const row = new TaskRepository(db).findById(body.taskId);
+      expect(row?.status).toBe('running');
+      expect(row?.sessionId).toBe('child-1');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('refuses tasks it does not own, non-agent tasks, and unknown ids', async () => {
+    const { db, service, steer, tool } = setup();
+    try {
+      const foreign = service.createTask({
+        type: 'agent',
+        parentSessionId: 'someone-else',
+        metadata: { prompt: 'p' },
+      });
+      service.startTask(foreign.id, { sessionId: 'child-2' });
+      const notOwned = await tool.execute('s3', { task_id: foreign.id, message: 'hi' });
+      expect(notOwned.details).toMatchObject({ ok: false, error: 'task_not_owned' });
+
+      const command = service.createTask({
+        type: 'command',
+        parentSessionId: 'parent',
+        metadata: { command: 'ls' },
+      });
+      const wrongType = await tool.execute('s4', { task_id: command.id, message: 'hi' });
+      expect(wrongType.details).toMatchObject({ ok: false, error: 'not_an_agent_task' });
+
+      const missing = await tool.execute('s5', { task_id: 'nope', message: 'hi' });
+      expect(missing.details).toMatchObject({ ok: false, error: 'task_not_found' });
+      expect(steer).not.toHaveBeenCalled();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('reports not_ready as retryable and validates arguments', async () => {
+    const { db, steer, tool, child } = setup();
+    try {
+      steer.mockReturnValueOnce({ delivery: 'not_ready' as const });
+      const res = await tool.execute('s6', { task_id: child.id, message: 'hi' });
+      expect(res.details).toMatchObject({
+        ok: false,
+        error: 'subagent_not_ready',
+        retryable: true,
+      });
+
+      const noMessage = await tool.execute('s7', { task_id: child.id, message: '  ' });
+      expect(noMessage.details).toMatchObject({ ok: false, error: 'missing_message' });
+    } finally {
+      db.close();
+    }
+  });
+});
+
+describe('RespondToCoordinator', () => {
+  it('delivers a system notice to the launching session and reports delivery', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    try {
+      const service = new TaskService(new TaskRepository(db));
+      const child = service.createTask({
+        type: 'agent',
+        title: 'child',
+        parentSessionId: 'parent',
+        metadata: { prompt: 'p' },
+      });
+      service.startTask(child.id, { sessionId: 'child-1' });
+      const notify = vi.fn(() => ({ delivery: 'queued' as const }));
+      const tool = taskTools.createRespondToCoordinatorTool({
+        sessionId: 'child-1',
+        db,
+        messenger: { steer: vi.fn(), notify } as never,
+      }) as any;
+      const res = await tool.execute('r1', { summary: 'found the bug', response: 'It is in x.ts' });
+      expect(JSON.parse(res.content[0].text)).toMatchObject({
+        ok: true,
+        taskId: child.id,
+        coordinatorSessionId: 'parent',
+        delivery: 'queued',
+      });
+      const notice = notify.mock.calls[0][1] as string;
+      expect(notice).toContain('<system-reminder>');
+      expect(notice).toContain(`Sub-agent task ${child.id} ("child") reports: found the bug`);
+      expect(notice).toContain('It is in x.ts');
+      expect(notice).toContain(`SendMessage({ task_id: "${child.id}"`);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('errors when the session was not launched by a coordinator', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    try {
+      const tool = taskTools.createRespondToCoordinatorTool({
+        sessionId: 'lonely',
+        db,
+        messenger: { steer: vi.fn(), notify: vi.fn() } as never,
+      }) as any;
+      const res = await tool.execute('r2', { summary: 's', response: 'r' });
+      expect(res.details).toMatchObject({ ok: false, error: 'no_coordinator' });
+    } finally {
+      db.close();
+    }
+  });
+});

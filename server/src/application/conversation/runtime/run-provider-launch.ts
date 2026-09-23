@@ -23,6 +23,7 @@ import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { ToolName } from '@zclaudia/shared/core/tools';
 import type { PermissionDecision } from '../../../infra/providers/types.js';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
+import type { AutomationPort, SubagentMessenger } from '../../../infra/providers/types.js';
 import { persistMcpInstructionsDeltaForSession } from './mcp-instructions-delta.js';
 import {
   executePreparedDirectSkillInvocation,
@@ -85,6 +86,8 @@ interface LaunchProviderRunInput {
   providerType: string;
   runId: string;
   agentTaskExecutor?: TaskExecutor;
+  subagentMessenger?: SubagentMessenger;
+  automationPort?: AutomationPort;
   sdkSessionId?: string;
   sendRunEvent: (event: ServerMessage) => void;
   listeners?: RunDomainEventListenerRegistry;
@@ -117,6 +120,8 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     providerType,
     runId,
     agentTaskExecutor,
+    subagentMessenger,
+    automationPort,
     sdkSessionId,
     sendRunEvent,
     listeners,
@@ -428,6 +433,8 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     providerTransport: session.provider_transport,
     runId,
     agentTaskExecutor,
+    subagentMessenger,
+    automationPort,
     sdkSessionId,
     serverPort,
     session,

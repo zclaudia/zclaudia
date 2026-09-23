@@ -37,7 +37,11 @@ function toRunnerTask(
     id: task.id,
     parentTaskId: task.parentTaskId ?? null,
     projectId: metadataString(metadata, 'projectId') ?? null,
-    sessionId: null,
+    // Set when SendMessage resumes a finished sub-agent: the runner continues
+    // the existing session (full history) instead of creating a new one.
+    sessionId: metadataString(metadata, 'sessionId') ?? null,
+    parentSessionId: task.parentSessionId ?? null,
+    agentProfileId: metadataString(metadata, 'agentProfileId'),
     branchId: null,
     contextTemplate: 'agent',
     status: 'queued',

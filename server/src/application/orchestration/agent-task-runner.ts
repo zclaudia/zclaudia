@@ -28,6 +28,10 @@ export interface AgentRunnerTask {
   canonicalTaskId?: string;
   initiator: 'system' | 'claudia';
   llmProfileId?: string;
+  /** Agent profile the sub-agent session is created with (`subagent_type`). */
+  agentProfileId?: string;
+  /** Session that launched this task; recorded on the sub-agent session. */
+  parentSessionId?: string | null;
   permissionOverride?: Partial<
     import('@zclaudia/shared/interaction/permissions').UnifiedPermissionPolicy
   >;
@@ -56,7 +60,13 @@ export interface AgentTaskRunnerDeps {
     clients?: Map<string, VirtualClient>
   ) => Promise<void>;
   getClients: () => Map<string, VirtualClient>;
-  createSession: (opts: { projectId: string | null; name: string; type: string }) => { id: string };
+  createSession: (opts: {
+    projectId: string | null;
+    name: string;
+    type: string;
+    agentProfileId?: string;
+    parentSessionId?: string;
+  }) => { id: string };
   sessionExists: (id: string) => boolean;
 }
 
@@ -76,6 +86,18 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
 
   function resolveSession(task: AgentRunnerTask): string {
     const sessionName = `Agent Task: ${task.task.slice(0, 50)}`;
+    // Resume path (SendMessage on a finished sub-agent): keep its session so
+    // the follow-up runs with the sub-agent's full history.
+    if (task.sessionId && deps.sessionExists(task.sessionId)) {
+      return task.sessionId;
+    }
+    const sessionOptions = {
+      projectId: task.projectId,
+      name: sessionName,
+      type: 'agent',
+      ...(task.agentProfileId ? { agentProfileId: task.agentProfileId } : {}),
+      ...(task.parentSessionId ? { parentSessionId: task.parentSessionId } : {}),
+    };
     if (task.branchId) {
       const branch = branchService.findById(task.branchId);
       const existingSession = branch?.activeSessionId
@@ -84,15 +106,11 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
       if (branch?.activeSessionId && existingSession) {
         return branch.activeSessionId;
       }
-      const session = deps.createSession({
-        projectId: task.projectId,
-        name: sessionName,
-        type: 'agent',
-      });
+      const session = deps.createSession(sessionOptions);
       branchService.attachSession(task.branchId, session.id);
       return session.id;
     }
-    return deps.createSession({ projectId: task.projectId, name: sessionName, type: 'agent' }).id;
+    return deps.createSession(sessionOptions).id;
   }
 
   return {

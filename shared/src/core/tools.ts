@@ -11,6 +11,7 @@ export const ALL_TOOL_NAMES = [
   'Glob',
   'LS',
   'TodoWrite',
+  'TodoRead',
   'AskUserQuestion',
   'WebFetch',
   'WebSearch',
@@ -21,6 +22,13 @@ export const ALL_TOOL_NAMES = [
   'TaskOutput',
   'Monitor',
   'Agent',
+  'SendMessage',
+  'RespondToCoordinator',
+  'ReadSessionContext',
+  'CronCreate',
+  'CronList',
+  'CronUpdate',
+  'CronDelete',
   'LSPTool',
   'AstGrep',
   'AstEdit',
@@ -114,6 +122,40 @@ export interface ToolMetadata {
   requiresNetwork: boolean;
   requiresUserInteraction: boolean;
   riskLevel: ToolRiskLevel;
+  /**
+   * Whether calls to this tool may run alongside other tool calls in the
+   * same assistant turn. Defaults to `declaredReadOnly && !mutatesWorkspace`
+   * when omitted (see `resolveToolConcurrency`). Tools that mutate shared
+   * state (workspace files, shell environment) are serialized against every
+   * other scheduled tool so a Bash and an Edit in one batch never race.
+   */
+  concurrentSafe?: boolean;
+  /**
+   * Wall-clock budget for a single call, enforced by the tool scheduler
+   * wrapper. Omitted means "no scheduler timeout" — tools with their own
+   * timeout semantics (Bash, Eval, Agent, TaskOutput, WebFetch) leave it unset.
+   */
+  timeoutMs?: number;
+}
+
+export type ToolConcurrency = 'shared' | 'exclusive' | 'unscheduled';
+
+/**
+ * Resolve how the scheduler should treat a tool:
+ * - `unscheduled`: blocking user-interaction tools never hold a slot (they are
+ *   the user's answer channel and may wait indefinitely).
+ * - `exclusive`: runs alone; waits for in-flight shared calls to drain.
+ * - `shared`: runs alongside other shared calls under the global cap.
+ */
+export function resolveToolConcurrency(
+  meta: Pick<
+    ToolMetadata,
+    'declaredReadOnly' | 'mutatesWorkspace' | 'requiresUserInteraction' | 'concurrentSafe'
+  >
+): ToolConcurrency {
+  if (meta.requiresUserInteraction) return 'unscheduled';
+  const safe = meta.concurrentSafe ?? (meta.declaredReadOnly && !meta.mutatesWorkspace);
+  return safe ? 'shared' : 'exclusive';
 }
 
 export interface ExternalToolRiskPolicy {
@@ -156,6 +198,7 @@ export const READ_ONLY_TOOL_NAMES: ReadonlyArray<ToolName> = [
   'Glob',
   'LS',
   'TodoWrite',
+  'TodoRead',
   'AskUserQuestion',
   'WebFetch',
   'WebSearch',
@@ -163,6 +206,11 @@ export const READ_ONLY_TOOL_NAMES: ReadonlyArray<ToolName> = [
   'ListMcpResources',
   'ReadMcpResource',
   'TaskOutput',
+  'ReadSessionContext',
+  'CronList',
+  // A sub-agent may report back to its coordinator while planning; the
+  // message only lands in the parent's steering queue.
+  'RespondToCoordinator',
   'LSPTool',
   'AstGrep',
   // Plan-mode tools must survive the plan-mode read-only filter so the model
@@ -176,7 +224,51 @@ export const READ_ONLY_TOOL_NAMES: ReadonlyArray<ToolName> = [
   'Memory',
 ];
 
-export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
+/**
+ * Execution policy overrides layered onto the base metadata table below.
+ * Kept separate so the concurrency/timeout decisions are reviewable in one
+ * place. Anything not listed falls back to `resolveToolConcurrency` defaults
+ * and no scheduler timeout.
+ */
+const TOOL_EXECUTION_POLICY: Readonly<
+  Partial<Record<ToolName, Pick<ToolMetadata, 'concurrentSafe' | 'timeoutMs'>>>
+> = {
+  Read: { timeoutMs: 120_000 },
+  Write: { timeoutMs: 60_000 },
+  Edit: { timeoutMs: 60_000 },
+  MultiEdit: { timeoutMs: 60_000 },
+  ReadSymbol: { timeoutMs: 60_000 },
+  EditSymbol: { timeoutMs: 60_000 },
+  Grep: { timeoutMs: 120_000 },
+  Glob: { timeoutMs: 120_000 },
+  LS: { timeoutMs: 60_000 },
+  // Registered only when a language server is configured for the workspace
+  // (see server language-server-port.ts); queries are in-process RPC.
+  LSPTool: { concurrentSafe: true, timeoutMs: 30_000 },
+  AstGrep: { timeoutMs: 120_000 },
+  AstEdit: { timeoutMs: 120_000 },
+  TodoWrite: { timeoutMs: 10_000 },
+  Memory: { concurrentSafe: true, timeoutMs: 30_000 },
+  // Sub-agents run in their own session (and optionally their own worktree);
+  // fanning several out in one turn is the intended pattern, so they must not
+  // serialize against each other or against the parent's read-only calls.
+  Agent: { concurrentSafe: true },
+  // Monitor only inspects/stops tasks; it never touches the workspace.
+  Monitor: { concurrentSafe: true, timeoutMs: 30_000 },
+  SendMessage: { concurrentSafe: true, timeoutMs: 30_000 },
+  RespondToCoordinator: { concurrentSafe: true, timeoutMs: 10_000 },
+  TodoRead: { timeoutMs: 10_000 },
+  ReadSessionContext: { timeoutMs: 300_000 },
+  CronList: { timeoutMs: 30_000 },
+  CronCreate: { concurrentSafe: true, timeoutMs: 30_000 },
+  CronUpdate: { concurrentSafe: true, timeoutMs: 30_000 },
+  CronDelete: { concurrentSafe: true, timeoutMs: 30_000 },
+  EnterWorktree: { timeoutMs: 300_000 },
+  ExitWorktree: { timeoutMs: 300_000 },
+  EnterPlanMode: { timeoutMs: 10_000 },
+};
+
+const BUILTIN_TOOL_METADATA_BASE: Readonly<Record<ToolName, ToolMetadata>> = {
   Read: {
     ref: { source: 'builtin', name: 'Read' },
     label: 'Read',
@@ -309,6 +401,17 @@ export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
     requiresUserInteraction: false,
     riskLevel: 'low',
   },
+  TodoRead: {
+    ref: { source: 'builtin', name: 'TodoRead' },
+    label: 'TodoRead',
+    description: 'Read the current task list of this session.',
+    setIds: ['interaction'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
   AskUserQuestion: {
     ref: { source: 'builtin', name: 'AskUserQuestion' },
     label: 'AskUserQuestion',
@@ -419,10 +522,91 @@ export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
     requiresUserInteraction: false,
     riskLevel: 'high',
   },
+  SendMessage: {
+    ref: { source: 'builtin', name: 'SendMessage' },
+    label: 'SendMessage',
+    description:
+      'Send a follow-up message to a sub-agent you launched: steers it mid-run or resumes it in the background.',
+    setIds: ['tasks'],
+    declaredReadOnly: false,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'medium',
+  },
+  RespondToCoordinator: {
+    ref: { source: 'builtin', name: 'RespondToCoordinator' },
+    label: 'RespondToCoordinator',
+    description:
+      'Reply to the coordinator session that launched this sub-agent without ending the current task.',
+    setIds: ['tasks'],
+    declaredReadOnly: false,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  ReadSessionContext: {
+    ref: { source: 'builtin', name: 'ReadSessionContext' },
+    label: 'ReadSessionContext',
+    description:
+      'Read another session of the same project, condensed for a query or as a handoff capsule.',
+    setIds: ['tasks'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: true,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  CronCreate: {
+    ref: { source: 'builtin', name: 'CronCreate' },
+    label: 'CronCreate',
+    description: 'Create a scheduled AI-prompt automation for this project.',
+    setIds: ['automation'],
+    declaredReadOnly: false,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'medium',
+  },
+  CronList: {
+    ref: { source: 'builtin', name: 'CronList' },
+    label: 'CronList',
+    description: 'List the automations of this project.',
+    setIds: ['automation'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  CronUpdate: {
+    ref: { source: 'builtin', name: 'CronUpdate' },
+    label: 'CronUpdate',
+    description: 'Update an automation of this project in place.',
+    setIds: ['automation'],
+    declaredReadOnly: false,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'medium',
+  },
+  CronDelete: {
+    ref: { source: 'builtin', name: 'CronDelete' },
+    label: 'CronDelete',
+    description: 'Delete an automation of this project.',
+    setIds: ['automation'],
+    declaredReadOnly: false,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'medium',
+  },
   LSPTool: {
     ref: { source: 'builtin', name: 'LSPTool' },
     label: 'LSPTool',
-    description: 'Find symbols, references, definitions, or diagnostics in the workspace.',
+    description:
+      'Query the workspace language server: go to definition, find references, hover, symbols, diagnostics. Only available when a language server is configured for the project.',
     setIds: ['code-intelligence'],
     declaredReadOnly: true,
     mutatesWorkspace: false,
@@ -511,6 +695,13 @@ export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
   },
 };
 
+export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = Object.fromEntries(
+  (Object.keys(BUILTIN_TOOL_METADATA_BASE) as ToolName[]).map(name => [
+    name,
+    { ...BUILTIN_TOOL_METADATA_BASE[name], ...(TOOL_EXECUTION_POLICY[name] ?? {}) },
+  ])
+) as Record<ToolName, ToolMetadata>;
+
 export const BUILTIN_TOOL_SETS = {
   'core-coding': {
     id: 'core-coding',
@@ -535,7 +726,7 @@ export const BUILTIN_TOOL_SETS = {
   interaction: {
     id: 'interaction',
     label: 'Interaction',
-    tools: ['TodoWrite', 'AskUserQuestion'],
+    tools: ['TodoWrite', 'TodoRead', 'AskUserQuestion'],
   },
   web: {
     id: 'web',
@@ -550,7 +741,21 @@ export const BUILTIN_TOOL_SETS = {
   tasks: {
     id: 'tasks',
     label: 'Tasks',
-    tools: ['Agent', 'TaskOutput', 'Monitor', 'EnterWorktree', 'ExitWorktree'],
+    tools: [
+      'Agent',
+      'SendMessage',
+      'RespondToCoordinator',
+      'TaskOutput',
+      'Monitor',
+      'EnterWorktree',
+      'ExitWorktree',
+      'ReadSessionContext',
+    ],
+  },
+  automation: {
+    id: 'automation',
+    label: 'Automation',
+    tools: ['CronCreate', 'CronList', 'CronUpdate', 'CronDelete'],
   },
   'code-intelligence': {
     id: 'code-intelligence',

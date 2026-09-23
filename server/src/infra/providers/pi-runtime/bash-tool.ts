@@ -132,6 +132,11 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
       type: 'object',
       properties: {
         command: { type: 'string', description: 'The shell command to run' },
+        description: {
+          type: 'string',
+          description:
+            'What this command does, in 5-10 words, shown to the user next to the command (e.g. "List files in src"). Not executed.',
+        },
         timeout: { type: 'number', description: 'Timeout in seconds (default 120, max 600)' },
         cwd: {
           type: 'string',

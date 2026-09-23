@@ -22,6 +22,7 @@ import { finalizeRun, handleRunException } from './run-recovery.js';
 import { setPhase } from './active-run-phase.js';
 import { persistAssistantTerminalSnapshot } from './run-terminal-snapshot.js';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
+import type { AutomationPort, SubagentMessenger } from '../../../infra/providers/types.js';
 import type { PermissionBridge } from '../agent/permission-bridge.js';
 import type { PermissionWorkflowResolver } from '../../../domains/workflows/index.js';
 
@@ -37,6 +38,10 @@ export interface RunHandlerContext {
   permissionBridge?: PermissionBridge;
   permissionWorkflowResolver?: PermissionWorkflowResolver;
   agentTaskExecutor?: TaskExecutor;
+  /** Cross-session delivery port for SendMessage / RespondToCoordinator. */
+  subagentMessenger?: SubagentMessenger;
+  /** Automation CRUD port for the Cron* tools. */
+  automationPort?: AutomationPort;
   /** Optional goal coordinator — fired after a turn completes successfully. */
   goalCoordinator?: { onTurnCompleted(sessionId: string, runTokensUsed: number): Promise<void> };
 }
@@ -207,6 +212,8 @@ export async function handleRunStart(
       providerType,
       runId,
       agentTaskExecutor: context.agentTaskExecutor,
+      subagentMessenger: context.subagentMessenger,
+      automationPort: context.automationPort,
       sdkSessionId,
       sendRunEvent,
       serverPort,

@@ -25,6 +25,7 @@ import {
 import type { PermissionCallback } from '../message-types.js';
 import { buildModel } from './build-model.js';
 import { buildTools } from './tool-bridge.js';
+import { applyToolScheduler } from './tool-scheduler.js';
 import { agentToolParameters, textResult, type ToolContent } from './tool-common.js';
 import { wrapStreamFnWithToolSchemaCompat } from './tool-schema-compat.js';
 
@@ -641,12 +642,14 @@ function buildForkSkillTools(
   policy: SkillExecutionPolicy
 ): AgentTool[] {
   const enabled = resolveForkSkillToolNames(execution, policy);
-  return buildTools(execution.cwd, {
-    enabled,
-    db: execution.db,
-    permissionOverride: execution.permissionOverride,
-    permissionCallback: execution.permissionCallback,
-  });
+  return applyToolScheduler(
+    buildTools(execution.cwd, {
+      enabled,
+      db: execution.db,
+      permissionOverride: execution.permissionOverride,
+      permissionCallback: execution.permissionCallback,
+    })
+  );
 }
 
 /**

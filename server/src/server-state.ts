@@ -34,6 +34,19 @@ import type { MessageHandlerContext } from './application/conversation/transport
 import type { RunHandlerContext } from './application/conversation/runtime/run-handler.js';
 import type { ConnectedClient, ActiveRun } from './application/conversation/transport/types.js';
 import type { BrowserManager } from './application/browser/browser-manager.js';
+import { createSubagentMessenger } from './application/conversation/runtime/subagent-messenger.js';
+import type { AutomationService } from './domains/automations/service.js';
+import type { AutomationPort } from './infra/providers/types.js';
+
+function automationPortFor(service: AutomationService): AutomationPort {
+  return {
+    list: projectId => service.listAutomations(projectId),
+    get: id => service.getAutomation(id),
+    create: data => service.createAutomation(data),
+    update: (id, data) => service.updateAutomation(id, data),
+    delete: id => service.deleteAutomation(id),
+  };
+}
 import { ClaudiaBranchService } from './application/orchestration/claudia-branch-service.js';
 import { getGatewayClient } from './infra/gateway/gateway-instance.js';
 import { providerRegistry } from './infra/providers/registry.js';
@@ -67,6 +80,7 @@ export class ServerState {
   branchAllocator: ClaudiaBranchService | undefined;
   metaWorkflowService: MetaWorkflowService | undefined;
   agentTaskExecutor: TaskExecutor | undefined;
+  automationService: AutomationService | undefined;
   goalCoordinator: GoalCoordinator | undefined;
   goalService: GoalService | undefined;
   browserManager: BrowserManager | undefined;
@@ -379,6 +393,10 @@ export class ServerState {
       permissionBridge: this.permissionBridge,
       permissionWorkflowResolver: this.permissionWorkflowResolver,
       agentTaskExecutor: this.agentTaskExecutor,
+      subagentMessenger: createSubagentMessenger({ activeRuns: this.activeRuns }),
+      automationPort: this.automationService
+        ? automationPortFor(this.automationService)
+        : undefined,
       goalCoordinator: this.goalCoordinator,
       sessionSync: this.getSessionSync(),
       providerRegistry,

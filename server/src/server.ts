@@ -204,6 +204,7 @@ export async function createServer(
   serverState.permissionWorkflowResolver = setup.permissionWorkflowResolver;
   serverState.metaWorkflowService = setup.metaWorkflowService;
   serverState.agentTaskExecutor = setup.agentTaskExecutor;
+  serverState.automationService = setup.automationService;
   serverState.goalCoordinator = setup.goalCoordinator;
   serverState.goalService = setup.goalService;
 

@@ -57,6 +57,7 @@ import type { MetaWorkflowService } from '../../domains/meta-workflow/service.js
 import { createWorktreeAllocatorFromSupervisor } from './meta-workflow-allocator.js';
 import { registerPluginsDomain } from '../plugins/register.js';
 import { toolRegistry, workflowStepRegistry, workflowTriggerRegistry } from '../plugins/index.js';
+import type { AutomationService } from '../../domains/automations/service.js';
 import { registerAutomationsDomain } from '../../domains/automations/index.js';
 import type { NotificationSender } from '../../infra/push/notification-sender.js';
 import type { NotificationService } from '../../domains/notification-feed/index.js';
@@ -128,6 +129,7 @@ export interface FeatureDomainsResult {
   permissionBridge: PermissionBridge;
   cancelWorkflowRun: (runId: string) => void;
   permissionWorkflowResolver: PermissionWorkflowResolver;
+  automationService: AutomationService;
   metaWorkflowService: MetaWorkflowService;
   executorRegistry: ExecutorRegistry;
   executorInstanceRepo: ExecutorInstanceRepository;
@@ -652,6 +654,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     permissionBridge,
     cancelWorkflowRun,
     permissionWorkflowResolver,
+    automationService,
     metaWorkflowService,
     executorRegistry,
     executorInstanceRepo,

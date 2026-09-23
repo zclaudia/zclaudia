@@ -7,6 +7,7 @@ import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import { builtinAgentPluginForRuntime } from '@zclaudia/shared/plugins/builtin-agents';
 import type { ToolName } from '@zclaudia/shared/core/tools';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
+import type { AutomationPort, SubagentMessenger } from '../../../infra/providers/types.js';
 import {
   buildSkillDirectoryHint,
   toolRegistry as pluginToolRegistry,
@@ -61,6 +62,8 @@ export interface BuildRunContextInput {
   providerTransport?: string | null;
   runId: string;
   agentTaskExecutor?: TaskExecutor;
+  subagentMessenger?: SubagentMessenger;
+  automationPort?: AutomationPort;
   sdkSessionId?: string;
   serverPort: number | null;
   session: SessionContext;
@@ -87,6 +90,8 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     providerTransport,
     runId,
     agentTaskExecutor,
+    subagentMessenger,
+    automationPort,
     sdkSessionId,
     serverPort,
     session,
@@ -109,6 +114,8 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     permissionOverride: message.permissionOverride as Partial<UnifiedPermissionPolicy> | undefined,
     db,
     agentTaskExecutor,
+    subagentMessenger,
+    automationPort,
     llmProfileConfig: providerConfig,
     agentProfile,
     enabledTools,

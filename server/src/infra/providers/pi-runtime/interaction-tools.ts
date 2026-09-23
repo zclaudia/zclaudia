@@ -6,6 +6,7 @@ import {
   validateTodoItems,
 } from '../../../application/conversation/interactions/todo-normalizer.js';
 import type { PermissionCallback } from '../types.js';
+import { getLatestTodos } from '../../../application/conversation/interactions/todo-state-tracker.js';
 import {
   agentToolParameters,
   errorResult,
@@ -67,6 +68,27 @@ export function createTodoWriteTool(): AgentTool {
   };
 }
 
+export function createTodoReadTool(sessionId?: string): AgentTool {
+  return {
+    name: 'TodoRead',
+    label: 'TodoRead',
+    description:
+      'Read the current task list of this session (the last TodoWrite, with auto-completed items).',
+    parameters: agentToolParameters({
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    }),
+    execute: async () => {
+      if (!sessionId) {
+        return jsonResult({ success: true, count: 0, todos: [], note: 'No session context' });
+      }
+      const todos = getLatestTodos(sessionId) ?? [];
+      return jsonResult({ success: true, count: todos.length, todos });
+    },
+  };
+}
+
 export function createAskUserQuestionTool(permissionCallback?: PermissionCallback): AgentTool {
   return {
     name: 'AskUserQuestion',
@@ -89,6 +111,11 @@ export function createAskUserQuestionTool(permissionCallback?: PermissionCallbac
                   properties: {
                     label: { type: 'string' },
                     description: { type: 'string' },
+                    preview: {
+                      type: 'string',
+                      description:
+                        'Optional markdown / ASCII / code preview shown next to the option so the user can compare concrete alternatives (layouts, snippets, configs).',
+                    },
                   },
                   required: ['label', 'description'],
                 },

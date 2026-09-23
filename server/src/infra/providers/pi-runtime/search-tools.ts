@@ -1,14 +1,10 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
-import { execFile } from 'child_process';
 import { readdir, stat } from 'fs/promises';
 import * as path from 'path';
-import { promisify } from 'util';
 
 import { runRipgrep } from './ripgrep-runner.js';
 import { agentToolParameters, errorResult, textResult, toolParams } from './tool-common.js';
 import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
-
-const execFileAsync = promisify(execFile);
 
 function parseRipgrepLines(
   cwd: string,
@@ -105,42 +101,6 @@ function parseRipgrepContextLines(
     matchCount += groupMatches;
   }
   return results;
-}
-
-async function ripgrepSearch(
-  cwd: string,
-  searchRoot: string,
-  query: string,
-  maxResults: number,
-  include?: string
-): Promise<Array<{ file: string; line: number; preview: string }>> {
-  // Used only by LSPTool: the query is matched literally (--fixed-strings),
-  // so regex metacharacters in a symbol name can never break the search.
-  const args = [
-    '--line-number',
-    '--no-heading',
-    '--color',
-    'never',
-    '--null',
-    '--fixed-strings',
-    '--max-count',
-    String(maxResults),
-    ...(include ? ['--glob', include] : []),
-    '--with-filename',
-    '--',
-    query,
-    searchRoot,
-  ];
-
-  try {
-    const { stdout } = await execFileAsync('rg', args, { timeout: 30_000, maxBuffer: 1024 * 1024 });
-    return parseRipgrepLines(cwd, stdout || '', maxResults);
-  } catch (err) {
-    const maybeOutput = err as { stdout?: string; code?: number };
-    if (maybeOutput.code === 1) return [];
-    if (maybeOutput.stdout) return parseRipgrepLines(cwd, maybeOutput.stdout, maxResults);
-    throw err;
-  }
 }
 
 export function createGrepBridgeTool(cwd: string): AgentTool {
@@ -489,85 +449,6 @@ export function createGlobTool(cwd: string): AgentTool {
       } catch (err) {
         return errorResult('glob_failed', err instanceof Error ? err.message : String(err), {
           pattern,
-        });
-      }
-    },
-  };
-}
-
-export function createLspTool(cwd: string): AgentTool {
-  return {
-    name: 'LSPTool',
-    label: 'LSPTool',
-    description:
-      'Text-based symbol search over the workspace, powered by ripgrep literal matching (no language server is attached and there are no LSP semantics: results are plain text matches, not compiler-verified symbols). All actions currently behave the same: "symbols", "references", and "definition" return the literal occurrences of query (file/line/preview) as candidate locations to inspect — they do NOT distinguish definitions from references; "diagnostics" returns no diagnostics today. The query is matched literally (like rg --fixed-strings), so regex metacharacters need no escaping. Use Grep when you need regex search or context lines.',
-    parameters: agentToolParameters({
-      type: 'object',
-      properties: {
-        action: {
-          type: 'string',
-          enum: ['symbols', 'references', 'definition', 'diagnostics'],
-          default: 'symbols',
-        },
-        query: { type: 'string', description: 'Literal text to search for (not a regex)' },
-        path: { type: 'string', description: 'Optional workspace-relative directory to search' },
-        include: { type: 'string', description: 'Optional ripgrep glob filter, such as *.ts' },
-        max_results: { type: 'number', default: 50 },
-      },
-      required: ['query'],
-    }),
-    execute: async (toolCallId: string, params: unknown) => {
-      const args = toolParams(toolCallId, params);
-      const action = String(args.action || 'symbols');
-      // Trim only for the empty-check; the raw query is matched literally.
-      const query = String(args.query ?? '');
-      if (!query.trim()) {
-        return errorResult('missing_query', 'LSPTool requires a query', { action });
-      }
-      const maxResults = Math.max(1, Math.min(Number(args.max_results ?? 50) || 50, 200));
-      let searchRoot: string;
-      try {
-        searchRoot = resolveInsideWorkspace(cwd, args.path);
-      } catch (err) {
-        return errorResult(
-          'path_outside_workspace',
-          err instanceof Error ? err.message : String(err),
-          { action, query }
-        );
-      }
-      try {
-        const results = await ripgrepSearch(
-          cwd,
-          searchRoot,
-          query,
-          maxResults,
-          typeof args.include === 'string' ? args.include : undefined
-        );
-        return textResult(
-          JSON.stringify(
-            {
-              action,
-              query,
-              fallback: 'ripgrep',
-              results,
-              total: results.length,
-            },
-            null,
-            2
-          ),
-          {
-            ok: true,
-            action,
-            query,
-            fallback: 'ripgrep',
-            total: results.length,
-          }
-        );
-      } catch (err) {
-        // Same guarded shape as Grep: structured error instead of a raw rejection.
-        return errorResult('lsp_search_failed', err instanceof Error ? err.message : String(err), {
-          action,
-          query,
         });
       }
     },
