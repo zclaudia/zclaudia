@@ -1,7 +1,15 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 
-import { createWebFetchTool, createWebSearchTool, fetchPublicHttpBody } from '../web-tools.js';
+import {
+  __resetWebFetchCacheForTests,
+  createWebFetchTool,
+  createWebSearchTool,
+  fetchPublicHttpBody,
+} from '../web-tools.js';
+
+// The WebFetch page cache is process-wide; every test starts from a cold cache.
+beforeEach(() => __resetWebFetchCacheForTests());
 
 vi.mock('undici', () => {
   class MockAgent {
@@ -581,6 +589,74 @@ describe('web tools', () => {
     expect(payload.results).toHaveLength(1);
     expect(payload.results[0]).toMatchObject({ url: 'https://docs.example.com/page' });
     // Brave, then SearXNG — DuckDuckGo never runs once a provider produced results.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('WebFetch prompt answering and cache', () => {
+  function htmlResponse(body: string) {
+    return {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      url: 'https://example.com/doc',
+      headers: new Headers({ 'content-type': 'text/html' }),
+      text: async () => body,
+      arrayBuffer: async () => new TextEncoder().encode(body).buffer,
+      body: null,
+    };
+  }
+
+  it('answers the prompt with the auxiliary model instead of returning the page', async () => {
+    __resetWebFetchCacheForTests();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => htmlResponse('<html><body><p>Install with pnpm add foo</p></body></html>'))
+    );
+    const complete = vi.fn(async ({ userText }: { userText: string }) => {
+      expect(userText).toContain('QUESTION:\nHow do I install it?');
+      expect(userText).toContain('pnpm add foo');
+      return 'Run `pnpm add foo`.';
+    });
+    const webFetch = createWebFetchTool({ auxiliaryModel: { complete } }) as any;
+    const result = await webFetch.execute('fetch-p', {
+      url: 'https://example.com/doc',
+      prompt: 'How do I install it?',
+    });
+    expect(result.content[0].text).toContain('Answer to: How do I install it?');
+    expect(result.content[0].text).toContain('Run `pnpm add foo`.');
+    expect(result.content[0].text).not.toContain('Install with pnpm add foo');
+    expect(result.details).toMatchObject({ promptAnswered: true, cacheHit: false });
+  });
+
+  it('falls back to the page content when no auxiliary model is configured', async () => {
+    __resetWebFetchCacheForTests();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => htmlResponse('<html><body><p>Body</p></body></html>'))
+    );
+    const webFetch = createWebFetchTool() as any;
+    const result = await webFetch.execute('fetch-np', {
+      url: 'https://example.com/doc',
+      prompt: 'anything',
+    });
+    expect(result.content[0].text).toContain('Body');
+    expect(result.details).toMatchObject({ promptAnswered: false });
+  });
+
+  it('serves a repeat fetch from the cache without hitting the network', async () => {
+    __resetWebFetchCacheForTests();
+    const fetchMock = vi.fn(async () => htmlResponse('<html><body><p>Cached</p></body></html>'));
+    vi.stubGlobal('fetch', fetchMock);
+    const webFetch = createWebFetchTool() as any;
+    const first = await webFetch.execute('fetch-c1', { url: 'https://example.com/doc' });
+    const second = await webFetch.execute('fetch-c2', { url: 'https://example.com/doc' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(first.details.cacheHit).toBe(false);
+    expect(second.details.cacheHit).toBe(true);
+    expect(second.content[0].text).toContain('Cached');
+    // A different extraction option is a different cache entry.
+    await webFetch.execute('fetch-c3', { url: 'https://example.com/doc', format: 'raw' });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

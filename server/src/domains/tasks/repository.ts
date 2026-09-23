@@ -134,6 +134,19 @@ export class TaskRepository {
     return rows.map(row => this.mapTask(row));
   }
 
+  /** The agent task whose run owns `sessionId` (sub-agent sessions only). */
+  findLatestAgentTaskForSession(sessionId: string): TaskRecord | null {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM tasks
+         WHERE session_id = ? AND type = 'agent'
+         ORDER BY created_at DESC
+         LIMIT 1`
+      )
+      .get(sessionId) as TaskRow | undefined;
+    return row ? this.mapTask(row) : null;
+  }
+
   findLatestClaudiaAgentTaskId(sessionId: string): string | null {
     const row = this.db
       .prepare(

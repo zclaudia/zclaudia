@@ -5,6 +5,8 @@ import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permi
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
+import { AgentProfileRepository } from '../../../domains/agent-profiles/repository.js';
+import type { SubagentMessenger } from '../types.js';
 import {
   agentToolParameters,
   errorResult,
@@ -47,6 +49,55 @@ function resolveProjectIdForSession(
   }
 }
 
+export interface SubagentType {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+/**
+ * Roster for the Agent tool's `subagent_type`: every active agent profile.
+ * Profiles are global (no project column), so the roster is the same for
+ * every session. Missing db or table → empty roster (tool still works with
+ * the default profile).
+ */
+export function listSubagentTypes(db: Database.Database | undefined): SubagentType[] {
+  if (!db) return [];
+  try {
+    return new AgentProfileRepository(db)
+      .findAllOrdered()
+      .filter(profile => (profile.status ?? 'active') === 'active')
+      .map(profile => ({
+        id: profile.id,
+        name: profile.name,
+        description: profile.description?.trim() || undefined,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+export function resolveSubagentType(
+  roster: SubagentType[],
+  requested: string
+): SubagentType | undefined {
+  const needle = requested.trim();
+  if (!needle) return undefined;
+  const lower = needle.toLowerCase();
+  return (
+    roster.find(entry => entry.id === needle) ??
+    roster.find(entry => entry.name.toLowerCase() === lower)
+  );
+}
+
+function describeSubagentTypes(roster: SubagentType[]): string {
+  if (roster.length === 0) return '';
+  const lines = roster.map(entry =>
+    entry.description ? `- ${entry.name}: ${entry.description}` : `- ${entry.name}`
+  );
+  return `\n\nAvailable subagent_type values (agent profiles):\n${lines.join('\n')}`;
+}
+
 export type TaskRuntimeRegistryFactory = (repo: TaskRepository) => TaskRuntimeRegistry;
 
 export function createDefaultTaskRuntimeRegistry(repo: TaskRepository): TaskRuntimeRegistry {
@@ -61,11 +112,13 @@ export function createAgentTool(
   permissionOverride?: Partial<UnifiedPermissionPolicy>,
   agentTaskExecutor?: TaskExecutor
 ): AgentTool {
+  const roster = listSubagentTypes(db);
   return {
     name: 'Agent',
     label: 'Agent',
     description:
-      'Delegate work to a background sub-agent task. Set isolation:"worktree" to run it in an ephemeral git worktree so parallel agents never conflict on files; a clean worktree is removed automatically, one with changes is kept and reported.',
+      'Delegate work to a background sub-agent task. Set isolation:"worktree" to run it in an ephemeral git worktree so parallel agents never conflict on files; a clean worktree is removed automatically, one with changes is kept and reported. Pick a subagent_type to run it under a specific agent profile (system prompt, model, tool set); omit it for the default profile. Send follow-up instructions to a running or finished sub-agent with SendMessage({ task_id, message }).' +
+      describeSubagentTypes(roster),
     parameters: agentToolParameters({
       type: 'object',
       properties: {
@@ -77,6 +130,11 @@ export function createAgentTool(
         description: {
           type: 'string',
           description: 'Short human-readable task title shown in the task list',
+        },
+        subagent_type: {
+          type: 'string',
+          description:
+            'Agent profile to run the sub-agent under (profile name or id). Omit for the default profile.',
         },
         wait: {
           type: 'boolean',
@@ -103,6 +161,26 @@ export function createAgentTool(
         return errorResult('missing_prompt', 'Agent requires a prompt');
       }
 
+      let agentProfileId: string | undefined;
+      if (args.subagent_type !== undefined) {
+        if (typeof args.subagent_type !== 'string' || !args.subagent_type.trim()) {
+          return errorResult('invalid_subagent_type', 'subagent_type must be a non-empty string');
+        }
+        // Re-read the roster at call time: profiles may have been added since
+        // the tool was built, and the description is only a hint.
+        const resolved = resolveSubagentType(listSubagentTypes(db), args.subagent_type);
+        if (!resolved) {
+          const available = listSubagentTypes(db)
+            .map(entry => entry.name)
+            .join(', ');
+          return errorResult(
+            'unknown_subagent_type',
+            `Unknown subagent_type "${args.subagent_type}". Available: ${available || '(none)'}`
+          );
+        }
+        agentProfileId = resolved.id;
+      }
+
       const projectId = resolveProjectIdForSession(db, sessionId);
       const taskService = new TaskService(new TaskRepository(db));
       const task = taskService.createTask({
@@ -114,6 +192,7 @@ export function createAgentTool(
         metadata: {
           prompt: args.prompt,
           wait: Boolean(args.wait),
+          ...(agentProfileId ? { agentProfileId } : {}),
           // Security (P0-2): never read permission_override/permissionOverride
           // from model-supplied args — a prompt-injected model could otherwise
           // mint a fully autonomous sub-agent (e.g. bash:'allow'). Only the
@@ -127,12 +206,19 @@ export function createAgentTool(
 
       try {
         const started = await agentTaskExecutor.start(task);
-        const running = taskService.startTask(task.id, { executorRef: started.executorRef });
+        // Persist the sub-agent's session id: SendMessage resolves task_id →
+        // session through it, and the UI links the task to its transcript.
+        const running = taskService.startTask(task.id, {
+          executorRef: started.executorRef,
+          sessionId: started.sessionId,
+        });
         if (args.wait !== true) {
           return jsonResult({
             ok: true,
             taskId: task.id,
             status: running.status,
+            ...(started.sessionId ? { sessionId: started.sessionId } : {}),
+            ...(agentProfileId ? { agentProfileId } : {}),
           });
         }
         const result = await agentTaskExecutor.wait(task.id);
@@ -328,6 +414,241 @@ export function createMonitorTool(
       }
 
       return errorResult('unknown_monitor_action', `Unknown Monitor action: ${action}`);
+    },
+  };
+}
+
+const TERMINAL_TASK_STATUSES = new Set(['completed', 'failed', 'stopped']);
+
+export interface SendMessageToolDeps {
+  cwd: string;
+  sessionId?: string;
+  runId?: string;
+  db?: Database.Database;
+  permissionOverride?: Partial<UnifiedPermissionPolicy>;
+  agentTaskExecutor?: TaskExecutor;
+  messenger?: SubagentMessenger;
+}
+
+/**
+ * SendMessage: follow-up instructions for a sub-agent this session launched.
+ *
+ * - running sub-agent → steered into its live run (persisted + broadcast in
+ *   the sub-agent's session, like a UI steer);
+ * - finished sub-agent → a new agent task is started on the SAME session, so
+ *   it resumes with its full history (`resumed_background`).
+ *
+ * Only the launching session may message a task (parentSessionId check):
+ * a prompt-injected sub-agent must not be able to redirect its siblings.
+ */
+export function createSendMessageTool(deps: SendMessageToolDeps): AgentTool {
+  const { cwd, sessionId, runId, db, permissionOverride, agentTaskExecutor, messenger } = deps;
+  return {
+    name: 'SendMessage',
+    label: 'SendMessage',
+    description:
+      'Send a follow-up message to a sub-agent you launched with Agent. A running sub-agent receives it at its next turn boundary (delivery "steered"); a finished one is resumed in the background on the same session with its full history (delivery "resumed_background"). Poll TaskOutput for the response.',
+    parameters: agentToolParameters({
+      type: 'object',
+      properties: {
+        task_id: { type: 'string', description: 'Task id returned by Agent' },
+        message: { type: 'string', description: 'Instructions or answer for the sub-agent' },
+        summary: {
+          type: 'string',
+          description: 'Optional 5-10 word summary shown in the task list',
+        },
+      },
+      required: ['task_id', 'message'],
+      additionalProperties: false,
+    }),
+    execute: async (toolCallId: string, params: unknown) => {
+      const args = toolParams(toolCallId, params);
+      if (!db) return errorResult('missing_db_context', 'SendMessage requires database context');
+      if (!messenger) {
+        return errorResult('missing_messenger', 'SendMessage requires the session messenger');
+      }
+      const taskId = typeof args.task_id === 'string' ? args.task_id.trim() : '';
+      if (!taskId) return errorResult('missing_task_id', 'SendMessage requires task_id');
+      const message = typeof args.message === 'string' ? args.message.trim() : '';
+      if (!message) return errorResult('missing_message', 'SendMessage requires a message');
+
+      const repo = new TaskRepository(db);
+      const task = repo.findById(taskId);
+      if (!task) return errorResult('task_not_found', `Task not found: ${taskId}`);
+      if (task.type !== 'agent') {
+        return errorResult('not_an_agent_task', `Task ${taskId} is a ${task.type} task`);
+      }
+      if (!sessionId || task.parentSessionId !== sessionId) {
+        return errorResult(
+          'task_not_owned',
+          `Task ${taskId} was not launched by this session; only its coordinator may message it`
+        );
+      }
+      if (!task.sessionId) {
+        return errorResult(
+          'task_session_unknown',
+          `Task ${taskId} has no session yet (it may not have started); retry after it starts`
+        );
+      }
+
+      const text = `[Message from coordinator]\n${message}`;
+      if (task.status === 'running') {
+        const outcome = messenger.steer(task.sessionId, text);
+        if (outcome.delivery === 'steered') {
+          return jsonResult({ ok: true, taskId, delivery: 'steered', sessionId: task.sessionId });
+        }
+        if (outcome.delivery === 'not_ready') {
+          return errorResult(
+            'subagent_not_ready',
+            `Sub-agent ${taskId} has not started its first turn yet; retry shortly`,
+            { taskId, retryable: true }
+          );
+        }
+        // running per the task row, but no live run: fall through and resume.
+      } else if (!TERMINAL_TASK_STATUSES.has(task.status)) {
+        return errorResult(
+          'task_not_running',
+          `Task ${taskId} is ${task.status}; it can only be messaged while running or after it finished`,
+          { taskId, status: task.status }
+        );
+      }
+
+      if (!agentTaskExecutor) {
+        return errorResult(
+          'missing_task_executor',
+          `Sub-agent ${taskId} is not running and no task executor is available to resume it`
+        );
+      }
+      const previous = task.metadata ?? {};
+      const taskService = new TaskService(repo);
+      const resumed = taskService.createTask({
+        type: 'agent',
+        title:
+          typeof args.summary === 'string' && args.summary.trim()
+            ? args.summary.trim()
+            : (task.title ?? truncateText(message, 120)),
+        parentSessionId: sessionId,
+        parentRunId: runId,
+        parentToolUseId: typeof toolCallId === 'string' ? toolCallId : undefined,
+        metadata: {
+          prompt: text,
+          wait: false,
+          // Same rule as Agent (P0-2): only the factory-provided override.
+          permissionOverride,
+          cwd: typeof previous.cwd === 'string' ? previous.cwd : cwd,
+          projectId:
+            typeof previous.projectId === 'string'
+              ? previous.projectId
+              : resolveProjectIdForSession(db, sessionId),
+          sessionId: task.sessionId,
+          resumedFromTaskId: taskId,
+          ...(typeof previous.agentProfileId === 'string'
+            ? { agentProfileId: previous.agentProfileId }
+            : {}),
+        },
+      });
+      try {
+        const started = await agentTaskExecutor.start(resumed);
+        taskService.startTask(resumed.id, {
+          executorRef: started.executorRef,
+          sessionId: started.sessionId ?? task.sessionId,
+        });
+        return jsonResult({
+          ok: true,
+          taskId: resumed.id,
+          resumedFromTaskId: taskId,
+          delivery: 'resumed_background',
+          sessionId: task.sessionId,
+        });
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        taskService.failTask(resumed.id, { error: errorMessage });
+        return errorResult('subagent_resume_failed', errorMessage, { taskId: resumed.id });
+      }
+    },
+  };
+}
+
+export interface RespondToCoordinatorToolDeps {
+  sessionId?: string;
+  db?: Database.Database;
+  messenger?: SubagentMessenger;
+}
+
+export function buildCoordinatorNotice(input: {
+  taskId: string;
+  title?: string;
+  summary: string;
+  response: string;
+}): string {
+  const title = input.title ? ` ("${input.title}")` : '';
+  return [
+    `<system-reminder>Sub-agent task ${input.taskId}${title} reports: ${input.summary}`,
+    input.response,
+    `Reply with SendMessage({ task_id: "${input.taskId}", message }) if it needs more direction; it keeps working meanwhile.</system-reminder>`,
+  ].join('\n');
+}
+
+/**
+ * RespondToCoordinator: a sub-agent's mid-task reply to the session that
+ * launched it. Delivered as a system notice into the coordinator's live run,
+ * or queued for its next run. Does not end the sub-agent's turn.
+ */
+export function createRespondToCoordinatorTool(deps: RespondToCoordinatorToolDeps): AgentTool {
+  const { sessionId, db, messenger } = deps;
+  return {
+    name: 'RespondToCoordinator',
+    label: 'RespondToCoordinator',
+    description:
+      'Reply to the coordinator that launched you (for example to answer a message it sent, or to report a blocking finding) without ending your task. Keep working after calling it; do not use it for your final result.',
+    parameters: agentToolParameters({
+      type: 'object',
+      properties: {
+        summary: { type: 'string', maxLength: 200, description: 'One-line summary of the reply' },
+        response: { type: 'string', description: 'The full reply for the coordinator' },
+      },
+      required: ['summary', 'response'],
+      additionalProperties: false,
+    }),
+    execute: async (toolCallId: string, params: unknown) => {
+      const args = toolParams(toolCallId, params);
+      if (!db) {
+        return errorResult('missing_db_context', 'RespondToCoordinator requires database context');
+      }
+      if (!messenger) {
+        return errorResult(
+          'missing_messenger',
+          'RespondToCoordinator requires the session messenger'
+        );
+      }
+      if (!sessionId) {
+        return errorResult('missing_session_context', 'RespondToCoordinator requires a session');
+      }
+      const summary = typeof args.summary === 'string' ? args.summary.trim() : '';
+      const response = typeof args.response === 'string' ? args.response.trim() : '';
+      if (!summary || !response) {
+        return errorResult('missing_fields', 'RespondToCoordinator requires summary and response');
+      }
+      const task = new TaskRepository(db).findLatestAgentTaskForSession(sessionId);
+      if (!task?.parentSessionId) {
+        return errorResult(
+          'no_coordinator',
+          'This session was not launched by a coordinator; there is nobody to respond to'
+        );
+      }
+      const notice = buildCoordinatorNotice({
+        taskId: task.id,
+        title: task.title,
+        summary: truncateText(summary, 200),
+        response,
+      });
+      const outcome = messenger.notify(task.parentSessionId, notice);
+      return jsonResult({
+        ok: true,
+        taskId: task.id,
+        coordinatorSessionId: task.parentSessionId,
+        delivery: outcome.delivery,
+      });
     },
   };
 }

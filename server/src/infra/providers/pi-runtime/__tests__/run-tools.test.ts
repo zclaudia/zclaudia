@@ -57,6 +57,31 @@ describe('buildPiRunToolBundle plan mode external tool gating (P0-6)', () => {
   });
 });
 
+describe('buildPiRunToolBundle LSPTool gating', () => {
+  function buildWithPort(languageServerPort?: unknown) {
+    return buildPiRunToolBundle({
+      options: { cwd: '/tmp', languageServerPort } as never,
+      effectiveTools: ['Read', 'LSPTool'],
+      supportsVision: false,
+      isPlanMode: false,
+      permissionCallback: async () => ({ behavior: 'allow' as const }),
+    });
+  }
+
+  it('drops LSPTool when no language server port is wired', () => {
+    expect(buildWithPort().visibleToolNames).toEqual(['Read']);
+  });
+
+  it('keeps LSPTool when the port has a server for the run cwd', () => {
+    const port = {
+      serversFor: (cwd: string) =>
+        cwd === '/tmp' ? [{ id: 'tsserver', name: 'TypeScript', languages: ['typescript'] }] : [],
+      query: async () => ({ action: 'hover', contents: null }),
+    };
+    expect(buildWithPort(port).visibleToolNames).toEqual(['Read', 'LSPTool']);
+  });
+});
+
 describe('buildPiRunToolBundle abortSignal wiring (P1-10)', () => {
   function buildWithAbort(abortController?: AbortController) {
     return buildPiRunToolBundle({

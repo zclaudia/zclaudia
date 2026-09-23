@@ -112,3 +112,36 @@ describe('interaction tools', () => {
     expect(result.content[0].text).toBe('No answer provided.');
   });
 });
+
+describe('TodoRead and AskUserQuestion preview', () => {
+  it('TodoRead returns the latest tracked list for the session', async () => {
+    const { trackAndAutoComplete, clearSession } =
+      await import('../../../../application/conversation/interactions/todo-state-tracker.js');
+    const { createTodoReadTool } = await import('../interaction-tools.js');
+    clearSession('s-todo');
+    trackAndAutoComplete('s-todo', 'i1', [
+      { content: 'A', status: 'pending' },
+      { content: 'B', status: 'in_progress' },
+    ] as never);
+    const read = createTodoReadTool('s-todo') as any;
+    const res = await read.execute('r1', {});
+    expect(JSON.parse(res.content[0].text)).toMatchObject({
+      success: true,
+      count: 2,
+      todos: [
+        { content: 'A', status: 'pending' },
+        { content: 'B', status: 'in_progress' },
+      ],
+    });
+    const empty = await (createTodoReadTool('s-none') as any).execute('r2', {});
+    expect(JSON.parse(empty.content[0].text)).toMatchObject({ success: true, count: 0, todos: [] });
+    clearSession('s-todo');
+  });
+
+  it('AskUserQuestion options accept an optional preview', () => {
+    const ask = createAskUserQuestionTool() as any;
+    const option = ask.parameters.properties.questions.items.properties.options.items;
+    expect(option.properties.preview.type).toBe('string');
+    expect(option.required).toEqual(['label', 'description']);
+  });
+});

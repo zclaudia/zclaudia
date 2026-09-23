@@ -18,6 +18,7 @@ import {
   extractRememberableShellCommands,
   splitCompoundCommand,
 } from './shell-parser.js';
+import { isProvablyReadOnlyBashCommand } from './bash-readonly/index.js';
 
 import { resolveProfile } from './policy-utils.js';
 
@@ -254,10 +255,13 @@ const READONLY_TOOLS = [
   'WebFetch',
   'WebSearch',
   'TodoWrite',
+  'TodoRead',
   'ToolSearch',
   'ListMcpResources',
   'ReadMcpResource',
   'TaskOutput',
+  'ReadSessionContext',
+  'CronList',
   'LSPTool',
 ];
 
@@ -382,11 +386,22 @@ export function classify(toolName: string, toolInput: unknown, detail: string): 
   }
   if (READONLY_TOOLS.includes(toolName)) return 'fileRead';
   if (EDIT_TOOLS.includes(toolName)) return 'fileWrite';
+  // Deleting a persistent automation is not recoverable from the transcript.
+  if (toolName === 'CronDelete') return 'destructiveOps';
   if (toolName.startsWith('mcp__')) return 'networkOps';
 
   if (isBashLikeTool(toolName)) {
     if (isDangerousCommand(toolInput, detail)) return 'destructiveOps';
     if (isNetworkCommand(toolInput, detail)) return 'networkOps';
+    // Provably read-only shell (ls, cat, git status, rg …) is a read, not a
+    // shell risk. Ordered AFTER the destructive/network checks so those keep
+    // absolute priority (`git fetch` stays networkOps), and BEFORE the
+    // shellSafe fallback so hardened profiles with `shellSafe: 'ask'` stop
+    // prompting for reads. The sensitive-file and outside-workspace guards
+    // run in evaluate() before category lookup, so `cat ~/.ssh/id_rsa` still
+    // escalates.
+    const command = extractBashCommand(toolInput, detail);
+    if (command && isProvablyReadOnlyBashCommand(command)) return 'fileRead';
     return 'shellSafe';
   }
 

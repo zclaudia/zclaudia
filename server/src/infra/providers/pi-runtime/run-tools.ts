@@ -14,6 +14,8 @@ import {
 import { buildActiveSkillContext, buildSkillCatalog, buildSkillMetaTools } from './skills.js';
 import { isBashBackgroundConvertible } from './bash-tool.js';
 import { buildTools } from './tool-bridge.js';
+import { applyToolScheduler } from './tool-scheduler.js';
+import { TaskRepository } from '../../../domains/tasks/repository.js';
 
 export interface PiRunToolBundle {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,6 +39,20 @@ export interface PiRunToolBundle {
  */
 const PLAN_MODE_BLOCKED_META_TOOLS = new Set(['LoadExternalTool']);
 
+const AUTOMATION_TOOLS = new Set<ToolName>(['CronCreate', 'CronList', 'CronUpdate', 'CronDelete']);
+
+function isSubagentSession(options: RunOptions): boolean {
+  if (!options.db || !options.claudiaSessionId) return false;
+  try {
+    return (
+      new TaskRepository(options.db).findLatestAgentTaskForSession(options.claudiaSessionId) !==
+      null
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function buildPiRunToolBundle(input: {
   options: RunOptions;
   effectiveTools: ToolName[];
@@ -52,8 +68,15 @@ export function buildPiRunToolBundle(input: {
     options.db && options.claudiaSessionId
       ? loadSessionSandboxDomains(options.db, options.claudiaSessionId)
       : [];
+  // RespondToCoordinator only makes sense inside a sub-agent session (one an
+  // Agent task launched); everywhere else it would just error, so drop it.
+  const enabledForSession = effectiveTools.filter(name => {
+    if (name === 'RespondToCoordinator') return isSubagentSession(options);
+    if (AUTOMATION_TOOLS.has(name)) return Boolean(options.automationPort);
+    return true;
+  });
   const tools = buildTools(options.cwd, {
-    enabled: effectiveTools,
+    enabled: enabledForSession,
     supportsVision,
     serverPort: options.serverPort,
     sessionId: options.claudiaSessionId,
@@ -61,6 +84,13 @@ export function buildPiRunToolBundle(input: {
     permissionOverride: options.permissionOverride,
     db: options.db,
     agentTaskExecutor: options.agentTaskExecutor,
+    subagentMessenger: options.subagentMessenger,
+    automationPort: options.automationPort,
+    languageServerPort: options.languageServerPort,
+    auxiliaryModel: {
+      llmProfileConfig: options.llmProfileConfig,
+      model: options.agentProfile?.model,
+    },
     permissionCallback,
     sandboxReadOnly: isPlanMode,
     sandboxAllowedDomains,
@@ -136,6 +166,11 @@ export function buildPiRunToolBundle(input: {
     // processes are cancelled when the run aborts.
     abortSignal: options.abortController?.signal,
   });
+
+  // Outermost wrapper, applied in place so the array reference handed to
+  // LoadExternalTool (`toolsArray`) stays the same. Covers built-ins, concrete
+  // MCP tools and both meta-tool families in one pass.
+  applyToolScheduler(tools);
 
   const bashConvertible =
     effectiveTools.includes('Bash') &&
