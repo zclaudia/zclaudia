@@ -85,3 +85,4 @@
 - [x] 删除 `search-tools.ts` 里的 ripgrep 版 LSPTool 与 `ripgrepSearch`；shared 元数据改 `concurrentSafe: true, timeoutMs: 30_000`，描述如实。
 - [x] 测试：`lsp-tool.test.ts` 新增；tool-bridge / run-tools 门控用例；pi-adapter 工具数断言改 `- 7`；search-tools 删 4 个 ripgrep 用例。
 - [ ] 后续：`LanguageServerManager`（进程、initialize、didOpen/didChange、诊断）+ 插件 manifest `lspServers` + 复用 `lsp-diagnostics-adapter.ts` 的写后诊断；rename 另开可写工具。
+      → 2026-10-04 重新规划，见 [2026-10-04-lsp-manager-plan.md](2026-10-04-lsp-manager-plan.md)（先内置预设、TS 随包、接口按多使用方设计）。
