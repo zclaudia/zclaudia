@@ -1,12 +1,15 @@
 /**
  * Built-in language-server presets (decision 1 of the LSP plan: presets come
- * before plugin / project configuration). TypeScript ships with zclaudia; Python, Go and Rust servers are used when found on PATH.
+ * before plugin / project configuration). TypeScript and Pyright ship with
+ * zclaudia; Go and Rust servers are used when found on PATH.
  */
 import {
   findOnPath,
+  findVirtualEnvPython,
   findWorkspaceTsserver,
   hasRootMarker,
   memoizeByRoot,
+  resolveBundledPyright,
   resolveBundledTypeScriptServer,
 } from './detection.js';
 import { fileUri } from './documents.js';
@@ -152,23 +155,68 @@ export function createPathPreset(
   };
 }
 
-export const PYRIGHT_PRESET: PathPresetSpec = {
-  id: 'pyright',
-  name: 'Python (Pyright)',
-  languages: ['python'],
-  extensions: { '.py': 'python', '.pyi': 'python' },
-  rootMarkers: [
-    'pyproject.toml',
-    'pyrightconfig.json',
-    'setup.py',
-    'setup.cfg',
-    'requirements.txt',
-    'Pipfile',
-  ],
-  command: 'pyright-langserver',
-  args: ['--stdio'],
-  installHint: 'npm install -g pyright',
-};
+const PYTHON_ROOT_MARKERS = [
+  'pyproject.toml',
+  'pyrightconfig.json',
+  'setup.py',
+  'setup.cfg',
+  'requirements.txt',
+  'Pipfile',
+];
+
+/**
+ * What pyright is told through `workspace/configuration` (section `python`).
+ * With a workspace venv it resolves imports from that interpreter. Without
+ * one, an import it cannot resolve says more about the environment than the
+ * code, so it is a warning: write diagnostics only report errors, and an agent
+ * adding `import requests` must not be told it broke something. A project's
+ * own pyrightconfig.json / [tool.pyright] still wins over these settings.
+ */
+export function pyrightSettings(venvPython: string | null): Record<string, unknown> {
+  return {
+    python: {
+      ...(venvPython ? { pythonPath: venvPython } : {}),
+      analysis: {
+        // Sending `analysis` at all turns this off unless it is set.
+        autoSearchPaths: true,
+        ...(venvPython ? {} : { diagnosticSeverityOverrides: { reportMissingImports: 'warning' } }),
+      },
+    },
+  };
+}
+
+export interface PyrightPresetDeps {
+  resolveServer?: () => string | null;
+  findVenvPython?: (root: string) => string | null;
+  nodePath?: string;
+}
+
+/** Pyright ships with zclaudia (decision 2 of the P3 plan) and runs on the sidecar node. */
+export function createPyrightPreset(deps: PyrightPresetDeps = {}): LanguageServerPreset {
+  const resolveServer = deps.resolveServer ?? (() => resolveBundledPyright());
+  const findVenvPython = deps.findVenvPython ?? findVirtualEnvPython;
+  const nodePath = deps.nodePath ?? process.execPath;
+  const resolveLaunch = memoizeByRoot((root: string): LaunchSpec | null => {
+    if (!hasRootMarker(root, PYTHON_ROOT_MARKERS)) return null;
+    const server = resolveServer();
+    if (!server) return null;
+    return {
+      command: nodePath,
+      args: [server, '--stdio'],
+      cwd: root,
+      settings: pyrightSettings(findVenvPython(root)),
+    };
+  });
+  return {
+    id: 'pyright',
+    name: 'Python (Pyright)',
+    languages: ['python'],
+    extensions: { '.py': 'python', '.pyi': 'python' },
+    rootMarkers: PYTHON_ROOT_MARKERS,
+    resolveLaunch,
+    refreshDetection: () => resolveLaunch.clear(),
+  };
+}
 
 export const GOPLS_PRESET: PathPresetSpec = {
   id: 'gopls',
@@ -195,7 +243,7 @@ export const RUST_ANALYZER_PRESET: PathPresetSpec = {
 export function defaultLanguageServerPresets(): LanguageServerPreset[] {
   return [
     createTypeScriptPreset(),
-    createPathPreset(PYRIGHT_PRESET),
+    createPyrightPreset(),
     createPathPreset(GOPLS_PRESET),
     createPathPreset(RUST_ANALYZER_PRESET),
   ];

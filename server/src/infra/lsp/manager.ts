@@ -818,6 +818,7 @@ export class LanguageServerManager implements LanguageServerService {
       const client = await LspClient.start(transport, {
         root: entry.root,
         initializationOptions: launch.initializationOptions,
+        settings: launch.settings,
         initializeTimeoutMs: this.options.initializeTimeoutMs,
       });
       const diagnostics = new DiagnosticsStore(entry.root);

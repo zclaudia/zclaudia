@@ -2,13 +2,16 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { settingsSection } from '../client.js';
 import {
   findFirstSourceFile,
   findOnPath,
+  findVirtualEnvPython,
   findWorkspaceTsserver,
   memoizeByRoot,
+  resolveBundledPyright,
 } from '../detection.js';
-import { createPathPreset } from '../presets.js';
+import { createPathPreset, createPyrightPreset, pyrightSettings } from '../presets.js';
 
 describe('language-server detection', () => {
   let dir: string;
@@ -101,5 +104,59 @@ describe('language-server detection', () => {
     } finally {
       rmSync(other, { recursive: true, force: true });
     }
+  });
+
+  it('finds a workspace venv interpreter, .venv first', () => {
+    expect(findVirtualEnvPython(dir, 'darwin')).toBeNull();
+    file('venv/bin/python');
+    expect(findVirtualEnvPython(dir, 'darwin')).toBe(path.join(dir, 'venv', 'bin', 'python'));
+    file('.venv/bin/python');
+    expect(findVirtualEnvPython(dir, 'darwin')).toBe(path.join(dir, '.venv', 'bin', 'python'));
+    file('.venv/Scripts/python.exe');
+    expect(findVirtualEnvPython(dir, 'win32')).toBe(
+      path.join(dir, '.venv', 'Scripts', 'python.exe')
+    );
+  });
+
+  it('resolves the bundled Pyright entry', () => {
+    expect(resolveBundledPyright()).toMatch(/pyright[\\/]langserver\.index\.js$/);
+  });
+
+  it('points Pyright at the venv, or downgrades unresolved imports without one', () => {
+    expect(pyrightSettings('/w/.venv/bin/python')).toEqual({
+      python: { pythonPath: '/w/.venv/bin/python', analysis: { autoSearchPaths: true } },
+    });
+    expect(pyrightSettings(null)).toEqual({
+      python: {
+        analysis: {
+          autoSearchPaths: true,
+          diagnosticSeverityOverrides: { reportMissingImports: 'warning' },
+        },
+      },
+    });
+    // What the client answers for the sections Pyright asks about.
+    const settings = pyrightSettings(null);
+    expect(settingsSection(settings, 'python')).toBe(settings.python);
+    expect(settingsSection(settings, 'python.analysis')).toMatchObject({ autoSearchPaths: true });
+    expect(settingsSection(settings, 'pyright')).toBeNull();
+    expect(settingsSection(undefined, 'python')).toBeNull();
+  });
+
+  it('enables Pyright for Python projects only, with the venv it finds', () => {
+    const preset = createPyrightPreset({
+      resolveServer: () => '/bundle/vendor/pyright/langserver.index.js',
+      findVenvPython: () => '/w/.venv/bin/python',
+      nodePath: '/node',
+    });
+    expect(preset.resolveLaunch(dir)).toBeNull();
+    preset.refreshDetection?.();
+    file('requirements.txt');
+    expect(preset.resolveLaunch(dir)).toEqual({
+      command: '/node',
+      args: ['/bundle/vendor/pyright/langserver.index.js', '--stdio'],
+      cwd: dir,
+      settings: pyrightSettings('/w/.venv/bin/python'),
+    });
+    expect(preset.installHint).toBeUndefined(); // shipped, so never "missing"
   });
 });

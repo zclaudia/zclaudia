@@ -41,6 +41,8 @@ export class LanguageServerStartupError extends Error {
 export interface LspClientOptions {
   root: string;
   initializationOptions?: unknown;
+  /** Answers to `workspace/configuration`, by section. */
+  settings?: Record<string, unknown>;
   initializeTimeoutMs?: number;
 }
 
@@ -80,6 +82,23 @@ function initializeParams(root: string, initializationOptions: unknown): Initial
   };
 }
 
+/**
+ * The value at a dotted `section` of the launch settings (`python.analysis`
+ * → settings.python.analysis), or null when the client has nothing to say.
+ */
+export function settingsSection(
+  settings: Record<string, unknown> | undefined,
+  section: string | undefined
+): unknown {
+  if (!settings || !section) return null;
+  let value: unknown = settings;
+  for (const key of section.split('.')) {
+    if (!value || typeof value !== 'object' || !(key in value)) return null;
+    value = (value as Record<string, unknown>)[key];
+  }
+  return value ?? null;
+}
+
 export class LspClient {
   private closed = false;
 
@@ -101,8 +120,10 @@ export class LspClient {
     // Requests servers send to clients. Acknowledge rather than leave them
     // unhandled: a MethodNotFound on registerCapability makes some servers
     // give up on features.
-    connection.onRequest('workspace/configuration', (params: { items?: unknown[] }) =>
-      (params?.items ?? []).map(() => null)
+    connection.onRequest(
+      'workspace/configuration',
+      (params: { items?: Array<{ section?: string }> }) =>
+        (params?.items ?? []).map(item => settingsSection(options.settings, item?.section))
     );
     connection.onRequest('workspace/workspaceFolders', () => [
       { uri: rootUri, name: path.basename(options.root) },

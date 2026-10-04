@@ -80,27 +80,40 @@ export function findWorkspaceTsserver(root: string): string | null {
 }
 
 /**
- * typescript-language-server's CLI, shipped with zclaudia: the release bundle
- * copies it to `vendor/` beside server.mjs (see scripts/bundle.mjs); dev
- * resolves the package dependency.
+ * A file of a server package that ships as its own process: beside the
+ * bundled server.mjs under `vendor/<package>/` in release builds (see
+ * server/scripts/bundle.mjs), from node_modules in development.
  */
-export function resolveBundledTypeScriptServer(moduleUrl: string = import.meta.url): string | null {
+function resolveBundledPackageFile(
+  packageName: string,
+  file: string,
+  moduleUrl: string
+): string | null {
   const vendored = path.resolve(
     path.dirname(fileURLToPath(moduleUrl)),
     'vendor',
-    'typescript-language-server',
-    'lib',
-    'cli.mjs'
+    packageName,
+    file
   );
   if (existsSync(vendored)) return vendored;
   try {
     const req = createRequire(moduleUrl);
-    const pkg = req.resolve('typescript-language-server/package.json');
-    const cli = path.join(path.dirname(pkg), 'lib', 'cli.mjs');
-    return existsSync(cli) ? cli : null;
+    const pkg = req.resolve(`${packageName}/package.json`);
+    const resolved = path.join(path.dirname(pkg), file);
+    return existsSync(resolved) ? resolved : null;
   } catch {
     return null;
   }
+}
+
+/** typescript-language-server's CLI, shipped with zclaudia. */
+export function resolveBundledTypeScriptServer(moduleUrl: string = import.meta.url): string | null {
+  return resolveBundledPackageFile('typescript-language-server', 'lib/cli.mjs', moduleUrl);
+}
+
+/** Pyright's language-server entry, shipped with zclaudia (CommonJS). */
+export function resolveBundledPyright(moduleUrl: string = import.meta.url): string | null {
+  return resolveBundledPackageFile('pyright', 'langserver.index.js', moduleUrl);
 }
 
 const SOURCE_SEARCH_SKIP = new Set(['node_modules', 'dist', 'build', 'out', 'coverage', 'target']);
@@ -180,6 +193,21 @@ export function findOnPath(command: string, pathValue = process.env.PATH ?? ''):
       const candidate = path.join(dir, `${command}${extension}`);
       if (isExecutableFile(candidate)) return candidate;
     }
+  }
+  return null;
+}
+
+const VENV_DIRECTORIES = ['.venv', 'venv'];
+
+/**
+ * The interpreter of a virtual environment in the workspace root (`.venv`,
+ * which uv and Poetry's in-project mode create, or `venv`), or null.
+ */
+export function findVirtualEnvPython(root: string, platform = process.platform): string | null {
+  const relative = platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python'];
+  for (const dir of VENV_DIRECTORIES) {
+    const candidate = path.join(root, dir, ...relative);
+    if (existsSync(candidate)) return candidate;
   }
   return null;
 }
