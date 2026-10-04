@@ -12,6 +12,10 @@ import * as fs from 'fs';
 const ROOT_DIR = path.resolve(import.meta.dirname, '../..');
 const GATEWAY_DIR = path.resolve(ROOT_DIR, '../zclaudia-gateway');
 const E2E_DATA_DIR = path.join(ROOT_DIR, '.tmp', 'e2e-data');
+// The server seeds plugin data from the legacy dir when it exists; pointing
+// the override at a path that is never created keeps e2e runs from copying a
+// developer's real ~/.claudia permissions/storage into the e2e data dir.
+const E2E_LEGACY_DATA_DIR = path.join(ROOT_DIR, '.tmp', 'e2e-data-legacy-missing');
 const E2E_GATEWAY_PORT = 3320;
 const E2E_SERVER_PORT = 3310;
 const E2E_DESKTOP_PORT = 1421;
@@ -143,6 +147,7 @@ function createServerService(includeGateway: boolean): ServiceConfig {
           }
         : {}),
       ZCLAUDIA_DATA_DIR: E2E_DATA_DIR,
+      ZCLAUDIA_LEGACY_DATA_DIR: E2E_LEGACY_DATA_DIR,
     },
   };
 }
@@ -348,6 +353,7 @@ export async function setup() {
 
   fs.mkdirSync(E2E_DATA_DIR, { recursive: true });
   process.env.ZCLAUDIA_DATA_DIR = E2E_DATA_DIR;
+  process.env.ZCLAUDIA_LEGACY_DATA_DIR = E2E_LEGACY_DATA_DIR;
   process.env.E2E_SERVER_PORT = String(E2E_SERVER_PORT);
   process.env.E2E_DESKTOP_PORT = String(E2E_DESKTOP_PORT);
   process.env.E2E_SERVER_URL = `http://localhost:${E2E_SERVER_PORT}`;

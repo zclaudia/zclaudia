@@ -369,11 +369,6 @@ export class PermissionManager {
   getAllPluginPermissions(): PermissionStore {
     return { ...this.store };
   }
-
-  setStorePath(storePath: string): void {
-    this.storePath = storePath;
-    this.loadStore();
-  }
 }
 
 export const permissionManager = new PermissionManager();

@@ -1,9 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'fs';
 import { homedir, tmpdir } from 'os';
 import { join, resolve } from 'path';
 
-import { resolveDataDir, sweepStaleLogs } from '../data-dir.js';
+import { resolveDataDir, seedFromLegacyFile, sweepStaleLogs } from '../data-dir.js';
 
 describe('resolveDataDir', () => {
   let prev: string | undefined;
@@ -25,6 +34,75 @@ describe('resolveDataDir', () => {
   it('falls back to ~/.zclaudia when unset', () => {
     delete process.env.ZCLAUDIA_DATA_DIR;
     expect(resolveDataDir()).toBe(join(homedir(), '.zclaudia'));
+  });
+});
+
+describe('seedFromLegacyFile', () => {
+  const seedTempFiles = (dir: string) =>
+    readdirSync(dir).filter((name) => name.includes('.seed-'));
+
+  it('copies the legacy file into place when the target is missing', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zc-seed-'));
+    try {
+      const legacy = join(dir, 'legacy', 'store.json');
+      mkdirSync(join(dir, 'legacy'));
+      writeFileSync(legacy, '{"granted":true}');
+      const target = join(dir, 'nested', 'deeper', 'store.json');
+
+      expect(seedFromLegacyFile(legacy, target)).toBe(true);
+      expect(existsSync(target)).toBe(true);
+      expect(readFileSync(target, 'utf-8')).toBe('{"granted":true}');
+      // a failed/interrupted copy must not leave a marker that blocks retry
+      expect(seedTempFiles(join(dir, 'nested', 'deeper'))).toEqual([]);
+      expect(existsSync(legacy)).toBe(true); // legacy stays for older builds
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('never overwrites an existing target', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zc-seed-'));
+    try {
+      const legacy = join(dir, 'legacy.json');
+      writeFileSync(legacy, '{"from":"legacy"}');
+      const target = join(dir, 'store.json');
+      writeFileSync(target, '{"from":"new"}');
+
+      expect(seedFromLegacyFile(legacy, target)).toBe(false);
+      expect(readFileSync(target, 'utf-8')).toBe('{"from":"new"}');
+      expect(seedTempFiles(dir)).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns false for a missing legacy file or identical paths', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zc-seed-'));
+    try {
+      expect(seedFromLegacyFile(join(dir, 'nope.json'), join(dir, 'store.json'))).toBe(false);
+      const same = join(dir, 'store.json');
+      writeFileSync(same, '{}');
+      expect(seedFromLegacyFile(same, same)).toBe(false);
+      expect(seedFromLegacyFile(same, join(dir, '.', 'store.json'))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('propagates copy errors and cleans up its temp file', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zc-seed-'));
+    try {
+      const legacy = join(dir, 'legacy.json');
+      writeFileSync(legacy, '{}');
+      // target parent path is occupied by a regular file → mkdir/copy fails
+      const blocker = join(dir, 'blocker');
+      writeFileSync(blocker, 'x');
+
+      expect(() => seedFromLegacyFile(legacy, join(blocker, 'store.json'))).toThrow();
+      expect(seedTempFiles(dir)).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

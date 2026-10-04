@@ -1,7 +1,7 @@
 import {
-  constants,
   copyFileSync,
   existsSync,
+  linkSync,
   mkdirSync,
   readdirSync,
   statSync,
@@ -39,13 +39,37 @@ export function resolveLegacyDataDir(): string {
  * does. Never overwrites the target and never writes to the legacy location
  * (it stays in place for older builds). Returns whether a copy happened;
  * fs errors propagate to the caller.
+ *
+ * The target appears via a single hard link from a fully written temp sibling,
+ * so an interrupted copy (ENOSPC, SIGKILL) never leaves a truncated target
+ * behind — target existence doubles as the "already migrated" marker, and a
+ * half-written file would permanently skip the migration. The link (rather
+ * than a rename) keeps the no-clobber guarantee when two processes race the
+ * same fresh data dir: the loser's link fails with EEXIST, reported as "no
+ * copy happened".
  */
 export function seedFromLegacyFile(legacyPath: string, targetPath: string): boolean {
   if (path.resolve(legacyPath) === path.resolve(targetPath)) return false;
   if (existsSync(targetPath) || !existsSync(legacyPath)) return false;
   mkdirSync(path.dirname(targetPath), { recursive: true });
-  // EXCL: never clobber a file another process created in the meantime.
-  copyFileSync(legacyPath, targetPath, constants.COPYFILE_EXCL);
+  const tempPath = `${targetPath}.seed-${process.pid}-${Date.now()}`;
+  try {
+    copyFileSync(legacyPath, tempPath);
+    try {
+      linkSync(tempPath, targetPath);
+    } catch (error) {
+      // Another process created the target between the probe and the link —
+      // it won, keep its file. Any other error still propagates.
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
+      throw error;
+    }
+  } finally {
+    try {
+      unlinkSync(tempPath);
+    } catch {
+      // the temp file may not exist if the copy itself failed — best effort
+    }
+  }
   return true;
 }
 
