@@ -23,6 +23,7 @@ import {
   recordSkillUsage,
 } from '../../../application/plugins/skill-tools.js';
 import type { PermissionCallback } from '../message-types.js';
+import type { PiToolLookupPort } from '../types.js';
 import { buildModel } from './build-model.js';
 import { buildTools } from './tool-bridge.js';
 import { applyToolScheduler } from './tool-scheduler.js';
@@ -107,6 +108,8 @@ type NestedAgentLike = {
 export interface SkillExecutionDependencies {
   cwd: string;
   db?: Database.Database;
+  /** Host lookups forwarded to the forked skill's built-in tools. */
+  toolLookups?: PiToolLookupPort;
   enabledTools?: string[];
   llmProfileConfig?: LlmProfileConfig;
   agentProfile?: AgentProfileConfig;
@@ -646,6 +649,7 @@ function buildForkSkillTools(
     buildTools(execution.cwd, {
       enabled,
       db: execution.db,
+      toolLookups: execution.toolLookups,
       permissionOverride: execution.permissionOverride,
       permissionCallback: execution.permissionCallback,
     })

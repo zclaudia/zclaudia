@@ -115,7 +115,7 @@ describe('interaction tools', () => {
 
 describe('TodoRead and AskUserQuestion preview', () => {
   it('TodoRead returns the latest tracked list for the session', async () => {
-    const { trackAndAutoComplete, clearSession } =
+    const { trackAndAutoComplete, clearSession, getLatestTodos } =
       await import('../../../../application/conversation/interactions/todo-state-tracker.js');
     const { createTodoReadTool } = await import('../interaction-tools.js');
     clearSession('s-todo');
@@ -123,7 +123,7 @@ describe('TodoRead and AskUserQuestion preview', () => {
       { content: 'A', status: 'pending' },
       { content: 'B', status: 'in_progress' },
     ] as never);
-    const read = createTodoReadTool('s-todo') as any;
+    const read = createTodoReadTool('s-todo', { getLatestTodos }) as any;
     const res = await read.execute('r1', {});
     expect(JSON.parse(res.content[0].text)).toMatchObject({
       success: true,
@@ -133,7 +133,7 @@ describe('TodoRead and AskUserQuestion preview', () => {
         { content: 'B', status: 'in_progress' },
       ],
     });
-    const empty = await (createTodoReadTool('s-none') as any).execute('r2', {});
+    const empty = await (createTodoReadTool('s-none', { getLatestTodos }) as any).execute('r2', {});
     expect(JSON.parse(empty.content[0].text)).toMatchObject({ success: true, count: 0, todos: [] });
     clearSession('s-todo');
   });

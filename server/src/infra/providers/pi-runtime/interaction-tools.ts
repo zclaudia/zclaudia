@@ -5,8 +5,7 @@ import {
   MAX_TODO_ITEMS,
   validateTodoItems,
 } from '../../../utils/todo-normalizer.js';
-import type { PermissionCallback } from '../types.js';
-import { getLatestTodos } from '../../../application/conversation/interactions/todo-state-tracker.js';
+import type { PermissionCallback, PiToolLookupPort } from '../types.js';
 import {
   agentToolParameters,
   errorResult,
@@ -68,7 +67,10 @@ export function createTodoWriteTool(): AgentTool {
   };
 }
 
-export function createTodoReadTool(sessionId?: string): AgentTool {
+export function createTodoReadTool(
+  sessionId?: string,
+  lookups?: Pick<PiToolLookupPort, 'getLatestTodos'>
+): AgentTool {
   return {
     name: 'TodoRead',
     label: 'TodoRead',
@@ -83,7 +85,7 @@ export function createTodoReadTool(sessionId?: string): AgentTool {
       if (!sessionId) {
         return jsonResult({ success: true, count: 0, todos: [], note: 'No session context' });
       }
-      const todos = getLatestTodos(sessionId) ?? [];
+      const todos = lookups?.getLatestTodos(sessionId) ?? [];
       return jsonResult({ success: true, count: todos.length, todos });
     },
   };

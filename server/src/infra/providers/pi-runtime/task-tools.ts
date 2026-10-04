@@ -5,8 +5,7 @@ import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permi
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
 import type { TaskExecutor } from '../../../utils/task-executor-types.js';
-import { AgentProfileRepository } from '../../../domains/agent-profiles/repository.js';
-import type { SubagentMessenger } from '../types.js';
+import type { PiToolLookupPort, SubagentMessenger, SubagentType } from '../types.js';
 import {
   agentToolParameters,
   errorResult,
@@ -49,29 +48,20 @@ function resolveProjectIdForSession(
   }
 }
 
-export interface SubagentType {
-  id: string;
-  name: string;
-  description?: string;
-}
+export type { SubagentType };
 
 /**
  * Roster for the Agent tool's `subagent_type`: every active agent profile.
  * Profiles are global (no project column), so the roster is the same for
- * every session. Missing db or table → empty roster (tool still works with
- * the default profile).
+ * every session. Missing lookups or a failed read → empty roster (tool still
+ * works with the default profile).
  */
-export function listSubagentTypes(db: Database.Database | undefined): SubagentType[] {
-  if (!db) return [];
+export function listSubagentTypes(
+  lookups: Pick<PiToolLookupPort, 'listSubagentTypes'> | undefined
+): SubagentType[] {
+  if (!lookups) return [];
   try {
-    return new AgentProfileRepository(db)
-      .findAllOrdered()
-      .filter(profile => (profile.status ?? 'active') === 'active')
-      .map(profile => ({
-        id: profile.id,
-        name: profile.name,
-        description: profile.description?.trim() || undefined,
-      }));
+    return lookups.listSubagentTypes();
   } catch {
     return [];
   }
@@ -110,9 +100,10 @@ export function createAgentTool(
   runId?: string,
   db?: Database.Database,
   permissionOverride?: Partial<UnifiedPermissionPolicy>,
-  agentTaskExecutor?: TaskExecutor
+  agentTaskExecutor?: TaskExecutor,
+  lookups?: Pick<PiToolLookupPort, 'listSubagentTypes'>
 ): AgentTool {
-  const roster = listSubagentTypes(db);
+  const roster = listSubagentTypes(lookups);
   return {
     name: 'Agent',
     label: 'Agent',
@@ -168,9 +159,9 @@ export function createAgentTool(
         }
         // Re-read the roster at call time: profiles may have been added since
         // the tool was built, and the description is only a hint.
-        const resolved = resolveSubagentType(listSubagentTypes(db), args.subagent_type);
+        const resolved = resolveSubagentType(listSubagentTypes(lookups), args.subagent_type);
         if (!resolved) {
-          const available = listSubagentTypes(db)
+          const available = listSubagentTypes(lookups)
             .map(entry => entry.name)
             .join(', ');
           return errorResult(

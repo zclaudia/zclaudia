@@ -72,7 +72,7 @@ export const BUILTIN_TOOL_FACTORIES: Record<ToolName, ToolFactory> = {
   Glob: cwd => createGlobTool(cwd),
   LS: cwd => createLsBridgeTool(cwd),
   TodoWrite: () => createTodoWriteTool(),
-  TodoRead: (_cwd, options) => createTodoReadTool(options?.sessionId),
+  TodoRead: (_cwd, options) => createTodoReadTool(options?.sessionId, options?.toolLookups),
   AskUserQuestion: (_cwd, options) => createAskUserQuestionTool(options?.permissionCallback),
   WebFetch: (_cwd, options) => createWebFetchTool({ auxiliaryModel: options?.auxiliaryModel }),
   WebSearch: (_cwd, options) => createWebSearchTool(options?.db),
@@ -96,7 +96,8 @@ export const BUILTIN_TOOL_FACTORIES: Record<ToolName, ToolFactory> = {
       options?.runId,
       options?.db,
       options?.permissionOverride,
-      options?.agentTaskExecutor
+      options?.agentTaskExecutor,
+      options?.toolLookups
     ),
   SendMessage: (cwd, options) =>
     createSendMessageTool({
@@ -118,6 +119,7 @@ export const BUILTIN_TOOL_FACTORIES: Record<ToolName, ToolFactory> = {
     createReadSessionContextTool({
       sessionId: options?.sessionId,
       db: options?.db,
+      sessions: options?.toolLookups,
       auxiliaryModel: options?.auxiliaryModel,
     }),
   CronCreate: (cwd, options) => createCronCreateTool(automationDeps(cwd, options)),

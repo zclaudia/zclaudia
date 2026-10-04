@@ -8,6 +8,7 @@ import {
   buildUserMessage,
 } from '../session-tree/write-path.js';
 import { createReadSessionContextTool, renderTranscript } from '../session-context-tool.js';
+import { createPiToolLookups } from '../../../../application/conversation/runtime/pi-tool-lookups.js';
 
 function seed(db: Database.Database) {
   const now = Date.now();
@@ -79,6 +80,7 @@ describe('ReadSessionContext', () => {
     const tool = createReadSessionContextTool({
       sessionId: 'current',
       db,
+      sessions: createPiToolLookups(db),
       auxiliaryModel: { complete },
     }) as any;
     const res = await tool.execute('r1', {
@@ -107,6 +109,7 @@ describe('ReadSessionContext', () => {
     const tool = createReadSessionContextTool({
       sessionId: 'current',
       db,
+      sessions: createPiToolLookups(db),
       auxiliaryModel: { complete },
     }) as any;
     const none = await tool.execute('r2', { session_id: 'sibling', query: 'unrelated' });
@@ -127,7 +130,11 @@ describe('ReadSessionContext', () => {
   });
 
   it('falls back to the raw transcript tail without an auxiliary model', async () => {
-    const tool = createReadSessionContextTool({ sessionId: 'current', db }) as any;
+    const tool = createReadSessionContextTool({
+      sessionId: 'current',
+      db,
+      sessions: createPiToolLookups(db),
+    }) as any;
     const res = await tool.execute('r4', { session_id: 'sibling', query: 'anything' });
     const body = JSON.parse(res.content[0].text);
     expect(body).toMatchObject({ status: 'ok', source: 'local', messageCount: 2 });
@@ -139,6 +146,7 @@ describe('ReadSessionContext', () => {
     const tool = createReadSessionContextTool({
       sessionId: 'current',
       db,
+      sessions: createPiToolLookups(db),
       auxiliaryModel: { complete: vi.fn() },
     }) as any;
     expect((await tool.execute('r5', { session_id: 'foreign', query: 'q' })).details).toMatchObject(

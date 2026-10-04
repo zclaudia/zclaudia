@@ -4,6 +4,7 @@ import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import type { ToolName } from '@zclaudia/shared/core/tools';
+import type { NormalizedTodoItem } from '@zclaudia/shared/interaction/forms';
 import type Database from 'better-sqlite3';
 import type { ProviderEventNormalizer } from './provider-normalizer.js';
 import type { PermissionCallback, ProviderRuntimeEvent } from './message-types.js';
@@ -78,6 +79,30 @@ export interface SubagentMessenger {
   notify(sessionId: string, text: string): { delivery: 'steered' | 'queued' };
 }
 
+/** An agent profile offered as a `subagent_type` by the Agent tool. */
+export interface SubagentType {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+/**
+ * Read-only lookups the built-in Pi tools need from application/domain state,
+ * adapted by the application runtime (see
+ * application/conversation/runtime/pi-tool-lookups.ts) so infra never imports
+ * those layers. Absent = the tools degrade as they do without a database.
+ */
+export interface PiToolLookupPort {
+  /** Latest todo list tracked for a session (TodoRead). */
+  getLatestTodos(sessionId: string): NormalizedTodoItem[] | undefined;
+  /** Whether an Agent task launched this session (gates RespondToCoordinator). */
+  isSubagentSession(sessionId: string): boolean;
+  /** Session fields ReadSessionContext needs to enforce the project boundary. */
+  findSession(sessionId: string): { projectId: string; name?: string | null } | undefined;
+  /** Active agent profiles, the Agent tool's `subagent_type` roster. */
+  listSubagentTypes(): SubagentType[];
+}
+
 // Re-export core provider message types (shared across all providers)
 export type {
   PermissionCallback,
@@ -116,6 +141,8 @@ export interface RunOptions {
   subagentMessenger?: SubagentMessenger;
   /** Automation CRUD port for the Cron* tools (absent = tools not registered). */
   automationPort?: AutomationPort;
+  /** Host lookups for TodoRead / RespondToCoordinator / ReadSessionContext / Agent. */
+  toolLookups?: PiToolLookupPort;
   /** Language-server port for LSPTool (absent or no server for cwd = tool not registered). */
   languageServerPort?: LanguageServerPort;
   /** Language-server manager: write diagnostics for the Pi runtime (absent = none). */

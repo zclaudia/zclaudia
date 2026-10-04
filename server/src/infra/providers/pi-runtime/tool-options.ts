@@ -22,7 +22,12 @@ import {
 import type { TaskRuntimeRegistryFactory } from './task-tools.js';
 import type { ToolExecutionObserver } from './tool-execution-observer.js';
 import type { PendingArgOverrides } from './pending-arg-overrides.js';
-import type { AutomationPort, LanguageServerPort, SubagentMessenger } from '../types.js';
+import type {
+  AutomationPort,
+  LanguageServerPort,
+  PiToolLookupPort,
+  SubagentMessenger,
+} from '../types.js';
 import type { AuxiliaryModelContext } from './auxiliary-model.js';
 import type {
   DiagnosticsMode,
@@ -47,6 +52,8 @@ export interface ToolBridgeOptions {
   subagentMessenger?: SubagentMessenger;
   /** Automation CRUD port for the Cron* tools. */
   automationPort?: AutomationPort;
+  /** Host lookups for TodoRead / ReadSessionContext / the Agent subagent_type roster. */
+  toolLookups?: PiToolLookupPort;
   /** Language-server port for LSPTool; the tool is skipped when it has no server for cwd. */
   languageServerPort?: LanguageServerPort;
   /** Auxiliary model context for summarizing tools (WebFetch prompt, ReadSessionContext). */

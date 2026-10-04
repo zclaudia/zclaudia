@@ -25,6 +25,7 @@ import { resolveProjectMemoryDir } from '../../../utils/memory-paths.js';
 import { workspaceService } from '../../services/workspace.js';
 import { mapPermissionMode } from '../../../infra/providers/pcp-permission.js';
 import type { LanguageServerService } from '../../../infra/lsp/index.js';
+import { createPiToolLookups } from './pi-tool-lookups.js';
 
 interface SessionContext {
   id: string;
@@ -120,6 +121,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     subagentMessenger,
     automationPort,
     languageServers,
+    toolLookups: createPiToolLookups(db),
     llmProfileConfig: providerConfig,
     agentProfile,
     enabledTools,

@@ -16,7 +16,6 @@ import { isBashBackgroundConvertible } from './bash-tool.js';
 import { buildTools } from './tool-bridge.js';
 import { applyToolScheduler } from './tool-scheduler.js';
 import { createLanguageServerDiagnosticsProvider } from './language-server-diagnostics.js';
-import { TaskRepository } from '../../../domains/tasks/repository.js';
 
 export interface PiRunToolBundle {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,12 +44,9 @@ const PLAN_MODE_BLOCKED_META_TOOLS = new Set(['LoadExternalTool']);
 const AUTOMATION_TOOLS = new Set<ToolName>(['CronCreate', 'CronList', 'CronUpdate', 'CronDelete']);
 
 function isSubagentSession(options: RunOptions): boolean {
-  if (!options.db || !options.claudiaSessionId) return false;
+  if (!options.toolLookups || !options.claudiaSessionId) return false;
   try {
-    return (
-      new TaskRepository(options.db).findLatestAgentTaskForSession(options.claudiaSessionId) !==
-      null
-    );
+    return options.toolLookups.isSubagentSession(options.claudiaSessionId);
   } catch {
     return false;
   }
@@ -89,6 +85,7 @@ export function buildPiRunToolBundle(input: {
     agentTaskExecutor: options.agentTaskExecutor,
     subagentMessenger: options.subagentMessenger,
     automationPort: options.automationPort,
+    toolLookups: options.toolLookups,
     languageServerPort: options.languageServerPort,
     diagnosticsProvider: options.languageServers
       ? createLanguageServerDiagnosticsProvider(options.languageServers, options.cwd)
@@ -140,6 +137,7 @@ export function buildPiRunToolBundle(input: {
         execution: {
           cwd: options.cwd,
           db: options.db,
+          toolLookups: options.toolLookups,
           enabledTools: effectiveTools,
           llmProfileConfig: options.llmProfileConfig,
           agentProfile: options.agentProfile,

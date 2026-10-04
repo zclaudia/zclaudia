@@ -13,7 +13,7 @@
  */
 import type { AgentTool, AgentMessage } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
-import { SessionRepository } from '../../../domains/sessions/repository.js';
+import type { PiToolLookupPort } from '../types.js';
 import { readRecentMessages } from './session-tree/index.js';
 import {
   hasAuxiliaryModel,
@@ -31,6 +31,7 @@ const NO_RELEVANT_CONTEXT = 'NO_RELEVANT_CONTEXT';
 export interface SessionContextToolDeps {
   sessionId?: string;
   db?: Database.Database;
+  sessions?: Pick<PiToolLookupPort, 'findSession'>;
   auxiliaryModel?: AuxiliaryModelContext;
 }
 
@@ -80,7 +81,7 @@ export function renderTranscript(messages: AgentMessage[]): { text: string; trun
 }
 
 export function createReadSessionContextTool(deps: SessionContextToolDeps): AgentTool {
-  const { sessionId, db, auxiliaryModel } = deps;
+  const { sessionId, db, sessions, auxiliaryModel } = deps;
   return {
     name: 'ReadSessionContext',
     label: 'ReadSessionContext',
@@ -102,7 +103,7 @@ export function createReadSessionContextTool(deps: SessionContextToolDeps): Agen
     }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
-      if (!db) {
+      if (!db || !sessions) {
         return errorResult('missing_db_context', 'ReadSessionContext requires database context');
       }
       const targetId = typeof args.session_id === 'string' ? args.session_id.trim() : '';
@@ -114,10 +115,9 @@ export function createReadSessionContextTool(deps: SessionContextToolDeps): Agen
       }
       const strategy = args.strategy === 'handoff' ? 'handoff' : 'relevant';
 
-      const sessions = new SessionRepository(db);
-      const target = sessions.findById(targetId);
+      const target = sessions.findSession(targetId);
       if (!target) return errorResult('session_not_found', `Session not found: ${targetId}`);
-      const current = sessionId ? sessions.findById(sessionId) : undefined;
+      const current = sessionId ? sessions.findSession(sessionId) : undefined;
       // Project boundary: a session may only read siblings of its own project.
       if (!current || current.projectId !== target.projectId) {
         return errorResult(

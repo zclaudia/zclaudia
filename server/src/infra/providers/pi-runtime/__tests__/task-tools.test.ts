@@ -6,6 +6,7 @@ import { TaskRepository } from '../../../../domains/tasks/repository.js';
 import { TaskService } from '../../../../domains/tasks/task-service.js';
 import * as taskTools from '../task-tools.js';
 import { createAgentTool, createMonitorTool, createTaskOutputTool } from '../task-tools.js';
+import { createPiToolLookups } from '../../../../application/conversation/runtime/pi-tool-lookups.js';
 
 describe('task bridge tools', () => {
   it('Agent reports missing executor or database context without launching', async () => {
@@ -242,7 +243,8 @@ describe('Agent subagent_type and session linkage', () => {
         'run-1',
         db,
         undefined,
-        executor as never
+        executor as never,
+        createPiToolLookups(db)
       ) as any;
       expect(tool.description).toContain('Explore: Explore profile');
       expect(tool.description).not.toContain('Legacy');
@@ -274,7 +276,8 @@ describe('Agent subagent_type and session linkage', () => {
         'run-1',
         db,
         undefined,
-        executor as never
+        executor as never,
+        createPiToolLookups(db)
       ) as any;
       const res = await tool.execute('a1', { prompt: 'x', subagent_type: 'Legacy' });
       expect(res.details).toMatchObject({ ok: false, error: 'unknown_subagent_type' });
@@ -297,7 +300,8 @@ describe('Agent subagent_type and session linkage', () => {
         'run-1',
         db,
         undefined,
-        executor as never
+        executor as never,
+        createPiToolLookups(db)
       ) as any;
       const res = await tool.execute('a1', { prompt: 'x' });
       const { taskId } = JSON.parse(res.content[0].text);

@@ -175,3 +175,41 @@ describe('buildPiRunToolBundle backgroundable tool announcement', () => {
     }
   });
 });
+
+describe('buildPiRunToolBundle RespondToCoordinator gating', () => {
+  function buildWithLookups(toolLookups?: unknown, options: { claudiaSessionId?: string } = {}) {
+    const claudiaSessionId = 'claudiaSessionId' in options ? options.claudiaSessionId : 's1';
+    return buildPiRunToolBundle({
+      options: { cwd: '/tmp', claudiaSessionId, toolLookups } as never,
+      effectiveTools: ['Read', 'RespondToCoordinator'],
+      supportsVision: false,
+      isPlanMode: false,
+      permissionCallback: async () => ({ behavior: 'allow' as const }),
+    });
+  }
+
+  it('keeps RespondToCoordinator only in sub-agent sessions', () => {
+    const lookups = (isSub: boolean) => ({
+      isSubagentSession: (id: string) => id === 's1' && isSub,
+    });
+    expect(buildWithLookups(lookups(true)).visibleToolNames).toEqual([
+      'Read',
+      'RespondToCoordinator',
+    ]);
+    expect(buildWithLookups(lookups(false)).visibleToolNames).toEqual(['Read']);
+  });
+
+  it('drops RespondToCoordinator without lookups, a session, or when the lookup throws', () => {
+    expect(buildWithLookups().visibleToolNames).toEqual(['Read']);
+    expect(
+      buildWithLookups({ isSubagentSession: () => true }, { claudiaSessionId: undefined })
+        .visibleToolNames
+    ).toEqual(['Read']);
+    const throwing = {
+      isSubagentSession: () => {
+        throw new Error('no such table: tasks');
+      },
+    };
+    expect(buildWithLookups(throwing).visibleToolNames).toEqual(['Read']);
+  });
+});
