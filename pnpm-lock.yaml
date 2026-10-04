@@ -528,6 +528,9 @@ importers:
       puppeteer-core:
         specifier: ^25.3.0
         version: 25.3.0(bufferutil@4.1.0)
+      pyright:
+        specifier: 1.1.414
+        version: 1.1.414
       socks-proxy-agent:
         specifier: ^8.0.5
         version: 8.0.5(supports-color@7.2.0)
@@ -4730,6 +4733,11 @@ packages:
   puppeteer-core@25.3.0:
     resolution: {integrity: sha512-fm+wpUr2oigH1PXZvwgATrM2tYWHMDG8ASzTEe9uukCye4X5Ldx1K5BTHPFKITrIWvQQAQ256d1NpbEveBcKjA==}
     engines: {node: '>=22.12.0'}
+
+  pyright@1.1.414:
+    resolution: {integrity: sha512-FPZZb51jepDX4eP7TEYDeNFtmE3WgwkkEcJpvH3/QmUSsj0EAy3LXu+xB4T/FWDejtsXlCfFr/rbWFjwuwuXww==}
+    engines: {node: '>=14.0.0'}
+    hasBin: true
 
   qs@6.15.2:
     resolution: {integrity: sha512-Rzq0KEyX/w/tEybncDgdkZrJgVUsUMk3xjh3t5bv3S1HTAtg+uOYt72+ZfwiQwKdysThkTBdL/rTi6HDmX9Ddw==}
@@ -10179,6 +10187,10 @@ snapshots:
       - proxy-agent
       - utf-8-validate
       - yauzl
+
+  pyright@1.1.414:
+    optionalDependencies:
+      fsevents: 2.3.3
 
   qs@6.15.2:
     dependencies:

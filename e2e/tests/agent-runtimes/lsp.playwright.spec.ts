@@ -205,3 +205,80 @@ test('LSP: the model can ask the language server for a definition by symbol', as
     await upstream.stop();
   }
 });
+
+test('LSP: Python works out of the box with the bundled Pyright', async ({ app, page }) => {
+  const { project, cwd } = await app.configureCodingProject('codex', undefined, '-lsp-python');
+  await writeFile(path.join(cwd, 'pyproject.toml'), '[project]\nname = "p"\nversion = "0"\n');
+
+  const upstream = await startCompletionFixture(request => {
+    if (!request.tools?.some(tool => tool.function.name === 'Write'))
+      return { content: 'LSP Python session' };
+    const last = request.messages.at(-1);
+    if (last?.role === 'user' && JSON.stringify(last.content).includes('warm up'))
+      return { content: 'E2E_PY_WARM' };
+    if (last?.role === 'user')
+      return {
+        tool: 'Write',
+        arguments: {
+          file_path: 'app.py',
+          content: 'def f(x: int) -> int:\n    return x\n\nf("a")\n',
+        },
+      };
+    return { content: 'E2E_PY_DONE' };
+  });
+  try {
+    const llm = await app.api('/api/llm-profiles', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'LSP Python model fixture',
+        providerType: 'openai',
+        baseUrl: upstream.baseUrl,
+        apiKey: 'e2e-placeholder',
+        models: [{ modelId: 'e2e-lsp', dialect: 'openai', contextWindow: 32768, maxTokens: 1024 }],
+      }),
+    });
+    const profile = await app.api('/api/agent-profiles', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'LSP Python E2E Agent',
+        runtimeType: 'zclaudia',
+        llmProfileId: llm.id,
+        model: 'e2e-lsp',
+        enabledTools: ['Read', 'Write'],
+      }),
+    });
+    await app.api(`/api/projects/${project.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ defaultAgentProfileId: profile.id }),
+    });
+    const session = await app.api('/api/sessions', {
+      method: 'POST',
+      body: JSON.stringify({
+        projectId: project.id,
+        name: 'LSP Python session',
+        agentProfileId: profile.id,
+      }),
+    });
+    await openCodingSession(page, app, project, session);
+    const messages = page.getByTestId('message-list');
+
+    await sendCodingMessage(page, 'Please warm up.');
+    await expect(messages.getByText('E2E_PY_WARM', { exact: true })).toBeVisible();
+    const indicator = page.getByTestId('language-server-indicator');
+    await expect(indicator).toHaveAttribute('data-state', 'ready', { timeout: 30_000 });
+
+    await sendCodingMessage(page, 'Call f with a string in app.py.');
+    await expect(messages.getByText('E2E_PY_DONE', { exact: true })).toBeVisible();
+    expect(upstream.errors).toEqual([]);
+    const writeResult = JSON.stringify(
+      upstream.requests
+        .at(-1)!
+        .messages.filter(m => m.role === 'tool')
+        .at(-1)
+    );
+    expect(writeResult).toContain('Diagnostics (Python (Pyright)): 1 new error introduced');
+    expect(writeResult).toMatch(/app\.py:4:\d+ Argument of type/);
+  } finally {
+    await upstream.stop();
+  }
+});

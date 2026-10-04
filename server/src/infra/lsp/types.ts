@@ -19,6 +19,11 @@ export interface LaunchSpec {
   args: string[];
   cwd: string;
   initializationOptions?: unknown;
+  /**
+   * Answers to the server's `workspace/configuration` requests, by section
+   * (dotted sections walk into nested objects).
+   */
+  settings?: Record<string, unknown>;
 }
 
 /**

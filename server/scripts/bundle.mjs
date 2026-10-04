@@ -369,6 +369,24 @@ try {
   console.log(`    ${path.relative(outDir, path.join(tlsDest, 'lib', 'cli.mjs'))}: OK`);
 }
 
+// Pyright ships the same way (resolveBundledPyright() in detection.ts). It is
+// CommonJS without dependencies: the entry, dist/ (with its typeshed copy)
+// and package.json, which keeps the files CommonJS. Source maps are left out.
+{
+  const pyrightRoot = resolvePackage('pyright');
+  const pyrightDest = path.join(outDir, 'vendor', 'pyright');
+  fs.rmSync(pyrightDest, { recursive: true, force: true });
+  fs.mkdirSync(pyrightDest, { recursive: true });
+  for (const file of ['package.json', 'LICENSE.txt', 'langserver.index.js']) {
+    fs.copyFileSync(path.join(pyrightRoot, file), path.join(pyrightDest, file));
+  }
+  fs.cpSync(path.join(pyrightRoot, 'dist'), path.join(pyrightDest, 'dist'), {
+    recursive: true,
+    filter: source => !source.endsWith('.map'),
+  });
+  console.log(`    ${path.relative(outDir, path.join(pyrightDest, 'langserver.index.js'))}: OK`);
+}
+
 // ============================================================================
 // Step 3: Clean-room npm install + selective copy to bundle
 // ============================================================================

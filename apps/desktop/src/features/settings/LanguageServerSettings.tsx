@@ -85,7 +85,7 @@ export function LanguageServerSettings() {
       <SettingsRow
         icon={<Braces className="h-4 w-4" strokeWidth={1.75} />}
         title="Type checking and code navigation"
-        description="Report type errors after each edit and answer LSPTool queries for ZClaudia agents. TypeScript is built in; Python, Go and Rust are used when installed."
+        description="Report type errors after each edit and answer LSPTool queries for ZClaudia agents. TypeScript and Python are built in; Go and Rust are used when installed."
         control={
           <Toggle
             checked={overview?.enabled ?? false}
