@@ -83,24 +83,36 @@ export function LanguageServerIndicator({
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
+    // Ask again at `delay` when the window is visible; a hidden window waits
+    // an extra settled interval first, so background tabs stay quiet.
+    const repoll = (delay: number) => {
+      timer = setTimeout(
+        () => {
+          if (document.visibilityState === 'visible') void refresh();
+          else timer = setTimeout(() => void refresh(), POLL_SETTLED_MS);
+        },
+        delay
+      );
+    };
+
     const refresh = async () => {
       clearTimeout(timer);
       // An older backend without the endpoint, or offline: show nothing.
       const next = await getSessionLanguageServers(sessionId).catch(() => null);
       if (cancelled) return;
+      if (!next) {
+        // Keep polling: a one-off fetch failure must not hide the indicator
+        // for the rest of the session in a window that never loses focus.
+        repoll(POLL_SETTLED_MS);
+        return;
+      }
       setData(next);
       if (!next?.applicable || !next.enabled || next.servers.length === 0) return;
       // A run starts idle servers, so keep watching them closely while it lasts.
       const changing = next.servers.some(
         s => s.state === 'starting' || s.state === 'stopped' || (runActive && s.state === 'idle')
       );
-      timer = setTimeout(
-        () => {
-          if (document.visibilityState === 'visible') void refresh();
-          else timer = setTimeout(() => void refresh(), POLL_SETTLED_MS);
-        },
-        changing ? POLL_CHANGING_MS : POLL_SETTLED_MS
-      );
+      repoll(changing ? POLL_CHANGING_MS : POLL_SETTLED_MS);
     };
 
     refreshNow.current = () => void refresh();

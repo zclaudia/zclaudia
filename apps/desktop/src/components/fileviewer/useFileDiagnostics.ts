@@ -49,6 +49,10 @@ export function useFileDiagnostics(params: {
   const [leasedFor, setLeasedFor] = useState<string | null>(null);
   const leased = leasedFor === workspaceKey;
   const leaseRef = useRef<string | null>(null);
+  // Double-click guard: without it a second in-flight acquire orphans the
+  // first lease (its id is overwritten and never released), keeping the
+  // workspace's servers alive until the backend's 90s TTL lapses.
+  const acquiringRef = useRef(false);
 
   // Fetch on file / content change, then poll while the server starts.
   useEffect(() => {
@@ -111,7 +115,8 @@ export function useFileDiagnostics(params: {
   }, [leased, projectRoot, backendId]);
 
   const startChecking = useCallback(() => {
-    if (leaseRef.current) return;
+    if (leaseRef.current || acquiringRef.current) return;
+    acquiringRef.current = true;
     setResult(current => (current ? { ...current, state: 'starting' } : current));
     acquireLanguageServerViewerLease(projectRoot, backendId)
       .then(lease => {
@@ -120,6 +125,9 @@ export function useFileDiagnostics(params: {
       })
       .catch(() => {
         setResult(current => (current ? { ...current, state: 'not_running' } : current));
+      })
+      .finally(() => {
+        acquiringRef.current = false;
       });
   }, [projectRoot, backendId, workspaceKey]);
 

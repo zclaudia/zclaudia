@@ -610,7 +610,10 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
     !isMobile && panelWidth !== null && panelWidth < TREE_WIDTH_MIN + CODE_WIDTH_MIN;
   const compact = isMobile || compactLayout;
   const setCompactLayout = useFileViewerStore(s => s.setCompactLayout);
-  useEffect(() => setCompactLayout(compactLayout), [compactLayout, setCompactLayout]);
+  // Layout phase: FileViewerActions builds the shared BottomPanel header from
+  // this store value, so it needs it before first paint or the tree toggle
+  // flickers for one frame when the panel opens or is resized.
+  useLayoutEffect(() => setCompactLayout(compactLayout), [compactLayout, setCompactLayout]);
   // Guard: when the store still holds state pointing at a different project
   // (e.g. user just switched session/project), treat the viewer as if no file
   // is selected. SessionChatLayout's effect will close()/reset the store

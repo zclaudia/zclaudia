@@ -274,6 +274,16 @@ function ToolExpandedContent({
                       {opt.description && (
                         <span className="text-muted-foreground ml-1">- {opt.description}</span>
                       )}
+                      {/* Same verbatim block the interactive prompt shows, so
+                          previews stay readable in history after answering. */}
+                      {opt.preview && (
+                        <pre
+                          data-testid="option-preview"
+                          className="mt-1.5 max-h-48 overflow-auto rounded-md border border-border bg-background p-2 font-mono text-2xs leading-snug text-foreground whitespace-pre"
+                        >
+                          {opt.preview}
+                        </pre>
+                      )}
                     </div>
                   </div>
                 ))}
