@@ -27,6 +27,8 @@ function server(overrides: Partial<LanguageServerStatusEntry> = {}): LanguageSer
     lastUsedAt: 2,
     lastError: null,
     installHint: null,
+    source: 'builtin',
+    pluginId: null,
     ...overrides,
   };
 }

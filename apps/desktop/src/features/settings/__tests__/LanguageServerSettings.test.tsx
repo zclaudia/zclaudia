@@ -6,6 +6,9 @@ import { LanguageServerSettings } from '../LanguageServerSettings';
 vi.mock('../../../services/api', () => ({
   getLanguageServers: vi.fn(),
   setLanguageServersEnabled: vi.fn(),
+  getCustomLanguageServers: vi.fn(),
+  setCustomLanguageServers: vi.fn(),
+  allowPluginLanguageServers: vi.fn(),
 }));
 vi.mock('../../../hooks/useSettingsTargetBackend', () => ({
   useSettingsTargetBackend: () => ({
@@ -14,7 +17,13 @@ vi.mock('../../../hooks/useSettingsTargetBackend', () => ({
     targetBackendName: 'This Device',
   }),
 }));
-import { getLanguageServers, setLanguageServersEnabled } from '../../../services/api';
+import {
+  allowPluginLanguageServers,
+  getCustomLanguageServers,
+  getLanguageServers,
+  setCustomLanguageServers,
+  setLanguageServersEnabled,
+} from '../../../services/api';
 
 const overview = (enabled: boolean): LanguageServersOverview => ({
   enabled,
@@ -33,6 +42,8 @@ const overview = (enabled: boolean): LanguageServersOverview => ({
           lastUsedAt: 1,
           lastError: null,
           installHint: null,
+          source: 'builtin',
+          pluginId: null,
         },
         {
           id: 'gopls',
@@ -47,6 +58,24 @@ const overview = (enabled: boolean): LanguageServersOverview => ({
           lastUsedAt: null,
           lastError: null,
           installHint: 'go install golang.org/x/tools/gopls@latest',
+          source: 'builtin',
+          pluginId: null,
+        },
+        {
+          id: 'lua',
+          name: 'Lua',
+          languages: ['lua'],
+          root: '/Users/me/code/game',
+          state: 'needs_permission',
+          leases: 0,
+          openDocuments: 0,
+          pid: null,
+          startedAt: null,
+          lastUsedAt: null,
+          lastError: 'The plugin needs permission to run commands (shell.execute)',
+          installHint: null,
+          source: 'plugin',
+          pluginId: 'com.example.lua',
         },
       ]
     : [],
@@ -55,6 +84,11 @@ const overview = (enabled: boolean): LanguageServersOverview => ({
 beforeEach(() => {
   vi.mocked(getLanguageServers).mockReset().mockResolvedValue(overview(true));
   vi.mocked(setLanguageServersEnabled).mockReset().mockResolvedValue(overview(false));
+  vi.mocked(getCustomLanguageServers).mockReset().mockResolvedValue({ servers: [] });
+  vi.mocked(setCustomLanguageServers)
+    .mockReset()
+    .mockImplementation(async servers => ({ servers }));
+  vi.mocked(allowPluginLanguageServers).mockReset().mockResolvedValue(undefined);
 });
 
 describe('LanguageServerSettings', () => {
@@ -73,5 +107,62 @@ describe('LanguageServerSettings', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'Language servers' }));
     await waitFor(() => expect(setLanguageServersEnabled).toHaveBeenCalledWith(false, 'local'));
     await waitFor(() => expect(screen.queryByTestId('language-server-list')).toBeNull());
+  });
+
+  it("lets a plugin's server run once the user allows it", async () => {
+    render(<LanguageServerSettings />);
+    const list = await screen.findByTestId('language-server-list');
+    expect(list).toHaveTextContent('Lua');
+    expect(list).toHaveTextContent('Plugin');
+    expect(list).toHaveTextContent('Needs permission');
+    fireEvent.click(screen.getByRole('button', { name: 'Allow plugin to run commands' }));
+    await waitFor(() =>
+      expect(allowPluginLanguageServers).toHaveBeenCalledWith('com.example.lua', 'local')
+    );
+    await waitFor(() => expect(getLanguageServers).toHaveBeenCalledTimes(2));
+  });
+
+  it('adds, edits and removes custom servers', async () => {
+    render(<LanguageServerSettings />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Add server' }));
+    const editor = screen.getByTestId('custom-server-editor');
+    // Saving an empty form names the missing fields instead of calling the backend.
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(editor).toHaveTextContent('Command is required');
+    expect(setCustomLanguageServers).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: 'C (clangd)' } });
+    expect(screen.getByLabelText(/^Id/)).toHaveValue('c-clangd');
+    fireEvent.change(screen.getByLabelText(/^Command/), { target: { value: 'clangd' } });
+    fireEvent.change(screen.getByLabelText(/^File extensions/), { target: { value: '.c .h=c' } });
+    fireEvent.change(screen.getByLabelText(/^Root markers/), {
+      target: { value: 'compile_commands.json' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const clangd = {
+      id: 'c-clangd',
+      name: 'C (clangd)',
+      command: 'clangd',
+      extensions: { '.c': 'c', '.h': 'c' },
+      rootMarkers: ['compile_commands.json'],
+    };
+    await waitFor(() => expect(setCustomLanguageServers).toHaveBeenCalledWith([clangd], 'local'));
+    const custom = await screen.findByTestId('custom-language-servers');
+    expect(custom).toHaveTextContent('C (clangd)');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit C (clangd)' }));
+    fireEvent.change(screen.getByLabelText(/^Arguments/), {
+      target: { value: '--background-index' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(setCustomLanguageServers).toHaveBeenLastCalledWith(
+        [{ ...clangd, args: ['--background-index'] }],
+        'local'
+      )
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove C (clangd)' }));
+    await waitFor(() => expect(setCustomLanguageServers).toHaveBeenLastCalledWith([], 'local'));
   });
 });
