@@ -7,7 +7,19 @@
  *                                                   (composer indicator)
  * - GET  /api/language-servers/custom               the user's own server definitions
  * - PUT  /api/language-servers/custom  { servers }  replace them, persisted
+ * - GET  /api/language-servers/file-diagnostics?root=&path=
+ *                                                   a file's diagnostics, from a running server only
+ * - POST   /api/language-servers/viewer-leases { root }  keep a workspace's servers running
+ * - POST   /api/language-servers/viewer-leases/:id/renew
+ * - DELETE /api/language-servers/viewer-leases/:id
+ *
+ * The file-viewer routes take a workspace root from the client. Starting a
+ * server runs code from that workspace (TypeScript uses the project's own
+ * `typescript`), so only roots of known projects or session worktrees are
+ * accepted.
  */
+import { randomUUID } from 'crypto';
+import path from 'path';
 import { Router, type Request, type Response } from 'express';
 import type { Database } from 'better-sqlite3';
 import { isPiAgentRuntime } from '@zclaudia/shared/core/agent-profile';
@@ -15,6 +27,8 @@ import type { ApiResponse } from '@zclaudia/shared/core/api';
 import {
   validateLanguageServerConfigs,
   type CustomLanguageServers,
+  type FileLanguageServerDiagnostics,
+  type LanguageServerViewerLease,
   type LanguageServerConfig,
   type LanguageServerStatusEntry,
   type LanguageServersOverview,
@@ -23,6 +37,7 @@ import {
 import {
   createConfiguredPreset,
   languageServerRegistry,
+  type FileDiagnostics,
   type LanguageServerManager,
   type LanguageServerRegistry,
   type LanguageServerStatus,
@@ -30,6 +45,29 @@ import {
 
 export const LANGUAGE_SERVERS_ENABLED_KEY = 'language_servers_enabled';
 export const CUSTOM_LANGUAGE_SERVERS_KEY = 'language_servers_custom';
+/** A viewer lease lapses unless renewed within this (a closed or crashed client). */
+export const VIEWER_LEASE_TTL_MS = 90_000;
+
+/** Whether `root` is a known project root or session worktree. */
+function isKnownWorkspaceRoot(db: Database, root: string): boolean {
+  const candidates = [...new Set([root, path.resolve(root)])];
+  const placeholders = candidates.map(() => '?').join(', ');
+  const row = db
+    .prepare(
+      `SELECT 1 FROM projects WHERE root_path IN (${placeholders})
+       UNION SELECT 1 FROM sessions WHERE working_directory IN (${placeholders})
+       LIMIT 1`
+    )
+    .get(...candidates, ...candidates);
+  return Boolean(row);
+}
+
+function rejectUnknownRoot(res: Response): void {
+  res.status(403).json({
+    success: false,
+    error: { code: 'FORBIDDEN', message: 'Not a project or session workspace' },
+  });
+}
 
 /** The user's saved definitions; invalid or unreadable storage yields none. */
 export function readCustomLanguageServers(db: Database): LanguageServerConfig[] {
@@ -187,6 +225,97 @@ export function createLanguageServerRoutes(
       servers: applicable && manager && root ? manager.statusFor(root).map(toEntry) : [],
     };
     res.json({ success: true, data } satisfies ApiResponse<SessionLanguageServers>);
+  });
+
+  router.get('/file-diagnostics', async (req: Request, res: Response) => {
+    const root = typeof req.query.root === 'string' ? req.query.root : '';
+    const file = typeof req.query.path === 'string' ? req.query.path : '';
+    if (!root || !file) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_INPUT', message: 'root and path are required' },
+      });
+      return;
+    }
+    if (!isKnownWorkspaceRoot(db, root)) return rejectUnknownRoot(res);
+    const manager = getManager();
+    const result: FileDiagnostics = manager
+      ? await manager.fileDiagnostics(root, file)
+      : { state: 'unavailable' };
+    const data: FileLanguageServerDiagnostics = {
+      state: result.state,
+      server: result.server ? { id: result.server.id, name: result.server.name } : null,
+      diagnostics:
+        result.state === 'ready'
+          ? result.diagnostics.map(diagnostic => ({
+              line: diagnostic.line,
+              character: diagnostic.character,
+              severity: diagnostic.severity,
+              message: diagnostic.message,
+              ...(diagnostic.source ? { source: diagnostic.source } : {}),
+              ...(diagnostic.code !== undefined ? { code: diagnostic.code } : {}),
+            }))
+          : [],
+    };
+    res.json({ success: true, data } satisfies ApiResponse<FileLanguageServerDiagnostics>);
+  });
+
+  const viewerLeases = new Map<
+    string,
+    { release: () => void; timer: ReturnType<typeof setTimeout> }
+  >();
+  const endLease = (leaseId: string) => {
+    const lease = viewerLeases.get(leaseId);
+    if (!lease) return false;
+    clearTimeout(lease.timer);
+    lease.release();
+    viewerLeases.delete(leaseId);
+    return true;
+  };
+  const armLease = (leaseId: string) => {
+    const timer = setTimeout(() => endLease(leaseId), VIEWER_LEASE_TTL_MS);
+    timer.unref?.();
+    return timer;
+  };
+
+  router.post('/viewer-leases', (req: Request, res: Response) => {
+    const root = (req.body as { root?: unknown } | undefined)?.root;
+    const manager = getManager();
+    if (typeof root !== 'string' || !root || !manager) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_INPUT', message: 'root is required' },
+      });
+      return;
+    }
+    if (!isKnownWorkspaceRoot(db, root)) return rejectUnknownRoot(res);
+    const leaseId = randomUUID();
+    const { release } = manager.acquire(root, 'file viewer');
+    viewerLeases.set(leaseId, { release, timer: armLease(leaseId) });
+    const data: LanguageServerViewerLease = { leaseId, ttlMs: VIEWER_LEASE_TTL_MS };
+    res.json({ success: true, data } satisfies ApiResponse<LanguageServerViewerLease>);
+  });
+
+  router.post('/viewer-leases/:leaseId/renew', (req: Request, res: Response) => {
+    const lease = viewerLeases.get(req.params.leaseId);
+    if (!lease) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Lease expired or unknown' },
+      });
+      return;
+    }
+    clearTimeout(lease.timer);
+    lease.timer = armLease(req.params.leaseId);
+    const data: LanguageServerViewerLease = {
+      leaseId: req.params.leaseId,
+      ttlMs: VIEWER_LEASE_TTL_MS,
+    };
+    res.json({ success: true, data } satisfies ApiResponse<LanguageServerViewerLease>);
+  });
+
+  router.delete('/viewer-leases/:leaseId', (req: Request, res: Response) => {
+    res.json({ success: true, data: { released: endLease(req.params.leaseId) } });
   });
 
   router.get('/custom', (_req: Request, res: Response) => {

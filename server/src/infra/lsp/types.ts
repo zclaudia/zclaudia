@@ -128,6 +128,12 @@ export type DiagnosticsCheck =
   | { state: 'pending'; server: LanguageServerInfo; reason: 'starting' | 'timeout' }
   | { state: 'unavailable'; reason: string };
 
+/** What a file viewer can show for one file (manager.fileDiagnostics). */
+export type FileDiagnostics =
+  | { state: 'ready'; server: LanguageServerInfo; diagnostics: LspDiagnostic[] }
+  | { state: 'starting' | 'not_running'; server: LanguageServerInfo }
+  | { state: 'unavailable'; server?: LanguageServerInfo };
+
 export interface DiagnosticsRequest {
   /** Total wait for fresh diagnostics after syncing the file. */
   budgetMs: number;

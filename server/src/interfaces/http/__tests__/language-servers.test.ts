@@ -4,14 +4,16 @@ import path from 'path';
 import Database from 'better-sqlite3';
 import express from 'express';
 import request from 'supertest';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageServerManager, LanguageServerRegistry } from '../../../infra/lsp/index.js';
 import type { LanguageServerPreset } from '../../../infra/lsp/index.js';
 import {
   createLanguageServerRoutes,
   readCustomLanguageServers,
   readLanguageServersEnabled,
+  VIEWER_LEASE_TTL_MS,
 } from '../language-servers.js';
+import { createFakeServer } from '../../../infra/lsp/__tests__/fake-lsp-server.js';
 
 const preset: LanguageServerPreset = {
   id: 'fake',
@@ -207,5 +209,98 @@ describe('language-server routes', () => {
 
   it('defaults to on when nothing is stored', () => {
     expect(readLanguageServersEnabled(db)).toBe(true);
+  });
+});
+
+describe('file-viewer routes', () => {
+  let db: Database.Database;
+  let root: string;
+  let manager: LanguageServerManager;
+  let app: express.Express;
+
+  beforeEach(() => {
+    db = createDb();
+    root = mkdtempSync(path.join(tmpdir(), 'lsp-viewer-'));
+    writeFileSync(path.join(root, 'fake.json'), '{}');
+    writeFileSync(path.join(root, 'a.fk'), 'ok\nERR: broken\n');
+    db.prepare(`INSERT INTO projects VALUES ('p1', ?)`).run(root);
+    manager = new LanguageServerManager({
+      presets: [preset],
+      settleMs: 10,
+      spawn: async () => createFakeServer().transport,
+    });
+    app = express();
+    app.use(express.json());
+    app.use(
+      '/api/language-servers',
+      createLanguageServerRoutes(db, () => manager)
+    );
+  });
+  afterEach(async () => {
+    vi.useRealTimers();
+    await manager.dispose();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  const diagnostics = (r: string, file: string) =>
+    request(app).get('/api/language-servers/file-diagnostics').query({ root: r, path: file });
+
+  it('refuses workspaces that are not a project or session root', async () => {
+    const other = mkdtempSync(path.join(tmpdir(), 'lsp-viewer-other-'));
+    try {
+      expect((await diagnostics(other, 'a.fk')).status).toBe(403);
+      const lease = await request(app)
+        .post('/api/language-servers/viewer-leases')
+        .send({ root: other });
+      expect(lease.status).toBe(403);
+      expect(manager.status()).toEqual([]);
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
+
+  it('never starts a server itself; a viewer lease does, and then diagnostics flow', async () => {
+    expect((await diagnostics(root, 'notes.txt')).body.data).toMatchObject({
+      state: 'unavailable',
+    });
+    expect((await diagnostics(root, 'a.fk')).body.data).toEqual({
+      state: 'not_running',
+      server: { id: 'fake', name: 'Fake' },
+      diagnostics: [],
+    });
+    expect(manager.status()).toEqual([]);
+
+    const lease = await request(app).post('/api/language-servers/viewer-leases').send({ root });
+    expect(lease.body.data).toMatchObject({ ttlMs: VIEWER_LEASE_TTL_MS });
+    expect(manager.status()[0].leases).toEqual(['file viewer']);
+    const deadline = Date.now() + 2000;
+    let data;
+    do {
+      data = (await diagnostics(root, 'a.fk')).body.data;
+    } while (data.state !== 'ready' && Date.now() < deadline);
+    expect(data).toMatchObject({
+      state: 'ready',
+      diagnostics: [{ line: 2, severity: 'error', message: 'broken' }],
+    });
+
+    const leaseId = lease.body.data.leaseId;
+    expect(
+      (await request(app).post(`/api/language-servers/viewer-leases/${leaseId}/renew`)).status
+    ).toBe(200);
+    expect(
+      (await request(app).delete(`/api/language-servers/viewer-leases/${leaseId}`)).body.data
+    ).toEqual({ released: true });
+    expect(manager.status()[0].leases).toEqual([]);
+    expect(
+      (await request(app).post(`/api/language-servers/viewer-leases/${leaseId}/renew`)).status
+    ).toBe(404);
+  });
+
+  it('lets a lease lapse when the client stops renewing it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    await request(app).post('/api/language-servers/viewer-leases').send({ root });
+    expect(manager.status()[0].leases).toEqual(['file viewer']);
+    await vi.advanceTimersByTimeAsync(VIEWER_LEASE_TTL_MS + 1);
+    expect(manager.status()[0].leases).toEqual([]);
   });
 });
