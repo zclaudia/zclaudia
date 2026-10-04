@@ -50,6 +50,7 @@ import { RunLaunchError } from './run-launch-error.js';
 import { SessionRuntimeBindingRepository } from '../../../domains/sessions/runtime-binding-repository.js';
 import type { EngineExecutionContext, RuntimeModelConnection } from '@zclaudia/shared/providers';
 import type { ManagedRuntimeSource } from '@zclaudia/shared/plugins/managed-runtimes';
+import type { LanguageServerService } from '../../../infra/lsp/index.js';
 
 function executableSourceFromManagedSource(
   source: ManagedRuntimeSource
@@ -88,6 +89,7 @@ interface LaunchProviderRunInput {
   agentTaskExecutor?: TaskExecutor;
   subagentMessenger?: SubagentMessenger;
   automationPort?: AutomationPort;
+  languageServers?: LanguageServerService;
   sdkSessionId?: string;
   sendRunEvent: (event: ServerMessage) => void;
   listeners?: RunDomainEventListenerRegistry;
@@ -122,6 +124,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     agentTaskExecutor,
     subagentMessenger,
     automationPort,
+    languageServers,
     sdkSessionId,
     sendRunEvent,
     listeners,
@@ -435,6 +438,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     agentTaskExecutor,
     subagentMessenger,
     automationPort,
+    languageServers,
     sdkSessionId,
     serverPort,
     session,

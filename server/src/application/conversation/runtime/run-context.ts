@@ -24,6 +24,7 @@ import { buildMemoryContext } from '../context/memory-context.js';
 import { resolveProjectMemoryDir } from '../../../utils/memory-paths.js';
 import { workspaceService } from '../../services/workspace.js';
 import { mapPermissionMode } from '../../../infra/providers/pcp-permission.js';
+import type { LanguageServerService } from '../../../infra/lsp/index.js';
 
 interface SessionContext {
   id: string;
@@ -64,6 +65,7 @@ export interface BuildRunContextInput {
   agentTaskExecutor?: TaskExecutor;
   subagentMessenger?: SubagentMessenger;
   automationPort?: AutomationPort;
+  languageServers?: LanguageServerService;
   sdkSessionId?: string;
   serverPort: number | null;
   session: SessionContext;
@@ -92,6 +94,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     agentTaskExecutor,
     subagentMessenger,
     automationPort,
+    languageServers,
     sdkSessionId,
     serverPort,
     session,
@@ -116,6 +119,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     agentTaskExecutor,
     subagentMessenger,
     automationPort,
+    languageServers,
     llmProfileConfig: providerConfig,
     agentProfile,
     enabledTools,

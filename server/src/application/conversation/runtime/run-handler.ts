@@ -25,6 +25,7 @@ import type { TaskExecutor } from '../../../utils/task-executor-types.js';
 import type { AutomationPort, SubagentMessenger } from '../../../infra/providers/types.js';
 import type { PermissionBridge } from '../agent/permission-bridge.js';
 import type { PermissionWorkflowResolver } from '../../../domains/workflows/index.js';
+import type { LanguageServerService } from '../../../infra/lsp/index.js';
 
 export interface RunHandlerContext {
   activeRuns: Map<string, ActiveRun>;
@@ -42,6 +43,7 @@ export interface RunHandlerContext {
   subagentMessenger?: SubagentMessenger;
   /** Automation CRUD port for the Cron* tools. */
   automationPort?: AutomationPort;
+  languageServers?: LanguageServerService;
   /** Optional goal coordinator — fired after a turn completes successfully. */
   goalCoordinator?: { onTurnCompleted(sessionId: string, runTokensUsed: number): Promise<void> };
 }
@@ -214,6 +216,7 @@ export async function handleRunStart(
       agentTaskExecutor: context.agentTaskExecutor,
       subagentMessenger: context.subagentMessenger,
       automationPort: context.automationPort,
+      languageServers: context.languageServers,
       sdkSessionId,
       sendRunEvent,
       serverPort,

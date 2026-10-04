@@ -14,6 +14,7 @@ import type {
   ToolExecutionObserver,
 } from './pi-runtime/index.js';
 import type { LanguageServerPort } from './language-server-port.js';
+import type { LanguageServerService } from '../lsp/index.js';
 
 export type {
   LanguageServerInfo,
@@ -117,6 +118,8 @@ export interface RunOptions {
   automationPort?: AutomationPort;
   /** Language-server port for LSPTool (absent or no server for cwd = tool not registered). */
   languageServerPort?: LanguageServerPort;
+  /** Language-server manager: write diagnostics for the Pi runtime (absent = none). */
+  languageServers?: LanguageServerService;
   /** Resolved LLM profile to drive buildModel. If undefined, buildModel falls back to env. */
   llmProfileConfig?: LlmProfileConfig;
   /** Full agent profile resolved by run-bootstrap (for tracing / future). */

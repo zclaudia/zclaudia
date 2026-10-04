@@ -244,116 +244,125 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
       isPlanMode,
       permissionCallback: onPermission,
     });
-    // Announce on tool_use which calls this adapter can move to the background,
-    // so the UI offers the action only where requestBackgroundForToolCall works.
-    ctx.backgroundableTools = new Set(toolBundle.backgroundableToolNames);
+    // Everything after this point holds the bundle's run-scoped resources
+    // (the language-server lease); release them however the run ends.
+    try {
+      // Announce on tool_use which calls this adapter can move to the background,
+      // so the UI offers the action only where requestBackgroundForToolCall works.
+      ctx.backgroundableTools = new Set(toolBundle.backgroundableToolNames);
 
-    // 4. Yield init now (after we know contextWindow + effective tools).
-    yield {
-      type: 'init',
-      sessionId,
-      systemInfo: {
+      // 4. Yield init now (after we know contextWindow + effective tools).
+      yield {
+        type: 'init',
+        sessionId,
+        systemInfo: {
+          model: ctx.model,
+          contextWindow: effectiveContextWindow,
+          contextWindowSource,
+          contextWindowMatchedProvider,
+          cwd: options.cwd,
+          permissionMode: ctx.permissionMode || 'default',
+          tools: toolBundle.visibleToolNames,
+          agents: [PI_AGENT_RUNTIME],
+        },
+      };
+
+      // 5. Load history from the session tree (Route C source of truth). buildContext
+      //    handles compaction/branch_summary boundaries natively; Route A postprocessors
+      //    (image resolve + token-budget trim) run on top. Non-fatal on failure.
+      let history: AgentMessage[] = [];
+      if (options.db && options.claudiaSessionId) {
+        try {
+          const session = new Session(
+            new SqliteSessionStorage(options.db, options.claudiaSessionId)
+          );
+          // 0.84 moved context assembly off Session onto a free function over the
+          // branch entries. `messages` is AgentMessage[] at runtime; postprocessors
+          // expect pi-ai Message[] (structurally equivalent for user/assistant
+          // turns). Cast through unknown for both directions.
+          const branch = await session.findEntriesOnBranch({ order: 'oldestFirst' });
+          let messages = buildSessionContext(branch)
+            .messages as unknown as import('@earendil-works/pi-ai').Message[];
+          messages = resolveImagesInMessages(messages, {
+            resolve: atts => {
+              const resolved = resolveImageAttachments(atts, getFileStore());
+              if (supportsVision) return resolved;
+              return {
+                images: [],
+                notices: atts.map(
+                  a => `[Image attached: ${a.name} — current model does not support vision]`
+                ),
+              };
+            },
+          });
+          messages = trimMessagesToBudget(messages, historyTokenBudget(effectiveContextWindow));
+          // The trailing user message is the current input, passed separately to the agent loop.
+          if (
+            messages.length &&
+            (messages[messages.length - 1] as { role?: string }).role === 'user'
+          ) {
+            messages.pop();
+          }
+          history = messages as unknown as AgentMessage[];
+        } catch (err) {
+          console.error('[PiAgentProviderAdapter] history load failed:', err);
+          yield {
+            type: 'error',
+            error: 'history unavailable, continuing fresh',
+            isComplete: false,
+          };
+        }
+      }
+
+      // 6. Construct Agent — wire tools + hooks from pi-runtime
+      const { tools, hooks, externalProviderCatalog, skillCatalog, activeSkillContext } =
+        toolBundle;
+      // Route C: surface connected MCP servers' instructions in the system prompt.
+      // The context tree dropped the old delta-in-history MCP notices, so this is
+      // now the model's only path to MCP instructions.
+      const mcpInstructions = formatMcpInstructionsForPrompt(
+        mcpClientManager
+          .listStatuses()
+          .filter(s => s.state === 'connected' && s.instructions?.trim())
+          .map(s => ({ name: s.name, instructions: s.instructions as string }))
+      );
+      const promptBundle = buildPiRunPrompt({
+        systemPrompt: options.systemPrompt,
+        externalProviderCatalog,
+        skillCatalog,
+        activeSkillContext,
+        isPlanMode,
+        mcpInstructions,
+      });
+
+      // Context snapshot for the /context command. The skill catalog is counted
+      // separately from the base prompt; the external provider catalog and the
+      // plan-mode suffix ride with the base prompt. Keyed by the zclaudia
+      // session id (what the desktop knows), not the adapter-local sessionId.
+      // The estimate intentionally omits the catalog boilerplate/separators baseSystemPrompt adds (~tens of tokens; noise for a chars/4 estimate).
+      capturePiRunContextSnapshot({
+        sessionId: options.claudiaSessionId,
         model: ctx.model,
         contextWindow: effectiveContextWindow,
         contextWindowSource,
-        contextWindowMatchedProvider,
-        cwd: options.cwd,
-        permissionMode: ctx.permissionMode || 'default',
-        tools: toolBundle.visibleToolNames,
-        agents: [PI_AGENT_RUNTIME],
-      },
-    };
+        prompt: promptBundle,
+        tools,
+      });
 
-    // 5. Load history from the session tree (Route C source of truth). buildContext
-    //    handles compaction/branch_summary boundaries natively; Route A postprocessors
-    //    (image resolve + token-budget trim) run on top. Non-fatal on failure.
-    let history: AgentMessage[] = [];
-    if (options.db && options.claudiaSessionId) {
-      try {
-        const session = new Session(new SqliteSessionStorage(options.db, options.claudiaSessionId));
-        // 0.84 moved context assembly off Session onto a free function over the
-        // branch entries. `messages` is AgentMessage[] at runtime; postprocessors
-        // expect pi-ai Message[] (structurally equivalent for user/assistant
-        // turns). Cast through unknown for both directions.
-        const branch = await session.findEntriesOnBranch({ order: 'oldestFirst' });
-        let messages = buildSessionContext(branch)
-          .messages as unknown as import('@earendil-works/pi-ai').Message[];
-        messages = resolveImagesInMessages(messages, {
-          resolve: atts => {
-            const resolved = resolveImageAttachments(atts, getFileStore());
-            if (supportsVision) return resolved;
-            return {
-              images: [],
-              notices: atts.map(
-                a => `[Image attached: ${a.name} — current model does not support vision]`
-              ),
-            };
-          },
-        });
-        messages = trimMessagesToBudget(messages, historyTokenBudget(effectiveContextWindow));
-        // The trailing user message is the current input, passed separately to the agent loop.
-        if (
-          messages.length &&
-          (messages[messages.length - 1] as { role?: string }).role === 'user'
-        ) {
-          messages.pop();
-        }
-        history = messages as unknown as AgentMessage[];
-      } catch (err) {
-        console.error('[PiAgentProviderAdapter] history load failed:', err);
-        yield {
-          type: 'error',
-          error: 'history unavailable, continuing fresh',
-          isComplete: false,
-        };
-      }
+      yield* runPiAgentStream({
+        userInput: input,
+        options,
+        sessionId,
+        ctx,
+        modelInfo,
+        supportsVision,
+        history,
+        tools,
+        hooks,
+        effectiveSystemPrompt: promptBundle.effectiveSystemPrompt,
+      });
+    } finally {
+      toolBundle.dispose();
     }
-
-    // 6. Construct Agent — wire tools + hooks from pi-runtime
-    const { tools, hooks, externalProviderCatalog, skillCatalog, activeSkillContext } = toolBundle;
-    // Route C: surface connected MCP servers' instructions in the system prompt.
-    // The context tree dropped the old delta-in-history MCP notices, so this is
-    // now the model's only path to MCP instructions.
-    const mcpInstructions = formatMcpInstructionsForPrompt(
-      mcpClientManager
-        .listStatuses()
-        .filter(s => s.state === 'connected' && s.instructions?.trim())
-        .map(s => ({ name: s.name, instructions: s.instructions as string }))
-    );
-    const promptBundle = buildPiRunPrompt({
-      systemPrompt: options.systemPrompt,
-      externalProviderCatalog,
-      skillCatalog,
-      activeSkillContext,
-      isPlanMode,
-      mcpInstructions,
-    });
-
-    // Context snapshot for the /context command. The skill catalog is counted
-    // separately from the base prompt; the external provider catalog and the
-    // plan-mode suffix ride with the base prompt. Keyed by the zclaudia
-    // session id (what the desktop knows), not the adapter-local sessionId.
-    // The estimate intentionally omits the catalog boilerplate/separators baseSystemPrompt adds (~tens of tokens; noise for a chars/4 estimate).
-    capturePiRunContextSnapshot({
-      sessionId: options.claudiaSessionId,
-      model: ctx.model,
-      contextWindow: effectiveContextWindow,
-      contextWindowSource,
-      prompt: promptBundle,
-      tools,
-    });
-
-    yield* runPiAgentStream({
-      userInput: input,
-      options,
-      sessionId,
-      ctx,
-      modelInfo,
-      supportsVision,
-      history,
-      tools,
-      hooks,
-      effectiveSystemPrompt: promptBundle.effectiveSystemPrompt,
-    });
   }
 }

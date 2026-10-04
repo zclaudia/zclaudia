@@ -7,6 +7,7 @@
 
 import type { FileDiffHunk, FileDiffResult } from '../diff.js';
 import type { MutationStateDescriptor } from '../file-state.js';
+import type { WriteDiagnosticsReport } from '../write-lifecycle.js';
 
 const MODEL_VISIBLE_DIFF_MAX_CHARS = 12_000;
 const DETAILS_DIFF_MAX_CHARS = 80_000;
@@ -136,6 +137,39 @@ function formatPerFileResults(perFileResults: unknown): string[] {
   });
 }
 
+const MAX_REPORTED_ERRORS = 10;
+
+/**
+ * Model-facing lines for a language-server check. Every state says what was
+ * (not) checked: "not checked" must never be mistaken for "no errors".
+ */
+export function formatDiagnosticsReport(report: WriteDiagnosticsReport): string[] {
+  const label = `Diagnostics (${report.checker})`;
+  if (report.state === 'pending') {
+    return [
+      report.pendingReason === 'starting'
+        ? `${label}: not checked, language server still starting.`
+        : `${label}: not checked, language server did not answer in time.`,
+    ];
+  }
+  if (report.errors.length === 0) {
+    return [`${label}: no new errors.`];
+  }
+  const count = report.errors.length;
+  const noun = count === 1 ? 'error' : 'errors';
+  const header =
+    report.baseline === 'known'
+      ? `${label}: ${count} new ${noun} introduced by this change:`
+      : `${label}: ${count} ${noun} in this file (may include pre-existing ones):`;
+  const lines = report.errors.slice(0, MAX_REPORTED_ERRORS).map(error => {
+    const where = [error.path, error.line, error.column].filter(v => v !== undefined).join(':');
+    const code = error.code !== undefined ? ` [${error.code}]` : '';
+    return `  ${where} ${error.message.split('\n')[0]}${code}`;
+  });
+  if (count > MAX_REPORTED_ERRORS) lines.push(`  ... and ${count - MAX_REPORTED_ERRORS} more`);
+  return [header, ...lines];
+}
+
 export function buildMutationResultText(input: {
   action: string;
   path?: string;
@@ -151,6 +185,7 @@ export function buildMutationResultText(input: {
   snapshotUpdated?: boolean;
   state?: MutationStateDescriptor;
   rebased?: boolean;
+  diagnostics?: WriteDiagnosticsReport;
 }): string {
   const headlineParts = [input.action];
   if (input.path) headlineParts.push(input.path);
@@ -178,6 +213,8 @@ export function buildMutationResultText(input: {
 
   const perFileLines = formatPerFileResults(input.perFileResults);
   if (perFileLines.length > 0) lines.push('Files:', ...perFileLines);
+
+  if (input.diagnostics) lines.push(...formatDiagnosticsReport(input.diagnostics));
 
   if (input.preview) {
     lines.push('Disk: not modified (preview_only:true).');

@@ -15,6 +15,7 @@ import { buildActiveSkillContext, buildSkillCatalog, buildSkillMetaTools } from 
 import { isBashBackgroundConvertible } from './bash-tool.js';
 import { buildTools } from './tool-bridge.js';
 import { applyToolScheduler } from './tool-scheduler.js';
+import { createLanguageServerDiagnosticsProvider } from './language-server-diagnostics.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 
 export interface PiRunToolBundle {
@@ -30,6 +31,8 @@ export interface PiRunToolBundle {
   skillCatalog: string;
   activeSkillContext: string;
   hooks: ReturnType<typeof buildAgentHooks>;
+  /** Release run-scoped resources (language-server lease). Call once the run ends. */
+  dispose(): void;
 }
 
 /**
@@ -87,6 +90,9 @@ export function buildPiRunToolBundle(input: {
     subagentMessenger: options.subagentMessenger,
     automationPort: options.automationPort,
     languageServerPort: options.languageServerPort,
+    diagnosticsProvider: options.languageServers
+      ? createLanguageServerDiagnosticsProvider(options.languageServers, options.cwd)
+      : undefined,
     auxiliaryModel: {
       llmProfileConfig: options.llmProfileConfig,
       model: options.agentProfile?.model,
@@ -180,6 +186,13 @@ export function buildPiRunToolBundle(input: {
       sandboxReadOnly: isPlanMode,
     });
 
+  // The lease keeps this workspace's language servers alive for the run and
+  // warms them up now, so the first edit does not pay their start-up.
+  const languageServerLease = options.languageServers?.acquire(
+    options.cwd,
+    `run:${options.runId ?? options.claudiaSessionId ?? 'unknown'}`
+  );
+
   return {
     tools,
     visibleToolNames: tools.map(tool => tool.name),
@@ -188,6 +201,7 @@ export function buildPiRunToolBundle(input: {
     skillCatalog,
     activeSkillContext,
     hooks,
+    dispose: () => languageServerLease?.release(),
   };
 }
 
