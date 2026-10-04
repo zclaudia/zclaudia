@@ -180,6 +180,8 @@ type DiagnosticsSnapshot =
 
 ## P3（不在本计划范围）
 
+> 已另立计划：[2026-10-04-lsp-p3-plan.md](2026-10-04-lsp-p3-plan.md)。下面是最初的设想，以新计划为准。
+
 - 插件 `contributes.lspServers` 与项目配置 `.zclaudia/lsp.json`，二者都要做信任确认。
 - 托管安装：扩展 managed runtime 机制以支持 npm 包，或只覆盖 rust-analyzer 这类单二进制服务器；还要解决"预设写在 host，但下载元数据不能写在 host"的冲突。
 - `rename` 写操作工具：通过现有编辑管线应用 WorkspaceEdit，保持 diff、备份、已读文件状态一致。
