@@ -1,4 +1,4 @@
-import { mkdir, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import {
@@ -278,6 +278,106 @@ test('LSP: Python works out of the box with the bundled Pyright', async ({ app, 
     );
     expect(writeResult).toContain('Diagnostics (Python (Pyright)): 1 new error introduced');
     expect(writeResult).toMatch(/app\.py:4:\d+ Argument of type/);
+  } finally {
+    await upstream.stop();
+  }
+});
+
+test('LSP: the model renames a symbol across files in one RenameSymbol call', async ({
+  app,
+  page,
+}) => {
+  const { project, cwd } = await app.configureCodingProject('codex', undefined, '-lsp-rename');
+  await mkdir(path.join(cwd, 'src'), { recursive: true });
+  await mkdir(path.join(cwd, 'node_modules'), { recursive: true });
+  await symlink(typescriptPackage, path.join(cwd, 'node_modules', 'typescript'), 'dir');
+  await writeFile(path.join(cwd, 'package.json'), '{"name":"lsp-rename-e2e","private":true}\n');
+  await writeFile(
+    path.join(cwd, 'tsconfig.json'),
+    JSON.stringify({ compilerOptions: { strict: true, noEmit: true }, include: ['src'] })
+  );
+  await writeFile(
+    path.join(cwd, 'src', 'lib.ts'),
+    'export function greet(name: string): string {\n  return name;\n}\n'
+  );
+  await writeFile(
+    path.join(cwd, 'src', 'main.ts'),
+    "import { greet } from './lib';\n\nexport const out = greet('a');\n"
+  );
+
+  const upstream = await startCompletionFixture(request => {
+    if (!request.tools?.some(tool => tool.function.name === 'RenameSymbol'))
+      return { content: 'LSP rename session' };
+    if (request.messages.at(-1)?.role === 'user')
+      return {
+        tool: 'RenameSymbol',
+        arguments: { file_path: 'src/main.ts', line: 3, symbol: 'greet', new_name: 'welcome' },
+      };
+    return { content: 'E2E_LSP_RENAME_DONE' };
+  });
+  try {
+    const llm = await app.api('/api/llm-profiles', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'LSP rename model fixture',
+        providerType: 'openai',
+        baseUrl: upstream.baseUrl,
+        apiKey: 'e2e-placeholder',
+        models: [{ modelId: 'e2e-lsp', dialect: 'openai', contextWindow: 32768, maxTokens: 1024 }],
+      }),
+    });
+    const profile = await app.api('/api/agent-profiles', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'LSP Rename E2E Agent',
+        runtimeType: 'zclaudia',
+        llmProfileId: llm.id,
+        model: 'e2e-lsp',
+        enabledTools: ['Read', 'RenameSymbol'],
+      }),
+    });
+    await app.api(`/api/projects/${project.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ defaultAgentProfileId: profile.id }),
+    });
+    const session = await app.api('/api/sessions', {
+      method: 'POST',
+      body: JSON.stringify({
+        projectId: project.id,
+        name: 'LSP rename session',
+        agentProfileId: profile.id,
+      }),
+    });
+    await openCodingSession(page, app, project, session);
+    await sendCodingMessage(page, 'Rename greet to welcome.');
+    const messages = page.getByTestId('message-list');
+    await expect(messages.getByText('E2E_LSP_RENAME_DONE', { exact: true })).toBeVisible({
+      timeout: 45_000,
+    });
+    expect(upstream.errors).toEqual([]);
+    const toolResult = JSON.stringify(
+      upstream.requests
+        .at(-1)!
+        .messages.filter(m => m.role === 'tool')
+        .at(-1)
+    );
+    expect(toolResult).toContain('Renamed greet → welcome');
+    expect(toolResult).toContain('Files changed: 2');
+    expect(await readFile(path.join(cwd, 'src', 'lib.ts'), 'utf8')).toContain('function welcome');
+    expect(await readFile(path.join(cwd, 'src', 'main.ts'), 'utf8')).toBe(
+      "import { welcome } from './lib';\n\nexport const out = welcome('a');\n"
+    );
+    // The collapsed group names the rename; its card adds the file.
+    await expect(messages.getByText('greet → welcome', { exact: true })).toBeVisible();
+    await messages.getByText('1 tool call').click();
+    await expect(messages.getByText('greet → welcome · src/main.ts')).toBeVisible();
+    // Expanded, the card shows each changed file's diff.
+    await messages.getByText('greet → welcome · src/main.ts').click();
+    await expect(messages.getByText('src/lib.ts', { exact: true })).toBeVisible();
+    await expect(messages.getByText('src/main.ts', { exact: true })).toBeVisible();
+    await page.screenshot({
+      path: '/private/tmp/claude-501/-Users-zhvala-SourceCode-zclaudia/80655315-71e9-4cc4-b5c1-aa9ab2f3b067/scratchpad/rename-card.png',
+    });
   } finally {
     await upstream.stop();
   }

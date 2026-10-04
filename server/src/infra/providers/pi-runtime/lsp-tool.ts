@@ -103,7 +103,7 @@ export function locateSymbol(
   return starts[occurrence - 1] + (lastDot >= 0 ? lastDot + 1 : 0) + 1;
 }
 
-async function resolveColumn(
+export async function resolveColumn(
   file: string,
   line: number,
   symbol: string,

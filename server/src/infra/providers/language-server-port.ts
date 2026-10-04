@@ -112,6 +112,46 @@ export type LspQueryResult =
     }
   | { action: 'incomingCalls'; calls: LspIncomingCall[]; truncated?: boolean };
 
+export interface LspRenameRequest {
+  cwd: string;
+  file: string;
+  /** 1-based, UTF-16 columns, like LspQueryRequest. */
+  line: number;
+  character: number;
+  newName: string;
+}
+
+/** One text edit; 0-based LSP range over the text the server was given. */
+export interface LspTextEdit {
+  startLine: number;
+  startCharacter: number;
+  endLine: number;
+  endCharacter: number;
+  newText: string;
+}
+
+export interface LspFileEdits {
+  /** Absolute path. */
+  file: string;
+  /** Workspace-relative path, or the absolute path when external. */
+  path: string;
+  external?: true;
+  /**
+   * sha1 of the file's UTF-8 text the edits were computed against, so the
+   * writer can refuse when the file changed in between.
+   */
+  contentHash: string;
+  edits: LspTextEdit[];
+}
+
+export interface LspRenameResult {
+  /** The current name, when the server reports it (prepareRename). */
+  oldName?: string;
+  files: LspFileEdits[];
+  /** Files the server wanted to edit that no longer exist on disk. */
+  skippedMissing?: string[];
+}
+
 export type LanguageServerErrorCode =
   | 'server_unavailable'
   | 'server_starting'
@@ -119,7 +159,9 @@ export type LanguageServerErrorCode =
   | 'request_failed'
   | 'unsupported_action'
   | 'unsupported_language'
-  | 'timeout';
+  | 'timeout'
+  | 'rename_not_allowed'
+  | 'unsupported_edit';
 
 export class LanguageServerError extends Error {
   constructor(
@@ -139,6 +181,13 @@ export interface LanguageServerPort {
   serversFor(cwd: string): LanguageServerInfo[];
   /** Run one query; may lazily start the matching server. */
   query(request: LspQueryRequest, signal?: AbortSignal): Promise<LspQueryResult>;
+  /**
+   * Compute (never apply) a rename. Optional: ports without it get no
+   * RenameSymbol tool. Fails with `rename_not_allowed` for positions that
+   * cannot be renamed and `unsupported_edit` when the server wants file
+   * operations (create / rename / delete), which are not supported.
+   */
+  rename?(request: LspRenameRequest, signal?: AbortSignal): Promise<LspRenameResult>;
 }
 
 /** True when `port` has at least one server for `cwd`; never throws. */

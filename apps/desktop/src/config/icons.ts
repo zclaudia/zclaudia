@@ -52,6 +52,7 @@ export const ICONS = {
     MultiEdit: FileEdit,
     ReadSymbol: Code2,
     EditSymbol: FileEdit,
+    RenameSymbol: FileEdit,
     Bash: Terminal,
     Grep: Search,
     Glob: FolderSearch,

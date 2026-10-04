@@ -1276,10 +1276,10 @@ describe('PiAgentProviderAdapter.run — tool loop integration', () => {
     expect((mockAgentInstances[0].initialState as any).tools).toBeDefined();
     // Memory is skipped when memoryDir is absent (no project context here),
     // RespondToCoordinator only exists in sub-agent sessions, the four Cron*
-    // tools need an automation port, and LSPTool needs a language server
-    // port — so seven fewer than the canonical list.
+    // tools need an automation port, and LSPTool and RenameSymbol need a
+    // language server port — so eight fewer than the canonical list.
     expect((mockAgentInstances[0].initialState as any).tools.length).toBe(
-      ALL_TOOL_NAMES.length - 7
+      ALL_TOOL_NAMES.length - 8
     );
   });
 

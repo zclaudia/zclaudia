@@ -23,7 +23,13 @@ type FileMutationDetails = {
   symbol?: string;
   symbolKind?: string;
   backup?: { id?: string; originalPath?: string; path?: string };
-  perFileResults?: Array<{ path?: string; diff?: string; ok?: boolean; error?: string }>;
+  perFileResults?: Array<{
+    path?: string;
+    diff?: string;
+    ok?: boolean;
+    error?: string;
+    backup?: { id?: string };
+  }>;
   lifecycle?: {
     diagnostics?: Diagnostic[];
     deferredDiagnostics?: { id?: string; status?: string };
@@ -67,6 +73,54 @@ function DiagnosticList({ diagnostics }: { diagnostics: Diagnostic[] }) {
   );
 }
 
+type RestoreStatus = 'idle' | 'restoring' | 'restored' | 'failed';
+
+/** Restores one backup; `compact` is the per-file variant beside a path. */
+function RestoreBackupButton({
+  backupId,
+  compact = false,
+}: {
+  backupId: string;
+  compact?: boolean;
+}) {
+  const [status, setStatus] = useState<RestoreStatus>('idle');
+  const restore = async () => {
+    if (status === 'restoring') return;
+    setStatus('restoring');
+    try {
+      await restoreFileBackup(backupId);
+      setStatus('restored');
+    } catch {
+      setStatus('failed');
+    }
+  };
+  const label = compact
+    ? { idle: 'Restore', restoring: 'Restoring…', restored: 'Restored', failed: 'Restore' }[status]
+    : {
+        idle: 'Restore backup',
+        restoring: 'Restoring backup...',
+        restored: 'Backup restored',
+        failed: 'Restore backup',
+      }[status];
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        className={`rounded-md border border-border text-foreground hover:bg-muted disabled:opacity-60 ${
+          compact ? 'px-1.5 py-0.5 text-2xs' : 'px-2 py-1 text-[11px]'
+        }`}
+        disabled={status === 'restoring' || status === 'restored'}
+        onClick={restore}
+      >
+        {label}
+      </button>
+      {status === 'failed' && (
+        <span className="text-[11px] text-destructive">Backup restore failed</span>
+      )}
+    </div>
+  );
+}
+
 export function FileMutationResult({ details }: { details: FileMutationDetails }) {
   const perFileResults =
     details.perFileResults?.filter(
@@ -75,9 +129,6 @@ export function FileMutationResult({ details }: { details: FileMutationDetails }
   const deferredId = details.lifecycle?.deferredDiagnostics?.id;
   const initialDeferredStatus = details.lifecycle?.deferredDiagnostics?.status ?? 'pending';
   const [deferredResult, setDeferredResult] = useState<DeferredDiagnosticsResult | undefined>();
-  const [restoreStatus, setRestoreStatus] = useState<'idle' | 'restoring' | 'restored' | 'failed'>(
-    'idle'
-  );
   const deferredStatus = deferredResult?.status ?? initialDeferredStatus;
   const diagnostics = [
     ...(details.lifecycle?.diagnostics ?? []),
@@ -111,17 +162,6 @@ export function FileMutationResult({ details }: { details: FileMutationDetails }
       if (timer) clearTimeout(timer);
     };
   }, [deferredId, initialDeferredStatus]);
-
-  const handleRestoreBackup = async () => {
-    if (!details.backup?.id || restoreStatus === 'restoring') return;
-    setRestoreStatus('restoring');
-    try {
-      await restoreFileBackup(details.backup.id);
-      setRestoreStatus('restored');
-    } catch {
-      setRestoreStatus('failed');
-    }
-  };
 
   return (
     <div className="px-3 pb-3 border-t border-border/50">
@@ -158,32 +198,17 @@ export function FileMutationResult({ details }: { details: FileMutationDetails }
           </div>
         )}
 
-        {details.backup?.id && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground hover:bg-muted disabled:opacity-60"
-              disabled={restoreStatus === 'restoring' || restoreStatus === 'restored'}
-              onClick={handleRestoreBackup}
-            >
-              {restoreStatus === 'restoring'
-                ? 'Restoring backup...'
-                : restoreStatus === 'restored'
-                  ? 'Backup restored'
-                  : 'Restore backup'}
-            </button>
-            {restoreStatus === 'failed' && (
-              <span className="text-[11px] text-destructive">Backup restore failed</span>
-            )}
-          </div>
-        )}
+        {details.backup?.id && <RestoreBackupButton backupId={details.backup.id} />}
 
         {perFileResults.length > 0 ? (
           <div className="space-y-3">
             {perFileResults.map((file, index) => (
               <div key={`${file.path ?? 'file'}:${index}`} className="space-y-1.5">
-                {file.path && (
-                  <div className="text-xs font-mono text-muted-foreground">{file.path}</div>
+                {(file.path || file.backup?.id) && (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-mono text-muted-foreground">{file.path}</span>
+                    {file.backup?.id && <RestoreBackupButton backupId={file.backup.id} compact />}
+                  </div>
                 )}
                 <UnifiedDiffViewer diff={file.diff ?? ''} filePath={file.path} />
               </div>

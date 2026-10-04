@@ -56,6 +56,7 @@ export function extractToolPathParam(
       case 'MultiEdit':
       case 'ReadSymbol':
       case 'EditSymbol':
+      case 'RenameSymbol':
       case 'Grep':
       case 'Glob':
       case 'LS':

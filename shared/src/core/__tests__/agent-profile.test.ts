@@ -68,6 +68,7 @@ describe('ALL_TOOL_NAMES', () => {
       'ReadMcpResource',
       'ReadSessionContext',
       'ReadSymbol',
+      'RenameSymbol',
       'RespondToCoordinator',
       'SendMessage',
       'TaskOutput',

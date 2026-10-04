@@ -153,7 +153,7 @@ describe('classify', () => {
   });
 
   it('should classify fileWrite tools', () => {
-    for (const tool of ['Write', 'Edit', 'MultiEdit', 'EditSymbol', 'NotebookEdit']) {
+    for (const tool of ['Write', 'Edit', 'MultiEdit', 'EditSymbol', 'RenameSymbol', 'NotebookEdit']) {
       expect(classify(tool, {}, '')).toBe('fileWrite' as PermissionCategory);
     }
   });

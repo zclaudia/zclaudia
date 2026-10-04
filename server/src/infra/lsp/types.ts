@@ -127,11 +127,17 @@ export interface DiagnosticsRequest {
    */
   baselineContent?: string | null;
   /**
-   * Also check the server's other open files for errors this change caused
-   * (a changed signature breaking a caller). `exclude`: files the same
-   * mutation changed, which get their own check.
+   * Other files the same mutation changed (a multi-file patch or rename).
+   * Open ones are synced before the check, since the server's copy of an open
+   * document overrides the disk; they are left out of `otherOpenFiles`
+   * because each gets its own check.
    */
-  otherOpenFiles?: { exclude?: string[]; max?: number };
+  changedWith?: string[];
+  /**
+   * Also check the server's other open files for errors this change caused
+   * (a changed signature breaking a caller).
+   */
+  otherOpenFiles?: { max?: number };
   signal?: AbortSignal;
 }
 

@@ -8,6 +8,8 @@
  * server restarts lazily with exponential backoff and is marked failed after
  * repeated crashes. See docs/plans/2026-10-04-lsp-manager-plan.md.
  */
+import { createHash } from 'crypto';
+import { readFile } from 'fs/promises';
 import path from 'path';
 import { LanguageServerStartupError, LspClient } from './client.js';
 import { DiagnosticsStore, mapDiagnostics } from './diagnostics.js';
@@ -24,9 +26,13 @@ import {
 } from './query.js';
 import {
   LanguageServerError,
+  type LspFileEdits,
   type LspQueryRequest,
   type LspQueryResult,
+  type LspRenameRequest,
+  type LspRenameResult,
 } from '../providers/language-server-port.js';
+import { prepareRenamePlaceholder, workspaceEditToFileEdits } from './rename.js';
 import { findFirstSourceFile, hasRootMarker } from './detection.js';
 import { defaultLanguageServerPresets } from './presets.js';
 import { spawnLanguageServer } from './spawn.js';
@@ -71,6 +77,7 @@ const ACTION_CAPABILITY = {
   documentSymbols: 'documentSymbolProvider',
   workspaceSymbols: 'workspaceSymbolProvider',
   incomingCalls: 'callHierarchyProvider',
+  rename: 'renameProvider',
 } as const;
 
 export interface LanguageServerManagerOptions {
@@ -131,6 +138,10 @@ function condenseServerError(err: unknown): string {
   return text.length > ERROR_MESSAGE_MAX_CHARS
     ? `${text.slice(0, ERROR_MESSAGE_MAX_CHARS)}…`
     : text;
+}
+
+function toPosixPath(file: string): string {
+  return file.split(path.sep).join('/');
 }
 
 function isInside(root: string, file: string): boolean {
@@ -272,17 +283,22 @@ export class LanguageServerManager implements LanguageServerService {
       : undefined;
     let baseline: LspDiagnostic[] | undefined = entry.stable.get(absolute)?.diagnostics;
     try {
-      if (documents.isOpen(absolute)) {
-        // The server still holds the pre-change content: ask for it exactly.
-        if (pull) baseline = (await pull(absolute)) ?? baseline;
-      } else if (request.baselineContent !== undefined) {
-        // First sight of this file: diagnose the old content first, so the
-        // report can separate what this change introduced from what was there.
-        if (request.baselineContent === null) {
+      const isOpen = documents.isOpen(absolute);
+      // Diagnose the pre-change text itself when it is known and either the
+      // server has not seen the file, or asking is cheap, or other files of
+      // the same mutation may already have moved this file's open copy on
+      // (synced as their sibling). Otherwise the last settled diagnostics of
+      // the open copy serve as the baseline.
+      const baselineContent = request.baselineContent;
+      const diagnoseBaseline =
+        baselineContent !== undefined &&
+        (!isOpen || Boolean(pull) || (request.changedWith?.length ?? 0) > 0);
+      if (diagnoseBaseline) {
+        if (baselineContent === null) {
           baseline = [];
         } else {
           const mark = diagnostics.mark(absolute);
-          await documents.syncText(absolute, request.baselineContent);
+          await documents.syncText(absolute, baselineContent);
           const before =
             (pull && (await pull(absolute))) ??
             (await diagnostics.waitForPublishAfter(absolute, mark, {
@@ -292,13 +308,26 @@ export class LanguageServerManager implements LanguageServerService {
             }));
           baseline = before ?? undefined;
         }
+      } else if (isOpen && pull) {
+        // The server still holds the pre-change content: ask for it exactly.
+        baseline = (await pull(absolute)) ?? baseline;
       }
 
       // Other open files, diagnosed while the server still has the old content.
+      const changedWith = (request.changedWith ?? []).map(other => path.resolve(other));
       const others =
         pull && request.otherOpenFiles
-          ? await this.otherOpenFilesBefore(active, absolute, request.otherOpenFiles, pull)
+          ? await this.otherOpenFilesBefore(
+              active,
+              [absolute, ...changedWith],
+              request.otherOpenFiles,
+              pull
+            )
           : undefined;
+      // The rest of the mutation is on disk too; open copies must catch up.
+      for (const other of changedWith) {
+        if (documents.isOpen(other)) await documents.syncFromDisk(other);
+      }
 
       const mark = diagnostics.mark(absolute);
       const outcome = await documents.syncFromDisk(absolute);
@@ -373,11 +402,11 @@ export class LanguageServerManager implements LanguageServerService {
 
   private async otherOpenFilesBefore(
     active: ActiveClient,
-    changed: string,
+    changed: string[],
     options: NonNullable<DiagnosticsRequest['otherOpenFiles']>,
     pull: (file: string) => Promise<LspDiagnostic[] | undefined>
   ): Promise<Array<{ file: string; before: LspDiagnostic[] }>> {
-    const exclude = new Set([changed, ...(options.exclude ?? []).map(file => path.resolve(file))]);
+    const exclude = new Set(changed);
     const files = active.documents
       .openFiles()
       .filter(file => !exclude.has(file))
@@ -388,6 +417,129 @@ export class LanguageServerManager implements LanguageServerService {
       if (before) result.push({ file, before });
     }
     return result;
+  }
+
+  /**
+   * Compute a rename across the workspace (nothing is written). Each file
+   * comes back with the hash of the text the edits apply to, read right after
+   * the server answered, so the writer can detect a change in between.
+   */
+  async rename(request: LspRenameRequest, signal?: AbortSignal): Promise<LspRenameResult> {
+    try {
+      return await this.runRename(request, signal);
+    } catch (err) {
+      if (err instanceof LanguageServerError) throw err;
+      throw new LanguageServerError('rename_not_allowed', condenseServerError(err));
+    }
+  }
+
+  private async runRename(
+    request: LspRenameRequest,
+    signal?: AbortSignal
+  ): Promise<LspRenameResult> {
+    if (!this.enabled) throw new LanguageServerError('server_unavailable', DISABLED_MESSAGE);
+    const root = path.resolve(request.cwd);
+    const file = path.resolve(root, request.file);
+    if (!isInside(root, file)) {
+      throw new LanguageServerError('unsupported_language', 'File is outside the workspace');
+    }
+    const preset = this.presetForFile(root, file);
+    if (!preset) {
+      throw new LanguageServerError(
+        'unsupported_language',
+        `No language server handles ${path.extname(file) || 'this kind of'} files here`
+      );
+    }
+    const active = await this.activeFor(this.entryFor(preset, root));
+    this.requireCapability(active, preset, 'rename');
+    // Same as queries: every open document reflects the disk before asking.
+    await active.documents.syncOpenFromDisk();
+    if ((await this.openAndAwaitProject(active, file, signal)) === 'missing') {
+      throw new LanguageServerError('unsupported_language', 'File does not exist');
+    }
+    let textDocument = { uri: fileUri(file) };
+    let position = { line: request.line - 1, character: request.character - 1 };
+
+    // Rename the symbol at its declaration. From a usage of an imported name,
+    // TypeScript would otherwise only alias the local binding
+    // (`import { a as b }`) instead of renaming the symbol everywhere. A
+    // declaration outside the workspace (a dependency) keeps the position:
+    // renaming the local binding is then the only possible rename.
+    if (active.client.capabilities.definitionProvider) {
+      const definitions = definitionLocations(
+        root,
+        await active.client.request('textDocument/definition', { textDocument, position }, signal)
+      );
+      const declaration = definitions[0];
+      if (declaration && definitions.every(location => !location.external)) {
+        const declarationFile = path.resolve(root, declaration.file);
+        if ((await active.documents.syncFromDisk(declarationFile)) !== 'missing') {
+          textDocument = { uri: fileUri(declarationFile) };
+          position = { line: declaration.line - 1, character: declaration.character - 1 };
+        }
+      }
+    }
+
+    let oldName: string | undefined;
+    const provider = active.client.capabilities.renameProvider;
+    if (provider && typeof provider === 'object' && provider.prepareProvider) {
+      const prepared = await active.client.request(
+        'textDocument/prepareRename',
+        { textDocument, position },
+        signal
+      );
+      if (!prepared) {
+        throw new LanguageServerError('rename_not_allowed', 'This position cannot be renamed');
+      }
+      oldName = prepareRenamePlaceholder(prepared);
+    }
+
+    const raw = await active.client.request(
+      'textDocument/rename',
+      { textDocument, position, newName: request.newName },
+      signal
+    );
+    const byFile = workspaceEditToFileEdits(raw);
+    if ([...byFile.values()].every(edits => edits.length === 0)) {
+      throw new LanguageServerError(
+        'rename_not_allowed',
+        'The language server found nothing to rename here'
+      );
+    }
+    const files: LspFileEdits[] = [];
+    const skipped: string[] = [];
+    for (const [target, edits] of byFile) {
+      if (edits.length === 0) continue;
+      let text: string;
+      try {
+        text = await readFile(target, 'utf8');
+      } catch (err) {
+        // Deleted since the server last looked (its project can lag behind
+        // the disk): there is nothing left to rename in it.
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+          skipped.push(isInside(root, target) ? path.relative(root, target) : target);
+          continue;
+        }
+        throw new LanguageServerError(
+          'unsupported_edit',
+          `Cannot read ${target}, which the rename edits`
+        );
+      }
+      const external = !isInside(root, target);
+      files.push({
+        file: target,
+        path: external ? target : path.relative(root, target).split(path.sep).join('/'),
+        ...(external ? { external: true as const } : {}),
+        contentHash: createHash('sha1').update(text).digest('hex'),
+        edits,
+      });
+    }
+    files.sort((a, b) => a.path.localeCompare(b.path));
+    return {
+      ...(oldName ? { oldName } : {}),
+      files,
+      ...(skipped.length > 0 ? { skippedMissing: skipped.map(toPosixPath) } : {}),
+    };
   }
 
   async query(request: LspQueryRequest, signal?: AbortSignal): Promise<LspQueryResult> {

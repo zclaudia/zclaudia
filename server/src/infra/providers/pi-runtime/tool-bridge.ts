@@ -46,6 +46,14 @@ export function buildTools(cwd: string, options?: ToolBridgeOptions): AgentTool<
     if (name === 'LSPTool' && !hasLanguageServers(effectiveOptions.languageServerPort, cwd)) {
       continue;
     }
+    // Same for RenameSymbol, which also needs a port that can compute renames.
+    if (
+      name === 'RenameSymbol' &&
+      (!effectiveOptions.languageServerPort?.rename ||
+        !hasLanguageServers(effectiveOptions.languageServerPort, cwd))
+    ) {
+      continue;
+    }
     const override = overrides.get(name);
     const tool = override
       ? withToolName(override, name, override.label ?? name)

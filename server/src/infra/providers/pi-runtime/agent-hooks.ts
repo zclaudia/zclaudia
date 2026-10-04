@@ -66,7 +66,8 @@ function buildToolDetail(toolName: string, args: unknown): string {
     toolName === 'MultiEdit' ||
     toolName === 'Write' ||
     toolName === 'ReadSymbol' ||
-    toolName === 'EditSymbol'
+    toolName === 'EditSymbol' ||
+    toolName === 'RenameSymbol'
   ) {
     const filePath = argsObj.file_path ?? argsObj.path;
     if (typeof filePath === 'string') return filePath;

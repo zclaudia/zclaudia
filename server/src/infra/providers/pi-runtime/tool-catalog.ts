@@ -32,6 +32,7 @@ import { createEnterWorktreeTool, createExitWorktreeTool } from './worktree-tool
 import { createEvalBridgeTool } from './eval-tool.js';
 import { createGlobTool, createGrepBridgeTool, createLsBridgeTool } from './search-tools.js';
 import { createLspTool } from './lsp-tool.js';
+import { createRenameSymbolTool } from './rename-symbol-tool.js';
 import {
   createListMcpResourcesTool,
   createMcpTool,
@@ -127,6 +128,8 @@ export const BUILTIN_TOOL_FACTORIES: Record<ToolName, ToolFactory> = {
   CronUpdate: (cwd, options) => createCronUpdateTool(automationDeps(cwd, options)),
   CronDelete: (cwd, options) => createCronDeleteTool(automationDeps(cwd, options)),
   LSPTool: (cwd, options) => createLspTool({ cwd, port: options?.languageServerPort }),
+  RenameSymbol: (cwd, options) =>
+    createRenameSymbolTool({ cwd, port: options?.languageServerPort, mutation: options }),
   AstGrep: cwd => createAstGrepTool(cwd),
   AstEdit: (cwd, options) => createAstEditTool(cwd, options),
   EnterWorktree: (cwd, options) => createEnterWorktreeTool(cwd, options),

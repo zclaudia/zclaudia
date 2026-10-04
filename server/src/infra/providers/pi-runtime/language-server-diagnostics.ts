@@ -75,7 +75,8 @@ export function createLanguageServerDiagnosticsProvider(
       await service.diagnosticsFor(cwd, input.absolutePath, {
         budgetMs,
         baselineContent: input.originalContent,
-        otherOpenFiles: { exclude: input.otherChangedPaths },
+        changedWith: input.otherChangedPaths,
+        otherOpenFiles: {},
       })
     );
 }

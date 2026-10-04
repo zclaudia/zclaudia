@@ -308,6 +308,8 @@ export function buildMutationResultText(input: {
   diagnostics?: WriteDiagnosticsReport;
   /** Per-file checks of a multi-file mutation; used instead of `diagnostics`. */
   diagnosticsReports?: FileDiagnosticsReport[];
+  /** Extra lines for the model, placed after the diagnostics. */
+  notes?: string[];
 }): string {
   const headlineParts = [input.action];
   if (input.path) headlineParts.push(input.path);
@@ -341,6 +343,7 @@ export function buildMutationResultText(input: {
   } else if (input.diagnostics) {
     lines.push(...formatDiagnosticsReport(input.diagnostics));
   }
+  if (input.notes) lines.push(...input.notes);
 
   if (input.preview) {
     lines.push('Disk: not modified (preview_only:true).');

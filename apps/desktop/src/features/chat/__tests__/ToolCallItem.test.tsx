@@ -810,6 +810,56 @@ describe('ToolCallItem', () => {
       expect(screen.getAllByText('b.ts').length).toBeGreaterThan(0);
     });
 
+    it('shows a RenameSymbol summary, every file it changed and the errors it introduced', () => {
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'RenameSymbol',
+            toolInput: { file_path: 'src/lib.ts', line: 1, symbol: 'greet', new_name: 'welcome' },
+            status: 'completed',
+            result: {
+              details: {
+                ok: true,
+                symbol: 'greet',
+                newName: 'welcome',
+                fileCount: 2,
+                editCount: 3,
+                perFileResults: [
+                  {
+                    path: 'src/a.ts',
+                    diff: '--- src/a.ts\n+++ src/a.ts\n@@\n-greet\n+welcome',
+                    backup: { id: 'backup-a' },
+                  },
+                  {
+                    path: 'src/lib.ts',
+                    diff: '--- src/lib.ts\n+++ src/lib.ts\n@@\n-greet\n+welcome',
+                  },
+                ],
+                lifecycle: {
+                  diagnostics: [
+                    {
+                      path: 'src/lib.ts',
+                      line: 4,
+                      severity: 'error',
+                      message: "Duplicate identifier 'welcome'.",
+                    },
+                  ],
+                },
+              },
+            },
+          })}
+        />
+      );
+      expect(screen.getByText('greet → welcome · src/lib.ts')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button'));
+      expect(screen.getAllByTestId('unified-diff-viewer')).toHaveLength(2);
+      expect(screen.getByText(/Duplicate identifier 'welcome'/)).toBeInTheDocument();
+      // Each file with a backup can be restored on its own.
+      mockRestoreFileBackup.mockResolvedValue(undefined);
+      fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+      expect(mockRestoreFileBackup).toHaveBeenCalledWith('backup-a');
+    });
+
     it('shows diagnostics backup and preview metadata for Edit results', async () => {
       render(
         <ToolCallItem
