@@ -14,6 +14,8 @@ export default [
       '**/dist/**',
       '**/node_modules/**',
       '**/bundle/**',
+      // 本地生成物（如 agent-runtime migration 快照）：压缩过的 bundle，不是源码。
+      '**/artifacts/**',
       '**/.pnpm-store/**',
       '**/playwright-report/**',
       '**/test-results/**',

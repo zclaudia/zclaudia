@@ -25,6 +25,7 @@ import type { Database } from 'better-sqlite3';
 import { isPiAgentRuntime } from '@zclaudia/shared/core/agent-profile';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import {
+  validateLanguageServerConfig,
   validateLanguageServerConfigs,
   type CustomLanguageServers,
   type FileLanguageServerDiagnostics,
@@ -69,18 +70,45 @@ function rejectUnknownRoot(res: Response): void {
   });
 }
 
-/** The user's saved definitions; invalid or unreadable storage yields none. */
+/**
+ * The user's saved definitions. One invalid entry is dropped with a log —
+ * all-or-nothing here would let a single bad record (a schema drift after an
+ * upgrade, a hand-edited config) silently disable every user server for the
+ * process. Saving through the API still validates strictly, so the UI is
+ * where bad input gets fixed.
+ */
 export function readCustomLanguageServers(db: Database): LanguageServerConfig[] {
+  let parsed: unknown;
   try {
     const row = db
       .prepare('SELECT value FROM app_config WHERE key = ?')
       .get(CUSTOM_LANGUAGE_SERVERS_KEY) as { value: string } | undefined;
     if (!row) return [];
-    const result = validateLanguageServerConfigs(JSON.parse(row.value));
-    return result.ok ? result.configs : [];
-  } catch {
+    parsed = JSON.parse(row.value);
+  } catch (err) {
+    console.error('[language-servers] cannot read custom language servers:', err);
     return [];
   }
+  if (!Array.isArray(parsed)) return [];
+  const configs: LanguageServerConfig[] = [];
+  const seen = new Set<string>();
+  parsed.forEach((entry, index) => {
+    const result = validateLanguageServerConfig(entry);
+    if (!result.ok) {
+      console.error(
+        `[language-servers] dropping invalid custom server ${index}:`,
+        result.errors.join('; ')
+      );
+      return;
+    }
+    if (seen.has(result.config.id)) {
+      console.error(`[language-servers] dropping duplicate custom server id "${result.config.id}"`);
+      return;
+    }
+    seen.add(result.config.id);
+    configs.push(result.config);
+  });
+  return configs;
 }
 
 /** Make the user's definitions the registry's `user` source. */

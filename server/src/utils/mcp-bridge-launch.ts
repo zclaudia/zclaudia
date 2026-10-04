@@ -30,14 +30,17 @@ export interface McpBridgeToolRef {
  * @param serverPort - Local server port for the bridge URL
  * @param sessionId - Session ID (direct env var) or undefined
  * @param sessionIdFile - Session ID file path (for providers that load MCP once at startup)
- * @param bridgeTools - Registered bridge tools (e.g. toolRegistry.getBridgeTools())
+ * @param bridgeTools - Registered bridge tools (e.g. toolRegistry.getBridgeTools());
+ *   required so a caller cannot silently disable the bridge by forgetting it
  */
 export function buildMcpBridgeEntry(
   serverPort: number,
-  sessionId?: string,
-  sessionIdFile?: string,
-  bridgeTools: readonly McpBridgeToolRef[] = []
+  sessionId: string | undefined,
+  sessionIdFile: string | undefined,
+  bridgeTools: readonly McpBridgeToolRef[]
 ): McpBridgeServerEntry | null {
+  // Required on purpose: an omitted argument would silently disable the
+  // bridge instead of asking for the registry's tools.
   if (bridgeTools.length === 0) return null;
 
   const launch = resolveMcpBridgeLaunchConfig();

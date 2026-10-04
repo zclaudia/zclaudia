@@ -65,10 +65,16 @@ export function createSessionRoutes(
     db,
     providerRegistry,
     sessionId => hasAnyActiveRunForSession(activeRuns, sessionId),
-    managedRuntimes ?? {
-      // Discovery without a resolver treats managed runtimes as unavailable.
-      resolveForRuntime: async () => undefined,
-    }
+    managedRuntimes ??
+      (() => {
+        // Discovery without a resolver treats managed runtimes as unavailable.
+        // Loud, not silent: a composition root that forgets to inject it would
+        // otherwise just show empty managed-runtime discovery.
+        console.warn('[sessions] no managedRuntimes port injected; managed runtimes unavailable');
+        return {
+          resolveForRuntime: async () => undefined,
+        };
+      })()
   );
   router.get('/:id/capabilities', async (req, res) => {
     try {
@@ -434,6 +440,11 @@ export function createSessionRoutes(
   // service re-checks eligibility and lands the result via a sessions_updated
   // broadcast, so this returns 202 immediately regardless of the outcome.
   router.post('/:id/generate-title', (req: Request, res: Response) => {
+    if (!requestTitleGeneration) {
+      // Loud, not silent: without the port the 202 below generates nothing,
+      // and a composition root that forgot to inject it would never find out.
+      console.warn('[sessions] no title generation port injected; generate-title is a no-op');
+    }
     requestTitleGeneration?.({
       db,
       sessionId: req.params.id,
