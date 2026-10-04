@@ -39,6 +39,13 @@ import { FileTree } from './FileTree';
 import { MarkdownFileContent } from './MarkdownFileContent';
 import { FileSymbol } from '../filesymbols';
 import { matchesByLine, findContentMatches, type ContentMatch } from './contentSearch';
+import { DiagnosticMarker, FileDiagnosticsSummary } from './FileDiagnostics';
+import {
+  diagnosticLineTint,
+  diagnosticsByLine,
+  type LineDiagnostics,
+} from './fileDiagnosticsModel';
+import { useFileDiagnostics } from './useFileDiagnostics';
 import { isDesktopTauri } from '../../utils/platform';
 import {
   openPopoutWindow,
@@ -135,6 +142,9 @@ type CodeRowExtraProps = {
   activeMatchLine: number | null;
   activeMatchColumn: number;
   matchesByLine: Map<number, { start: number; end: number }[]>;
+  diagnosticLines: Map<number, LineDiagnostics>;
+  /** Reserve the marker column (a language server covers this file). */
+  diagnosticGutter: boolean;
 };
 
 function CodeRow({
@@ -149,6 +159,8 @@ function CodeRow({
   activeMatchLine,
   activeMatchColumn,
   matchesByLine,
+  diagnosticLines,
+  diagnosticGutter,
 }: RowComponentProps<CodeRowExtraProps>) {
   const line = tokens[index];
   if (!line) return null;
@@ -162,6 +174,7 @@ function CodeRow({
   const lineProps = getLineProps({ line });
   const themeBg = (lineProps.style?.backgroundColor as string | undefined) ?? undefined;
   const matchRanges = matchesByLine.get(lineNumber) ?? [];
+  const lineDiagnostics = diagnosticLines.get(lineNumber);
   return (
     <div
       style={{
@@ -172,9 +185,16 @@ function CodeRow({
           ? 'hsl(var(--primary) / 0.16)'
           : inRange
             ? 'hsl(var(--primary) / 0.12)'
-            : themeBg,
+            : lineDiagnostics
+              ? diagnosticLineTint(lineDiagnostics.severity)
+              : themeBg,
       }}
     >
+      {diagnosticGutter && (
+        <span style={{ display: 'inline-flex', width: '0.75rem', flexShrink: 0 }}>
+          {lineDiagnostics && <DiagnosticMarker line={lineNumber} entry={lineDiagnostics} />}
+        </span>
+      )}
       <span
         style={{
           display: 'inline-block',
@@ -315,6 +335,8 @@ interface VirtualizedCodeViewProps {
   matchesByLine: Map<number, { start: number; end: number }[]>;
   activeMatchLine: number | null;
   activeMatchColumn: number;
+  diagnosticLines: Map<number, LineDiagnostics>;
+  diagnosticGutter: boolean;
 }
 
 /**
@@ -332,6 +354,8 @@ function VirtualizedCodeView({
   matchesByLine,
   activeMatchLine,
   activeMatchColumn,
+  diagnosticLines,
+  diagnosticGutter,
 }: VirtualizedCodeViewProps) {
   const lineCount = useMemo(() => content.split(/\r?\n/).length, [content]);
   const lineNumberWidth = `${Math.max(2, String(lineCount).length) + 2}ch`;
@@ -353,6 +377,8 @@ function VirtualizedCodeView({
             activeMatchLine,
             activeMatchColumn,
             matchesByLine,
+            diagnosticLines,
+            diagnosticGutter,
           }}
           listRef={listRef}
           style={{
@@ -568,6 +594,18 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const error = projectMatches ? store.error : null;
   const fileBackendId = resolveProjectBackendId(projectRoot);
   const listRef = useListRef(null);
+  const fileDiagnostics = useFileDiagnostics({
+    projectRoot,
+    filePath,
+    backendId: fileBackendId,
+    version: projectMatches ? store.knownMtimeMs : null,
+  });
+  const diagnosticLines = useMemo(
+    () => diagnosticsByLine(fileDiagnostics.diagnostics),
+    [fileDiagnostics.diagnostics]
+  );
+  const diagnosticGutter =
+    fileDiagnostics.state !== 'unavailable' && fileDiagnostics.state !== 'loading';
 
   const [activeMatch, setActiveMatch] = useState<ContentMatch | null>(null);
 
@@ -845,6 +883,14 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
                   </span>
                 );
               })()}
+            {filePath && content && !showMarkdownPreview && (
+              <span className="ml-auto flex flex-shrink-0 items-center">
+                <FileDiagnosticsSummary
+                  result={fileDiagnostics}
+                  onJump={line => openFile(projectRoot, filePath, line)}
+                />
+              </span>
+            )}
           </div>
 
           {searchOpen && (
@@ -935,6 +981,8 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
                     matchesByLine={matchesByLineMap}
                     activeMatchLine={activeMatchLine}
                     activeMatchColumn={activeMatchColumn}
+                    diagnosticLines={diagnosticLines}
+                    diagnosticGutter={diagnosticGutter}
                   />
                 ))}
             </div>

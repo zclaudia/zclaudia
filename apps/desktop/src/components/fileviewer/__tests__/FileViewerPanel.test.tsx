@@ -21,6 +21,10 @@ vi.mock('../../../services/api', () => ({
   getFileStat: vi.fn().mockResolvedValue({ mtimeMs: 1000, size: 11, path: 'src/app.tsx' }),
   getBaseUrl: vi.fn(() => 'http://localhost:3100'),
   getAuthHeaders: vi.fn(() => ({})),
+  getFileLanguageServerDiagnostics: vi.fn(),
+  acquireLanguageServerViewerLease: vi.fn(),
+  renewLanguageServerViewerLease: vi.fn(),
+  releaseLanguageServerViewerLease: vi.fn(),
 }));
 
 vi.mock('../FileSearchInput', () => ({
@@ -143,6 +147,12 @@ beforeEach(() => {
   mockFileViewerState.treeWidthPx = 256;
   mockFileViewerState.projectRoot = null;
   mockFileViewerState.knownMtimeMs = null;
+  vi.mocked(api.getFileLanguageServerDiagnostics).mockResolvedValue({
+    state: 'unavailable',
+    server: null,
+    diagnostics: [],
+  });
+  vi.mocked(api.releaseLanguageServerViewerLease).mockResolvedValue(undefined);
 });
 
 describe('FileViewerPanel', () => {
@@ -620,5 +630,84 @@ describe('FileViewerActions', () => {
     expect(
       container.querySelector('button[title="Show rendered preview"]')
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('FileViewerPanel language-server diagnostics', () => {
+  const server = { id: 'typescript', name: 'TypeScript' };
+
+  it('shows nothing extra when no language server covers the file', async () => {
+    mockFileViewerState.filePath = 'notes.txt';
+    mockFileViewerState.content = 'hello';
+    render(<FileViewerPanel projectRoot="/project" />);
+    await waitFor(() => expect(api.getFileLanguageServerDiagnostics).toHaveBeenCalled());
+    expect(screen.queryByTestId('check-types')).toBeNull();
+    expect(screen.queryByTestId('diagnostics-status')).toBeNull();
+    expect(screen.queryByTestId('diagnostic-marker')).toBeNull();
+  });
+
+  it('offers Check types, then marks the problem lines and jumps to them', async () => {
+    mockFileViewerState.filePath = 'src/app.ts';
+    mockFileViewerState.projectRoot = '/project';
+    mockFileViewerState.content = 'const a = 1;\nconst b: string = 2;\nconst c = 3;';
+    vi.mocked(api.getFileLanguageServerDiagnostics).mockResolvedValue({
+      state: 'not_running',
+      server,
+      diagnostics: [],
+    });
+    vi.mocked(api.acquireLanguageServerViewerLease).mockResolvedValue({
+      leaseId: 'lease-1',
+      ttlMs: 90_000,
+    });
+    const { unmount } = render(<FileViewerPanel projectRoot="/project" />);
+
+    const check = await screen.findByTestId('check-types');
+    vi.mocked(api.getFileLanguageServerDiagnostics).mockResolvedValue({
+      state: 'ready',
+      server,
+      diagnostics: [
+        {
+          line: 2,
+          character: 7,
+          severity: 'error',
+          message: "Type 'number' is not assignable to type 'string'.",
+          code: 2322,
+        },
+        { line: 3, character: 7, severity: 'hint', message: 'unused' },
+      ],
+    });
+    fireEvent.click(check);
+    expect(api.acquireLanguageServerViewerLease).toHaveBeenCalledWith('/project', null);
+
+    const status = await screen.findByText('1 error');
+    const markers = await screen.findAllByTestId('diagnostic-marker');
+    expect(markers).toHaveLength(1); // the hint is not shown
+    expect(markers[0]).toHaveAttribute('data-severity', 'error');
+
+    fireEvent.click(markers[0]);
+    expect(await screen.findByTestId('diagnostic-popover')).toHaveTextContent(
+      "Type 'number' is not assignable to type 'string'. [2322]"
+    );
+
+    fireEvent.click(status);
+    expect(mockFileViewerState.openFile).toHaveBeenCalledWith('/project', 'src/app.ts', 2);
+
+    unmount();
+    await waitFor(() =>
+      expect(api.releaseLanguageServerViewerLease).toHaveBeenCalledWith('lease-1', null)
+    );
+  });
+
+  it('says so when the running server finds no problems', async () => {
+    mockFileViewerState.filePath = 'src/app.ts';
+    mockFileViewerState.content = 'const a = 1;';
+    vi.mocked(api.getFileLanguageServerDiagnostics).mockResolvedValue({
+      state: 'ready',
+      server,
+      diagnostics: [],
+    });
+    render(<FileViewerPanel projectRoot="/project" />);
+    expect(await screen.findByText('No problems')).toBeInTheDocument();
+    expect(api.acquireLanguageServerViewerLease).not.toHaveBeenCalled();
   });
 });
