@@ -251,6 +251,7 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     gateway,
     getServerPort,
     permissionWorkflowResolver,
+    getLanguageServers: () => serverState.languageServerManager,
   });
 
   registerInteractionTools({

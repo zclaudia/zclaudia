@@ -17,6 +17,8 @@ import { createWorkspaceRoutes } from './interfaces/http/workspace.js';
 import { createGatewayRouter } from './interfaces/http/gateway.js';
 import { createWebSearchConfigRoutes } from './interfaces/http/web-search.js';
 import { createUsageStatsRoutes } from './interfaces/http/usage-stats.js';
+import { createLanguageServerRoutes } from './interfaces/http/language-servers.js';
+import type { LanguageServerManager } from './infra/lsp/index.js';
 import type { ProcessSupervisor } from './infra/services/process-supervisor.js';
 import type { GatewayState } from './infra/gateway/gateway-state.js';
 import { getGatewayClient } from './infra/gateway/gateway-instance.js';
@@ -30,6 +32,7 @@ interface RegisterPlatformRoutesDeps {
   gateway: GatewayState;
   getServerPort: () => number | null;
   permissionWorkflowResolver?: import('./domains/workflows/index.js').PermissionWorkflowResolver;
+  getLanguageServers?: () => LanguageServerManager | undefined;
 }
 
 export function registerPlatformRoutes(deps: RegisterPlatformRoutesDeps): void {
@@ -71,6 +74,11 @@ export function registerPlatformRoutes(deps: RegisterPlatformRoutesDeps): void {
 
   app.use('/api/system', localOnlyMiddleware, createSystemStatsRoutes());
   app.use('/api/stats', authMiddleware, createUsageStatsRoutes(db));
+  app.use(
+    '/api/language-servers',
+    authMiddleware,
+    createLanguageServerRoutes(db, deps.getLanguageServers ?? (() => undefined))
+  );
   app.use(
     '/api/debug',
     localOnlyMiddleware,
