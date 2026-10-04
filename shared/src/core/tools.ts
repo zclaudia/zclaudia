@@ -606,7 +606,7 @@ const BUILTIN_TOOL_METADATA_BASE: Readonly<Record<ToolName, ToolMetadata>> = {
     ref: { source: 'builtin', name: 'LSPTool' },
     label: 'LSPTool',
     description:
-      'Query the workspace language server: go to definition, find references, hover, symbols, diagnostics. Only available when a language server is configured for the project.',
+      'Query the workspace language server: go to definition, find references, hover, incoming calls, symbols, diagnostics. Only available when a language server is configured for the project.',
     setIds: ['code-intelligence'],
     declaredReadOnly: true,
     mutatesWorkspace: false,

@@ -8,7 +8,7 @@ import {
   type LanguageServerPort,
   type LspQueryRequest,
 } from '../../language-server-port.js';
-import { createLspTool, describeLanguageServers } from '../lsp-tool.js';
+import { createLspTool, describeLanguageServers, locateSymbol } from '../lsp-tool.js';
 
 function fakePort(overrides: Partial<LanguageServerPort> = {}): LanguageServerPort & {
   query: ReturnType<typeof vi.fn>;
@@ -32,7 +32,14 @@ function fakePort(overrides: Partial<LanguageServerPort> = {}): LanguageServerPo
           ],
         };
       case 'diagnostics':
-        return { action: 'diagnostics' as const, diagnostics: [], truncated: false };
+        return {
+          action: 'diagnostics' as const,
+          state: 'ready' as const,
+          diagnostics: [],
+          truncated: false,
+        };
+      case 'incomingCalls':
+        return { action: 'incomingCalls' as const, calls: [] };
     }
   });
   return {
@@ -58,6 +65,33 @@ describe('describeLanguageServers', () => {
     ).toBe(
       'Language servers available for this workspace: TypeScript (tsserver: typescript, javascript); Python (pyright: any).'
     );
+  });
+});
+
+describe('locateSymbol', () => {
+  it('finds the identifier as a whole word, by occurrence', () => {
+    const line = 'const total = subtotal + total;';
+    expect(locateSymbol(line, 'total')).toBe(7);
+    expect(locateSymbol(line, 'total', 2)).toBe(26);
+    expect(locateSymbol(line, 'total', 3)).toMatchObject({
+      error: expect.stringContaining('2 time(s)'),
+    });
+  });
+
+  it('lands on the last segment of a dotted name', () => {
+    expect(locateSymbol('  return config.port;', 'config.port')).toBe(17);
+  });
+
+  it('counts columns in UTF-16 code units', () => {
+    // '😀' is two UTF-16 code units, so `x` starts at index 6 (column 7).
+    expect(locateSymbol("'😀', x", 'x')).toBe(7);
+  });
+
+  it('matches non-identifier text literally and reports misses with the line', () => {
+    expect(locateSymbol('a => b', '=>')).toBe(3);
+    expect(locateSymbol('const a = 1;', 'b')).toEqual({
+      error: '"b" does not appear on that line: const a = 1;',
+    });
   });
 });
 
@@ -131,6 +165,45 @@ describe('LSPTool', () => {
     const payload = JSON.parse(result.content[0].text);
     expect(payload.file).toBe('a.ts');
     expect(payload.locations[0]).toMatchObject({ file: 'src/a.ts', line: 3 });
+  });
+
+  it('turns line + symbol into the column of that identifier', async () => {
+    const cwd = workspace();
+    const port = fakePort();
+    const tool = createLspTool({ cwd, port }) as any;
+    await tool.execute('c1', { action: 'hover', file: 'a.ts', line: 1, symbol: 'a' });
+    expect(port.query).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'hover', line: 1, character: 14 }),
+      undefined
+    );
+    await tool.execute('c2', { action: 'incomingCalls', file: 'a.ts', line: 1, symbol: 'a' });
+    expect(port.query).toHaveBeenLastCalledWith(
+      expect.objectContaining({ action: 'incomingCalls', character: 14 }),
+      undefined
+    );
+  });
+
+  it('reports a symbol missing from the line without querying', async () => {
+    const cwd = workspace();
+    const port = fakePort();
+    const tool = createLspTool({ cwd, port }) as any;
+    const missing = await tool.execute('c1', {
+      action: 'definition',
+      file: 'a.ts',
+      line: 1,
+      symbol: 'b',
+    });
+    expect(missing.details).toMatchObject({ ok: false, error: 'symbol_not_found' });
+    const pastEnd = await tool.execute('c2', {
+      action: 'definition',
+      file: 'a.ts',
+      line: 9,
+      symbol: 'a',
+    });
+    expect(pastEnd.details.message).toContain('past the end');
+    const noTarget = await tool.execute('c3', { action: 'definition', file: 'a.ts', line: 1 });
+    expect(noTarget.details).toMatchObject({ error: 'invalid_position' });
+    expect(port.query).not.toHaveBeenCalled();
   });
 
   it('maps symbols to documentSymbols with a file and workspaceSymbols with a query', async () => {

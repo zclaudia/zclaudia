@@ -83,4 +83,67 @@ describe('TypeScript write diagnostics (real language server)', () => {
       lease.release();
     }
   }, 60_000);
+
+  it('answers LSPTool queries by symbol, correct on the first call and after disk edits', async () => {
+    writeFileSync(
+      path.join(root, 'src', 'lib.ts'),
+      'export function greet(name: string): string {\n  return `hi ${name}`;\n}\n'
+    );
+    writeFileSync(
+      path.join(root, 'src', 'main.ts'),
+      "import { greet } from './lib';\n\nexport function run(): string {\n  return greet('a');\n}\n"
+    );
+    const lsp = buildTools(root, { enabled: ['LSPTool'], languageServerPort: manager }).find(
+      tool => tool.name === 'LSPTool'
+    ) as any;
+    expect(lsp).toBeDefined();
+    const call = async (args: Record<string, unknown>) => {
+      const result = await lsp.execute('q', args);
+      expect(result.details.ok).toBe(true);
+      return JSON.parse(result.content[0].text);
+    };
+
+    // First query on a cold project: must reach the declaration, not stop at the import.
+    const definition = await call({
+      action: 'definition',
+      file: 'src/main.ts',
+      line: 4,
+      symbol: 'greet',
+    });
+    expect(definition.locations[0]).toMatchObject({
+      file: 'src/lib.ts',
+      line: 1,
+      preview: 'export function greet(name: string): string {',
+    });
+
+    const hover = await call({ action: 'hover', file: 'src/main.ts', line: 4, symbol: 'greet' });
+    expect(hover.contents).toContain('greet(name: string): string');
+
+    const callers = await call({
+      action: 'incomingCalls',
+      file: 'src/lib.ts',
+      line: 1,
+      symbol: 'greet',
+    });
+    expect(callers.calls[0].caller).toMatchObject({
+      name: 'run',
+      location: { file: 'src/main.ts' },
+    });
+
+    // A change made outside Edit/Write (think Bash `sed`) is visible to the next query.
+    writeFileSync(
+      path.join(root, 'src', 'main.ts'),
+      "import { greet } from './lib';\n\nexport function run(): string {\n  return greet('a') + greet('b');\n}\n"
+    );
+    const references = await call({
+      action: 'references',
+      file: 'src/lib.ts',
+      line: 1,
+      symbol: 'greet',
+    });
+    const inMain = references.locations.filter(
+      (l: any) => l.file === 'src/main.ts' && l.line === 4
+    );
+    expect(inMain).toHaveLength(2);
+  }, 60_000);
 });
