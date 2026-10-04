@@ -1,5 +1,7 @@
 import type {
   CustomLanguageServers,
+  FileLanguageServerDiagnostics,
+  LanguageServerViewerLease,
   LanguageServerConfig,
   LanguageServersOverview,
   SessionLanguageServers,
@@ -66,5 +68,52 @@ export async function allowPluginLanguageServers(
     backendId,
     `/api/plugins/${encodeURIComponent(pluginId)}/permissions/grant`,
     { method: 'POST', body: JSON.stringify({ permissions: ['shell.execute'] }) }
+  );
+}
+
+/** A file's diagnostics, only from a language server that is already running. */
+export async function getFileLanguageServerDiagnostics(params: {
+  projectRoot: string;
+  relativePath: string;
+  backendId?: string | null;
+}): Promise<FileLanguageServerDiagnostics> {
+  const query = new URLSearchParams({ root: params.projectRoot, path: params.relativePath });
+  return apiCallForBackend<FileLanguageServerDiagnostics>(
+    params.backendId,
+    `/api/language-servers/file-diagnostics?${query.toString()}`
+  );
+}
+
+/** Start (and keep running) a workspace's language servers for a file viewer. */
+export async function acquireLanguageServerViewerLease(
+  projectRoot: string,
+  backendId?: string | null
+): Promise<LanguageServerViewerLease> {
+  return apiCallForBackend<LanguageServerViewerLease>(
+    backendId,
+    '/api/language-servers/viewer-leases',
+    { method: 'POST', body: JSON.stringify({ root: projectRoot }) }
+  );
+}
+
+export async function renewLanguageServerViewerLease(
+  leaseId: string,
+  backendId?: string | null
+): Promise<LanguageServerViewerLease> {
+  return apiCallForBackend<LanguageServerViewerLease>(
+    backendId,
+    `/api/language-servers/viewer-leases/${encodeURIComponent(leaseId)}/renew`,
+    { method: 'POST' }
+  );
+}
+
+export async function releaseLanguageServerViewerLease(
+  leaseId: string,
+  backendId?: string | null
+): Promise<void> {
+  await apiCallForBackend<unknown>(
+    backendId,
+    `/api/language-servers/viewer-leases/${encodeURIComponent(leaseId)}`,
+    { method: 'DELETE' }
   );
 }

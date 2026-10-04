@@ -38,6 +38,7 @@ import { LanguageServerRegistry } from './registry.js';
 import { defaultLanguageServerPresets } from './presets.js';
 import { spawnLanguageServer } from './spawn.js';
 import type {
+  FileDiagnostics,
   DiagnosticsCheck,
   DiagnosticsRequest,
   LanguageServerInfo,
@@ -60,6 +61,7 @@ const DEFAULT_MAX_OTHER_FILES = 20;
 /** How long a query waits for a cold server before answering server_starting. */
 const DEFAULT_START_WAIT_MS = 20_000;
 const QUERY_DIAGNOSTICS_BUDGET_MS = 5_000;
+const VIEWER_DIAGNOSTICS_BUDGET_MS = 1_500;
 /**
  * How long a query waits, after opening a file, for its project to load.
  * tsserver answers early requests from a partial project (definition stops at
@@ -251,6 +253,37 @@ export class LanguageServerManager implements LanguageServerService {
         }
       },
     };
+  }
+
+  /**
+   * A file's current diagnostics for a viewer, only from a server that is
+   * already running: never starts one and takes no lease (see
+   * docs/plans/2026-10-04-lsp-p3-plan.md, P3e). `not_running` lets the
+   * viewer offer to start it.
+   */
+  async fileDiagnostics(
+    root: string,
+    file: string,
+    budgetMs = VIEWER_DIAGNOSTICS_BUDGET_MS
+  ): Promise<FileDiagnostics> {
+    if (!this.enabled) return { state: 'unavailable' };
+    const resolvedRoot = path.resolve(root);
+    const absolute = path.resolve(resolvedRoot, file);
+    if (!isInside(resolvedRoot, absolute)) return { state: 'unavailable' };
+    const preset = this.presetForFile(resolvedRoot, absolute);
+    if (!preset) return { state: 'unavailable' };
+    const server = info(preset);
+    const entry = this.entries.get(`${preset.id}::${resolvedRoot}`);
+    if (entry?.state === 'failed') return { state: 'unavailable', server };
+    if (!entry?.active) {
+      return entry?.starting || entry?.state === 'starting'
+        ? { state: 'starting', server }
+        : { state: 'not_running', server };
+    }
+    const check = await this.diagnosticsFor(resolvedRoot, absolute, { budgetMs });
+    if (check.state === 'ready') return { state: 'ready', server, diagnostics: check.diagnostics };
+    if (check.state === 'pending') return { state: 'starting', server };
+    return { state: 'unavailable', server };
   }
 
   async diagnosticsFor(

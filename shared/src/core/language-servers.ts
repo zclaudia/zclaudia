@@ -60,6 +60,34 @@ export interface SessionLanguageServers {
   servers: LanguageServerStatusEntry[];
 }
 
+/** One diagnostic as a file viewer shows it (1-based line and column). */
+export interface FileDiagnosticEntry {
+  line: number;
+  character: number;
+  severity: 'error' | 'warning' | 'information' | 'hint';
+  message: string;
+  source?: string;
+  code?: string | number;
+}
+
+/**
+ * GET /api/language-servers/file-diagnostics — a file's diagnostics from a
+ * server that is already running. `not_running`: one exists but is stopped
+ * (the viewer may offer to start it); `unavailable`: no server for this file.
+ */
+export interface FileLanguageServerDiagnostics {
+  state: 'ready' | 'starting' | 'not_running' | 'unavailable';
+  server: { id: string; name: string } | null;
+  diagnostics: FileDiagnosticEntry[];
+}
+
+/** POST /api/language-servers/viewer-leases — keeps a workspace's servers running. */
+export interface LanguageServerViewerLease {
+  leaseId: string;
+  /** Renew before this elapses, or the lease lapses on its own. */
+  ttlMs: number;
+}
+
 /**
  * A language server defined by the user (Settings) or a plugin
  * (`contributes.lspServers`). It is used in workspaces that contain one of

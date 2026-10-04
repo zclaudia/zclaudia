@@ -382,3 +382,96 @@ test('LSP: the model renames a symbol across files in one RenameSymbol call', as
     await upstream.stop();
   }
 });
+
+test('LSP: the file viewer marks type errors once the user checks types', async ({ app, page }) => {
+  const { project, cwd } = await app.configureCodingProject('codex', undefined, '-lsp-viewer');
+  await mkdir(path.join(cwd, 'src'), { recursive: true });
+  await mkdir(path.join(cwd, 'node_modules'), { recursive: true });
+  await symlink(typescriptPackage, path.join(cwd, 'node_modules', 'typescript'), 'dir');
+  await writeFile(path.join(cwd, 'package.json'), '{"name":"lsp-viewer-e2e","private":true}\n');
+  await writeFile(
+    path.join(cwd, 'tsconfig.json'),
+    JSON.stringify({ compilerOptions: { strict: true, noEmit: true }, include: ['src'] })
+  );
+  await writeFile(
+    path.join(cwd, 'src', 'app.ts'),
+    "export const a = 1;\nexport const b: string = 2;\nexport const c = 'ok';\n"
+  );
+
+  const upstream = await startCompletionFixture(request =>
+    request.tools?.length ? { content: 'Look at `src/app.ts:2`.' } : { content: 'Viewer session' }
+  );
+  try {
+    const llm = await app.api('/api/llm-profiles', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'LSP viewer model fixture',
+        providerType: 'openai',
+        baseUrl: upstream.baseUrl,
+        apiKey: 'e2e-placeholder',
+        models: [{ modelId: 'e2e-lsp', dialect: 'openai', contextWindow: 32768, maxTokens: 1024 }],
+      }),
+    });
+    const profile = await app.api('/api/agent-profiles', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'LSP Viewer E2E Agent',
+        runtimeType: 'zclaudia',
+        llmProfileId: llm.id,
+        model: 'e2e-lsp',
+        enabledTools: ['Read'],
+      }),
+    });
+    await app.api(`/api/projects/${project.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ defaultAgentProfileId: profile.id }),
+    });
+    const session = await app.api('/api/sessions', {
+      method: 'POST',
+      body: JSON.stringify({
+        projectId: project.id,
+        name: 'LSP viewer session',
+        agentProfileId: profile.id,
+      }),
+    });
+    await openCodingSession(page, app, project, session);
+    await sendCodingMessage(page, 'Where is the problem?');
+    const reference = page.getByTestId('message-list').getByText('src/app.ts:2');
+    await expect(reference).toBeVisible({ timeout: 45_000 });
+
+    // The run started the workspace's server; stop it, so the viewer starts cold.
+    await app.api('/api/language-servers', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled: false }),
+    });
+    await app.api('/api/language-servers', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled: true }),
+    });
+
+    await reference.click();
+    // The side panel is narrow: give the code the room the file tree takes.
+    await page.getByRole('button', { name: 'Hide file tree' }).click();
+    const checkTypes = page.getByTestId('check-types');
+    await expect(checkTypes).toBeVisible({ timeout: 15_000 });
+    await checkTypes.click();
+    const marker = page.getByTestId('diagnostic-marker');
+    await expect(marker).toBeVisible({ timeout: 30_000 });
+    await expect(marker).toHaveAttribute('data-severity', 'error');
+    await expect(page.getByTestId('diagnostics-status')).toHaveText('1 error');
+    await marker.hover();
+    await expect(page.getByTestId('diagnostic-popover')).toContainText(
+      "Type 'number' is not assignable to type 'string'."
+    );
+    await page.screenshot({
+      path: '/private/tmp/claude-501/-Users-zhvala-SourceCode-zclaudia/80655315-71e9-4cc4-b5c1-aa9ab2f3b067/scratchpad/viewer-diagnostics.png',
+    });
+    // The viewer's lease keeps the server running.
+    const overview = await app.api('/api/language-servers');
+    expect(overview.servers).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'typescript', leases: 1 })])
+    );
+  } finally {
+    await upstream.stop();
+  }
+});

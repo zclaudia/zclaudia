@@ -13,6 +13,7 @@ export {
 export type {
   DiagnosticsCheck,
   DiagnosticsRequest,
+  FileDiagnostics,
   LanguageServerPreset,
   LanguageServerService,
   LanguageServerStatus,
