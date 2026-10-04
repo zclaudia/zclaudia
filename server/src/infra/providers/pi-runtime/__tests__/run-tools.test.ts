@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 
 import type { McpToolRef } from '@zclaudia/shared/core/tools';
@@ -79,6 +79,29 @@ describe('buildPiRunToolBundle LSPTool gating', () => {
       query: async () => ({ action: 'hover', contents: null }),
     };
     expect(buildWithPort(port).visibleToolNames).toEqual(['Read', 'LSPTool']);
+  });
+
+  it('uses the language-server manager as the port and leases it for the run', () => {
+    const release = vi.fn();
+    const manager = {
+      serversFor: () => [{ id: 'typescript', name: 'TypeScript', languages: ['typescript'] }],
+      query: async () => ({ action: 'hover', contents: null }),
+      acquire: vi.fn(() => ({ release })),
+      diagnosticsFor: vi.fn(),
+      status: () => [],
+      dispose: async () => {},
+    };
+    const bundle = buildPiRunToolBundle({
+      options: { cwd: '/tmp', runId: 'run-1', languageServers: manager } as never,
+      effectiveTools: ['Read', 'LSPTool'],
+      supportsVision: false,
+      isPlanMode: false,
+      permissionCallback: async () => ({ behavior: 'allow' as const }),
+    });
+    expect(bundle.visibleToolNames).toEqual(['Read', 'LSPTool']);
+    expect(manager.acquire).toHaveBeenCalledWith('/tmp', 'run:run-1');
+    bundle.dispose();
+    expect(release).toHaveBeenCalledTimes(1);
   });
 });
 

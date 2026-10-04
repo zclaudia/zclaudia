@@ -5,7 +5,11 @@
  * nothing here knows about runs, sessions or tool calls. Clients are keyed by
  * (preset id, workspace root) and kept alive by opaque leases.
  */
-import type { LanguageServerInfo, LspDiagnostic } from '../providers/language-server-port.js';
+import type {
+  LanguageServerInfo,
+  LanguageServerPort,
+  LspDiagnostic,
+} from '../providers/language-server-port.js';
 
 export type { LanguageServerInfo, LspDiagnostic };
 
@@ -100,8 +104,11 @@ export interface LanguageServerStatus {
   lastError: string | null;
 }
 
-/** The manager's public surface; consumers depend on this, not the class. */
-export interface LanguageServerService {
+/**
+ * The manager's public surface; consumers depend on this, not the class. It is
+ * also the LSPTool's `LanguageServerPort` (`serversFor` + `query`).
+ */
+export interface LanguageServerService extends LanguageServerPort {
   serversFor(root: string): LanguageServerInfo[];
   acquire(root: string, consumer: string): { release(): void };
   diagnosticsFor(

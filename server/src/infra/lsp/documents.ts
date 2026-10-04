@@ -72,6 +72,15 @@ export class DocumentStore {
     });
   }
 
+  /**
+   * Re-sync every open document. An open document overrides the disk for the
+   * server, so a file changed outside Edit/Write since it was opened would
+   * otherwise feed stale content into cross-file answers (references).
+   */
+  async syncOpenFromDisk(): Promise<void> {
+    await Promise.all([...this.open.keys()].map(key => this.syncFromDisk(key)));
+  }
+
   async closeAll(): Promise<void> {
     const keys = [...this.open.keys()];
     await Promise.all(keys.map(key => this.close(key).catch(() => undefined)));

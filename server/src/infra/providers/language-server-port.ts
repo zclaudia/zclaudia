@@ -1,15 +1,14 @@
 /**
- * Language-server port: the contract a future in-process LSP manager fulfils
- * for the built-in LSPTool.
+ * Language-server port: the contract `LanguageServerManager` (infra/lsp)
+ * fulfils for the built-in LSPTool.
  *
- * Design (2026-09-23, see docs/plans/2026-09-23-tool-set-alignment-plan.md
- * Task 9): the tool surface stays a built-in so it keeps read-only permission
+ * The tool surface stays a built-in so it keeps read-only permission
  * classification, shared scheduling and a stable model-facing name; the
- * *servers* are meant to be declared by plugins (ZCode-style `lspServers`
- * manifest entries) and driven by one server-side manager that owns the
- * processes, document sync and diagnostics. Until that manager exists no port
- * is wired, and `buildTools` does not register LSPTool at all — the model never
- * sees a tool that cannot answer.
+ * servers come from built-in presets first (plugin `lspServers` and project
+ * configuration later, see docs/plans/2026-10-04-lsp-manager-plan.md) and are
+ * driven by the manager, which owns processes, document sync and diagnostics.
+ * `buildTools` registers LSPTool only when `serversFor(cwd)` is non-empty, so
+ * the model never sees a tool that cannot answer.
  *
  * Contract notes for implementers:
  * - `serversFor` must be cheap and side-effect free: it is called once per run
@@ -19,6 +18,8 @@
  *   expected failures so the tool can return a structured error.
  * - Positions are 1-based lines and columns on both sides of this port (what
  *   the model sees in Read output); the manager converts to 0-based LSP.
+ *   Columns count UTF-16 code units — the unit of JS string indices — so a
+ *   column found with `line.indexOf(...)` is already in the right unit.
  * - Keying: worktree-isolated sub-agents run with a different cwd than the
  *   parent session, so a manager must key its clients by the actual cwd.
  */
@@ -38,16 +39,17 @@ export type LspQueryAction =
   | 'hover'
   | 'documentSymbols'
   | 'workspaceSymbols'
-  | 'diagnostics';
+  | 'diagnostics'
+  | 'incomingCalls';
 
 export interface LspQueryRequest {
   cwd: string;
   action: LspQueryAction;
   /** Absolute path inside `cwd`. Required for every action except `workspaceSymbols`. */
   file?: string;
-  /** 1-based line. Required for `definition`, `references`, `hover`. */
+  /** 1-based line. Required for `definition`, `references`, `hover`, `incomingCalls`. */
   line?: number;
-  /** 1-based column. Required for `definition`, `references`, `hover`. */
+  /** 1-based UTF-16 column. Required with `line`. */
   character?: number;
   /** Symbol query for `workspaceSymbols`. */
   query?: string;
@@ -55,8 +57,10 @@ export interface LspQueryRequest {
 }
 
 export interface LspLocation {
-  /** Workspace-relative path. */
+  /** Workspace-relative path, or absolute when `external`. */
   file: string;
+  /** Outside the workspace (dependencies, stdlib): Read cannot open it. */
+  external?: true;
   line: number;
   character: number;
   endLine?: number;
@@ -70,6 +74,13 @@ export interface LspSymbol {
   location: LspLocation;
   containerName?: string;
   children?: LspSymbol[];
+}
+
+export interface LspIncomingCall {
+  /** The calling function / method. */
+  caller: LspSymbol;
+  /** Where inside the caller the call happens. */
+  callSites: LspLocation[];
 }
 
 export interface LspDiagnostic {
@@ -89,12 +100,23 @@ export type LspQueryResult =
       action: 'documentSymbols' | 'workspaceSymbols';
       symbols: LspSymbol[];
       truncated?: boolean;
+      /** What a workspace search covered, when that limits the answer. */
+      note?: string;
     }
-  | { action: 'diagnostics'; diagnostics: LspDiagnostic[]; truncated?: boolean };
+  | {
+      action: 'diagnostics';
+      /** `pending`: the server did not publish in time — not the same as clean. */
+      state: 'ready' | 'pending';
+      diagnostics: LspDiagnostic[];
+      truncated?: boolean;
+    }
+  | { action: 'incomingCalls'; calls: LspIncomingCall[]; truncated?: boolean };
 
 export type LanguageServerErrorCode =
   | 'server_unavailable'
+  | 'server_starting'
   | 'server_failed'
+  | 'request_failed'
   | 'unsupported_action'
   | 'unsupported_language'
   | 'timeout';

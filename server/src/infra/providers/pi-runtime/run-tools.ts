@@ -86,7 +86,8 @@ export function buildPiRunToolBundle(input: {
     subagentMessenger: options.subagentMessenger,
     automationPort: options.automationPort,
     toolLookups: options.toolLookups,
-    languageServerPort: options.languageServerPort,
+    // The manager is the LSPTool port; an explicit port (tests) wins.
+    languageServerPort: options.languageServerPort ?? options.languageServers,
     diagnosticsProvider: options.languageServers
       ? createLanguageServerDiagnosticsProvider(options.languageServers, options.cwd)
       : undefined,

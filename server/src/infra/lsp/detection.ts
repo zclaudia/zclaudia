@@ -100,3 +100,42 @@ export function resolveBundledTypeScriptServer(moduleUrl: string = import.meta.u
     return null;
   }
 }
+
+const SOURCE_SEARCH_SKIP = new Set(['node_modules', 'dist', 'build', 'out', 'coverage', 'target']);
+const SOURCE_SEARCH_MAX_DIRS = 2_000;
+
+/**
+ * First source file with one of `extensions`, breadth first from `root`
+ * (skipping dependencies, build output and dot directories). Used to load a
+ * project when a workspace-wide query arrives before any file was opened.
+ */
+export function findFirstSourceFile(root: string, extensions: string[]): string | null {
+  const wanted = new Set(extensions.map(ext => ext.toLowerCase()));
+  const queue = [path.resolve(root)];
+  for (let visited = 0; queue.length > 0 && visited < SOURCE_SEARCH_MAX_DIRS; visited++) {
+    const dir = queue.shift()!;
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.isFile() && wanted.has(path.extname(entry.name).toLowerCase())) {
+        if (!entry.name.endsWith('.d.ts')) return path.join(dir, entry.name);
+      }
+    }
+    for (const entry of entries) {
+      if (
+        entry.isDirectory() &&
+        !entry.name.startsWith('.') &&
+        !SOURCE_SEARCH_SKIP.has(entry.name)
+      ) {
+        queue.push(path.join(dir, entry.name));
+      }
+    }
+  }
+  return null;
+}
