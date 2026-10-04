@@ -34,6 +34,7 @@ import {
 } from '../providers/language-server-port.js';
 import { prepareRenamePlaceholder, workspaceEditToFileEdits } from './rename.js';
 import { findFirstSourceFile, hasRootMarker } from './detection.js';
+import { LanguageServerRegistry } from './registry.js';
 import { defaultLanguageServerPresets } from './presets.js';
 import { spawnLanguageServer } from './spawn.js';
 import type {
@@ -81,7 +82,10 @@ const ACTION_CAPABILITY = {
 } as const;
 
 export interface LanguageServerManagerOptions {
+  /** Fixed presets (tests); otherwise `registry`. */
   presets?: LanguageServerPreset[];
+  /** Live preset source (built in, plugins, Settings). */
+  registry?: LanguageServerRegistry;
   spawn?: SpawnLanguageServer;
   maxServers?: number;
   idleTimeoutMs?: number;
@@ -150,7 +154,8 @@ function isInside(root: string, file: string): boolean {
 }
 
 export class LanguageServerManager implements LanguageServerService {
-  private readonly presets: LanguageServerPreset[];
+  private readonly registry: LanguageServerRegistry;
+  private readonly unsubscribeRegistry: () => void;
   private readonly spawn: SpawnLanguageServer;
   private readonly maxServers: number;
   private readonly idleTimeoutMs: number;
@@ -160,7 +165,10 @@ export class LanguageServerManager implements LanguageServerService {
   private enabled: boolean;
 
   constructor(private readonly options: LanguageServerManagerOptions = {}) {
-    this.presets = options.presets ?? defaultLanguageServerPresets();
+    this.registry =
+      options.registry ??
+      new LanguageServerRegistry(options.presets ?? defaultLanguageServerPresets());
+    this.unsubscribeRegistry = this.registry.onChange(() => this.onRegistryChange());
     this.spawn = options.spawn ?? spawnLanguageServer;
     this.maxServers = Math.max(1, options.maxServers ?? DEFAULT_MAX_SERVERS);
     this.idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
@@ -195,7 +203,7 @@ export class LanguageServerManager implements LanguageServerService {
    * installed what was missing.
    */
   redetect(): void {
-    for (const preset of this.presets) preset.refreshDetection?.();
+    for (const preset of this.registry.presets()) preset.refreshDetection?.();
     for (const entry of this.entries.values()) {
       if (entry.state === 'failed' && entry.startupFailed) this.resetFailed(entry);
     }
@@ -752,39 +760,48 @@ export class LanguageServerManager implements LanguageServerService {
       ...this.availablePresets(resolvedRoot).map(preset =>
         this.statusOf(this.entryFor(preset, resolvedRoot))
       ),
-      ...this.missingFor(resolvedRoot),
+      ...this.unavailableFor(resolvedRoot),
     ];
   }
 
   /**
-   * Servers the workspace needs (its root markers are there) whose executable
-   * was not found. Only presets that say how to install them are reported.
+   * Servers the workspace needs (its root markers are there) that cannot run:
+   * `missing` when the executable is not found (reported only when the user
+   * can act on it: an install hint, or a configured command), and
+   * `needs_permission` when a plugin's server lacks its plugin's permission.
    */
-  missingFor(root: string): LanguageServerStatus[] {
+  unavailableFor(root: string): LanguageServerStatus[] {
     if (!this.enabled) return [];
     const resolvedRoot = path.resolve(root);
-    return this.presets
-      .filter(
-        preset =>
-          preset.installHint &&
-          hasRootMarker(resolvedRoot, preset.rootMarkers) &&
-          !this.availablePresets(resolvedRoot).includes(preset)
-      )
-      .map(preset => ({
+    const available = this.availablePresets(resolvedRoot);
+    const result: LanguageServerStatus[] = [];
+    for (const { preset, source, pluginId } of this.registry.entries()) {
+      if (available.includes(preset) || !hasRootMarker(resolvedRoot, preset.rootMarkers)) continue;
+      const blocked = preset.permission && !preset.permission.granted();
+      if (!blocked && !preset.installHint && !preset.missingReason) continue;
+      result.push({
         id: preset.id,
         name: preset.name,
         languages: preset.languages,
         root: resolvedRoot,
-        state: 'missing' as const,
+        state: blocked ? 'needs_permission' : 'missing',
         leases: [],
         openDocuments: 0,
         pid: null,
         processId: null,
         startedAt: null,
         lastUsedAt: null,
-        lastError: null,
-        installHint: preset.installHint ?? null,
-      }));
+        lastError: blocked
+          ? 'The plugin needs permission to run commands (shell.execute)'
+          : preset.installHint
+            ? null
+            : (preset.missingReason?.() ?? null),
+        installHint: blocked ? null : (preset.installHint ?? null),
+        source,
+        pluginId: pluginId ?? null,
+      });
+    }
+    return result;
   }
 
   private statusOf(entry: Entry): LanguageServerStatus {
@@ -802,24 +819,58 @@ export class LanguageServerManager implements LanguageServerService {
       lastUsedAt: entry.lastUsedAt,
       lastError: entry.lastError,
       installHint: entry.startupFailed ? (entry.preset.installHint ?? null) : null,
+      source: this.registry.sourceOf(entry.preset)?.source ?? 'builtin',
+      pluginId: this.registry.sourceOf(entry.preset)?.pluginId ?? null,
     };
   }
 
   async dispose(): Promise<void> {
     this.disposed = true;
+    this.unsubscribeRegistry();
     await Promise.all([...this.entries.values()].map(entry => this.stop(entry)));
   }
 
   // --- internals -----------------------------------------------------------
 
+  /**
+   * Presets that can run in `root`, in priority order. A preset whose every
+   * extension an earlier (higher-priority) one already claims is left out,
+   * so a user's own Python server replaces the built-in one rather than
+   * running beside it.
+   */
   private availablePresets(root: string): LanguageServerPreset[] {
-    return this.presets.filter(preset => {
+    const claimed = new Set<string>();
+    const result: LanguageServerPreset[] = [];
+    for (const preset of this.registry.presets()) {
+      if (preset.permission && !preset.permission.granted()) continue;
       try {
-        return preset.resolveLaunch(root) !== null;
+        if (preset.resolveLaunch(root) === null) continue;
       } catch {
-        return false;
+        continue;
       }
-    });
+      const extensions = Object.keys(preset.extensions);
+      if (extensions.length > 0 && extensions.every(ext => claimed.has(ext))) continue;
+      for (const ext of extensions) claimed.add(ext);
+      result.push(preset);
+    }
+    return result;
+  }
+
+  /**
+   * A preset was added, replaced or removed, or a plugin permission changed:
+   * stop instances that no longer match what the registry offers. The next
+   * use starts them again with the new definition.
+   */
+  private onRegistryChange(): void {
+    const current = new Map(this.registry.presets().map(preset => [preset.id, preset]));
+    for (const [key, entry] of this.entries) {
+      const preset = current.get(entry.preset.id);
+      const stale = preset !== entry.preset || (preset?.permission && !preset.permission.granted());
+      if (!stale) continue;
+      this.entries.delete(key);
+      this.clearIdle(entry);
+      void this.stop(entry);
+    }
   }
 
   private presetForFile(root: string, file: string): LanguageServerPreset | undefined {

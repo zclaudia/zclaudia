@@ -18,6 +18,7 @@ import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
 import { AgentProfileRepository } from '../../../domains/agent-profiles/repository.js';
+import { languageServerRegistry } from '../../../infra/lsp/index.js';
 
 // Mock fs module
 vi.mock('fs', async () => {
@@ -870,6 +871,44 @@ describe('PluginLoader', () => {
 
       expect(workflowStepRegistry.has('com.test.plugin/my-step')).toBe(true);
       expect(broadcastFn).toHaveBeenCalledWith({ type: 'workflow_step_types_changed' });
+    });
+
+    it('adds contributed language servers to the registry, gated on shell.execute', async () => {
+      const manifest = makeManifest({
+        contributes: {
+          lspServers: [
+            {
+              id: 'lua',
+              name: 'Lua',
+              command: './bin/lua-language-server',
+              extensions: { '.lua': 'lua' },
+              rootMarkers: ['.luarc.json'],
+            },
+          ],
+        },
+      });
+      setupSinglePlugin(mockPluginDir, 'test-plugin', manifest);
+      await loader.discover();
+      await loader.activate('com.test.plugin');
+
+      const entry = languageServerRegistry
+        .entries()
+        .find(candidate => candidate.pluginId === 'com.test.plugin');
+      expect(entry).toMatchObject({ source: 'plugin', preset: { id: 'lua', name: 'Lua' } });
+      expect(entry!.preset.permission?.granted()).toBe(false);
+      // A spy, not grant(): the permission store writes a file in the home directory.
+      const hasPermission = vi
+        .spyOn(permissionManager, 'hasPermission')
+        .mockImplementation(
+          (id, permission) => id === 'com.test.plugin' && permission === 'shell.execute'
+        );
+      expect(entry!.preset.permission?.granted()).toBe(true);
+      hasPermission.mockRestore();
+
+      await loader.deactivate('com.test.plugin');
+      expect(
+        languageServerRegistry.entries().some(candidate => candidate.pluginId === 'com.test.plugin')
+      ).toBe(false);
     });
 
     it('should collect plugin-contributed skill directories into pluginSkillDirs', async () => {

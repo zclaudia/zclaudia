@@ -12,6 +12,9 @@ import {
   resolveBundledPyright,
   resolveBundledTypeScriptServer,
 } from './detection.js';
+import { existsSync } from 'fs';
+import path from 'path';
+import type { LanguageServerConfig } from '@zclaudia/shared/core/language-servers';
 import { fileUri } from './documents.js';
 import type { LanguageServerPreset, LaunchSpec, LspRequest, RawLspDiagnostic } from './types.js';
 
@@ -239,6 +242,62 @@ export const RUST_ANALYZER_PRESET: PathPresetSpec = {
   args: [],
   installHint: 'rustup component add rust-analyzer',
 };
+
+export interface ConfiguredPresetOptions {
+  /** Plugin directory a `./` command resolves against (plugins only). */
+  baseDir?: string;
+  permission?: LanguageServerPreset['permission'];
+  find?: (command: string) => string | null;
+}
+
+/**
+ * A preset from a user or plugin definition (decision 1 of the P3 plan). The
+ * command is an absolute path, a name on PATH, or for plugins a `./` path
+ * that must stay inside the plugin directory.
+ */
+export function createConfiguredPreset(
+  config: LanguageServerConfig,
+  options: ConfiguredPresetOptions = {}
+): LanguageServerPreset {
+  const find = options.find ?? findOnPath;
+  const resolveExecutable = memoizeByRoot((): string | null => {
+    const command = config.command;
+    if (/^\.\.?[\\/]/.test(command)) {
+      if (!options.baseDir) return null;
+      const base = path.resolve(options.baseDir);
+      const resolved = path.resolve(base, command);
+      const relative = path.relative(base, resolved);
+      if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
+      return existsSync(resolved) ? resolved : null;
+    }
+    if (path.isAbsolute(command)) return existsSync(command) ? command : null;
+    return find(command);
+  });
+  return {
+    id: config.id,
+    name: config.name,
+    languages: [...new Set(Object.values(config.extensions))],
+    extensions: config.extensions,
+    rootMarkers: config.rootMarkers,
+    resolveLaunch: root => {
+      if (!hasRootMarker(root, config.rootMarkers)) return null;
+      const executable = resolveExecutable('/');
+      if (!executable) return null;
+      return {
+        command: executable,
+        args: config.args ?? [],
+        cwd: root,
+        ...(config.initializationOptions !== undefined
+          ? { initializationOptions: config.initializationOptions }
+          : {}),
+        ...(config.settings ? { settings: config.settings } : {}),
+      };
+    },
+    refreshDetection: () => resolveExecutable.clear(),
+    missingReason: () => `Command not found: ${config.command}`,
+    ...(options.permission ? { permission: options.permission } : {}),
+  };
+}
 
 export function defaultLanguageServerPresets(): LanguageServerPreset[] {
   return [

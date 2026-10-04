@@ -1,4 +1,6 @@
 import type {
+  CustomLanguageServers,
+  LanguageServerConfig,
   LanguageServersOverview,
   SessionLanguageServers,
 } from '@zclaudia/shared/core/language-servers';
@@ -35,4 +37,34 @@ export async function setLanguageServersEnabled(
     method: 'PUT',
     body: JSON.stringify({ enabled }),
   });
+}
+
+/** The user's own server definitions on the backend. */
+export async function getCustomLanguageServers(
+  backendId?: string | null
+): Promise<CustomLanguageServers> {
+  return apiCallForBackend<CustomLanguageServers>(backendId, '/api/language-servers/custom');
+}
+
+/** Replace the user's server definitions (validated by the backend). */
+export async function setCustomLanguageServers(
+  servers: LanguageServerConfig[],
+  backendId?: string | null
+): Promise<CustomLanguageServers> {
+  return apiCallForBackend<CustomLanguageServers>(backendId, '/api/language-servers/custom', {
+    method: 'PUT',
+    body: JSON.stringify({ servers }),
+  });
+}
+
+/** Let a plugin run commands, which its language servers need. */
+export async function allowPluginLanguageServers(
+  pluginId: string,
+  backendId?: string | null
+): Promise<void> {
+  await apiCallForBackend<unknown>(
+    backendId,
+    `/api/plugins/${encodeURIComponent(pluginId)}/permissions/grant`,
+    { method: 'POST', body: JSON.stringify({ permissions: ['shell.execute'] }) }
+  );
 }

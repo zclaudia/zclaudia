@@ -21,8 +21,9 @@ const STATE_TONE: Record<LanguageServerState, Tone> = {
   stopped: 'warning',
   ready: 'success',
   failed: 'destructive',
-  // Not a fault: the user simply has not installed it. No warning color.
+  // Not faults: the user can act on them. No warning color.
   missing: 'neutral',
+  needs_permission: 'neutral',
 };
 
 // Which state the single trigger dot shows when servers disagree.
@@ -33,6 +34,7 @@ const STATE_PRIORITY: LanguageServerState[] = [
   'ready',
   'idle',
   'missing',
+  'needs_permission',
 ];
 
 function stateLabel(server: LanguageServerStatusEntry): string {
@@ -49,6 +51,8 @@ function stateLabel(server: LanguageServerStatusEntry): string {
       return 'Not running';
     case 'missing':
       return 'Not installed';
+    case 'needs_permission':
+      return 'Needs permission';
   }
 }
 
@@ -162,6 +166,14 @@ function LanguageServerPanel({ servers }: { servers: LanguageServerStatusEntry[]
                   {server.lastError}
                 </p>
               )}
+              {server.lastError &&
+                (server.state === 'missing' || server.state === 'needs_permission') && (
+                  <p className="mt-0.5 break-words pl-4 text-2xs text-muted-foreground">
+                    {server.state === 'needs_permission'
+                      ? 'Allow it in Settings → Claudia → Language servers'
+                      : server.lastError}
+                  </p>
+                )}
               {server.installHint && (
                 <div className="mt-1 pl-4">
                   <CopyableCommand command={server.installHint} />

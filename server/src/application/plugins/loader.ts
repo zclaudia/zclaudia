@@ -30,6 +30,7 @@ import {
 } from '@zclaudia/shared/plugins/builtin-agents';
 import { resolveBuiltinAgentRoot } from './builtin-agents.js';
 import { validateAgentRuntimeContributions } from '@zclaudia/shared/plugins/manifest';
+import { registerLanguageServerContributions } from './language-server-contributions.js';
 import type Database from 'better-sqlite3';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type {
@@ -108,6 +109,8 @@ export class PluginLoader {
   private db: Database.Database | null = null;
   private pluginAPIs = new Map<string, unknown>();
   private broadcastFn: ((msg: ServerMessage) => void) | null = null;
+  /** Per plugin with lspServers: remove its servers from the registry. */
+  private readonly lspUnregisters = new Map<string, () => void>();
   // Plugin-bundled skill directories collected during contribution registration.
   // Loaded into the shared skill cache by skill-bootstrap.loadAndCachePluginSkills,
   // which calls pi loadSourcedSkills. NOT registered as MCP tools anymore — the
@@ -125,6 +128,32 @@ export class PluginLoader {
       ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
       : path.join(os.homedir(), '.zclaudia');
     this.pluginDirs = [path.join(dataDir, 'plugins'), ...(options.pluginDirs || [])];
+  }
+
+  private registerLanguageServers(
+    manifest: PluginManifest,
+    pluginPath: string,
+    declared: unknown
+  ): void {
+    this.unregisterLanguageServers(manifest.id);
+    const result = registerLanguageServerContributions(declared, {
+      pluginId: manifest.id,
+      pluginPath,
+      builtinShellExecute:
+        this.isBuiltin(manifest.id) && (manifest.permissions ?? []).includes('shell.execute'),
+    });
+    if (!result.ok) {
+      console.warn(
+        `[PluginLoader] ${manifest.id}: ignoring lspServers: ${result.errors.join('; ')}`
+      );
+      return;
+    }
+    this.lspUnregisters.set(manifest.id, result.unregister);
+  }
+
+  private unregisterLanguageServers(pluginId: string): void {
+    this.lspUnregisters.get(pluginId)?.();
+    this.lspUnregisters.delete(pluginId);
   }
 
   isBuiltin(pluginId: string): boolean {
@@ -1015,6 +1044,10 @@ export class PluginLoader {
       if (n > 0) this.broadcastFn?.({ type: 'agent_runtimes_changed' });
     }
 
+    if (contributes.lspServers?.length) {
+      this.registerLanguageServers(manifest, instance.path, contributes.lspServers);
+    }
+
     if (contributes.agentProfiles && !this.isBuiltin(manifest.id)) {
       if (this.db) {
         const service = new PluginAgentProfileService(this.db);
@@ -1112,6 +1145,8 @@ export class PluginLoader {
 
     // Notify frontend to unregister panels
     this.broadcastFn?.({ type: 'plugin_panel_unregistered', pluginId });
+
+    this.unregisterLanguageServers(pluginId);
 
     // Clear agentRuntimes descriptors + any registered adapters for this plugin.
     managedRuntimeService.unregisterPlugin(pluginId);

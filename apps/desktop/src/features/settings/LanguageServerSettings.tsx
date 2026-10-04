@@ -2,14 +2,22 @@ import { useCallback, useEffect, useState } from 'react';
 import { Braces } from 'lucide-react';
 import type {
   LanguageServerState,
+  LanguageServerStatusEntry,
   LanguageServersOverview,
 } from '@zclaudia/shared/core/language-servers';
-import { getLanguageServers, setLanguageServersEnabled } from '../../services/api';
+import {
+  allowPluginLanguageServers,
+  getLanguageServers,
+  setLanguageServersEnabled,
+} from '../../services/api';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { CopyableCommand } from '../../components/ui/CopyableCommand';
 import { Toggle } from '../../components/ui/Toggle';
 import { TONE_DOT, type Tone } from '../../components/ui/tone';
 import { useSettingsTargetBackend } from '../../hooks/useSettingsTargetBackend';
 import { SettingsGroup, SettingsRow } from './ui/SettingsGroup';
+import { CustomLanguageServers } from './CustomLanguageServers';
 
 const POLL_MS = 5_000;
 
@@ -25,6 +33,7 @@ const STATE_LABEL: Record<LanguageServerState, string> = {
   stopped: 'Crashed, restarting',
   failed: 'Failed',
   missing: 'Not installed',
+  needs_permission: 'Needs permission',
 };
 
 const STATE_TONE: Record<LanguageServerState, Tone> = {
@@ -34,7 +43,13 @@ const STATE_TONE: Record<LanguageServerState, Tone> = {
   ready: 'success',
   failed: 'destructive',
   missing: 'neutral',
+  needs_permission: 'neutral',
 };
+
+/** Not faults: the user can act on them, so no alarm color. */
+function isActionable(server: LanguageServerStatusEntry): boolean {
+  return server.state === 'missing' || server.state === 'needs_permission';
+}
 
 /**
  * Master switch for the language servers the ZClaudia agent uses (type
@@ -79,6 +94,15 @@ export function LanguageServerSettings() {
     }
   };
 
+  const allow = async (pluginId: string) => {
+    try {
+      await allowPluginLanguageServers(pluginId, targetBackendId);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to allow the plugin');
+    }
+  };
+
   const servers = overview?.servers ?? [];
   return (
     <SettingsGroup>
@@ -113,6 +137,9 @@ export function LanguageServerSettings() {
                       className={`inline-block h-2 w-2 flex-shrink-0 rounded-full ${TONE_DOT[STATE_TONE[server.state]]}`}
                     />
                     <span className="text-foreground">{server.name}</span>
+                    {server.source !== 'builtin' && (
+                      <Badge label={server.source === 'user' ? 'Custom' : 'Plugin'} />
+                    )}
                     <span className="truncate text-muted-foreground" title={server.root}>
                       {rootName(server.root)}
                     </span>
@@ -122,9 +149,22 @@ export function LanguageServerSettings() {
                     </span>
                   </div>
                   {server.lastError && server.state !== 'ready' && (
-                    <p className="mt-0.5 break-words pl-4 text-2xs text-destructive">
+                    <p
+                      className={`mt-0.5 break-words pl-4 text-2xs ${isActionable(server) ? 'text-muted-foreground' : 'text-destructive'}`}
+                    >
                       {server.lastError}
                     </p>
+                  )}
+                  {server.state === 'needs_permission' && server.pluginId && (
+                    <div className="mt-1 pl-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void allow(server.pluginId!)}
+                      >
+                        Allow plugin to run commands
+                      </Button>
+                    </div>
                   )}
                   {server.installHint && (
                     <div className="mt-1 pl-4">
@@ -135,6 +175,14 @@ export function LanguageServerSettings() {
               ))}
             </ul>
           )}
+        </SettingsRow>
+      )}
+      {overview?.enabled && (
+        <SettingsRow
+          title="Custom servers"
+          description="Add servers for other languages, or replace a built-in one. They run on this backend's machine."
+        >
+          <CustomLanguageServers backendId={targetBackendId} onSaved={() => void load(true)} />
         </SettingsRow>
       )}
     </SettingsGroup>
