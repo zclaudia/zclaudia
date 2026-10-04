@@ -75,8 +75,15 @@ function initializeParams(root: string, initializationOptions: unknown): Initial
         hover: { contentFormat: ['markdown', 'plaintext'] },
         documentSymbol: { hierarchicalDocumentSymbolSupport: true },
         callHierarchy: {},
+        rename: { prepareSupport: true },
       },
-      workspace: { workspaceFolders: true, configuration: true, symbol: {} },
+      workspace: {
+        workspaceFolders: true,
+        configuration: true,
+        symbol: {},
+        // Renames come back as plain text edits; file operations are refused.
+        workspaceEdit: { documentChanges: true, resourceOperations: [] },
+      },
       window: { workDoneProgress: false },
     },
   };

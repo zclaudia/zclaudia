@@ -92,7 +92,8 @@ describe('createLanguageServerDiagnosticsProvider', () => {
     expect(service.diagnosticsFor).toHaveBeenCalledWith('/work', '/work/src/a.ts', {
       budgetMs: 1234,
       baselineContent: 'before',
-      otherOpenFiles: { exclude: undefined },
+      changedWith: undefined,
+      otherOpenFiles: {},
     });
   });
 });

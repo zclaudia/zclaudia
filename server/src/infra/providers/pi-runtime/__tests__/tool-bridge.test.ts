@@ -255,6 +255,7 @@ describe('buildTools', () => {
       'ReadMcpResource',
       'ReadSessionContext',
       'ReadSymbol',
+      'RenameSymbol',
       'RespondToCoordinator',
       'SendMessage',
       'TaskOutput',

@@ -30,6 +30,7 @@ export const ALL_TOOL_NAMES = [
   'CronUpdate',
   'CronDelete',
   'LSPTool',
+  'RenameSymbol',
   'AstGrep',
   'AstEdit',
   'EnterWorktree',
@@ -245,6 +246,8 @@ const TOOL_EXECUTION_POLICY: Readonly<
   // Registered only when a language server is configured for the workspace
   // (see server language-server-port.ts); queries are in-process RPC.
   LSPTool: { concurrentSafe: true, timeoutMs: 30_000 },
+  // Also registered only with a language server; writes several files.
+  RenameSymbol: { timeoutMs: 60_000 },
   AstGrep: { timeoutMs: 120_000 },
   AstEdit: { timeoutMs: 120_000 },
   TodoWrite: { timeoutMs: 10_000 },
@@ -613,6 +616,18 @@ const BUILTIN_TOOL_METADATA_BASE: Readonly<Record<ToolName, ToolMetadata>> = {
     requiresNetwork: false,
     requiresUserInteraction: false,
     riskLevel: 'low',
+  },
+  RenameSymbol: {
+    ref: { source: 'builtin', name: 'RenameSymbol' },
+    label: 'RenameSymbol',
+    description:
+      'Rename a symbol everywhere it is referenced, using the workspace language server; all files change together or none do. Only available when a language server is configured for the project.',
+    setIds: ['code-intelligence'],
+    declaredReadOnly: false,
+    mutatesWorkspace: true,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'medium',
   },
   AstGrep: {
     ref: { source: 'builtin', name: 'AstGrep' },

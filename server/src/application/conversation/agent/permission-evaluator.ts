@@ -7,9 +7,7 @@ import type {
   UnifiedPermissionPolicy,
 } from '@zclaudia/shared/interaction/permissions';
 import type { McpRiskAction, McpServerTrustPolicy } from '@zclaudia/shared/core/mcp';
-import { DEFAULT_SENSITIVE_PATTERNS } from '@zclaudia/shared/interaction/permissions';
 import * as path from 'path';
-import { minimatch } from 'minimatch';
 
 import {
   extractPathsFromCommand,
@@ -21,6 +19,7 @@ import {
 import { isProvablyReadOnlyBashCommand } from './bash-readonly/index.js';
 
 import { resolveProfile } from './policy-utils.js';
+import { isSensitiveFile } from '../../../utils/sensitive-files.js';
 
 // ============================================
 // Re-exports (preserve public API)
@@ -265,7 +264,7 @@ const READONLY_TOOLS = [
   'LSPTool',
 ];
 
-const EDIT_TOOLS = ['Write', 'Edit', 'MultiEdit', 'EditSymbol', 'NotebookEdit'];
+const EDIT_TOOLS = ['Write', 'Edit', 'MultiEdit', 'EditSymbol', 'RenameSymbol', 'NotebookEdit'];
 
 const DANGEROUS_BASH_PATTERNS = [
   /\brm\s+(-[a-z]*f|-[a-z]*r|--force|--recursive)\b/i,
@@ -305,11 +304,6 @@ const NETWORK_BASH_PATTERNS = [
 // ============================================
 // Internal Guard Checks
 // ============================================
-
-function isSensitiveFile(filePath: string): boolean {
-  const basename = path.basename(filePath);
-  return DEFAULT_SENSITIVE_PATTERNS.some(p => minimatch(basename, p, { dot: true }));
-}
 
 function targetsSensitiveFile(toolName: string, toolInput: unknown, detail: string): boolean {
   const filePath = extractFilePath(toolInput);

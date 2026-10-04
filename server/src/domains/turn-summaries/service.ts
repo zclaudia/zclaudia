@@ -217,6 +217,10 @@ function compactToolInput(toolName: string, input: unknown): string {
       const newBody = String(obj.new_body ?? '');
       return `${path} | symbol: ${symbol} | new: ${truncate(newBody, TOOL_INPUT_PREVIEW_CHARS)}`;
     }
+    case 'RenameSymbol': {
+      const path = obj.file_path ?? '';
+      return `${path} | rename ${obj.symbol ?? ''} → ${obj.new_name ?? ''}`;
+    }
     case 'MultiEdit': {
       const path = obj.file_path ?? '';
       const edits = Array.isArray(obj.edits) ? obj.edits : [];
