@@ -23,8 +23,12 @@ import { GatewayNotificationSender } from './infra/push/notification-sender.js';
 import { ClaudiaBranchService } from './application/orchestration/claudia-branch-service.js';
 import { getGatewayClient } from './infra/gateway/gateway-instance.js';
 import { BrowserManager } from './application/browser/browser-manager.js';
-import { LanguageServerManager } from './infra/lsp/index.js';
-import { readLanguageServersEnabled } from './interfaces/http/language-servers.js';
+import { LanguageServerManager, languageServerRegistry } from './infra/lsp/index.js';
+import {
+  applyCustomLanguageServers,
+  readCustomLanguageServers,
+  readLanguageServersEnabled,
+} from './interfaces/http/language-servers.js';
 import { PuppeteerEngine } from './application/browser/puppeteer-engine.js';
 import { installEngine, defaultEngineInstallDeps } from './application/browser/engine-install.js';
 import { resolveDataDir } from './utils/data-dir.js';
@@ -184,8 +188,11 @@ export async function createServer(
   });
   serverState.browserManager = browserManager;
   // Language servers start lazily on first use; constructing spawns nothing.
+  // Built-in presets plus the user's own (Settings); plugins add theirs as they load.
+  applyCustomLanguageServers(languageServerRegistry, readCustomLanguageServers(db));
   const languageServers = new LanguageServerManager({
     enabled: readLanguageServersEnabled(db),
+    registry: languageServerRegistry,
   });
   serverState.languageServerManager = languageServers;
   serverState.installBrowserEngineFn = notify =>

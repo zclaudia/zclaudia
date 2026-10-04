@@ -2,6 +2,7 @@ import type { Permission } from './permissions.js';
 import type { PluginContributes } from './contributions.js';
 import type { PluginRequirements } from './capabilities.js';
 import { validateEngineModeDeclarations } from '@zclaudia/plugin-sdk/providers';
+import { validateLanguageServerConfigs } from '../core/language-servers.js';
 
 export interface PluginAuthor {
   name: string;
@@ -84,6 +85,16 @@ export function validateAgentRuntimeContributions(contributes: unknown): string[
   });
 }
 
+/** Validate language-server declarations with the same rules as user definitions. */
+export function validateLspServerContributions(contributes: unknown): string[] {
+  if (!isRecord(contributes) || contributes.lspServers === undefined) return [];
+  const result = validateLanguageServerConfigs(contributes.lspServers, {
+    allowRelativeCommand: true,
+    label: 'contributes.lspServers',
+  });
+  return result.ok ? [] : result.errors;
+}
+
 export function validatePluginManifest(manifest: unknown): PluginValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -94,6 +105,7 @@ export function validatePluginManifest(manifest: unknown): PluginValidationResul
 
   const m = manifest as Record<string, unknown>;
   errors.push(...validateAgentRuntimeContributions(m.contributes));
+  errors.push(...validateLspServerContributions(m.contributes));
 
   if (!m.id || typeof m.id !== 'string') {
     errors.push('Missing required field: id');

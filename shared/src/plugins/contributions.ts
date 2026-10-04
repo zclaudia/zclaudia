@@ -3,6 +3,7 @@ import type { ThinkingLevel } from '../core/agent-profile.js';
 import type { SkillExecutionSelection, SkillSelection } from '../core/skills.js';
 import type { ToolSelection } from '../core/tools.js';
 import type { AgentRuntimeContribution } from '../providers/agent-runtime.js';
+import type { LanguageServerConfig } from '../core/language-servers.js';
 
 export interface CommandContribution {
   command: string; // e.g., '/my-command'
@@ -151,6 +152,12 @@ export interface PluginContributes {
   /** @deprecated Accepted for compatibility only. Use an external notification sink plugin. */
   notchTabs?: NotchTabContribution[];
   agentRuntimes?: AgentRuntimeContribution[];
+  /**
+   * Language servers for the ZClaudia agent (write diagnostics, LSPTool,
+   * RenameSymbol). Started only while the plugin holds `shell.execute`;
+   * `command` may point inside the plugin with `./`.
+   */
+  lspServers?: LanguageServerConfig[];
 }
 
 export interface UIExtensionRegistration {

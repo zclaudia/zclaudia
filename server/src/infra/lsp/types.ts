@@ -55,6 +55,17 @@ export interface LanguageServerPreset {
   /** Drop cached probes, so an install shows up without waiting for the TTL. */
   refreshDetection?(): void;
   /**
+   * Why `resolveLaunch` finds nothing to start in a workspace that has the
+   * root markers (`Command not found: clangd`), for configured servers that
+   * have no install hint.
+   */
+  missingReason?(): string;
+  /**
+   * A plugin's server runs only while the plugin may run commands; checked
+   * every time it would start, so a revoked permission takes effect at once.
+   */
+  permission?: { pluginId: string; granted(): boolean };
+  /**
    * Ask the server for a file's diagnostics directly, for servers that do not
    * publish when nothing changed (typescript-language-server skips an
    * empty → empty update, so a clean edit would never be answered). Returns
@@ -141,8 +152,20 @@ export interface DiagnosticsRequest {
   signal?: AbortSignal;
 }
 
-/** `missing`: the workspace needs this server but it is not installed. */
-export type LanguageServerState = 'idle' | 'starting' | 'ready' | 'stopped' | 'failed' | 'missing';
+/**
+ * `missing`: the workspace needs this server but it is not installed.
+ * `needs_permission`: a plugin's server whose plugin may not run commands.
+ */
+export type LanguageServerState =
+  | 'idle'
+  | 'starting'
+  | 'ready'
+  | 'stopped'
+  | 'failed'
+  | 'missing'
+  | 'needs_permission';
+
+export type LanguageServerSource = 'builtin' | 'plugin' | 'user';
 
 export interface LanguageServerStatus {
   id: string;
@@ -159,6 +182,8 @@ export interface LanguageServerStatus {
   lastError: string | null;
   /** Set when the server is missing or failed to start (install it, then retry). */
   installHint: string | null;
+  source: LanguageServerSource;
+  pluginId: string | null;
 }
 
 /**

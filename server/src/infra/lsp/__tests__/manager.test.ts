@@ -226,6 +226,7 @@ describe('LanguageServerManager', () => {
       ...fakePreset,
       id: 'rust-analyzer',
       name: 'Rust',
+      extensions: { '.rs': 'rust' },
       rootMarkers: ['Cargo.toml'],
       installHint: 'rustup component add rust-analyzer',
       resolveLaunch: root => (installed ? { command: 'ra', args: [], cwd: root } : null),
@@ -236,6 +237,7 @@ describe('LanguageServerManager', () => {
     const noHint: LanguageServerPreset = {
       ...missable,
       id: 'no-hint',
+      extensions: { '.nh': 'nohint' },
       installHint: undefined,
       refreshDetection: undefined,
     };

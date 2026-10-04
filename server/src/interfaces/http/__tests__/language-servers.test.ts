@@ -5,9 +5,13 @@ import Database from 'better-sqlite3';
 import express from 'express';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { LanguageServerManager } from '../../../infra/lsp/index.js';
+import { LanguageServerManager, LanguageServerRegistry } from '../../../infra/lsp/index.js';
 import type { LanguageServerPreset } from '../../../infra/lsp/index.js';
-import { createLanguageServerRoutes, readLanguageServersEnabled } from '../language-servers.js';
+import {
+  createLanguageServerRoutes,
+  readCustomLanguageServers,
+  readLanguageServersEnabled,
+} from '../language-servers.js';
 
 const preset: LanguageServerPreset = {
   id: 'fake',
@@ -66,7 +70,16 @@ describe('language-server routes', () => {
       enabled: true,
       root,
       servers: [
-        { id: 'fake', name: 'Fake', state: 'idle', leases: 0, lastError: null, installHint: null },
+        {
+          id: 'fake',
+          name: 'Fake',
+          state: 'idle',
+          leases: 0,
+          lastError: null,
+          installHint: null,
+          source: 'builtin',
+          pluginId: null,
+        },
       ],
     });
   });
@@ -119,6 +132,7 @@ describe('language-server routes', () => {
       ...preset,
       id: 'gopls',
       name: 'Go',
+      extensions: { '.go': 'go' },
       rootMarkers: ['go.mod'],
       installHint: 'go install golang.org/x/tools/gopls@latest',
       resolveLaunch: root => (installed ? { command: 'gopls', args: [], cwd: root } : null),
@@ -150,6 +164,44 @@ describe('language-server routes', () => {
     ).toEqual([
       ['fake', 'idle'],
       ['gopls', 'idle'],
+    ]);
+  });
+
+  it('saves custom servers, which the manager then uses, and rejects invalid ones', async () => {
+    const registry = new LanguageServerRegistry([preset]);
+    await manager.dispose();
+    manager = new LanguageServerManager({ registry });
+    const custom = express();
+    custom.use(express.json());
+    custom.use(
+      '/api/language-servers',
+      createLanguageServerRoutes(db, () => manager, registry)
+    );
+
+    const bad = await request(custom)
+      .put('/api/language-servers/custom')
+      .send({ servers: [{ id: 'x', command: '' }] });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.message).toContain('servers[0]');
+
+    const clangd = {
+      id: 'clangd',
+      name: 'C (clangd)',
+      command: process.execPath, // any existing absolute path
+      extensions: { '.c': 'c' },
+      rootMarkers: ['fake.json'],
+    };
+    const saved = await request(custom)
+      .put('/api/language-servers/custom')
+      .send({ servers: [clangd] });
+    expect(saved.body.data.servers).toEqual([clangd]);
+    expect(readCustomLanguageServers(db)).toEqual([clangd]);
+    expect((await request(custom).get('/api/language-servers/custom')).body.data.servers).toEqual([
+      clangd,
+    ]);
+    expect(manager.statusFor(root).map(s => [s.id, s.source])).toEqual([
+      ['clangd', 'user'],
+      ['fake', 'builtin'],
     ]);
   });
 
