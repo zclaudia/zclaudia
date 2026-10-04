@@ -36,6 +36,7 @@ export * from './api/runtime-descriptors';
 export * from './api/managed-runtimes';
 export * from './api/provider-diagnostics';
 export * from './api/context-usage';
+export * from './api/language-servers';
 export * from './api/web-search';
 export * from './api/context-graph';
 export * from './api/usage-stats';
