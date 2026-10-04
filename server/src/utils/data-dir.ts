@@ -1,4 +1,12 @@
-import { readdirSync, statSync, unlinkSync } from 'fs';
+import {
+  constants,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+} from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
@@ -11,6 +19,34 @@ export function resolveDataDir(): string {
   return process.env.ZCLAUDIA_DATA_DIR
     ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
     : path.join(os.homedir(), '.zclaudia');
+}
+
+/**
+ * Pre-rename data root (`~/.claudia`). Only ever read, to seed files that do
+ * not exist in {@link resolveDataDir} yet. `ZCLAUDIA_LEGACY_DATA_DIR` overrides
+ * it — the test setup points it at a missing dir so tests never read the
+ * developer's real legacy data.
+ */
+export function resolveLegacyDataDir(): string {
+  return process.env.ZCLAUDIA_LEGACY_DATA_DIR
+    ? path.resolve(process.env.ZCLAUDIA_LEGACY_DATA_DIR)
+    : path.join(os.homedir(), '.claudia');
+}
+
+/**
+ * One-time copy of a legacy file into the data dir: copies `legacyPath` to
+ * `targetPath` only when the target does not exist yet and the legacy file
+ * does. Never overwrites the target and never writes to the legacy location
+ * (it stays in place for older builds). Returns whether a copy happened;
+ * fs errors propagate to the caller.
+ */
+export function seedFromLegacyFile(legacyPath: string, targetPath: string): boolean {
+  if (path.resolve(legacyPath) === path.resolve(targetPath)) return false;
+  if (existsSync(targetPath) || !existsSync(legacyPath)) return false;
+  mkdirSync(path.dirname(targetPath), { recursive: true });
+  // EXCL: never clobber a file another process created in the meantime.
+  copyFileSync(legacyPath, targetPath, constants.COPYFILE_EXCL);
+  return true;
 }
 
 /**

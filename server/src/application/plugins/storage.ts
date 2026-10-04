@@ -3,10 +3,59 @@
  */
 
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
+import { resolveDataDir, resolveLegacyDataDir, seedFromLegacyFile } from '../../utils/data-dir.js';
 
 const MAX_STORAGE_BYTES = 5 * 1024 * 1024;
+const STORAGE_DIR = 'plugin-storage';
+
+/** `$ZCLAUDIA_DATA_DIR/plugin-storage` (default `~/.zclaudia/plugin-storage`). */
+export function pluginStorageDir(): string {
+  return path.join(resolveDataDir(), STORAGE_DIR);
+}
+
+/** Pre-rename location; only ever read, to seed a plugin's file in the data dir. */
+export function legacyPluginStorageDir(): string {
+  return path.join(resolveLegacyDataDir(), STORAGE_DIR);
+}
+
+function storageFileName(pluginId: string): string {
+  return `${pluginId}.json`;
+}
+
+/**
+ * Path of a plugin's storage file in the data dir, seeded once from the legacy
+ * `~/.claudia/plugin-storage/<id>.json` when it does not exist yet.
+ */
+export function resolvePluginStorageFile(pluginId: string): string {
+  const storagePath = path.join(pluginStorageDir(), storageFileName(pluginId));
+  migrateLegacyStorageFile(
+    pluginId,
+    path.join(legacyPluginStorageDir(), storageFileName(pluginId)),
+    storagePath
+  );
+  return storagePath;
+}
+
+function migrateLegacyStorageFile(pluginId: string, legacyPath: string, storagePath: string): void {
+  try {
+    seedFromLegacyFile(legacyPath, storagePath);
+  } catch (error) {
+    console.error(`[PluginStorage] Failed to migrate legacy storage for ${pluginId}:`, error);
+  }
+}
+
+export interface PluginStorageOptions {
+  /** Defaults to `<pluginStorageDir()>/<pluginId>.json`. */
+  storagePath?: string;
+  /**
+   * File copied into `storagePath` on first load when that file does not exist
+   * yet. Defaults to the plugin's file in {@link legacyPluginStorageDir} for
+   * the default storage path, and to no migration when `storagePath` is given
+   * explicitly.
+   */
+  legacyStoragePath?: string | null;
+}
 
 export interface StorageAPI {
   get<T>(key: string): Promise<T | undefined>;
@@ -18,11 +67,22 @@ export interface StorageAPI {
 
 export class PluginStorage implements StorageAPI {
   private storagePath: string;
+  private legacyStoragePath: string | null;
   private cache = new Map<string, unknown>();
   private loaded = false;
 
-  constructor(private pluginId: string) {
-    this.storagePath = path.join(os.homedir(), '.claudia', 'plugin-storage', `${pluginId}.json`);
+  constructor(
+    private pluginId: string,
+    options: PluginStorageOptions = {}
+  ) {
+    this.storagePath =
+      options.storagePath ?? path.join(pluginStorageDir(), storageFileName(pluginId));
+    this.legacyStoragePath =
+      options.legacyStoragePath !== undefined
+        ? options.legacyStoragePath
+        : options.storagePath === undefined
+          ? path.join(legacyPluginStorageDir(), storageFileName(pluginId))
+          : null;
   }
 
   private async ensureLoaded(): Promise<void> {
@@ -34,6 +94,10 @@ export class PluginStorage implements StorageAPI {
       const dir = path.dirname(this.storagePath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
+      }
+
+      if (this.legacyStoragePath) {
+        migrateLegacyStorageFile(this.pluginId, this.legacyStoragePath, this.storagePath);
       }
 
       if (fs.existsSync(this.storagePath)) {

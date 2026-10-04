@@ -15,6 +15,8 @@ vi.mock('fs', () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
+  copyFileSync: vi.fn(),
+  constants: { COPYFILE_EXCL: 1 },
 }));
 
 // Mock os module

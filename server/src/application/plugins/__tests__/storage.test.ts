@@ -14,6 +14,8 @@ vi.mock('fs', () => ({
   mkdirSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
+  copyFileSync: vi.fn(),
+  constants: { COPYFILE_EXCL: 1 },
 }));
 
 describe('PluginStorage', () => {

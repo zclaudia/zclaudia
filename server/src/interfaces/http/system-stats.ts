@@ -1,9 +1,9 @@
 import { Router, type Request, type Response } from 'express';
 import * as os from 'os';
 import * as fs from 'fs';
-import * as path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { resolvePluginStorageFile } from '../../application/plugins/storage.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -62,7 +62,7 @@ export function createSystemStatsRoutes(): Router {
       return;
     }
 
-    const storagePath = path.join(os.homedir(), '.claudia', 'plugin-storage', `${pluginId}.json`);
+    const storagePath = resolvePluginStorageFile(pluginId);
     if (!fs.existsSync(storagePath)) {
       res.json({ success: true, data: {} });
       return;

@@ -7,9 +7,13 @@ import { createSystemStatsRoutes } from '../system-stats.js';
 vi.mock('fs', () => ({
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
+  mkdirSync: vi.fn(),
+  copyFileSync: vi.fn(),
+  constants: { COPYFILE_EXCL: 1 },
 }));
 
 import * as fs from 'fs';
+import * as path from 'path';
 
 describe('system-stats routes', () => {
   let app: express.Express;
@@ -63,6 +67,10 @@ describe('system-stats routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data).toEqual({ key: 'value' });
+      expect(fs.readFileSync).toHaveBeenCalledWith(
+        path.join(process.env.ZCLAUDIA_DATA_DIR!, 'plugin-storage', 'com.example.plugin.json'),
+        'utf-8'
+      );
     });
 
     it('returns 500 when reading fails', async () => {
