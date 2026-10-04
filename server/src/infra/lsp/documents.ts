@@ -49,6 +49,11 @@ export class DocumentStore {
     return this.open.size;
   }
 
+  /** Open documents, most recently used first. */
+  openFiles(): string[] {
+    return [...this.open.keys()].reverse();
+  }
+
   isOpen(file: string): boolean {
     return this.open.has(path.resolve(file));
   }

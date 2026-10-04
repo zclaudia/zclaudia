@@ -43,6 +43,24 @@ describe('reportFromCheck', () => {
     expect(report).toMatchObject({ baseline: 'unknown', errors: [{ message: 'a' }] });
   });
 
+  it('reports errors the change introduced in other open files', () => {
+    const caller = (message: string): LspDiagnostic => ({ ...diag(message), file: 'src/use.ts' });
+    const report = reportFromCheck({
+      state: 'ready',
+      server,
+      baseline: [],
+      diagnostics: [],
+      others: [
+        { before: [caller('old')], after: [caller('old'), caller('broken')] },
+        { before: [], after: [] },
+      ],
+    });
+    expect(report?.otherFiles).toEqual({
+      checked: 2,
+      errors: [expect.objectContaining({ path: 'src/use.ts', message: 'broken' })],
+    });
+  });
+
   it('turns pending into a "not checked" report and unavailable into none', () => {
     expect(reportFromCheck({ state: 'pending', server, reason: 'timeout' })).toMatchObject({
       state: 'pending',
@@ -74,6 +92,7 @@ describe('createLanguageServerDiagnosticsProvider', () => {
     expect(service.diagnosticsFor).toHaveBeenCalledWith('/work', '/work/src/a.ts', {
       budgetMs: 1234,
       baselineContent: 'before',
+      otherOpenFiles: { exclude: undefined },
     });
   });
 });

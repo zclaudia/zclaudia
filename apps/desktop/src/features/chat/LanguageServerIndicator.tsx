@@ -6,6 +6,7 @@ import type {
   SessionLanguageServers,
 } from '@zclaudia/shared/core/language-servers';
 import { getSessionLanguageServers } from '../../services/api';
+import { CopyableCommand } from '../../components/ui/CopyableCommand';
 import { HoverPopover } from '../../components/ui/HoverPopover';
 import { SECTION_LABEL } from '../../components/ui/typography';
 import { TONE_DOT, type Tone } from '../../components/ui/tone';
@@ -20,10 +21,19 @@ const STATE_TONE: Record<LanguageServerState, Tone> = {
   stopped: 'warning',
   ready: 'success',
   failed: 'destructive',
+  // Not a fault: the user simply has not installed it. No warning color.
+  missing: 'neutral',
 };
 
 // Which state the single trigger dot shows when servers disagree.
-const STATE_PRIORITY: LanguageServerState[] = ['failed', 'stopped', 'starting', 'ready', 'idle'];
+const STATE_PRIORITY: LanguageServerState[] = [
+  'failed',
+  'stopped',
+  'starting',
+  'ready',
+  'idle',
+  'missing',
+];
 
 function stateLabel(server: LanguageServerStatusEntry): string {
   switch (server.state) {
@@ -37,6 +47,8 @@ function stateLabel(server: LanguageServerStatusEntry): string {
       return 'Failed';
     case 'idle':
       return 'Not running';
+    case 'missing':
+      return 'Not installed';
   }
 }
 
@@ -149,6 +161,11 @@ function LanguageServerPanel({ servers }: { servers: LanguageServerStatusEntry[]
                 <p className="mt-0.5 break-words pl-4 text-2xs text-destructive">
                   {server.lastError}
                 </p>
+              )}
+              {server.installHint && (
+                <div className="mt-1 pl-4">
+                  <CopyableCommand command={server.installHint} />
+                </div>
               )}
             </li>
           ))}

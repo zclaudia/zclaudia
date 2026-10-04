@@ -16,9 +16,9 @@ export function memoizeByRoot<T>(
   probe: (root: string) => T,
   ttlMs = DETECTION_TTL_MS,
   now: () => number = Date.now
-): (root: string) => T {
+): ((root: string) => T) & { clear(): void } {
   const cache = new Map<string, { at: number; value: T }>();
-  return root => {
+  const memoized = (root: string) => {
     const key = path.resolve(root);
     const hit = cache.get(key);
     if (hit && now() - hit.at < ttlMs) return hit.value;
@@ -26,6 +26,7 @@ export function memoizeByRoot<T>(
     cache.set(key, { at: now(), value });
     return value;
   };
+  return Object.assign(memoized, { clear: () => cache.clear() });
 }
 
 export function hasRootMarker(root: string, markers: string[]): boolean {

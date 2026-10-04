@@ -5,6 +5,7 @@ import type {
   LanguageServersOverview,
 } from '@zclaudia/shared/core/language-servers';
 import { getLanguageServers, setLanguageServersEnabled } from '../../services/api';
+import { CopyableCommand } from '../../components/ui/CopyableCommand';
 import { Toggle } from '../../components/ui/Toggle';
 import { TONE_DOT, type Tone } from '../../components/ui/tone';
 import { useSettingsTargetBackend } from '../../hooks/useSettingsTargetBackend';
@@ -23,6 +24,7 @@ const STATE_LABEL: Record<LanguageServerState, string> = {
   ready: 'Ready',
   stopped: 'Crashed, restarting',
   failed: 'Failed',
+  missing: 'Not installed',
 };
 
 const STATE_TONE: Record<LanguageServerState, Tone> = {
@@ -31,6 +33,7 @@ const STATE_TONE: Record<LanguageServerState, Tone> = {
   stopped: 'warning',
   ready: 'success',
   failed: 'destructive',
+  missing: 'neutral',
 };
 
 /**
@@ -44,18 +47,22 @@ export function LanguageServerSettings() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      setOverview(await getLanguageServers(targetBackendId));
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load language servers');
-    }
-  }, [targetBackendId]);
+  const load = useCallback(
+    async (refresh = false) => {
+      try {
+        setOverview(await getLanguageServers(targetBackendId, { refresh }));
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load language servers');
+      }
+    },
+    [targetBackendId]
+  );
 
   useEffect(() => {
     if (!targetBackendId) return;
-    void load();
+    // Opening Settings re-probes, so a server installed a moment ago shows up.
+    void load(true);
     const interval = setInterval(() => void load(), POLL_MS);
     return () => clearInterval(interval);
   }, [load, targetBackendId]);
@@ -118,6 +125,11 @@ export function LanguageServerSettings() {
                     <p className="mt-0.5 break-words pl-4 text-2xs text-destructive">
                       {server.lastError}
                     </p>
+                  )}
+                  {server.installHint && (
+                    <div className="mt-1 pl-4">
+                      <CopyableCommand command={server.installHint} />
+                    </div>
                   )}
                 </li>
               ))}

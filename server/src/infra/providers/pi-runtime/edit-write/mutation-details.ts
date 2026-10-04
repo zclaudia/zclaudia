@@ -7,7 +7,7 @@
 
 import type { FileDiffHunk, FileDiffResult } from '../diff.js';
 import type { MutationStateDescriptor } from '../file-state.js';
-import type { WriteDiagnosticsReport } from '../write-lifecycle.js';
+import type { WriteDiagnosticsReport, WriteLifecycleDiagnostic } from '../write-lifecycle.js';
 
 const MODEL_VISIBLE_DIFF_MAX_CHARS = 12_000;
 const DETAILS_DIFF_MAX_CHARS = 80_000;
@@ -139,6 +139,44 @@ function formatPerFileResults(perFileResults: unknown): string[] {
 
 const MAX_REPORTED_ERRORS = 10;
 
+function errorLines(errors: WriteLifecycleDiagnostic[]): string[] {
+  const lines = errors.slice(0, MAX_REPORTED_ERRORS).map(error => {
+    const where = [error.path, error.line, error.column].filter(v => v !== undefined).join(':');
+    const code = error.code !== undefined ? ` [${error.code}]` : '';
+    return `  ${where} ${error.message.split('\n')[0]}${code}`;
+  });
+  if (errors.length > MAX_REPORTED_ERRORS) {
+    lines.push(`  ... and ${errors.length - MAX_REPORTED_ERRORS} more`);
+  }
+  return lines;
+}
+
+function errorCount(count: number, qualifier = ''): string {
+  return `${count} ${qualifier}${count === 1 ? 'error' : 'errors'}`;
+}
+
+type OtherFiles = NonNullable<WriteDiagnosticsReport['otherFiles']>;
+
+/**
+ * "No new errors" says how far the check reached: only the server's open
+ * files are re-checked, so an unopened caller can still be broken.
+ */
+function noNewErrorsLine(label: string, otherFiles: OtherFiles | undefined, scope = ''): string {
+  const reach =
+    otherFiles && otherFiles.checked > 0
+      ? ` (also checked ${otherFiles.checked} other open ${otherFiles.checked === 1 ? 'file' : 'files'})`
+      : '';
+  return `${label}: no new errors${scope}${reach}.`;
+}
+
+function otherFilesLines(label: string, otherFiles: OtherFiles | undefined): string[] {
+  if (!otherFiles || otherFiles.errors.length === 0) return [];
+  return [
+    `${label}: ${errorCount(otherFiles.errors.length)} introduced in other open files:`,
+    ...errorLines(otherFiles.errors),
+  ];
+}
+
 /**
  * Model-facing lines for a language-server check. Every state says what was
  * (not) checked: "not checked" must never be mistaken for "no errors".
@@ -152,22 +190,104 @@ export function formatDiagnosticsReport(report: WriteDiagnosticsReport): string[
         : `${label}: not checked, language server did not answer in time.`,
     ];
   }
+  const others = otherFilesLines(label, report.otherFiles);
   if (report.errors.length === 0) {
-    return [`${label}: no new errors.`];
+    return others.length > 0 ? others : [noNewErrorsLine(label, report.otherFiles)];
   }
   const count = report.errors.length;
-  const noun = count === 1 ? 'error' : 'errors';
   const header =
     report.baseline === 'known'
-      ? `${label}: ${count} new ${noun} introduced by this change:`
-      : `${label}: ${count} ${noun} in this file (may include pre-existing ones):`;
-  const lines = report.errors.slice(0, MAX_REPORTED_ERRORS).map(error => {
-    const where = [error.path, error.line, error.column].filter(v => v !== undefined).join(':');
-    const code = error.code !== undefined ? ` [${error.code}]` : '';
-    return `  ${where} ${error.message.split('\n')[0]}${code}`;
-  });
-  if (count > MAX_REPORTED_ERRORS) lines.push(`  ... and ${count - MAX_REPORTED_ERRORS} more`);
-  return [header, ...lines];
+      ? `${label}: ${errorCount(count, 'new ')} introduced by this change:`
+      : `${label}: ${errorCount(count)} in this file (may include pre-existing ones):`;
+  return [header, ...errorLines(report.errors), ...others];
+}
+
+/** One changed file's language-server check, for multi-file mutations. */
+export interface FileDiagnosticsReport {
+  path: string;
+  report: WriteDiagnosticsReport;
+}
+
+/** Other-file errors across a multi-file mutation, without duplicates. */
+function mergeOtherFiles(entries: FileDiagnosticsReport[]): OtherFiles | undefined {
+  const reports = entries.map(entry => entry.report.otherFiles).filter(Boolean) as OtherFiles[];
+  if (reports.length === 0) return undefined;
+  const changed = new Set(entries.map(entry => entry.path));
+  const seen = new Set<string>();
+  const errors: WriteLifecycleDiagnostic[] = [];
+  for (const error of reports.flatMap(report => report.errors)) {
+    const key = [error.path, error.line, error.column, error.code, error.message].join('\0');
+    if (changed.has(error.path) || seen.has(key)) continue;
+    seen.add(key);
+    errors.push(error);
+  }
+  return { checked: Math.max(...reports.map(report => report.checked)), errors };
+}
+
+/**
+ * Model-facing lines for a mutation that changed several files: one block per
+ * checker, errors across files under a single cap, and the files that went
+ * unchecked named explicitly so their silence is not read as "no errors".
+ */
+export function formatDiagnosticsReports(entries: FileDiagnosticsReport[]): string[] {
+  if (entries.length === 0) return [];
+  if (entries.length === 1) return formatDiagnosticsReport(entries[0].report);
+
+  const byChecker = new Map<string, FileDiagnosticsReport[]>();
+  for (const entry of entries) {
+    const group = byChecker.get(entry.report.checker) ?? [];
+    group.push(entry);
+    byChecker.set(entry.report.checker, group);
+  }
+
+  const lines: string[] = [];
+  for (const [checker, group] of byChecker) {
+    const label = `Diagnostics (${checker})`;
+    const checked = group.filter(entry => entry.report.state === 'checked');
+    const pending = group.filter(entry => entry.report.state === 'pending');
+
+    if (checked.length > 0) {
+      const errors = checked.flatMap(entry => entry.report.errors);
+      const otherFiles = mergeOtherFiles(checked);
+      const others = otherFilesLines(label, otherFiles);
+      if (errors.length === 0) {
+        if (others.length > 0) {
+          lines.push(...others);
+        } else {
+          lines.push(
+            noNewErrorsLine(
+              label,
+              otherFiles,
+              pending.length === 0 ? '' : ` in ${checked.map(entry => entry.path).join(', ')}`
+            )
+          );
+        }
+      } else {
+        const baselineKnown = checked.every(
+          entry => entry.report.errors.length === 0 || entry.report.baseline === 'known'
+        );
+        lines.push(
+          baselineKnown
+            ? `${label}: ${errorCount(errors.length, 'new ')} introduced by this change:`
+            : `${label}: ${errorCount(errors.length)} in the changed files (may include pre-existing ones):`,
+          ...errorLines(errors),
+          ...others
+        );
+      }
+    }
+
+    if (pending.length > 0) {
+      const why = pending.some(entry => entry.report.pendingReason === 'starting')
+        ? 'language server still starting'
+        : 'language server did not answer in time';
+      lines.push(
+        checked.length === 0
+          ? `${label}: not checked, ${why}.`
+          : `${label}: not checked for ${pending.map(entry => entry.path).join(', ')}, ${why}.`
+      );
+    }
+  }
+  return lines;
 }
 
 export function buildMutationResultText(input: {
@@ -186,6 +306,8 @@ export function buildMutationResultText(input: {
   state?: MutationStateDescriptor;
   rebased?: boolean;
   diagnostics?: WriteDiagnosticsReport;
+  /** Per-file checks of a multi-file mutation; used instead of `diagnostics`. */
+  diagnosticsReports?: FileDiagnosticsReport[];
 }): string {
   const headlineParts = [input.action];
   if (input.path) headlineParts.push(input.path);
@@ -214,7 +336,11 @@ export function buildMutationResultText(input: {
   const perFileLines = formatPerFileResults(input.perFileResults);
   if (perFileLines.length > 0) lines.push('Files:', ...perFileLines);
 
-  if (input.diagnostics) lines.push(...formatDiagnosticsReport(input.diagnostics));
+  if (input.diagnosticsReports?.length) {
+    lines.push(...formatDiagnosticsReports(input.diagnosticsReports));
+  } else if (input.diagnostics) {
+    lines.push(...formatDiagnosticsReport(input.diagnostics));
+  }
 
   if (input.preview) {
     lines.push('Disk: not modified (preview_only:true).');

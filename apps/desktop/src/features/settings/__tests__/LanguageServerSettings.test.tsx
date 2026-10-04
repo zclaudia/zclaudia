@@ -32,6 +32,21 @@ const overview = (enabled: boolean): LanguageServersOverview => ({
           startedAt: 1,
           lastUsedAt: 1,
           lastError: null,
+          installHint: null,
+        },
+        {
+          id: 'gopls',
+          name: 'Go (gopls)',
+          languages: ['go'],
+          root: '/Users/me/code/svc',
+          state: 'missing',
+          leases: 0,
+          openDocuments: 0,
+          pid: null,
+          startedAt: null,
+          lastUsedAt: null,
+          lastError: null,
+          installHint: 'go install golang.org/x/tools/gopls@latest',
         },
       ]
     : [],
@@ -49,7 +64,11 @@ describe('LanguageServerSettings', () => {
     expect(list).toHaveTextContent('TypeScript');
     expect(list).toHaveTextContent('app');
     expect(list).toHaveTextContent('Ready · 3 open');
-    expect(getLanguageServers).toHaveBeenCalledWith('local');
+    expect(list).toHaveTextContent('Go (gopls)');
+    expect(list).toHaveTextContent('Not installed');
+    expect(list).toHaveTextContent('go install golang.org/x/tools/gopls@latest');
+    // Opening re-probes, so a server installed a moment ago shows up.
+    expect(getLanguageServers).toHaveBeenCalledWith('local', { refresh: true });
 
     fireEvent.click(screen.getByRole('switch', { name: 'Language servers' }));
     await waitFor(() => expect(setLanguageServersEnabled).toHaveBeenCalledWith(false, 'local'));

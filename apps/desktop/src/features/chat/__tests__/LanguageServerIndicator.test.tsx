@@ -26,6 +26,7 @@ function server(overrides: Partial<LanguageServerStatusEntry> = {}): LanguageSer
     startedAt: 1,
     lastUsedAt: 2,
     lastError: null,
+    installHint: null,
     ...overrides,
   };
 }
@@ -85,6 +86,42 @@ describe('LanguageServerIndicator', () => {
     expect(popover).toHaveTextContent('Ready · 12 open files');
     expect(popover).toHaveTextContent('Failed');
     expect(popover).toHaveTextContent("Unknown binary 'rust-analyzer'");
+  });
+
+  it('shows a needed but uninstalled server without alarm, with its install command', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    mockFetch.mockResolvedValue(
+      payload({
+        servers: [
+          server({
+            id: 'rust-analyzer',
+            name: 'Rust (rust-analyzer)',
+            state: 'missing',
+            leases: 0,
+            openDocuments: 0,
+            pid: null,
+            installHint: 'rustup component add rust-analyzer',
+          }),
+        ],
+      })
+    );
+    render(<LanguageServerIndicator sessionId="s1" />);
+    const trigger = await screen.findByTestId('language-server-indicator');
+    expect(trigger).toHaveAttribute('data-state', 'missing');
+
+    fireEvent.click(trigger);
+    const popover = await screen.findByTestId('language-server-popover');
+    expect(popover).toHaveTextContent('Not installed');
+    expect(popover).toHaveTextContent('rustup component add rust-analyzer');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Copy command: rustup component add rust-analyzer' })
+    );
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith('rustup component add rust-analyzer')
+    );
+    // Copying does not close the popover.
+    expect(screen.getByTestId('language-server-popover')).toBeInTheDocument();
   });
 
   it('polls quickly while a server is starting, then settles', async () => {

@@ -10,7 +10,7 @@
  */
 import path from 'path';
 import { LanguageServerStartupError, LspClient } from './client.js';
-import { DiagnosticsStore } from './diagnostics.js';
+import { DiagnosticsStore, mapDiagnostics } from './diagnostics.js';
 import { DocumentStore, fileUri, type SyncOutcome } from './documents.js';
 import {
   attachPreviews,
@@ -27,7 +27,7 @@ import {
   type LspQueryRequest,
   type LspQueryResult,
 } from '../providers/language-server-port.js';
-import { findFirstSourceFile } from './detection.js';
+import { findFirstSourceFile, hasRootMarker } from './detection.js';
 import { defaultLanguageServerPresets } from './presets.js';
 import { spawnLanguageServer } from './spawn.js';
 import type {
@@ -48,6 +48,8 @@ const CRASH_WINDOW_MS = 5 * 60 * 1000;
 const MAX_CRASHES_IN_WINDOW = 3;
 const MAX_BACKOFF_MS = 30_000;
 const BASELINE_BUDGET_MS = 1_500;
+/** Other open files re-checked after a write (servers that can be asked). */
+const DEFAULT_MAX_OTHER_FILES = 20;
 /** How long a query waits for a cold server before answering server_starting. */
 const DEFAULT_START_WAIT_MS = 20_000;
 const QUERY_DIAGNOSTICS_BUDGET_MS = 5_000;
@@ -106,6 +108,8 @@ interface Entry {
   startedAt: number | null;
   lastUsedAt: number | null;
   lastError: string | null;
+  /** Failed by exiting before initialize: a setup problem the user can fix. */
+  startupFailed: boolean;
   idleTimer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -170,13 +174,28 @@ export class LanguageServerManager implements LanguageServerService {
       return;
     }
     for (const entry of this.entries.values()) {
-      if (entry.state === 'failed') {
-        entry.state = 'idle';
-        entry.lastError = null;
-        entry.crashes = [];
-        entry.nextStartAt = 0;
-      }
+      if (entry.state === 'failed') this.resetFailed(entry);
     }
+  }
+
+  /**
+   * Re-probe every preset now instead of after the detection TTL, and give
+   * servers that failed at start-up another chance: the user may just have
+   * installed what was missing.
+   */
+  redetect(): void {
+    for (const preset of this.presets) preset.refreshDetection?.();
+    for (const entry of this.entries.values()) {
+      if (entry.state === 'failed' && entry.startupFailed) this.resetFailed(entry);
+    }
+  }
+
+  private resetFailed(entry: Entry): void {
+    entry.state = 'idle';
+    entry.lastError = null;
+    entry.startupFailed = false;
+    entry.crashes = [];
+    entry.nextStartAt = 0;
   }
 
   serversFor(root: string): LanguageServerInfo[] {
@@ -244,47 +263,77 @@ export class LanguageServerManager implements LanguageServerService {
       return { state: 'pending', server, reason: 'starting' };
     }
 
-    const { documents, diagnostics } = entry.active;
+    const active = entry.active;
+    const { documents, diagnostics } = active;
     const settleMs = this.options.settleMs;
+    // Ask directly when the preset can; otherwise wait for a publish.
+    const pull = preset.pullDiagnostics
+      ? (target: string) => this.pullDiagnostics(active, preset, resolvedRoot, target, request)
+      : undefined;
     let baseline: LspDiagnostic[] | undefined = entry.stable.get(absolute)?.diagnostics;
     try {
-      // First sight of this file: diagnose the old content first, so the
-      // report can separate what this change introduced from what was there.
-      if (!documents.isOpen(absolute) && request.baselineContent !== undefined) {
+      if (documents.isOpen(absolute)) {
+        // The server still holds the pre-change content: ask for it exactly.
+        if (pull) baseline = (await pull(absolute)) ?? baseline;
+      } else if (request.baselineContent !== undefined) {
+        // First sight of this file: diagnose the old content first, so the
+        // report can separate what this change introduced from what was there.
         if (request.baselineContent === null) {
           baseline = [];
         } else {
           const mark = diagnostics.mark(absolute);
           await documents.syncText(absolute, request.baselineContent);
-          const before = await diagnostics.waitForPublishAfter(absolute, mark, {
-            budgetMs: Math.min(BASELINE_BUDGET_MS, request.budgetMs),
-            settleMs,
-            signal: request.signal,
-          });
+          const before =
+            (pull && (await pull(absolute))) ??
+            (await diagnostics.waitForPublishAfter(absolute, mark, {
+              budgetMs: Math.min(BASELINE_BUDGET_MS, request.budgetMs),
+              settleMs,
+              signal: request.signal,
+            }));
           baseline = before ?? undefined;
         }
       }
+
+      // Other open files, diagnosed while the server still has the old content.
+      const others =
+        pull && request.otherOpenFiles
+          ? await this.otherOpenFilesBefore(active, absolute, request.otherOpenFiles, pull)
+          : undefined;
+
       const mark = diagnostics.mark(absolute);
       const outcome = await documents.syncFromDisk(absolute);
       if (outcome === 'missing') return { state: 'unavailable', reason: 'file does not exist' };
-      // Unchanged content gets no new publish; serve what the server last said.
-      const cached =
-        outcome === 'unchanged'
-          ? (entry.stable.get(absolute)?.diagnostics ?? diagnostics.latest(absolute))
-          : undefined;
-      const settled =
-        cached ??
-        (await diagnostics.waitForPublishAfter(absolute, mark, {
-          budgetMs: request.budgetMs,
-          settleMs,
-          signal: request.signal,
-        }));
+      let settled: LspDiagnostic[] | null | undefined = pull ? await pull(absolute) : undefined;
+      if (!settled) {
+        // Unchanged content gets no new publish; serve what the server last said.
+        const cached =
+          outcome === 'unchanged'
+            ? (entry.stable.get(absolute)?.diagnostics ?? diagnostics.latest(absolute))
+            : undefined;
+        settled =
+          cached ??
+          (await diagnostics.waitForPublishAfter(absolute, mark, {
+            budgetMs: request.budgetMs,
+            settleMs,
+            signal: request.signal,
+          }));
+      }
       if (!settled) return { state: 'pending', server, reason: 'timeout' };
+
+      const otherResults: Array<{ before: LspDiagnostic[]; after: LspDiagnostic[] }> = [];
+      if (pull && others) {
+        for (const other of others) {
+          const after = await pull(other.file);
+          if (after) otherResults.push({ before: other.before, after });
+        }
+      }
+
       const check: DiagnosticsCheck & { state: 'ready' } = {
         state: 'ready',
         server,
         diagnostics: settled,
         ...(baseline ? { baseline } : {}),
+        ...(others ? { others: otherResults } : {}),
       };
       entry.stable.set(absolute, { state: 'ready', server, diagnostics: settled });
       return check;
@@ -294,6 +343,51 @@ export class LanguageServerManager implements LanguageServerService {
         reason: err instanceof Error ? err.message : String(err),
       };
     }
+  }
+
+  /** Diagnostics by asking the server; undefined when it cannot answer in budget. */
+  private async pullDiagnostics(
+    active: ActiveClient,
+    preset: LanguageServerPreset,
+    root: string,
+    file: string,
+    request: DiagnosticsRequest
+  ): Promise<LspDiagnostic[] | undefined> {
+    const ask = preset.pullDiagnostics;
+    if (!ask) return undefined;
+    const timeout = AbortSignal.timeout(Math.max(1, request.budgetMs));
+    const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
+    try {
+      const raw = await ask(
+        (method, params, s) => active.client.request(method, params, s),
+        file,
+        signal
+      );
+      const mapped = mapDiagnostics(root, file, raw);
+      active.diagnostics.record(file, mapped);
+      return mapped;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async otherOpenFilesBefore(
+    active: ActiveClient,
+    changed: string,
+    options: NonNullable<DiagnosticsRequest['otherOpenFiles']>,
+    pull: (file: string) => Promise<LspDiagnostic[] | undefined>
+  ): Promise<Array<{ file: string; before: LspDiagnostic[] }>> {
+    const exclude = new Set([changed, ...(options.exclude ?? []).map(file => path.resolve(file))]);
+    const files = active.documents
+      .openFiles()
+      .filter(file => !exclude.has(file))
+      .slice(0, options.max ?? DEFAULT_MAX_OTHER_FILES);
+    const result: Array<{ file: string; before: LspDiagnostic[] }> = [];
+    for (const file of files) {
+      const before = await pull(file);
+      if (before) result.push({ file, before });
+    }
+    return result;
   }
 
   async query(request: LspQueryRequest, signal?: AbortSignal): Promise<LspQueryResult> {
@@ -502,9 +596,43 @@ export class LanguageServerManager implements LanguageServerService {
   statusFor(root: string): LanguageServerStatus[] {
     if (!this.enabled) return [];
     const resolvedRoot = path.resolve(root);
-    return this.availablePresets(resolvedRoot).map(preset =>
-      this.statusOf(this.entryFor(preset, resolvedRoot))
-    );
+    return [
+      ...this.availablePresets(resolvedRoot).map(preset =>
+        this.statusOf(this.entryFor(preset, resolvedRoot))
+      ),
+      ...this.missingFor(resolvedRoot),
+    ];
+  }
+
+  /**
+   * Servers the workspace needs (its root markers are there) whose executable
+   * was not found. Only presets that say how to install them are reported.
+   */
+  missingFor(root: string): LanguageServerStatus[] {
+    if (!this.enabled) return [];
+    const resolvedRoot = path.resolve(root);
+    return this.presets
+      .filter(
+        preset =>
+          preset.installHint &&
+          hasRootMarker(resolvedRoot, preset.rootMarkers) &&
+          !this.availablePresets(resolvedRoot).includes(preset)
+      )
+      .map(preset => ({
+        id: preset.id,
+        name: preset.name,
+        languages: preset.languages,
+        root: resolvedRoot,
+        state: 'missing' as const,
+        leases: [],
+        openDocuments: 0,
+        pid: null,
+        processId: null,
+        startedAt: null,
+        lastUsedAt: null,
+        lastError: null,
+        installHint: preset.installHint ?? null,
+      }));
   }
 
   private statusOf(entry: Entry): LanguageServerStatus {
@@ -521,6 +649,7 @@ export class LanguageServerManager implements LanguageServerService {
       startedAt: entry.startedAt,
       lastUsedAt: entry.lastUsedAt,
       lastError: entry.lastError,
+      installHint: entry.startupFailed ? (entry.preset.installHint ?? null) : null,
     };
   }
 
@@ -565,6 +694,7 @@ export class LanguageServerManager implements LanguageServerService {
         startedAt: null,
         lastUsedAt: null,
         lastError: null,
+        startupFailed: false,
         idleTimer: null,
       };
       this.entries.set(key, entry);
@@ -716,6 +846,7 @@ export class LanguageServerManager implements LanguageServerService {
         // bad install), not a flake: retrying would fail the same way.
         entry.state = 'failed';
         entry.lastError = message;
+        entry.startupFailed = true;
         return null;
       }
       this.recordCrash(entry, message);

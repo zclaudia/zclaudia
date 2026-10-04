@@ -27,6 +27,8 @@ export interface WriteDiagnosticsReport {
   baseline: 'known' | 'unknown';
   /** Errors introduced by the write (all errors when the baseline is unknown). */
   errors: WriteLifecycleDiagnostic[];
+  /** Errors the write introduced in the server's other open files. */
+  otherFiles?: { checked: number; errors: WriteLifecycleDiagnostic[] };
 }
 
 export interface WriteLifecycleInput {
@@ -38,6 +40,8 @@ export interface WriteLifecycleInput {
   updatedContent: string;
   diff: string;
   firstChangedLine?: number;
+  /** Absolute paths of other files the same mutation changed (multi-file patches). */
+  otherChangedPaths?: string[];
 }
 
 export interface WriteLifecycleResult {

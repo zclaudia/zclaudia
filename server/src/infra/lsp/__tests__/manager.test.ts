@@ -219,6 +219,66 @@ describe('LanguageServerManager', () => {
     expect(servers).toHaveLength(1); // no retry loop
   });
 
+  it('reports a needed but uninstalled server as missing, with how to install it', () => {
+    let installed = false;
+    let refreshed = 0;
+    const missable: LanguageServerPreset = {
+      ...fakePreset,
+      id: 'rust-analyzer',
+      name: 'Rust',
+      rootMarkers: ['Cargo.toml'],
+      installHint: 'rustup component add rust-analyzer',
+      resolveLaunch: root => (installed ? { command: 'ra', args: [], cwd: root } : null),
+      refreshDetection: () => {
+        refreshed += 1;
+      },
+    };
+    const noHint: LanguageServerPreset = {
+      ...missable,
+      id: 'no-hint',
+      installHint: undefined,
+      refreshDetection: undefined,
+    };
+    const manager = createManager({ presets: [missable, noHint] });
+
+    // No marker: not needed, so not missing.
+    expect(manager.statusFor(dir)).toEqual([]);
+
+    writeFileSync(path.join(dir, 'Cargo.toml'), '');
+    expect(manager.serversFor(dir)).toEqual([]);
+    expect(manager.statusFor(dir)).toEqual([
+      expect.objectContaining({
+        id: 'rust-analyzer',
+        state: 'missing',
+        installHint: 'rustup component add rust-analyzer',
+      }),
+    ]);
+
+    installed = true;
+    manager.redetect();
+    expect(refreshed).toBe(1);
+    expect(manager.statusFor(dir).map(s => [s.id, s.state])).toEqual([
+      ['rust-analyzer', 'idle'],
+      ['no-hint', 'idle'],
+    ]);
+  });
+
+  it('attaches the install hint to a start-up failure and retries it on redetect', async () => {
+    serverOptions = { dieOnInitialize: true };
+    const manager = createManager({
+      presets: [{ ...fakePreset, installHint: 'install fake' }],
+    });
+    writeFileSync(path.join(dir, 'a.fk'), 'x\n');
+    manager.acquire(dir, 'run');
+    await until(() => manager.status()[0]?.state === 'failed');
+    expect(manager.status()[0].installHint).toBe('install fake');
+
+    serverOptions = {};
+    manager.redetect();
+    expect(manager.statusFor(dir)[0]).toMatchObject({ state: 'idle', installHint: null });
+    expect(manager.serversFor(dir).map(s => s.id)).toEqual(['fake']);
+  });
+
   it('turning the switch off stops servers and offers nothing; on retries failed ones', async () => {
     const manager = createManager();
     const file = path.join(dir, 'a.fk');

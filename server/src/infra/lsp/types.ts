@@ -41,6 +41,37 @@ export interface LanguageServerPreset {
    * while building a run's tool list — so implementations cache their probes.
    */
   resolveLaunch(root: string): LaunchSpec | null;
+  /**
+   * How the user installs this server, shown when the workspace has its root
+   * markers but the executable is missing. Presets without one (TypeScript,
+   * which follows the project's own `typescript`) are never reported missing.
+   */
+  installHint?: string;
+  /** Drop cached probes, so an install shows up without waiting for the TTL. */
+  refreshDetection?(): void;
+  /**
+   * Ask the server for a file's diagnostics directly, for servers that do not
+   * publish when nothing changed (typescript-language-server skips an
+   * empty → empty update, so a clean edit would never be answered). Returns
+   * LSP-shaped diagnostics; throws when the server cannot answer.
+   */
+  pullDiagnostics?(
+    request: LspRequest,
+    file: string,
+    signal?: AbortSignal
+  ): Promise<RawLspDiagnostic[]>;
+}
+
+/** Send one request to a running server. */
+export type LspRequest = <R>(method: string, params: unknown, signal?: AbortSignal) => Promise<R>;
+
+/** A diagnostic as LSP sends it (0-based positions). */
+export interface RawLspDiagnostic {
+  range?: { start?: { line?: number; character?: number } };
+  severity?: number;
+  message?: string;
+  source?: string;
+  code?: string | number | { value?: string | number };
 }
 
 /** A spawned server process as the client sees it. */
@@ -72,6 +103,11 @@ export type DiagnosticsCheck =
        * there is no baseline, so pre-existing problems cannot be told apart.
        */
       baseline?: LspDiagnostic[];
+      /**
+       * Other open files of the same server, diagnosed just before and just
+       * after this change (only servers that can be asked directly).
+       */
+      others?: Array<{ before: LspDiagnostic[]; after: LspDiagnostic[] }>;
     }
   | { state: 'pending'; server: LanguageServerInfo; reason: 'starting' | 'timeout' }
   | { state: 'unavailable'; reason: string };
@@ -85,10 +121,17 @@ export interface DiagnosticsRequest {
    * file yet, to diagnose the old content first.
    */
   baselineContent?: string | null;
+  /**
+   * Also check the server's other open files for errors this change caused
+   * (a changed signature breaking a caller). `exclude`: files the same
+   * mutation changed, which get their own check.
+   */
+  otherOpenFiles?: { exclude?: string[]; max?: number };
   signal?: AbortSignal;
 }
 
-export type LanguageServerState = 'idle' | 'starting' | 'ready' | 'stopped' | 'failed';
+/** `missing`: the workspace needs this server but it is not installed. */
+export type LanguageServerState = 'idle' | 'starting' | 'ready' | 'stopped' | 'failed' | 'missing';
 
 export interface LanguageServerStatus {
   id: string;
@@ -103,6 +146,8 @@ export interface LanguageServerStatus {
   startedAt: number | null;
   lastUsedAt: number | null;
   lastError: string | null;
+  /** Set when the server is missing or failed to start (install it, then retry). */
+  installHint: string | null;
 }
 
 /**
