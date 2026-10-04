@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useActiveSessionStream } from '../useActiveSessionStream';
-import { useFacadeStore } from '../../stores/facadeStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { useSelectionStore } from '../../stores/selectionStore';
-import { useServerStore } from '../../stores/serverStore';
-import { useOwnershipStore } from '../../stores/ownershipStore';
-import { useChatMessageStore } from '../../stores/chatMessageStore';
+import { useFacadeStore } from '../../../../stores/facadeStore';
+import { useProjectStore } from '../../../../stores/projectStore';
+import { useSelectionStore } from '../../../../stores/selectionStore';
+import { useServerStore } from '../../../../stores/serverStore';
+import { useOwnershipStore } from '../../../../stores/ownershipStore';
+import { useChatMessageStore } from '../../../../stores/chatMessageStore';
 
 describe('useActiveSessionStream', () => {
   const facade = {
