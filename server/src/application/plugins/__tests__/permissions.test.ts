@@ -35,8 +35,7 @@ describe('PermissionManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    manager = new PermissionManager();
-    manager.setStorePath(testStorePath);
+    manager = new PermissionManager({ storePath: testStorePath });
 
     // Reset mocks
     (fs.existsSync as any).mockReturnValue(false);
