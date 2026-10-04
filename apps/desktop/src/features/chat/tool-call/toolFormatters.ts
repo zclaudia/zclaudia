@@ -27,7 +27,7 @@ function normalizeToolInput(input: unknown): unknown {
 function extractQuestions(raw: unknown): Array<{
   question: string;
   header: string;
-  options: Array<{ label: string; description: string }>;
+  options: Array<{ label: string; description: string; preview?: string }>;
   multiSelect?: boolean;
   allowCustomValue?: boolean;
   customValuePlaceholder?: string;
@@ -66,6 +66,9 @@ function buildAskUserQuestionInteraction(params: {
         value: option.label,
         label: option.label,
         description: option.description,
+        ...(typeof option.preview === 'string' && option.preview.trim()
+          ? { preview: option.preview }
+          : {}),
       })),
       placeholder: 'Type your answer...',
       allowCustomValue: question.allowCustomValue ?? true,
@@ -192,6 +195,16 @@ function formatToolInput(toolName: string, input: unknown, semantic?: ToolSemant
   }
 }
 
+// The model's one-line `description` of a Bash call ("List files in src"),
+// shown in the collapsed header in place of the raw command; the command
+// itself stays in the expanded body. Undefined when absent or blank.
+function bashDescription(input: unknown): string | undefined {
+  const normalized = normalizeToolInput(input);
+  if (!normalized || typeof normalized !== 'object') return undefined;
+  const description = (normalized as Record<string, unknown>).description;
+  return typeof description === 'string' && description.trim() ? description.trim() : undefined;
+}
+
 // Format tool result for display (no truncation — UI handles collapse/expand)
 function formatToolResult(result: unknown): string {
   if (typeof result === 'string') {
@@ -211,6 +224,7 @@ export {
   extractQuestions,
   extractInteractionId,
   buildAskUserQuestionInteraction,
+  bashDescription,
   normalizeTodoItems,
   formatToolInput,
   formatToolResult,

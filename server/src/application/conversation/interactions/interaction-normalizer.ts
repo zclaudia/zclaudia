@@ -102,6 +102,10 @@ export function normalizeFromAskUser(args: NormalizeAskUserArgs): InteractionPro
         value: option.label,
         label: option.label,
         description: option.description,
+        // Model-supplied input: keep only a real, non-blank string.
+        ...(typeof option.preview === 'string' && option.preview.trim()
+          ? { preview: option.preview }
+          : {}),
       })),
       placeholder: question.placeholder || 'Type your answer...',
       allowCustomValue: question.allowCustomValue ?? true,

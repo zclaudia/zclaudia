@@ -4,6 +4,8 @@
 export interface AskUserQuestionOption {
   label: string;
   description: string;
+  /** Markdown / ASCII / code shown with the option so alternatives can be compared. */
+  preview?: string;
 }
 
 export interface AskUserQuestionItem {
@@ -36,6 +38,8 @@ export interface InteractionPromptOption {
   value: string;
   label: string;
   description?: string;
+  /** Verbatim preview (layout, snippet, config) rendered monospace under the option. */
+  preview?: string;
 }
 
 export interface InteractionPromptField {

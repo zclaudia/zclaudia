@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeFromToolUse } from '../interaction-normalizer.js';
+import { normalizeFromAskUser, normalizeFromToolUse } from '../interaction-normalizer.js';
 
 describe('normalizeFromToolUse', () => {
   it('returns normalized todo interaction for valid TodoWrite input', () => {
@@ -120,5 +120,48 @@ describe('normalizeFromToolUse', () => {
     });
 
     expect(result).toBeNull();
+  });
+});
+
+describe('normalizeFromAskUser', () => {
+  it('carries an option preview through to the prompt field', () => {
+    const result = normalizeFromAskUser({
+      requestId: 'req-1',
+      sessionId: 'session-1',
+      questions: [
+        {
+          question: 'Which layout?',
+          header: 'Layout',
+          options: [
+            { label: 'Grid', description: 'Two columns', preview: '| a | b |\n| c | d |' },
+            { label: 'List', description: 'One column' },
+          ],
+        },
+      ],
+    });
+
+    expect(result.fields[0].options).toEqual([
+      { value: 'Grid', label: 'Grid', description: 'Two columns', preview: '| a | b |\n| c | d |' },
+      { value: 'List', label: 'List', description: 'One column' },
+    ]);
+  });
+
+  it('drops blank or non-string previews', () => {
+    const result = normalizeFromAskUser({
+      requestId: 'req-1',
+      sessionId: 'session-1',
+      questions: [
+        {
+          question: 'Pick one',
+          header: 'Pick',
+          options: [
+            { label: 'A', description: 'a', preview: '   ' },
+            { label: 'B', description: 'b', preview: 42 as unknown as string },
+          ],
+        },
+      ],
+    });
+
+    expect(result.fields[0].options?.map(option => 'preview' in option)).toEqual([false, false]);
   });
 });

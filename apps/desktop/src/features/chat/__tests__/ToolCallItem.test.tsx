@@ -432,6 +432,34 @@ describe('ToolCallItem', () => {
       expect(screen.getByText('npm test')).toBeInTheDocument();
     });
 
+    it('summarizes Bash with its description and keeps the command in the body', () => {
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Bash',
+            toolInput: { command: 'ls -la src', description: 'List files in src' },
+            result: '',
+          })}
+        />
+      );
+      expect(screen.getByText('List files in src')).toBeInTheDocument();
+      expect(screen.queryByText('ls -la src')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('tool-name'));
+      expect(screen.getByText('ls -la src')).toBeInTheDocument();
+    });
+
+    it('falls back to the Bash command when the description is blank', () => {
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Bash',
+            toolInput: { command: 'npm test', description: '   ' },
+          })}
+        />
+      );
+      expect(screen.getByText('npm test')).toBeInTheDocument();
+    });
+
     it('formats Grep tool with pattern and path', () => {
       render(
         <ToolCallItem
@@ -1487,6 +1515,74 @@ describe('ToolCallItem', () => {
       expect(screen.getByText('Should mobile allow direct replies?')).toBeInTheDocument();
       expect(screen.getByText('Submit')).toBeInTheDocument();
       expect(screen.queryByText('Implementation details')).not.toBeNull();
+    });
+
+    it('renders option previews verbatim in the fallback prompt', () => {
+      mockSelectionState.selectedSessionId = 's1';
+      mockPromptRequestState.pendingRequests = [
+        { requestId: 'tool-1', sessionId: 's1', serverId: 'gw:backend-1' },
+      ];
+      const gridPreview = '+---+---+\n| a | b |\n+---+---+';
+
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'AskUserQuestion',
+            toolInput: {
+              questions: [
+                {
+                  header: 'Layout',
+                  question: 'Which layout?',
+                  options: [
+                    { label: 'Grid', description: 'Two columns', preview: gridPreview },
+                    { label: 'List', description: 'One column', preview: '  ' },
+                  ],
+                },
+              ],
+            },
+            status: 'running',
+          })}
+        />
+      );
+
+      const previews = screen.getAllByTestId('option-preview');
+      expect(previews).toHaveLength(1);
+      expect(previews[0].tagName).toBe('PRE');
+      expect(previews[0].textContent).toBe(gridPreview);
+    });
+
+    it('renders option previews from a server-normalized prompt interaction', () => {
+      mockInteractionState.interactions['tool-1'] = {
+        type: 'interaction_prompt',
+        interactionId: 'tool-1',
+        sessionId: 's1',
+        source: 'provider_native',
+        createdAt: Date.now(),
+        title: 'Question',
+        variant: 'question',
+        responseMode: 'prompt_answer',
+        fields: [
+          {
+            id: 'question_0',
+            label: 'Which config?',
+            type: 'multiselect',
+            options: [{ value: 'strict', label: 'strict', preview: '{ "strict": true }' }],
+          },
+        ],
+      };
+      mockSelectionState.selectedSessionId = 's1';
+
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'AskUserQuestion',
+            toolInput: { questions: [] },
+            status: 'running',
+          })}
+        />
+      );
+
+      expect(screen.getByTestId('option-preview')).toHaveTextContent('{ "strict": true }');
     });
 
     it('sends optional feedback when approving a plan review', () => {

@@ -65,6 +65,8 @@
 - [x] TodoRead 工具。
 - [x] AskUserQuestion `preview` 字段透传。
 
+补记（2026-10-04）：上面两项当初只改了工具 schema，桌面端并未展示，现已补齐。Bash 有非空 `description` 时作为折叠头摘要，命令留在展开体（`tool-call/ToolCallCard.tsx` 的 `displaySummary` + `toolFormatters.ts` 的 `bashDescription`）；`preview` 经 shared `AskUserQuestionOption` / `InteractionPromptOption` → server `normalizeFromAskUser` → 桌面 fallback `buildAskUserQuestionInteraction`，在 `InteractionItem` 的 `ChoiceField` 里以等宽 `<pre>`（max-h-48 可滚动）显示在选项描述下方。
+
 ## Task 8: 收尾
 
 实施记录（2026-09-23）：全部在分支 `feat/tool-set-alignment` 上完成，未提交。server 全量 6304 测试、shared 219 测试通过；server/shared lint 0 error；改动文件 prettier 通过。桌面端无需改动（tsc 通过，无测试引用工具表）。

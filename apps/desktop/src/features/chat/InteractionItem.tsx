@@ -146,6 +146,15 @@ function ChoiceField({
               {opt.description && (
                 <div className="text-muted-foreground mt-0.5">{opt.description}</div>
               )}
+              {/* Verbatim (layouts, snippets, configs): whitespace is the content. */}
+              {opt.preview && (
+                <pre
+                  data-testid="option-preview"
+                  className="mt-1.5 max-h-48 overflow-auto rounded-md border border-border bg-background p-2 font-mono text-2xs leading-snug text-foreground whitespace-pre"
+                >
+                  {opt.preview}
+                </pre>
+              )}
             </div>
           </label>
         );

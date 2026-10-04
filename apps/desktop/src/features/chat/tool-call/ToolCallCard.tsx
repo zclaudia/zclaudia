@@ -3,6 +3,7 @@ import type { ToolCallView } from '@zclaudia/agent-transcript-kit';
 import { ToolCallCard as KitToolCallCard } from '@zclaudia/agent-transcript-kit/react';
 import { ToolExpandedContent } from './ToolExpandedContent';
 import { toolCallEffect } from './toolCallView';
+import { bashDescription } from './toolFormatters';
 
 export interface ToolCallCardProps {
   toolCall: ToolCallView;
@@ -35,6 +36,7 @@ export const ToolCallCard = memo(function ToolCallCard({
   return (
     <KitToolCallCard
       toolCall={toolCall}
+      displaySummary={toolCall.name === 'Bash' ? bashDescription(toolCall.input) : undefined}
       onSendToBackground={onSendToBackground}
       backgroundRequested={backgroundRequested}
       renderExpanded={() => (
