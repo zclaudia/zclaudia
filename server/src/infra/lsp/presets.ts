@@ -1,8 +1,9 @@
 /**
  * Built-in language-server presets (decision 1 of the LSP plan: presets come
- * before plugin / project configuration). P0 ships TypeScript only.
+ * before plugin / project configuration). TypeScript ships with zclaudia; Python, Go and Rust servers are used when found on PATH.
  */
 import {
+  findOnPath,
   findWorkspaceTsserver,
   hasRootMarker,
   memoizeByRoot,
@@ -57,6 +58,83 @@ export function createTypeScriptPreset(deps: TypeScriptPresetDeps = {}): Languag
   };
 }
 
+export interface PathPresetSpec {
+  id: string;
+  name: string;
+  languages: string[];
+  extensions: Record<string, string>;
+  rootMarkers: string[];
+  command: string;
+  args: string[];
+}
+
+/**
+ * A preset whose server is an executable found on PATH (decision 2 of the LSP
+ * plan: other languages are detected, never downloaded). The spec has the
+ * same shape a plugin `lspServers` entry will have.
+ */
+export function createPathPreset(
+  spec: PathPresetSpec,
+  find: (command: string) => string | null = findOnPath
+): LanguageServerPreset {
+  // PATH lookups do not depend on the root; one memo entry serves every root.
+  const resolveExecutable = memoizeByRoot(() => find(spec.command));
+  return {
+    id: spec.id,
+    name: spec.name,
+    languages: spec.languages,
+    extensions: spec.extensions,
+    rootMarkers: spec.rootMarkers,
+    resolveLaunch: root => {
+      if (!hasRootMarker(root, spec.rootMarkers)) return null;
+      const executable = resolveExecutable('/');
+      return executable ? { command: executable, args: spec.args, cwd: root } : null;
+    },
+  };
+}
+
+export const PYRIGHT_PRESET: PathPresetSpec = {
+  id: 'pyright',
+  name: 'Python (Pyright)',
+  languages: ['python'],
+  extensions: { '.py': 'python', '.pyi': 'python' },
+  rootMarkers: [
+    'pyproject.toml',
+    'pyrightconfig.json',
+    'setup.py',
+    'setup.cfg',
+    'requirements.txt',
+    'Pipfile',
+  ],
+  command: 'pyright-langserver',
+  args: ['--stdio'],
+};
+
+export const GOPLS_PRESET: PathPresetSpec = {
+  id: 'gopls',
+  name: 'Go (gopls)',
+  languages: ['go'],
+  extensions: { '.go': 'go' },
+  rootMarkers: ['go.mod', 'go.work'],
+  command: 'gopls',
+  args: [],
+};
+
+export const RUST_ANALYZER_PRESET: PathPresetSpec = {
+  id: 'rust-analyzer',
+  name: 'Rust (rust-analyzer)',
+  languages: ['rust'],
+  extensions: { '.rs': 'rust' },
+  rootMarkers: ['Cargo.toml'],
+  command: 'rust-analyzer',
+  args: [],
+};
+
 export function defaultLanguageServerPresets(): LanguageServerPreset[] {
-  return [createTypeScriptPreset()];
+  return [
+    createTypeScriptPreset(),
+    createPathPreset(PYRIGHT_PRESET),
+    createPathPreset(GOPLS_PRESET),
+    createPathPreset(RUST_ANALYZER_PRESET),
+  ];
 }

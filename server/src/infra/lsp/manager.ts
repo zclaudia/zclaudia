@@ -9,7 +9,7 @@
  * repeated crashes. See docs/plans/2026-10-04-lsp-manager-plan.md.
  */
 import path from 'path';
-import { LspClient } from './client.js';
+import { LanguageServerStartupError, LspClient } from './client.js';
 import { DiagnosticsStore } from './diagnostics.js';
 import { DocumentStore, fileUri, type SyncOutcome } from './documents.js';
 import {
@@ -149,7 +149,13 @@ export class LanguageServerManager implements LanguageServerService {
   }
 
   serversFor(root: string): LanguageServerInfo[] {
-    return this.availablePresets(path.resolve(root)).map(info);
+    const resolvedRoot = path.resolve(root);
+    // A server that failed here (e.g. a rustup proxy without the component)
+    // is detected but cannot answer: stop offering it until the process
+    // restarts or a later preset probe changes.
+    return this.availablePresets(resolvedRoot)
+      .filter(preset => this.entries.get(`${preset.id}::${resolvedRoot}`)?.state !== 'failed')
+      .map(info);
   }
 
   acquire(root: string, consumer: string): { release(): void } {
@@ -651,7 +657,15 @@ export class LanguageServerManager implements LanguageServerService {
       this.scheduleIdle(entry);
       return active;
     } catch (err) {
-      this.recordCrash(entry, err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      if (err instanceof LanguageServerStartupError) {
+        // Exiting before initialize is a setup problem (missing component,
+        // bad install), not a flake: retrying would fail the same way.
+        entry.state = 'failed';
+        entry.lastError = message;
+        return null;
+      }
+      this.recordCrash(entry, message);
       return null;
     }
   }

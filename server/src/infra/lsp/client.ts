@@ -33,6 +33,11 @@ const ACKNOWLEDGED_REQUESTS = [
   'workspace/diagnostic/refresh',
 ];
 
+/** The server process exited before answering `initialize`. */
+export class LanguageServerStartupError extends Error {
+  readonly name = 'LanguageServerStartupError';
+}
+
 export interface LspClientOptions {
   root: string;
   initializationOptions?: unknown;
@@ -106,11 +111,23 @@ export class LspClient {
     for (const method of ACKNOWLEDGED_REQUESTS) connection.onRequest(method, () => null);
     connection.listen();
     try {
+      // A server that dies before answering (missing component, bad args)
+      // must fail the start now with its own words, not after the timeout.
+      const diedEarly = transport.exited.then(({ code, signal }) => {
+        const tail = transport.stderrTail().trim().split('\n').slice(-2).join(' | ');
+        throw new LanguageServerStartupError(
+          `language server exited during start-up (${signal ?? `code ${code}`})${tail ? `: ${tail}` : ''}`
+        );
+      });
+      diedEarly.catch(() => undefined);
       const result = await withTimeout(
-        connection.sendRequest(
-          'initialize',
-          initializeParams(options.root, options.initializationOptions)
-        ) as Promise<InitializeResult>,
+        Promise.race([
+          connection.sendRequest(
+            'initialize',
+            initializeParams(options.root, options.initializationOptions)
+          ) as Promise<InitializeResult>,
+          diedEarly,
+        ]),
         options.initializeTimeoutMs ?? DEFAULT_INITIALIZE_TIMEOUT_MS,
         'initialize'
       );

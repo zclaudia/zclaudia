@@ -3,7 +3,8 @@
  * (`resolveLaunch` feeds the sync `serversFor`) and memoised per root, so a
  * run's tool-list build costs a few `existsSync` calls at most once a minute.
  */
-import { existsSync, readdirSync } from 'fs';
+import { accessSync, constants, existsSync, readdirSync, statSync } from 'fs';
+import os from 'os';
 import { createRequire } from 'module';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -135,6 +136,48 @@ export function findFirstSourceFile(root: string, extensions: string[]): string 
       ) {
         queue.push(path.join(dir, entry.name));
       }
+    }
+  }
+  return null;
+}
+
+/**
+ * Where language servers usually land besides PATH. Apps launched from the
+ * macOS Dock inherit a minimal PATH without these, so search them too.
+ */
+function extraSearchDirs(): string[] {
+  const home = os.homedir();
+  const gopath = process.env.GOPATH?.split(path.delimiter)[0];
+  return [
+    gopath ? path.join(gopath, 'bin') : path.join(home, 'go', 'bin'),
+    path.join(process.env.CARGO_HOME ?? path.join(home, '.cargo'), 'bin'),
+    path.join(home, '.local', 'bin'),
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+  ];
+}
+
+function isExecutableFile(candidate: string): boolean {
+  try {
+    if (!statSync(candidate).isFile()) return false;
+    if (process.platform !== 'win32') accessSync(candidate, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Absolute path of `command` on PATH (plus the usual install dirs), or null. */
+export function findOnPath(command: string, pathValue = process.env.PATH ?? ''): string | null {
+  const extensions =
+    process.platform === 'win32'
+      ? (process.env.PATHEXT ?? '.EXE;.CMD;.BAT;.COM').split(';').filter(Boolean)
+      : [''];
+  const dirs = [...pathValue.split(path.delimiter).filter(Boolean), ...extraSearchDirs()];
+  for (const dir of dirs) {
+    for (const extension of extensions) {
+      const candidate = path.join(dir, `${command}${extension}`);
+      if (isExecutableFile(candidate)) return candidate;
     }
   }
   return null;

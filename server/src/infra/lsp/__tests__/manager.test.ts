@@ -204,6 +204,21 @@ describe('LanguageServerManager', () => {
     }
   });
 
+  it('marks a server that dies before initialize failed at once and stops offering it', async () => {
+    serverOptions = { dieOnInitialize: true };
+    const manager = createManager();
+    const file = path.join(dir, 'a.fk');
+    writeFileSync(file, 'x\n');
+    expect(manager.serversFor(dir).map(s => s.id)).toEqual(['fake']);
+    manager.acquire(dir, 'run');
+    await until(() => manager.status()[0]?.state === 'failed');
+    expect(manager.status()[0].lastError).toContain(
+      'exited during start-up (code 1): fake server stderr'
+    );
+    expect(manager.serversFor(dir)).toEqual([]);
+    expect(servers).toHaveLength(1); // no retry loop
+  });
+
   it('stops every server on dispose', async () => {
     const manager = createManager();
     manager.acquire(dir, 'run');
