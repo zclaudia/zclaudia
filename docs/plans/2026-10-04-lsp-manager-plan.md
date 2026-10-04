@@ -118,27 +118,45 @@ type DiagnosticsSnapshot =
 - **T7 测试：**
   - 单元测试：用内存流跑真实 JSON-RPC 的假服务器，覆盖 diagnostics、documents、manager、facade。
   - 真服务器集成测试：`typescript.integration.test.ts`。
-  - 端到端：`e2e/tests/agent-runtimes/lsp-diagnostics.playwright.spec.ts`。真实 server、真实工具，只把模型换成脚本；断言模型收到的 Write 结果里有新引入的错误，同时断言 Debug 进程列表里出现 `language_server` 进程。
+  - 端到端：`e2e/tests/agent-runtimes/lsp.playwright.spec.ts`。真实 server、真实工具，只把模型换成脚本；断言模型收到的 Write 结果里有新引入的错误，同时断言 Debug 进程列表里出现 `language_server` 进程。
 - **已知行为：** 新 run 的第一轮如果立刻编辑（比 server 启动还快），只会报"not checked, still starting"，这是按设计不阻塞写入。端到端测试为此先跑一轮预热。
 
 ## P1：打开 LSPTool
 
-- [ ] **T8 扩展端口契约。**
+- [x] **T8 扩展端口契约。**
   - 在 `language-server-port.ts` 注明列号单位是 UTF-16。
   - `LspLocation` 增加 `external?: true`：工作区外的结果保留绝对路径，不再强行转成相对路径。
   - 诊断结果带 `state`。
   - 新增 `incomingCalls` 动作，仅在服务器支持 callHierarchy 时开放。
-- [ ] **T9 LSPTool 改为符号寻址。**
+- [x] **T9 LSPTool 改为符号寻址。**
   - 参数改为 `file + line + symbol`（加可选的 `occurrence`），工具在该行里定位列号；`character` 保留作后备。
   - 查询前从磁盘同步。
   - 每个结果附一行预览，减少模型为看上下文再调用 Read。
-- [ ] **T10 接线。**
+- [x] **T10 接线。**
   - 在 `server-state` 里把 manager 的 `LanguageServerPort` facade 传入 RunOptions。现有门控（`tool-bridge.ts`：`serversFor` 为空就不注册）保持不变。
   - 服务器首次启动时等待最多 20s，超时返回结构化错误 `server_starting` 并提示稍后重试，不要一直挂到 30s 工具超时。
-- [ ] **T11 核对 Read 能否打开外部路径。** 跳转定义经常落到 `node_modules` 或 `lib.d.ts`。如果 Read 只允许工作区内路径，就靠 T9 的预览行兜底，或者为外部结果单独放开只读访问。二选一，并写进工具描述。
-- [ ] **T12 测试。** 符号寻址（同一行多次出现、找不到、多字节字符）、外部路径、Bash 修改后查询能拿到新内容、`server_starting` 错误。
+- [x] **T11 核对 Read 能否打开外部路径。** 跳转定义经常落到 `node_modules` 或 `lib.d.ts`。如果 Read 只允许工作区内路径，就靠 T9 的预览行兜底，或者为外部结果单独放开只读访问。二选一，并写进工具描述。
+- [x] **T12 测试。** 符号寻址（同一行多次出现、找不到、多字节字符）、外部路径、Bash 修改后查询能拿到新内容、`server_starting` 错误。
 
 **P1 验收：** agent 能对 zclaudia 仓库里的符号做 definition / references / hover / symbols / incomingCalls 查询，结果正确，且反映 Bash 改动后的最新内容。
+
+**P1 实施记录（2026-10-04，分支 `feat/lsp-tool`）：**
+
+- **T8：**
+  - 端口新增 `incomingCalls` 动作。
+  - `LspLocation.external` 标记工作区外的位置；diagnostics 结果带 `state`；workspace symbols 结果可带 `note`。
+  - 新增错误码 `server_starting` 和 `request_failed`。
+  - manager 直接实现 `LanguageServerPort`。
+- **T9：**
+  - 参数改为 `line + symbol`（加 `occurrence`），`character` 保留作后备。点号名落在最后一段；列号按 UTF-16 计。
+  - 每个位置附一行预览。
+- **T10：** run-tools 用 `options.languageServerPort ?? options.languageServers`，现有门控不变；查询时冷启动最多等 20s。
+- **T11 结论：** Read 对工作区外路径（realpath 之后）一律拒绝，这是安全策略，不放开。外部位置靠预览行和 hover 兜底，工具描述里写明了。pnpm 的 `node_modules/.pnpm/...` realpath 后仍在仓库内，Read 照样能打开。
+- **对真服务器实测发现并已修复：**
+  - **冷项目的第一次查询答案不完整：** tsserver 在项目加载完之前就作答，definition 停在 import 行，hover 也缺类型。现在首次打开文件后会等它的第一次诊断推送（标志项目已加载），最多等 15s。
+  - **没有打开任何文件时，workspace symbol 报错：** tsserver 返回 "No Project"，并把堆栈整段带给模型。现在会先从一个源文件加载项目；找不到结果时用 `note` 说明只搜了哪些已加载的项目（多包仓库里空结果不代表不存在）；服务器报错压缩到前两行。
+  - **open 状态的文档会盖住磁盘内容：** 每次查询前把所有已打开文档按磁盘内容重新同步一遍，免得 Bash 改过的文件在跨文件查询里给出陈旧内容。
+- **T12 测试：** 查询映射与 manager.query 用假服务器；locateSymbol 和工具级寻址单测；真服务器集成测试（首次查询就正确、incomingCalls、磁盘改动可见）；run-tools 中 manager 当 port 并续租的测试；e2e 新增模型调用 LSPTool definition 的用例。
 
 ## P2：更多语言 + 可见性
 

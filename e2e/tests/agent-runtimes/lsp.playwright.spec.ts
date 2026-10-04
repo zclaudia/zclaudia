@@ -108,3 +108,87 @@ test('LSP: the ZClaudia runtime tells the model which type errors its edit intro
     await upstream.stop();
   }
 });
+
+test('LSP: the model can ask the language server for a definition by symbol', async ({
+  app,
+  page,
+}) => {
+  const { project, cwd } = await app.configureCodingProject('codex', undefined, '-lsp-tool');
+  await mkdir(path.join(cwd, 'src'), { recursive: true });
+  await mkdir(path.join(cwd, 'node_modules'), { recursive: true });
+  await symlink(typescriptPackage, path.join(cwd, 'node_modules', 'typescript'), 'dir');
+  await writeFile(path.join(cwd, 'package.json'), '{"name":"lsp-tool-e2e","private":true}\n');
+  await writeFile(
+    path.join(cwd, 'tsconfig.json'),
+    JSON.stringify({ compilerOptions: { strict: true, noEmit: true }, include: ['src'] })
+  );
+  await writeFile(
+    path.join(cwd, 'src', 'lib.ts'),
+    'export function greet(name: string): string {\n  return name;\n}\n'
+  );
+  await writeFile(
+    path.join(cwd, 'src', 'main.ts'),
+    "import { greet } from './lib';\n\nexport const out = greet('a');\n"
+  );
+
+  const upstream = await startCompletionFixture(request => {
+    if (!request.tools?.some(tool => tool.function.name === 'LSPTool'))
+      return { content: 'LSP tool session' };
+    if (request.messages.at(-1)?.role === 'user')
+      return {
+        tool: 'LSPTool',
+        arguments: { action: 'definition', file: 'src/main.ts', line: 3, symbol: 'greet' },
+      };
+    return { content: 'E2E_LSP_TOOL_DONE' };
+  });
+  try {
+    const llm = await app.api('/api/llm-profiles', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'LSP tool model fixture',
+        providerType: 'openai',
+        baseUrl: upstream.baseUrl,
+        apiKey: 'e2e-placeholder',
+        models: [{ modelId: 'e2e-lsp', dialect: 'openai', contextWindow: 32768, maxTokens: 1024 }],
+      }),
+    });
+    const profile = await app.api('/api/agent-profiles', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'LSP Tool E2E Agent',
+        runtimeType: 'zclaudia',
+        llmProfileId: llm.id,
+        model: 'e2e-lsp',
+        enabledTools: ['Read', 'LSPTool'],
+      }),
+    });
+    await app.api(`/api/projects/${project.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ defaultAgentProfileId: profile.id }),
+    });
+    const session = await app.api('/api/sessions', {
+      method: 'POST',
+      body: JSON.stringify({
+        projectId: project.id,
+        name: 'LSP tool session',
+        agentProfileId: profile.id,
+      }),
+    });
+    await openCodingSession(page, app, project, session);
+    await sendCodingMessage(page, 'Where is greet defined?');
+    await expect(
+      page.getByTestId('message-list').getByText('E2E_LSP_TOOL_DONE', { exact: true })
+    ).toBeVisible({ timeout: 45_000 });
+    expect(upstream.errors).toEqual([]);
+    const toolResult = JSON.stringify(
+      upstream.requests
+        .at(-1)!
+        .messages.filter(m => m.role === 'tool')
+        .at(-1)
+    );
+    expect(toolResult).toContain('src/lib.ts');
+    expect(toolResult).toContain('export function greet(name: string): string {');
+  } finally {
+    await upstream.stop();
+  }
+});
