@@ -49,9 +49,11 @@
     "puppeteer-core": "^25.3.0",
     "socks-proxy-agent": "^8.0.5",
     "turndown": "^7.2.4",
+    "typescript-language-server": "^5.3.0",
     "undici": "7.27.2",
     "unpdf": "^1.6.2",
     "uuid": "^11.1.1",
+    "vscode-languageserver-protocol": "^3.18.4",
     "ws": "^8.21.0"
   },
   "devDependencies": {
