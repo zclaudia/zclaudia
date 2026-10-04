@@ -1,5 +1,14 @@
 import { createHash } from 'crypto';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import {
+  chmodSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -140,6 +149,79 @@ describe('applyFileEditsAtomically', () => {
       Buffer.from('﻿const bar = 1;\r\nbar;\r\n', 'utf8')
     );
   });
+
+  it('refuses a BOM-less non-UTF-8 file instead of re-encoding it', async () => {
+    const a = file('legacy.c', '');
+    const latin1 = Buffer.from('const r\xe9sum\xe9 = 1;\nvalue;\n', 'latin1');
+    writeFileSync(a.absolutePath, latin1);
+    const result = await applyFileEditsAtomically(
+      [
+        {
+          ...a,
+          contentHash: sha1(latin1.toString('utf8')),
+          edits: [edit(1, 0, 1, 5, 'other')],
+        },
+      ],
+      undefined
+    );
+    expect(result).toMatchObject({ ok: false, error: 'unsupported_encoding' });
+    expect(readFileSync(a.absolutePath)).toEqual(latin1);
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'writes through a symlink instead of replacing it with a regular file',
+    async () => {
+      const target = file('pkg/real.ts', 'foo\n');
+      mkdirSync(path.join(dir, 'src'));
+      const linkPath = path.join(dir, 'src', 'a.ts');
+      symlinkSync(target.absolutePath, linkPath);
+      const result = await applyFileEditsAtomically(
+        [
+          {
+            absolutePath: linkPath,
+            path: 'src/a.ts',
+            contentHash: sha1('foo\n'),
+            edits: [edit(0, 0, 0, 3, 'bar')],
+          },
+        ],
+        undefined,
+        { cwd: dir }
+      );
+      expect(result).toMatchObject({ ok: true });
+      expect(lstatSync(linkPath).isSymbolicLink()).toBe(true);
+      expect(readFileSync(target.absolutePath, 'utf8')).toBe('bar\n');
+    }
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'refuses a symlink whose target is outside the workspace',
+    async () => {
+      const outside = mkdtempSync(path.join(tmpdir(), 'zc-apply-outside-'));
+      try {
+        const targetAbs = path.join(outside, 'real.ts');
+        writeFileSync(targetAbs, 'foo\n');
+        const linkPath = path.join(dir, 'link.ts');
+        symlinkSync(targetAbs, linkPath);
+        const result = await applyFileEditsAtomically(
+          [
+            {
+              absolutePath: linkPath,
+              path: 'link.ts',
+              contentHash: sha1('foo\n'),
+              edits: [edit(0, 0, 0, 3, 'bar')],
+            },
+          ],
+          undefined,
+          { cwd: dir }
+        );
+        expect(result).toMatchObject({ ok: false, error: 'rename_refused' });
+        expect(lstatSync(linkPath).isSymbolicLink()).toBe(true);
+        expect(readFileSync(targetAbs, 'utf8')).toBe('foo\n');
+      } finally {
+        rmSync(outside, { recursive: true, force: true });
+      }
+    }
+  );
 });
 
 describe('RenameSymbol tool', () => {

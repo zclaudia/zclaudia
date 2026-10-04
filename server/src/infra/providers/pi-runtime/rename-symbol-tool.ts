@@ -165,7 +165,7 @@ export function createRenameSymbolTool(deps: RenameSymbolToolDeps): AgentTool {
           edits: target.edits,
         })),
         mutation,
-        { previewOnly }
+        { previewOnly, cwd }
       );
       if (!applied.ok) {
         return errorResult(

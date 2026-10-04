@@ -27,6 +27,7 @@ import {
 import { buildMutationDetailsBase } from './mutation-details.js';
 import { PatchDiagnosticsTargets, runPatchDiagnostics } from './patch-diagnostics.js';
 import {
+  resolveWritePath,
   runWithFileWriteLocks,
   type FileMutationToolOptions,
   type MutationDetails,
@@ -47,6 +48,16 @@ export type ApplyTextEditsOutcome =
 
 function sha1(text: string): string {
   return createHash('sha1').update(text).digest('hex');
+}
+
+/**
+ * Rejects BOM-less non-UTF-8 files (Latin-1, Shift-JIS, …): toString('utf8')
+ * silently replaces every invalid byte with U+FFFD, so the encoding probe
+ * alone passes and the write would re-encode the whole file, not just the
+ * renamed lines.
+ */
+function isRoundTrippableUtf8(buffer: Buffer): boolean {
+  return Buffer.from(buffer.toString('utf8'), 'utf8').equals(buffer);
 }
 
 function stripBom(text: string): string {
@@ -112,6 +123,8 @@ export function applyTextEdits(text: string, edits: LspTextEdit[]): string {
 
 interface PreparedFile {
   file: FileTextEdits;
+  /** Where the bytes go — the symlink's target when `cwd` resolves one. */
+  writePath: string;
   original: string;
   updated: string;
   mode: number;
@@ -120,19 +133,40 @@ interface PreparedFile {
 export async function applyFileEditsAtomically(
   files: FileTextEdits[],
   options: FileMutationToolOptions | undefined,
-  { previewOnly = false }: { previewOnly?: boolean } = {}
+  { previewOnly = false, cwd }: { previewOnly?: boolean; cwd?: string } = {}
 ): Promise<ApplyTextEditsOutcome> {
   const outcome = await runWithFileWriteLocks(
     files.map(file => file.absolutePath),
     async (): Promise<ApplyTextEditsOutcome | PreparedFile[]> => {
       const prepared: PreparedFile[] = [];
       for (const file of files) {
+        // Write through symlinks the way Edit/Write do — temp+rename against
+        // the target — so a rename never replaces a linked file with a
+        // regular file. Locks, backups and readFileState stay keyed on the
+        // path the model knows (the link).
+        let writePath = file.absolutePath;
+        if (cwd) {
+          const resolved = await resolveWritePath(cwd, file.absolutePath, file.path);
+          if (!resolved.ok) {
+            const message = resolved.result.details.message;
+            return {
+              ok: false,
+              error: 'rename_refused',
+              message:
+                typeof message === 'string'
+                  ? message
+                  : `Cannot write ${file.path} through a symlink`,
+              path: file.path,
+            };
+          }
+          writePath = resolved.writePath;
+        }
         let buffer: Buffer;
         let mode: number;
         try {
           [buffer, mode] = await Promise.all([
-            readFile(file.absolutePath),
-            stat(file.absolutePath).then(info => info.mode & 0o7777),
+            readFile(writePath),
+            stat(writePath).then(info => info.mode & 0o7777),
           ]);
         } catch (err) {
           return {
@@ -142,7 +176,7 @@ export async function applyFileEditsAtomically(
             path: file.path,
           };
         }
-        if (decodeTextBuffer(buffer).encoding !== 'utf8') {
+        if (decodeTextBuffer(buffer).encoding !== 'utf8' || !isRoundTrippableUtf8(buffer)) {
           return {
             ok: false,
             error: 'unsupported_encoding',
@@ -174,7 +208,7 @@ export async function applyFileEditsAtomically(
         if (guard) {
           return { ok: false, error: guard.code, message: guard.message, path: file.path };
         }
-        prepared.push({ file, original, updated, mode });
+        prepared.push({ file, writePath, original, updated, mode });
       }
       if (previewOnly) return prepared;
 
@@ -182,7 +216,7 @@ export async function applyFileEditsAtomically(
       for (const entry of prepared) {
         try {
           // The raw text keeps its own BOM character and line endings.
-          await writeTextFileAtomic(entry.file.absolutePath, entry.updated, {
+          await writeTextFileAtomic(entry.writePath, entry.updated, {
             encoding: 'utf8',
             hasBom: false,
             mode: entry.mode,
@@ -191,7 +225,7 @@ export async function applyFileEditsAtomically(
         } catch (err) {
           const restoreFailures: string[] = [];
           for (const done of written.reverse()) {
-            await writeTextFileAtomic(done.file.absolutePath, done.original, {
+            await writeTextFileAtomic(done.writePath, done.original, {
               encoding: 'utf8',
               hasBom: false,
               mode: done.mode,
