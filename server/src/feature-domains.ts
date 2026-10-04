@@ -65,6 +65,7 @@ import {
   workflowStepRegistry,
   workflowTriggerRegistry,
 } from './application/plugins/index.js';
+import type { AutomationService } from './domains/automations/service.js';
 import { registerAutomationsDomain } from './domains/automations/index.js';
 import type { NotificationSender } from './infra/push/notification-sender.js';
 import type { NotificationService } from './domains/notification-feed/index.js';
@@ -139,6 +140,7 @@ export interface FeatureDomainsResult {
   permissionBridge: PermissionBridge;
   cancelWorkflowRun: (runId: string) => void;
   permissionWorkflowResolver: PermissionWorkflowResolver;
+  automationService: AutomationService;
   metaWorkflowService: MetaWorkflowService;
   executorRegistry: ExecutorRegistry;
   executorInstanceRepo: ExecutorInstanceRepository;
@@ -697,6 +699,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     permissionBridge,
     cancelWorkflowRun,
     permissionWorkflowResolver,
+    automationService,
     metaWorkflowService,
     executorRegistry,
     executorInstanceRepo,

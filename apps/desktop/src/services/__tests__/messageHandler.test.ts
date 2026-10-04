@@ -639,6 +639,7 @@ describe('handleServerMessage', () => {
         'Read',
         {},
         undefined,
+        undefined,
         undefined
       );
       expect(mockChatStore.addToolUseBlock).toHaveBeenCalledWith('r1', 'tu1');

@@ -130,4 +130,49 @@ describe('AgentTaskRunner', () => {
     );
     expect(clients.has('orchestrator-task-1')).toBe(false);
   });
+  it('reuses an existing session on resume and passes profile + parent on create', async () => {
+    const clients = new Map<string, any>();
+    const createSession = vi.fn(() => ({ id: 'fresh-session' }));
+    const handleRunStart = vi.fn(async (client: any) => {
+      client.ws.send({ type: 'run_completed' });
+    });
+    const runner = createAgentTaskRunner({
+      db,
+      createVirtualClient: (clientId, ws) => ({ id: clientId, ws }),
+      handleRunStart,
+      getClients: () => clients,
+      createSession,
+      sessionExists: vi.fn((id: string) => id === 'existing-session'),
+    });
+
+    // Resume path: the task already names a live session → no new session.
+    const onStartedResume = vi.fn();
+    runner.run(makeTask({ id: 'task-resume', sessionId: 'existing-session' }), {
+      onStarted: onStartedResume,
+      onCompleted: vi.fn(),
+      onFailed: vi.fn(),
+    });
+    expect(onStartedResume).toHaveBeenCalledWith('existing-session');
+    expect(createSession).not.toHaveBeenCalled();
+
+    // Fresh path with subagent_type + coordinator: both reach createSession.
+    const onStartedFresh = vi.fn();
+    runner.run(
+      makeTask({
+        id: 'task-fresh',
+        sessionId: 'stale-session',
+        agentProfileId: 'prof-explore',
+        parentSessionId: 'parent-session',
+      }),
+      { onStarted: onStartedFresh, onCompleted: vi.fn(), onFailed: vi.fn() }
+    );
+    expect(onStartedFresh).toHaveBeenCalledWith('fresh-session');
+    expect(createSession).toHaveBeenCalledWith({
+      projectId: 'project-1',
+      name: 'Agent Task: Review latest diff',
+      type: 'agent',
+      agentProfileId: 'prof-explore',
+      parentSessionId: 'parent-session',
+    });
+  });
 });

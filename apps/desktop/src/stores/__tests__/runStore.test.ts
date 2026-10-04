@@ -174,3 +174,31 @@ describe('runStore', () => {
     expect(useChatMessageStore.getState().messages.s1[0].content).toBe('new run');
   });
 });
+
+describe('runStore backgroundable tool affordance', () => {
+  beforeEach(reset);
+
+  it('projects backgroundable onto the tool call only when announced', () => {
+    useRunStore.getState().startRun('r1', 's1');
+    useRunStore
+      .getState()
+      .addToolCall('r1', 't1', 'Bash', { command: 'sleep 30' }, undefined, undefined, true);
+    useRunStore.getState().addToolCall('r1', 't2', 'Bash', { command: 'ls' });
+    const calls = useRunStore.getState().activeToolCalls.r1;
+    expect(calls.t1.backgroundable).toBe(true);
+    expect(calls.t2).not.toHaveProperty('backgroundable');
+  });
+
+  it('keeps backgroundable alongside an effect discovered at completion', () => {
+    useRunStore.getState().startRun('r1', 's1');
+    useRunStore
+      .getState()
+      .addToolCall('r1', 't1', 'Bash', { command: 'ls' }, undefined, undefined, true);
+    const effect = { kind: 'shell' as const, command: 'ls' };
+    useRunStore.getState().updateToolCallResult('r1', 't1', 'ok', false, effect);
+    const call = useRunStore.getState().activeToolCalls.r1.t1;
+    expect(call.effect).toEqual(effect);
+    expect(call.backgroundable).toBe(true);
+    expect(call.status).toBe('completed');
+  });
+});

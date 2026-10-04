@@ -18,9 +18,9 @@ import {
   clearSessionRuntimeMode,
   type RunFinalizationSnapshot,
 } from '../services/run-store-coordination';
-import type { ToolCallState } from './runTypes';
+import type { ToolCallHostMeta, ToolCallState } from './runTypes';
 
-export type { ToolCallState };
+export type { ToolCallHostMeta, ToolCallState };
 
 // Run health info from server heartbeat
 export interface RunHealth {
@@ -60,8 +60,8 @@ interface RunState {
    * below are projections of it and must not be mutated directly.
    */
   runTranscripts: Record<string, TranscriptState>;
-  /** ToolEffect has no kit slot yet; carried host-side and merged in projection. */
-  runToolEffects: Record<string, Record<string, ToolEffect>>;
+  /** ToolEffect / backgroundable have no kit slot; carried host-side and merged in projection. */
+  runToolMeta: Record<string, Record<string, ToolCallHostMeta>>;
   // Active tool calls per run (projected): runId → { toolUseId → ToolCallState }
   activeToolCalls: Record<string, Record<string, ToolCallState>>;
   // Tool calls history per run (projected): runId → ToolCallState[] (block order)
@@ -88,7 +88,8 @@ interface RunState {
     toolName: string,
     toolInput: unknown,
     semantic?: ToolSemantic,
-    effect?: ToolEffect
+    effect?: ToolEffect,
+    backgroundable?: boolean
   ) => void;
   updateToolCallResult: (
     runId: string,
@@ -132,7 +133,7 @@ function runTurn(transcript: TranscriptState, runId: string): AssistantTurnItem 
 
 function toToolCallState(
   tool: ToolCallView,
-  effects: Record<string, ToolEffect> | undefined
+  meta: Record<string, ToolCallHostMeta> | undefined
 ): ToolCallState {
   return {
     id: tool.id,
@@ -145,23 +146,29 @@ function toToolCallState(
     isError: tool.status === 'error' ? true : undefined,
     activity: tool.summary,
     semantic: tool.semantic as ToolSemantic | undefined,
-    effect: effects?.[tool.id],
+    effect: meta?.[tool.id]?.effect,
+    ...(meta?.[tool.id]?.backgroundable ? { backgroundable: true } : {}),
   };
 }
 
 function projectBlocks(turn: AssistantTurnItem | undefined): ContentBlock[] {
   if (!turn) return [];
-  return turn.blocks.map(block =>
-    block.kind === 'text'
-      ? { type: 'text' as const, content: block.text }
-      : block.kind === 'thinking'
-        ? {
-            type: 'thinking' as const,
-            content: block.text,
-            ...(block.signature !== undefined ? { signature: block.signature } : {}),
-          }
-        : { type: 'tool_use' as const, toolUseId: block.toolCallId }
-  );
+  return turn.blocks.flatMap((block): ContentBlock[] => {
+    if (block.kind === 'text') return [{ type: 'text', content: block.text }];
+    if (block.kind === 'thinking') {
+      return [
+        {
+          type: 'thinking',
+          content: block.text,
+          ...(block.signature !== undefined ? { signature: block.signature } : {}),
+        },
+      ];
+    }
+    if (block.kind === 'tool_call') return [{ type: 'tool_use', toolUseId: block.toolCallId }];
+    // Host-defined custom blocks (kit ≥ 0.8) have no ContentBlock projection;
+    // this app never emits them.
+    return [];
+  });
 }
 
 /**
@@ -173,22 +180,22 @@ function applyRunEvents(
   state: RunState,
   runId: string,
   events: TranscriptEvent[],
-  effects?: Record<string, Record<string, ToolEffect>>
+  meta?: Record<string, Record<string, ToolCallHostMeta>>
 ): Partial<RunState> {
   const previous = state.runTranscripts[runId] ?? initialTranscriptState;
   const transcript = events.reduce(
     (current, event) => applyTranscriptEvent(current, event),
     previous
   );
-  const nextEffects = effects ?? state.runToolEffects;
-  if (transcript === previous && nextEffects === state.runToolEffects) return {};
+  const nextMeta = meta ?? state.runToolMeta;
+  if (transcript === previous && nextMeta === state.runToolMeta) return {};
   const turn = runTurn(transcript, runId);
   const history = turn
-    ? orderedToolCalls(turn).map(tool => toToolCallState(tool, nextEffects[runId]))
+    ? orderedToolCalls(turn).map(tool => toToolCallState(tool, nextMeta[runId]))
     : [];
   return {
     runTranscripts: { ...state.runTranscripts, [runId]: transcript },
-    runToolEffects: nextEffects,
+    runToolMeta: nextMeta,
     runContentBlocks: { ...state.runContentBlocks, [runId]: projectBlocks(turn) },
     activeToolCalls: {
       ...state.activeToolCalls,
@@ -205,7 +212,7 @@ export const useRunStore = create<RunState>((set, get) => ({
   runHealth: {},
   runRetryStatus: {},
   runTranscripts: {},
-  runToolEffects: {},
+  runToolMeta: {},
   activeToolCalls: {},
   toolCallsHistory: {},
   runContentBlocks: {},
@@ -229,7 +236,7 @@ export const useRunStore = create<RunState>((set, get) => ({
         : state.assistantMessageIds,
       backgroundRunIds: newBackgroundRunIds,
       runTranscripts: { ...state.runTranscripts, [runId]: transcript },
-      runToolEffects: { ...state.runToolEffects, [runId]: {} },
+      runToolMeta: { ...state.runToolMeta, [runId]: {} },
       activeToolCalls: { ...state.activeToolCalls, [runId]: {} },
       toolCallsHistory: { ...state.toolCallsHistory, [runId]: [] },
       runContentBlocks: { ...state.runContentBlocks, [runId]: [] },
@@ -242,7 +249,7 @@ export const useRunStore = create<RunState>((set, get) => ({
       const { [runId]: _removedRun, ...remainingRuns } = state.activeRuns;
       const { [runId]: _removedMessageId, ...remainingMessageIds } = state.assistantMessageIds;
       const { [runId]: _removedTranscript, ...remainingTranscripts } = state.runTranscripts;
-      const { [runId]: _removedEffects, ...remainingEffects } = state.runToolEffects;
+      const { [runId]: _removedMeta, ...remainingMeta } = state.runToolMeta;
       const { [runId]: _removedTC, ...remainingTC } = state.activeToolCalls;
       const { [runId]: _removedHist, ...remainingHist } = state.toolCallsHistory;
       const { [runId]: _removedCB, ...remainingCB } = state.runContentBlocks;
@@ -255,7 +262,7 @@ export const useRunStore = create<RunState>((set, get) => ({
         assistantMessageIds: remainingMessageIds,
         backgroundRunIds: newBackgroundRunIds,
         runTranscripts: remainingTranscripts,
-        runToolEffects: remainingEffects,
+        runToolMeta: remainingMeta,
         activeToolCalls: remainingTC,
         toolCallsHistory: remainingHist,
         runContentBlocks: remainingCB,
@@ -292,14 +299,22 @@ export const useRunStore = create<RunState>((set, get) => ({
 
   // ── Tool call actions (per run) ────────────────────────────────
 
-  addToolCall: (runId, toolUseId, toolName, toolInput, semantic, effect) =>
+  addToolCall: (runId, toolUseId, toolName, toolInput, semantic, effect, backgroundable) =>
     set(state => {
-      const effects = effect
-        ? {
-            ...state.runToolEffects,
-            [runId]: { ...state.runToolEffects[runId], [toolUseId]: effect },
-          }
-        : undefined;
+      const meta =
+        effect || backgroundable
+          ? {
+              ...state.runToolMeta,
+              [runId]: {
+                ...state.runToolMeta[runId],
+                [toolUseId]: {
+                  ...state.runToolMeta[runId]?.[toolUseId],
+                  ...(effect ? { effect } : {}),
+                  ...(backgroundable ? { backgroundable: true } : {}),
+                },
+              },
+            }
+          : undefined;
       return applyRunEvents(
         state,
         runId,
@@ -313,7 +328,7 @@ export const useRunStore = create<RunState>((set, get) => ({
             semantic,
           },
         ],
-        effects
+        meta
       );
     }),
 
@@ -323,10 +338,13 @@ export const useRunStore = create<RunState>((set, get) => ({
       // result is ignored for unknown tools and for already-terminal ones.
       const existing = state.activeToolCalls[runId]?.[toolUseId];
       if (!existing || existing.status !== 'running') return state;
-      const effects = effect
+      const meta = effect
         ? {
-            ...state.runToolEffects,
-            [runId]: { ...state.runToolEffects[runId], [toolUseId]: effect },
+            ...state.runToolMeta,
+            [runId]: {
+              ...state.runToolMeta[runId],
+              [toolUseId]: { ...state.runToolMeta[runId]?.[toolUseId], effect },
+            },
           }
         : undefined;
       return applyRunEvents(
@@ -341,7 +359,7 @@ export const useRunStore = create<RunState>((set, get) => ({
             isError,
           },
         ],
-        effects
+        meta
       );
     }),
 

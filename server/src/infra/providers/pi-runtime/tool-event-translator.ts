@@ -5,6 +5,8 @@ export interface TranslateToolContext {
   sessionId: string;
   model: string;
   cwd: string;
+  /** Tool names whose calls are announced as `toolBackgroundable` (see run-tools). */
+  backgroundableTools?: ReadonlySet<string>;
 }
 
 interface PiToolCallBlock {
@@ -85,7 +87,7 @@ function extractPartialText(partialResult: unknown): string {
  */
 export function translateToolEvent(
   event: AgentEvent,
-  _ctx: TranslateToolContext
+  ctx: TranslateToolContext
 ): ProviderRuntimeEvent | ProviderRuntimeEvent[] | undefined {
   try {
     switch (event.type) {
@@ -105,6 +107,7 @@ export function translateToolEvent(
             toolName: tc.name,
             toolInput: tc.arguments,
             ...(interactionKind && { toolInteractionKind: interactionKind }),
+            ...(ctx.backgroundableTools?.has(tc.name) && { toolBackgroundable: true }),
           };
         });
       }

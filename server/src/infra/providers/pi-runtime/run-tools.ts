@@ -12,12 +12,20 @@ import {
   externalToolKey,
 } from './external-tools.js';
 import { buildActiveSkillContext, buildSkillCatalog, buildSkillMetaTools } from './skills.js';
+import { isBashBackgroundConvertible } from './bash-tool.js';
 import { buildTools } from './tool-bridge.js';
+import { applyToolScheduler } from './tool-scheduler.js';
+import { TaskRepository } from '../../../domains/tasks/repository.js';
 
 export interface PiRunToolBundle {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tools: AgentTool<any>[];
   visibleToolNames: string[];
+  /**
+   * Tools whose running calls can be moved to a background task on user
+   * request (announced as `toolBackgroundable` on their tool_use events).
+   */
+  backgroundableToolNames: string[];
   externalProviderCatalog: string;
   skillCatalog: string;
   activeSkillContext: string;
@@ -30,6 +38,20 @@ export interface PiRunToolBundle {
  * (e.g. MCP tools) are not part of the read-only plan-mode tool set.
  */
 const PLAN_MODE_BLOCKED_META_TOOLS = new Set(['LoadExternalTool']);
+
+const AUTOMATION_TOOLS = new Set<ToolName>(['CronCreate', 'CronList', 'CronUpdate', 'CronDelete']);
+
+function isSubagentSession(options: RunOptions): boolean {
+  if (!options.db || !options.claudiaSessionId) return false;
+  try {
+    return (
+      new TaskRepository(options.db).findLatestAgentTaskForSession(options.claudiaSessionId) !==
+      null
+    );
+  } catch {
+    return false;
+  }
+}
 
 export function buildPiRunToolBundle(input: {
   options: RunOptions;
@@ -46,8 +68,15 @@ export function buildPiRunToolBundle(input: {
     options.db && options.claudiaSessionId
       ? loadSessionSandboxDomains(options.db, options.claudiaSessionId)
       : [];
+  // RespondToCoordinator only makes sense inside a sub-agent session (one an
+  // Agent task launched); everywhere else it would just error, so drop it.
+  const enabledForSession = effectiveTools.filter(name => {
+    if (name === 'RespondToCoordinator') return isSubagentSession(options);
+    if (AUTOMATION_TOOLS.has(name)) return Boolean(options.automationPort);
+    return true;
+  });
   const tools = buildTools(options.cwd, {
-    enabled: effectiveTools,
+    enabled: enabledForSession,
     supportsVision,
     serverPort: options.serverPort,
     sessionId: options.claudiaSessionId,
@@ -55,6 +84,13 @@ export function buildPiRunToolBundle(input: {
     permissionOverride: options.permissionOverride,
     db: options.db,
     agentTaskExecutor: options.agentTaskExecutor,
+    subagentMessenger: options.subagentMessenger,
+    automationPort: options.automationPort,
+    languageServerPort: options.languageServerPort,
+    auxiliaryModel: {
+      llmProfileConfig: options.llmProfileConfig,
+      model: options.agentProfile?.model,
+    },
     permissionCallback,
     sandboxReadOnly: isPlanMode,
     sandboxAllowedDomains,
@@ -131,9 +167,23 @@ export function buildPiRunToolBundle(input: {
     abortSignal: options.abortController?.signal,
   });
 
+  // Outermost wrapper, applied in place so the array reference handed to
+  // LoadExternalTool (`toolsArray`) stays the same. Covers built-ins, concrete
+  // MCP tools and both meta-tool families in one pass.
+  applyToolScheduler(tools);
+
+  const bashConvertible =
+    effectiveTools.includes('Bash') &&
+    isBashBackgroundConvertible({
+      db: options.db,
+      sessionId: options.claudiaSessionId,
+      sandboxReadOnly: isPlanMode,
+    });
+
   return {
     tools,
     visibleToolNames: tools.map(tool => tool.name),
+    backgroundableToolNames: bashConvertible ? ['Bash'] : [],
     externalProviderCatalog,
     skillCatalog,
     activeSkillContext,

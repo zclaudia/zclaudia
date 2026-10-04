@@ -84,6 +84,13 @@ export function trackAndAutoComplete(
  * Marks every remaining pending/in_progress item as "completed".
  * Returns the updated interactions and removes the session from tracking.
  */
+/** Latest todo list tracked for a session (what TodoRead returns). */
+export function getLatestTodos(sessionId: string): NormalizedTodoItem[] | undefined {
+  const tracked = sessionTodos.get(sessionId);
+  if (!tracked || tracked.length === 0) return undefined;
+  return tracked[tracked.length - 1].todos.map(todo => ({ ...todo }));
+}
+
 export function finalizeSession(sessionId: string): TodoStateUpdate[] {
   const previous = sessionTodos.get(sessionId);
   if (!previous) return [];

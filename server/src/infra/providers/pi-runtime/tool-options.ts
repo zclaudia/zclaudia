@@ -23,6 +23,8 @@ import {
 import type { TaskRuntimeRegistryFactory } from './task-tools.js';
 import type { ToolExecutionObserver } from './tool-execution-observer.js';
 import type { PendingArgOverrides } from './pending-arg-overrides.js';
+import type { AutomationPort, LanguageServerPort, SubagentMessenger } from '../types.js';
+import type { AuxiliaryModelContext } from './auxiliary-model.js';
 import type {
   DiagnosticsMode,
   WriteDiagnosticsProvider,
@@ -42,6 +44,14 @@ export interface ToolBridgeOptions {
   permissionOverride?: Partial<UnifiedPermissionPolicy>;
   db?: Database.Database;
   agentTaskExecutor?: TaskExecutor;
+  /** Cross-session delivery port for SendMessage / RespondToCoordinator. */
+  subagentMessenger?: SubagentMessenger;
+  /** Automation CRUD port for the Cron* tools. */
+  automationPort?: AutomationPort;
+  /** Language-server port for LSPTool; the tool is skipped when it has no server for cwd. */
+  languageServerPort?: LanguageServerPort;
+  /** Auxiliary model context for summarizing tools (WebFetch prompt, ReadSessionContext). */
+  auxiliaryModel?: AuxiliaryModelContext;
   /** Provider permission/interaction callback used by AskUserQuestion. */
   permissionCallback?: PermissionCallback;
   /** Whether the active model accepts image content blocks (model.input includes 'image'). */

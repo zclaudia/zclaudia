@@ -9,6 +9,16 @@ import { isPrivateOrReservedIp } from '../../../utils/ip-guard.js';
 import { extractPdfText } from './rich-read.js';
 import { htmlToMarkdown, stripHtmlToText, shouldExtractAsHtml } from './web-extract.js';
 import {
+  hasAuxiliaryModel,
+  runAuxiliaryPrompt,
+  type AuxiliaryModelContext,
+} from './auxiliary-model.js';
+import {
+  WEB_FETCH_CACHE_MAX_BYTES,
+  WEB_FETCH_CACHE_TTL_MS,
+  WebFetchCache,
+} from './web-fetch-cache.js';
+import {
   agentToolParameters,
   errorResult,
   textResult,
@@ -773,16 +783,44 @@ function looksBinary(text: string): boolean {
   return text.slice(0, 8192).includes('\u0000');
 }
 
-export function createWebFetchTool(): AgentTool {
+export interface WebFetchToolDeps {
+  auxiliaryModel?: AuxiliaryModelContext;
+}
+
+interface CachedFetch {
+  header: string;
+  content: string;
+  details: Record<string, unknown>;
+}
+
+const fetchCache = new WebFetchCache<CachedFetch>({
+  ttlMs: WEB_FETCH_CACHE_TTL_MS,
+  maxBytes: WEB_FETCH_CACHE_MAX_BYTES,
+});
+
+export function __resetWebFetchCacheForTests(): void {
+  fetchCache.clear();
+}
+
+const WEB_FETCH_PROMPT_SYSTEM = `You answer a question about a fetched web page for a coding agent.
+Use only the PAGE CONTENT. Quote exact identifiers, commands and code where they matter. If the content does not answer the question, say so briefly. Be concise.`;
+const WEB_FETCH_PROMPT_INPUT_CHARS = 100_000;
+
+export function createWebFetchTool(deps: WebFetchToolDeps = {}): AgentTool {
   return {
     name: 'WebFetch',
     label: 'WebFetch',
     description:
-      'Fetch a public URL and return its content. Redirects (max 8 hops within a 90s overall budget) are followed only after each target is revalidated. HTML pages are extracted to clean Markdown; PDFs are text-extracted; JSON/plain text/markdown are returned as-is. Supports domain filters and response size limits.',
+      'Fetch a public URL and return its content. Redirects (max 8 hops within a 90s overall budget) are followed only after each target is revalidated. HTML pages are extracted to clean Markdown; PDFs are text-extracted; JSON/plain text/markdown are returned as-is. Supports domain filters and response size limits. Pass `prompt` to get only the answer to a question about the page instead of the whole content (saves context); fetched pages are cached for 15 minutes.',
     parameters: agentToolParameters({
       type: 'object',
       properties: {
         url: { type: 'string' },
+        prompt: {
+          type: 'string',
+          description:
+            'Question to answer from the page. When set, only the answer is returned, not the page content.',
+        },
         format: { type: 'string', enum: ['markdown', 'text', 'raw'], default: 'markdown' },
         allowed_domains: {
           type: 'array',
@@ -841,91 +879,187 @@ export function createWebFetchTool(): AgentTool {
         1_000,
         HARD_OUTPUT_CHARS
       );
-      let fetched: FetchedPublicBody;
-      try {
-        const result = await fetchPublicHttpBody(url, {
+      const format = args.format === 'raw' || args.format === 'text' ? args.format : 'markdown';
+      const pages = optionalStringParam(args.pages);
+      const prompt = optionalStringParam(args.prompt);
+
+      const cacheKey = JSON.stringify({
+        url,
+        format,
+        pages: pages ?? null,
+        maxBytes,
+        allowed: allowed.filters,
+        blocked: blocked.filters,
+      });
+      let fetchedPage = fetchCache.get(cacheKey);
+      const cacheHit = fetchedPage !== undefined;
+      if (!fetchedPage) {
+        const result = await fetchAndExtract({
+          url,
+          format,
+          pages,
           maxBytes,
           allowedDomains: allowed.filters,
           blockedDomains: blocked.filters,
         });
-        if (!result.ok) return errorResult(result.code, result.message, result.details);
-        fetched = result.value;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return errorResult('fetch_failed', `WebFetch failed: ${message}`, { url });
-      }
-
-      const response = fetched.response;
-      const contentType = response.headers?.get?.('content-type') ?? '';
-      const bodyText = decodeBodyText(fetched.body, contentType);
-      const finalUrl = fetched.finalUrl;
-      const format = args.format === 'raw' || args.format === 'text' ? args.format : 'markdown';
-
-      let content: string;
-      let extractMode: string | undefined;
-      let title: string | undefined;
-      let pdfInfo: { totalPages: number; pages: number[] } | undefined;
-      if (isPdfContentType(contentType)) {
-        try {
-          const extracted = await extractPdfText(fetched.body, optionalStringParam(args.pages));
-          content = extracted.text;
-          extractMode = 'pdf';
-          pdfInfo = { totalPages: extracted.totalPages, pages: extracted.pages };
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          return errorResult(
-            'pdf_extract_failed',
-            `WebFetch could not extract PDF text: ${message}`,
-            {
-              url: finalUrl,
-              status: response.status,
-              contentType,
-            }
+        if (!result.ok) return result.error;
+        fetchedPage = result.page;
+        // Only successful responses are worth caching; error pages are cheap.
+        if (result.page.details.ok === true) {
+          fetchCache.set(
+            cacheKey,
+            result.page,
+            result.page.content.length + result.page.header.length
           );
         }
-      } else {
-        const extractAsHtml = shouldExtractAsHtml(contentType, bodyText);
-        // The binary sniff runs before the format branches so format:'raw'
-        // cannot return replacement-char garbage for a PNG/zip/etc.
-        if (!extractAsHtml && (!isTextLikeContentType(contentType) || looksBinary(bodyText))) {
-          return errorResult(
-            'unsupported_binary_content',
-            'WebFetch received non-text content that cannot be returned safely',
-            {
-              url: finalUrl,
-              status: response.status,
-              contentType: contentType || 'unknown',
-              bytesRead: fetched.bytesRead,
-              bodyTruncated: fetched.bodyTruncated,
-            }
-          );
-        }
-        if (format === 'raw') {
-          content = bodyText;
-          extractMode = 'raw';
-        } else if (!extractAsHtml) {
-          content = bodyText;
-          extractMode = 'passthrough';
-        } else if (format === 'text') {
-          content = stripHtmlToText(bodyText);
-          extractMode = 'text';
-        } else {
-          const extracted = await htmlToMarkdown(bodyText, finalUrl);
-          content = extracted.markdown;
-          extractMode = extracted.mode;
-          title = extracted.title;
-        }
       }
+      const { header, content, details } = fetchedPage;
+      const baseDetails = {
+        ...details,
+        maxBytes,
+        maxContentChars,
+        allowedDomains: allowed.filters,
+        blockedDomains: blocked.filters,
+        cacheHit,
+      };
 
-      const header = [
-        `URL: ${finalUrl}`,
-        `Status: ${response.status} ${response.statusText}`,
-        `Content-Type: ${contentType || 'unknown'}`,
-        ...(fetched.redirects.length > 0 ? [`Redirects: ${fetched.redirects.length}`] : []),
-        ...(fetched.bodyTruncated ? [`Body: truncated after ${fetched.bytesRead} bytes`] : []),
-        ...(title ? [`Title: ${title}`] : []),
-      ].join('\n');
+      if (prompt && hasAuxiliaryModel(deps.auxiliaryModel)) {
+        const pageContent =
+          content.length > WEB_FETCH_PROMPT_INPUT_CHARS
+            ? `${content.slice(0, WEB_FETCH_PROMPT_INPUT_CHARS)}\n…[content truncated]`
+            : content;
+        const answer = await runAuxiliaryPrompt(deps.auxiliaryModel, {
+          systemPrompt: WEB_FETCH_PROMPT_SYSTEM,
+          userText: `QUESTION:\n${prompt}\n\nPAGE CONTENT (${details.url}):\n${pageContent}`,
+          maxTokens: 1_500,
+        });
+        if (answer !== null) {
+          return textResult(`${header}\n\nAnswer to: ${prompt}\n\n${answer}`, {
+            ...baseDetails,
+            promptAnswered: true,
+            contentChars: content.length,
+          });
+        }
+        // Fall through: return the content itself rather than failing.
+      }
       return textResult(truncateText(`${header}\n\n${content}`, maxContentChars), {
+        ...baseDetails,
+        ...(prompt ? { promptAnswered: false } : {}),
+      });
+    },
+  };
+}
+
+async function fetchAndExtract(input: {
+  url: string;
+  format: 'markdown' | 'text' | 'raw';
+  pages?: string;
+  maxBytes: number;
+  allowedDomains: string[];
+  blockedDomains: string[];
+}): Promise<
+  { ok: true; page: CachedFetch } | { ok: false; error: ReturnType<typeof errorResult> }
+> {
+  const { url, format, pages, maxBytes } = input;
+  let fetched: FetchedPublicBody;
+  try {
+    const result = await fetchPublicHttpBody(url, {
+      maxBytes,
+      allowedDomains: input.allowedDomains,
+      blockedDomains: input.blockedDomains,
+    });
+    if (!result.ok)
+      return { ok: false, error: errorResult(result.code, result.message, result.details) };
+    fetched = result.value;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      error: errorResult('fetch_failed', `WebFetch failed: ${message}`, { url }),
+    };
+  }
+
+  const response = fetched.response;
+  const contentType = response.headers?.get?.('content-type') ?? '';
+  const bodyText = decodeBodyText(fetched.body, contentType);
+  const finalUrl = fetched.finalUrl;
+
+  let content: string;
+  let extractMode: string | undefined;
+  let title: string | undefined;
+  let pdfInfo: { totalPages: number; pages: number[] } | undefined;
+  if (isPdfContentType(contentType)) {
+    try {
+      const extracted = await extractPdfText(fetched.body, pages);
+      content = extracted.text;
+      extractMode = 'pdf';
+      pdfInfo = { totalPages: extracted.totalPages, pages: extracted.pages };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        ok: false,
+        error: errorResult(
+          'pdf_extract_failed',
+          `WebFetch could not extract PDF text: ${message}`,
+          {
+            url: finalUrl,
+            status: response.status,
+            contentType,
+          }
+        ),
+      };
+    }
+  } else {
+    const extractAsHtml = shouldExtractAsHtml(contentType, bodyText);
+    // The binary sniff runs before the format branches so format:'raw'
+    // cannot return replacement-char garbage for a PNG/zip/etc.
+    if (!extractAsHtml && (!isTextLikeContentType(contentType) || looksBinary(bodyText))) {
+      return {
+        ok: false,
+        error: errorResult(
+          'unsupported_binary_content',
+          'WebFetch received non-text content that cannot be returned safely',
+          {
+            url: finalUrl,
+            status: response.status,
+            contentType: contentType || 'unknown',
+            bytesRead: fetched.bytesRead,
+            bodyTruncated: fetched.bodyTruncated,
+          }
+        ),
+      };
+    }
+    if (format === 'raw') {
+      content = bodyText;
+      extractMode = 'raw';
+    } else if (!extractAsHtml) {
+      content = bodyText;
+      extractMode = 'passthrough';
+    } else if (format === 'text') {
+      content = stripHtmlToText(bodyText);
+      extractMode = 'text';
+    } else {
+      const extracted = await htmlToMarkdown(bodyText, finalUrl);
+      content = extracted.markdown;
+      extractMode = extracted.mode;
+      title = extracted.title;
+    }
+  }
+
+  const header = [
+    `URL: ${finalUrl}`,
+    `Status: ${response.status} ${response.statusText}`,
+    `Content-Type: ${contentType || 'unknown'}`,
+    ...(fetched.redirects.length > 0 ? [`Redirects: ${fetched.redirects.length}`] : []),
+    ...(fetched.bodyTruncated ? [`Body: truncated after ${fetched.bytesRead} bytes`] : []),
+    ...(title ? [`Title: ${title}`] : []),
+  ].join('\n');
+  return {
+    ok: true,
+    page: {
+      header,
+      content,
+      details: {
         ok: response.ok,
         status: response.status,
         statusText: response.statusText,
@@ -934,15 +1068,11 @@ export function createWebFetchTool(): AgentTool {
         redirects: fetched.redirects,
         bytesRead: fetched.bytesRead,
         bodyTruncated: fetched.bodyTruncated,
-        maxBytes,
-        maxContentChars,
-        allowedDomains: allowed.filters,
-        blockedDomains: blocked.filters,
         ...(fetched.contentLength !== undefined ? { contentLength: fetched.contentLength } : {}),
         ...(extractMode ? { extractMode } : {}),
         ...(title ? { title } : {}),
         ...(pdfInfo ? { pdf: pdfInfo } : {}),
-      });
+      },
     },
   };
 }

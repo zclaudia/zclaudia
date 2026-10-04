@@ -17,6 +17,10 @@ export interface AgentRunnerTask {
   canonicalTaskId?: string;
   initiator: 'system' | 'claudia';
   llmProfileId?: string;
+  /** Agent profile the sub-agent session is created with (`subagent_type`). */
+  agentProfileId?: string;
+  /** Session that launched this task; recorded on the sub-agent session. */
+  parentSessionId?: string | null;
   permissionOverride?: Partial<
     import('@zclaudia/shared/interaction/permissions').UnifiedPermissionPolicy
   >;

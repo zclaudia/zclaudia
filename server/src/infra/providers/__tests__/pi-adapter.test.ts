@@ -907,12 +907,7 @@ describe('PiAgentProviderAdapter.run', () => {
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {});
 
-    expect(out.map(m => m.type)).toEqual([
-      'init',
-      'assistant',
-      'provider_usage_updated',
-      'result',
-    ]);
+    expect(out.map(m => m.type)).toEqual(['init', 'assistant', 'provider_usage_updated', 'result']);
   });
 
   it('translates mode "plan" to systemInfo.permissionMode "plan"', async () => {
@@ -1055,7 +1050,6 @@ describe('PiAgentProviderAdapter.run', () => {
         'ReadMcpResource',
         'TaskOutput',
         'Agent',
-        'LSPTool',
       ] as ToolName[],
     });
 
@@ -1073,7 +1067,6 @@ describe('PiAgentProviderAdapter.run', () => {
       'ListMcpResources',
       'ReadMcpResource',
       'TaskOutput',
-      'LSPTool',
     ]);
 
     // Agent should have been constructed with only the RO tools too.
@@ -1094,7 +1087,6 @@ describe('PiAgentProviderAdapter.run', () => {
       'ListMcpResources',
       'ReadMcpResource',
       'TaskOutput',
-      'LSPTool',
     ]);
   });
 
@@ -1282,10 +1274,12 @@ describe('PiAgentProviderAdapter.run — tool loop integration', () => {
 
     expect(mockAgentInstances.length).toBe(1);
     expect((mockAgentInstances[0].initialState as any).tools).toBeDefined();
-    // Memory is skipped when memoryDir is absent (no project context here), so
-    // the built tool count is one less than the full canonical list.
+    // Memory is skipped when memoryDir is absent (no project context here),
+    // RespondToCoordinator only exists in sub-agent sessions, the four Cron*
+    // tools need an automation port, and LSPTool needs a language server
+    // port — so seven fewer than the canonical list.
     expect((mockAgentInstances[0].initialState as any).tools.length).toBe(
-      ALL_TOOL_NAMES.length - 1
+      ALL_TOOL_NAMES.length - 7
     );
   });
 

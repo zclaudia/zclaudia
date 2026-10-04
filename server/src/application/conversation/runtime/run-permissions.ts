@@ -13,7 +13,6 @@ import {
   buildRememberKey,
   classify,
   evaluateMcpToolTrustPolicy,
-  extractBashCommand,
   getAgentPermissionPolicy,
   getMatchedPermissionRule,
   getOutsideWorkspacePaths,
@@ -42,9 +41,6 @@ import { isSandboxAvailable } from '../../../infra/providers/pi-runtime/sandbox.
 import { providerRegistry } from '../../../infra/providers/registry.js';
 import { recomputePhase, computeBlockers } from './active-run-phase.js';
 
-/** Read-only bash commands that are safe to auto-approve for remembered outside-workspace directories. */
-const READONLY_BASH_COMMANDS =
-  /^\s*(ls|cat|head|tail|wc|file|stat|du|find|tree|realpath|dirname|basename)\b/;
 import type { PermissionDecision } from '../../../infra/providers/types.js';
 import type { ActiveRun } from '../transport/types.js';
 import { broadcastRunMessage } from '../transport/broadcast.js';
@@ -342,15 +338,14 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
         return;
       }
 
+      // classify() already downgrades provably read-only bash (ls, cat, git
+      // status …) to fileRead via bash-readonly/, so remembered
+      // outside-workspace roots cover those reads without a second regex.
       const category = classify(request.toolName, request.toolInput, request.detail);
-      const isReadOnlyBash =
-        category === 'shellSafe' &&
-        isBashLikeTool(request.toolName) &&
-        READONLY_BASH_COMMANDS.test(extractBashCommand(request.toolInput, request.detail) || '');
 
       if (
         !isProviderNativeQuestion &&
-        (category === 'fileRead' || isReadOnlyBash) &&
+        category === 'fileRead' &&
         isOutsideWorkspacePathAllowed(
           request.toolName,
           request.toolInput,

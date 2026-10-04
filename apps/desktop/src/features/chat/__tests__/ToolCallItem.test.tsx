@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ToolCallItem } from '../ToolCallItem';
 import { ToolCallList } from '../tool-call/ToolCallList';
 import type { ToolCallState } from '../../../stores/runStore';
+import { useBackgroundRequestStore } from '../../../stores/backgroundRequestStore';
 
 const mockSendMessage = vi.fn();
 const mockHandlePromptAnswer = vi.fn();
@@ -1890,5 +1891,60 @@ describe('ToolCallList', () => {
       expect(screen.getByText('index.ts')).toBeInTheDocument();
       expect(screen.getByText('npm')).toBeInTheDocument();
     });
+  });
+});
+
+describe('ToolCallItem send-to-background gating', () => {
+  beforeEach(() => {
+    mockSelectionState.selectedSessionId = 's1';
+    mockSendMessage.mockReset();
+    useBackgroundRequestStore.setState({ pending: {} });
+  });
+
+  const runningBash = (overrides: Partial<ToolCallState> = {}) =>
+    createToolCall({
+      toolName: 'Bash',
+      toolInput: { command: 'sleep 30' },
+      status: 'running',
+      result: undefined,
+      ...overrides,
+    });
+
+  it('offers "Send to background" only for calls the runtime announced as backgroundable', () => {
+    const { unmount } = render(<ToolCallItem toolCall={runningBash()} />);
+    expect(screen.queryByText('Send to background')).not.toBeInTheDocument();
+    unmount();
+
+    render(<ToolCallItem toolCall={runningBash({ backgroundable: true })} />);
+    fireEvent.click(screen.getByText('Send to background'));
+    expect(mockSendMessage).toHaveBeenCalledWith({
+      type: 'background_running_command',
+      sessionId: 's1',
+      toolUseId: 'tool-1',
+    });
+  });
+
+  it('locks the button while the request is in flight and unlocks when the server declines', () => {
+    const { rerender } = render(<ToolCallItem toolCall={runningBash({ backgroundable: true })} />);
+    fireEvent.click(screen.getByText('Send to background'));
+    expect(screen.getByText('Moving to background…')).toBeDisabled();
+    expect(useBackgroundRequestStore.getState().pending).toHaveProperty('tool-1');
+
+    // What the error handler does on NO_INFLIGHT_COMMAND / BACKGROUND_UNSUPPORTED.
+    act(() => useBackgroundRequestStore.getState().clearAll());
+    fireEvent.click(screen.getByText('Send to background'));
+    expect(mockSendMessage).toHaveBeenCalledTimes(2);
+
+    // A settled call drops its bookkeeping.
+    rerender(
+      <ToolCallItem toolCall={runningBash({ backgroundable: true, status: 'completed' })} />
+    );
+    expect(useBackgroundRequestStore.getState().pending).toEqual({});
+  });
+
+  it('never offers it without a selected session, even when announced', () => {
+    mockSelectionState.selectedSessionId = null;
+    render(<ToolCallItem toolCall={runningBash({ backgroundable: true })} />);
+    expect(screen.queryByText('Send to background')).not.toBeInTheDocument();
   });
 });

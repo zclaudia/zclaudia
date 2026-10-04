@@ -11,6 +11,8 @@ export interface ToolCallCardProps {
    * a running Bash card offers "Send to background".
    */
   onSendToBackground?: () => void;
+  /** Controls the kit's "Moving to background…" lock; see backgroundRequestStore. */
+  backgroundRequested?: boolean;
   /** Host capability: paste a command into the terminal (expanded Bash view). */
   runInTerminal?: (command: string) => void;
 }
@@ -27,12 +29,14 @@ export interface ToolCallCardProps {
 export const ToolCallCard = memo(function ToolCallCard({
   toolCall,
   onSendToBackground,
+  backgroundRequested,
   runInTerminal,
 }: ToolCallCardProps) {
   return (
     <KitToolCallCard
       toolCall={toolCall}
       onSendToBackground={onSendToBackground}
+      backgroundRequested={backgroundRequested}
       renderExpanded={() => (
         <ToolExpandedContent
           toolName={toolCall.name}

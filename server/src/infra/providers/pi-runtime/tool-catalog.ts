@@ -1,7 +1,24 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { ToolName } from '@zclaudia/shared/core/tools';
-import { createAgentTool, createMonitorTool, createTaskOutputTool } from './task-tools.js';
-import { createAskUserQuestionTool, createTodoWriteTool } from './interaction-tools.js';
+import {
+  createAgentTool,
+  createMonitorTool,
+  createRespondToCoordinatorTool,
+  createSendMessageTool,
+  createTaskOutputTool,
+} from './task-tools.js';
+import {
+  createAskUserQuestionTool,
+  createTodoReadTool,
+  createTodoWriteTool,
+} from './interaction-tools.js';
+import {
+  createCronCreateTool,
+  createCronDeleteTool,
+  createCronListTool,
+  createCronUpdateTool,
+} from './automation-tools.js';
+import { createReadSessionContextTool } from './session-context-tool.js';
 import { createAstEditTool, createAstGrepTool } from './ast-bridge-tools.js';
 import { createBashBridgeTool } from './bash-tool.js';
 import {
@@ -13,12 +30,8 @@ import { createEditSymbolTool, createReadSymbolTool } from './symbol-tools.js';
 import { createEnterPlanModeTool, createExitPlanModeTool } from './mode-tools.js';
 import { createEnterWorktreeTool, createExitWorktreeTool } from './worktree-tools.js';
 import { createEvalBridgeTool } from './eval-tool.js';
-import {
-  createGlobTool,
-  createGrepBridgeTool,
-  createLsBridgeTool,
-  createLspTool,
-} from './search-tools.js';
+import { createGlobTool, createGrepBridgeTool, createLsBridgeTool } from './search-tools.js';
+import { createLspTool } from './lsp-tool.js';
 import {
   createListMcpResourcesTool,
   createMcpTool,
@@ -31,6 +44,16 @@ import { createWebFetchTool, createWebSearchTool } from './web-tools.js';
 import type { ToolBridgeOptions } from './tool-options.js';
 
 export type ToolFactory = (cwd: string, options?: ToolBridgeOptions) => AgentTool<any>;
+
+function automationDeps(cwd: string, options?: ToolBridgeOptions) {
+  return {
+    cwd,
+    sessionId: options?.sessionId,
+    db: options?.db,
+    port: options?.automationPort,
+    llmProfileId: options?.auxiliaryModel?.llmProfileConfig?.id,
+  };
+}
 
 // Dispatch table: tool name → factory taking (cwd, options?) and returning an AgentTool.
 // Factories wire the ToolBridgeOptions slices they need (db, session/run ids,
@@ -49,8 +72,9 @@ export const BUILTIN_TOOL_FACTORIES: Record<ToolName, ToolFactory> = {
   Glob: cwd => createGlobTool(cwd),
   LS: cwd => createLsBridgeTool(cwd),
   TodoWrite: () => createTodoWriteTool(),
+  TodoRead: (_cwd, options) => createTodoReadTool(options?.sessionId),
   AskUserQuestion: (_cwd, options) => createAskUserQuestionTool(options?.permissionCallback),
-  WebFetch: () => createWebFetchTool(),
+  WebFetch: (_cwd, options) => createWebFetchTool({ auxiliaryModel: options?.auxiliaryModel }),
   WebSearch: (_cwd, options) => createWebSearchTool(options?.db),
   MCPTool: (_cwd, options) => createMcpTool(options?.db),
   ToolSearch: (_cwd, options) => createToolSearchTool(options?.db),
@@ -74,7 +98,33 @@ export const BUILTIN_TOOL_FACTORIES: Record<ToolName, ToolFactory> = {
       options?.permissionOverride,
       options?.agentTaskExecutor
     ),
-  LSPTool: cwd => createLspTool(cwd),
+  SendMessage: (cwd, options) =>
+    createSendMessageTool({
+      cwd,
+      sessionId: options?.sessionId,
+      runId: options?.runId,
+      db: options?.db,
+      permissionOverride: options?.permissionOverride,
+      agentTaskExecutor: options?.agentTaskExecutor,
+      messenger: options?.subagentMessenger,
+    }),
+  RespondToCoordinator: (_cwd, options) =>
+    createRespondToCoordinatorTool({
+      sessionId: options?.sessionId,
+      db: options?.db,
+      messenger: options?.subagentMessenger,
+    }),
+  ReadSessionContext: (_cwd, options) =>
+    createReadSessionContextTool({
+      sessionId: options?.sessionId,
+      db: options?.db,
+      auxiliaryModel: options?.auxiliaryModel,
+    }),
+  CronCreate: (cwd, options) => createCronCreateTool(automationDeps(cwd, options)),
+  CronList: (cwd, options) => createCronListTool(automationDeps(cwd, options)),
+  CronUpdate: (cwd, options) => createCronUpdateTool(automationDeps(cwd, options)),
+  CronDelete: (cwd, options) => createCronDeleteTool(automationDeps(cwd, options)),
+  LSPTool: (cwd, options) => createLspTool({ cwd, port: options?.languageServerPort }),
   AstGrep: cwd => createAstGrepTool(cwd),
   AstEdit: (cwd, options) => createAstEditTool(cwd, options),
   EnterWorktree: (cwd, options) => createEnterWorktreeTool(cwd, options),

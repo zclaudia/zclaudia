@@ -36,4 +36,10 @@ export type ProviderRuntimeEvent = Omit<SdkProviderRuntimeEvent, 'type'> & {
   type: SdkProviderRuntimeEvent['type'] | 'provider_usage_updated';
   /** Cumulative invocation usage snapshot (runtime usage design §4). */
   snapshot?: RuntimeUsageSnapshot;
+  /**
+   * On `tool_use` / `tool_started`: the adapter owns this call's process and
+   * can move it to a background task via `ProviderAdapter.requestBackgroundForToolCall`.
+   * Projected to the wire as `ToolUseMessage.backgroundable`.
+   */
+  toolBackgroundable?: boolean;
 };

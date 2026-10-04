@@ -40,6 +40,7 @@ export function projectRunDomainEventToWireMessages(event: RunDomainEvent): Serv
           toolInput: event.payload.input,
           semantic: event.payload.semantic,
           effect: event.payload.effect,
+          ...(event.payload.backgroundable ? { backgroundable: true } : {}),
           seq: event.seq,
         },
       ];

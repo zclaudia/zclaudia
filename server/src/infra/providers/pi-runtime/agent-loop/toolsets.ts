@@ -6,6 +6,7 @@ import type {
 } from '../../../../domains/agent-loop/index.js';
 import { SANDBOX_NETWORK_ACCESS_COMPAT_TOOL } from '../sandbox-execution/index.js';
 import { buildTools } from '../tool-bridge.js';
+import { applyToolScheduler } from '../tool-scheduler.js';
 import type { PendingArgOverrides } from '../pending-arg-overrides.js';
 
 const SANDBOX_PERMISSION_TOOLS = [
@@ -113,17 +114,19 @@ export function buildAgentLoopTools(args: {
   }
 
   const descriptorOverrides = descriptor.createOverrides?.({ cwd: args.cwd, db: args.db });
-  return buildTools(args.cwd, {
-    enabled: [...descriptor.tools],
-    overrides: {
-      ...(descriptorOverrides ?? {}),
-      ...(args.overrides ?? {}),
-    },
-    db: args.db,
-    permissionCallback: args.permissionCallback,
-    sessionId: args.sessionId,
-    runId: args.runId,
-    sandboxReadOnly: descriptor.sandboxReadOnly,
-    argOverrides: args.argOverrides,
-  });
+  return applyToolScheduler(
+    buildTools(args.cwd, {
+      enabled: [...descriptor.tools],
+      overrides: {
+        ...(descriptorOverrides ?? {}),
+        ...(args.overrides ?? {}),
+      },
+      db: args.db,
+      permissionCallback: args.permissionCallback,
+      sessionId: args.sessionId,
+      runId: args.runId,
+      sandboxReadOnly: descriptor.sandboxReadOnly,
+      argOverrides: args.argOverrides,
+    })
+  );
 }

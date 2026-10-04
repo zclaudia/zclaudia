@@ -19,4 +19,16 @@ export interface ToolCallState {
    */
   semantic?: ToolSemantic;
   effect?: ToolEffect;
+  /**
+   * Runtime-declared: while running, this call can be moved to a background
+   * task (`background_running_command`). Absent for runtimes that execute
+   * the command out of the host's reach, so the UI offers nothing there.
+   */
+  backgroundable?: boolean;
+}
+
+/** Host-side tool metadata the kit transcript has no slot for. */
+export interface ToolCallHostMeta {
+  effect?: ToolEffect;
+  backgroundable?: boolean;
 }

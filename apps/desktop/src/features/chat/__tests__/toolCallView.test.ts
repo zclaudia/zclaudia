@@ -43,3 +43,15 @@ describe('toToolCallView', () => {
     expect(toolCallEffect(toToolCallView(state()))).toBeUndefined();
   });
 });
+
+describe('toToolCallView backgroundable affordance', () => {
+  it('carries backgroundable through the kit ext slot only when set', () => {
+    expect(toToolCallView(state({ backgroundable: true })).ext).toEqual({ backgroundable: true });
+    expect(toToolCallView(state())).not.toHaveProperty('ext');
+    const effect = { kind: 'shell' as const, command: 'ls' };
+    expect(toToolCallView(state({ effect, backgroundable: true })).ext).toEqual({
+      effect,
+      backgroundable: true,
+    });
+  });
+});

@@ -156,6 +156,10 @@ describe('buildTools', () => {
       'AstEdit',
       'AstGrep',
       'Bash',
+      'CronCreate',
+      'CronDelete',
+      'CronList',
+      'CronUpdate',
       'Edit',
       'EditSymbol',
       'EnterPlanMode',
@@ -166,15 +170,18 @@ describe('buildTools', () => {
       'Glob',
       'Grep',
       'LS',
-      'LSPTool',
       'ListMcpResources',
       'MCPTool',
       'Monitor',
       'MultiEdit',
       'Read',
       'ReadMcpResource',
+      'ReadSessionContext',
       'ReadSymbol',
+      'RespondToCoordinator',
+      'SendMessage',
       'TaskOutput',
+      'TodoRead',
       'TodoWrite',
       'ToolSearch',
       'WebFetch',
@@ -225,6 +232,10 @@ describe('buildTools', () => {
       'AstEdit',
       'AstGrep',
       'Bash',
+      'CronCreate',
+      'CronDelete',
+      'CronList',
+      'CronUpdate',
       'Edit',
       'EditSymbol',
       'EnterPlanMode',
@@ -243,8 +254,12 @@ describe('buildTools', () => {
       'MultiEdit',
       'Read',
       'ReadMcpResource',
+      'ReadSessionContext',
       'ReadSymbol',
+      'RespondToCoordinator',
+      'SendMessage',
       'TaskOutput',
+      'TodoRead',
       'TodoWrite',
       'ToolSearch',
       'WebFetch',
@@ -910,38 +925,34 @@ describe('buildTools', () => {
     ]);
   });
 
-  it('LSPTool returns structured symbol search results with glob filtering', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-lsp-'));
-    tempDirs.push(root);
-    await mkdir(path.join(root, 'src'), { recursive: true });
-    await writeFile(
-      path.join(root, 'src', 'feature.ts'),
-      ['export function targetSymbol() {', '  return 1;', '}', ''].join('\n')
-    );
-    await writeFile(path.join(root, 'src', 'feature.md'), 'targetSymbol in docs\n');
-    const lsp = buildTools(root, { enabled: ['LSPTool'] })[0] as any;
+  it('skips LSPTool unless a language server is configured for the workspace', () => {
+    expect(buildTools('/tmp', { enabled: ['LSPTool'] })).toEqual([]);
+    const noServers = {
+      serversFor: () => [],
+      query: async () => ({ action: 'hover', contents: null }),
+    };
+    expect(
+      buildTools('/tmp', { enabled: ['LSPTool'], languageServerPort: noServers as never })
+    ).toEqual([]);
+    const throwing = {
+      serversFor: () => {
+        throw new Error('boom');
+      },
+      query: async () => ({ action: 'hover', contents: null }),
+    };
+    expect(
+      buildTools('/tmp', { enabled: ['LSPTool'], languageServerPort: throwing as never })
+    ).toEqual([]);
+  });
 
-    const result = await lsp.execute('lsp-1', {
-      action: 'symbols',
-      query: 'targetSymbol',
-      include: '*.ts',
-      max_results: 5,
-    });
-    const parsed = JSON.parse(result.content[0].text);
-
-    expect(result.details).toMatchObject({
-      ok: true,
-      action: 'symbols',
-      fallback: 'ripgrep',
-      total: 1,
-    });
-    expect(parsed.results).toEqual([
-      expect.objectContaining({
-        file: 'src/feature.ts',
-        line: 1,
-        preview: 'export function targetSymbol() {',
-      }),
-    ]);
+  it('registers LSPTool when the port lists a server for the workspace', () => {
+    const port = {
+      serversFor: () => [{ id: 'tsserver', name: 'TypeScript', languages: ['typescript'] }],
+      query: async () => ({ action: 'hover', contents: null }),
+    };
+    const tools = buildTools('/tmp', { enabled: ['LSPTool'], languageServerPort: port as never });
+    expect(tools.map(t => t.name)).toEqual(['LSPTool']);
+    expect(tools[0].description).toContain('TypeScript (tsserver: typescript)');
   });
 });
 
