@@ -35,6 +35,12 @@ interface FileViewerState {
   showTree: boolean;
   // File tree width (desktop)
   treeWidthPx: number;
+  /**
+   * The panel is too narrow for the tree beside the code (desktop): it then
+   * lays out like mobile, one at a time. Set by FileViewerPanel from its
+   * measured width; read by FileViewerActions, which cannot measure it.
+   */
+  compactLayout: boolean;
   // Full-screen overlay (mobile)
   fullscreen: boolean;
   // In-file content search UI state
@@ -67,6 +73,7 @@ interface FileViewerState {
   setShowTree: (show: boolean) => void;
   toggleTree: () => void;
   setTreeWidthPx: (widthPx: number) => void;
+  setCompactLayout: (compact: boolean) => void;
   setSearchOpen: (open: boolean) => void;
   setFullscreen: (open: boolean) => void;
   setInFileSearchOpen: (open: boolean) => void;
@@ -107,6 +114,7 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   searchOpen: false,
   showTree: true,
   treeWidthPx: TREE_WIDTH_DEFAULT,
+  compactLayout: false,
   fullscreen: false,
   inFileSearchOpen: false,
   inFileSearchQuery: '',
@@ -205,6 +213,10 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   toggleTree: () => set(state => ({ showTree: !state.showTree })),
 
   setTreeWidthPx: widthPx => set({ treeWidthPx: clampTreeWidth(widthPx) }),
+
+  setCompactLayout: compact => {
+    if (get().compactLayout !== compact) set({ compactLayout: compact });
+  },
 
   setSearchOpen: (open: boolean) => set({ searchOpen: open, isOpen: open ? true : undefined }),
 
