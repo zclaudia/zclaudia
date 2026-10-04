@@ -6,9 +6,10 @@
 /**
  * `idle`: detected but not running (starts on first use). `stopped`: crashed
  * and waiting out its restart backoff. `failed`: will not start again until
- * the server restarts or the setting is toggled.
+ * the server restarts or the setting is toggled. `missing`: the workspace
+ * needs it (root markers present) but it is not installed.
  */
-export type LanguageServerState = 'idle' | 'starting' | 'ready' | 'stopped' | 'failed';
+export type LanguageServerState = 'idle' | 'starting' | 'ready' | 'stopped' | 'failed' | 'missing';
 
 export interface LanguageServerStatusEntry {
   id: string;
@@ -24,6 +25,8 @@ export interface LanguageServerStatusEntry {
   startedAt: number | null;
   lastUsedAt: number | null;
   lastError: string | null;
+  /** Command that installs the server, when it is missing or failed to start. */
+  installHint: string | null;
 }
 
 /** GET /api/language-servers — every server instance on this backend. */

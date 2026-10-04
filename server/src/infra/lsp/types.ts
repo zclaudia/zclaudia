@@ -42,6 +42,14 @@ export interface LanguageServerPreset {
    */
   resolveLaunch(root: string): LaunchSpec | null;
   /**
+   * How the user installs this server, shown when the workspace has its root
+   * markers but the executable is missing. Presets without one (TypeScript,
+   * which follows the project's own `typescript`) are never reported missing.
+   */
+  installHint?: string;
+  /** Drop cached probes, so an install shows up without waiting for the TTL. */
+  refreshDetection?(): void;
+  /**
    * Ask the server for a file's diagnostics directly, for servers that do not
    * publish when nothing changed (typescript-language-server skips an
    * empty → empty update, so a clean edit would never be answered). Returns
@@ -122,7 +130,8 @@ export interface DiagnosticsRequest {
   signal?: AbortSignal;
 }
 
-export type LanguageServerState = 'idle' | 'starting' | 'ready' | 'stopped' | 'failed';
+/** `missing`: the workspace needs this server but it is not installed. */
+export type LanguageServerState = 'idle' | 'starting' | 'ready' | 'stopped' | 'failed' | 'missing';
 
 export interface LanguageServerStatus {
   id: string;
@@ -137,6 +146,8 @@ export interface LanguageServerStatus {
   startedAt: number | null;
   lastUsedAt: number | null;
   lastError: string | null;
+  /** Set when the server is missing or failed to start (install it, then retry). */
+  installHint: string | null;
 }
 
 /**

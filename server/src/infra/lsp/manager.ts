@@ -27,7 +27,7 @@ import {
   type LspQueryRequest,
   type LspQueryResult,
 } from '../providers/language-server-port.js';
-import { findFirstSourceFile } from './detection.js';
+import { findFirstSourceFile, hasRootMarker } from './detection.js';
 import { defaultLanguageServerPresets } from './presets.js';
 import { spawnLanguageServer } from './spawn.js';
 import type {
@@ -108,6 +108,8 @@ interface Entry {
   startedAt: number | null;
   lastUsedAt: number | null;
   lastError: string | null;
+  /** Failed by exiting before initialize: a setup problem the user can fix. */
+  startupFailed: boolean;
   idleTimer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -172,13 +174,28 @@ export class LanguageServerManager implements LanguageServerService {
       return;
     }
     for (const entry of this.entries.values()) {
-      if (entry.state === 'failed') {
-        entry.state = 'idle';
-        entry.lastError = null;
-        entry.crashes = [];
-        entry.nextStartAt = 0;
-      }
+      if (entry.state === 'failed') this.resetFailed(entry);
     }
+  }
+
+  /**
+   * Re-probe every preset now instead of after the detection TTL, and give
+   * servers that failed at start-up another chance: the user may just have
+   * installed what was missing.
+   */
+  redetect(): void {
+    for (const preset of this.presets) preset.refreshDetection?.();
+    for (const entry of this.entries.values()) {
+      if (entry.state === 'failed' && entry.startupFailed) this.resetFailed(entry);
+    }
+  }
+
+  private resetFailed(entry: Entry): void {
+    entry.state = 'idle';
+    entry.lastError = null;
+    entry.startupFailed = false;
+    entry.crashes = [];
+    entry.nextStartAt = 0;
   }
 
   serversFor(root: string): LanguageServerInfo[] {
@@ -579,9 +596,43 @@ export class LanguageServerManager implements LanguageServerService {
   statusFor(root: string): LanguageServerStatus[] {
     if (!this.enabled) return [];
     const resolvedRoot = path.resolve(root);
-    return this.availablePresets(resolvedRoot).map(preset =>
-      this.statusOf(this.entryFor(preset, resolvedRoot))
-    );
+    return [
+      ...this.availablePresets(resolvedRoot).map(preset =>
+        this.statusOf(this.entryFor(preset, resolvedRoot))
+      ),
+      ...this.missingFor(resolvedRoot),
+    ];
+  }
+
+  /**
+   * Servers the workspace needs (its root markers are there) whose executable
+   * was not found. Only presets that say how to install them are reported.
+   */
+  missingFor(root: string): LanguageServerStatus[] {
+    if (!this.enabled) return [];
+    const resolvedRoot = path.resolve(root);
+    return this.presets
+      .filter(
+        preset =>
+          preset.installHint &&
+          hasRootMarker(resolvedRoot, preset.rootMarkers) &&
+          !this.availablePresets(resolvedRoot).includes(preset)
+      )
+      .map(preset => ({
+        id: preset.id,
+        name: preset.name,
+        languages: preset.languages,
+        root: resolvedRoot,
+        state: 'missing' as const,
+        leases: [],
+        openDocuments: 0,
+        pid: null,
+        processId: null,
+        startedAt: null,
+        lastUsedAt: null,
+        lastError: null,
+        installHint: preset.installHint ?? null,
+      }));
   }
 
   private statusOf(entry: Entry): LanguageServerStatus {
@@ -598,6 +649,7 @@ export class LanguageServerManager implements LanguageServerService {
       startedAt: entry.startedAt,
       lastUsedAt: entry.lastUsedAt,
       lastError: entry.lastError,
+      installHint: entry.startupFailed ? (entry.preset.installHint ?? null) : null,
     };
   }
 
@@ -642,6 +694,7 @@ export class LanguageServerManager implements LanguageServerService {
         startedAt: null,
         lastUsedAt: null,
         lastError: null,
+        startupFailed: false,
         idleTimer: null,
       };
       this.entries.set(key, entry);
@@ -793,6 +846,7 @@ export class LanguageServerManager implements LanguageServerService {
         // bad install), not a flake: retrying would fail the same way.
         entry.state = 'failed';
         entry.lastError = message;
+        entry.startupFailed = true;
         return null;
       }
       this.recordCrash(entry, message);

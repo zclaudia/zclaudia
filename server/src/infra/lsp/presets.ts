@@ -109,6 +109,7 @@ export function createTypeScriptPreset(deps: TypeScriptPresetDeps = {}): Languag
     extensions: TYPESCRIPT_EXTENSIONS,
     rootMarkers: TYPESCRIPT_ROOT_MARKERS,
     resolveLaunch,
+    refreshDetection: () => resolveLaunch.clear(),
     pullDiagnostics: pullTypeScriptDiagnostics,
   };
 }
@@ -121,6 +122,7 @@ export interface PathPresetSpec {
   rootMarkers: string[];
   command: string;
   args: string[];
+  installHint?: string;
 }
 
 /**
@@ -140,11 +142,13 @@ export function createPathPreset(
     languages: spec.languages,
     extensions: spec.extensions,
     rootMarkers: spec.rootMarkers,
+    ...(spec.installHint ? { installHint: spec.installHint } : {}),
     resolveLaunch: root => {
       if (!hasRootMarker(root, spec.rootMarkers)) return null;
       const executable = resolveExecutable('/');
       return executable ? { command: executable, args: spec.args, cwd: root } : null;
     },
+    refreshDetection: () => resolveExecutable.clear(),
   };
 }
 
@@ -163,6 +167,7 @@ export const PYRIGHT_PRESET: PathPresetSpec = {
   ],
   command: 'pyright-langserver',
   args: ['--stdio'],
+  installHint: 'npm install -g pyright',
 };
 
 export const GOPLS_PRESET: PathPresetSpec = {
@@ -173,6 +178,7 @@ export const GOPLS_PRESET: PathPresetSpec = {
   rootMarkers: ['go.mod', 'go.work'],
   command: 'gopls',
   args: [],
+  installHint: 'go install golang.org/x/tools/gopls@latest',
 };
 
 export const RUST_ANALYZER_PRESET: PathPresetSpec = {
@@ -183,6 +189,7 @@ export const RUST_ANALYZER_PRESET: PathPresetSpec = {
   rootMarkers: ['Cargo.toml'],
   command: 'rust-analyzer',
   args: [],
+  installHint: 'rustup component add rust-analyzer',
 };
 
 export function defaultLanguageServerPresets(): LanguageServerPreset[] {

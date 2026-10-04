@@ -65,7 +65,9 @@ describe('language-server routes', () => {
       applicable: true,
       enabled: true,
       root,
-      servers: [{ id: 'fake', name: 'Fake', state: 'idle', leases: 0, lastError: null }],
+      servers: [
+        { id: 'fake', name: 'Fake', state: 'idle', leases: 0, lastError: null, installHint: null },
+      ],
     });
   });
 
@@ -108,6 +110,47 @@ describe('language-server routes', () => {
   it('rejects a non-boolean switch value', async () => {
     const res = await request(app).put('/api/language-servers').send({ enabled: 'yes' });
     expect(res.status).toBe(400);
+  });
+
+  it('lists servers a known project needs but lacks, and re-probes on refresh', async () => {
+    let installed = false;
+    let refreshed = 0;
+    const missable: LanguageServerPreset = {
+      ...preset,
+      id: 'gopls',
+      name: 'Go',
+      rootMarkers: ['go.mod'],
+      installHint: 'go install golang.org/x/tools/gopls@latest',
+      resolveLaunch: root => (installed ? { command: 'gopls', args: [], cwd: root } : null),
+      refreshDetection: () => {
+        refreshed += 1;
+      },
+    };
+    await manager.dispose();
+    manager = new LanguageServerManager({ presets: [preset, missable] });
+    writeFileSync(path.join(root, 'go.mod'), 'module x');
+
+    const res = await request(app).get('/api/language-servers');
+    expect(res.body.data.servers).toEqual([
+      expect.objectContaining({
+        id: 'gopls',
+        root,
+        state: 'missing',
+        installHint: 'go install golang.org/x/tools/gopls@latest',
+      }),
+    ]);
+
+    installed = true;
+    await request(app).get('/api/language-servers?refresh=1');
+    expect(refreshed).toBe(1);
+    db.prepare(`INSERT INTO sessions VALUES ('s1', 'p1', 'pi', NULL)`).run();
+    const session = await request(app).get('/api/language-servers/sessions/s1');
+    expect(
+      session.body.data.servers.map((s: { id: string; state: string }) => [s.id, s.state])
+    ).toEqual([
+      ['fake', 'idle'],
+      ['gopls', 'idle'],
+    ]);
   });
 
   it('defaults to on when nothing is stored', () => {

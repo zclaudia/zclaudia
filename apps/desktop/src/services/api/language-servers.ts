@@ -13,11 +13,18 @@ export async function getSessionLanguageServers(
   );
 }
 
-/** Every language-server instance on the backend, plus the master switch. */
+/**
+ * Every language-server instance on the backend, plus the master switch.
+ * `refresh` re-probes installed servers now instead of after the cache TTL.
+ */
 export async function getLanguageServers(
-  backendId?: string | null
+  backendId?: string | null,
+  options: { refresh?: boolean } = {}
 ): Promise<LanguageServersOverview> {
-  return apiCallForBackend<LanguageServersOverview>(backendId, '/api/language-servers');
+  return apiCallForBackend<LanguageServersOverview>(
+    backendId,
+    `/api/language-servers${options.refresh ? '?refresh=1' : ''}`
+  );
 }
 
 export async function setLanguageServersEnabled(

@@ -44,6 +44,7 @@ function toEntry(status: LanguageServerStatus): LanguageServerStatusEntry {
     startedAt: status.startedAt,
     lastUsedAt: status.lastUsedAt,
     lastError: status.lastError,
+    installHint: status.installHint,
   };
 }
 
@@ -59,13 +60,31 @@ export function createLanguageServerRoutes(
 ): Router {
   const router = Router();
 
-  const overview = (manager: LanguageServerManager): LanguageServersOverview => ({
-    enabled: manager.isEnabled,
-    servers: manager.status().map(toEntry),
-  });
+  // Running instances, plus servers a known project needs but lacks.
+  const overview = (manager: LanguageServerManager): LanguageServersOverview => {
+    const roots = (
+      db
+        .prepare('SELECT DISTINCT root_path FROM projects WHERE root_path IS NOT NULL')
+        .all() as Array<{
+        root_path: string;
+      }>
+    ).map(row => row.root_path);
+    return {
+      enabled: manager.isEnabled,
+      servers: [...manager.status(), ...roots.flatMap(root => manager.missingFor(root))].map(
+        toEntry
+      ),
+    };
+  };
 
-  router.get('/', (_req: Request, res: Response) => {
+  // `?refresh=1` re-probes now (Settings opening, after the user installed something).
+  const maybeRedetect = (req: Request, manager: LanguageServerManager | undefined) => {
+    if (manager && req.query.refresh === '1') manager.redetect();
+  };
+
+  router.get('/', (req: Request, res: Response) => {
     const manager = getManager();
+    maybeRedetect(req, manager);
     const data: LanguageServersOverview = manager
       ? overview(manager)
       : { enabled: false, servers: [] };
@@ -119,6 +138,7 @@ export function createLanguageServerRoutes(
       )?.runtime_type ??
       null;
     const manager = getManager();
+    maybeRedetect(req, manager);
     // Same precedence a run uses for its cwd (run-bootstrap).
     const root = row.working_directory || row.root_path || null;
     // Only the ZClaudia (Pi) runtime uses these servers; external CLIs bring their own.
