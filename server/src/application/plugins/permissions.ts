@@ -1,9 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import type { Permission, PluginManifest } from '@zclaudia/shared/plugin-types';
 import { pluginEvents } from '../../infra/events/index.js';
-import { resolveDataDir } from '../../utils/data-dir.js';
+import { resolveDataDir, resolveLegacyDataDir, seedFromLegacyFile } from '../../utils/data-dir.js';
 
 const STORE_FILE = 'plugin-permissions.json';
 
@@ -14,7 +13,7 @@ export function defaultPermissionStorePath(): string {
 
 /** Pre-rename location; only ever read, to seed a data dir that has no store yet. */
 export function legacyPermissionStorePath(): string {
-  return path.join(os.homedir(), '.claudia', STORE_FILE);
+  return path.join(resolveLegacyDataDir(), STORE_FILE);
 }
 
 export interface PermissionManagerOptions {
@@ -88,12 +87,8 @@ export class PermissionManager {
 
   /** One-time copy; the legacy file is left in place for older builds. */
   private migrateLegacyStore(legacyStorePath: string): void {
-    if (path.resolve(legacyStorePath) === path.resolve(this.storePath)) return;
     try {
-      if (fs.existsSync(this.storePath) || !fs.existsSync(legacyStorePath)) return;
-      fs.mkdirSync(path.dirname(this.storePath), { recursive: true });
-      // EXCL: never clobber a store another process created in the meantime.
-      fs.copyFileSync(legacyStorePath, this.storePath, fs.constants.COPYFILE_EXCL);
+      seedFromLegacyFile(legacyStorePath, this.storePath);
     } catch (error) {
       console.error('[PermissionManager] Failed to migrate legacy store:', error);
     }

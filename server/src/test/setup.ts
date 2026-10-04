@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { vi, beforeEach, afterEach, afterAll } from 'vitest';
@@ -9,9 +9,9 @@ import { vi, beforeEach, afterEach, afterAll } from 'vitest';
 // Tests that need a specific data dir still set ZCLAUDIA_DATA_DIR themselves.
 const testDataDir = mkdtempSync(join(tmpdir(), 'zclaudia-test-data-'));
 process.env.ZCLAUDIA_DATA_DIR = testDataDir;
-// An existing (empty) permission store keeps PermissionManager from seeding
-// itself out of the legacy ~/.claudia store, so tests never read it either.
-writeFileSync(join(testDataDir, 'plugin-permissions.json'), '{}');
+// Legacy (~/.claudia) seeding — plugin permissions, plugin storage — reads
+// from a dir that never exists, so tests never touch the real legacy data.
+process.env.ZCLAUDIA_LEGACY_DATA_DIR = join(testDataDir, 'legacy-claudia-missing');
 
 afterAll(() => {
   rmSync(testDataDir, { recursive: true, force: true });
