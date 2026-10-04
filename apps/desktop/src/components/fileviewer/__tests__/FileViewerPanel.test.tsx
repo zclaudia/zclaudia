@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as api from '../../../services/api';
@@ -102,6 +102,8 @@ const mockFileViewerState = {
   backToTree: vi.fn(),
   treeWidthPx: 256,
   setTreeWidthPx: vi.fn(),
+  compactLayout: false,
+  setCompactLayout: vi.fn(),
   isOpen: false,
   knownMtimeMs: null as number | null,
   invalidate: vi.fn(),
@@ -145,6 +147,7 @@ beforeEach(() => {
   mockFileViewerState.markdownSourceView = false;
   mockFileViewerState.showTree = true;
   mockFileViewerState.treeWidthPx = 256;
+  mockFileViewerState.compactLayout = false;
   mockFileViewerState.projectRoot = null;
   mockFileViewerState.knownMtimeMs = null;
   vi.mocked(api.getFileLanguageServerDiagnostics).mockResolvedValue({
@@ -709,5 +712,68 @@ describe('FileViewerPanel language-server diagnostics', () => {
     render(<FileViewerPanel projectRoot="/project" />);
     expect(await screen.findByText('No problems')).toBeInTheDocument();
     expect(api.acquireLanguageServerViewerLease).not.toHaveBeenCalled();
+  });
+});
+
+describe('FileViewerPanel width-aware layout', () => {
+  let width = 1000;
+  const realResizeObserver = globalThis.ResizeObserver;
+  const realRect = HTMLElement.prototype.getBoundingClientRect;
+
+  beforeEach(() => {
+    width = 1000;
+    (globalThis as any).ResizeObserver = class {
+      observe() {}
+      disconnect() {}
+    };
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      return {
+        width,
+        height: 600,
+        top: 0,
+        left: 0,
+        right: width,
+        bottom: 600,
+        x: 0,
+        y: 0,
+        toJSON() {},
+      } as DOMRect;
+    };
+    mockFileViewerState.filePath = 'src/app.ts';
+    mockFileViewerState.content = 'const a = 1;';
+  });
+  afterEach(() => {
+    (globalThis as any).ResizeObserver = realResizeObserver;
+    HTMLElement.prototype.getBoundingClientRect = realRect;
+  });
+
+  it('keeps the tree beside the code when there is room, at the chosen width', () => {
+    render(<FileViewerPanel projectRoot="/project" />);
+    expect(screen.getByTestId('file-tree-pane')).toHaveStyle({ width: '256px' });
+    expect(mockFileViewerState.setCompactLayout).toHaveBeenLastCalledWith(false);
+  });
+
+  it('narrows the tree so the code keeps its minimum width', () => {
+    width = 500; // 500 - 320 = 180px left for the tree
+    render(<FileViewerPanel projectRoot="/project" />);
+    expect(screen.getByTestId('file-tree-pane')).toHaveStyle({ width: '180px' });
+    expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '180');
+  });
+
+  it('shows only the code in a narrow panel, with Back to the tree', () => {
+    width = 300;
+    render(<FileViewerPanel projectRoot="/project" />);
+    expect(screen.queryByTestId('file-tree-pane')).toBeNull();
+    expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
+    expect(mockFileViewerState.setCompactLayout).toHaveBeenLastCalledWith(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Back to file tree' }));
+    expect(mockFileViewerState.backToTree).toHaveBeenCalled();
+  });
+
+  it('drops the tree toggle from the header in a narrow panel', () => {
+    mockFileViewerState.compactLayout = true;
+    render(<FileViewerActions />);
+    expect(screen.queryByRole('button', { name: /file tree/ })).toBeNull();
+    mockFileViewerState.compactLayout = false;
   });
 });

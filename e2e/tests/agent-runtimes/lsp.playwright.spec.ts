@@ -450,8 +450,9 @@ test('LSP: the file viewer marks type errors once the user checks types', async 
     });
 
     await reference.click();
-    // The side panel is narrow: give the code the room the file tree takes.
-    await page.getByRole('button', { name: 'Hide file tree' }).click();
+    // The side panel is narrow, so the viewer shows the code without the tree.
+    await expect(page.getByTestId('code-viewer')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Back to file tree' })).toBeVisible();
     const checkTypes = page.getByTestId('check-types');
     await expect(checkTypes).toBeVisible({ timeout: 15_000 });
     await checkTypes.click();

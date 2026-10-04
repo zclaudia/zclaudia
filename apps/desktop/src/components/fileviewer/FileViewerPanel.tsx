@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useLayoutEffect,
   useRef,
   useState,
   useEffect,
@@ -126,6 +127,8 @@ interface FileViewerPanelProps {
 /** Row height (px) — must match lineHeight below so virtualization aligns rows. */
 const ROW_HEIGHT_PX = 20;
 const TREE_WIDTH_MIN = 160;
+/** The code keeps at least this much width beside the tree. */
+const CODE_WIDTH_MIN = 320;
 const TREE_WIDTH_MAX = 520;
 
 type CodeRowExtraProps = {
@@ -436,8 +439,11 @@ export function FileViewerActions() {
     toggleTree,
     markdownSourceView,
     toggleMarkdownSourceView,
+    compactLayout,
   } = useFileViewerStore();
-  const showFileTree = isMobile ? !filePath : showTree;
+  // Narrow panels lay out like mobile: the tree is reached with Back, not a toggle.
+  const compact = isMobile || compactLayout;
+  const showFileTree = compact ? !filePath : showTree;
   const isMarkdown = !!filePath && detectLanguage(filePath) === 'markdown';
   const [copied, setCopied] = useState(false);
 
@@ -459,7 +465,7 @@ export function FileViewerActions() {
 
   return (
     <div className="flex items-center gap-1">
-      {filePath && !isMobile && (
+      {filePath && !compact && (
         <button
           type="button"
           onClick={toggleTree}
@@ -556,6 +562,21 @@ export function FileViewerActions() {
 }
 
 /** File viewer content (renders inside the shared BottomPanel) */
+/** The element's current width, or null before it is measured (or without ResizeObserver). */
+function usePanelWidth(ref: React.RefObject<HTMLElement | null>): number | null {
+  const [width, setWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const measure = () => setWidth(element.getBoundingClientRect().width || null);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref]);
+  return width;
+}
+
 export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const isMobile = useIsMobile();
   const store = useFileViewerStore();
@@ -582,6 +603,14 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
     markdownSourceView,
   } = store;
   const treeResizeCleanupRef = useRef<(() => void) | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelWidth = usePanelWidth(panelRef);
+  // Too narrow for the tree (at its minimum) beside usable code: one at a time.
+  const compactLayout =
+    !isMobile && panelWidth !== null && panelWidth < TREE_WIDTH_MIN + CODE_WIDTH_MIN;
+  const compact = isMobile || compactLayout;
+  const setCompactLayout = useFileViewerStore(s => s.setCompactLayout);
+  useEffect(() => setCompactLayout(compactLayout), [compactLayout, setCompactLayout]);
   // Guard: when the store still holds state pointing at a different project
   // (e.g. user just switched session/project), treat the viewer as if no file
   // is selected. SessionChatLayout's effect will close()/reset the store
@@ -767,8 +796,14 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   );
   const highlightStart = targetLine ?? null;
   const highlightEnd = targetEndLine ?? targetLine ?? null;
-  const showFileTree = isMobile ? !filePath : showTree;
+  const showFileTree = compact ? !filePath : showTree;
   const contentLayoutClass = isMobile ? (showFileTree ? 'flex flex-col' : 'block') : 'flex';
+  // The tree never squeezes the code below CODE_WIDTH_MIN; the user's width
+  // comes back when the panel is wide enough again.
+  const treeWidth =
+    panelWidth === null
+      ? treeWidthPx
+      : Math.max(TREE_WIDTH_MIN, Math.min(treeWidthPx, panelWidth - CODE_WIDTH_MIN));
 
   useEffect(() => () => treeResizeCleanupRef.current?.(), []);
 
@@ -780,7 +815,8 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
       event.preventDefault();
       treeResizeCleanupRef.current?.();
 
-      const startWidth = treeWidthPx;
+      // Drag from the width on screen, which may be narrower than the preference.
+      const startWidth = treeWidth;
       const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
         const clientX = 'touches' in moveEvent ? moveEvent.touches[0]?.clientX : moveEvent.clientX;
         if (typeof clientX !== 'number') return;
@@ -803,7 +839,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
       window.addEventListener('touchcancel', cleanup);
       treeResizeCleanupRef.current = cleanup;
     },
-    [isMobile, setTreeWidthPx, treeWidthPx]
+    [isMobile, setTreeWidthPx, treeWidth]
   );
 
   // Scroll the virtualized list to the target line when one is set / changed.
@@ -829,7 +865,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const isBrowseMode = !filePath && !loading && !error;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div ref={panelRef} className="flex flex-col h-full overflow-hidden">
       {isBrowseMode ? (
         <>
           {/* Browse: search field is the toolbar, tree fills the panel */}
@@ -852,7 +888,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
         <>
           {/* Read: breadcrumb toolbar */}
           <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-background/95 flex-shrink-0 min-w-0">
-            {isMobile && filePath && (
+            {compact && filePath && (
               <IconButton
                 size="sm"
                 onClick={backToTree}
@@ -924,7 +960,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
                       ? 'h-2/5 min-h-[180px] flex-shrink-0 border-b border-border'
                       : 'flex-shrink-0 border-r border-border'
                   }
-                  style={isMobile ? undefined : { width: `${treeWidthPx}px` }}
+                  style={isMobile ? undefined : { width: `${treeWidth}px` }}
                 >
                   <FileTree
                     projectRoot={projectRoot}
@@ -940,7 +976,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
                     aria-orientation="vertical"
                     aria-valuemin={TREE_WIDTH_MIN}
                     aria-valuemax={TREE_WIDTH_MAX}
-                    aria-valuenow={treeWidthPx}
+                    aria-valuenow={treeWidth}
                     className="-ml-px h-full w-2 flex-shrink-0 cursor-col-resize touch-none border-l border-transparent transition-colors hover:border-border hover:bg-muted/60"
                     onMouseDown={beginTreeResize}
                     onTouchStart={beginTreeResize}
