@@ -461,6 +461,11 @@ export class ProcessSupervisor {
           exitedAt: Date.now(),
           metadata: { spawnError: error.message },
         });
+        // A spawn that fails (ENOENT, EACCES) emits only 'error', never
+        // 'exit' — without resolving here the exitPromise never settles and
+        // callers waiting on it (LSP client startup) hang until their own
+        // timeout. An error after the process started still ends via 'exit'.
+        if (!initialized) resolve({ code: null, signal: null });
       });
 
       child.once('exit', (code, signal) => {

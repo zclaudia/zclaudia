@@ -11,6 +11,7 @@
 import { createHash } from 'crypto';
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { ResponseError } from 'vscode-languageserver-protocol/node';
 import { LanguageServerStartupError, LspClient } from './client.js';
 import { DiagnosticsStore, mapDiagnostics } from './diagnostics.js';
 import { DocumentStore, fileUri, type SyncOutcome } from './documents.js';
@@ -124,6 +125,8 @@ interface Entry {
   /** Failed by exiting before initialize: a setup problem the user can fix. */
   startupFailed: boolean;
   idleTimer: ReturnType<typeof setTimeout> | null;
+  /** While a lease waits out a crash backoff: the start attempt at nextStartAt. */
+  retryTimer: ReturnType<typeof setTimeout> | null;
 }
 
 function info(preset: LanguageServerPreset): LanguageServerInfo {
@@ -470,7 +473,14 @@ export class LanguageServerManager implements LanguageServerService {
       return await this.runRename(request, signal);
     } catch (err) {
       if (err instanceof LanguageServerError) throw err;
-      throw new LanguageServerError('rename_not_allowed', condenseServerError(err));
+      // A ResponseError is the server answering "no" (or failing) for this
+      // position — the model's way out is Edit, so keep the refusal code. A
+      // crash, timeout or closed connection is not a property of the
+      // position: report a failed request so the model retries instead.
+      if (err instanceof ResponseError) {
+        throw new LanguageServerError('rename_not_allowed', condenseServerError(err));
+      }
+      throw new LanguageServerError('request_failed', condenseServerError(err));
     }
   }
 
@@ -551,12 +561,21 @@ export class LanguageServerManager implements LanguageServerService {
     const skipped: string[] = [];
     for (const [target, edits] of byFile) {
       if (edits.length === 0) continue;
+      // The server's copy must be the disk copy before its offsets are
+      // trusted: servers reload non-open files through async watchers, so a
+      // rename racing an external change (git checkout, sed) would otherwise
+      // apply stale positions — and the hash below only proves the disk did
+      // not change after the answer, not that the server ever saw it.
+      if ((await active.documents.syncFromDisk(target)) === 'missing') {
+        // Deleted since the server last looked (its project can lag behind
+        // the disk): there is nothing left to rename in it.
+        skipped.push(isInside(root, target) ? path.relative(root, target) : target);
+        continue;
+      }
       let text: string;
       try {
         text = await readFile(target, 'utf8');
       } catch (err) {
-        // Deleted since the server last looked (its project can lag behind
-        // the disk): there is nothing left to rename in it.
         if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
           skipped.push(isInside(root, target) ? path.relative(root, target) : target);
           continue;
@@ -609,8 +628,17 @@ export class LanguageServerManager implements LanguageServerService {
           'No language server is configured for this workspace'
         );
       }
-      const lists = await Promise.all(
-        presets.map(async preset => {
+      // One preset at a time: the sync fan-out below used to mark every
+      // preset `starting` before any was `active`, and since the running cap
+      // counts `starting` entries a workspace with more presets than the cap
+      // failed every cold search. Sequential starts also mean one server
+      // without the capability (or without a project to load) only reduces
+      // coverage — it must not erase the answers of the others.
+      const lists: Array<{ symbols: ReturnType<typeof symbolList>; openFiles: number }> = [];
+      const skipped: string[] = [];
+      let firstError: unknown;
+      for (const preset of presets) {
+        try {
           const active = await this.activeFor(this.entryFor(preset, root));
           this.requireCapability(active, preset, 'workspaceSymbols');
           await active.documents.syncOpenFromDisk();
@@ -631,9 +659,19 @@ export class LanguageServerManager implements LanguageServerService {
             { query: request.query ?? '' },
             signal
           );
-          return { symbols: symbolList(root, null, raw), openFiles: active.documents.size };
-        })
-      );
+          lists.push({ symbols: symbolList(root, null, raw), openFiles: active.documents.size });
+        } catch (err) {
+          if (!firstError) firstError = err;
+          skipped.push(preset.name);
+        }
+      }
+      if (lists.length === 0) {
+        if (firstError instanceof LanguageServerError) throw firstError;
+        throw new LanguageServerError(
+          'server_unavailable',
+          'No configured language server could answer the workspace symbol search'
+        );
+      }
       const { symbols, truncated } = pruneSymbols(
         lists.flatMap(list => list.symbols),
         maxResults
@@ -643,15 +681,22 @@ export class LanguageServerManager implements LanguageServerService {
       // opened so far; in a multi-package workspace an empty answer is not
       // proof of absence, so say what was covered.
       const openFiles = lists.reduce((sum, list) => sum + list.openFiles, 0);
-      const note =
-        symbols.length === 0
-          ? `Searched only the projects of the ${openFiles} file(s) opened so far. In a multi-package workspace, run symbols on a file of another package (or a positional action) to load it, then search again.`
-          : undefined;
+      const notes: string[] = [];
+      if (skipped.length > 0) {
+        notes.push(
+          `${skipped.length} of ${presets.length} configured server(s) could not be searched (${skipped.join(', ')}), so results may be incomplete.`
+        );
+      }
+      if (symbols.length === 0) {
+        notes.push(
+          `Searched only the projects of the ${openFiles} file(s) opened so far. In a multi-package workspace, run symbols on a file of another package (or a positional action) to load it, then search again.`
+        );
+      }
       return {
         action: 'workspaceSymbols',
         symbols,
-        ...(truncated ? { truncated } : {}),
-        ...(note ? { note } : {}),
+        ...(truncated ? { truncated : true } : {}),
+        ...(notes.length > 0 ? { note: notes.join(' ') } : {}),
       };
     }
 
@@ -932,6 +977,7 @@ export class LanguageServerManager implements LanguageServerService {
         lastError: null,
         startupFailed: false,
         idleTimer: null,
+        retryTimer: null,
       };
       this.entries.set(key, entry);
     }
@@ -1016,6 +1062,7 @@ export class LanguageServerManager implements LanguageServerService {
     if (this.disposed || entry.state === 'failed') return null;
     if (this.now() < entry.nextStartAt) {
       entry.lastError = entry.lastError ?? 'language server restarting';
+      this.scheduleBackoffStart(entry);
       return null;
     }
     if (!this.makeRoom(entry)) {
@@ -1027,6 +1074,25 @@ export class LanguageServerManager implements LanguageServerService {
       entry.starting = null;
     });
     return entry.starting;
+  }
+
+  /**
+   * A crash backoff with no requester would sit out its full wait even when
+   * a lease (a viewer's "Check types", a run) is holding the server wanted:
+   * nothing else would ever trigger the start. Arm one at nextStartAt.
+   */
+  private scheduleBackoffStart(entry: Entry): void {
+    if (entry.retryTimer || entry.leases.size === 0) return;
+    entry.retryTimer = setTimeout(
+      () => {
+        entry.retryTimer = null;
+        if (!this.disposed && entry.leases.size > 0 && !entry.active && !entry.starting) {
+          void this.ensureStarted(entry);
+        }
+      },
+      Math.max(0, entry.nextStartAt - this.now())
+    );
+    entry.retryTimer.unref?.();
   }
 
   private makeRoom(entry: Entry): boolean {
@@ -1043,13 +1109,13 @@ export class LanguageServerManager implements LanguageServerService {
   }
 
   private async start(entry: Entry): Promise<ActiveClient | null> {
-    const launch = entry.preset.resolveLaunch(entry.root);
-    if (!launch) {
-      entry.state = 'idle';
-      entry.lastError = 'language server executable not found';
-      return null;
-    }
     try {
+      const launch = entry.preset.resolveLaunch(entry.root);
+      if (!launch) {
+        entry.state = 'idle';
+        entry.lastError = 'language server executable not found';
+        return null;
+      }
       const transport = await this.spawn(launch, { presetId: entry.preset.id, root: entry.root });
       const client = await LspClient.start(transport, {
         root: entry.root,
@@ -1133,7 +1199,14 @@ export class LanguageServerManager implements LanguageServerService {
   private async stop(entry: Entry): Promise<void> {
     this.clearIdle(entry);
     const active = entry.active ?? (entry.starting ? await entry.starting : null);
-    if (!active) return;
+    if (!active) {
+      // The start settled to nothing (disposed mid-start, launch gone): it
+      // had set state 'starting', so reset it or status() reports a phantom
+      // starting server forever. A start re-issued in the meantime owns the
+      // state again, so leave that alone.
+      if (entry.state === 'starting' && !entry.starting) entry.state = 'idle';
+      return;
+    }
     entry.stopping = true;
     try {
       await active.documents.closeAll().catch(() => undefined);
@@ -1141,6 +1214,8 @@ export class LanguageServerManager implements LanguageServerService {
     } finally {
       if (entry.active === active) entry.active = null;
       entry.stable.clear();
+      if (entry.retryTimer) clearTimeout(entry.retryTimer);
+      entry.retryTimer = null;
       entry.state = entry.state === 'failed' ? 'failed' : 'idle';
       entry.stopping = false;
     }

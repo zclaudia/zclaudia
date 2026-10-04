@@ -124,7 +124,11 @@ export class DiagnosticsStore {
       const finish = (value: LspDiagnostic[] | null) => {
         clearTimeout(settleTimer);
         clearTimeout(budgetTimer);
-        this.listeners.get(uri)?.delete(onPublish);
+        const set = this.listeners.get(uri);
+        set?.delete(onPublish);
+        // Drop the per-file entry once nobody waits on it, or one empty Set
+        // accumulates per file URI ever waited on for the client's lifetime.
+        if (set && set.size === 0) this.listeners.delete(uri);
         options.signal?.removeEventListener('abort', onAbort);
         resolve(value);
       };

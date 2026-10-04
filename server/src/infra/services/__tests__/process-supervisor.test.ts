@@ -114,3 +114,35 @@ describe('ProcessSupervisor env scrubbing (P2)', () => {
     }
   });
 });
+
+describe('ProcessSupervisor spawn failure', () => {
+  let db: Database.Database;
+  let supervisor: ProcessSupervisor;
+
+  beforeEach(() => {
+    db = createDb();
+    supervisor = new ProcessSupervisor(db);
+  });
+
+  // Node emits only 'error' for a failed spawn — the exitPromise must still
+  // settle, or startup paths waiting on it (LSP client) hang until timeout.
+  it('resolves exitPromise when the command does not exist', async () => {
+    const result = await supervisor.spawn({
+      source: 'language_server',
+      command: 'zc-supervisor-no-such-command-xyz',
+      args: [],
+    });
+    await expect(result.handle.exitPromise).resolves.toEqual({ code: null, signal: null });
+    expect(supervisor.getProcess(result.processId)?.status).toBe('failed');
+  });
+
+  it('resolves exitPromise when the file exists but is not executable', async () => {
+    if (process.platform === 'win32') return;
+    const result = await supervisor.spawn({
+      source: 'language_server',
+      command: '/etc/hosts',
+      args: [],
+    });
+    await expect(result.handle.exitPromise).resolves.toEqual({ code: null, signal: null });
+  });
+});
