@@ -48,6 +48,12 @@ import {
   buildMutationResultText,
   truncateDiffDetail,
 } from './mutation-details.js';
+import {
+  collectDiagnosticsReports,
+  mergePerFileLifecycles,
+  PatchDiagnosticsTargets,
+  runPatchDiagnostics,
+} from './patch-diagnostics.js';
 import { createWriteBridgeTool } from './write-tool.js';
 import {
   assertRebaseAnchorsWereRead,
@@ -137,6 +143,15 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
           const operations = parseApplyPatch(args.patch);
           const perFileResults: MutationDetails[] = [];
           const previewOnly = args.preview_only === true;
+          // Inline diagnostics run once after every operation (see
+          // patch-diagnostics.ts); the per-file writes skip their own check.
+          const patchDiagnostics =
+            !previewOnly && options?.diagnosticsProvider && options.diagnosticsMode !== 'deferred'
+              ? { provider: options.diagnosticsProvider, targets: new PatchDiagnosticsTargets() }
+              : undefined;
+          const operationOptions: FileMutationToolOptions | undefined = patchDiagnostics
+            ? { ...options, diagnosticsProvider: undefined }
+            : options;
           if (!previewOnly) {
             // Preflight runs with the noop guard disabled: it is a speculative
             // dry run, so failures inside it must not count toward
@@ -303,7 +318,13 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
                 });
                 continue;
               }
-              const writeTool = createWriteBridgeTool(cwd, options);
+              patchDiagnostics?.targets.add({
+                // Matches the perFileResults entry below.
+                path: operation.path,
+                absolutePath: filePath,
+                originalContent,
+              });
+              const writeTool = createWriteBridgeTool(cwd, operationOptions);
               const result = await writeTool.execute(`${toolCallId}:add:${operation.path}`, {
                 file_path: operation.path,
                 content: operation.content,
@@ -448,7 +469,15 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
               });
               continue;
             }
-            const editTool = createEditBridgeTool(cwd, options);
+            if (patchDiagnostics) {
+              try {
+                const targetPath = resolveInsideWorkspace(cwd, operation.path);
+                await patchDiagnostics.targets.addFromDisk(operation.path, targetPath);
+              } catch {
+                // Outside the workspace: the update reports the failure.
+              }
+            }
+            const editTool = createEditBridgeTool(cwd, operationOptions);
             const runUpdate = (oldText: string, newText: string, attempt: string) =>
               editTool.execute(`${toolCallId}:update:${operation.path}${attempt}`, {
                 file_path: operation.path,
@@ -488,6 +517,15 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             }
             perFileResults.push({ ...details, type: 'update', path: operation.path });
           }
+          if (patchDiagnostics) {
+            await runPatchDiagnostics(
+              patchDiagnostics.provider,
+              patchDiagnostics.targets.list(),
+              perFileResults
+            );
+          }
+          const diagnosticsReports = collectDiagnosticsReports(perFileResults);
+          const lifecycle = mergePerFileLifecycles(perFileResults);
           const failed = perFileResults.some(result => result.ok === false);
           const patchDiff = perFileResults
             .map(result => result.diff)
@@ -501,6 +539,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
                 perFileResults,
                 diff: patchDiff,
                 snapshotUpdated: false,
+                diagnosticsReports,
               }),
               {
                 ok: false,
@@ -508,6 +547,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
                 perFileResults,
                 ...(patchDiff ? { diff: patchDiffDetails.diff } : {}),
                 ...(patchDiffDetails.truncated ? { diffTruncated: true } : {}),
+                ...(lifecycle ? { lifecycle } : {}),
               }
             );
           }
@@ -521,6 +561,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
                 ?.firstChangedLine,
               preview: previewOnly,
               snapshotUpdated: false,
+              diagnosticsReports,
             }),
             {
               ok: true,
@@ -530,6 +571,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
               ...(patchDiffDetails.truncated ? { diffTruncated: true } : {}),
               firstChangedLine: perFileResults.find(result => result.firstChangedLine !== undefined)
                 ?.firstChangedLine,
+              ...(lifecycle ? { lifecycle } : {}),
             }
           );
         } catch (err) {

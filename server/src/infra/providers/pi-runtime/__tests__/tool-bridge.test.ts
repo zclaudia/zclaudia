@@ -1473,6 +1473,47 @@ describe('Write bridge tool', () => {
     });
   });
 
+  it('names errors a write introduced in other open files, and how far the check reached', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    let otherErrors: any[] = [
+      {
+        path: 'use.ts',
+        line: 2,
+        column: 18,
+        severity: 'error' as const,
+        message: "Argument of type 'number' is not assignable to parameter of type 'string'.",
+        code: 2345,
+      },
+    ];
+    const diagnosticsProvider = vi.fn(async () => ({
+      checker: 'TypeScript',
+      state: 'checked' as const,
+      baseline: 'known' as const,
+      errors: [],
+      otherFiles: { checked: 3, errors: otherErrors },
+    }));
+    const write = buildTools(dir, { enabled: ['Write'], diagnosticsProvider }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
+
+    const broken = await write.execute('w-other-files', { file_path: 'dep.ts', content: 'x\n' });
+    expect(broken.content[0].text).toContain(
+      'Diagnostics (TypeScript): 1 error introduced in other open files:'
+    );
+    expect(broken.content[0].text).toContain('  use.ts:2:18 Argument of type');
+    expect(broken.content[0].text).not.toContain('no new errors');
+
+    otherErrors = [];
+    const clean = await write.execute('w-other-files-clean', {
+      file_path: 'dep.ts',
+      content: 'y\n',
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(clean.content[0].text).toContain(
+      'Diagnostics (TypeScript): no new errors (also checked 3 other open files).'
+    );
+  });
+
   it('says "not checked" when the language server has not answered', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
     const diagnosticsProvider = vi.fn(async () => ({
@@ -1824,6 +1865,111 @@ describe('Edit bridge tool', () => {
     expect(res.content[0].text).toContain('+const a = 2;');
     expect(a).toBe('const a = 2;\n');
     expect(b).toBe('export const b = 1;\n');
+  });
+
+  it('checks a multi-file patch once, after every file is written', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'a.ts'), 'const a = 1;\n');
+    const seen: Array<{ path: string; original: string | null; updated: string }> = [];
+    const diagnosticsProvider = vi.fn(async (input: any) => {
+      seen.push({
+        path: input.path,
+        original: input.originalContent,
+        // Both files are already on disk when either is checked.
+        updated: readFileSync(path.join(dir, 'b.ts'), 'utf8'),
+      });
+      return {
+        checker: 'TypeScript',
+        state: 'checked' as const,
+        baseline: 'known' as const,
+        errors:
+          input.path === 'a.ts'
+            ? [
+                {
+                  path: 'a.ts',
+                  line: 1,
+                  column: 7,
+                  severity: 'error' as const,
+                  message: "Type 'number' is not assignable to type 'string'.",
+                  code: 2322,
+                },
+              ]
+            : [],
+      };
+    });
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'], diagnosticsProvider });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-patch-diag-a', { path: 'a.ts' });
+    const res = await edit.execute('e-patch-diag', {
+      patch: [
+        '*** Begin Patch',
+        '*** Update File: a.ts',
+        '@@',
+        '-const a = 1;',
+        '+const a: string = 1;',
+        '*** Add File: b.ts',
+        '+export const b = 1;',
+        '*** End Patch',
+      ].join('\n'),
+    });
+    rmSync(dir, { recursive: true, force: true });
+
+    expect(diagnosticsProvider).toHaveBeenCalledTimes(2);
+    expect(seen).toEqual(
+      expect.arrayContaining([
+        { path: 'a.ts', original: 'const a = 1;\n', updated: 'export const b = 1;\n' },
+        { path: 'b.ts', original: null, updated: 'export const b = 1;\n' },
+      ])
+    );
+    const text = res.content[0].text as string;
+    expect(text).toContain('Diagnostics (TypeScript): 1 new error introduced by this change:');
+    expect(text).toContain("a.ts:1:7 Type 'number' is not assignable to type 'string'. [2322]");
+    // The UI gets one merged list for the whole patch.
+    expect(res.details.lifecycle).toMatchObject({
+      diagnostics: [{ path: 'a.ts', line: 1, code: 2322 }],
+    });
+    expect(res.details.lifecycle.diagnosticsReport).toBeUndefined();
+  });
+
+  it('names the patched files a language server has not checked', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    const diagnosticsProvider = vi.fn(async (input: any) =>
+      input.path === 'b.ts'
+        ? {
+            checker: 'TypeScript',
+            state: 'pending' as const,
+            pendingReason: 'timeout' as const,
+            baseline: 'unknown' as const,
+            errors: [],
+          }
+        : {
+            checker: 'TypeScript',
+            state: 'checked' as const,
+            baseline: 'known' as const,
+            errors: [],
+          }
+    );
+    const edit = buildTools(dir, { enabled: ['Edit'], diagnosticsProvider }).find(
+      (t: any) => t.name === 'Edit'
+    ) as any;
+    const res = await edit.execute('e-patch-diag-pending', {
+      patch: [
+        '*** Begin Patch',
+        '*** Add File: a.ts',
+        '+export const a = 1;',
+        '*** Add File: b.ts',
+        '+export const b = 1;',
+        '*** End Patch',
+      ].join('\n'),
+    });
+    rmSync(dir, { recursive: true, force: true });
+    const text = res.content[0].text as string;
+    expect(text).toContain('Diagnostics (TypeScript): no new errors in a.ts.');
+    expect(text).toContain(
+      'Diagnostics (TypeScript): not checked for b.ts, language server did not answer in time.'
+    );
   });
 
   it('applies patch delete and rename operations', async () => {

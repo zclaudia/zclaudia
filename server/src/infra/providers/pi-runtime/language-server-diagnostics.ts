@@ -51,11 +51,17 @@ export function reportFromCheck(check: DiagnosticsCheck): WriteDiagnosticsReport
   }
   const after = errorsOnly(check.diagnostics);
   const errors = check.baseline ? introducedDiagnostics(errorsOnly(check.baseline), after) : after;
+  const otherErrors = (check.others ?? []).flatMap(other =>
+    introducedDiagnostics(errorsOnly(other.before), errorsOnly(other.after))
+  );
   return {
     checker: check.server.name,
     state: 'checked',
     baseline: check.baseline ? 'known' : 'unknown',
     errors: errors.map(toLifecycle),
+    ...(check.others
+      ? { otherFiles: { checked: check.others.length, errors: otherErrors.map(toLifecycle) } }
+      : {}),
   };
 }
 
@@ -69,6 +75,7 @@ export function createLanguageServerDiagnosticsProvider(
       await service.diagnosticsFor(cwd, input.absolutePath, {
         budgetMs,
         baselineContent: input.originalContent,
+        otherOpenFiles: { exclude: input.otherChangedPaths },
       })
     );
 }

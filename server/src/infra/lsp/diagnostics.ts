@@ -9,18 +9,12 @@
  */
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { LspDiagnostic } from './types.js';
+import type { LspDiagnostic, RawLspDiagnostic } from './types.js';
 import { fileUri } from './documents.js';
 
 const DEFAULT_SETTLE_MS = 150;
 
-interface RawDiagnostic {
-  range?: { start?: { line?: number; character?: number } };
-  severity?: number;
-  message?: string;
-  source?: string;
-  code?: string | number | { value?: string | number };
-}
+type RawDiagnostic = RawLspDiagnostic;
 
 interface PublishParams {
   uri?: string;
@@ -96,6 +90,17 @@ export class DiagnosticsStore {
   /** Publish counter for `file`; pass it to `waitForPublishAfter`. */
   mark(file: string): number {
     return this.files.get(fileUri(file))?.count ?? 0;
+  }
+
+  /**
+   * Store diagnostics obtained by asking (not pushed). Does not count as a
+   * publish, so it never satisfies a pending `waitForPublishAfter`.
+   */
+  record(file: string, diagnostics: LspDiagnostic[]): void {
+    const uri = fileUri(file);
+    const entry = this.files.get(uri) ?? { count: 0, diagnostics: [] };
+    entry.diagnostics = diagnostics;
+    this.files.set(uri, entry);
   }
 
   latest(file: string): LspDiagnostic[] | undefined {

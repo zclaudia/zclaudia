@@ -9,7 +9,8 @@ import {
   memoizeByRoot,
   resolveBundledTypeScriptServer,
 } from './detection.js';
-import type { LanguageServerPreset, LaunchSpec } from './types.js';
+import { fileUri } from './documents.js';
+import type { LanguageServerPreset, LaunchSpec, LspRequest, RawLspDiagnostic } from './types.js';
 
 const TYPESCRIPT_EXTENSIONS: Record<string, string> = {
   '.ts': 'typescript',
@@ -23,6 +24,59 @@ const TYPESCRIPT_EXTENSIONS: Record<string, string> = {
 };
 
 const TYPESCRIPT_ROOT_MARKERS = ['tsconfig.json', 'jsconfig.json', 'package.json'];
+
+interface TsServerDiagnostic {
+  start?: { line?: number; offset?: number };
+  text?: string;
+  code?: number;
+  category?: string;
+}
+
+interface TsServerResponse {
+  success?: boolean;
+  message?: string;
+  body?: TsServerDiagnostic[];
+}
+
+const TS_SEVERITY: Record<string, number> = { error: 1, warning: 2, message: 3, suggestion: 4 };
+
+/**
+ * Pull a file's syntactic + semantic diagnostics from tsserver through
+ * typescript-language-server's `typescript.tsserverRequest` command. Same
+ * messages, codes and source as its pushed diagnostics, so the two compare.
+ */
+export async function pullTypeScriptDiagnostics(
+  request: LspRequest,
+  file: string,
+  signal?: AbortSignal
+): Promise<RawLspDiagnostic[]> {
+  const diagnostics: RawLspDiagnostic[] = [];
+  for (const command of ['syntacticDiagnosticsSync', 'semanticDiagnosticsSync']) {
+    const response = await request<TsServerResponse | null>(
+      'workspace/executeCommand',
+      { command: 'typescript.tsserverRequest', arguments: [command, { file: fileUri(file) }] },
+      signal
+    );
+    if (!response || response.success === false || !Array.isArray(response.body)) {
+      throw new Error(response?.message ?? `tsserver ${command} returned no diagnostics`);
+    }
+    for (const diagnostic of response.body) {
+      diagnostics.push({
+        range: {
+          start: {
+            line: (diagnostic.start?.line ?? 1) - 1,
+            character: (diagnostic.start?.offset ?? 1) - 1,
+          },
+        },
+        severity: TS_SEVERITY[diagnostic.category ?? 'error'] ?? 1,
+        message: diagnostic.text ?? '',
+        source: 'typescript',
+        ...(diagnostic.code !== undefined ? { code: diagnostic.code } : {}),
+      });
+    }
+  }
+  return diagnostics;
+}
 
 export interface TypeScriptPresetDeps {
   resolveServer?: () => string | null;
@@ -55,6 +109,7 @@ export function createTypeScriptPreset(deps: TypeScriptPresetDeps = {}): Languag
     extensions: TYPESCRIPT_EXTENSIONS,
     rootMarkers: TYPESCRIPT_ROOT_MARKERS,
     resolveLaunch,
+    pullDiagnostics: pullTypeScriptDiagnostics,
   };
 }
 

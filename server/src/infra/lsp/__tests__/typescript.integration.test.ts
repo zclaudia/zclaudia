@@ -146,4 +146,82 @@ describe('TypeScript write diagnostics (real language server)', () => {
     );
     expect(inMain).toHaveLength(2);
   }, 60_000);
+
+  describe('write diagnostics beyond the edited file', () => {
+    let lease: { release(): void };
+    let tools: any[];
+    const tool = (name: string) => tools.find(t => t.name === name);
+
+    beforeAll(async () => {
+      lease = manager.acquire(root, 'test-beyond');
+      await until(() => manager.status().some(s => s.state === 'ready'), 30_000);
+      tools = buildTools(root, {
+        enabled: ['Read', 'Write', 'Edit'],
+        diagnosticsProvider: createLanguageServerDiagnosticsProvider(manager, root, 15_000),
+      });
+    });
+    afterAll(() => lease.release());
+
+    it('answers a clean edit of a clean file at once', async () => {
+      // typescript-language-server publishes nothing for empty → empty, so a
+      // publish-only wait would sit out the whole budget here.
+      await tool('Write').execute('c1', {
+        file_path: 'src/clean.ts',
+        content: 'export const c = 1;\n',
+      });
+      const started = Date.now();
+      const res = await tool('Write').execute('c2', {
+        file_path: 'src/clean.ts',
+        content: 'export const c = 2;\n',
+      });
+      expect(Date.now() - started).toBeLessThan(5_000);
+      expect(res.content[0].text).toContain('Diagnostics (TypeScript): no new errors');
+    }, 60_000);
+
+    it('reports a caller in another open file broken by a signature change', async () => {
+      await tool('Write').execute('d1', {
+        file_path: 'src/dep.ts',
+        content: 'export function f(x: number): number {\n  return x;\n}\n',
+      });
+      const use = await tool('Write').execute('d2', {
+        file_path: 'src/use.ts',
+        content: "import { f } from './dep';\nexport const y = f(1);\n",
+      });
+      expect(use.content[0].text).toContain('Diagnostics (TypeScript): no new errors');
+
+      const changed = await tool('Write').execute('d3', {
+        file_path: 'src/dep.ts',
+        content: 'export function f(x: string): string {\n  return x;\n}\n',
+      });
+      const text = changed.content[0].text as string;
+      expect(text).toContain('Diagnostics (TypeScript): 1 error introduced in other open files:');
+      expect(text).toMatch(/src\/use\.ts:2:\d+ Argument of type 'number' is not assignable/);
+    }, 60_000);
+
+    it('checks a patch after all of its files are written', async () => {
+      await tool('Write').execute('p0', {
+        file_path: 'src/p1.ts',
+        content: 'export const one = 1;\n',
+      });
+      await tool('Read').execute('p0r', { path: 'src/p1.ts' });
+      // p1 imports from p2, which the same patch adds afterwards.
+      const res = await tool('Edit').execute('p1', {
+        patch: [
+          '*** Begin Patch',
+          '*** Update File: src/p1.ts',
+          '@@',
+          '-export const one = 1;',
+          "+import { two } from './p2';",
+          '+export const one: number = two - 1;',
+          '*** Add File: src/p2.ts',
+          '+export const two = 2;',
+          '*** End Patch',
+        ].join('\n'),
+      });
+      expect(res.details.ok).toBe(true);
+      const text = res.content[0].text as string;
+      expect(text).toContain('Diagnostics (TypeScript): no new errors');
+      expect(text).not.toContain('introduced');
+    }, 60_000);
+  });
 });
