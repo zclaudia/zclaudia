@@ -79,18 +79,18 @@ type DiagnosticsSnapshot =
 
 ## P0：manager 核心 + TypeScript + 写后诊断
 
-- [ ] **T1 依赖与打包验证。** server 加 `vscode-languageserver-protocol`、`typescript-language-server@^5`；`bundle.mjs` 把 `typescript-language-server` 包目录复制到 bundle 资源；新增 `resolveBundledTsServerPath()`，dev 下走 node_modules，release 下走资源目录。验证三件事：
+- [x] **T1 依赖与打包验证。** server 加 `vscode-languageserver-protocol`、`typescript-language-server@^5`；`bundle.mjs` 把 `typescript-language-server` 包目录复制到 bundle 资源；新增 `resolveBundledTsServerPath()`，dev 下走 node_modules，release 下走资源目录。验证三件事：
   - dev 下能用 `process.execPath` 起 `--stdio`；
   - macOS release 包里能起（手动冒烟）；
   - 项目没有 `node_modules/typescript` 时的行为（是否回退到自带的 TypeScript）。若不回退，探测条件改为"项目里能解析到 `typescript`"。
-- [ ] **T2 LspClient。** 通过 `ProcessSupervisor.spawn` 启动，新增来源 `language_server`；JSON-RPC 走 stdio；`initialize` 声明 UTF-16、`publishDiagnostics`、`callHierarchy` 等能力并记录服务器支持哪些；处理服务器发来的请求（`workspace/configuration` 返回空配置、`window/workDoneProgress/create`、`client/registerCapability` 直接应答）；按 `shutdown` → `exit` 顺序关闭。
-- [ ] **T3 DocumentStore。** 版本号与哈希，`syncFromDisk(file)`，按扩展名取 languageId，打开文档最多 200 个（LRU 发 `didClose`）。
-- [ ] **T4 DiagnosticsStore。** 推送缓存按保存代数标记、等待者、150ms 稳定判定、返回带状态的 `DiagnosticsSnapshot`。可以吸收 `lsp-diagnostics-adapter.ts` 里的代数和等待者逻辑。
-- [ ] **T5 ClientPool + Manager + TS 预设。**
+- [x] **T2 LspClient。** 通过 `ProcessSupervisor.spawn` 启动，新增来源 `language_server`；JSON-RPC 走 stdio；`initialize` 声明 UTF-16、`publishDiagnostics`、`callHierarchy` 等能力并记录服务器支持哪些；处理服务器发来的请求（`workspace/configuration` 返回空配置、`window/workDoneProgress/create`、`client/registerCapability` 直接应答）；按 `shutdown` → `exit` 顺序关闭。
+- [x] **T3 DocumentStore。** 版本号与哈希，`syncFromDisk(file)`，按扩展名取 languageId，打开文档最多 200 个（LRU 发 `didClose`）。
+- [x] **T4 DiagnosticsStore。** 推送缓存按保存代数标记、等待者、150ms 稳定判定、返回带状态的 `DiagnosticsSnapshot`。可以吸收 `lsp-diagnostics-adapter.ts` 里的代数和等待者逻辑。
+- [x] **T5 ClientPool + Manager + TS 预设。**
   - 实现租约、空闲关闭、全局上限、崩溃退避和 `status()`。
   - TS 预设的根标记是 `tsconfig.json` / `jsconfig.json` / `package.json`，覆盖 `.ts/.tsx/.js/.jsx/.mts/.cts/.mjs/.cjs`。
   - 在 `server/src/index.ts` 的 `shutdown` 里调用 `manager.dispose()`。
-- [ ] **T6 写后诊断接线。**
+- [x] **T6 写后诊断接线。**
   - facade 提供 `WriteDiagnosticsProvider` 与 `FileChangeNotifier`，取代 `createLspDiagnosticsAdapter` 自带 transport 的路径。旧 adapter 删除，有用的测试迁到 T4。
   - 在 `server-state` 里构造 manager，经 RunOptions 传到 `buildEffectiveToolOptions`；run 开始时获取租约。
   - `buildMutationResultText` 增加诊断小节，输出模型可见的文本：
@@ -98,11 +98,28 @@ type DiagnosticsSnapshot =
     - 服务器未就绪：`Diagnostics not checked: TypeScript server still starting`
     - 没有新错误：一行 `No new errors.`
   - 预算：服务器已就绪时最多等 3s；正在启动时立即返回 pending，不阻塞编辑。`details.lifecycle` 照旧保留给界面。
-- [ ] **T7 测试。**
+- [x] **T7 测试。**
   - 单元测试：用 `vscode-jsonrpc` 的内存流做假服务器，覆盖初始化、同步、诊断稳定、pending、只报新增错误、租约与空闲关闭、崩溃退避。
   - 集成测试：用随包的 `typescript-language-server` 在临时 TS 项目里写入一个类型错误，断言编辑结果文本里出现该错误。
 
 **P0 验收：** 在 zclaudia 仓库里让 Pi agent 故意改出一个类型错误，工具结果里能看到这个错误；修好后显示 `No new errors.`；Debug 页的 Managed processes 里能看到 `language_server` 进程，run 结束 10 分钟后进程退出。
+
+**P0 实施记录（2026-10-04，分支 `feat/lsp-manager`）：**
+
+- **T1 验证结论：**
+  - `typescript-language-server@5.3.0` 是单个无依赖的 `lib/cli.mjs`，打包后 vendor 目录约 916K；sidecar node 22.20.0 能直接运行它。bundle 里的 `server.mjs` 按 `vendor/typescript-language-server/lib/cli.mjs` 查找，路径已核对。
+  - **它没有自带 TypeScript**：查找顺序是 `tsserver.path` → 工作区 `node_modules/typescript` → 自身旁边的 `typescript`（发布包里不存在）。因此探测条件是"项目里能找到 `typescript`"，并通过 `initializationOptions.tsserver.path` 把探测到的那一份钉住。
+  - **pnpm monorepo 根目录没有 `node_modules/typescript`**（zclaudia 本仓就是这样），所以探测先向上找，找不到再向下查工作区包两层，在本仓用时 0.3ms。
+  - macOS `.app` 实机冒烟仍待手动做。
+- **T6 实现：**
+  - 诊断以 `WriteDiagnosticsReport` 的形式写进 Write/Edit 返回给模型的文本，`details.lifecycle` 照旧保留给界面。
+  - 首次见到某个文件时，先用 `originalContent` 诊断旧内容得到基线；新建文件的基线为空。
+  - 旧的 `lsp-diagnostics-adapter.ts` 已删除。多文件 patch 路径本来就不跑诊断，保持原样。
+- **T7 测试：**
+  - 单元测试：用内存流跑真实 JSON-RPC 的假服务器，覆盖 diagnostics、documents、manager、facade。
+  - 真服务器集成测试：`typescript.integration.test.ts`。
+  - 端到端：`e2e/tests/agent-runtimes/lsp-diagnostics.playwright.spec.ts`。真实 server、真实工具，只把模型换成脚本；断言模型收到的 Write 结果里有新引入的错误，同时断言 Debug 进程列表里出现 `language_server` 进程。
+- **已知行为：** 新 run 的第一轮如果立刻编辑（比 server 启动还快），只会报"not checked, still starting"，这是按设计不阻塞写入。端到端测试为此先跑一轮预热。
 
 ## P1：打开 LSPTool
 
