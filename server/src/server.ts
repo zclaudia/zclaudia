@@ -24,6 +24,7 @@ import { ClaudiaBranchService } from './application/orchestration/claudia-branch
 import { getGatewayClient } from './infra/gateway/gateway-instance.js';
 import { BrowserManager } from './application/browser/browser-manager.js';
 import { LanguageServerManager } from './infra/lsp/index.js';
+import { readLanguageServersEnabled } from './interfaces/http/language-servers.js';
 import { PuppeteerEngine } from './application/browser/puppeteer-engine.js';
 import { installEngine, defaultEngineInstallDeps } from './application/browser/engine-install.js';
 import { resolveDataDir } from './utils/data-dir.js';
@@ -183,7 +184,9 @@ export async function createServer(
   });
   serverState.browserManager = browserManager;
   // Language servers start lazily on first use; constructing spawns nothing.
-  const languageServers = new LanguageServerManager();
+  const languageServers = new LanguageServerManager({
+    enabled: readLanguageServersEnabled(db),
+  });
   serverState.languageServerManager = languageServers;
   serverState.installBrowserEngineFn = notify =>
     installEngine(defaultEngineInstallDeps(path.join(dataDir, 'browsers')), notify);

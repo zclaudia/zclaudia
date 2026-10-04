@@ -10,6 +10,7 @@ import { SessionModelSelector } from './SessionModelSelector';
 import { WorktreeSelector } from './WorktreeSelector';
 import { TokenUsageDisplay } from './TokenUsageDisplay';
 import { ContextUsagePopover } from './ContextUsagePopover';
+import { LanguageServerIndicator } from './LanguageServerIndicator';
 import { ComposerFooter } from './ComposerFooter';
 import { EmptySessionSnapshot, EmptySessionChips } from './EmptySessionOverview';
 import { MessageInput, type Attachment } from './MessageInput';
@@ -705,17 +706,24 @@ export function ChatInputArea({
           <ComposerFooter
             left={selectorTrio}
             right={
-              <ContextUsagePopover
-                sessionId={sessionId}
-                latestCacheRead={currentUsage.latestCacheReadTokens}
-              >
-                <TokenUsageDisplay
-                  latestInputTokens={currentUsage.latestInputTokens}
-                  inputTokens={currentUsage.inputTokens}
-                  contextUsedTokens={currentUsage.contextUsedTokens}
-                  contextWindow={currentUsage.contextWindow}
+              <>
+                <LanguageServerIndicator
+                  key={sessionId}
+                  sessionId={sessionId}
+                  runActive={isLoading}
                 />
-              </ContextUsagePopover>
+                <ContextUsagePopover
+                  sessionId={sessionId}
+                  latestCacheRead={currentUsage.latestCacheReadTokens}
+                >
+                  <TokenUsageDisplay
+                    latestInputTokens={currentUsage.latestInputTokens}
+                    inputTokens={currentUsage.inputTokens}
+                    contextUsedTokens={currentUsage.contextUsedTokens}
+                    contextWindow={currentUsage.contextWindow}
+                  />
+                </ContextUsagePopover>
+              </>
             }
           />
         )}

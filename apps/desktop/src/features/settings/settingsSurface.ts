@@ -45,6 +45,10 @@ export const SETTINGS_SURFACES = {
     surface: 'desktop',
     why: 'Installs, pins and garbage-collects software on the backend host',
   },
+  'agent.language-servers': {
+    surface: 'desktop',
+    why: 'Starts and stops language-server processes on the backend host',
+  },
   'agent.capabilities': {
     surface: 'desktop',
     why: 'A long read-only inventory with nothing to act on',

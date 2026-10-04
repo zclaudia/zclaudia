@@ -9,7 +9,7 @@
  * repeated crashes. See docs/plans/2026-10-04-lsp-manager-plan.md.
  */
 import path from 'path';
-import { LspClient } from './client.js';
+import { LanguageServerStartupError, LspClient } from './client.js';
 import { DiagnosticsStore } from './diagnostics.js';
 import { DocumentStore, fileUri, type SyncOutcome } from './documents.js';
 import {
@@ -59,6 +59,7 @@ const QUERY_DIAGNOSTICS_BUDGET_MS = 5_000;
 const PROJECT_LOAD_WAIT_MS = 15_000;
 const ERROR_MESSAGE_MAX_CHARS = 300;
 const DEFAULT_MAX_RESULTS = 50;
+const DISABLED_MESSAGE = 'Language servers are turned off in Settings';
 
 /** Server capability each query action needs. */
 const ACTION_CAPABILITY = {
@@ -78,6 +79,8 @@ export interface LanguageServerManagerOptions {
   initializeTimeoutMs?: number;
   settleMs?: number;
   startWaitMs?: number;
+  /** Initial value of the user's master switch (Settings → Language servers). */
+  enabled?: boolean;
   now?: () => number;
 }
 
@@ -139,6 +142,7 @@ export class LanguageServerManager implements LanguageServerService {
   private readonly now: () => number;
   private readonly entries = new Map<string, Entry>();
   private disposed = false;
+  private enabled: boolean;
 
   constructor(private readonly options: LanguageServerManagerOptions = {}) {
     this.presets = options.presets ?? defaultLanguageServerPresets();
@@ -146,13 +150,48 @@ export class LanguageServerManager implements LanguageServerService {
     this.maxServers = Math.max(1, options.maxServers ?? DEFAULT_MAX_SERVERS);
     this.idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
     this.now = options.now ?? Date.now;
+    this.enabled = options.enabled ?? true;
+  }
+
+  get isEnabled(): boolean {
+    return this.enabled;
+  }
+
+  /**
+   * The user's master switch. Off stops every server and makes the manager
+   * offer nothing (no LSPTool, no write diagnostics); on clears failed
+   * servers so a fixed installation gets a fresh start.
+   */
+  async setEnabled(enabled: boolean): Promise<void> {
+    if (this.enabled === enabled) return;
+    this.enabled = enabled;
+    if (!enabled) {
+      await Promise.all([...this.entries.values()].map(entry => this.stop(entry)));
+      return;
+    }
+    for (const entry of this.entries.values()) {
+      if (entry.state === 'failed') {
+        entry.state = 'idle';
+        entry.lastError = null;
+        entry.crashes = [];
+        entry.nextStartAt = 0;
+      }
+    }
   }
 
   serversFor(root: string): LanguageServerInfo[] {
-    return this.availablePresets(path.resolve(root)).map(info);
+    if (!this.enabled) return [];
+    const resolvedRoot = path.resolve(root);
+    // A server that failed here (e.g. a rustup proxy without the component)
+    // is detected but cannot answer: stop offering it until the process
+    // restarts or a later preset probe changes.
+    return this.availablePresets(resolvedRoot)
+      .filter(preset => this.entries.get(`${preset.id}::${resolvedRoot}`)?.state !== 'failed')
+      .map(info);
   }
 
   acquire(root: string, consumer: string): { release(): void } {
+    if (!this.enabled) return { release: () => undefined };
     const resolvedRoot = path.resolve(root);
     const token = Symbol(consumer);
     const leased = this.availablePresets(resolvedRoot).map(preset => {
@@ -181,6 +220,7 @@ export class LanguageServerManager implements LanguageServerService {
     file: string,
     request: DiagnosticsRequest
   ): Promise<DiagnosticsCheck> {
+    if (!this.enabled) return { state: 'unavailable', reason: DISABLED_MESSAGE };
     const resolvedRoot = path.resolve(root);
     const absolute = path.resolve(resolvedRoot, file);
     if (!isInside(resolvedRoot, absolute)) {
@@ -266,6 +306,7 @@ export class LanguageServerManager implements LanguageServerService {
   }
 
   private async runQuery(request: LspQueryRequest, signal?: AbortSignal): Promise<LspQueryResult> {
+    if (!this.enabled) throw new LanguageServerError('server_unavailable', DISABLED_MESSAGE);
     const root = path.resolve(request.cwd);
     const file = request.file ? path.resolve(root, request.file) : undefined;
     const maxResults = Math.max(1, request.maxResults ?? DEFAULT_MAX_RESULTS);
@@ -449,10 +490,28 @@ export class LanguageServerManager implements LanguageServerService {
     }
   }
 
+  /** Every server instance this manager has created (Settings overview). */
   status(): LanguageServerStatus[] {
-    return [...this.entries.values()].map(entry => ({
+    return [...this.entries.values()].map(entry => this.statusOf(entry));
+  }
+
+  /**
+   * Servers detected for one workspace, running or not, including failed
+   * ones (unlike `serversFor`, which only lists what can answer).
+   */
+  statusFor(root: string): LanguageServerStatus[] {
+    if (!this.enabled) return [];
+    const resolvedRoot = path.resolve(root);
+    return this.availablePresets(resolvedRoot).map(preset =>
+      this.statusOf(this.entryFor(preset, resolvedRoot))
+    );
+  }
+
+  private statusOf(entry: Entry): LanguageServerStatus {
+    return {
       id: entry.preset.id,
       name: entry.preset.name,
+      languages: entry.preset.languages,
       root: entry.root,
       state: entry.state,
       leases: [...entry.leases.values()],
@@ -462,7 +521,7 @@ export class LanguageServerManager implements LanguageServerService {
       startedAt: entry.startedAt,
       lastUsedAt: entry.lastUsedAt,
       lastError: entry.lastError,
-    }));
+    };
   }
 
   async dispose(): Promise<void> {
@@ -651,7 +710,15 @@ export class LanguageServerManager implements LanguageServerService {
       this.scheduleIdle(entry);
       return active;
     } catch (err) {
-      this.recordCrash(entry, err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      if (err instanceof LanguageServerStartupError) {
+        // Exiting before initialize is a setup problem (missing component,
+        // bad install), not a flake: retrying would fail the same way.
+        entry.state = 'failed';
+        entry.lastError = message;
+        return null;
+      }
+      this.recordCrash(entry, message);
       return null;
     }
   }

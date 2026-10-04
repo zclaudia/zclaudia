@@ -18,7 +18,7 @@ const typescriptPackage = path.dirname(serverRequire.resolve('typescript/package
 test('LSP: the ZClaudia runtime tells the model which type errors its edit introduced', async ({
   app,
   page,
-}) => {
+}, testInfo) => {
   const { project, cwd } = await app.configureCodingProject('codex', undefined, '-lsp');
   await mkdir(path.join(cwd, 'src'), { recursive: true });
   await mkdir(path.join(cwd, 'node_modules'), { recursive: true });
@@ -91,6 +91,19 @@ test('LSP: the ZClaudia runtime tells the model which type errors its edit intro
         { timeout: 30_000 }
       )
       .toBe(1);
+
+    // The composer shows the session's language server as ready, with details on hover.
+    const indicator = page.getByTestId('language-server-indicator');
+    await expect(indicator).toHaveAttribute('data-state', 'ready', { timeout: 20_000 });
+    await indicator.hover();
+    const popover = page.getByTestId('language-server-popover');
+    await expect(popover).toContainText('TypeScript');
+    await expect(popover).toContainText('Ready');
+    await testInfo.attach('lsp-indicator', {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await page.keyboard.press('Escape');
 
     // Turn 2 writes a type error; the Write result the model receives must name it.
     await sendCodingMessage(page, 'Add the constant a to src/a.ts.');

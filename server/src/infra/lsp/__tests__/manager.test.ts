@@ -204,6 +204,52 @@ describe('LanguageServerManager', () => {
     }
   });
 
+  it('marks a server that dies before initialize failed at once and stops offering it', async () => {
+    serverOptions = { dieOnInitialize: true };
+    const manager = createManager();
+    const file = path.join(dir, 'a.fk');
+    writeFileSync(file, 'x\n');
+    expect(manager.serversFor(dir).map(s => s.id)).toEqual(['fake']);
+    manager.acquire(dir, 'run');
+    await until(() => manager.status()[0]?.state === 'failed');
+    expect(manager.status()[0].lastError).toContain(
+      'exited during start-up (code 1): fake server stderr'
+    );
+    expect(manager.serversFor(dir)).toEqual([]);
+    expect(servers).toHaveLength(1); // no retry loop
+  });
+
+  it('turning the switch off stops servers and offers nothing; on retries failed ones', async () => {
+    const manager = createManager();
+    const file = path.join(dir, 'a.fk');
+    writeFileSync(file, 'x\n');
+    manager.acquire(dir, 'run');
+    await started(manager);
+
+    await manager.setEnabled(false);
+    expect(manager.status()[0].state).toBe('idle');
+    expect(servers[0].received.map(r => r.method)).toContain('shutdown');
+    expect(manager.serversFor(dir)).toEqual([]);
+    expect(manager.statusFor(dir)).toEqual([]);
+    expect(await manager.diagnosticsFor(dir, file, { budgetMs: 10 })).toMatchObject({
+      state: 'unavailable',
+      reason: 'Language servers are turned off in Settings',
+    });
+    await expect(
+      manager.query({ cwd: dir, action: 'hover', file, line: 1, character: 1 })
+    ).rejects.toMatchObject({ code: 'server_unavailable' });
+
+    serverOptions = { dieOnInitialize: true };
+    await manager.setEnabled(true);
+    manager.acquire(dir, 'run');
+    await until(() => manager.status()[0].state === 'failed');
+    serverOptions = {};
+    await manager.setEnabled(false);
+    await manager.setEnabled(true);
+    expect(manager.statusFor(dir)[0]).toMatchObject({ state: 'idle', lastError: null });
+    expect(manager.serversFor(dir).map(s => s.id)).toEqual(['fake']);
+  });
+
   it('stops every server on dispose', async () => {
     const manager = createManager();
     manager.acquire(dir, 'run');

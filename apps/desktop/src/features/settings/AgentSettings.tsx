@@ -8,6 +8,7 @@ import { TargetBackendBanner, NoTargetBackendNotice } from './ui/TargetBackendNo
 import { Select } from '../../components/ui/Select';
 import { ManagedRuntimeSettings } from './ManagedRuntimeSettings';
 import { OnSurface } from './ui/OnSurface';
+import { LanguageServerSettings } from './LanguageServerSettings';
 
 interface AgentCapabilities {
   tools: Array<{ id: string; name: string; description: string; scope: string[] }>;
@@ -162,6 +163,14 @@ export function AgentSettings() {
           <h3 className="text-sm font-medium mb-3">Managed Agent CLIs</h3>
           {/* This page already shows the target-backend banner at the top. */}
           <ManagedRuntimeSettings hideTargetBanner />
+        </div>
+      </OnSurface>
+
+      {/* Starting and stopping processes on the backend host is desktop work. */}
+      <OnSurface id="agent.language-servers">
+        <div>
+          <h3 className="text-sm font-medium mb-3">Language servers</h3>
+          <LanguageServerSettings />
         </div>
       </OnSurface>
 

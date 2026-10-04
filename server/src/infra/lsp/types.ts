@@ -93,6 +93,7 @@ export type LanguageServerState = 'idle' | 'starting' | 'ready' | 'stopped' | 'f
 export interface LanguageServerStatus {
   id: string;
   name: string;
+  languages: string[];
   root: string;
   state: LanguageServerState;
   leases: string[];

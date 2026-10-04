@@ -24,6 +24,8 @@ export interface FakeServerOptions {
   initializeDelayMs?: number;
   /** workspace/symbol finds nothing. */
   noWorkspaceSymbols?: boolean;
+  /** Exit (code 1) instead of answering `initialize`. */
+  dieOnInitialize?: boolean;
 }
 
 export interface FakeServer {
@@ -81,6 +83,10 @@ export function createFakeServer(options: FakeServerOptions = {}): FakeServer {
 
   connection.onRequest('initialize', async params => {
     record('initialize')(params);
+    if (options.dieOnInitialize) {
+      terminate(1);
+      return new Promise(() => undefined);
+    }
     if (options.initializeDelayMs) {
       await new Promise(resolve => setTimeout(resolve, options.initializeDelayMs));
     }

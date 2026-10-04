@@ -160,12 +160,23 @@ type DiagnosticsSnapshot =
 
 ## P2：更多语言 + 可见性
 
-- [ ] **T13 预设扩展。** `pyright-langserver --stdio`、`gopls`、`rust-analyzer`，只在 PATH 上探测；探测结果异步刷新、TTL 60s，保证 `serversFor` 始终同步且廉价。
-- [ ] **T14 状态 API + Debug 小节。**
+- [x] **T13 预设扩展。** `pyright-langserver --stdio`、`gopls`、`rust-analyzer`，只在 PATH 上探测；探测结果异步刷新、TTL 60s，保证 `serversFor` 始终同步且廉价。
+- [x] **T14 状态 API + Debug 小节。**
   - 新增 `GET /api/debug/language-servers`：返回服务器、状态、租约数、打开文档数、最近错误。
   - 在 Debug 页加一个小节显示这些信息，界面文案用英文。
-- [ ] **T15 总开关。** 设置里加 LSP 总开关，默认开启，关闭后 `serversFor` 恒为空。
-- [ ] **T16 测试 + 文档。** 预设探测单元测试；`CLAUDE.md` / `docs/` 补充 LSP 一节（预设、上限、开关）。
+- [x] **T15 总开关。** 设置里加 LSP 总开关，默认开启，关闭后 `serversFor` 恒为空。
+- [x] **T16 测试 + 文档。** 预设探测单元测试；`CLAUDE.md` / `docs/` 补充 LSP 一节（预设、上限、开关）。
+
+- [x] **T17 会话内 LSP 状态（2026-10-04 追加）。** 用户提出在 session 中看到 LSP 激活状态；先在真实 app 里注入三种 mockup（composer footer / header chip / 内联通知）截图对比，用户选定 composer footer。
+
+**P2 实施记录（2026-10-04，分支 `feat/lsp-p2`）：**
+
+- **T13：** Pyright / gopls / rust-analyzer 只在 PATH 上探测；探测路径额外包含 `~/go/bin`、`~/.cargo/bin`、`~/.local/bin`、Homebrew，因为从 Dock 启动的 macOS app 的 PATH 很短。用本机的 rustup `rust-analyzer` 代理实测发现：组件没装时代理存在却一启动就退出，原来会卡在 starting 直到 60s 初始化超时。现在进程在 initialize 前退出会立即失败，带上它自己的 stderr；直接标记 failed、不再重试；`serversFor` 不再列出它，LSPTool 也就不会注册。
+- **T14：** 状态 API 为 `GET /api/language-servers`（全部实例）和 `GET /api/language-servers/sessions/:id`（某会话可用的服务器：工作区按 worktree 优先于项目根，与 run 一致；外部运行时返回 `applicable:false`）。界面上的状态放在 Settings → Claudia → Language servers，没有单独做 Debug 小节；进程本身已在 Debug → Managed processes 里显示为 `language_server`。
+- **T15：** 总开关存在 `app_config.language_servers_enabled`，启动时读取。关闭会停掉所有服务器、什么都不提供；重新打开会清掉 failed 状态，装好组件后可以重试。
+- **T16：** CLAUDE.md 的 Server 一节补充了 LSP 说明。
+- **T17：** composer footer 的 `{ }` 指示器，状态点是唯一的颜色，悬停弹出 popover 显示各服务器的状态、打开文件数和最近错误。只对检测到服务器的 ZClaudia（Pi）会话显示。run 开始和结束时立即刷新，有状态变化时 2s 轮询，否则 15s；e2e 里从预热到显示 ready 由 19.5s 降到 4.7s。悬停 popover 的机制从 ContextUsagePopover 抽成共享的 `components/ui/HoverPopover`，行为不变，原有 21 个测试全部通过。
+- **测试：** 新增 detection、presets、启动失败、开关、路由、指示器、设置页的测试；e2e 断言指示器在预热后变为 ready。
 
 ## P3（不在本计划范围）
 
