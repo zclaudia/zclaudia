@@ -23,6 +23,7 @@ import { GatewayNotificationSender } from './infra/push/notification-sender.js';
 import { ClaudiaBranchService } from './application/orchestration/claudia-branch-service.js';
 import { getGatewayClient } from './infra/gateway/gateway-instance.js';
 import { BrowserManager } from './application/browser/browser-manager.js';
+import { LanguageServerManager } from './infra/lsp/index.js';
 import { PuppeteerEngine } from './application/browser/puppeteer-engine.js';
 import { installEngine, defaultEngineInstallDeps } from './application/browser/engine-install.js';
 import { resolveDataDir } from './utils/data-dir.js';
@@ -103,6 +104,7 @@ export interface ServerContext {
   db: ReturnType<typeof initDatabase>;
   terminalManager: TerminalManager;
   browserManager: BrowserManager;
+  languageServers: LanguageServerManager;
   handleMessage: (client: ConnectedClient, message: ClientMessage) => Promise<void>;
   getGatewayStatus: () => GatewayStatus;
   getStateHeartbeat: () => StateHeartbeatMessage;
@@ -180,6 +182,9 @@ export async function createServer(
     if (client) sendMessage(client.ws, msg);
   });
   serverState.browserManager = browserManager;
+  // Language servers start lazily on first use; constructing spawns nothing.
+  const languageServers = new LanguageServerManager();
+  serverState.languageServerManager = languageServers;
   serverState.installBrowserEngineFn = notify =>
     installEngine(defaultEngineInstallDeps(path.join(dataDir, 'browsers')), notify);
 
@@ -464,6 +469,7 @@ export async function createServer(
     db,
     terminalManager,
     browserManager,
+    languageServers,
     getStateHeartbeat: () => serverState.buildStateHeartbeat(),
     handleMessage: async (client: ConnectedClient, message: ClientMessage) => {
       if (!clients.has(client.id)) {

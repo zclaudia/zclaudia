@@ -354,6 +354,21 @@ try {
   console.log('    agent-tool-bridge-stdio: SKIP (package not installed)');
 }
 
+// typescript-language-server runs as its own process (spawned by the LSP
+// manager with the sidecar node), so it ships as a file beside server.mjs.
+// It is a single dependency-free ESM file; resolveBundledTypeScriptServer()
+// in src/infra/lsp/detection.ts looks for it at this path.
+{
+  const tlsRoot = resolvePackage('typescript-language-server');
+  const tlsDest = path.join(outDir, 'vendor', 'typescript-language-server');
+  fs.rmSync(tlsDest, { recursive: true, force: true });
+  fs.mkdirSync(path.join(tlsDest, 'lib'), { recursive: true });
+  fs.copyFileSync(path.join(tlsRoot, 'package.json'), path.join(tlsDest, 'package.json'));
+  fs.copyFileSync(path.join(tlsRoot, 'LICENSE'), path.join(tlsDest, 'LICENSE'));
+  fs.copyFileSync(path.join(tlsRoot, 'lib', 'cli.mjs'), path.join(tlsDest, 'lib', 'cli.mjs'));
+  console.log(`    ${path.relative(outDir, path.join(tlsDest, 'lib', 'cli.mjs'))}: OK`);
+}
+
 // ============================================================================
 // Step 3: Clean-room npm install + selective copy to bundle
 // ============================================================================

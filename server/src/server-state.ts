@@ -34,6 +34,7 @@ import type { MessageHandlerContext } from './application/conversation/transport
 import type { RunHandlerContext } from './application/conversation/runtime/run-handler.js';
 import type { ConnectedClient, ActiveRun } from './application/conversation/transport/types.js';
 import type { BrowserManager } from './application/browser/browser-manager.js';
+import type { LanguageServerManager } from './infra/lsp/index.js';
 import { createSubagentMessenger } from './application/conversation/runtime/subagent-messenger.js';
 import type { AutomationService } from './domains/automations/service.js';
 import type { AutomationPort } from './infra/providers/types.js';
@@ -84,6 +85,7 @@ export class ServerState {
   goalCoordinator: GoalCoordinator | undefined;
   goalService: GoalService | undefined;
   browserManager: BrowserManager | undefined;
+  languageServerManager: LanguageServerManager | undefined;
   installBrowserEngineFn:
     | ((notify: (msg: BrowserEngineStatusMessage) => void) => Promise<void>)
     | undefined;
@@ -397,6 +399,7 @@ export class ServerState {
       automationPort: this.automationService
         ? automationPortFor(this.automationService)
         : undefined,
+      languageServers: this.languageServerManager,
       goalCoordinator: this.goalCoordinator,
       sessionSync: this.getSessionSync(),
       providerRegistry,

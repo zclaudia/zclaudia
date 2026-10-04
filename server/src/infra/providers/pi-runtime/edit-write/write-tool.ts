@@ -211,6 +211,7 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
               firstChangedLine: diff.firstChangedLine,
               lineChanges: diff.lineChanges,
               state,
+              diagnostics: lifecycle?.diagnosticsReport,
             }),
             details
           );

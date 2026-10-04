@@ -277,6 +277,9 @@ async function main() {
       // Close all browser sessions (Chromium pages + engine)
       await serverContext.browserManager.dispose().catch(() => {});
 
+      // Shut down language servers (shutdown → exit, kill on timeout)
+      await serverContext.languageServers.dispose().catch(() => {});
+
       console.log('✅ Server closed');
       process.exit(0);
     };

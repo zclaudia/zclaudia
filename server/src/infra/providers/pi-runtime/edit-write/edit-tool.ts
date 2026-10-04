@@ -870,6 +870,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
                 lineChanges: diff.lineChanges,
                 state,
                 rebased,
+                diagnostics: lifecycle?.diagnosticsReport,
               }),
               {
                 ...detailsBase,
@@ -1131,6 +1132,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
               lineChanges: diff.lineChanges,
               state,
               rebased,
+              diagnostics: lifecycle?.diagnosticsReport,
             }),
             {
               ...detailsBase,

@@ -30,6 +30,7 @@ export type ManagedProcessSource =
   | 'test_run'
   | 'embedded_server'
   | 'mcp_server'
+  | 'language_server'
   | 'agent_tool'
   | 'unknown';
 

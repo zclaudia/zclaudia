@@ -10,6 +10,23 @@ export interface WriteLifecycleDiagnostic {
   severity: 'error' | 'warning' | 'info';
   message: string;
   source?: string;
+  code?: string | number;
+}
+
+/**
+ * What a language-server check concluded about one write, for the model-facing
+ * result text. Separate from `diagnostics` (the UI list) because the model
+ * needs the *state* too: "not checked" must never read as "no errors".
+ */
+export interface WriteDiagnosticsReport {
+  /** Display name of the checker, e.g. `TypeScript`. */
+  checker: string;
+  state: 'checked' | 'pending';
+  pendingReason?: 'starting' | 'timeout';
+  /** `unknown`: no pre-change diagnostics, so `errors` may include old ones. */
+  baseline: 'known' | 'unknown';
+  /** Errors introduced by the write (all errors when the baseline is unknown). */
+  errors: WriteLifecycleDiagnostic[];
 }
 
 export interface WriteLifecycleInput {
@@ -29,6 +46,7 @@ export interface WriteLifecycleResult {
   warnings?: string[];
   errors?: Array<{ code: string; message: string }>;
   deferredDiagnostics?: { id: string; status: 'pending' };
+  diagnosticsReport?: WriteDiagnosticsReport;
 }
 
 export interface WriteLifecycleHooks {
@@ -38,9 +56,23 @@ export interface WriteLifecycleHooks {
   timeoutMs?: number;
 }
 
+/**
+ * A plain list (command-based providers) or a report (language servers);
+ * undefined when the provider does not apply to the file.
+ */
+export type WriteDiagnosticsOutcome =
+  | WriteLifecycleDiagnostic[]
+  | WriteDiagnosticsReport
+  | undefined;
+
 export type WriteDiagnosticsProvider = (
   input: WriteLifecycleInput
-) => Promise<WriteLifecycleDiagnostic[]> | WriteLifecycleDiagnostic[];
+) => Promise<WriteDiagnosticsOutcome> | WriteDiagnosticsOutcome;
+
+function outcomeDiagnostics(outcome: WriteDiagnosticsOutcome): WriteLifecycleDiagnostic[] {
+  if (!outcome) return [];
+  return Array.isArray(outcome) ? outcome : outcome.errors;
+}
 
 export type DiagnosticsMode = 'inline' | 'deferred';
 
@@ -122,6 +154,9 @@ export function mergeWriteLifecycleResults(
     ...(first.deferredDiagnostics || second.deferredDiagnostics
       ? { deferredDiagnostics: first.deferredDiagnostics ?? second.deferredDiagnostics }
       : {}),
+    ...(first.diagnosticsReport || second.diagnosticsReport
+      ? { diagnosticsReport: first.diagnosticsReport ?? second.diagnosticsReport }
+      : {}),
   };
 }
 
@@ -131,8 +166,14 @@ export async function runDiagnosticsProvider(
 ): Promise<WriteLifecycleResult | undefined> {
   if (!provider) return undefined;
   try {
-    const diagnostics = await provider(input);
-    return diagnostics.length > 0 ? { diagnostics } : undefined;
+    const outcome = await provider(input);
+    const diagnostics = outcomeDiagnostics(outcome);
+    const report = outcome && !Array.isArray(outcome) ? outcome : undefined;
+    if (!report && diagnostics.length === 0) return undefined;
+    return {
+      ...(diagnostics.length > 0 ? { diagnostics } : {}),
+      ...(report ? { diagnosticsReport: report } : {}),
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return failureResult('write_diagnostics_failed', message);
@@ -149,7 +190,8 @@ export function scheduleDeferredDiagnostics(
   deferredDiagnostics.set(id, { createdAt: Date.now(), result: { status: 'pending' } });
   Promise.resolve()
     .then(() => provider(input))
-    .then(diagnostics => {
+    .then(outcome => {
+      const diagnostics = outcomeDiagnostics(outcome);
       const entry = deferredDiagnostics.get(id);
       // The entry may already be evicted (TTL) — dropping the result is fine,
       // late diagnostics are best-effort.

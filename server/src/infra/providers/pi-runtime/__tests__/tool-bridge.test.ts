@@ -19,7 +19,6 @@ import path from 'path';
 import Database from 'better-sqlite3';
 import { buildTools, ALL_TOOL_NAMES, type ToolName } from '../tool-bridge.js';
 import { getDeferredDiagnosticsResult } from '../write-lifecycle.js';
-import { filePathToUri, type LspTransport } from '../lsp-diagnostics-adapter.js';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
 import { TaskService } from '../../../../domains/tasks/task-service.js';
@@ -1437,35 +1436,27 @@ describe('Write bridge tool', () => {
     });
   });
 
-  it('wires an LSP diagnostics adapter into write diagnostics and file notifications', async () => {
+  it('puts a language-server diagnostics report into the model-visible result', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
-    const filePath = path.join(dir, 'f.ts');
-    const handlers = new Map<string, (params: unknown) => void>();
-    const transport: LspTransport = {
-      notify: vi.fn(async method => {
-        if (method === 'textDocument/didSave') {
-          handlers.get('textDocument/publishDiagnostics')?.({
-            uri: filePathToUri(filePath),
-            diagnostics: [
-              {
-                range: { start: { line: 0, character: 6 } },
-                severity: 1,
-                message: 'Type mismatch',
-                source: 'tsserver',
-              },
-            ],
-          });
-        }
-      }),
-      onNotification: (method, handler) => {
-        handlers.set(method, handler);
-        return () => handlers.delete(method);
-      },
-    };
-    const write = buildTools(dir, {
-      enabled: ['Write'],
-      lspDiagnosticsAdapter: { transport, diagnosticsTimeoutMs: 100 },
-    } as any).find((t: any) => t.name === 'Write') as any;
+    const diagnosticsProvider = vi.fn(async () => ({
+      checker: 'TypeScript',
+      state: 'checked' as const,
+      baseline: 'known' as const,
+      errors: [
+        {
+          path: 'f.ts',
+          line: 1,
+          column: 7,
+          severity: 'error' as const,
+          message: "Type 'number' is not assignable to type 'string'.",
+          source: 'typescript',
+          code: 2322,
+        },
+      ],
+    }));
+    const write = buildTools(dir, { enabled: ['Write'], diagnosticsProvider }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
 
     const res = await write.execute('w-lsp-diagnostics', {
       file_path: 'f.ts',
@@ -1473,21 +1464,33 @@ describe('Write bridge tool', () => {
     });
 
     rmSync(dir, { recursive: true, force: true });
-    expect(transport.notify).toHaveBeenCalledWith('textDocument/didOpen', expect.any(Object));
-    expect(transport.notify).toHaveBeenCalledWith('textDocument/didSave', expect.any(Object));
+    const text = res.content[0].text as string;
+    expect(text).toContain('Diagnostics (TypeScript): 1 new error introduced by this change:');
+    expect(text).toContain("f.ts:1:7 Type 'number' is not assignable to type 'string'. [2322]");
     expect(res.details.lifecycle).toMatchObject({
-      diagnostics: [
-        {
-          path: 'f.ts',
-          line: 1,
-          column: 7,
-          severity: 'error',
-          message: 'Type mismatch',
-          source: 'tsserver',
-        },
-      ],
-      notifications: ['file_change_notified:f.ts'],
+      diagnostics: [{ path: 'f.ts', line: 1, column: 7, severity: 'error', code: 2322 }],
+      diagnosticsReport: { checker: 'TypeScript', state: 'checked' },
     });
+  });
+
+  it('says "not checked" when the language server has not answered', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const diagnosticsProvider = vi.fn(async () => ({
+      checker: 'TypeScript',
+      state: 'pending' as const,
+      pendingReason: 'starting' as const,
+      baseline: 'unknown' as const,
+      errors: [],
+    }));
+    const write = buildTools(dir, { enabled: ['Write'], diagnosticsProvider }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
+    const res = await write.execute('w-lsp-pending', { file_path: 'f.ts', content: 'x\n' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.content[0].text).toContain(
+      'Diagnostics (TypeScript): not checked, language server still starting.'
+    );
+    expect(res.content[0].text).not.toContain('no new errors');
   });
 
   it('defers slow diagnostics provider results without blocking write completion', async () => {

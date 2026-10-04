@@ -13,7 +13,6 @@ import {
   createFileChangeLifecycleHooks,
   type FileChangeNotifier,
 } from './file-change-notifier.js';
-import { createLspDiagnosticsAdapter, type LspTransport } from './lsp-diagnostics-adapter.js';
 import { NoopEditGuard } from './noop-edit-guard.js';
 import {
   createReadFileStateStore,
@@ -63,13 +62,10 @@ export interface ToolBridgeOptions {
   writeLifecycle?: WriteLifecycleHooks;
   /** Optional adapter notified after successful file creates/modifications. */
   fileChangeNotifier?: FileChangeNotifier;
-  /** Optional LSP diagnostics adapter backed by an injected transport. */
-  lspDiagnosticsAdapter?: {
-    transport: LspTransport;
-    diagnosticsTimeoutMs?: number;
-    languageIdForPath?: (filePath: string) => string;
-  };
-  /** Optional diagnostics adapter invoked after successful file writes. */
+  /**
+   * Optional diagnostics adapter invoked after successful file writes; the
+   * language-server one comes from language-server-diagnostics.ts.
+   */
   diagnosticsProvider?: WriteDiagnosticsProvider;
   /** Optional command-backed diagnostics adapter invoked after successful file writes. */
   diagnosticsCommand?: CommandDiagnosticsOptions;
@@ -103,12 +99,7 @@ export function buildEffectiveToolOptions(
   cwd: string,
   options?: ToolBridgeOptions
 ): ToolBridgeOptions {
-  const lspAdapter = options?.lspDiagnosticsAdapter
-    ? createLspDiagnosticsAdapter({ cwd, ...options.lspDiagnosticsAdapter })
-    : undefined;
-  const fileChangeLifecycle = createFileChangeLifecycleHooks(
-    options?.fileChangeNotifier ?? lspAdapter?.fileChangeNotifier
-  );
+  const fileChangeLifecycle = createFileChangeLifecycleHooks(options?.fileChangeNotifier);
   return {
     ...options,
     readFileState:
@@ -120,7 +111,6 @@ export function buildEffectiveToolOptions(
     writeLifecycle: composeWriteLifecycleHooks(options?.writeLifecycle, fileChangeLifecycle),
     diagnosticsProvider:
       options?.diagnosticsProvider ??
-      lspAdapter?.diagnosticsProvider ??
       (options?.diagnosticsCommand
         ? createCommandDiagnosticsProvider(cwd, options.diagnosticsCommand)
         : undefined),
