@@ -174,6 +174,8 @@ function formatToolInput(toolName: string, input: unknown, semantic?: ToolSemant
       return `${filePath || 'file'} | ${Array.isArray(obj.edits) ? obj.edits.length : 0} edits`;
     case 'EditSymbol':
       return fileAndSymbol || JSON.stringify(input);
+    case 'RenameSymbol':
+      return renameSummary(input) ?? JSON.stringify(input);
     case 'Bash':
       return (obj.command as string) || JSON.stringify(input);
     case 'Grep':
@@ -205,6 +207,15 @@ function bashDescription(input: unknown): string | undefined {
   return typeof description === 'string' && description.trim() ? description.trim() : undefined;
 }
 
+/** Card summary for RenameSymbol: `old → new · file`. */
+function renameSummary(input: unknown): string | undefined {
+  const normalized = normalizeToolInput(input);
+  if (!normalized || typeof normalized !== 'object') return undefined;
+  const { symbol, new_name: newName, file_path: filePath } = normalized as Record<string, unknown>;
+  if (typeof symbol !== 'string' || typeof newName !== 'string') return undefined;
+  return `${symbol} → ${newName}${typeof filePath === 'string' && filePath ? ` · ${filePath}` : ''}`;
+}
+
 // Format tool result for display (no truncation — UI handles collapse/expand)
 function formatToolResult(result: unknown): string {
   if (typeof result === 'string') {
@@ -225,6 +236,7 @@ export {
   extractInteractionId,
   buildAskUserQuestionInteraction,
   bashDescription,
+  renameSummary,
   normalizeTodoItems,
   formatToolInput,
   formatToolResult,

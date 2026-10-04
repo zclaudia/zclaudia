@@ -105,7 +105,8 @@ function ToolExpandedContent({
     toolName === 'Edit' ||
     toolName === 'MultiEdit' ||
     toolName === 'Write' ||
-    toolName === 'EditSymbol';
+    toolName === 'EditSymbol' ||
+    toolName === 'RenameSymbol';
   const fileMutationDetails = isFileMutationTool ? getToolResultDetails(result) : undefined;
   const hasFileMutationResult = Boolean(
     fileMutationDetails?.diff ||

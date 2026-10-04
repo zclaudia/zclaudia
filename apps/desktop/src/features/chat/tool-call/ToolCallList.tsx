@@ -82,6 +82,11 @@ function getToolCallSummary(tc: ToolCallState): string {
       const symbol = String(input.symbol ?? '');
       return symbol ? `${fileName}#${symbol}` : fileName;
     }
+    case 'RenameSymbol': {
+      const symbol = String(input.symbol ?? '');
+      const newName = String(input.new_name ?? '');
+      return symbol && newName ? `${symbol} → ${newName}` : 'RenameSymbol';
+    }
     case 'Bash': {
       const cmd = String(input.command || '').split(' ')[0];
       return cmd || 'bash';
