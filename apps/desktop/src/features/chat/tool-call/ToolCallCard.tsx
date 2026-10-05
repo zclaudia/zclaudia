@@ -5,6 +5,24 @@ import { ToolExpandedContent } from './ToolExpandedContent';
 import { toolCallEffect } from './toolCallView';
 import { bashDescription, renameSummary } from './toolFormatters';
 
+/**
+ * Sub-agent type from a Task/Agent call's input (`subagent_type`, with
+ * `agentType` tolerated for runtimes that camel-case). Used to badge the card
+ * header so a transcript full of parallel Task calls stays scannable.
+ */
+function subagentType(input: unknown): string | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  const raw =
+    (input as Record<string, unknown>).subagent_type ?? (input as Record<string, unknown>).agentType;
+  return typeof raw === 'string' && raw.length > 0 ? raw : undefined;
+}
+
+function displayNameFor(toolCall: ToolCallView): string | undefined {
+  if (toolCall.name !== 'Task' && toolCall.name !== 'Agent') return undefined;
+  const agentType = subagentType(toolCall.input);
+  return agentType ? `Task · ${agentType}` : undefined;
+}
+
 export interface ToolCallCardProps {
   toolCall: ToolCallView;
   /**
@@ -36,6 +54,7 @@ export const ToolCallCard = memo(function ToolCallCard({
   return (
     <KitToolCallCard
       toolCall={toolCall}
+      displayName={displayNameFor(toolCall)}
       displaySummary={
         toolCall.name === 'Bash'
           ? bashDescription(toolCall.input)

@@ -60,4 +60,37 @@ describe('ToolCallCard (pure)', () => {
     fireEvent.click(screen.getByTestId('tool-name'));
     expect(screen.queryByTitle('Paste to terminal')).not.toBeInTheDocument();
   });
+
+  it('badges a Task card with its sub-agent type', () => {
+    render(
+      <ToolCallCard
+        toolCall={createToolCall({
+          name: 'Task',
+          input: { description: 'Find files', subagent_type: 'explore' },
+        })}
+      />
+    );
+    expect(screen.getByTestId('tool-name')).toHaveTextContent('Task · explore');
+  });
+
+  it('accepts a camel-cased agentType from runtimes that emit one', () => {
+    render(
+      <ToolCallCard
+        toolCall={createToolCall({
+          name: 'Task',
+          input: { description: 'Find files', agentType: 'coder' },
+        })}
+      />
+    );
+    expect(screen.getByTestId('tool-name')).toHaveTextContent('Task · coder');
+  });
+
+  it('leaves the Task name untouched when no agent type is present', () => {
+    render(
+      <ToolCallCard
+        toolCall={createToolCall({ name: 'Task', input: { description: 'Find files' } })}
+      />
+    );
+    expect(screen.getByTestId('tool-name')).toHaveTextContent('Task');
+  });
 });

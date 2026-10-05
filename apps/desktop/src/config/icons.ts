@@ -56,7 +56,7 @@ export const ICONS = {
     Bash: Terminal,
     Grep: Search,
     Glob: FolderSearch,
-    Task: ClipboardList,
+    Task: Bot,
     WebFetch: Globe,
     WebSearch: SearchCode,
     AskUserQuestion: HelpCircle,

@@ -14,6 +14,7 @@ import {
   buildAskUserQuestionInteraction,
 } from './tool-call/toolFormatters';
 import { ToolCallCard } from './tool-call/ToolCallCard';
+import { BackgroundTaskChip } from './BackgroundTaskChip';
 import { toToolCallView } from './tool-call/toolCallView';
 import { useRunInTerminal } from './tool-call/useRunInTerminal';
 
@@ -121,11 +122,14 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
   }
 
   return (
-    <ToolCallCard
-      toolCall={view}
-      onSendToBackground={onSendToBackground}
-      backgroundRequested={onSendToBackground ? backgroundRequested : undefined}
-      runInTerminal={runInTerminal}
-    />
+    <div className="space-y-1">
+      <ToolCallCard
+        toolCall={view}
+        onSendToBackground={onSendToBackground}
+        backgroundRequested={onSendToBackground ? backgroundRequested : undefined}
+        runInTerminal={runInTerminal}
+      />
+      <BackgroundTaskChip sessionId={selectedSessionId} toolUseId={toolCall.id} />
+    </div>
   );
 });
