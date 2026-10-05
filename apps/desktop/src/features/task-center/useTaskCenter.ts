@@ -40,7 +40,8 @@ export function useTaskCenter(serverId: string | undefined): TaskCenterViewModel
       const message = {
         type: 'stop_background_task' as const,
         sessionId: task.sessionId,
-        taskId: task.id,
+        // The server knows the raw SDK id; task.id is the namespaced store key.
+        taskId: task.wireTaskId ?? task.id,
         cliPid: task.cliPid,
         taskRootPid: task.taskRootPid,
         taskCommand: task.taskCommand,

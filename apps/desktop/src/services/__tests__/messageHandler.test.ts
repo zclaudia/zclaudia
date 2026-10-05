@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { MessageHandlerContext } from '../messageHandler';
 
 // Mock all stores
@@ -242,6 +242,7 @@ import { downloadPushedFile } from '../fileDownload';
 import { useNotificationFeedStore } from '../../stores/notificationFeedStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { useToastStore } from '../../stores/toastStore';
+import { useFacadeStore } from '../../stores/facadeStore';
 import { __resetDeltaBufferForTests } from '../message-handlers/delta-buffer';
 
 function makeCtx(overrides?: Partial<MessageHandlerContext>): MessageHandlerContext {
@@ -1157,7 +1158,8 @@ describe('handleServerMessage', () => {
       );
       expect(mockBackgroundTaskStore.addTask).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: 't1',
+          id: 'server-1#t1',
+          wireTaskId: 't1',
           sessionId: 's1',
           status: 'started',
           source: 'sdk_task',
@@ -1167,7 +1169,7 @@ describe('handleServerMessage', () => {
     });
 
     it('updates existing background task', () => {
-      mockBackgroundTaskStore.tasks = { t1: { id: 't1' } };
+      mockBackgroundTaskStore.tasks = { 'server-1#t1': { id: 'server-1#t1', wireTaskId: 't1' } };
       handleServerMessage(
         {
           type: 'task_notification',
@@ -1179,7 +1181,7 @@ describe('handleServerMessage', () => {
         makeCtx()
       );
       expect(mockBackgroundTaskStore.updateTask).toHaveBeenCalledWith(
-        't1',
+        'server-1#t1',
         expect.objectContaining({
           status: 'completed',
         })
@@ -1188,8 +1190,9 @@ describe('handleServerMessage', () => {
 
     it('preserves existing pid fields when update omits them', () => {
       mockBackgroundTaskStore.tasks = {
-        t1: {
-          id: 't1',
+        'server-1#t1': {
+          id: 'server-1#t1',
+          wireTaskId: 't1',
           sessionId: 's1',
           description: 'Working...',
           startedAt: 1,
@@ -1211,7 +1214,7 @@ describe('handleServerMessage', () => {
       );
 
       expect(mockBackgroundTaskStore.updateTask).toHaveBeenCalledWith(
-        't1',
+        'server-1#t1',
         expect.objectContaining({
           cliPid: 123,
           taskRootPid: 456,
@@ -1724,8 +1727,9 @@ describe('handleServerMessage', () => {
 
     it('does not kill sdk tasks (sub-agents) whose session has an active regular run', () => {
       mockBackgroundTaskStore.tasks = {
-        'agent_1': {
-          id: 'agent_1',
+        'server-1#agent_1': {
+          id: 'server-1#agent_1',
+          wireTaskId: 'agent_1',
           serverId: 'server-1',
           sessionId: 's1',
           source: 'sdk_task',
@@ -1743,15 +1747,16 @@ describe('handleServerMessage', () => {
       );
 
       expect(mockBackgroundTaskStore.updateTask).not.toHaveBeenCalledWith(
-        'agent_1',
+        'server-1#agent_1',
         expect.objectContaining({ status: 'stopped' })
       );
     });
 
     it('still stops sdk tasks whose session has no active run', () => {
       mockBackgroundTaskStore.tasks = {
-        'agent_1': {
-          id: 'agent_1',
+        'server-1#agent_1': {
+          id: 'server-1#agent_1',
+          wireTaskId: 'agent_1',
           serverId: 'server-1',
           sessionId: 's1',
           source: 'sdk_task',
@@ -1763,9 +1768,78 @@ describe('handleServerMessage', () => {
       handleServerMessage(makeHeartbeat({ activeRuns: [] }), makeCtx());
 
       expect(mockBackgroundTaskStore.updateTask).toHaveBeenCalledWith(
-        'agent_1',
+        'server-1#agent_1',
         expect.objectContaining({ status: 'stopped', completedAt: expect.any(Number) })
       );
+    });
+
+    describe('tasks from removed backends', () => {
+      const registry = (...backendIds: string[]) =>
+        useFacadeStore.setState({
+          backends: backendIds.map(backendId => ({ backendId })) as any,
+        });
+      const sdkTask = (serverId: string, status = 'in_progress') => ({
+        id: `${serverId}#bash_1`,
+        wireTaskId: 'bash_1',
+        serverId,
+        sessionId: 's-orphan',
+        source: 'sdk_task',
+        status,
+        summary: 'sleep 600',
+      });
+
+      afterEach(() => {
+        useFacadeStore.setState({ backends: [] });
+      });
+
+      it('stops a running task whose backend is no longer in the registry', () => {
+        registry('server-1');
+        mockBackgroundTaskStore.tasks = { 'gone#bash_1': sdkTask('gone') };
+
+        handleServerMessage(makeHeartbeat({ activeRuns: [] }), makeCtx());
+
+        expect(mockBackgroundTaskStore.updateTask).toHaveBeenCalledWith(
+          'gone#bash_1',
+          expect.objectContaining({
+            status: 'stopped',
+            summary: 'sleep 600\nBackend was removed',
+            completedAt: expect.any(Number),
+          })
+        );
+      });
+
+      it('leaves tasks of registered backends alone, gateway-prefixed or not', () => {
+        registry('server-1', 'remote-1');
+        mockBackgroundTaskStore.tasks = {
+          'gw:remote-1#bash_1': sdkTask('gw:remote-1'),
+          'remote-1#bash_1': sdkTask('remote-1'),
+        };
+
+        handleServerMessage(makeHeartbeat({ activeRuns: [] }), makeCtx());
+
+        // Other backends' rows are reconciled by their own heartbeats.
+        expect(mockBackgroundTaskStore.updateTask).not.toHaveBeenCalled();
+      });
+
+      it('does not sweep before the registry has loaded', () => {
+        mockBackgroundTaskStore.tasks = { 'gone#bash_1': sdkTask('gone') };
+
+        handleServerMessage(makeHeartbeat({ activeRuns: [] }), makeCtx());
+
+        expect(mockBackgroundTaskStore.updateTask).not.toHaveBeenCalled();
+      });
+
+      it('does not touch terminal tasks or legacy local ids', () => {
+        registry('server-1');
+        mockBackgroundTaskStore.tasks = {
+          'gone#bash_1': sdkTask('gone', 'completed'),
+          'local#bash_1': sdkTask('local'),
+        };
+
+        handleServerMessage(makeHeartbeat({ activeRuns: [] }), makeCtx());
+
+        expect(mockBackgroundTaskStore.updateTask).not.toHaveBeenCalled();
+      });
     });
 
     it('replaces only the current backend project subset when project versions change', async () => {

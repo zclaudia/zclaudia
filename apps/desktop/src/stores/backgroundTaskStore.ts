@@ -2,7 +2,13 @@ import { create } from 'zustand';
 import { getProcessInfo } from '../services/api';
 
 export interface BackgroundTask {
-  id: string; // taskId from SDK
+  /**
+   * Store key, unique across backends. For SDK tasks this is
+   * `${serverId}#${wireTaskId}`; background runs use `background:${sessionId}`.
+   */
+  id: string;
+  /** Raw SDK taskId (unique only within its backend), for outbound messages. */
+  wireTaskId?: string;
   serverId?: string; // owning server/backend for heartbeat reconciliation
   toolUseId?: string; // tool_use_id that triggered this background task
   sessionId: string; // parent session ID
@@ -80,7 +86,9 @@ function getMonitorPid(task: BackgroundTask): number | undefined {
 }
 
 /** Effective task kind: explicit value wins, source is the fallback. */
-export function taskKind(task: Pick<BackgroundTask, 'kind' | 'source'>): NonNullable<BackgroundTask['kind']> {
+export function taskKind(
+  task: Pick<BackgroundTask, 'kind' | 'source'>
+): NonNullable<BackgroundTask['kind']> {
   return task.kind ?? (task.source === 'background_run' ? 'background_run' : 'shell');
 }
 

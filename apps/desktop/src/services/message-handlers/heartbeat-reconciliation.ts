@@ -12,9 +12,14 @@ import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { eagerSyncCurrentSession, recoverCurrentSessionTail } from '../sessionSync';
 import { finalizeRunLifecycle } from './run-finalization';
 import { getProjectsForBackend } from '../api/projects';
-import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../actions/controlPlane';
+import {
+  isLegacyLocalBackendId,
+  resolveCanonicalBackendId,
+  resolveLocalBackendId,
+} from '../../actions/controlPlane';
 import { parseBackendId } from '../../stores/gatewayStore';
 import { useBackgroundTaskStore } from '../../stores/backgroundTaskStore';
+import { useFacadeStore } from '../../stores/facadeStore';
 import type { MessageHandlerContext } from './types';
 import type { InteractionPromptMessage } from '@zclaudia/shared/interaction/forms';
 
@@ -144,6 +149,40 @@ function reconcileStaleBackgroundRunTasks(
   }
 }
 
+/**
+ * Stop non-terminal tasks whose backend has left the registry. Per-backend
+ * reconciliation above only ever visits a backend's own rows, and a removed
+ * backend sends no more heartbeats, so its running rows would otherwise stay
+ * "running" forever. Any live backend's heartbeat sweeps them.
+ *
+ * serverStore is no help here: its connection entries are never pruned. The
+ * facade registry is — but it is empty until the first snapshot lands, and
+ * absence from an empty list proves nothing, so the sweep waits for one.
+ */
+function reconcileTasksFromRemovedBackends(serverId: string): void {
+  const { backends } = useFacadeStore.getState();
+  if (backends.length === 0) return;
+
+  const known = new Set(backends.map(backend => backend.backendId));
+  known.add(parseBackendId(serverId) ?? serverId);
+
+  const backgroundTaskStore = useBackgroundTaskStore.getState();
+  const now = Date.now();
+  for (const task of Object.values(backgroundTaskStore.tasks)) {
+    if (!task.serverId || known.has(parseBackendId(task.serverId) ?? task.serverId)) continue;
+    // The embedded server's legacy ids never appear in the registry.
+    if (isLegacyLocalBackendId(task.serverId)) continue;
+    if (task.status !== 'started' && task.status !== 'in_progress' && task.status !== 'paused')
+      continue;
+
+    backgroundTaskStore.updateTask(task.id, {
+      status: 'stopped',
+      summary: task.summary ? `${task.summary}\nBackend was removed` : 'Backend was removed',
+      completedAt: now,
+    });
+  }
+}
+
 export function handleHeartbeat(
   heartbeat: StateHeartbeatMessage,
   ctx: MessageHandlerContext,
@@ -253,6 +292,7 @@ export function handleHeartbeat(
     activeBackgroundSessionIds,
     new Set(heartbeat.activeRuns.map(r => r.sessionId))
   );
+  reconcileTasksFromRemovedBackends(serverId);
 
   // Reconcile permissions
   const validPermIds = new Set<string>(heartbeat.pendingPermissions.map(p => p.requestId));

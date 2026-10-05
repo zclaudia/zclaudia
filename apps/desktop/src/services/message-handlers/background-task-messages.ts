@@ -36,6 +36,17 @@ function resolveSubagentMeta(
   return { agentType };
 }
 
+/**
+ * Store key for an SDK task. SDK task ids (`bash_1`, `agent_1`) are only
+ * unique within one backend, so two backends reporting `bash_1` would
+ * overwrite each other's row under the raw id. The raw id rides along as
+ * `wireTaskId` for outbound messages; `#` appears in neither a serverId
+ * (`gw:` prefixed ids use `:`) nor an SDK task id.
+ */
+function sdkTaskStoreId(serverId: string, wireTaskId: string): string {
+  return `${serverId}#${wireTaskId}`;
+}
+
 function upsertBackgroundTask(taskId: string, task: BackgroundTask): void {
   const backgroundTaskStore = useBackgroundTaskStore.getState();
   const existingTask = backgroundTaskStore.tasks[taskId];
@@ -45,7 +56,10 @@ function upsertBackgroundTask(taskId: string, task: BackgroundTask): void {
     // not resurrect one — an unguarded non-terminal status would leave the
     // task "running" forever. Ordered delivery makes this rare; the guard is
     // the backstop.
-    if (isCompletedBackgroundStatus(existingTask.status) && !isCompletedBackgroundStatus(task.status)) {
+    if (
+      isCompletedBackgroundStatus(existingTask.status) &&
+      !isCompletedBackgroundStatus(task.status)
+    ) {
       return;
     }
     const nextDescription =
@@ -102,8 +116,10 @@ export function handleBackgroundTaskMessage(
     case 'task_notification': {
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       if (msg.sessionId && msg.taskId) {
-        upsertBackgroundTask(msg.taskId, {
-          id: msg.taskId,
+        const storeId = sdkTaskStoreId(serverId, msg.taskId);
+        upsertBackgroundTask(storeId, {
+          id: storeId,
+          wireTaskId: msg.taskId,
           serverId,
           sessionId: msg.sessionId,
           description: msg.message || 'Background Task',
@@ -129,8 +145,10 @@ export function handleBackgroundTaskMessage(
 
     case 'task_progress': {
       const subagent = resolveSubagentMeta(msg.runId, msg.toolUseId);
-      upsertBackgroundTask(msg.taskId, {
-        id: msg.taskId,
+      const storeId = sdkTaskStoreId(serverId, msg.taskId);
+      upsertBackgroundTask(storeId, {
+        id: storeId,
+        wireTaskId: msg.taskId,
         serverId,
         toolUseId: msg.toolUseId,
         sessionId: msg.sessionId,
@@ -150,8 +168,10 @@ export function handleBackgroundTaskMessage(
 
     case 'task_status_notification': {
       const subagent = resolveSubagentMeta(msg.runId, msg.toolUseId);
-      upsertBackgroundTask(msg.taskId, {
-        id: msg.taskId,
+      const storeId = sdkTaskStoreId(serverId, msg.taskId);
+      upsertBackgroundTask(storeId, {
+        id: storeId,
+        wireTaskId: msg.taskId,
         serverId,
         toolUseId: msg.toolUseId,
         sessionId: msg.sessionId,

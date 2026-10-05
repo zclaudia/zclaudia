@@ -47,11 +47,13 @@ describe('useTaskCenter', () => {
     expect(result.current.hasTerminalTasks).toBe(true);
   });
 
-  it('sends stop_background_task to the owning server when the task has a serverId', () => {
+  it('sends stop_background_task with the raw SDK taskId to the owning server', () => {
     const { result } = renderHook(() => useTaskCenter('local'));
 
+    // The store key is namespaced by backend; the server only knows the raw id.
     result.current.stopTask(
-      makeTask('task-123', {
+      makeTask('local#task-123', {
+        wireTaskId: 'task-123',
         serverId: 'local',
         sessionId: 'sess-1',
         cliPid: 456,
