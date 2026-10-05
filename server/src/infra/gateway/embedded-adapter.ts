@@ -21,6 +21,8 @@ import type { SessionItem, ProjectItem, SessionMessage } from '@zclaudia/protoco
 import type { ClientMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { GatewayClient } from './gateway-client.js';
 
+const LOCAL_BACKEND_NAME = 'This Device';
+
 // ============================================================================
 // Local Backend Handler Interface
 // ============================================================================
@@ -106,10 +108,9 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
   readonly queries: FacadeAdapterQueries = {
     bootstrap: {
       getInitialState: (): FacadeAdapterBootstrapState => {
-        const remoteItems = Array.from(this.gatewayClient.queries.registry.getItems().values());
-        const registryItems = this.localBackendId
-          ? [this.buildLocalPresence(), ...remoteItems]
-          : remoteItems;
+        const registryItems = this.withLocalPresence(
+          Array.from(this.gatewayClient.queries.registry.getItems().values())
+        );
         const backendIds: string[] = [];
         // Add local backend if subscribed
         if (this.localBackendId && this.localSubscribed) {
@@ -185,13 +186,28 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
     return this.localBackendId !== null && backendId === this.localBackendId;
   }
 
+  /**
+   * The gateway lists this instance too, under its gateway display name
+   * ("Backend on <host>"). Locally it is always "This Device": once the local
+   * id is known its gateway entry is replaced by the local presence (a later
+   * duplicate would overwrite it in the registry store); before that, the entry
+   * is kept — runtime-core matches it to discover the local id — but renamed.
+   */
+  private withLocalPresence(items: BackendPresence[]): BackendPresence[] {
+    const instanceId = this.gatewayClient.queries.identity.getInstanceId();
+    const others = items
+      .filter(item => item.backendId !== this.localBackendId)
+      .map(item => (item.instanceId === instanceId ? { ...item, name: LOCAL_BACKEND_NAME } : item));
+    return this.localBackendId ? [this.buildLocalPresence(), ...others] : others;
+  }
+
   private buildLocalPresence(): BackendPresence {
     return {
       namespace: 'zclaudia',
       backendId: this.localBackendId!,
       instanceId: this.gatewayClient.queries.identity.getInstanceId(),
       deviceId: this.gatewayClient.queries.identity.getDeviceId(),
-      name: 'This Device',
+      name: LOCAL_BACKEND_NAME,
       channel: 'local',
       visible: true,
       capabilities: this.localHandler?.getCapabilities() ?? [],
@@ -284,8 +300,7 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
       onRegistrySnapshotChanged: items => {
         // Include local backend in registry snapshot so runtime-core doesn't
         // mark it as removed on every 30s gateway registry push.
-        const allItems = this.localBackendId ? [this.buildLocalPresence(), ...items] : items;
-        this.emit({ type: 'registry_snapshot_received', items: allItems });
+        this.emit({ type: 'registry_snapshot_received', items: this.withLocalPresence(items) });
       },
 
       onOutgoingBackendSubscribed: (backendId, epoch, capabilities) => {

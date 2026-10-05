@@ -25,7 +25,7 @@ function createLocalHandler(): TestLocalHandler {
   } as TestLocalHandler;
 }
 
-function createGatewayClientMock() {
+function createGatewayClientMock(registryItems: Record<string, unknown>[] = []) {
   return {
     commands: {
       connection: { connect: vi.fn(), disconnect: vi.fn() },
@@ -41,7 +41,7 @@ function createGatewayClientMock() {
         getBackendId: () => 'backend-local',
         getEpoch: () => 1,
       },
-      registry: { getItems: () => new Map() },
+      registry: { getItems: () => new Map(registryItems.map(i => [i.backendId, i])) },
       channel: {
         getOutgoing: vi.fn(),
         getAllOutgoing: () => new Map(),
@@ -80,5 +80,58 @@ describe('EmbeddedGatewayAdapter', () => {
         }),
       ])
     );
+  });
+
+  describe('local backend name', () => {
+    // The gateway lists this instance under its gateway display name
+    // ("Backend on <host>"); locally it must always read "This Device".
+    const ownGatewayEntry = {
+      namespace: 'zclaudia',
+      backendId: 'backend-local',
+      instanceId: 'instance-1',
+      deviceId: 'device-1',
+      name: 'Backend on my-mac',
+      channel: 'gateway',
+      visible: true,
+      capabilities: [],
+      backendProtocolVersion: 1,
+      minClientProtocolVersion: 1,
+      epoch: 1,
+      connectedAt: 0,
+      lastSeenAt: 0,
+    };
+    const remoteEntry = {
+      ...ownGatewayEntry,
+      backendId: 'backend-remote',
+      instanceId: 'instance-2',
+      deviceId: 'device-2',
+      name: 'Backend on devbox',
+    };
+
+    it('keeps "This Device" when a registry push includes our own gateway entry', () => {
+      const gatewayClient = createGatewayClientMock();
+      const adapter = new EmbeddedGatewayAdapter(gatewayClient as any, createLocalHandler(), 3100);
+      adapter.setLocalBackendId('backend-local');
+      const events: any[] = [];
+      adapter.events.subscribe(event => events.push(event));
+
+      const outgoing = gatewayClient.events.setOutgoingEvents.mock.calls[0][0];
+      outgoing.onRegistrySnapshotChanged([ownGatewayEntry, remoteEntry]);
+
+      const snapshot = events.find(e => e.type === 'registry_snapshot_received');
+      const local = snapshot.items.filter((i: any) => i.backendId === 'backend-local');
+      expect(local).toHaveLength(1);
+      expect(local[0]).toMatchObject({ name: 'This Device', channel: 'local' });
+      expect(snapshot.items).toContainEqual(remoteEntry);
+    });
+
+    it('names our own gateway entry "This Device" before the local id is known', () => {
+      const gatewayClient = createGatewayClientMock([ownGatewayEntry, remoteEntry]);
+      const adapter = new EmbeddedGatewayAdapter(gatewayClient as any, createLocalHandler(), 3100);
+
+      const { items } = adapter.queries.bootstrap.getInitialState().registry;
+      expect(items.find(i => i.backendId === 'backend-local')?.name).toBe('This Device');
+      expect(items.find(i => i.backendId === 'backend-remote')?.name).toBe('Backend on devbox');
+    });
   });
 });
