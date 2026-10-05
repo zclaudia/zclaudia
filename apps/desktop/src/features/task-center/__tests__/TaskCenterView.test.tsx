@@ -71,6 +71,33 @@ describe('TaskCenterView', () => {
     expect(text).toContain('Edit');
   });
 
+  it('wires the View action on sub-agent rows only, never inline detail', () => {
+    const onViewSubagent = vi.fn();
+    const agent = makeTask('a1', {
+      kind: 'subagent',
+      agentType: 'coder',
+      summary: 'has a summary but must not expand inline',
+    });
+    const props = makeProps({
+      groups: makeGroups({
+        running: [makeTask('r1', { summary: 'shell summary' })],
+        subagents: [agent],
+      }),
+      onViewSubagent,
+    });
+    const { getByText, container } = render(<TaskCenterView {...props} />);
+
+    fireEvent.click(getByText('View'));
+    expect(onViewSubagent).toHaveBeenCalledWith(agent);
+
+    // The sub-agent row's main button is inert (no inline expansion); the
+    // shell row still expands to show its summary.
+    expect(container.textContent?.includes('must not expand inline')).toBe(false);
+    expect(container.textContent?.includes('shell summary')).toBe(false);
+    fireEvent.click(getByText('Task r1'));
+    expect(container.textContent?.includes('shell summary')).toBe(true);
+  });
+
   it('disables Clear finished when there are no terminal tasks', () => {
     const { getByText } = render(<TaskCenterView {...makeProps()} />);
     expect(getByText('Clear finished')).toHaveProperty('disabled', true);

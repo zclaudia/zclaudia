@@ -1,5 +1,6 @@
 import type { BackgroundTask } from '../../stores/backgroundTaskStore';
 import type { GroupedBackgroundTasks } from '../../stores/backgroundTaskStore';
+import { taskKind } from '../../stores/backgroundTaskStore';
 import { X } from 'lucide-react';
 import { SECTION_LABEL } from '../../components/ui/typography';
 import { Button, IconButton } from '../../components/ui/Button';
@@ -16,6 +17,8 @@ export interface TaskCenterViewProps {
   onClearFinished: () => void;
   /** Jump to the session that owns a (cross-session) task. */
   onLocate?: (task: BackgroundTask) => void;
+  /** Open the sub-agent detail drawer — wired to sub-agent rows' View action. */
+  onViewSubagent?: (task: BackgroundTask) => void;
   /** When set (mobile overlay), the header shows a close button. */
   onClose?: () => void;
 }
@@ -36,6 +39,7 @@ export function TaskCenterView({
   onDismiss,
   onClearFinished,
   onLocate,
+  onViewSubagent,
   onClose,
 }: TaskCenterViewProps) {
   const renderRow = (task: BackgroundTask) => {
@@ -49,6 +53,7 @@ export function TaskCenterView({
         onStop={onStop}
         onDismiss={onDismiss}
         onLocate={isOtherSession ? onLocate : undefined}
+        onView={taskKind(task) === 'subagent' ? onViewSubagent : undefined}
       />
     );
   };

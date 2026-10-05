@@ -7,7 +7,7 @@ import { PoppedOutPlaceholder } from './PoppedOutPlaceholder';
 import { InterruptedBanner } from './InterruptedBanner';
 import { PlanStatusBar } from './PlanStatusBar';
 import { SessionHeader } from './SessionHeader';
-import { TaskAmbientStrip, TaskCenterEntry, useTaskCenterUiStore } from '../task-center';
+import { TaskAmbientStrip, TaskCenterEntry, TaskDrawerHost, useTaskCenterUiStore } from '../task-center';
 import { DraftLockPrompt } from '../../components/draft/DraftLockPrompt';
 import { TaskCardStrip } from '../supervision';
 import { forkSession, branchSession } from '../../services/api';
@@ -582,6 +582,9 @@ export function ChatInterface({
                 }
               />
             )}
+
+            {/* Sub-agent detail drawer (opened from task-center rows) */}
+            <TaskDrawerHost />
 
             {/* Plan status indicator */}
             {currentSession?.projectRole === 'task' && currentSession.planStatus === 'planning' && (

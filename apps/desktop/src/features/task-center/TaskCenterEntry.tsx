@@ -54,6 +54,11 @@ export function TaskCenterEntry({ sessionId }: { sessionId: string }) {
       selectSession(task.sessionId);
       setOpen(false);
     },
+    // The drawer outlives the popover: opening it closes the popover (the
+    // ui store's openDrawer does both), and the drawer mounts app-side.
+    onViewSubagent: (task: BackgroundTask) => {
+      useTaskCenterUiStore.getState().openDrawer(task.id);
+    },
   };
 
   if (isMobile) {

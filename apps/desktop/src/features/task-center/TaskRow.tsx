@@ -60,6 +60,8 @@ interface TaskRowProps {
   onDismiss: (taskId: string) => void;
   /** Jump to the owning session — only passed for cross-session rows. */
   onLocate?: (task: BackgroundTask) => void;
+  /** Open the sub-agent detail drawer — only passed for sub-agent rows. */
+  onView?: (task: BackgroundTask) => void;
 }
 
 /**
@@ -68,13 +70,18 @@ interface TaskRowProps {
  * accent per ui-conventions §5 — or Dismiss for terminal ones). PIDs live in
  * the expandable detail, never inline.
  */
-export function TaskRow({ task, isOtherSession, sessionLabel, onStop, onDismiss, onLocate }: TaskRowProps) {
+export function TaskRow({ task, isOtherSession, sessionLabel, onStop, onDismiss, onLocate, onView }: TaskRowProps) {
   const [expanded, setExpanded] = useState(false);
   const isRunning = task.status === 'started' || task.status === 'in_progress';
   const canStop = isRunning && task.stoppable !== false;
-  const hasDetail = !!(task.summary || task.taskCommand || task.outputFile || task.taskRootPid || task.cliPid);
-  const usage = formatUsage(task);
   const isSubagent = taskKind(task) === 'subagent';
+  // Sub-agent rows expand into the drawer (via the View action), not the
+  // inline detail — their detail surface is the prompt/result, which the
+  // inline area is too small to hold.
+  const hasDetail =
+    !isSubagent &&
+    !!(task.summary || task.taskCommand || task.outputFile || task.taskRootPid || task.cliPid);
+  const usage = formatUsage(task);
   // Sub-agent rows lead with their live activity ("what is the agent doing
   // right now"); shell tasks lead with elapsed time.
   const meta = [isRunning && task.activity ? task.activity : null, formatTimeAgo(task.startedAt), usage]
@@ -114,6 +121,11 @@ export function TaskRow({ task, isOtherSession, sessionLabel, onStop, onDismiss,
           )}
         </button>
         <span className="hidden shrink-0 items-center gap-1 group-hover:flex">
+          {onView && (
+            <Button variant="ghost" size="sm" onClick={() => onView(task)}>
+              View
+            </Button>
+          )}
           {onLocate && (
             <Button variant="ghost" size="sm" onClick={() => onLocate(task)}>
               Open

@@ -184,6 +184,7 @@ vi.mock('../../task-center', () => ({
   TaskCenterEntry: (props: any) => (
     <div data-testid="task-center-entry" data-session-id={props.sessionId} />
   ),
+  TaskDrawerHost: () => null,
   useTaskCenterUiStore: Object.assign(
     (selector: any) => selector({ popoverOpen: false }),
     { getState: () => ({ popoverOpen: false, setPopoverOpen: vi.fn(), togglePopover: vi.fn() }) }
