@@ -161,6 +161,8 @@ export interface FilePushMetadata {
 
 export interface ToolCall {
   toolUseId?: string;
+  /** Sub-agent lineage: the parent Task call's tool_use_id, when this call ran inside a sub-agent. */
+  parentToolUseId?: string;
   name: string;
   input: unknown;
   output?: unknown;

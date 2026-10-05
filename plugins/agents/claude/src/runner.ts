@@ -542,6 +542,11 @@ export function transformClaudeSdkMessage(
   message: unknown
 ): ProviderRuntimeEvent | ProviderRuntimeEvent[] {
   const msg = message as Record<string, unknown>;
+  // Sub-agent lineage (SDK sets this on every nested-agent message): kept on
+  // the emitted tool events so the host can attribute inner steps to their
+  // agent. Undefined for main-loop messages.
+  const parentToolUseId =
+    typeof msg.parent_tool_use_id === 'string' ? msg.parent_tool_use_id : undefined;
 
   if (msg.type === 'system' && msg.subtype === 'init') {
     const systemInfo: SystemInfo = {
@@ -637,6 +642,7 @@ export function transformClaudeSdkMessage(
           toolName: block.name as string | undefined,
           toolInput: boundedToolInput(block.input),
           toolSemantic: planToolSemantic(block.name),
+          ...(parentToolUseId ? { parentToolUseId } : {}),
         });
       }
     }
@@ -655,6 +661,7 @@ export function transformClaudeSdkMessage(
         toolUseId: block.tool_use_id as string | undefined,
         toolResult: boundedValue(block.content, DEFAULT_TOOL_RESULT_BYTES),
         isToolError: block.is_error as boolean | undefined,
+        ...(parentToolUseId ? { parentToolUseId } : {}),
       }));
     return events.length === 1 ? events[0] : events;
   }

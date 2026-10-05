@@ -14,6 +14,12 @@ export interface ToolCallState {
   isError?: boolean;
   activity?: string; // Subagent activity text (e.g. "Reading file X...")
   /**
+   * Sub-agent lineage: set when this call ran inside a sub-agent — the value
+   * is the parent Task call's tool_use_id. Filtered out of the top-level
+   * transcript; rendered in the sub-agent drawer instead.
+   */
+  parentToolUseId?: string;
+  /**
    * Provider-declared semantic category (e.g. `'plan_proposal'`). Lets the
    * UI pick a renderer without string-matching provider-specific tool names.
    */
@@ -31,4 +37,10 @@ export interface ToolCallState {
 export interface ToolCallHostMeta {
   effect?: ToolEffect;
   backgroundable?: boolean;
+  /**
+   * Sub-agent lineage: when set, this call ran inside a sub-agent and the
+   * value is the parent Task call's tool_use_id. The transcript filters such
+   * calls out of the top-level list; the sub-agent drawer renders them.
+   */
+  parentToolUseId?: string;
 }

@@ -117,4 +117,27 @@ describe('TaskDrawer', () => {
     expect(screen.getByText('21 tool calls')).toBeInTheDocument();
     expect(screen.getByText('agent-output.md')).toBeInTheDocument();
   });
+
+  it('renders inner steps with tool names and argument summaries', () => {
+    render(
+      <TaskDrawer
+        task={makeTask()}
+        detail={null}
+        steps={[
+          { id: 'i1', toolName: 'Read', toolInput: { file_path: '/src/auth/login.ts' }, status: 'completed' },
+          { id: 'i2', toolName: 'Grep', toolInput: { pattern: 'verifyToken' }, status: 'running' },
+        ]}
+        onClose={() => {}}
+      />
+    );
+    expect(screen.getByText('Steps · 2')).toBeInTheDocument();
+    expect(screen.getByText('Read')).toBeInTheDocument();
+    expect(screen.getByText('login.ts')).toBeInTheDocument();
+    expect(screen.getByText('Grep')).toBeInTheDocument();
+  });
+
+  it('omits the Steps section when the agent has no attributed steps', () => {
+    render(<TaskDrawer task={makeTask()} detail={null} onClose={() => {}} />);
+    expect(screen.queryByText(/Steps ·/)).not.toBeInTheDocument();
+  });
 });

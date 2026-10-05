@@ -50,6 +50,7 @@ export function translateProviderRuntimeEvent(
             input: event.toolInput,
             semantic: event.toolSemantic,
             effect: event.toolEffect,
+            ...(event.parentToolUseId ? { parentToolUseId: event.parentToolUseId } : {}),
             ...(event.toolBackgroundable ? { backgroundable: true } : {}),
           },
           { toolUseId: event.toolUseId }
@@ -83,6 +84,7 @@ export function translateProviderRuntimeEvent(
             output: event.toolResult,
             isError: event.isToolError,
             effect: event.toolEffect,
+            ...(event.parentToolUseId ? { parentToolUseId: event.parentToolUseId } : {}),
           },
           { toolUseId: event.toolUseId }
         ),

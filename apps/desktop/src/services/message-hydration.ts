@@ -23,6 +23,7 @@ export function hydrateMessagesForDisplay(messages: Message[]): MessageWithToolC
         result: tc.output,
         isError: tc.isError,
         effect: tc.effect,
+        parentToolUseId: tc.parentToolUseId,
       }));
     }
     if (msg.metadata?.contentBlocks && msg.metadata.contentBlocks.length > 0) {

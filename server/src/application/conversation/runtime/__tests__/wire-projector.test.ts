@@ -78,6 +78,40 @@ describe('wire projector', () => {
     ]);
   });
 
+  it('projects sub-agent lineage onto tool_use and tool_result wire messages', () => {
+    expect(
+      projectRunDomainEventToWireMessages(
+        event('tool.started', {
+          toolUseId: 'inner-1',
+          parentToolUseId: 'task-call-1',
+          toolName: 'Grep',
+          input: { pattern: 'verifyToken' },
+        })
+      )
+    ).toEqual([
+      expect.objectContaining({ type: 'tool_use', parentToolUseId: 'task-call-1' }),
+    ]);
+
+    expect(
+      projectRunDomainEventToWireMessages(
+        event('tool.finished', {
+          toolUseId: 'inner-1',
+          parentToolUseId: 'task-call-1',
+          toolName: 'Grep',
+          output: '3 matches',
+        })
+      )
+    ).toEqual([
+      expect.objectContaining({ type: 'tool_result', parentToolUseId: 'task-call-1' }),
+    ]);
+
+    // Untagged events must not grow the field at all.
+    const [started] = projectRunDomainEventToWireMessages(
+      event('tool.started', { toolUseId: 'top-1', toolName: 'Task', input: {} })
+    );
+    expect('parentToolUseId' in started).toBe(false);
+  });
+
   it('projects lifecycle, retry, and mode events to existing wire messages', () => {
     expect(
       projectRunDomainEventToWireMessages(

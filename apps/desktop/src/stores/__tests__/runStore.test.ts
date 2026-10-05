@@ -52,6 +52,19 @@ describe('runStore', () => {
     expect(useRunStore.getState().activeToolCalls.r1.t1.result).toBe('ok');
   });
 
+  it('carries sub-agent lineage from addToolCall through the meta map into ToolCallState', () => {
+    useRunStore.getState().startRun('r1', 's1');
+    useRunStore.getState().addToolCall('r1', 'task-1', 'Task', { description: 'd' });
+    useRunStore
+      .getState()
+      .addToolCall('r1', 'inner-1', 'Read', { file_path: 'x' }, undefined, undefined, undefined, 'task-1');
+    const calls = useRunStore.getState().activeToolCalls.r1;
+    expect(calls['inner-1'].parentToolUseId).toBe('task-1');
+    expect(calls['task-1'].parentToolUseId).toBeUndefined();
+    const history = useRunStore.getState().toolCallsHistory.r1;
+    expect(history.find(tc => tc.id === 'inner-1')?.parentToolUseId).toBe('task-1');
+  });
+
   it('appendTextBlock coalesces consecutive text blocks', () => {
     useRunStore.getState().startRun('r1', 's1');
     useRunStore.getState().appendTextBlock('r1', 'a');

@@ -36,6 +36,9 @@ export function projectRunDomainEventToWireMessages(event: RunDomainEvent): Serv
           runId: event.runId,
           sessionId: event.sessionId,
           toolUseId: event.payload.toolUseId,
+          ...(event.payload.parentToolUseId
+            ? { parentToolUseId: event.payload.parentToolUseId }
+            : {}),
           toolName: event.payload.toolName,
           toolInput: event.payload.input,
           semantic: event.payload.semantic,
@@ -52,6 +55,9 @@ export function projectRunDomainEventToWireMessages(event: RunDomainEvent): Serv
           runId: event.runId,
           sessionId: event.sessionId,
           toolUseId: event.payload.toolUseId,
+          ...(event.payload.parentToolUseId
+            ? { parentToolUseId: event.payload.parentToolUseId }
+            : {}),
           toolName: event.payload.toolName,
           result: event.payload.output,
           isError: event.payload.isError,

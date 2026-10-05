@@ -209,12 +209,17 @@ function SummaryBar({ toolCalls, onClick }: { toolCalls: ToolCallState[]; onClic
 type ToolCallListMode = 'streaming' | 'collapsed' | 'expanded';
 
 export const ToolCallList = memo(function ToolCallList({
-  toolCalls,
+  toolCalls: allToolCalls,
   defaultCollapsed = false,
   isStreaming = false,
 }: ToolCallListProps) {
   const [userOverride, setUserOverride] = useState<ToolCallListMode | null>(null);
   const [showAll, setShowAll] = useState(false);
+
+  // Sub-agent inner steps (parentToolUseId set) never render top-level here;
+  // they belong to the sub-agent drawer. Filtering once keeps every mode's
+  // counts and "latest tool" fallbacks free of nested calls.
+  const toolCalls = allToolCalls.filter(tc => !tc.parentToolUseId);
 
   // While streaming, a new tool arriving should reset any user override so the latest tool
   // becomes visible again; otherwise a single click could hide every subsequent tool of the run.

@@ -3,6 +3,7 @@ import { useBackgroundTaskStore } from '../../stores/backgroundTaskStore';
 import { useServerStore } from '../../stores/serverStore';
 import { TaskDrawer } from './TaskDrawer';
 import { useSubagentDetail } from './useSubagentDetail';
+import { useSubagentSteps } from './useSubagentSteps';
 import { useTaskCenter } from './useTaskCenter';
 import { useTaskCenterUiStore } from './taskCenterUiStore';
 
@@ -18,6 +19,7 @@ export function TaskDrawerHost() {
   const closeDrawer = useTaskCenterUiStore(s => s.closeDrawer);
   const task = useBackgroundTaskStore(s => (drawerTaskId ? s.tasks[drawerTaskId] : undefined));
   const detail = useSubagentDetail(task ?? null);
+  const steps = useSubagentSteps(task ?? null);
   const activeServerId = useServerStore(s => s.activeServerId);
   const { stopTask } = useTaskCenter(activeServerId ?? undefined);
 
@@ -32,6 +34,7 @@ export function TaskDrawerHost() {
     <TaskDrawer
       task={task}
       detail={detail}
+      steps={steps}
       onStop={isRunning && task.stoppable !== false ? stopTask : undefined}
       onClose={closeDrawer}
     />

@@ -89,7 +89,8 @@ interface RunState {
     toolInput: unknown,
     semantic?: ToolSemantic,
     effect?: ToolEffect,
-    backgroundable?: boolean
+    backgroundable?: boolean,
+    parentToolUseId?: string
   ) => void;
   updateToolCallResult: (
     runId: string,
@@ -147,6 +148,7 @@ function toToolCallState(
     activity: tool.summary,
     semantic: tool.semantic as ToolSemantic | undefined,
     effect: meta?.[tool.id]?.effect,
+    parentToolUseId: meta?.[tool.id]?.parentToolUseId,
     ...(meta?.[tool.id]?.backgroundable ? { backgroundable: true } : {}),
   };
 }
@@ -299,10 +301,10 @@ export const useRunStore = create<RunState>((set, get) => ({
 
   // ── Tool call actions (per run) ────────────────────────────────
 
-  addToolCall: (runId, toolUseId, toolName, toolInput, semantic, effect, backgroundable) =>
+  addToolCall: (runId, toolUseId, toolName, toolInput, semantic, effect, backgroundable, parentToolUseId) =>
     set(state => {
       const meta =
-        effect || backgroundable
+        effect || backgroundable || parentToolUseId
           ? {
               ...state.runToolMeta,
               [runId]: {
@@ -311,6 +313,7 @@ export const useRunStore = create<RunState>((set, get) => ({
                   ...state.runToolMeta[runId]?.[toolUseId],
                   ...(effect ? { effect } : {}),
                   ...(backgroundable ? { backgroundable: true } : {}),
+                  ...(parentToolUseId ? { parentToolUseId } : {}),
                 },
               },
             }

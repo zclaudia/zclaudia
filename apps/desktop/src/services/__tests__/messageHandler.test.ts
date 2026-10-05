@@ -640,9 +640,36 @@ describe('handleServerMessage', () => {
         {},
         undefined,
         undefined,
+        undefined,
+        // parentToolUseId — absent for a main-loop call
         undefined
       );
       expect(mockChatStore.addToolUseBlock).toHaveBeenCalledWith('r1', 'tu1');
+    });
+
+    it('forwards sub-agent lineage on tool_use to the store', () => {
+      mockChatStore.activeRuns = { r1: 's1' };
+      handleServerMessage(
+        {
+          type: 'tool_use',
+          runId: 'r1',
+          toolUseId: 'inner-1',
+          parentToolUseId: 'task-1',
+          toolName: 'Read',
+          toolInput: { file_path: '/x.ts' },
+        },
+        makeCtx()
+      );
+      expect(mockChatStore.addToolCall).toHaveBeenCalledWith(
+        'r1',
+        'inner-1',
+        'Read',
+        { file_path: '/x.ts' },
+        undefined,
+        undefined,
+        undefined,
+        'task-1'
+      );
     });
 
     it('commits buffered deltas before the tool block, preserving stream order', () => {

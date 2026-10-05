@@ -1911,6 +1911,41 @@ describe('ToolCallList', () => {
     expect(screen.getAllByTestId('tool-use')).toHaveLength(3);
   });
 
+  // ── sub-agent lineage (P5) ────────────────────────────────────────────────
+
+  it('never renders sub-agent inner steps at the top level (expanded mode)', () => {
+    const toolCalls = [
+      makeTc('task-1', { toolName: 'Task', toolInput: { description: 'Survey' } }),
+      makeTc('inner-1', { parentToolUseId: 'task-1' }),
+      makeTc('inner-2', { parentToolUseId: 'task-1' }),
+    ];
+    render(<ToolCallList toolCalls={toolCalls} />);
+    expect(screen.getAllByTestId('tool-use')).toHaveLength(1);
+  });
+
+  it('excludes inner steps from the collapsed summary and its counts', () => {
+    const toolCalls = [makeTc('task-1'), makeTc('inner-1', { parentToolUseId: 'task-1' })];
+    render(<ToolCallList toolCalls={toolCalls} defaultCollapsed />);
+    expect(screen.getByText('1 tool call')).toBeInTheDocument();
+  });
+
+  it('excludes inner steps from the streaming expanded set', () => {
+    const toolCalls = [
+      makeTc('task-1', { toolName: 'Task', toolInput: { description: 'Survey' }, status: 'running' }),
+      makeTc('inner-1', { parentToolUseId: 'task-1', status: 'running' }),
+    ];
+    render(<ToolCallList toolCalls={toolCalls} isStreaming />);
+    expect(screen.getAllByTestId('tool-use')).toHaveLength(1);
+  });
+
+  it('renders nothing when every call is an inner step', () => {
+    const { container } = render(
+      <ToolCallList toolCalls={[makeTc('inner-1', { parentToolUseId: 'task-1' })]} />
+    );
+    expect(container.firstChild).toBeNull();
+  });
+
+
   it('re-renders with different tool calls', () => {
     const toolCalls = [makeTc('tc-1')];
     const { rerender } = render(<ToolCallList toolCalls={toolCalls} />);

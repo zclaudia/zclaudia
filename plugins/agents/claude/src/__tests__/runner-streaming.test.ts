@@ -80,6 +80,63 @@ describe('transformClaudeSdkMessage streaming', () => {
     expect(transformClaudeSdkMessage(streamEvent(textDelta('sub'), 'tool_1'))).toEqual([]);
   });
 
+  it('tags sub-agent tool_use blocks with their parent tool_use_id', () => {
+    expect(
+      transformClaudeSdkMessage({
+        type: 'assistant',
+        parent_tool_use_id: 'task-call-1',
+        message: {
+          content: [
+            { type: 'tool_use', id: 'inner-1', name: 'Read', input: { file_path: '/x.ts' } },
+          ],
+        },
+      })
+    ).toEqual({
+      type: 'tool_use',
+      toolUseId: 'inner-1',
+      toolName: 'Read',
+      toolInput: { file_path: '/x.ts' },
+      toolSemantic: undefined,
+      parentToolUseId: 'task-call-1',
+    });
+  });
+
+  it('tags sub-agent tool_result blocks with their parent tool_use_id', () => {
+    expect(
+      transformClaudeSdkMessage({
+        type: 'user',
+        parent_tool_use_id: 'task-call-1',
+        message: {
+          content: [{ type: 'tool_result', tool_use_id: 'inner-1', content: 'file body' }],
+        },
+      })
+    ).toEqual({
+      type: 'tool_result',
+      toolUseId: 'inner-1',
+      toolResult: 'file body',
+      isToolError: undefined,
+      parentToolUseId: 'task-call-1',
+    });
+  });
+
+  it('leaves main-loop tool events untagged', () => {
+    expect(
+      transformClaudeSdkMessage({
+        type: 'assistant',
+        parent_tool_use_id: null,
+        message: {
+          content: [{ type: 'tool_use', id: 'top-1', name: 'Task', input: { description: 'd' } }],
+        },
+      })
+    ).toEqual({
+      type: 'tool_use',
+      toolUseId: 'top-1',
+      toolName: 'Task',
+      toolInput: { description: 'd' },
+      toolSemantic: undefined,
+    });
+  });
+
   it('forwards thinking blocks of a complete assistant message', () => {
     expect(
       transformClaudeSdkMessage({

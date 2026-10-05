@@ -84,6 +84,51 @@ describe('provider-event-translator', () => {
     ]);
   });
 
+  it('forwards sub-agent lineage on tool events when the provider sets it', () => {
+    expect(
+      translateProviderRuntimeEvent({
+        ...base,
+        event: {
+          type: 'tool_use',
+          toolUseId: 'inner-1',
+          toolName: 'Grep',
+          toolInput: { pattern: 'verifyToken' },
+          parentToolUseId: 'task-call-1',
+        },
+      })
+    ).toEqual([
+      expect.objectContaining({
+        type: 'tool.started',
+        payload: expect.objectContaining({ parentToolUseId: 'task-call-1' }),
+      }),
+    ]);
+
+    expect(
+      translateProviderRuntimeEvent({
+        ...base,
+        event: {
+          type: 'tool_result',
+          toolUseId: 'inner-1',
+          toolName: 'Grep',
+          toolResult: '3 matches',
+          parentToolUseId: 'task-call-1',
+        },
+      })
+    ).toEqual([
+      expect.objectContaining({
+        type: 'tool.finished',
+        payload: expect.objectContaining({ parentToolUseId: 'task-call-1' }),
+      }),
+    ]);
+
+    // Untagged events must not grow the field at all (exact-payload equality).
+    const [started] = translateProviderRuntimeEvent({
+      ...base,
+      event: { type: 'tool_use', toolUseId: 'top-1', toolName: 'Task', toolInput: {} },
+    });
+    expect('parentToolUseId' in started.payload).toBe(false);
+  });
+
   it('maps provider terminal and retry events into run domain events', () => {
     expect(
       translateProviderRuntimeEvent({

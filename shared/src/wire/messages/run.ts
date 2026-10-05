@@ -191,6 +191,11 @@ export interface ToolUseMessage {
   runId: string;
   sessionId: string;
   toolUseId: string;
+  /**
+   * Sub-agent lineage: set when this call ran inside a sub-agent, naming the
+   * parent Task call's tool_use_id. Only nested-agent runtimes emit it.
+   */
+  parentToolUseId?: string;
   toolName: string;
   toolInput: unknown;
   /** Optional provider-declared semantic category. See {@link ToolSemantic}. */
@@ -212,6 +217,8 @@ export interface ToolResultMessage {
   runId: string;
   sessionId: string;
   toolUseId: string;
+  /** Sub-agent lineage; see ToolUseMessage.parentToolUseId. */
+  parentToolUseId?: string;
   toolName: string;
   result: unknown;
   isError?: boolean;

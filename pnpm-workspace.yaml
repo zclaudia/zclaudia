@@ -8,7 +8,7 @@ packages:
 # pnpm 10+ no longer reads the `pnpm` field from package.json — resolution and
 # build settings live here instead.
 overrides:
-  '@zclaudia/plugin-sdk': 0.6.0
+  '@zclaudia/plugin-sdk': 0.6.1
 
 # pnpm 10+ does not run dependency lifecycle scripts unless the package is
 # allowed here. This list is every dependency that had an install/postinstall

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, renderHook, render, screen } from '@testing-library/react';
 import { useSubagentDetail } from '../useSubagentDetail';
+import { useSubagentSteps } from '../useSubagentSteps';
 import { TaskDrawerHost } from '../TaskDrawerHost';
 import { useRunStore } from '../../../stores/runStore';
 import { useBackgroundTaskStore, type BackgroundTask } from '../../../stores/backgroundTaskStore';
@@ -94,6 +95,52 @@ describe('useSubagentDetail', () => {
 
   it('returns null when the task itself is null', () => {
     expect(renderHook(() => useSubagentDetail(null)).result.current).toBeNull();
+  });
+});
+
+describe('useSubagentSteps', () => {
+  // The drawer's task was spawned by the Task call 'task-1', so steps name it.
+  const stepsTask = () => makeTask({ toolUseId: 'task-1' });
+
+  function step(id: string, parentToolUseId: string | undefined, toolName = 'Read'): ToolCallState {
+    return {
+      id,
+      toolName,
+      toolInput: { file_path: `/${id}.ts` },
+      status: 'completed',
+      parentToolUseId,
+    };
+  }
+
+  it('collects inner steps naming the task’s toolUseId, oldest first', () => {
+    useRunStore.setState({
+      toolCallsHistory: {
+        'run-1': [step('task-1', undefined, 'Task'), step('inner-1', 'task-1'), step('inner-2', 'task-1')],
+      },
+    });
+    const { result } = renderHook(() => useSubagentSteps(stepsTask()));
+    expect(result.current.map(s => s.id)).toEqual(['inner-1', 'inner-2']);
+  });
+
+  it('ignores steps of other agents and other runs’ unrelated calls', () => {
+    useRunStore.setState({
+      toolCallsHistory: {
+        'run-1': [step('inner-1', 'task-1')],
+        'run-2': [step('other-1', 'task-9'), step('plain', undefined)],
+      },
+    });
+    const { result } = renderHook(() => useSubagentSteps(stepsTask()));
+    expect(result.current.map(s => s.id)).toEqual(['inner-1']);
+  });
+
+  it('returns empty without a toolUseId or any matching steps', () => {
+    expect(renderHook(() => useSubagentSteps(makeTask({ toolUseId: undefined }))).result.current).toEqual([]);
+    useRunStore.setState({ toolCallsHistory: { 'run-1': [step('plain', undefined)] } });
+    expect(renderHook(() => useSubagentSteps(stepsTask())).result.current).toEqual([]);
+  });
+
+  it('returns empty for a null task', () => {
+    expect(renderHook(() => useSubagentSteps(null)).result.current).toEqual([]);
   });
 });
 

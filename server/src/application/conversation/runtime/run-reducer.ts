@@ -86,6 +86,7 @@ function applyToolStarted(
     input: payload.input,
     effect: payload.effect,
     startedAt: Date.now(),
+    ...(payload.parentToolUseId ? { parentToolUseId: payload.parentToolUseId } : {}),
   });
   activeRun.contentBlocks.push({ type: 'tool_use', toolUseId: payload.toolUseId });
 }

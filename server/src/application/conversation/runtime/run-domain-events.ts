@@ -285,6 +285,8 @@ export interface RunDomainEventPayloadMap {
 
 export interface ToolEventPayload {
   toolUseId: string;
+  /** Sub-agent lineage: parent Task call's tool_use_id, when the call ran inside a sub-agent. */
+  parentToolUseId?: string;
   toolName: string;
   input?: unknown;
   semantic?: ToolSemantic;

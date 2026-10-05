@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Bot, FileText, X } from 'lucide-react';
 import type { BackgroundTask } from '../../stores/backgroundTaskStore';
+import type { ToolCallState } from '../../stores/runStore';
 import { SECTION_LABEL } from '../../components/ui/typography';
 import { Button, IconButton } from '../../components/ui/Button';
+import { Icon } from '../../components/ui/Icon';
+import { getToolIcon } from '../../config/icons';
+import { getToolCallSummary } from '../chat/tool-call/ToolCallList';
 import type { SubagentDetail } from './useSubagentDetail';
 
 function formatDuration(ms: number): string {
@@ -39,9 +43,42 @@ function usageStats(task: BackgroundTask, duration: string): string[] {
 export interface TaskDrawerProps {
   task: BackgroundTask;
   detail: SubagentDetail | null;
+  /** Inner tool steps of the sub-agent (P5 lineage), oldest first. */
+  steps?: ToolCallState[];
   /** Present only when the task can actually be stopped (running + stoppable). */
   onStop?: (task: BackgroundTask) => void;
   onClose: () => void;
+}
+
+function StepDot({ status }: { status: ToolCallState['status'] }) {
+  if (status === 'running') {
+    return <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary" />;
+  }
+  if (status === 'error') {
+    return <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />;
+  }
+  return <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />;
+}
+
+/**
+ * One inner step of the sub-agent: status dot, tool icon, name, and the
+ * one-line argument summary the transcript's collapsed rows also use.
+ */
+function StepRow({ step }: { step: ToolCallState }) {
+  return (
+    <li className="flex items-center gap-2 py-0.5 text-xs">
+      <StepDot status={step.status} />
+      <span className="shrink-0 text-muted-foreground">
+        <Icon icon={getToolIcon(step.toolName)} size={11} />
+      </span>
+      <span className={step.status === 'running' ? 'text-foreground' : 'text-muted-foreground'}>
+        {step.toolName}
+      </span>
+      <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground/70">
+        {getToolCallSummary(step)}
+      </span>
+    </li>
+  );
 }
 
 /**
@@ -51,7 +88,7 @@ export interface TaskDrawerProps {
  * the honest live signal is the activity line plus usage. Purely
  * presentational; the host resolves stores and positioning.
  */
-export function TaskDrawer({ task, detail, onStop, onClose }: TaskDrawerProps) {
+export function TaskDrawer({ task, detail, steps = [], onStop, onClose }: TaskDrawerProps) {
   const duration = useDuration(task);
   const isRunning = task.status === 'started' || task.status === 'in_progress';
 
@@ -97,6 +134,17 @@ export function TaskDrawer({ task, detail, onStop, onClose }: TaskDrawerProps) {
               <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary" />
               <span className="truncate">{task.activity}</span>
             </p>
+          </section>
+        )}
+
+        {steps.length > 0 && (
+          <section>
+            <h5 className={`${SECTION_LABEL} pb-1`}>Steps · {steps.length}</h5>
+            <ol className="flex flex-col">
+              {steps.map(step => (
+                <StepRow key={step.id} step={step} />
+              ))}
+            </ol>
           </section>
         )}
 
