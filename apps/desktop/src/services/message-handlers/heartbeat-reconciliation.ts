@@ -108,7 +108,8 @@ function shouldIgnoreHeartbeatRun(state: HeartbeatState, runId: string, lastSeq?
 
 function reconcileStaleBackgroundRunTasks(
   serverId: string,
-  activeBackgroundSessionIds: Set<string>
+  activeBackgroundSessionIds: Set<string>,
+  activeSessionIds: Set<string>
 ): void {
   const backgroundTaskStore = useBackgroundTaskStore.getState();
   const now = Date.now();
@@ -122,7 +123,12 @@ function reconcileStaleBackgroundRunTasks(
     if (task.source === 'background_run' && task.id.startsWith('background:')) {
       backgroundSessionId = task.id.slice('background:'.length);
     } else if (task.source === 'sdk_task') {
-      backgroundSessionId = task.sessionId;
+      // SDK tasks (shell or sub-agent) live inside their parent session's
+      // run, which heartbeats report as a regular session — not a
+      // background-typed one. They are stale only once no run at all is
+      // active for that session; matching against background-typed runs
+      // alone would kill a live sub-agent on every heartbeat.
+      backgroundSessionId = activeSessionIds.has(task.sessionId) ? null : task.sessionId;
     }
     if (!backgroundSessionId) continue;
 
@@ -242,7 +248,11 @@ export function handleHeartbeat(
     });
   }
 
-  reconcileStaleBackgroundRunTasks(serverId, activeBackgroundSessionIds);
+  reconcileStaleBackgroundRunTasks(
+    serverId,
+    activeBackgroundSessionIds,
+    new Set(heartbeat.activeRuns.map(r => r.sessionId))
+  );
 
   // Reconcile permissions
   const validPermIds = new Set<string>(heartbeat.pendingPermissions.map(p => p.requestId));

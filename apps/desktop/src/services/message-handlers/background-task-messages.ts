@@ -41,6 +41,13 @@ function upsertBackgroundTask(taskId: string, task: BackgroundTask): void {
   const existingTask = backgroundTaskStore.tasks[taskId];
 
   if (existingTask) {
+    // Terminal tasks persist until dismissed, so a late progress event must
+    // not resurrect one — an unguarded non-terminal status would leave the
+    // task "running" forever. Ordered delivery makes this rare; the guard is
+    // the backstop.
+    if (isCompletedBackgroundStatus(existingTask.status) && !isCompletedBackgroundStatus(task.status)) {
+      return;
+    }
     const nextDescription =
       !task.description || task.description === 'Background Task'
         ? existingTask.description

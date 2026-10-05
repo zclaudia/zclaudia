@@ -1722,6 +1722,52 @@ describe('handleServerMessage', () => {
       );
     });
 
+    it('does not kill sdk tasks (sub-agents) whose session has an active regular run', () => {
+      mockBackgroundTaskStore.tasks = {
+        'agent_1': {
+          id: 'agent_1',
+          serverId: 'server-1',
+          sessionId: 's1',
+          source: 'sdk_task',
+          kind: 'subagent',
+          toolUseId: 'toolu_1',
+          status: 'in_progress',
+        },
+      };
+
+      handleServerMessage(
+        makeHeartbeat({
+          activeRuns: [{ runId: 'r1', sessionId: 's1', sessionType: 'foreground' }],
+        }),
+        makeCtx()
+      );
+
+      expect(mockBackgroundTaskStore.updateTask).not.toHaveBeenCalledWith(
+        'agent_1',
+        expect.objectContaining({ status: 'stopped' })
+      );
+    });
+
+    it('still stops sdk tasks whose session has no active run', () => {
+      mockBackgroundTaskStore.tasks = {
+        'agent_1': {
+          id: 'agent_1',
+          serverId: 'server-1',
+          sessionId: 's1',
+          source: 'sdk_task',
+          kind: 'subagent',
+          status: 'in_progress',
+        },
+      };
+
+      handleServerMessage(makeHeartbeat({ activeRuns: [] }), makeCtx());
+
+      expect(mockBackgroundTaskStore.updateTask).toHaveBeenCalledWith(
+        'agent_1',
+        expect.objectContaining({ status: 'stopped', completedAt: expect.any(Number) })
+      );
+    });
+
     it('replaces only the current backend project subset when project versions change', async () => {
       mockGetProjectsForBackend.mockResolvedValue([{ id: 'p1', name: 'Project 1' }]);
 
