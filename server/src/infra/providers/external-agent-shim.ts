@@ -26,6 +26,7 @@ export function toExternalAgentRunContext(options: RunOptions): ExternalAgentRun
     // in-memory only: it must never be logged, traced, or persisted downstream.
     engineExecution: options.engineExecution,
     modelConnection: options.modelConnection,
+    usageBaseline: options.usageBaseline,
   };
 }
 

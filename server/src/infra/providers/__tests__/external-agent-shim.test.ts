@@ -61,6 +61,25 @@ describe('toExternalAgentRunContext', () => {
     expect('toolExecutionObserver' in ctx).toBe(false);
     expect('db' in ctx).toBe(false);
   });
+
+  it('forwards the resumed-thread usage baseline, keeping null distinct from absent', () => {
+    const cumulative = {
+      totalTokens: 120,
+      inputTokens: 100,
+      cachedInputTokens: 40,
+      cacheWriteInputTokens: 0,
+      outputTokens: 20,
+      reasoningOutputTokens: 5,
+    };
+    const resumed = toExternalAgentRunContext({
+      ...baseOptions(),
+      usageBaseline: { cumulative, nativeThreadId: 'thread_1' },
+    });
+    expect(resumed.usageBaseline).toEqual({ cumulative, nativeThreadId: 'thread_1' });
+
+    const noneFound = toExternalAgentRunContext({ ...baseOptions(), usageBaseline: null });
+    expect(noneFound.usageBaseline).toBeNull();
+  });
 });
 
 describe('wrapExternalAgentAdapter', () => {

@@ -186,10 +186,7 @@ export interface RunOptions {
    * unknown, never as zero. The plugin proves same-thread identity (its own
    * threadId vs `nativeThreadId`) before trusting the counters.
    */
-  usageBaseline?: {
-    cumulative: import('@zclaudia/shared/core/runtime-usage').CodexTokenUsageCounters;
-    nativeThreadId?: string;
-  } | null;
+  usageBaseline?: import('@zclaudia/shared/core/runtime-usage').RuntimeUsageBaseline | null;
 }
 
 /** Outcome of `ProviderAdapter.requestBackgroundForToolCall`. */

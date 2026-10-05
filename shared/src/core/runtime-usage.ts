@@ -18,6 +18,7 @@ export {
 export type {
   CodexTokenUsageCounters,
   ProviderUsageUpdatedEvent,
+  RuntimeUsageBaseline,
   RuntimeUsageDataStatus,
   RuntimeUsageSnapshot,
   RuntimeUsageSnapshotSource,
