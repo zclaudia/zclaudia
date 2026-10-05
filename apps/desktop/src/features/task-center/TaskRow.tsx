@@ -6,8 +6,10 @@ import {
   PauseCircle,
   ChevronDown,
   ChevronRight,
+  Bot,
 } from 'lucide-react';
 import type { BackgroundTask } from '../../stores/backgroundTaskStore';
+import { taskKind } from '../../stores/backgroundTaskStore';
 import { Button } from '../../components/ui/Button';
 import { TaskDetail } from './TaskDetail';
 
@@ -72,6 +74,12 @@ export function TaskRow({ task, isOtherSession, sessionLabel, onStop, onDismiss,
   const canStop = isRunning && task.stoppable !== false;
   const hasDetail = !!(task.summary || task.taskCommand || task.outputFile || task.taskRootPid || task.cliPid);
   const usage = formatUsage(task);
+  const isSubagent = taskKind(task) === 'subagent';
+  // Sub-agent rows lead with their live activity ("what is the agent doing
+  // right now"); shell tasks lead with elapsed time.
+  const meta = [isRunning && task.activity ? task.activity : null, formatTimeAgo(task.startedAt), usage]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <div>
@@ -82,6 +90,12 @@ export function TaskRow({ task, isOtherSession, sessionLabel, onStop, onDismiss,
           className="flex min-w-0 flex-1 select-none items-center gap-1.5 text-left"
           disabled={!hasDetail}
         >
+          {isSubagent && (
+            <span className="inline-flex h-4 shrink-0 items-center gap-1 rounded-[var(--radius-inline-token)] border border-border px-1 text-[10px] font-medium text-muted-foreground">
+              <Bot size={9} strokeWidth={1.75} />
+              {task.agentType ?? 'agent'}
+            </span>
+          )}
           <span className={`truncate ${isRunning ? 'text-foreground' : 'text-muted-foreground'}`}>
             {task.description || 'Background Task'}
           </span>
@@ -91,8 +105,7 @@ export function TaskRow({ task, isOtherSession, sessionLabel, onStop, onDismiss,
             </span>
           )}
           <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums group-hover:hidden">
-            {formatTimeAgo(task.startedAt)}
-            {usage ? ` · ${usage}` : ''}
+            {meta}
           </span>
           {hasDetail && (
             <span className="shrink-0 text-muted-foreground/40">

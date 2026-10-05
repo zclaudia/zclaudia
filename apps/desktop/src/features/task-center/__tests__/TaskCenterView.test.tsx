@@ -17,6 +17,7 @@ const makeTask = (
 
 const makeGroups = (overrides: Partial<GroupedBackgroundTasks> = {}): GroupedBackgroundTasks => ({
   running: [],
+  subagents: [],
   paused: [],
   terminal: [],
   ...overrides,
@@ -46,6 +47,28 @@ describe('TaskCenterView', () => {
 
     expect(text.indexOf('Running · 1')).toBeLessThan(text.indexOf('Paused · 1'));
     expect(text.indexOf('Paused · 1')).toBeLessThan(text.indexOf('Finished · 1'));
+  });
+
+  it('renders the Sub-agents group between Running and Paused with agent badges', () => {
+    const props = makeProps({
+      groups: makeGroups({
+        running: [makeTask('r1')],
+        subagents: [
+          makeTask('a1', { kind: 'subagent', agentType: 'coder', activity: 'Edit' }),
+          makeTask('a2', { kind: 'subagent', agentType: 'explore' }),
+        ],
+        paused: [makeTask('p1', { status: 'paused' })],
+      }),
+    });
+    const { container, getByText } = render(<TaskCenterView {...props} />);
+    const text = container.textContent ?? '';
+
+    expect(text.indexOf('Running · 1')).toBeLessThan(text.indexOf('Sub-agents · 2'));
+    expect(text.indexOf('Sub-agents · 2')).toBeLessThan(text.indexOf('Paused · 1'));
+    expect(getByText('coder')).toBeTruthy();
+    expect(getByText('explore')).toBeTruthy();
+    // live activity leads the meta slot for running sub-agents
+    expect(text).toContain('Edit');
   });
 
   it('disables Clear finished when there are no terminal tasks', () => {

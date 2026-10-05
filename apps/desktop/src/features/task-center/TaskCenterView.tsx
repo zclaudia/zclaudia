@@ -75,6 +75,14 @@ export function TaskCenterView({
           {groups.running.map(renderRow)}
         </>
       )}
+      {groups.subagents.length > 0 && (
+        <>
+          <h4 className={`${SECTION_LABEL} px-3 pb-0.5 pt-1.5`}>
+            Sub-agents · {groups.subagents.length}
+          </h4>
+          {groups.subagents.map(renderRow)}
+        </>
+      )}
       {groups.paused.length > 0 && (
         <>
           <h4 className={`${SECTION_LABEL} px-3 pb-0.5 pt-1.5`}>Paused · {groups.paused.length}</h4>

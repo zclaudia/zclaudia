@@ -8,6 +8,18 @@ export interface BackgroundTask {
   sessionId: string; // parent session ID
   description: string; // task description
   source?: 'sdk_task' | 'background_run';
+  /**
+   * What this task actually is. 'shell' = backgrounded command process;
+   * 'background_run' = automation background session; 'subagent' = a Task
+   * tool call running in the background (derived client-side by resolving
+   * toolUseId against the run's tool calls — no wire change needed).
+   * Defaults to source === 'background_run' ? 'background_run' : 'shell'.
+   */
+  kind?: 'shell' | 'background_run' | 'subagent';
+  /** Sub-agent type (e.g. coder / explore / plan), from the Task tool input. */
+  agentType?: string;
+  /** Live activity line for sub-agents (last tool the agent used). */
+  activity?: string;
   stoppable?: boolean;
   status: 'started' | 'in_progress' | 'paused' | 'completed' | 'failed' | 'stopped';
   outputFile?: string; // output file path (for completed tasks)
@@ -62,6 +74,11 @@ function getMonitorPid(task: BackgroundTask): number | undefined {
   return task.taskRootPid || task.cliPid;
 }
 
+/** Effective task kind: explicit value wins, source is the fallback. */
+export function taskKind(task: Pick<BackgroundTask, 'kind' | 'source'>): NonNullable<BackgroundTask['kind']> {
+  return task.kind ?? (task.source === 'background_run' ? 'background_run' : 'shell');
+}
+
 function maybeStartPidMonitor(
   task: BackgroundTask | undefined,
   get: () => BackgroundTaskState
@@ -83,6 +100,7 @@ export function selectRunningCount(
 
 export interface GroupedBackgroundTasks {
   running: BackgroundTask[];
+  subagents: BackgroundTask[];
   paused: BackgroundTask[];
   terminal: BackgroundTask[];
 }
@@ -90,6 +108,8 @@ export interface GroupedBackgroundTasks {
 /**
  * Tasks split into display groups for the task center. Running/paused keep
  * start order (oldest first); terminal tasks sort most-recently-finished first.
+ * Running sub-agents get their own group — they have a different detail
+ * surface (what the agent is doing) than shell tasks (process info).
  */
 export function selectTasksGrouped(
   state: Pick<BackgroundTaskState, 'tasks'>,
@@ -99,8 +119,10 @@ export function selectTasksGrouped(
     t => serverId === undefined || t.serverId === serverId
   );
   const byStartedAt = (a: BackgroundTask, b: BackgroundTask) => a.startedAt - b.startedAt;
+  const running = tasks.filter(t => isRunningStatus(t.status));
   return {
-    running: tasks.filter(t => isRunningStatus(t.status)).sort(byStartedAt),
+    running: running.filter(t => taskKind(t) !== 'subagent').sort(byStartedAt),
+    subagents: running.filter(t => taskKind(t) === 'subagent').sort(byStartedAt),
     paused: tasks.filter(t => t.status === 'paused').sort(byStartedAt),
     terminal: tasks
       .filter(t => isTerminalStatus(t.status))

@@ -202,6 +202,34 @@ describe('backgroundTaskStore', () => {
     expect(grouped.running.map(t => t.id)).toEqual(['t2']);
   });
 
+  it('selectTasksGrouped puts running sub-agents in their own group', () => {
+    useBackgroundTaskStore.setState({
+      tasks: {
+        t1: makeTask('t1', 'sess-1', 'in_progress'),
+        t2: { ...makeTask('t2', 'sess-1', 'in_progress'), kind: 'subagent', agentType: 'coder' },
+        t3: { ...makeTask('t3', 'sess-1', 'completed'), kind: 'subagent', agentType: 'coder' },
+      },
+    });
+
+    const grouped = selectTasksGrouped(useBackgroundTaskStore.getState());
+    expect(grouped.running.map(t => t.id)).toEqual(['t1']);
+    expect(grouped.subagents.map(t => t.id)).toEqual(['t2']);
+    // terminal sub-agents land in the terminal group like everything else
+    expect(grouped.terminal.map(t => t.id)).toEqual(['t3']);
+  });
+
+  it('selectTasksGrouped treats background_run source as its own kind but keeps it in running', () => {
+    useBackgroundTaskStore.setState({
+      tasks: {
+        t1: { ...makeTask('t1', 'sess-1', 'in_progress'), source: 'background_run' },
+      },
+    });
+
+    const grouped = selectTasksGrouped(useBackgroundTaskStore.getState());
+    expect(grouped.running.map(t => t.id)).toEqual(['t1']);
+    expect(grouped.subagents).toHaveLength(0);
+  });
+
   it('starts PID monitor when an existing running task gains a PID', async () => {
     mockGetProcessInfo.mockResolvedValue({ alive: false, pid: 71100 });
     useBackgroundTaskStore.getState().addTask({
