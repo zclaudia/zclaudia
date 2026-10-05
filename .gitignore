@@ -142,6 +142,7 @@ docs/superpowers/
 .codex/
 .zcode/
 .impeccable/
+.zcodeignore
 
 /artifacts/
 
