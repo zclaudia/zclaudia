@@ -56,6 +56,8 @@ interface TaskRowProps {
   sessionLabel?: string;
   onStop: (task: BackgroundTask) => void;
   onDismiss: (taskId: string) => void;
+  /** Jump to the owning session — only passed for cross-session rows. */
+  onLocate?: (task: BackgroundTask) => void;
 }
 
 /**
@@ -64,7 +66,7 @@ interface TaskRowProps {
  * accent per ui-conventions §5 — or Dismiss for terminal ones). PIDs live in
  * the expandable detail, never inline.
  */
-export function TaskRow({ task, isOtherSession, sessionLabel, onStop, onDismiss }: TaskRowProps) {
+export function TaskRow({ task, isOtherSession, sessionLabel, onStop, onDismiss, onLocate }: TaskRowProps) {
   const [expanded, setExpanded] = useState(false);
   const isRunning = task.status === 'started' || task.status === 'in_progress';
   const canStop = isRunning && task.stoppable !== false;
@@ -98,7 +100,12 @@ export function TaskRow({ task, isOtherSession, sessionLabel, onStop, onDismiss 
             </span>
           )}
         </button>
-        <span className="hidden shrink-0 group-hover:block">
+        <span className="hidden shrink-0 items-center gap-1 group-hover:flex">
+          {onLocate && (
+            <Button variant="ghost" size="sm" onClick={() => onLocate(task)}>
+              Open
+            </Button>
+          )}
           {canStop ? (
             <Button variant="destructive" size="sm" onClick={() => onStop(task)}>
               Stop

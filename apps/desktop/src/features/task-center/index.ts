@@ -5,3 +5,4 @@ export { TaskCenterEntry } from './TaskCenterEntry';
 export { TaskAmbientStrip } from './TaskAmbientStrip';
 export { useTaskCenter, type TaskCenterViewModel } from './useTaskCenter';
 export { useTaskCenterUiStore } from './taskCenterUiStore';
+export { useTaskCompletionToasts } from './useTaskCompletionToasts';

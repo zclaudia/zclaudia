@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
+import type { BackgroundTask } from '../../stores/backgroundTaskStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useSessionsStore } from '../../stores/sessionsStore';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
 import { TaskPill } from './TaskPill';
 import { TaskCenterPopover } from './TaskCenterPopover';
 import { TaskCenterView } from './TaskCenterView';
@@ -28,6 +30,7 @@ export function TaskCenterEntry({ sessionId }: { sessionId: string }) {
   // hiding) keeps a single role=dialog in the DOM — two hidden copies confuse
   // screen readers and text-based lookups alike.
   const isMobile = useIsMobile();
+  const { selectSession } = useSelectionCoordinator();
 
   const resolveSessionLabel = useMemo(() => {
     const names = new Map<string, string>();
@@ -47,6 +50,10 @@ export function TaskCenterEntry({ sessionId }: { sessionId: string }) {
     onStop: viewModel.stopTask,
     onDismiss: viewModel.dismissTask,
     onClearFinished: viewModel.clearFinished,
+    onLocate: (task: BackgroundTask) => {
+      selectSession(task.sessionId);
+      setOpen(false);
+    },
   };
 
   if (isMobile) {

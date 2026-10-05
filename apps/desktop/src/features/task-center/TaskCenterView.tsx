@@ -14,6 +14,8 @@ export interface TaskCenterViewProps {
   onStop: (task: BackgroundTask) => void;
   onDismiss: (taskId: string) => void;
   onClearFinished: () => void;
+  /** Jump to the session that owns a (cross-session) task. */
+  onLocate?: (task: BackgroundTask) => void;
   /** When set (mobile overlay), the header shows a close button. */
   onClose?: () => void;
 }
@@ -33,6 +35,7 @@ export function TaskCenterView({
   onStop,
   onDismiss,
   onClearFinished,
+  onLocate,
   onClose,
 }: TaskCenterViewProps) {
   const renderRow = (task: BackgroundTask) => {
@@ -45,6 +48,7 @@ export function TaskCenterView({
         sessionLabel={isOtherSession ? resolveSessionLabel?.(task.sessionId) : undefined}
         onStop={onStop}
         onDismiss={onDismiss}
+        onLocate={isOtherSession ? onLocate : undefined}
       />
     );
   };

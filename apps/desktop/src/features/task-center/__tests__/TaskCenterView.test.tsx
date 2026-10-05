@@ -106,6 +106,32 @@ describe('TaskCenterView', () => {
     expect(getByText('deploy-pipeline')).toBeTruthy();
   });
 
+  it('offers Open only on cross-session rows and calls onLocate with the task', () => {
+    const own = makeTask('own', { sessionId: 'sess-1' });
+    const other = makeTask('other', { sessionId: 'sess-2' });
+    const props = makeProps({
+      groups: makeGroups({ running: [own, other] }),
+      currentSessionId: 'sess-1',
+      onLocate: vi.fn(),
+    });
+    const { getAllByText, queryAllByText } = render(<TaskCenterView {...props} />);
+
+    // Only the cross-session row gets the Open action
+    expect(queryAllByText('Open')).toHaveLength(1);
+    fireEvent.click(getAllByText('Open')[0]);
+    expect(props.onLocate).toHaveBeenCalledWith(other);
+  });
+
+  it('omits Open when no onLocate is provided', () => {
+    const other = makeTask('other', { sessionId: 'sess-2' });
+    const props = makeProps({
+      groups: makeGroups({ running: [other] }),
+      currentSessionId: 'sess-1',
+    });
+    const { queryByText } = render(<TaskCenterView {...props} />);
+    expect(queryByText('Open')).toBeNull();
+  });
+
   it('expands the detail area when a row with detail is clicked', () => {
     const task = makeTask('r1', { taskCommand: 'pnpm test' });
     const props = makeProps({ groups: makeGroups({ running: [task] }) });

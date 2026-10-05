@@ -17,6 +17,7 @@ import { MobileOverlays } from './app/MobileOverlays';
 import { useConnection } from './contexts/ConnectionContext';
 import { useDataLoader } from './hooks/useDataLoader';
 import { useSelectionCoordinator } from './hooks/useSelectionCoordinator';
+import { useTaskCompletionToasts } from './features/task-center/useTaskCompletionToasts';
 import { useIsMobile } from './hooks/useMediaQuery';
 import { useAndroidBack } from './hooks/useAndroidBack';
 import { useSwipeBack } from './hooks/useSwipeBack';
@@ -133,6 +134,10 @@ function AppContent() {
     selectProject: selectProjectRoute,
     selectSession: _selectSessionRoute,
   } = useSelectionCoordinator();
+
+  // Background task completion toasts (P2): fires on terminal transitions
+  // when the window is unfocused or the task lives in another session.
+  useTaskCompletionToasts();
 
   // --- Local state ---
   const [dashboardProjectId, setDashboardProjectId] = useState<string | null>(null);
