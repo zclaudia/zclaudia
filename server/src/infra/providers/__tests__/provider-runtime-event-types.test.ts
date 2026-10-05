@@ -21,6 +21,7 @@ describe('ProviderRuntimeEvent types', () => {
       'mode_transition',
       'thinking_delta',
       'retry_scheduled',
+      'provider_usage_updated',
     ]);
   });
 

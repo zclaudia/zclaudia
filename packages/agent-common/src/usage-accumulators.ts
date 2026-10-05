@@ -22,7 +22,7 @@ import {
   buildInvocationSnapshot,
   emptyBreakdown,
   missingUsageSnapshot,
-  USAGE_SNAPSHOT_SCHEMA_VERSION,
+  RUNTIME_USAGE_SNAPSHOT_SCHEMA_VERSION,
 } from './usage-snapshot.js';
 
 export type { UsageModelAllocation };
@@ -496,7 +496,7 @@ export class CodexUsageAccumulator {
     }
     const checkpoint: RuntimeUsageSnapshot['checkpoint'] = this.lastSeen
       ? {
-          schemaVersion: USAGE_SNAPSHOT_SCHEMA_VERSION,
+          schemaVersion: RUNTIME_USAGE_SNAPSHOT_SCHEMA_VERSION,
           ...(this.nativeThreadId ? { nativeThreadId: this.nativeThreadId } : {}),
           cumulative: this.lastSeen,
           capturedAt: Date.now(),

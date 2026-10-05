@@ -1,114 +1,37 @@
 /**
- * Plugin-side runtime usage contract (design:
+ * Plugin-side helpers for the runtime usage contract (design:
  * docs/specs/2026-09-16-runtime-token-usage-design.md §4).
  *
- * Agent-common must stay inside the public plugin boundary (no
- * @zclaudia/shared imports), so these declarations are the plugin-side twin
- * of the host contract in shared/src/core/runtime-usage.ts. They must remain
- * structurally identical; the server's snapshot validator plus the
- * agent-common fixture round-trip test are the drift guard.
- *
- * The schema-version constant lives here too — a value import from shared
- * would drag workspace code into plugin bundles.
+ * The contract types are canonical in @zclaudia/plugin-sdk/usage and are
+ * re-exported here so runtime plugins keep a single import site.
  */
 import type { ProviderRuntimeEvent } from '@zclaudia/plugin-sdk/providers';
+import {
+  RUNTIME_USAGE_SNAPSHOT_SCHEMA_VERSION,
+  type RuntimeUsageDataStatus,
+  type RuntimeUsageSnapshot,
+  type UsageModelAllocation,
+  type UsageTokenBreakdown,
+} from '@zclaudia/plugin-sdk/usage';
 
-/** Version of the usage snapshot contract. Bump on any breaking field change. */
-export const USAGE_SNAPSHOT_SCHEMA_VERSION = 1;
+export { RUNTIME_USAGE_SNAPSHOT_SCHEMA_VERSION } from '@zclaudia/plugin-sdk/usage';
+export type {
+  CodexTokenUsageCounters,
+  ProviderUsageUpdatedEvent,
+  RuntimeUsageDataStatus,
+  RuntimeUsageSnapshot,
+  RuntimeUsageSnapshotSource,
+  UsageModelAllocation,
+  UsageSourceCheckpoint,
+  UsageTokenBreakdown,
+} from '@zclaudia/plugin-sdk/usage';
 
 /** Metering rules version interpreted by the accumulators in this module. */
 export const USAGE_RULE_VERSION = 1;
 
-/**
- * Token classification. All values are non-negative safe integers; `null`
- * means "unknown". 0 must always come from an observed zero, never as a
- * placeholder for missing data. Complete classification satisfies
- * `total = inputUncached + cacheRead + cacheWrite + output`.
- */
-export interface UsageTokenBreakdown {
-  inputUncached: number | null;
-  cacheRead: number | null;
-  cacheWrite: number | null;
-  output: number | null;
-  /** Output subset — display detail only, never added back into totals. */
-  reasoningOutput: number | null;
-  total: number | null;
-}
-
-export type RuntimeUsageDataStatus = 'complete' | 'partial' | 'missing';
-
-/** Per-model allocation inside one invocation. Allocations are mutually exclusive. */
-export interface UsageModelAllocation {
-  /** Runtime-reported actual model id; null = Unknown model bucket. */
-  modelId: string | null;
-  tokens: UsageTokenBreakdown;
-}
-
-/** Persisted counter state used to baseline the next resumed invocation. */
-export interface UsageSourceCheckpoint {
-  schemaVersion: 1;
-  nativeThreadId?: string;
-  counterEpoch?: number;
-  cumulative?: CodexTokenUsageCounters | null;
-  capturedAt: number;
-}
-
-/** OpenAI-convention Codex counters (`cachedInputTokens` ⊆ `inputTokens`). */
-export interface CodexTokenUsageCounters {
-  totalTokens: number;
-  inputTokens: number;
-  cachedInputTokens: number;
-  cacheWriteInputTokens: number;
-  outputTokens: number;
-  reasoningOutputTokens: number;
-}
-
-/**
- * One cumulative usage snapshot for an invocation. The adapter emits the
- * CURRENT accumulated state; the host REPLACES stored snapshots by
- * (invocationId, revision) rather than summing successive events.
- */
-export interface RuntimeUsageSnapshot {
-  schemaVersion: typeof USAGE_SNAPSHOT_SCHEMA_VERSION;
-  /** Strictly increasing within one invocation. */
-  revision: number;
-  /** True once the usage snapshot is settled — does NOT imply task success. */
-  final: boolean;
-  status: RuntimeUsageDataStatus;
-  /** Machine-readable downgrade cause, e.g. `missing_baseline` / `interrupted`. */
-  reason?: string;
-  /** Audit summary when source total and classification/allocation conflict. */
-  discrepancy?: string;
-  tokens: UsageTokenBreakdown;
-  models: UsageModelAllocation[];
-  source: {
-    kind: string;
-    scope: 'invocation';
-    includesSubagents: 'yes' | 'no' | 'unknown';
-    ruleVersion: number;
-  };
-  /**
-   * Restricted checkpoint: counters, native ids and time ONLY — never
-   * prompts, replies, tool input or secrets. Host-side storage; never
-   * forwarded to clients.
-   */
-  checkpoint?: UsageSourceCheckpoint;
-}
-
-/** Plugin → host usage event (bridged onto the provider event channel). */
-export interface ProviderUsageUpdatedEvent {
-  type: 'provider_usage_updated';
-  snapshot: RuntimeUsageSnapshot;
-}
-
-/**
- * Bridge a usage snapshot onto the plugin→host event channel. The published
- * plugin-sdk (0.4.0) union does not carry the usage event yet — plugins cast
- * at this single site and the host accepts the variant through
- * @zclaudia/shared/providers. Drop the cast once the SDK ships the variant.
- */
+/** Wrap a usage snapshot as a plugin→host provider event. */
 export function providerUsageUpdatedEvent(snapshot: RuntimeUsageSnapshot): ProviderRuntimeEvent {
-  return { type: 'provider_usage_updated', snapshot } as unknown as ProviderRuntimeEvent;
+  return { type: 'provider_usage_updated', snapshot };
 }
 
 export function emptyBreakdown(): UsageTokenBreakdown {
@@ -165,7 +88,7 @@ export interface InvocationSnapshotInput {
 
 export function buildInvocationSnapshot(input: InvocationSnapshotInput): RuntimeUsageSnapshot {
   return {
-    schemaVersion: USAGE_SNAPSHOT_SCHEMA_VERSION,
+    schemaVersion: RUNTIME_USAGE_SNAPSHOT_SCHEMA_VERSION,
     revision: input.revision,
     final: input.final,
     status: input.status,
