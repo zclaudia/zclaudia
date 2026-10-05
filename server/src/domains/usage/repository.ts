@@ -269,16 +269,7 @@ export class RuntimeUsageRepository {
         nativeThreadId?: string;
       };
       const cumulative = parsed.cumulative;
-      if (
-        !cumulative ||
-        !(
-          typeof cumulative.totalTokens === 'number' &&
-          Number.isSafeInteger(cumulative.totalTokens) &&
-          cumulative.totalTokens >= 0
-        )
-      ) {
-        return null;
-      }
+      if (!cumulative || !isValidCumulativeCounters(cumulative)) return null;
       return {
         cumulative,
         ...(parsed.nativeThreadId ? { nativeThreadId: parsed.nativeThreadId } : {}),
@@ -431,6 +422,28 @@ export class RuntimeUsageRepository {
   finalizedStates(): readonly RuntimeUsageExecutionState[] {
     return FINALIZED_EXECUTION_STATES;
   }
+}
+
+/**
+ * A persisted checkpoint feeds `subtractCounters`, where one missing/NaN
+ * field poisons every derived value — so all six counters must be present,
+ * safe integers, non-negative (matching the write path's parse validation).
+ */
+function isValidCumulativeCounters(counters: CodexTokenUsageCounters): boolean {
+  const fields: Array<keyof CodexTokenUsageCounters> = [
+    'totalTokens',
+    'inputTokens',
+    'cachedInputTokens',
+    'cacheWriteInputTokens',
+    'outputTokens',
+    'reasoningOutputTokens',
+  ];
+  return fields.every(
+    field =>
+      typeof counters[field] === 'number' &&
+      Number.isSafeInteger(counters[field]) &&
+      (counters[field] as number) >= 0
+  );
 }
 
 function summarizeModelAllocation(allocation: {

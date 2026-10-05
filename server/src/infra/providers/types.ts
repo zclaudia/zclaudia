@@ -180,11 +180,13 @@ export interface RunOptions {
   /** Ledger invocation this dispatch is accounted under (runtime usage design §6). */
   usageAccounting?: { invocationId: string };
   /**
-   * Trusted cumulative usage checkpoint for resumed native threads (Codex
-   * design §5.2), read from the ledger before dispatch. `null` means the
-   * host looked and found none — the plugin must treat the baseline as
-   * unknown, never as zero. The plugin proves same-thread identity (its own
-   * threadId vs `nativeThreadId`) before trusting the counters.
+   * Cumulative usage checkpoint for resumed native threads (Codex design
+   * §5.2), read from the ledger before dispatch. `null` means the host
+   * looked and found none — the plugin must treat the baseline as unknown,
+   * never as zero. Advisory until the plugin accepts it: the Codex runner
+   * currently rejects any persisted checkpoint for a resumed thread, since
+   * even a same-thread id (`nativeThreadId`) cannot exclude external CLI
+   * work or the unreported tail of an interrupted invocation.
    */
   usageBaseline?: import('@zclaudia/shared/core/runtime-usage').RuntimeUsageBaseline | null;
 }

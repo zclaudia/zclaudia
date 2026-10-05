@@ -271,6 +271,44 @@ describe('usage ledger', () => {
     expect(repo.findLatestCheckpoint('sess-inv-1', 'claude')).toBeNull();
   });
 
+  it('rejects a corrupted checkpoint row missing counter fields', () => {
+    startRun(db, recorder);
+    recorder.applySnapshotEvent(
+      'inv-1',
+      snapshot({
+        revision: 2,
+        final: true,
+        status: 'complete',
+        checkpoint: {
+          schemaVersion: 1,
+          nativeThreadId: 'thread-9',
+          cumulative: {
+            totalTokens: 100_000,
+            inputTokens: 90_000,
+            cachedInputTokens: 40_000,
+            cacheWriteInputTokens: 0,
+            outputTokens: 10_000,
+            reasoningOutputTokens: 0,
+          },
+          capturedAt: Date.now(),
+        },
+      })
+    );
+    // Simulate a hand-edited/legacy row: one counter missing poisons the
+    // baseline diff, so the read must reject the whole checkpoint.
+    db.prepare(
+      'UPDATE runtime_usage_records SET source_checkpoint_json = ? WHERE session_id = ?'
+    ).run(
+      JSON.stringify({
+        schemaVersion: 1,
+        nativeThreadId: 'thread-9',
+        cumulative: { totalTokens: 100_000 },
+      }),
+      'sess-inv-1'
+    );
+    expect(repo.findLatestCheckpoint('sess-inv-1', 'codex')).toBeNull();
+  });
+
   it('the dataset id is stable across reads', () => {
     const first = repo.getDatasetId();
     expect(repo.getDatasetId()).toBe(first);
