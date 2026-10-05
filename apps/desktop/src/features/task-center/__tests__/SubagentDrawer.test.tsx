@@ -4,6 +4,7 @@ import { useSubagentDetail } from '../useSubagentDetail';
 import { useSubagentSteps } from '../useSubagentSteps';
 import { TaskDrawerHost } from '../TaskDrawerHost';
 import { useRunStore } from '../../../stores/runStore';
+import { useChatMessageStore } from '../../../stores/chatMessageStore';
 import { useBackgroundTaskStore, type BackgroundTask } from '../../../stores/backgroundTaskStore';
 import { useTaskCenterUiStore } from '../taskCenterUiStore';
 import type { ToolCallState } from '../../../stores/runStore';
@@ -38,9 +39,15 @@ function makeTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
 
 beforeEach(() => {
   useRunStore.setState({ activeToolCalls: {}, toolCallsHistory: {} });
+  useChatMessageStore.setState({ messages: {} });
   useBackgroundTaskStore.setState({ tasks: {} });
   useTaskCenterUiStore.setState({ popoverOpen: false, drawerTaskId: null });
 });
+
+/** Assistant message carrying finalized tool calls, as run finalization leaves it. */
+function finalizedMessage(id: string, toolCalls: ToolCallState[]) {
+  return { id, sessionId: 's1', role: 'assistant' as const, content: '', createdAt: 1, toolCalls };
+}
 
 describe('useSubagentDetail', () => {
   it('resolves the prompt from the active run tool calls', () => {
@@ -96,6 +103,20 @@ describe('useSubagentDetail', () => {
   it('returns null when the task itself is null', () => {
     expect(renderHook(() => useSubagentDetail(null)).result.current).toBeNull();
   });
+
+  it('falls back to finalized chat messages once the run store discards the run', () => {
+    useChatMessageStore.setState({
+      messages: {
+        s1: [
+          finalizedMessage('m1', [
+            taskCall({ status: 'completed', result: 'Late report' }),
+          ]),
+        ],
+      },
+    });
+    const { result } = renderHook(() => useSubagentDetail(makeTask()));
+    expect(result.current).toEqual({ prompt: 'Map it all', resultText: 'Late report' });
+  });
 });
 
 describe('useSubagentSteps', () => {
@@ -141,6 +162,33 @@ describe('useSubagentSteps', () => {
 
   it('returns empty for a null task', () => {
     expect(renderHook(() => useSubagentSteps(null)).result.current).toEqual([]);
+  });
+
+  it('falls back to finalized chat messages once the run store discards the run', () => {
+    useChatMessageStore.setState({
+      messages: {
+        s1: [
+          finalizedMessage('m1', [step('task-1', undefined, 'Task'), step('inner-1', 'task-1')]),
+        ],
+      },
+    });
+    const { result } = renderHook(() => useSubagentSteps(stepsTask()));
+    expect(result.current.map(s => s.id)).toEqual(['inner-1']);
+  });
+
+  it('merges run and message steps without duplicating a call', () => {
+    useRunStore.setState({
+      toolCallsHistory: { 'run-1': [step('inner-1', 'task-1')] },
+    });
+    useChatMessageStore.setState({
+      messages: {
+        s1: [
+          finalizedMessage('m1', [step('inner-1', 'task-1'), step('inner-2', 'task-1')]),
+        ],
+      },
+    });
+    const { result } = renderHook(() => useSubagentSteps(stepsTask()));
+    expect(result.current.map(s => s.id)).toEqual(['inner-1', 'inner-2']);
   });
 });
 

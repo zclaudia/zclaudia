@@ -82,11 +82,11 @@ function StepRow({ step }: { step: ToolCallState }) {
 }
 
 /**
- * Sub-agent detail surface: what the agent was asked to do, what it is
- * doing, and what it came back with. The inner step-by-step tool stream is
- * deliberately absent — the wire doesn't carry sub-agent parentage yet, so
- * the honest live signal is the activity line plus usage. Purely
- * presentational; the host resolves stores and positioning.
+ * Sub-agent detail surface: what the agent was asked to do, the inner
+ * step-by-step tool stream (P5 lineage; resolvable live from the run and,
+ * once the run finalizes, from the session's persisted messages), and what
+ * it came back with. Purely presentational; the host resolves stores and
+ * positioning.
  */
 export function TaskDrawer({ task, detail, steps = [], onStop, onClose }: TaskDrawerProps) {
   const duration = useDuration(task);
