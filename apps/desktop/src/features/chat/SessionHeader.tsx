@@ -1,5 +1,5 @@
 import { SessionSettingsDialog } from './SessionSettingsDialog';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   RotateCcw,
   Download,
@@ -75,6 +75,13 @@ interface SessionHeaderProps {
   onToggleSessionMenu: () => void;
   contextPercent?: number | null;
   systemInfo?: SystemInfo | null;
+  /**
+   * Optional task-center entry (pill + popover), supplied by ChatInterface as
+   * a slot. Rendered before the session-info chip for non-background
+   * sessions; the header itself stays store- and connection-free, which keeps
+   * its tests renderable without a ConnectionProvider.
+   */
+  taskCenter?: ReactNode;
 }
 
 export function SessionHeader({
@@ -99,6 +106,7 @@ export function SessionHeader({
   onToggleSessionMenu,
   contextPercent = null,
   systemInfo = null,
+  taskCenter,
 }: SessionHeaderProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
@@ -221,6 +229,8 @@ export function SessionHeader({
         </span>
       )}
       <div className="hidden min-w-6 flex-1 self-stretch sm:block" data-tauri-drag-region />
+      {/* Task center entry — same chip family as session info, before it */}
+      {currentSession.type !== 'background' && taskCenter}
       {/* Session info chip — agent/model + context%, opens a details popover.
           md: (not sm:) so the CSS gate matches useIsMobile's 768px breakpoint;
           below that, session info lives in the mobile "…" menu instead. */}

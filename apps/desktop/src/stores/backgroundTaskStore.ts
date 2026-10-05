@@ -33,6 +33,8 @@ interface BackgroundTaskState {
   updateTask: (taskId: string, updates: Partial<BackgroundTask>) => void;
   removeTask: (taskId: string) => void;
   clearTasks: (sessionId?: string) => void;
+  /** Remove only terminal (completed/failed/stopped) tasks; running tasks are kept. */
+  clearTerminalTasks: (sessionId?: string) => void;
   getTasksBySession: (sessionId: string) => BackgroundTask[];
   /** Start periodic PID liveness checking */
   startPidMonitor: () => void;
@@ -41,11 +43,12 @@ interface BackgroundTaskState {
 }
 
 const PID_CHECK_INTERVAL_MS = 10_000; // Check every 10 seconds
-const AUTO_REMOVE_DELAY_MS = 15_000;
+
+// Terminal tasks are kept until the user dismisses them or hits "clear
+// finished" — no timer-based auto-removal.
 
 // Module-level state managed within the store's closure
 let pidMonitorInterval: ReturnType<typeof setInterval> | null = null;
-const autoRemoveTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function isTerminalStatus(status: BackgroundTask['status']): boolean {
   return status === 'completed' || status === 'failed' || status === 'stopped';
@@ -59,25 +62,6 @@ function getMonitorPid(task: BackgroundTask): number | undefined {
   return task.taskRootPid || task.cliPid;
 }
 
-function clearAutoRemoveTimer(taskId: string): void {
-  const timer = autoRemoveTimers.get(taskId);
-  if (timer) {
-    clearTimeout(timer);
-    autoRemoveTimers.delete(taskId);
-  }
-}
-
-function scheduleAutoRemove(taskId: string, get: () => BackgroundTaskState): void {
-  clearAutoRemoveTimer(taskId);
-  autoRemoveTimers.set(
-    taskId,
-    setTimeout(() => {
-      autoRemoveTimers.delete(taskId);
-      get().removeTask(taskId);
-    }, AUTO_REMOVE_DELAY_MS)
-  );
-}
-
 function maybeStartPidMonitor(
   task: BackgroundTask | undefined,
   get: () => BackgroundTaskState
@@ -85,6 +69,43 @@ function maybeStartPidMonitor(
   if (task && isRunningStatus(task.status) && getMonitorPid(task)) {
     get().startPidMonitor();
   }
+}
+
+/** Running task count; pass a serverId to scope to one backend. */
+export function selectRunningCount(
+  state: Pick<BackgroundTaskState, 'tasks'>,
+  serverId?: string
+): number {
+  return Object.values(state.tasks).filter(
+    t => isRunningStatus(t.status) && (serverId === undefined || t.serverId === serverId)
+  ).length;
+}
+
+export interface GroupedBackgroundTasks {
+  running: BackgroundTask[];
+  paused: BackgroundTask[];
+  terminal: BackgroundTask[];
+}
+
+/**
+ * Tasks split into display groups for the task center. Running/paused keep
+ * start order (oldest first); terminal tasks sort most-recently-finished first.
+ */
+export function selectTasksGrouped(
+  state: Pick<BackgroundTaskState, 'tasks'>,
+  serverId?: string
+): GroupedBackgroundTasks {
+  const tasks = Object.values(state.tasks).filter(
+    t => serverId === undefined || t.serverId === serverId
+  );
+  const byStartedAt = (a: BackgroundTask, b: BackgroundTask) => a.startedAt - b.startedAt;
+  return {
+    running: tasks.filter(t => isRunningStatus(t.status)).sort(byStartedAt),
+    paused: tasks.filter(t => t.status === 'paused').sort(byStartedAt),
+    terminal: tasks
+      .filter(t => isTerminalStatus(t.status))
+      .sort((a, b) => (b.completedAt ?? b.startedAt) - (a.completedAt ?? a.startedAt)),
+  };
 }
 
 export const useBackgroundTaskStore = create<BackgroundTaskState>((set, get) => ({
@@ -95,11 +116,6 @@ export const useBackgroundTaskStore = create<BackgroundTaskState>((set, get) => 
       tasks: { ...state.tasks, [task.id]: task },
     }));
     maybeStartPidMonitor(task, get);
-    if (isTerminalStatus(task.status)) {
-      scheduleAutoRemove(task.id, get);
-    } else {
-      clearAutoRemoveTimer(task.id);
-    }
   },
 
   updateTask: (taskId, updates) => {
@@ -109,19 +125,11 @@ export const useBackgroundTaskStore = create<BackgroundTaskState>((set, get) => 
         [taskId]: { ...state.tasks[taskId], ...updates },
       },
     }));
-    const task = get().tasks[taskId];
-    maybeStartPidMonitor(task, get);
-    const status = task?.status;
-    if (status && isTerminalStatus(status)) {
-      scheduleAutoRemove(taskId, get);
-    } else {
-      clearAutoRemoveTimer(taskId);
-    }
+    maybeStartPidMonitor(get().tasks[taskId], get);
   },
 
   removeTask: taskId =>
     set(state => {
-      clearAutoRemoveTimer(taskId);
       const { [taskId]: _, ...rest } = state.tasks;
       return { tasks: rest };
     }),
@@ -129,20 +137,23 @@ export const useBackgroundTaskStore = create<BackgroundTaskState>((set, get) => 
   clearTasks: sessionId =>
     set(state => {
       if (!sessionId) {
-        for (const taskId of Object.keys(state.tasks)) {
-          clearAutoRemoveTimer(taskId);
-        }
         return { tasks: {} };
-      }
-      for (const [taskId, task] of Object.entries(state.tasks)) {
-        if (task.sessionId === sessionId) {
-          clearAutoRemoveTimer(taskId);
-        }
       }
       const filteredTasks = Object.fromEntries(
         Object.entries(state.tasks).filter(([_, task]) => task.sessionId !== sessionId)
       );
       return { tasks: filteredTasks };
+    }),
+
+  clearTerminalTasks: sessionId =>
+    set(state => {
+      const kept = Object.fromEntries(
+        Object.entries(state.tasks).filter(([_, task]) => {
+          if (!isTerminalStatus(task.status)) return true;
+          return sessionId !== undefined && task.sessionId !== sessionId;
+        })
+      );
+      return { tasks: kept };
     }),
 
   getTasksBySession: sessionId => {
@@ -208,18 +219,10 @@ export const useBackgroundTaskStore = create<BackgroundTaskState>((set, get) => 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     useBackgroundTaskStore.getState().stopPidMonitor();
-    for (const timer of autoRemoveTimers.values()) {
-      clearTimeout(timer);
-    }
-    autoRemoveTimers.clear();
   });
 }
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     useBackgroundTaskStore.getState().stopPidMonitor();
-    for (const timer of autoRemoveTimers.values()) {
-      clearTimeout(timer);
-    }
-    autoRemoveTimers.clear();
   });
 }

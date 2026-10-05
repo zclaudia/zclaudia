@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>任务中心 & Sub-agent UI — Design Mockup</title>
+<style>
+  :root {
+    /* dark theme, single hue axis (225°, cool) per ui-conventions */
+    --bg: hsl(225 8% 9%);
+    --sidebar: hsl(225 8% 7%);
+    --card: hsl(225 8% 12%);
+    --popover: hsl(225 8% 12%);
+    --secondary: hsl(225 7% 16%);
+    --border: hsl(225 6% 20%);
+    --foreground: hsl(225 10% 92%);
+    --muted-foreground: hsl(225 7% 62%);
+    --primary: hsl(215 85% 62%);
+    --success: hsl(150 55% 48%);
+    --warning: hsl(38 85% 55%);
+    --destructive: hsl(0 70% 58%);
+    --radius-control: 10px;
+    --radius-panel: 16px;
+    --radius-chrome: 24px;
+    --radius-inline: 5px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--sidebar);
+    color: var(--foreground);
+    font-family: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 48px 32px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
+
+  /* ---------- page scaffolding ---------- */
+  .page { max-width: 1160px; margin: 0 auto; }
+  .page h1 { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+  .page .sub { color: var(--muted-foreground); margin-top: 6px; font-size: 13px; }
+  .frame-section { margin-top: 56px; }
+  .frame-label {
+    font-size: 11px; font-weight: 500; color: var(--muted-foreground);
+    margin-bottom: 4px;
+  }
+  .frame-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+  .frame-title .tag {
+    font-size: 10px; font-weight: 500; color: var(--muted-foreground);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 1px 8px; margin-left: 8px; vertical-align: 2px;
+  }
+  .frame-notes { margin-top: 12px; color: var(--muted-foreground); font-size: 12px; max-width: 720px; }
+  .frame-notes li { margin-left: 18px; margin-top: 3px; }
+  .frames-row { display: flex; gap: 40px; align-items: flex-start; flex-wrap: wrap; }
+
+  /* ---------- app window ---------- */
+  .window {
+    width: 760px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: var(--radius-chrome);
+    overflow: hidden; flex-shrink: 0;
+  }
+  .window-narrow { width: 420px; }
+
+  /* session header */
+  .session-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+  }
+  .session-header .title { font-size: 13px; font-weight: 600; }
+  .session-header .crumb { color: var(--muted-foreground); font-size: 12px; }
+  .header-spacer { flex: 1; }
+
+  /* ghost icon button */
+  .icon-btn {
+    width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-control); color: var(--muted-foreground);
+    border: none; background: transparent; cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--secondary); color: var(--foreground); }
+
+  /* ---------- L1: ambient pill ---------- */
+  .task-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 28px; padding: 0 10px;
+    border: 1px solid var(--border); border-radius: var(--radius-control);
+    background: transparent; color: var(--muted-foreground);
+    font-size: 12px; cursor: pointer; user-select: none;
+  }
+  .task-pill:hover { background: var(--secondary); color: var(--foreground); }
+  .task-pill .count { color: var(--foreground); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .spin { animation: spin 1.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .pulse-dot { animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+
+  /* status dots — tone map */
+  .dot { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; }
+  .dot.running { background: var(--primary); }
+  .dot.success { background: var(--success); }
+  .dot.warning { background: var(--warning); }
+  .dot.destructive { background: var(--destructive); }
+  .dot.muted { background: var(--muted-foreground); }
+
+  /* ---------- chat body ---------- */
+  .chat { padding: 20px 20px 24px; display: flex; flex-direction: column; gap: 14px; min-height: 260px; }
+  .msg-user {
+    align-self: flex-end; max-width: 70%;
+    background: var(--secondary); border-radius: var(--radius-panel);
+    padding: 8px 12px; font-size: 13px;
+  }
+  .msg-assistant { font-size: 13px; color: var(--foreground); max-width: 92%; }
+
+  /* ---------- transcript: upgraded Task tool card ---------- */
+  .toolcard {
+    border: 1px solid var(--border); border-radius: var(--radius-panel);
+    background: var(--card); overflow: hidden;
+  }
+  .toolcard-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; font-size: 12px; cursor: pointer; user-select: none;
+  }
+  .toolcard-head:hover { background: var(--secondary); }
+  .toolcard-head .name { font-weight: 600; font-size: 12px; }
+  .agent-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 500; color: var(--muted-foreground);
+    border: 1px solid var(--border); border-radius: var(--radius-inline);
+    padding: 0 5px; height: 16px;
+  }
+  .status-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 500; border-radius: 999px; padding: 1px 8px; height: 18px;
+  }
+  .status-chip.running { color: var(--primary); background: hsl(215 85% 62% / 0.12); }
+  .status-chip.success { color: var(--success); background: hsl(150 55% 48% / 0.12); }
+  .toolcard-meta { color: var(--muted-foreground); font-size: 11px; margin-left: auto; font-variant-numeric: tabular-nums; }
+  .toolcard-activity {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 12px 9px 33px; font-size: 11px; color: var(--muted-foreground);
+  }
+  .toolcard-activity .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toolcard-actions { display: flex; gap: 4px; margin-left: 8px; }
+  .ghost-mini {
+    font-size: 11px; height: 22px; padding: 0 8px; border-radius: var(--radius-control);
+    border: none; background: transparent; color: var(--muted-foreground); cursor: pointer;
+  }
+  .ghost-mini:hover { background: var(--secondary); color: var(--foreground); }
+  .ghost-mini.destructive:hover { background: hsl(0 70% 58% / 0.12); color: var(--destructive); }
+
+  /* parallel aggregate card */
+  .agg-subrow {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px 6px 33px; font-size: 12px;
+  }
+  .agg-subrow + .agg-subrow { border-top: 1px solid hsl(225 6% 20% / 0.5); }
+  .agg-subrow .atype { color: var(--muted-foreground); font-size: 11px; width: 52px; flex-shrink: 0; }
+  .agg-subrow .adesc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .agg-subrow .aact { margin-left: auto; color: var(--muted-foreground); font-size: 11px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+
+  /* ---------- composer + ambient strip ---------- */
+  .ambient-strip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 14px; border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--muted-foreground);
+    cursor: pointer; user-select: none;
+  }
+  .ambient-strip:hover { background: var(--secondary); }
+  .ambient-strip .view { margin-left: auto; color: var(--muted-foreground); font-size: 11px; }
+  .composer {
+    margin: 12px 16px 16px; border: 1px solid var(--border);
+    border-radius: var(--radius-chrome); padding: 10px 14px;
+    color: var(--muted-foreground); font-size: 13px; background: var(--bg);
+  }
+
+  /* ---------- L2: task center popover ---------- */
+  .popover-wrap { position: relative; }
+  .popover {
+    width: 380px; background: var(--popover);
+    border: 1px solid var(--border); border-radius: var(--radius-panel);
+    box-shadow: 0 12px 40px hsl(225 20% 3% / 0.55);
+    overflow: hidden;
+  }
+  .popover-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px 8px; font-size: 13px; font-weight: 600;
+  }
+  .popover-header .ghost-mini { margin-left: auto; }
+  .section-label {
+    font-size: 11px; font-weight: 500; color: var(--muted-foreground);
+    padding: 8px 14px 4px;
+  }
+  .task-row {
+    display: flex; align-items: center; gap: 9px;
+    padding: 6px 14px; font-size: 12px; cursor: pointer; user-select: none;
+    position: relative;
+  }
+  .task-row:hover { background: var(--secondary); }
+  .task-row .desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task-row .meta { color: var(--muted-foreground); font-size: 11px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .task-row .row-actions { display: none; gap: 2px; margin-left: auto; flex-shrink: 0; }
+  .task-row:hover .row-actions { display: flex; }
+  .task-row:hover .meta.hide-on-hover { display: none; }
+  .session-tag {
+    font-size: 10px; color: var(--muted-foreground);
+    border: 1px solid var(--border); border-radius: var(--radius-inline);
+    padding: 0 4px; flex-shrink: 0;
+  }
+  .row-icon { color: var(--muted-foreground); display: inline-flex; flex-shrink: 0; }
+  .task-detail {
+    margin: 0 14px 8px 40px; padding: 8px 10px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius-control); font-size: 11px; color: var(--muted-foreground);
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .task-detail .kv { display: flex; gap: 8px; }
+  .task-detail .k { width: 64px; flex-shrink: 0; color: var(--muted-foreground); opacity: 0.6; }
+  .task-detail .v { color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; color: var(--primary);
+    background: hsl(215 85% 62% / 0.1); border-radius: var(--radius-inline);
+    padding: 0 5px; height: 18px; cursor: pointer;
+  }
+  .popover-footer {
+    border-top: 1px solid var(--border); padding: 6px 14px;
+    display: flex; align-items: center;
+  }
+
+  /* ---------- L3: drawer ---------- */
+  .drawer {
+    width: 380px; background: var(--popover);
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; height: 560px;
+  }
+  .drawer-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px; border-bottom: 1px solid var(--border);
+  }
+  .drawer-header .dt { font-size: 13px; font-weight: 600; }
+  .drawer-body { flex: 1; overflow: hidden; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .mini-step {
+    display: flex; align-items: center; gap: 8px; font-size: 12px;
+    color: var(--muted-foreground); padding: 4px 0;
+  }
+  .mini-step .sname { color: var(--foreground); }
+  .mini-step .sarg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+  .mini-step.done .sname { color: var(--muted-foreground); }
+  .drawer-summary {
+    border-top: 1px solid var(--border); padding: 10px 14px;
+    font-size: 12px; color: var(--muted-foreground);
+  }
+  .drawer-summary .s-title { color: var(--foreground); font-weight: 600; font-size: 11px; margin-bottom: 4px; }
+
+  /* toast */
+  .toast {
+    width: 340px; background: var(--popover); border: 1px solid var(--border);
+    border-radius: var(--radius-panel); padding: 10px 12px;
+    box-shadow: 0 12px 40px hsl(225 20% 3% / 0.55);
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .toast .t-title { font-size: 12px; font-weight: 600; }
+  .toast .t-body { font-size: 11px; color: var(--muted-foreground); margin-top: 2px; }
+
+  .anchor {
+    position: absolute; border: 1.5px dashed var(--primary); border-radius: 6px;
+    pointer-events: none;
+  }
+  .anchor-label {
+    position: absolute; font-size: 10px; color: var(--primary); font-weight: 600;
+    background: var(--sidebar); padding: 0 4px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>任务中心 & Sub-agent 独立 UI — Mockup</h1>
+  <p class="sub">对应方案：后台任务从底部横条升级为全局任务中心（L1 Pill → L2 Popover → L3 Drawer）；sub-agent 成为一等运行实体。配色/圆角/图标均遵循 ui-conventions。</p>
+
+  <!-- ============ FRAME 1 ============ -->
+  <div class="frame-section">
+    <div class="frame-label">FRAME 1</div>
+    <div class="frame-title">L1 环境指示器 — Session Header 右侧 Pill<span class="tag">P1</span></div>
+
+    <div class="window">
+      <div class="session-header">
+        <span class="title">fix: login redirect loop</span>
+        <span class="crumb">zclaudia · main</span>
+        <div class="header-spacer"></div>
+
+        <!-- the pill -->
+        <button class="task-pill">
+          <svg class="spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg>
+          <span class="count">3</span><span>running</span>
+        </button>
+
+        <button class="icon-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </button>
+      </div>
+
+      <div class="chat">
+        <div class="msg-user">把登录跳转死循环修一下，顺便跑一下全量测试</div>
+        <div class="msg-assistant">好的。测试我放到后台跑，同时开两个 sub-agent 分别排查 redirect 逻辑和 middleware 链。</div>
+      </div>
+
+      <div class="ambient-strip">
+        <span class="dot running pulse-dot"></span>
+        <span><b style="color:var(--foreground);font-weight:600;">3</b> 个任务运行中 · 2 个 sub-agent</span>
+        <span class="view">查看任务中心 →</span>
+      </div>
+      <div class="composer">输入消息…</div>
+    </div>
+
+    <ul class="frame-notes">
+      <li>Pill 常驻 Session Header：无任务时完全不渲染；计数为<b>该 server 全部会话</b>的运行中任务。</li>
+      <li>聊天底部横条降级为一行 ambient strip（可关闭），点击与 Pill 等效——不再承载完整列表。</li>
+    </ul>
+  </div>
+
+  <!-- ============ FRAME 2 ============ -->
+  <div class="frame-section">
+    <div class="frame-label">FRAME 2</div>
+    <div class="frame-title">L2 任务中心 Popover — 分组、跨会话、详情内联展开<span class="tag">P1–P3</span></div>
+
+    <div class="frames-row">
+      <div class="popover">
+        <div class="popover-header">
+          任务中心
+          <button class="ghost-mini">清除已完成</button>
+        </div>
+
+        <!-- running group -->
+        <div class="section-label">运行中 · 1</div>
+        <div class="task-row">
+          <span class="row-icon"><svg class="spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg></span>
+          <span class="desc">pnpm test（全量测试套件）</span>
+          <span class="meta hide-on-hover">2m 14s · 38k tok</span>
+          <span class="row-actions">
+            <button class="ghost-mini destructive">停止</button>
+          </span>
+        </div>
+
+        <!-- sub-agents group -->
+        <div class="section-label">Sub-agents · 2</div>
+        <div class="task-row">
+          <span class="dot running pulse-dot"></span>
+          <span class="agent-badge">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M8 4h8"/></svg>
+            coder
+          </span>
+          <span class="desc">排查 redirect 逻辑</span>
+          <span class="meta hide-on-hover">Edit · auth.ts</span>
+          <span class="row-actions">
+            <button class="ghost-mini">定位</button>
+            <button class="ghost-mini destructive">停止</button>
+          </span>
+        </div>
+        <div class="task-row">
+          <span class="dot running pulse-dot"></span>
+          <span class="agent-badge">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M8 4h8"/></svg>
+            explore
+          </span>
+          <span class="desc">梳理 middleware 链</span>
+          <span class="meta hide-on-hover">Grep · 1m 03s</span>
+          <span class="row-actions">
+            <button class="ghost-mini">定位</button>
+            <button class="ghost-mini destructive">停止</button>
+          </span>
+        </div>
+
+        <!-- completed group -->
+        <div class="section-label">已完成 · 2</div>
+        <div class="task-row">
+          <span class="dot success"></span>
+          <span class="desc" style="color:var(--muted-foreground);">eslint --fix（全仓）</span>
+          <span class="meta">4m ago · 12k tok</span>
+        </div>
+        <!-- expanded detail row -->
+        <div class="task-row" style="background:var(--secondary);">
+          <span class="dot destructive"></span>
+          <span class="desc" style="color:var(--muted-foreground);">构建产物上传</span>
+          <span class="session-tag">deploy-pipeline</span>
+          <span class="meta">12m ago</span>
+        </div>
+        <div class="task-detail">
+          <div class="kv"><span class="k">命令</span><span class="v mono">rsync -a dist/ prod:/srv/app</span></div>
+          <div class="kv"><span class="k">状态</span><span class="v" style="color:var(--destructive);">失败 · exit 23（磁盘空间不足）</span></div>
+          <div class="kv"><span class="k">进程</span><span class="v mono">PID 41277 · 已退出 · 运行 3m 41s</span></div>
+          <div class="kv"><span class="k">输出</span><span class="file-chip">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+            upload.log
+          </span></div>
+        </div>
+
+        <div class="popover-footer">
+          <span style="font-size:11px;color:var(--muted-foreground);">已完成任务保留至手动清除，不再 15 秒自动消失</span>
+        </div>
+      </div>
+
+      <ul class="frame-notes" style="margin-top:0;max-width:340px;">
+        <li><b>分组固定顺序</b>：运行中 → Sub-agents → 已暂停 → 已完成；行高 28px、悬停浮现操作，符合 one row language。</li>
+        <li><b>行内减重</b>：PID 徽标从行内移除，挪进详情区；行内只保留状态点 / agent 类型 / 描述 / 用量摘要。</li>
+        <li><b>跨会话条目</b>带会话名标签（如 deploy-pipeline），点击跳转会话。</li>
+        <li><b>Sub-agent 行</b>的 meta 位显示实时 activity（当前工具 · 文件 / 耗时）。</li>
+        <li><b>详情内联展开</b>：命令、状态、进程信息、outputFile 引用芯片。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============ FRAME 3 ============ -->
+  <div class="frame-section">
+    <div class="frame-label">FRAME 3</div>
+    <div class="frame-title">Transcript 内 — Task 工具卡升级 & 并行聚合卡<span class="tag">P3</span></div>
+
+    <div class="window">
+      <div class="session-header">
+        <span class="title">fix: login redirect loop</span>
+        <div class="header-spacer"></div>
+        <button class="task-pill">
+          <svg class="spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg>
+          <span class="count">3</span><span>running</span>
+        </button>
+      </div>
+
+      <div class="chat">
+        <div class="msg-assistant">我开两个 sub-agent 并行排查：</div>
+
+        <!-- parallel aggregate card -->
+        <div class="toolcard">
+          <div class="toolcard-head">
+            <span class="row-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M8 4h8"/></svg></span>
+            <span class="name">Task</span>
+            <span class="status-chip running"><svg class="spin" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg>2 agents running</span>
+            <span class="toolcard-meta">1m 38s</span>
+            <span class="row-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+          </div>
+          <div class="agg-subrow">
+            <span class="dot running pulse-dot"></span>
+            <span class="atype">coder</span>
+            <span class="adesc">排查 redirect 逻辑</span>
+            <span class="aact">Edit · auth.ts · 12k tok</span>
+          </div>
+          <div class="agg-subrow">
+            <span class="dot running pulse-dot"></span>
+            <span class="atype">explore</span>
+            <span class="adesc">梳理 middleware 链</span>
+            <span class="aact">Grep · 8k tok</span>
+          </div>
+        </div>
+
+        <!-- single background subagent card -->
+        <div class="toolcard">
+          <div class="toolcard-head">
+            <span class="row-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M8 4h8"/></svg></span>
+            <span class="name">Task</span>
+            <span class="agent-badge">
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M8 4h8"/></svg>
+              coder
+            </span>
+            <span style="color:var(--muted-foreground);font-size:12px;">回归修复后的登录流程</span>
+            <span class="status-chip running" style="margin-left:auto;">后台运行中</span>
+            <span class="toolcard-actions">
+              <button class="ghost-mini">在任务中心查看</button>
+            </span>
+          </div>
+          <div class="toolcard-activity">
+            <svg class="spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg>
+            <span class="ellipsis">Bash · pnpm test:e2e -- login.spec</span>
+            <span style="margin-left:auto;flex-shrink:0;">46s · 9k tok</span>
+          </div>
+        </div>
+
+        <!-- completed foreground subagent card -->
+        <div class="toolcard">
+          <div class="toolcard-head">
+            <span class="row-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></span>
+            <span class="name">Task</span>
+            <span class="agent-badge">
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M8 4h8"/></svg>
+              explore
+            </span>
+            <span style="color:var(--muted-foreground);font-size:12px;">查找 session 存储的位置</span>
+            <span class="toolcard-meta">23s · 6k tok · 已返回结果</span>
+            <span class="row-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+          </div>
+        </div>
+      </div>
+      <div class="composer">输入消息…</div>
+    </div>
+
+    <ul class="frame-notes">
+      <li><b>聚合卡</b>：同一块内多个并行 Task 调用折叠为一张卡 + 紧凑子行，避免 transcript 被撑爆。</li>
+      <li><b>后台 sub-agent 卡</b>：状态 chip + activity 行 + "在任务中心查看" 锚点跳转。</li>
+      <li><b>前台 sub-agent 卡</b>：完成后徽标转 success，meta 带 "已返回结果"，展开即子 agent 最终汇报。</li>
+    </ul>
+  </div>
+
+  <!-- ============ FRAME 4 ============ -->
+  <div class="frame-section">
+    <div class="frame-label">FRAME 4</div>
+    <div class="frame-title">L3 Sub-agent 详情抽屉 — 子 transcript 迷你流<span class="tag">P4</span></div>
+
+    <div class="frames-row">
+      <div class="window window-narrow" style="border-radius:var(--radius-panel);">
+        <div class="drawer" style="width:100%;height:520px;">
+          <div class="drawer-header">
+            <span class="dot running pulse-dot"></span>
+            <span class="dt">coder · 排查 redirect 逻辑</span>
+            <div class="header-spacer"></div>
+            <button class="ghost-mini destructive">停止</button>
+            <button class="icon-btn" style="width:24px;height:24px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="drawer-body">
+            <div class="section-label" style="padding:0 0 2px;">执行过程</div>
+            <div class="mini-step done"><span class="dot muted"></span><span class="sname">Read</span><span class="sarg mono">src/routes/login.ts</span></div>
+            <div class="mini-step done"><span class="dot muted"></span><span class="sname">Grep</span><span class="sarg mono">"redirect(" in src/</span></div>
+            <div class="mini-step done"><span class="dot muted"></span><span class="sname">Read</span><span class="sarg mono">src/middleware/auth.ts</span></div>
+            <div class="mini-step"><span class="dot running pulse-dot"></span><span class="sname">Edit</span><span class="sarg mono">src/middleware/auth.ts</span></div>
+          </div>
+          <div class="drawer-summary">
+            <div class="s-title">运行数据</div>
+            <div class="kv" style="display:flex;gap:16px;">
+              <span>1m 38s</span><span>12k tokens</span><span>7 次工具调用</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="toast">
+        <span class="dot success" style="margin-top:5px;"></span>
+        <div>
+          <div class="t-title">Sub-agent 完成 · coder</div>
+          <div class="t-body">「排查 redirect 逻辑」已返回结果 — 点击跳转会话查看</div>
+        </div>
+      </div>
+    </div>
+
+    <ul class="frame-notes">
+      <li>抽屉从任务中心条目展开（或右侧滑出），<b>懒加载</b>子 run 的消息流：shell 任务展开看输出尾部，sub-agent 展开看「它做了什么」。</li>
+      <li>右图：窗口失焦时任务进入终态 → 轻量 toast，点击直达对应会话并打开任务中心。</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

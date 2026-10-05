@@ -177,21 +177,16 @@ vi.mock('../../../features/supervision/components/TaskCardStrip', () => ({
     <div data-testid="task-card-strip" data-project-id={props.projectId} />
   ),
 }));
-vi.mock('../../../components/BackgroundTaskPanel', () => ({
-  BackgroundTaskPanel: (props: any) => (
-    <div data-testid="bg-task-panel" data-session-id={props.sessionId}>
-      <button
-        data-testid="bg-task-stop"
-        onClick={() =>
-          props.onStopTask?.({
-            id: 'task-123',
-            cliPid: 456,
-            taskRootPid: 789,
-            taskCommand: 'sleep 30 && echo hello',
-          })
-        }
-      />
-    </div>
+vi.mock('../../task-center', () => ({
+  TaskAmbientStrip: (props: any) => (
+    <div data-testid="task-ambient-strip" data-session-id={props.sessionId} />
+  ),
+  TaskCenterEntry: (props: any) => (
+    <div data-testid="task-center-entry" data-session-id={props.sessionId} />
+  ),
+  useTaskCenterUiStore: Object.assign(
+    (selector: any) => selector({ popoverOpen: false }),
+    { getState: () => ({ popoverOpen: false, setPopoverOpen: vi.fn(), togglePopover: vi.fn() }) }
   ),
 }));
 
@@ -568,9 +563,9 @@ describe('ChatInterface', () => {
     expect(container.querySelector('[data-testid="before-composer-basic"]')).toBeTruthy();
   });
 
-  it('renders background task panel', () => {
+  it('renders background task ambient strip', () => {
     const { container } = render(<ChatInterface sessionId="sess-1" />);
-    expect(container.querySelector('[data-testid="bg-task-panel"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="task-ambient-strip"]')).toBeTruthy();
   });
 
   it('renders toolbar selectors (mode selector, permission)', () => {
@@ -1689,25 +1684,18 @@ describe('ChatInterface', () => {
     );
   });
 
-  // ─── BackgroundTaskPanel sessionId ────────────────────────────────────
+  // ─── Task center wiring ───────────────────────────────────────────────
 
-  it('passes sessionId to BackgroundTaskPanel', () => {
+  it('passes sessionId to the task ambient strip', () => {
     const { container } = render(<ChatInterface sessionId="sess-1" />);
-    const btp = container.querySelector('[data-testid="bg-task-panel"]');
-    expect(btp?.getAttribute('data-session-id')).toBe('sess-1');
+    const strip = container.querySelector('[data-testid="task-ambient-strip"]');
+    expect(strip?.getAttribute('data-session-id')).toBe('sess-1');
   });
 
-  it('sends stop_background_task when BackgroundTaskPanel requests stop', () => {
-    const { getByTestId } = render(<ChatInterface sessionId="sess-1" />);
-    fireEvent.click(getByTestId('bg-task-stop'));
-    expect(mockSendToServer).toHaveBeenCalledWith('local', {
-      type: 'stop_background_task',
-      sessionId: 'sess-1',
-      taskId: 'task-123',
-      cliPid: 456,
-      taskRootPid: 789,
-      taskCommand: 'sleep 30 && echo hello',
-    });
+  it('passes sessionId to the task center entry in the header slot', () => {
+    const { container } = render(<ChatInterface sessionId="sess-1" />);
+    const entry = container.querySelector('[data-testid="task-center-entry"]');
+    expect(entry?.getAttribute('data-session-id')).toBe('sess-1');
   });
 
   // ─── Multiple sessions rendering correctly ────────────────────────────

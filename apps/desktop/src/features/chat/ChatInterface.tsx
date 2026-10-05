@@ -7,7 +7,7 @@ import { PoppedOutPlaceholder } from './PoppedOutPlaceholder';
 import { InterruptedBanner } from './InterruptedBanner';
 import { PlanStatusBar } from './PlanStatusBar';
 import { SessionHeader } from './SessionHeader';
-import { BackgroundTaskPanel } from '../../components/BackgroundTaskPanel';
+import { TaskAmbientStrip, TaskCenterEntry, useTaskCenterUiStore } from '../task-center';
 import { DraftLockPrompt } from '../../components/draft/DraftLockPrompt';
 import { TaskCardStrip } from '../supervision';
 import { forkSession, branchSession } from '../../services/api';
@@ -566,6 +566,7 @@ export function ChatInterface({
                 archiveDisabled={isSessionRunning}
                 onPopOut={handlePopOut}
                 onToggleSessionMenu={() => setShowSessionMenu(!showSessionMenu)}
+                taskCenter={<TaskCenterEntry sessionId={sessionId} />}
                 systemInfo={currentSystemInfo}
                 contextPercent={
                   currentUsage.contextWindow && currentUsage.contextWindow > 0
@@ -640,19 +641,10 @@ export function ChatInterface({
               collapsed={isEmptySession}
             />
 
-            {/* Background Tasks Panel */}
-            <BackgroundTaskPanel
+            {/* Background task entry — one-line strip opening the task center */}
+            <TaskAmbientStrip
               sessionId={sessionId}
-              onStopTask={task => {
-                wsSendMessage({
-                  type: 'stop_background_task',
-                  sessionId,
-                  taskId: task.id,
-                  cliPid: task.cliPid,
-                  taskRootPid: task.taskRootPid,
-                  taskCommand: task.taskCommand,
-                });
-              }}
+              onOpen={() => useTaskCenterUiStore.getState().setPopoverOpen(true)}
             />
 
             {beforeComposer}
