@@ -8,6 +8,22 @@ describe('TaskPill', () => {
     expect(container.innerHTML).toBe('');
   });
 
+  it('renders nothing when there are only zero finished tasks', () => {
+    const { container } = render(
+      <TaskPill runningCount={0} finishedCount={0} open={false} onToggle={vi.fn()} />
+    );
+    expect(container.innerHTML).toBe('');
+  });
+
+  it('stays visible with a settled style when only finished tasks remain', () => {
+    const { getByText, queryByText } = render(
+      <TaskPill runningCount={0} finishedCount={2} open={false} onToggle={vi.fn()} />
+    );
+    expect(getByText('2')).toBeTruthy();
+    expect(getByText('finished')).toBeTruthy();
+    expect(queryByText('running')).toBeNull();
+  });
+
   it('shows the running count', () => {
     const { getByText } = render(<TaskPill runningCount={3} open={false} onToggle={vi.fn()} />);
     expect(getByText('3')).toBeTruthy();

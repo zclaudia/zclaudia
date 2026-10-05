@@ -45,8 +45,13 @@ interface BackgroundTaskState {
   updateTask: (taskId: string, updates: Partial<BackgroundTask>) => void;
   removeTask: (taskId: string) => void;
   clearTasks: (sessionId?: string) => void;
-  /** Remove only terminal (completed/failed/stopped) tasks; running tasks are kept. */
-  clearTerminalTasks: (sessionId?: string) => void;
+  /**
+   * Remove only terminal (completed/failed/stopped) tasks; running tasks are
+   * kept. Without a scope every backend's terminal tasks go; pass serverId
+   * (the task-center view is backend-scoped) and/or sessionId to limit the
+   * sweep.
+   */
+  clearTerminalTasks: (scope?: { sessionId?: string; serverId?: string }) => void;
   getTasksBySession: (sessionId: string) => BackgroundTask[];
   /** Start periodic PID liveness checking */
   startPidMonitor: () => void;
@@ -167,12 +172,14 @@ export const useBackgroundTaskStore = create<BackgroundTaskState>((set, get) => 
       return { tasks: filteredTasks };
     }),
 
-  clearTerminalTasks: sessionId =>
+  clearTerminalTasks: scope =>
     set(state => {
       const kept = Object.fromEntries(
         Object.entries(state.tasks).filter(([_, task]) => {
           if (!isTerminalStatus(task.status)) return true;
-          return sessionId !== undefined && task.sessionId !== sessionId;
+          if (scope?.sessionId !== undefined && task.sessionId !== scope.sessionId) return true;
+          if (scope?.serverId !== undefined && task.serverId !== scope.serverId) return true;
+          return false;
         })
       );
       return { tasks: kept };

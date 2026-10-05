@@ -1,7 +1,9 @@
-import { Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2 } from 'lucide-react';
 
 interface TaskPillProps {
   runningCount: number;
+  /** Terminal tasks still listed — they keep the pill visible so they can be cleared. */
+  finishedCount?: number;
   open: boolean;
   onToggle: () => void;
 }
@@ -9,12 +11,16 @@ interface TaskPillProps {
 /**
  * L1 ambient indicator in the SessionHeader: a ghost chip with the number of
  * tasks running across this backend (all sessions). Renders nothing when
- * idle — the header carries zero task chrome unless there is something to
- * point at. Matches the session-info chip's visual family (11px, rounded-md
- * border, h-7-ish padding).
+ * there are no tasks at all — the header carries zero task chrome unless
+ * there is something to point at. Once only finished tasks remain the pill
+ * stays (in a settled style), because terminal tasks persist until cleared
+ * and this is the only persistent affordance to reach them. Matches the
+ * session-info chip's visual family (11px, rounded-md border, h-7-ish
+ * padding).
  */
-export function TaskPill({ runningCount, open, onToggle }: TaskPillProps) {
-  if (runningCount === 0) return null;
+export function TaskPill({ runningCount, finishedCount = 0, open, onToggle }: TaskPillProps) {
+  if (runningCount === 0 && finishedCount === 0) return null;
+  const settled = runningCount === 0;
 
   return (
     <button
@@ -28,9 +34,15 @@ export function TaskPill({ runningCount, open, onToggle }: TaskPillProps) {
       aria-haspopup="dialog"
       aria-expanded={open}
     >
-      <Loader2 size={12} className="shrink-0 animate-spin text-primary" strokeWidth={1.75} />
-      <span className="font-medium text-foreground tabular-nums">{runningCount}</span>
-      <span>running</span>
+      {settled ? (
+        <CheckCircle2 size={12} className="shrink-0 text-success" strokeWidth={1.75} />
+      ) : (
+        <Loader2 size={12} className="shrink-0 animate-spin text-primary" strokeWidth={1.75} />
+      )}
+      <span className="font-medium text-foreground tabular-nums">
+        {settled ? finishedCount : runningCount}
+      </span>
+      <span>{settled ? 'finished' : 'running'}</span>
     </button>
   );
 }

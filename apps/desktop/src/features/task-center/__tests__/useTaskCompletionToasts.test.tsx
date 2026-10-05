@@ -99,8 +99,21 @@ describe('useTaskCompletionToasts', () => {
     const toast = useToastStore.getState().toasts[0];
     toast.onClick?.();
 
-    expect(mockSelectSession).toHaveBeenCalledWith('sess-2');
+    expect(mockSelectSession).toHaveBeenCalledWith('sess-2', { backendId: undefined });
     expect(useTaskCenterUiStore.getState().popoverOpen).toBe(true);
+  });
+
+  it('toast click jumps on the owning backend', () => {
+    renderHook(() => useTaskCompletionToasts());
+    useBackgroundTaskStore.setState({
+      tasks: { t1: makeTask('t1', { sessionId: 'sess-2', serverId: 'srv-9' }) },
+    });
+    useBackgroundTaskStore.getState().updateTask('t1', { status: 'completed' });
+
+    const toast = useToastStore.getState().toasts[0];
+    toast.onClick?.();
+
+    expect(mockSelectSession).toHaveBeenCalledWith('sess-2', { backendId: 'srv-9' });
   });
 
   it('stops toasting after unmount', () => {

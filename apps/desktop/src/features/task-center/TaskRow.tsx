@@ -111,7 +111,7 @@ export function TaskRow({ task, isOtherSession, sessionLabel, onStop, onDismiss,
               {sessionLabel}
             </span>
           )}
-          <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums group-hover:hidden">
+          <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums group-hover:hidden group-focus-within:hidden max-md:hidden">
             {meta}
           </span>
           {hasDetail && (
@@ -120,7 +120,10 @@ export function TaskRow({ task, isOtherSession, sessionLabel, onStop, onDismiss,
             </span>
           )}
         </button>
-        <span className="hidden shrink-0 items-center gap-1 group-hover:flex">
+        {/* Hidden from the tab order would make Stop/Dismiss unreachable for
+            keyboard and touch users, so the actions also reveal on focus and
+            on <md, where there is no hover. */}
+        <span className="hidden shrink-0 items-center gap-1 group-hover:flex group-focus-within:flex max-md:flex">
           {onView && (
             <Button variant="ghost" size="sm" onClick={() => onView(task)}>
               View

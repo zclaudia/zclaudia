@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { BackgroundTask } from '../../stores/backgroundTaskStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useSessionsStore } from '../../stores/sessionsStore';
@@ -51,7 +51,9 @@ export function TaskCenterEntry({ sessionId }: { sessionId: string }) {
     onDismiss: viewModel.dismissTask,
     onClearFinished: viewModel.clearFinished,
     onLocate: (task: BackgroundTask) => {
-      selectSession(task.sessionId);
+      // Pass the owning backend so the jump lands on the right server even
+      // when that backend's session list isn't loaded.
+      selectSession(task.sessionId, { backendId: task.serverId });
       setOpen(false);
     },
     // The drawer outlives the popover: opening it closes the popover (the
@@ -60,6 +62,17 @@ export function TaskCenterEntry({ sessionId }: { sessionId: string }) {
       useTaskCenterUiStore.getState().openDrawer(task.id);
     },
   };
+
+  // Same Escape contract as the desktop popover: the mobile backdrop is
+  // click-only, so the overlay needs a window-level listener while mounted.
+  useEffect(() => {
+    if (!(isMobile && open)) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isMobile, open, setOpen]);
 
   if (isMobile) {
     return open ? (
@@ -83,7 +96,12 @@ export function TaskCenterEntry({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="relative shrink-0">
-      <TaskPill runningCount={viewModel.runningCount} open={open} onToggle={toggle} />
+      <TaskPill
+        runningCount={viewModel.runningCount}
+        finishedCount={viewModel.groups.terminal.length}
+        open={open}
+        onToggle={toggle}
+      />
       <TaskCenterPopover open={open} onClose={() => setOpen(false)} {...viewProps} />
     </div>
   );

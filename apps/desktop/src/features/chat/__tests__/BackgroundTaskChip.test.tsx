@@ -24,7 +24,7 @@ function makeTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
 describe('BackgroundTaskChip', () => {
   beforeEach(() => {
     useBackgroundTaskStore.setState({ tasks: {} });
-    useTaskCenterUiStore.setState({ popoverOpen: false });
+    useTaskCenterUiStore.setState({ popoverOpen: false, drawerTaskId: null });
   });
 
   it('renders nothing when no background task matches the tool call', () => {
@@ -80,10 +80,21 @@ describe('BackgroundTaskChip', () => {
     expect(screen.getByTestId('background-task-chip')).toHaveTextContent('Running in background');
   });
 
-  it('opens the task center popover from the chip action', () => {
+  it('opens the sub-agent drawer from the chip action', () => {
     useBackgroundTaskStore.setState({ tasks: { a: makeTask() } });
     render(<BackgroundTaskChip sessionId="s1" toolUseId="tool-1" />);
     fireEvent.click(screen.getByText('View in task center'));
+    expect(useTaskCenterUiStore.getState().drawerTaskId).toBe('task-1');
+    expect(useTaskCenterUiStore.getState().popoverOpen).toBe(false);
+  });
+
+  it('opens the task center popover for shell tasks', () => {
+    useBackgroundTaskStore.setState({
+      tasks: { a: makeTask({ kind: 'shell', toolUseId: 'tool-1' }) },
+    });
+    render(<BackgroundTaskChip sessionId="s1" toolUseId="tool-1" />);
+    fireEvent.click(screen.getByText('View in task center'));
     expect(useTaskCenterUiStore.getState().popoverOpen).toBe(true);
+    expect(useTaskCenterUiStore.getState().drawerTaskId).toBeNull();
   });
 });

@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { CheckCircle2, XCircle, Loader2, PauseCircle } from 'lucide-react';
 import {
   useBackgroundTaskStore,
+  taskKind,
   type BackgroundTask,
 } from '../../stores/backgroundTaskStore';
 import { useTaskCenterUiStore } from '../task-center/taskCenterUiStore';
@@ -85,7 +86,18 @@ export const BackgroundTaskChip = memo(function BackgroundTaskChip({
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => useTaskCenterUiStore.getState().setPopoverOpen(true)}
+        onClick={() => {
+          const ui = useTaskCenterUiStore.getState();
+          if (taskKind(task) === 'subagent') {
+            // The drawer is the sub-agent's detail surface — and opening the
+            // popover from under an open drawer (z-dropdown < z-modal) would
+            // be an invisible dead click.
+            ui.openDrawer(task.id);
+            return;
+          }
+          ui.closeDrawer();
+          ui.setPopoverOpen(true);
+        }}
       >
         View in task center
       </Button>

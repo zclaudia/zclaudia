@@ -121,9 +121,22 @@ describe('backgroundTaskStore', () => {
         t2: makeTask('t2', 'sess-2', 'stopped'),
       },
     });
-    useBackgroundTaskStore.getState().clearTerminalTasks('sess-1');
+    useBackgroundTaskStore.getState().clearTerminalTasks({ sessionId: 'sess-1' });
 
     expect(Object.keys(useBackgroundTaskStore.getState().tasks)).toEqual(['t2']);
+  });
+
+  it('clearTerminalTasks scopes removal to the given serverId', () => {
+    useBackgroundTaskStore.setState({
+      tasks: {
+        t1: { ...makeTask('t1', 'sess-1', 'completed'), serverId: 'srv-1' },
+        t2: { ...makeTask('t2', 'sess-1', 'stopped'), serverId: 'srv-2' },
+        t3: { ...makeTask('t3', 'sess-1', 'in_progress'), serverId: 'srv-1' },
+      },
+    });
+    useBackgroundTaskStore.getState().clearTerminalTasks({ serverId: 'srv-1' });
+
+    expect(Object.keys(useBackgroundTaskStore.getState().tasks).sort()).toEqual(['t2', 't3']);
   });
 
   it('getTasksBySession returns tasks for session', () => {

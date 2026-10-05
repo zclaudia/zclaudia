@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { TaskCenterView, type TaskCenterViewProps } from './TaskCenterView';
 
 interface TaskCenterPopoverProps extends TaskCenterViewProps {
@@ -13,6 +14,17 @@ interface TaskCenterPopoverProps extends TaskCenterViewProps {
  * Height constraint lives here, never in TaskCenterView.
  */
 export function TaskCenterPopover({ open, onClose, ...viewProps }: TaskCenterPopoverProps) {
+  // The backdrop shield is click-only, so Escape needs its own window-level
+  // listener (same contract as TaskDrawer's).
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (

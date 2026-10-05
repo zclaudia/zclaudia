@@ -64,7 +64,9 @@ export function useTaskCenter(serverId: string | undefined): TaskCenterViewModel
     stopTask,
     dismissTask: removeTask,
     // Wrap rather than alias: the view wires this straight into Button
-    // onClick, which would otherwise pass the click event as `sessionId`.
-    clearFinished: () => clearTerminalTasks(),
+    // onClick, which would otherwise pass the click event as the scope.
+    // Scoped to this backend — the view only lists this backend's tasks, so
+    // clearing across all backends would delete rows the user cannot see.
+    clearFinished: () => clearTerminalTasks(serverId ? { serverId } : undefined),
   };
 }

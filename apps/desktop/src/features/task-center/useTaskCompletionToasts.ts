@@ -57,7 +57,10 @@ export function useTaskCompletionToasts(): void {
           sessionId: task.sessionId,
           serverId: task.serverId,
           onClick: () => {
-            selectSession(task.sessionId);
+            // Jump on the owning backend, same contract as TaskCenterEntry's
+            // onLocate — the fallback to the active backend would silently
+            // land nowhere when the owner's session list isn't loaded.
+            selectSession(task.sessionId, { backendId: task.serverId });
             useTaskCenterUiStore.getState().setPopoverOpen(true);
           },
         });

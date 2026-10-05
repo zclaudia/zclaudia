@@ -12,6 +12,7 @@ import { useServerStore } from '../stores/serverStore';
 import { resolveGatewayBackendUrl, getGatewayAuthHeaders } from './gatewayProxy';
 import { useChatMessageStore } from '../stores/chatMessageStore';
 import { useProjectStore } from '../stores/projectStore';
+import { useBackgroundTaskStore } from '../stores/backgroundTaskStore';
 import { useSelectionStore } from '../stores/selectionStore';
 import { useSessionRunStateStore } from '../stores/sessionRunStateStore';
 import * as api from './api';
@@ -300,6 +301,9 @@ async function fullSync(backendId: string): Promise<RemoteSession[] | null> {
     for (const sessionId of findDeletedSessionIds(localSessions, sessions)) {
       console.log(`[SessionSync] Detected deleted session: ${sessionId}`);
       projectStore.deleteSession(sessionId);
+      // Their task-center rows would linger forever with an Open button that
+      // selects a ghost session.
+      useBackgroundTaskStore.getState().clearTasks(sessionId);
     }
 
     // Replace sessionsStore with server's complete list (no need for individual delete events)
