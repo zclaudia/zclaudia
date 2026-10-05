@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.4.0",
-    "@zclaudia/plugin-sdk": "0.6.0"
+    "@zclaudia/plugin-sdk": "0.6.1"
   },
   "devDependencies": {
     "@zclaudia/agent-common": "workspace:*",
