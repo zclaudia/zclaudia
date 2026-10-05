@@ -1687,8 +1687,10 @@ describe('Write bridge tool', () => {
 
     const first = write.execute('w-serial-1', { file_path: 'f.ts', content: 'one\n' });
     const second = write.execute('w-serial-2', { file_path: 'f.ts', content: 'two\n' });
-    await new Promise(resolve => setTimeout(resolve, 25));
-    expect(afterWrite).toHaveBeenCalledTimes(1);
+    // Wait for the first write to actually reach its lifecycle hook instead
+    // of sleeping: a fixed 25ms loses the race when the suite runs under
+    // heavy parallel load.
+    await vi.waitFor(() => expect(afterWrite).toHaveBeenCalledTimes(1));
 
     releaseFirst();
     const results = await Promise.all([first, second]);
