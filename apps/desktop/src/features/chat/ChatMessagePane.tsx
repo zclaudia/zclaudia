@@ -12,6 +12,7 @@ import type { PermissionRequest } from '../../stores/permissionStore';
 import type { ContentBlock } from '@zclaudia/shared/core/message';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { isPlanProposalTool } from './tool-call/toolClassifiers';
+import { TodoFloatingPanel } from './todo/TodoFloatingPanel';
 
 const AUTO_STICK_BOTTOM_THRESHOLD_PX = 200;
 
@@ -146,6 +147,10 @@ export const ChatMessagePane = memo(function ChatMessagePane({
       )
       .sort((a, b) => a.createdAt - b.createdAt);
   }, [interactionsMap, sessionId, sessionToolCallHistory, sessionToolCalls]);
+  const liveToolCalls = useMemo(
+    () => [...sessionToolCallHistory, ...sessionToolCalls],
+    [sessionToolCallHistory, sessionToolCalls]
+  );
   const shouldStickToBottomRef = useRef(true);
   const lastObservedScrollTopRef = useRef(0);
   const prevMessageCountRef = useRef<number | null>(null);
@@ -443,6 +448,13 @@ export const ChatMessagePane = memo(function ChatMessagePane({
           <div ref={messagesEndRef} />
         </div>
       </div>
+
+      <TodoFloatingPanel
+        sessionId={sessionId}
+        messages={sessionMessages}
+        liveToolCalls={liveToolCalls}
+        isRunning={isLoading}
+      />
 
       {showScrollToBottom && (
         <button
