@@ -2,7 +2,11 @@ import type { InteractionMessage, NormalizedTodoItem } from '@zclaudia/shared/in
 import type { MessageWithToolCalls } from '../../../stores/chatMessageStore';
 import type { ToolCallState } from '../../../stores/runStore';
 import { isTodoTool } from '../tool-call/toolClassifiers';
-import { extractInteractionId, normalizeTodoItems } from '../tool-call/toolFormatters';
+import {
+  extractInteractionId,
+  normalizeTodoItems,
+  normalizeToolInput,
+} from '../tool-call/toolFormatters';
 
 export interface TodoSnapshot {
   todos: NormalizedTodoItem[];
@@ -36,9 +40,18 @@ function coerce(items: { content: string; status: string }[]): NormalizedTodoIte
   }));
 }
 
+type TaskTool = 'TaskCreate' | 'TaskUpdate';
+
+// Bridged names carry a server prefix (`mcp__x__TaskCreate`, `x:TaskCreate`).
+function taskTool(name: string): TaskTool | null {
+  const bare = name.split(/__|:/).pop();
+  return bare === 'TaskCreate' || bare === 'TaskUpdate' ? bare : null;
+}
+
 // A sub-agent's own checklist is not the session's plan.
-function isMainTodoCall(toolCall: ToolCallState): boolean {
-  return isTodoTool(toolCall.toolName) && !toolCall.parentToolUseId;
+function isTracked(toolCall: ToolCallState): boolean {
+  if (toolCall.parentToolUseId) return false;
+  return isTodoTool(toolCall.toolName) || taskTool(toolCall.toolName) !== null;
 }
 
 function todosFor(
@@ -55,10 +68,31 @@ function todosFor(
   return coerce(normalizeTodoItems(toolCall.toolInput));
 }
 
+function inputRecord(toolCall: ToolCallState): Record<string, unknown> {
+  const input = normalizeToolInput(toolCall.toolInput);
+  return input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+}
+
+// "Task #3 created successfully: …" — the id later TaskUpdate calls refer to.
+function createdTaskId(toolCall: ToolCallState): string {
+  const text = typeof toolCall.result === 'string' ? toolCall.result : '';
+  return text.match(/#(\d+)/)?.[1] ?? `pending:${toolCall.id}`;
+}
+
+interface Located {
+  toolCall: ToolCallState;
+  messageId: string | null;
+  /** Position in `messages`; live-only calls sort after every message. */
+  index: number;
+}
+
 /**
- * Latest todo list for a session, newest source first: the live run's tool
- * calls, then persisted messages from the end. Updates whose input doesn't
- * parse yet (still streaming) are skipped so the previous list stays up.
+ * Current task list for a session, rebuilt by replaying its updates in
+ * order. Two styles exist: TodoWrite-like tools send the whole list each time,
+ * while Claude's TaskCreate/TaskUpdate edit one task at a time — the style of
+ * the most recent update decides which list is shown. Calls that don't parse
+ * yet (input still streaming, or failed) are skipped so the last good list
+ * stays up.
  */
 export function findLatestTodoSnapshot(params: {
   sessionId: string;
@@ -68,30 +102,73 @@ export function findLatestTodoSnapshot(params: {
 }): TodoSnapshot | null {
   const { sessionId, messages, liveToolCalls, interactions } = params;
 
-  for (let i = liveToolCalls.length - 1; i >= 0; i--) {
-    const toolCall = liveToolCalls[i];
-    if (!isMainTodoCall(toolCall)) continue;
-    const todos = todosFor(toolCall, interactions);
-    if (todos.length > 0) return { todos, messageId: null, fromLatestTurn: true };
-  }
-
-  let lastUserIndex = -1;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === 'user') {
-      lastUserIndex = i;
-      break;
+  // A streaming assistant message and the live run carry the same calls; keep
+  // the message's position but the live copy, which may be fresher.
+  const located = new Map<string, Located>();
+  messages.forEach((message, index) => {
+    for (const toolCall of message.toolCalls ?? []) {
+      if (isTracked(toolCall)) located.set(toolCall.id, { toolCall, messageId: message.id, index });
     }
+  });
+  for (const toolCall of liveToolCalls) {
+    if (!isTracked(toolCall)) continue;
+    const existing = located.get(toolCall.id);
+    located.set(
+      toolCall.id,
+      existing ? { ...existing, toolCall } : { toolCall, messageId: null, index: messages.length }
+    );
   }
 
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const toolCalls = messages[i].toolCalls ?? [];
-    for (let j = toolCalls.length - 1; j >= 0; j--) {
-      if (!isMainTodoCall(toolCalls[j])) continue;
-      const todos = todosFor(toolCalls[j], interactions);
-      if (todos.length > 0) {
-        return { todos, messageId: messages[i].id, fromLatestTurn: i > lastUserIndex };
+  let list: NormalizedTodoItem[] = [];
+  const tasks = new Map<string, NormalizedTodoItem>();
+  let latest: { at: Located; style: 'list' | 'tasks' } | null = null;
+
+  for (const at of [...located.values()].sort((a, b) => a.index - b.index)) {
+    const { toolCall } = at;
+    if (toolCall.isError) continue;
+    const tool = taskTool(toolCall.toolName);
+    if (tool === null) {
+      const todos = todosFor(toolCall, interactions);
+      if (todos.length === 0) continue;
+      list = todos;
+      latest = { at, style: 'list' };
+      continue;
+    }
+    const input = inputRecord(toolCall);
+    if (tool === 'TaskCreate') {
+      if (typeof input.subject !== 'string' || !input.subject) continue;
+      tasks.set(createdTaskId(toolCall), { content: input.subject, status: 'pending' });
+    } else {
+      const id = String(input.taskId ?? '');
+      const task = tasks.get(id);
+      if (!task) continue;
+      if (input.status === 'deleted') {
+        tasks.delete(id);
+      } else {
+        tasks.set(id, {
+          content:
+            typeof input.subject === 'string' && input.subject ? input.subject : task.content,
+          status: STATUSES.has(input.status as NormalizedTodoItem['status'])
+            ? (input.status as NormalizedTodoItem['status'])
+            : task.status,
+        });
       }
     }
+    latest = { at, style: 'tasks' };
+  }
+
+  if (latest) {
+    const todos = latest.style === 'list' ? list : [...tasks.values()];
+    if (todos.length === 0) return null;
+    let lastUserIndex = -1;
+    messages.forEach((message, index) => {
+      if (message.role === 'user') lastUserIndex = index;
+    });
+    return {
+      todos,
+      messageId: latest.at.messageId,
+      fromLatestTurn: latest.at.index > lastUserIndex,
+    };
   }
 
   // MCP-bridge updates can land before any tool call is visible.
