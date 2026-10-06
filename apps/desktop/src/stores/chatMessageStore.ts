@@ -136,6 +136,37 @@ function adoptOptimisticUserMessages(
   return adopted ?? existing;
 }
 
+/**
+ * Where a newly arrived message goes, without disturbing what's already
+ * listed. A server row follows the last row with a smaller offset — so it
+ * lands ahead of client-only placeholders for the run in flight — or else
+ * precedes the first larger one. That never consults createdAt, which mixes
+ * this client's clock (optimistic and placeholder messages) with the
+ * backend's, and a remote backend's can be skewed. Without offsets to compare,
+ * `fallback` decides.
+ */
+function insertionIndex(
+  list: MessageWithToolCalls[],
+  message: MessageWithToolCalls,
+  fallback: 'createdAt' | 'end'
+): number {
+  const offset = message.offset;
+  if (offset != null) {
+    let lastSmaller = -1;
+    let firstLarger = -1;
+    list.forEach((other, index) => {
+      if (other.offset == null) return;
+      if (other.offset < offset) lastSmaller = index;
+      else if (other.offset > offset && firstLarger === -1) firstLarger = index;
+    });
+    if (lastSmaller !== -1) return lastSmaller + 1;
+    if (firstLarger !== -1) return firstLarger;
+  }
+  if (fallback === 'end') return list.length;
+  const later = list.findIndex(other => other.createdAt > message.createdAt);
+  return later === -1 ? list.length : later;
+}
+
 export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
   messages: {},
   pagination: {},
@@ -161,7 +192,12 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
   prependMessages: (sessionId, newMessages, pagination) =>
     set(state => {
       const existingMessages = state.messages[sessionId] || [];
-      const hydratedNewMessages = hydrateMessagesForDisplay(newMessages);
+      // An older page can overlap what's loaded (rows shifted by a concurrent
+      // insert, or a jump that loaded around a message); keep one of each.
+      const seen = new Set(existingMessages.map(m => m.id));
+      const hydratedNewMessages = hydrateMessagesForDisplay(newMessages).filter(
+        m => !seen.has(m.id) && !!seen.add(m.id)
+      );
       // Prepend new messages (older) to the beginning
       const combined = [...hydratedNewMessages, ...existingMessages];
 
@@ -187,7 +223,9 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
       const existingMessages = adoptOptimisticUserMessages(currentMessages, hydratedNewMessages);
       // Deduplicate by message ID
       const existingIds = new Set(existingMessages.map(m => m.id));
-      const deduped = hydratedNewMessages.filter(m => !existingIds.has(m.id));
+      const deduped = hydratedNewMessages.filter(
+        m => !existingIds.has(m.id) && !!existingIds.add(m.id)
+      );
       const existingPagination = state.pagination[sessionId] || DEFAULT_PAGINATION;
       const nextMessageVersion =
         pagination?.messageVersion != null
@@ -201,7 +239,10 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
         return state;
       }
 
-      const combined = [...existingMessages, ...deduped];
+      const combined = [...existingMessages];
+      for (const message of deduped) {
+        combined.splice(insertionIndex(combined, message, 'end'), 0, message);
+      }
 
       return {
         messages: { ...state.messages, [sessionId]: combined },
@@ -233,22 +274,33 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
         currentMessages,
         hydratedIncomingMessages
       );
-      const byId = new Map(existingMessages.map(message => [message.id, message]));
+      const mergedMessages = [...existingMessages];
       let changed = existingMessages !== currentMessages;
 
-      for (const incoming of hydratedIncomingMessages) {
-        const existing = byId.get(incoming.id);
-        if (!existing) {
-          byId.set(incoming.id, incoming);
-          changed = true;
-          continue;
-        }
-
+      const mergeInto = (index: number, incoming: MessageWithToolCalls) => {
+        const existing = mergedMessages[index];
         const merged = withoutContentRegression(existing, { ...existing, ...incoming });
         if (JSON.stringify(existing) !== JSON.stringify(merged)) {
-          byId.set(incoming.id, merged);
+          mergedMessages[index] = merged;
           changed = true;
         }
+      };
+      const fresh: MessageWithToolCalls[] = [];
+      // Updates first: a placeholder picking up its offset here is what lets
+      // the new rows in the same batch find their place around it.
+      for (const incoming of hydratedIncomingMessages) {
+        const index = mergedMessages.findIndex(message => message.id === incoming.id);
+        if (index === -1) fresh.push(incoming);
+        else mergeInto(index, incoming);
+      }
+      for (const incoming of fresh) {
+        const index = mergedMessages.findIndex(message => message.id === incoming.id);
+        if (index !== -1) {
+          mergeInto(index, incoming);
+          continue;
+        }
+        mergedMessages.splice(insertionIndex(mergedMessages, incoming, 'createdAt'), 0, incoming);
+        changed = true;
       }
 
       const existingPagination = state.pagination[sessionId] || DEFAULT_PAGINATION;
@@ -269,8 +321,6 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
         : existingPagination;
 
       if (!changed && nextPagination === existingPagination) return state;
-
-      const mergedMessages = Array.from(byId.values()).sort((a, b) => a.createdAt - b.createdAt);
 
       return {
         messages: { ...state.messages, [sessionId]: mergedMessages },

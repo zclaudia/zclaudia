@@ -219,3 +219,90 @@ describe('optimistic user message vs. its persisted row', () => {
     expect(ids()).toEqual(['srv-1', 'srv-2', 'srv-3']);
   });
 });
+
+// Server rows carry a per-session offset; createdAt mixes the client's clock
+// (optimistic and placeholder messages) with the backend's, which can be skewed
+// on a remote host.
+describe('ordering without trusting createdAt across clocks', () => {
+  beforeEach(reset);
+
+  const row = (id: string, role: 'user' | 'assistant', offset: number, createdAt: number) =>
+    ({ id, sessionId: 's1', role, content: id, createdAt, offset }) as MessageWithToolCalls;
+
+  const ids = () => useChatMessageStore.getState().messages.s1.map(m => m.id);
+
+  it('places merged rows by offset even when the client clock lags', () => {
+    const store = useChatMessageStore.getState();
+    // Client ~1h behind the backend: its placeholder looks older than every row.
+    store.setMessages('s1', [
+      row('u1', 'user', 1, 3_600_000),
+      row('a1', 'assistant', 2, 3_600_100),
+    ]);
+    // A run started from another device: this client only gets the placeholder.
+    store.addMessage('s1', {
+      id: 'a2',
+      sessionId: 's1',
+      role: 'assistant',
+      content: '',
+      createdAt: 1_000,
+    } as MessageWithToolCalls);
+
+    // Its user row lands, then a gap fetch fills a missed row before it.
+    store.mergeMessages('s1', [row('u2', 'user', 4, 3_600_300)]);
+    store.mergeMessages('s1', [row('t3', 'assistant', 3, 3_600_200)]);
+
+    expect(ids()).toEqual(['u1', 'a1', 't3', 'u2', 'a2']);
+  });
+
+  it('appends a missed row ahead of the placeholder for the run in flight', () => {
+    const store = useChatMessageStore.getState();
+    store.setMessages('s1', [row('u1', 'user', 1, 1_000), row('a1', 'assistant', 2, 1_100)]);
+    store.addMessage('s1', {
+      id: 'a2',
+      sessionId: 's1',
+      role: 'assistant',
+      content: '',
+      createdAt: 1_300,
+    } as MessageWithToolCalls);
+    store.appendMessages('s1', [row('u2', 'user', 3, 1_200), row('u2', 'user', 3, 1_200)]);
+    expect(ids()).toEqual(['u1', 'a1', 'u2', 'a2']);
+  });
+
+  it('never moves messages that are already in the list', () => {
+    const store = useChatMessageStore.getState();
+    store.setMessages('s1', [row('u1', 'user', 1, 5_000), row('a1', 'assistant', 2, 1_000)]);
+    store.mergeMessages('s1', [{ ...row('a1', 'assistant', 2, 1_000), content: 'grown' }]);
+    expect(ids()).toEqual(['u1', 'a1']);
+  });
+
+  it('keeps a placeholder in place when its persisted row merges in', () => {
+    const store = useChatMessageStore.getState();
+    store.setMessages('s1', [row('u1', 'user', 1, 1_000)]);
+    store.addMessage('s1', {
+      id: 'a1',
+      sessionId: 's1',
+      role: 'assistant',
+      content: '',
+      createdAt: 9_999_999,
+    } as MessageWithToolCalls);
+    store.mergeMessages('s1', [row('u2', 'user', 3, 1_300), row('a1', 'assistant', 2, 1_100)]);
+    expect(ids()).toEqual(['u1', 'a1', 'u2']);
+    expect(useChatMessageStore.getState().messages.s1[1].offset).toBe(2);
+  });
+});
+
+describe('prependMessages', () => {
+  beforeEach(reset);
+
+  it('skips messages that are already loaded or repeated in the page', () => {
+    const store = useChatMessageStore.getState();
+    store.setMessages('s1', [msg('c', 'user', 3), msg('d', 'assistant', 4)]);
+    store.prependMessages('s1', [
+      msg('a', 'user', 1),
+      msg('b', 'assistant', 2),
+      msg('b', 'assistant', 2),
+      msg('c', 'user', 3),
+    ]);
+    expect(useChatMessageStore.getState().messages.s1.map(m => m.id)).toEqual(['a', 'b', 'c', 'd']);
+  });
+});
