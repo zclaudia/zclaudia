@@ -136,3 +136,86 @@ describe('chatMessageStore', () => {
     expect(useChatMessageStore.getState().pagination.s1.hasMore).toBe(false);
   });
 });
+
+// A slow runtime launch (Claude spawns a CLI) lets a session-sync fetch return
+// the persisted user row before run_started renames the optimistic copy.
+describe('optimistic user message vs. its persisted row', () => {
+  beforeEach(reset);
+
+  const optimistic = (clientId: string, content: string, createdAt = 10) =>
+    ({
+      id: clientId,
+      clientMessageId: clientId,
+      sessionId: 's1',
+      role: 'user',
+      content,
+      createdAt,
+    }) as MessageWithToolCalls;
+
+  const persisted = (id: string, content: string, offset: number, createdAt = 11) =>
+    ({ id, sessionId: 's1', role: 'user', content, createdAt, offset }) as MessageWithToolCalls;
+
+  const ids = () => useChatMessageStore.getState().messages.s1.map(m => m.id);
+
+  it('run_started does not rename into an id the sync already added', () => {
+    const store = useChatMessageStore.getState();
+    store.setMessages('s1', [msg('u0', 'user', 1), msg('a0', 'assistant', 2)]);
+    store.addMessage('s1', optimistic('client-1', 'Run it'));
+    // Not content-matched (e.g. attachment-only text differs), so both coexist.
+    store.mergeMessages('s1', [persisted('srv-1', '', 3)]);
+
+    useChatMessageStore.getState().updateMessageIdByClientMessageId('s1', 'client-1', 'srv-1');
+
+    expect(ids()).toEqual(['u0', 'a0', 'srv-1']);
+    const row = useChatMessageStore.getState().messages.s1[2];
+    expect(row.clientMessageId).toBe('client-1');
+  });
+
+  it('a merged server row adopts the matching unacked optimistic message', () => {
+    const store = useChatMessageStore.getState();
+    store.setMessages('s1', [msg('u0', 'user', 1), msg('a0', 'assistant', 2)]);
+    store.addMessage('s1', optimistic('client-1', 'Run it'));
+
+    store.mergeMessages('s1', [persisted('srv-1', 'Run it', 3)]);
+
+    expect(ids()).toEqual(['u0', 'a0', 'srv-1']);
+    const row = useChatMessageStore.getState().messages.s1[2];
+    expect(row).toMatchObject({ offset: 3, clientMessageId: 'client-1' });
+
+    // The late run_started is then a no-op rather than a duplicate.
+    useChatMessageStore.getState().updateMessageIdByClientMessageId('s1', 'client-1', 'srv-1');
+    expect(ids()).toEqual(['u0', 'a0', 'srv-1']);
+  });
+
+  it('an appended server row adopts the matching optimistic message too', () => {
+    const store = useChatMessageStore.getState();
+    store.setMessages('s1', [msg('u0', 'user', 1)]);
+    store.addMessage('s1', optimistic('client-1', 'Run it'));
+
+    store.appendMessages('s1', [persisted('srv-1', 'Run it', 2)]);
+
+    expect(ids()).toEqual(['u0', 'srv-1']);
+  });
+
+  it('pairs repeated identical prompts one-to-one, oldest first', () => {
+    const store = useChatMessageStore.getState();
+    store.addMessage('s1', optimistic('client-1', 'again', 10));
+    store.addMessage('s1', optimistic('client-2', 'again', 20));
+
+    store.mergeMessages('s1', [persisted('srv-1', 'again', 1, 11)]);
+
+    expect(ids()).toEqual(['srv-1', 'client-2']);
+    expect(useChatMessageStore.getState().messages.s1[0].clientMessageId).toBe('client-1');
+  });
+
+  it('leaves acknowledged messages and other roles alone', () => {
+    const store = useChatMessageStore.getState();
+    store.addMessage('s1', optimistic('client-1', 'Run it'));
+    store.updateMessageIdByClientMessageId('s1', 'client-1', 'srv-1');
+    store.mergeMessages('s1', [
+      { ...persisted('srv-2', 'Run it', 2, 12) },
+      { ...persisted('srv-3', 'Run it', 3, 13), role: 'assistant' } as MessageWithToolCalls,
+    ]);
+    expect(ids()).toEqual(['srv-1', 'srv-2', 'srv-3']);
+  });
+});

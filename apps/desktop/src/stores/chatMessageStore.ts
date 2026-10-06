@@ -99,6 +99,43 @@ function withoutContentRegression(
   return merged;
 }
 
+// A user message shown before the server acknowledged it: still keyed by the
+// client id it was sent with (run_started later renames it to the row id).
+function isUnackedOptimistic(message: MessageWithToolCalls): boolean {
+  return (
+    message.role === 'user' && !!message.clientMessageId && message.id === message.clientMessageId
+  );
+}
+
+/**
+ * A history sync can return the persisted user row before run_started has
+ * renamed the optimistic copy — slow runtime launches (Claude spawns a CLI)
+ * leave seconds for that. Swap each unacknowledged copy for its row, pairing
+ * by text oldest-first, so the message isn't shown twice and the later rename
+ * finds the row already in place. The row keeps the client id for that lookup.
+ */
+function adoptOptimisticUserMessages(
+  existing: MessageWithToolCalls[],
+  incoming: MessageWithToolCalls[]
+): MessageWithToolCalls[] {
+  const pending = existing.flatMap((message, index) =>
+    isUnackedOptimistic(message) ? [index] : []
+  );
+  if (pending.length === 0) return existing;
+  const knownIds = new Set(existing.map(message => message.id));
+  let adopted: MessageWithToolCalls[] | null = null;
+  for (const row of incoming) {
+    if (row.role !== 'user' || knownIds.has(row.id)) continue;
+    const slot = pending.findIndex(index => existing[index].content.trim() === row.content.trim());
+    if (slot === -1) continue;
+    const [index] = pending.splice(slot, 1);
+    adopted ??= [...existing];
+    adopted[index] = { ...row, clientMessageId: existing[index].clientMessageId };
+    knownIds.add(row.id);
+  }
+  return adopted ?? existing;
+}
+
 export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
   messages: {},
   pagination: {},
@@ -145,8 +182,9 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
 
   appendMessages: (sessionId, newMessages, pagination) =>
     set(state => {
-      const existingMessages = state.messages[sessionId] || [];
+      const currentMessages = state.messages[sessionId] || [];
       const hydratedNewMessages = hydrateMessagesForDisplay(newMessages);
+      const existingMessages = adoptOptimisticUserMessages(currentMessages, hydratedNewMessages);
       // Deduplicate by message ID
       const existingIds = new Set(existingMessages.map(m => m.id));
       const deduped = hydratedNewMessages.filter(m => !existingIds.has(m.id));
@@ -155,7 +193,11 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
         pagination?.messageVersion != null
           ? Math.max(pagination.messageVersion, existingPagination.messageVersion ?? 0)
           : existingPagination.messageVersion;
-      if (deduped.length === 0 && nextMessageVersion === existingPagination.messageVersion) {
+      if (
+        deduped.length === 0 &&
+        existingMessages === currentMessages &&
+        nextMessageVersion === existingPagination.messageVersion
+      ) {
         return state;
       }
 
@@ -185,10 +227,14 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
 
   mergeMessages: (sessionId, incomingMessages, pagination) =>
     set(state => {
-      const existingMessages = state.messages[sessionId] || [];
+      const currentMessages = state.messages[sessionId] || [];
       const hydratedIncomingMessages = hydrateMessagesForDisplay(incomingMessages);
+      const existingMessages = adoptOptimisticUserMessages(
+        currentMessages,
+        hydratedIncomingMessages
+      );
       const byId = new Map(existingMessages.map(message => [message.id, message]));
-      let changed = false;
+      let changed = existingMessages !== currentMessages;
 
       for (const incoming of hydratedIncomingMessages) {
         const existing = byId.get(incoming.id);
@@ -272,6 +318,19 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
       const sessionMessages = state.messages[sessionId] || [];
       const idx = sessionMessages.findIndex(m => m.clientMessageId === clientMessageId);
       if (idx === -1) return state;
+      if (sessionMessages[idx].id === newId) return state;
+      // A sync already brought the persisted row in (unpaired, e.g. its text
+      // differs from the optimistic copy): drop the copy rather than renaming it
+      // into a second message with the same id.
+      const rowIdx = sessionMessages.findIndex(m => m.id === newId);
+      if (rowIdx !== -1) {
+        const updated = sessionMessages.filter((_, i) => i !== idx);
+        updated[rowIdx > idx ? rowIdx - 1 : rowIdx] = {
+          ...sessionMessages[rowIdx],
+          clientMessageId,
+        };
+        return { messages: { ...state.messages, [sessionId]: updated } };
+      }
       const updated = [...sessionMessages];
       updated[idx] = { ...updated[idx], id: newId };
       return { messages: { ...state.messages, [sessionId]: updated } };
