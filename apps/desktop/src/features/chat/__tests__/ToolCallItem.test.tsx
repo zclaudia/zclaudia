@@ -1302,7 +1302,8 @@ describe('ToolCallItem', () => {
         />
       );
 
-      expect(screen.getByText('Task List')).toBeInTheDocument();
+      expect(screen.getByText('Task list updated')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Task list updated/ }));
       expect(screen.getByText('Use normalized todo list')).toBeInTheDocument();
     });
 
@@ -1327,7 +1328,8 @@ describe('ToolCallItem', () => {
         />
       );
 
-      expect(screen.getByText('Task List')).toBeInTheDocument();
+      expect(screen.getByText('Task list updated')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Task list updated/ }));
       expect(screen.getByText('Render MCP todo list')).toBeInTheDocument();
       expect(screen.queryByText('Stale raw todo')).not.toBeInTheDocument();
     });
@@ -1352,7 +1354,8 @@ describe('ToolCallItem', () => {
         />
       );
 
-      expect(screen.getByText('Task List')).toBeInTheDocument();
+      expect(screen.getByText('Task list updated')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Task list updated/ }));
       expect(screen.getByText('Render Cursor todo list')).toBeInTheDocument();
       expect(screen.queryByText('Stale raw todo')).not.toBeInTheDocument();
     });
@@ -1931,7 +1934,11 @@ describe('ToolCallList', () => {
 
   it('excludes inner steps from the streaming expanded set', () => {
     const toolCalls = [
-      makeTc('task-1', { toolName: 'Task', toolInput: { description: 'Survey' }, status: 'running' }),
+      makeTc('task-1', {
+        toolName: 'Task',
+        toolInput: { description: 'Survey' },
+        status: 'running',
+      }),
       makeTc('inner-1', { parentToolUseId: 'task-1', status: 'running' }),
     ];
     render(<ToolCallList toolCalls={toolCalls} isStreaming />);
@@ -1944,7 +1951,6 @@ describe('ToolCallList', () => {
     );
     expect(container.firstChild).toBeNull();
   });
-
 
   it('re-renders with different tool calls', () => {
     const toolCalls = [makeTc('tc-1')];

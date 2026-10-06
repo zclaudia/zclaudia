@@ -1,15 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import {
-  CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  GripVertical,
-  Loader2,
-  Minus,
-  Square,
-  XCircle,
-} from 'lucide-react';
-import type { NormalizedTodoItem } from '@zclaudia/shared/interaction/forms';
+import { CheckCircle2, ChevronDown, ChevronRight, GripVertical, Minus } from 'lucide-react';
 import { IconButton } from '../../../components/ui/Button';
 import { Tooltip } from '../../../components/ui/Tooltip';
 import { useInteractionStore } from '../../../stores/interactionStore';
@@ -18,14 +8,19 @@ import { useIsMobile } from '../../../hooks/useMediaQuery';
 import type { MessageWithToolCalls } from '../../../stores/chatMessageStore';
 import type { ToolCallState } from '../../../stores/runStore';
 import { UsageRing } from '../UsageRing';
-import { findLatestTodoSnapshot, summarizeTodos } from './todoSnapshot';
+import {
+  clampOffset,
+  findLatestTodoSnapshot,
+  summarizeTodos,
+  TODO_PANEL_EDGE as EDGE,
+  type Bounds,
+  type Offset,
+} from './todoSnapshot';
+import { TodoRow } from './TodoRow';
 
 const COLLAPSED_KEY = 'zclaudia:todo-panel:collapsed';
 const OFFSET_KEY = 'zclaudia:todo-panel:offset';
-const EDGE = 8;
 const DEFAULT_OFFSET = { top: EDGE, right: 12 };
-
-type Offset = { top: number; right: number };
 
 function readCollapsed(fallback: boolean): boolean {
   try {
@@ -52,42 +47,6 @@ function persist(key: string, value: string) {
   } catch {
     // Position and collapse state are conveniences; losing them is harmless.
   }
-}
-
-function TodoStatusIcon({ status }: { status: NormalizedTodoItem['status'] }) {
-  const common = { size: 14, strokeWidth: 1.75, className: 'flex-shrink-0 mt-[3px]' };
-  switch (status) {
-    case 'completed':
-      return <CheckCircle2 {...common} className={`${common.className} text-success`} />;
-    case 'in_progress':
-      return <Loader2 {...common} className={`${common.className} animate-spin text-primary`} />;
-    case 'cancelled':
-      return <XCircle {...common} className={`${common.className} text-muted-foreground/60`} />;
-    default:
-      return <Square {...common} className={`${common.className} text-muted-foreground`} />;
-  }
-}
-
-function TodoRow({ todo }: { todo: NormalizedTodoItem }) {
-  const text =
-    todo.status === 'completed'
-      ? 'text-muted-foreground line-through'
-      : todo.status === 'cancelled'
-        ? 'text-muted-foreground/60 line-through'
-        : todo.status === 'in_progress'
-          ? 'text-foreground font-medium'
-          : 'text-foreground';
-  return (
-    <li
-      data-status={todo.status}
-      className={`flex items-start gap-2 rounded-md px-2 py-1 text-xs leading-5 ${
-        todo.status === 'in_progress' ? 'bg-secondary' : ''
-      }`}
-    >
-      <TodoStatusIcon status={todo.status} />
-      <span className={`min-w-0 break-words ${text}`}>{todo.content}</span>
-    </li>
-  );
 }
 
 interface TodoFloatingPanelProps {
@@ -125,34 +84,57 @@ export function TodoFloatingPanel({
   useEffect(() => {
     offsetRef.current = offset;
   }, [offset]);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; start: Offset } | null>(null);
+
+  // `offset` is where the user put the panel; what's drawn is that, pulled
+  // back inside the pane. Re-measured whenever the panel grows (completed
+  // steps revealed, collapse/expand) or the pane shrinks, so the remembered
+  // spot survives a temporarily small window.
+  const [bounds, setBounds] = useState<Bounds | null>(null);
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const measure = useCallback(() => {
+    const panel = panelRef.current;
+    const parent = panel?.offsetParent as HTMLElement | null;
+    if (!panel || !parent) return;
+    const next = {
+      maxTop: parent.clientHeight - panel.offsetHeight - EDGE,
+      maxRight: parent.clientWidth - panel.offsetWidth - EDGE,
+    };
+    setBounds(prev =>
+      prev && prev.maxTop === next.maxTop && prev.maxRight === next.maxRight ? prev : next
+    );
+  }, []);
+  const setPanelRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+      panelRef.current = node;
+      if (!node || typeof ResizeObserver === 'undefined') return;
+      const observer = new ResizeObserver(measure);
+      observer.observe(node);
+      if (node.offsetParent) observer.observe(node.offsetParent);
+      observerRef.current = observer;
+      measure();
+    },
+    [measure]
+  );
+  const displayed = clampOffset(offset, bounds);
 
   const setCollapsedPersisted = useCallback((next: boolean) => {
     setCollapsed(next);
     persist(COLLAPSED_KEY, next ? '1' : '0');
   }, []);
 
-  const clampOffset = useCallback((next: Offset): Offset => {
-    const panel = panelRef.current;
-    const parent = panel?.offsetParent as HTMLElement | null;
-    if (!panel || !parent) return next;
-    const maxTop = Math.max(EDGE, parent.clientHeight - panel.offsetHeight - EDGE);
-    const maxRight = Math.max(EDGE, parent.clientWidth - panel.offsetWidth - EDGE);
-    return {
-      top: Math.min(Math.max(EDGE, next.top), maxTop),
-      right: Math.min(Math.max(EDGE, next.right), maxRight),
-    };
-  }, []);
-
   const onDragStart = useCallback(
     (e: PointerEvent<HTMLElement>) => {
       if (isMobile || e.button !== 0) return;
       if ((e.target as HTMLElement).closest('button')) return;
-      dragRef.current = { x: e.clientX, y: e.clientY, start: offset };
+      // Start from where it's drawn, so a clamped panel doesn't jump on grab.
+      dragRef.current = { x: e.clientX, y: e.clientY, start: displayed };
       e.currentTarget.setPointerCapture(e.pointerId);
     },
-    [isMobile, offset]
+    [isMobile, displayed]
   );
 
   const onDragMove = useCallback(
@@ -160,13 +142,16 @@ export function TodoFloatingPanel({
       const drag = dragRef.current;
       if (!drag) return;
       setOffset(
-        clampOffset({
-          top: drag.start.top + (e.clientY - drag.y),
-          right: drag.start.right - (e.clientX - drag.x),
-        })
+        clampOffset(
+          {
+            top: drag.start.top + (e.clientY - drag.y),
+            right: drag.start.right - (e.clientX - drag.x),
+          },
+          bounds
+        )
       );
     },
-    [clampOffset]
+    [bounds]
   );
 
   const onDragEnd = useCallback((e: PointerEvent<HTMLElement>) => {
@@ -181,7 +166,7 @@ export function TodoFloatingPanel({
   if (!snapshot) return null;
   if (!isRunning && (summary.allDone || !snapshot.fromLatestTurn)) return null;
 
-  const position = isMobile ? { top: EDGE, right: EDGE } : offset;
+  const position = isMobile ? { top: EDGE, right: EDGE } : displayed;
   const dragHandlers = {
     onPointerDown: onDragStart,
     onPointerMove: onDragMove,
@@ -195,7 +180,7 @@ export function TodoFloatingPanel({
       : (summary.current?.content ?? 'Tasks');
     return (
       <div
-        ref={panelRef}
+        ref={setPanelRef}
         className="absolute z-10"
         style={position}
         data-testid="todo-floating-panel"
@@ -236,7 +221,7 @@ export function TodoFloatingPanel({
 
   return (
     <div
-      ref={panelRef}
+      ref={setPanelRef}
       className="absolute z-10 flex w-[min(18rem,calc(100%-1rem))] flex-col rounded-xl border border-border bg-popover shadow-lg"
       style={position}
       data-testid="todo-floating-panel"

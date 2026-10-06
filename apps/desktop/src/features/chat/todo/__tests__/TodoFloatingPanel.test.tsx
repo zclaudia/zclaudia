@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import type { MessageWithToolCalls } from '../../../../stores/chatMessageStore';
 import type { ToolCallState } from '../../../../stores/runStore';
 import { TodoFloatingPanel } from '../TodoFloatingPanel';
+import { clampOffset } from '../todoSnapshot';
 
 const requestMessageJump = vi.fn();
 let isMobile = false;
@@ -140,5 +141,91 @@ describe('TodoFloatingPanel', () => {
   it('omits the jump link while the update only exists in the live run', () => {
     renderPanel();
     expect(screen.queryByRole('button', { name: 'Show in chat' })).toBeNull();
+  });
+
+  describe('keeping the panel inside the chat pane', () => {
+    const PANE = { clientWidth: 400, clientHeight: 300 };
+    let panelHeight = 200;
+    let observed: ResizeObserverCallback[] = [];
+    const restore: Array<() => void> = [];
+
+    function stub<K extends keyof HTMLElement>(key: K, get: (el: HTMLElement) => unknown) {
+      const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, key);
+      Object.defineProperty(HTMLElement.prototype, key, {
+        configurable: true,
+        get(this: HTMLElement) {
+          return get(this);
+        },
+      });
+      restore.push(() => {
+        if (original) Object.defineProperty(HTMLElement.prototype, key, original);
+      });
+    }
+
+    beforeEach(() => {
+      panelHeight = 200;
+      observed = [];
+      const pane = document.createElement('div');
+      Object.defineProperties(pane, {
+        clientWidth: { get: () => PANE.clientWidth },
+        clientHeight: { get: () => PANE.clientHeight },
+      });
+      stub('offsetParent', el => (el.dataset.testid === 'todo-floating-panel' ? pane : null));
+      stub('offsetHeight', el => (el.dataset.testid === 'todo-floating-panel' ? panelHeight : 0));
+      stub('offsetWidth', el => (el.dataset.testid === 'todo-floating-panel' ? 288 : 0));
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(cb: ResizeObserverCallback) {
+            observed.push(cb);
+          }
+          observe() {}
+          disconnect() {}
+          unobserve() {}
+        }
+      );
+      return () => {
+        restore.splice(0).forEach(fn => fn());
+        vi.unstubAllGlobals();
+      };
+    });
+
+    it('pulls a saved low position back up so the panel fits', () => {
+      localStorage.setItem('zclaudia:todo-panel:offset', JSON.stringify({ top: 265, right: 12 }));
+      renderPanel();
+      // 300 pane - 200 panel - 8 edge
+      expect(screen.getByTestId('todo-floating-panel').style.top).toBe('92px');
+    });
+
+    it('re-clamps when the panel grows, without forgetting the saved spot', () => {
+      localStorage.setItem('zclaudia:todo-panel:offset', JSON.stringify({ top: 60, right: 12 }));
+      renderPanel();
+      const panel = screen.getByTestId('todo-floating-panel');
+      expect(panel.style.top).toBe('60px');
+
+      panelHeight = 260;
+      act(() => observed.forEach(cb => cb([], {} as ResizeObserver)));
+      expect(panel.style.top).toBe('32px');
+
+      panelHeight = 200;
+      act(() => observed.forEach(cb => cb([], {} as ResizeObserver)));
+      expect(panel.style.top).toBe('60px');
+      expect(localStorage.getItem('zclaudia:todo-panel:offset')).toBe(
+        JSON.stringify({ top: 60, right: 12 })
+      );
+    });
+  });
+});
+
+describe('clampOffset', () => {
+  it('passes the offset through before anything is measured', () => {
+    expect(clampOffset({ top: 500, right: 500 }, null)).toEqual({ top: 500, right: 500 });
+  });
+
+  it('keeps at least the edge margin even when the pane is too small', () => {
+    expect(clampOffset({ top: 100, right: 100 }, { maxTop: -40, maxRight: 2 })).toEqual({
+      top: 8,
+      right: 8,
+    });
   });
 });

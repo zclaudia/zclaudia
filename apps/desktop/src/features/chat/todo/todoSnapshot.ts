@@ -112,3 +112,19 @@ export function summarizeTodos(todos: NormalizedTodoItem[]): TodoSummary {
     todos.find(t => t.status === 'in_progress') ?? todos.find(t => t.status === 'pending') ?? null;
   return { done, total: todos.length, allDone: todos.length > 0 && done === todos.length, current };
 }
+
+/** Gap the floating panel keeps from the chat pane's edges. */
+export const TODO_PANEL_EDGE = 8;
+const EDGE = TODO_PANEL_EDGE;
+
+export type Offset = { top: number; right: number };
+/** Largest offsets that keep the whole panel inside the chat pane. */
+export type Bounds = { maxTop: number; maxRight: number };
+
+export function clampOffset(offset: Offset, bounds: Bounds | null): Offset {
+  if (!bounds) return offset;
+  return {
+    top: Math.min(Math.max(EDGE, offset.top), Math.max(EDGE, bounds.maxTop)),
+    right: Math.min(Math.max(EDGE, offset.right), Math.max(EDGE, bounds.maxRight)),
+  };
+}

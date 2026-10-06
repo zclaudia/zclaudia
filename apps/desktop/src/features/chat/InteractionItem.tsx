@@ -4,7 +4,6 @@ import {
   Loader2,
   Square,
   XCircle,
-  ListTodo,
   FileQuestion,
   Send,
   Check,
@@ -35,6 +34,7 @@ import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { SavePlanAsIssueDialog } from './SavePlanAsIssueDialog';
 import { useChatActionsOptional } from './ChatActionsContext';
+import { TodoUpdateSummary } from './todo/TodoUpdateSummary';
 import { Button } from '../../components/ui/Button';
 import { Toggle } from '../../components/ui/Toggle';
 
@@ -777,38 +777,7 @@ function InteractionItemInner({ interaction }: InteractionItemProps) {
   }
 
   if (interaction.type === 'interaction_todo_update') {
-    return (
-      <div className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-muted/30 border border-border/50">
-        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-          <ListTodo size={12} />
-          <span>Task List</span>
-        </div>
-        <div className="space-y-1">
-          {interaction.todos.map((todo, idx) => (
-            <div key={idx} className="flex items-center gap-2 text-xs">
-              <span className="flex-shrink-0">
-                {todo.status === 'completed' ? (
-                  <CheckCircle2 size={12} className="text-success" />
-                ) : todo.status === 'in_progress' ? (
-                  <Loader2 size={12} className="animate-spin text-primary" />
-                ) : (
-                  <Square size={12} className="text-muted-foreground" />
-                )}
-              </span>
-              <span
-                className={
-                  todo.status === 'completed'
-                    ? 'text-muted-foreground line-through'
-                    : 'text-foreground'
-                }
-              >
-                {todo.content}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <TodoUpdateSummary todos={interaction.todos} />;
   }
 
   if (interaction.type === 'interaction_prompt') {
