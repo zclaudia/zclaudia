@@ -1,3 +1,4 @@
+import type { CacheTokenSums } from '@zclaudia/shared/core/cache-stats';
 import type {
   UsageSourceCheckpoint,
   UsageTokenBreakdown,
@@ -63,6 +64,11 @@ export interface ModelAllocationRecord {
   output: number | null;
   /** Known input side (uncached + cache) for the model; null when not derivable. */
   input: number | null;
+  /**
+   * The model's input-side split when the source reported all three buckets;
+   * null/absent when unknown (always absent on rows written before cache stats).
+   */
+  cache?: CacheTokenSums | null;
 }
 
 export interface StoredUsageRecord {

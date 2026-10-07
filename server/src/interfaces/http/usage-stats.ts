@@ -314,5 +314,18 @@ export function createUsageStatsRoutes(db: Database, opts: { ttlMs?: number } = 
     }
   });
 
+  // GET /api/stats/sessions/:sessionId/cache — one session's prompt-cache sums
+  // (all runtimes; survives restarts, unlike the in-memory context snapshot).
+  router.get('/sessions/:sessionId/cache', (req: Request, res: Response) => {
+    try {
+      res.json({ success: true, data: usageLedger.sessionCacheStats(req.params.sessionId) });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: { code: 'STATS_ERROR', message: (error as Error).message },
+      });
+    }
+  });
+
   return router;
 }

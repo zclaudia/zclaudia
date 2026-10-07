@@ -94,6 +94,30 @@ describe('usage ledger', () => {
     expect(record.tokens.total).toBe(180);
   });
 
+  it('persists the per-model cache split inside the model breakdown', () => {
+    startRun(db, recorder);
+    const tokens = {
+      inputUncached: 100,
+      cacheRead: 50,
+      cacheWrite: 10,
+      output: 20,
+      reasoningOutput: null,
+      total: 180,
+    };
+    expect(
+      recorder.applySnapshotEvent('inv-1', snapshot({ models: [{ modelId: 'm-a', tokens }] }))
+    ).toBe(true);
+    expect(repo.getById('inv-1')!.modelBreakdown).toEqual([
+      {
+        modelId: 'm-a',
+        total: 180,
+        output: 20,
+        input: 160,
+        cache: { inputUncached: 100, cacheRead: 50, cacheWrite: 10 },
+      },
+    ]);
+  });
+
   it('rejects negative counters instead of silently normalizing complete usage', () => {
     startRun(db, recorder);
     const invalid = snapshot({ status: 'complete', final: true });
@@ -416,19 +440,24 @@ describe('usage query service', () => {
         total: number;
         output: number | null;
         input: number | null;
+        cache?: { inputUncached: number; cacheRead: number; cacheWrite: number } | null;
       }>;
+      cache?: { inputUncached: number | null; cacheRead: number | null; cacheWrite: number | null };
+      discrepancy?: string;
+      sessionId?: string;
     }
   ): void {
-    const sessionId = `sess-${invocationId}`;
+    const sessionId = overrides.sessionId ?? `sess-${invocationId}`;
     db.prepare(
-      "INSERT INTO sessions (id, project_id, created_at, updated_at) VALUES (?, 'p', 1, 1)"
+      "INSERT OR IGNORE INTO sessions (id, project_id, created_at, updated_at) VALUES (?, 'p', 1, 1)"
     ).run(sessionId);
     db.prepare(
       `INSERT INTO runtime_usage_records (
          invocation_id, run_id, session_id, runtime_id, execution_state,
          started_at, ended_at, accounted_at, updated_at,
-         usage_status, revision, total_tokens, model_breakdown_json
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         usage_status, revision, total_tokens, model_breakdown_json,
+         input_uncached, cache_read, cache_write, discrepancy
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       invocationId,
       `run-${invocationId}`,
@@ -442,9 +471,156 @@ describe('usage query service', () => {
       overrides.status ?? 'complete',
       1,
       overrides.total ?? null,
-      overrides.models ? JSON.stringify(overrides.models) : null
+      overrides.models ? JSON.stringify(overrides.models) : null,
+      overrides.cache?.inputUncached ?? null,
+      overrides.cache?.cacheRead ?? null,
+      overrides.cache?.cacheWrite ?? null,
+      overrides.discrepancy ?? null
     );
   }
+
+  describe('prompt cache sums', () => {
+    const asOf = Date.UTC(2026, 9, 7, 12);
+    const warm = { inputUncached: 10, cacheRead: 80, cacheWrite: 10 };
+
+    it('count only finalized invocations that reported all three buckets, in every view', () => {
+      seedRecord('pi-1', {
+        runtimeId: 'pi',
+        total: 200,
+        accountedAt: asOf,
+        cache: warm,
+        models: [{ modelId: 'm-a', total: 120, output: 20, input: 100, cache: warm }],
+      });
+      // Unknown cacheWrite → excluded, not zero-filled.
+      seedRecord('codex-1', {
+        runtimeId: 'codex',
+        status: 'partial',
+        total: 50,
+        accountedAt: asOf,
+        cache: { inputUncached: 30, cacheRead: 10, cacheWrite: null },
+      });
+      seedRecord('legacy-1', {
+        runtimeId: 'legacy',
+        status: 'legacy',
+        total: 400,
+        accountedAt: asOf,
+      });
+      seedRecord('live', {
+        runtimeId: 'pi',
+        state: 'running',
+        status: 'partial',
+        total: 3,
+        accountedAt: asOf,
+        cache: { inputUncached: 1, cacheRead: 1, cacheWrite: 1 },
+      });
+
+      const payload = query.runtimeUsagePayload('all', 'UTC', asOf);
+      expect(payload.totals.cache).toEqual(warm);
+      expect(payload.runtimes.find(r => r.runtimeId === 'pi')!.cache).toEqual(warm);
+      expect(payload.runtimes.find(r => r.runtimeId === 'codex')!.cache).toEqual({
+        inputUncached: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+      });
+      expect(payload.series).toHaveLength(1);
+      expect(payload.series[0].cache).toEqual(warm);
+      expect(query.accountingSummary('all', 'UTC', asOf).cache).toEqual(warm);
+
+      const models = query.modelUsagePayload('all', 'UTC', asOf).models;
+      expect(models.find(m => m.model === 'm-a')!.cache).toEqual(warm);
+    });
+
+    it('a model deficit gets the row cache minus the allocated cache', () => {
+      seedRecord('r1', {
+        runtimeId: 'pi',
+        total: 200,
+        accountedAt: asOf,
+        cache: { inputUncached: 30, cacheRead: 100, cacheWrite: 20 },
+        models: [{ modelId: 'm-a', total: 120, output: 20, input: 100, cache: warm }],
+      });
+      const unknown = query
+        .modelUsagePayload('all', 'UTC', asOf)
+        .models.find(m => m.model === 'Unknown')!;
+      expect(unknown.cache).toEqual({ inputUncached: 20, cacheRead: 20, cacheWrite: 10 });
+    });
+
+    it('a collapsed breakdown carries the row-level cache into Unknown', () => {
+      seedRecord('r1', {
+        runtimeId: 'pi',
+        total: 100,
+        accountedAt: asOf,
+        cache: warm,
+        discrepancy: 'model_sum_exceeds_total',
+        models: [{ modelId: 'm-a', total: 100, output: 0, input: 100, cache: warm }],
+      });
+      const models = query.modelUsagePayload('all', 'UTC', asOf).models;
+      expect(models.find(m => m.model === 'm-a')).toBeUndefined();
+      expect(models.find(m => m.model === 'Unknown')!.cache).toEqual(warm);
+    });
+
+    it('per-session stats sum finalized runs and expose the latest run', () => {
+      const s = 'sess-a';
+      seedRecord('r1', {
+        sessionId: s,
+        runtimeId: 'pi',
+        total: 1,
+        accountedAt: asOf - 2000,
+        cache: { inputUncached: 100, cacheRead: 0, cacheWrite: 50 },
+      });
+      seedRecord('r2', {
+        sessionId: s,
+        runtimeId: 'pi',
+        total: 1,
+        accountedAt: asOf - 1000,
+        cache: warm,
+      });
+      seedRecord('live', {
+        sessionId: s,
+        runtimeId: 'pi',
+        state: 'running',
+        status: 'partial',
+        total: 1,
+        accountedAt: asOf,
+        cache: { inputUncached: 1, cacheRead: 1, cacheWrite: 1 },
+      });
+      seedRecord('unknown', {
+        sessionId: s,
+        runtimeId: 'pi',
+        total: 1,
+        accountedAt: asOf,
+        cache: { inputUncached: 1, cacheRead: 1, cacheWrite: null },
+      });
+      seedRecord('other', { runtimeId: 'pi', total: 1, accountedAt: asOf, cache: warm });
+
+      expect(query.sessionCacheStats(s)).toEqual({
+        session: { inputUncached: 110, cacheRead: 80, cacheWrite: 60 },
+        latestRun: warm,
+        runs: 2,
+      });
+      expect(query.sessionCacheStats('nope')).toEqual({
+        session: { inputUncached: 0, cacheRead: 0, cacheWrite: 0 },
+        latestRun: null,
+        runs: 0,
+      });
+    });
+
+    it('breakdowns stored before cache split stay unknown per model', () => {
+      seedRecord('old', {
+        runtimeId: 'pi',
+        total: 100,
+        accountedAt: asOf,
+        cache: warm,
+        models: [{ modelId: 'm-a', total: 60, output: 10, input: 50 }],
+      });
+      const models = query.modelUsagePayload('all', 'UTC', asOf).models;
+      const empty = { inputUncached: 0, cacheRead: 0, cacheWrite: 0 };
+      expect(models.find(m => m.model === 'm-a')!.cache).toEqual(empty);
+      // Remainder can't be derived when an allocation's split is unknown.
+      expect(models.find(m => m.model === 'Unknown')!.cache).toEqual(empty);
+      // Row-level views still count the invocation.
+      expect(query.runtimeUsagePayload('all', 'UTC', asOf).totals.cache).toEqual(warm);
+    });
+  });
 
   it('excludes unstarted dispatches and live tokens from every historical view', () => {
     seedRecord('done', { total: 100 });

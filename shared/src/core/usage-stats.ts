@@ -1,5 +1,7 @@
 // Usage statistics for the Home page stats strip.
 
+import type { CacheTokenSums } from './cache-stats.js';
+
 export interface UsageActiveDay {
   /** Local date, 'YYYY-MM-DD' (server timezone). */
   date: string;
@@ -61,6 +63,8 @@ export interface AccountingSummary {
   legacyRecords: number;
   /** Epoch ms the ledger started recording new invocations; null before activation. */
   accountingSince: number | null;
+  /** Prompt-cache input-side sums (complete-bucket invocations only); absent on older backends. */
+  cache?: CacheTokenSums;
 }
 
 export interface ModelUsageDay {
@@ -78,6 +82,8 @@ export interface ModelUsageTotal {
   totalTokens: number;
   /** Fraction of the window's grand total, in [0, 1]. */
   share: number;
+  /** Prompt-cache input-side sums (complete-bucket invocations only); absent on older backends. */
+  cache?: CacheTokenSums;
 }
 
 export interface ModelUsagePayload {
@@ -89,6 +95,16 @@ export interface ModelUsagePayload {
   /** MIN(created_at) of model-tagged assistant messages (all-time); null when none. */
   trackedSince: number | null;
   capturedAt: number;
+}
+
+/** Payload of GET /api/stats/sessions/:sessionId/cache. */
+export interface SessionCacheStats {
+  /** Finalized invocations of the session that reported all three buckets. */
+  session: CacheTokenSums;
+  /** The most recent such invocation (one run); null when none. */
+  latestRun: CacheTokenSums | null;
+  /** Invocations counted in `session`. */
+  runs: number;
 }
 
 // === Runtime usage ledger payload (GET /api/stats/runtime-usage) ===
@@ -117,6 +133,8 @@ export interface RuntimeUsageRuntimeRow {
   coverageRate: number | null;
   /** Per actual model (Unknown bucket = null modelId), known totals only. */
   models: Array<{ modelId: string | null; tokens: number }>;
+  /** Prompt-cache input-side sums (complete-bucket invocations only); absent on older backends. */
+  cache?: CacheTokenSums;
 }
 
 export interface RuntimeUsageSeriesPoint {
@@ -124,6 +142,8 @@ export interface RuntimeUsageSeriesPoint {
   date: string;
   /** runtimeId → recorded tokens for that day (known values only). */
   runtimes: Record<string, number>;
+  /** All runtimes' cache sums for the day; absent on older backends. */
+  cache?: CacheTokenSums;
 }
 
 /** Payload of GET /api/stats/runtime-usage. */
@@ -146,6 +166,8 @@ export interface RuntimeUsagePayload {
     legacyTokens: number | null;
     /** Known totals of invocations still running (reported separately). */
     activeRecordedTokens: number | null;
+    /** Finalized invocations' cache sums; absent on older backends. */
+    cache?: CacheTokenSums;
   };
   coverage: {
     complete: number;

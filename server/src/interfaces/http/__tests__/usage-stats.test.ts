@@ -359,6 +359,28 @@ describe('GET /usage', () => {
     expect(res.body.data.sessions).toBe(1);
   });
 
+  it('serves per-session cache stats from the ledger', async () => {
+    db.exec(usageLedgerMigration.sql);
+    seedSession('s1');
+    db.prepare(
+      `INSERT INTO runtime_usage_records (
+         invocation_id, run_id, session_id, runtime_id, execution_state,
+         accounted_at, updated_at, usage_status, total_tokens,
+         input_uncached, cache_read, cache_write
+       ) VALUES ('i1', 'r1', 's1', 'pi', 'completed', 1, 1, 'complete', 120, 10, 80, 10)`
+    ).run();
+    const res = await request(makeApp()).get('/api/stats/sessions/s1/cache');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      success: true,
+      data: {
+        session: { inputUncached: 10, cacheRead: 80, cacheWrite: 10 },
+        latestRun: { inputUncached: 10, cacheRead: 80, cacheWrite: 10 },
+        runs: 1,
+      },
+    });
+  });
+
   it('serves model stats with a per-range cache', async () => {
     seedMessage('assistant', noonDaysAgo(1), 500, { model: 'claude-fable-5', output: 100 });
     const app = makeApp(60_000);

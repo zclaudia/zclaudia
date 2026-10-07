@@ -44,6 +44,7 @@ export * from './core/record-status-resolvers.js';
 export * from './core/pcp.js';
 export * from './core/provider-policy.js';
 export * from './core/usage-stats.js';
+export * from './core/cache-stats.js';
 export type {
   BuiltinTaskType,
   TaskType,

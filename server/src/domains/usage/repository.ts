@@ -4,6 +4,7 @@ import type {
   RuntimeUsageSnapshot,
   UsageTokenBreakdown,
 } from '@zclaudia/shared/core/runtime-usage';
+import { cacheSumsFromBreakdown, type CacheTokenSums } from '@zclaudia/shared/core/cache-stats';
 import type {
   InvocationSettlement,
   ModelAllocationRecord,
@@ -399,6 +400,41 @@ export class RuntimeUsageRepository {
     return rows.map(mapStatsRow);
   }
 
+  /**
+   * One session's cache sums over finalized rows with all three buckets
+   * known, plus the most recent such row (served by idx_runtime_usage_session).
+   */
+  selectSessionCache(sessionId: string): {
+    session: CacheTokenSums;
+    latestRun: CacheTokenSums | null;
+    runs: number;
+  } {
+    const where = `session_id = ?
+         AND input_uncached IS NOT NULL AND cache_read IS NOT NULL AND cache_write IS NOT NULL
+         AND execution_state NOT IN ('dispatching', 'running', 'not_started')`;
+    const sum = this.db
+      .prepare(
+        `SELECT COUNT(*) AS runs, SUM(input_uncached) AS u, SUM(cache_read) AS r,
+                SUM(cache_write) AS w
+         FROM runtime_usage_records WHERE ${where}`
+      )
+      .get(sessionId) as { runs: number; u: number | null; r: number | null; w: number | null };
+    const latest = this.db
+      .prepare(
+        `SELECT input_uncached AS u, cache_read AS r, cache_write AS w
+         FROM runtime_usage_records WHERE ${where}
+         ORDER BY accounted_at DESC, rowid DESC LIMIT 1`
+      )
+      .get(sessionId) as { u: number; r: number; w: number } | undefined;
+    return {
+      session: { inputUncached: sum.u ?? 0, cacheRead: sum.r ?? 0, cacheWrite: sum.w ?? 0 },
+      latestRun: latest
+        ? { inputUncached: latest.u, cacheRead: latest.r, cacheWrite: latest.w }
+        : null,
+      runs: sum.runs,
+    };
+  }
+
   /** Sum of known totals over FINALIZED rows (the default history total). */
   sumFinalizedTotalTokens(startUtcMs: number, endUtcMs: number): number | null {
     const row = this.db
@@ -463,6 +499,7 @@ function summarizeModelAllocation(allocation: {
     total: allocation.tokens.total ?? 0,
     output: allocation.tokens.output,
     input,
+    cache: cacheSumsFromBreakdown(allocation.tokens),
   };
 }
 

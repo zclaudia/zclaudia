@@ -6,9 +6,16 @@ import type {
   RuntimeUsagePayload,
   RuntimeUsageRuntimeRow,
   RuntimeUsageSeriesPoint,
+  SessionCacheStats,
   UsageStatsPayload,
   UsageStatsRange,
 } from '@zclaudia/shared/core/usage-stats';
+import {
+  addCacheSums,
+  cacheSumsFromBreakdown,
+  emptyCacheSums,
+  type CacheTokenSums,
+} from '@zclaudia/shared/core/cache-stats';
 import type { UsageStatsRecord } from './types.js';
 import { IN_FLIGHT_EXECUTION_STATES, LEGACY_RUNTIME_ID } from './types.js';
 import { RuntimeUsageRepository } from './repository.js';
@@ -47,6 +54,12 @@ export class UsageQueryService {
 
   accountingSince(): number | null {
     return this.repository.getAccountingSince();
+  }
+
+  /** GET /api/stats/sessions/:sessionId/cache payload. */
+  sessionCacheStats(sessionId: string): SessionCacheStats {
+    if (!this.available) return { session: emptyCacheSums(), latestRun: null, runs: 0 };
+    return this.repository.selectSessionCache(sessionId);
   }
 
   /** GET /api/stats/runtime-usage payload. */
@@ -116,6 +129,7 @@ export class UsageQueryService {
         finalized.filter(r => r.usageStatus === 'legacy').map(r => r.tokens.total)
       ),
       activeRecordedTokens: sumKnown(inFlight.map(row => row.tokens.total)),
+      cache: sumRowCache(finalized),
     };
 
     const eligible = finalized.filter(row => row.usageStatus !== 'legacy');
@@ -192,6 +206,7 @@ export class UsageQueryService {
       inFlightCalls: inFlight.length,
       legacyRecords: finalized.length - eligible.length,
       accountingSince: this.repository.getAccountingSince(),
+      cache: sumRowCache(finalized),
     };
   }
 
@@ -267,7 +282,7 @@ export class UsageQueryService {
     ).filter(row => isFinalized(row.executionState));
 
     const dayMap = new Map<string, Map<string, number>>();
-    const totals = new Map<string, { total: number; output: number }>();
+    const totals = new Map<string, { total: number; output: number; cache: CacheTokenSums }>();
     for (const row of rows) {
       const date = row.accountedAt !== null ? zonedDateKey(window.timeZone, row.accountedAt) : null;
       const allocations = effectiveAllocations(row);
@@ -281,9 +296,10 @@ export class UsageQueryService {
           day.set(modelKey, (day.get(modelKey) ?? 0) + allocation.total);
           dayMap.set(date, day);
         }
-        const t = totals.get(modelKey) ?? { total: 0, output: 0 };
+        const t = totals.get(modelKey) ?? { total: 0, output: 0, cache: emptyCacheSums() };
         t.total += allocation.total;
         t.output += allocation.output ?? 0;
+        if (allocation.cache) t.cache = addCacheSums(t.cache, allocation.cache);
         totals.set(modelKey, t);
       }
     }
@@ -302,6 +318,7 @@ export class UsageQueryService {
         outTokens: t.output,
         totalTokens: t.total,
         share: grandTotal > 0 ? t.total / grandTotal : 0,
+        cache: t.cache,
       }))
       .sort((a, b) => b.totalTokens - a.totalTokens);
 
@@ -345,6 +362,7 @@ export function effectiveAllocations(row: UsageStatsRecord): Array<{
   total: number;
   output: number | null;
   input: number | null;
+  cache: CacheTokenSums | null;
 }> {
   const breakdown = row.modelBreakdown ?? [];
   const allocated = breakdown.reduce((sum, entry) => sum + entry.total, 0);
@@ -353,13 +371,57 @@ export function effectiveAllocations(row: UsageStatsRecord): Array<{
     return [];
   }
   if (allocated > total || row.discrepancy) {
-    return [{ modelId: null, total, output: row.tokens.output, input: inputSide(row) }];
+    return [
+      {
+        modelId: null,
+        total,
+        output: row.tokens.output,
+        input: inputSide(row),
+        cache: cacheSumsFromBreakdown(row.tokens),
+      },
+    ];
   }
-  const result = breakdown.map(entry => ({ ...entry }));
+  const result = breakdown.map(entry => ({ ...entry, cache: entry.cache ?? null }));
   if (allocated < total) {
-    result.push({ modelId: null, total: total - allocated, output: null, input: null });
+    result.push({
+      modelId: null,
+      total: total - allocated,
+      output: null,
+      input: null,
+      cache: remainderCache(row),
+    });
   }
   return result;
+}
+
+/**
+ * Cache split of the Unknown-model deficit: row sums minus the allocated
+ * sums, derivable only when every allocation carries its own split.
+ */
+function remainderCache(row: UsageStatsRecord): CacheTokenSums | null {
+  const rowCache = cacheSumsFromBreakdown(row.tokens);
+  if (!rowCache) return null;
+  let allocated = emptyCacheSums();
+  for (const entry of row.modelBreakdown ?? []) {
+    if (!entry.cache) return null;
+    allocated = addCacheSums(allocated, entry.cache);
+  }
+  const rest = {
+    inputUncached: rowCache.inputUncached - allocated.inputUncached,
+    cacheRead: rowCache.cacheRead - allocated.cacheRead,
+    cacheWrite: rowCache.cacheWrite - allocated.cacheWrite,
+  };
+  return rest.inputUncached < 0 || rest.cacheRead < 0 || rest.cacheWrite < 0 ? null : rest;
+}
+
+/** Input-side cache sums over rows that reported all three buckets. */
+function sumRowCache(rows: UsageStatsRecord[]): CacheTokenSums {
+  let acc = emptyCacheSums();
+  for (const row of rows) {
+    const cache = cacheSumsFromBreakdown(row.tokens);
+    if (cache) acc = addCacheSums(acc, cache);
+  }
+  return acc;
 }
 
 function inputSide(row: UsageStatsRecord): number | null {
@@ -394,6 +456,7 @@ function buildRuntimeRows(
     eligibleCalls: number;
     inFlight: number;
     models: Map<string, number>;
+    cache: CacheTokenSums;
   }
   const emptyAgg = (): RuntimeAgg => ({
     recordedKnown: false,
@@ -409,6 +472,7 @@ function buildRuntimeRows(
     eligibleCalls: 0,
     inFlight: 0,
     models: new Map(),
+    cache: emptyCacheSums(),
   });
   const aggregates = new Map<string, RuntimeAgg>();
 
@@ -433,6 +497,8 @@ function buildRuntimeRows(
       agg.outputKnown = true;
       agg.output += row.tokens.output;
     }
+    const cache = cacheSumsFromBreakdown(row.tokens);
+    if (cache) agg.cache = addCacheSums(agg.cache, cache);
     if (isInFlightRow) {
       agg.inFlight += 1;
     } else if (row.usageStatus === 'legacy') {
@@ -477,6 +543,7 @@ function buildRuntimeRows(
           tokens,
         }))
         .sort((a, b) => b.tokens - a.tokens),
+      cache: agg.cache,
     }))
     .sort((a, b) => (b.recordedTokens ?? 0) - (a.recordedTokens ?? 0));
 }
@@ -500,17 +567,26 @@ function buildSeries(
   finalized: UsageStatsRecord[],
   window: UsageWindow
 ): RuntimeUsageSeriesPoint[] {
-  const byDate = new Map<string, Map<string, number>>();
+  const byDate = new Map<string, { runtimes: Map<string, number>; cache: CacheTokenSums }>();
   for (const row of finalized) {
     if (row.accountedAt === null || row.accountedAt < window.startUtcMs) continue;
     if (row.tokens.total === null || row.tokens.total <= 0) continue;
     const date = zonedDateKey(window.timeZone, row.accountedAt);
     const runtimeKey = row.usageStatus === 'legacy' ? LEGACY_RUNTIME_ID : row.runtimeId;
-    const day = byDate.get(date) ?? new Map<string, number>();
-    day.set(runtimeKey, (day.get(runtimeKey) ?? 0) + row.tokens.total);
+    const day = byDate.get(date) ?? {
+      runtimes: new Map<string, number>(),
+      cache: emptyCacheSums(),
+    };
+    day.runtimes.set(runtimeKey, (day.runtimes.get(runtimeKey) ?? 0) + row.tokens.total);
+    const cache = cacheSumsFromBreakdown(row.tokens);
+    if (cache) day.cache = addCacheSums(day.cache, cache);
     byDate.set(date, day);
   }
   return [...byDate.entries()]
-    .map(([date, runtimes]) => ({ date, runtimes: Object.fromEntries(runtimes) }))
+    .map(([date, day]) => ({
+      date,
+      runtimes: Object.fromEntries(day.runtimes),
+      cache: day.cache,
+    }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
