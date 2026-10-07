@@ -220,7 +220,7 @@ export function RightSidebar({
   return (
     <div
       ref={rootRef}
-      className="flex flex-col flex-shrink-0 relative bg-[hsl(var(--sidebar))]"
+      className="flex flex-col flex-shrink-0 relative"
       style={{
         width: `${widthFraction * 100}%`,
         minWidth: `${RIGHT_SIDEBAR_LIMITS.MIN_WIDTH_PX}px`,

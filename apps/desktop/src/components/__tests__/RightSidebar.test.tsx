@@ -103,12 +103,12 @@ describe('RightSidebar', () => {
     expect(queryByText('Workspace')).toBeNull();
   });
 
-  it('fills the column with the recessed tray tone so pane cards read as elevated', () => {
+  it('does not paint its own column background (inherits the app background)', () => {
     const { container } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
     const wrapper = container.firstChild as HTMLElement;
-    // Same --sidebar tone the left sidebar panel uses: the column sits below the
-    // chat background, and the bg-card panes inside it sit above the column.
-    expect(wrapper.className).toContain('bg-[hsl(var(--sidebar))]');
+    // No recessed tray tone: the column blends with the chat background and only
+    // the pane cards inside it carry their own bg-card surface.
+    expect(wrapper.className).not.toContain('bg-');
   });
 
   it('uses widthFraction from store as the sidebar width (proportional)', () => {
