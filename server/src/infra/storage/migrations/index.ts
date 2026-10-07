@@ -48,6 +48,7 @@ import { migration as m_043_session_provider_transport } from './043_session_pro
 import { migration as m_044_session_model_settings } from './044_session_model_settings.js';
 import { migration as m_045_runtime_usage_records } from './045_runtime_usage_records.js';
 import { migration as m_046_claudia_request_records } from './046_claudia_request_records.js';
+import { migration as m_047_prompt_cache_trace } from './047_prompt_cache_trace.js';
 
 export type { Migration };
 
@@ -98,6 +99,7 @@ export const migrations: Migration[] = [
   m_044_session_model_settings,
   m_045_runtime_usage_records,
   m_046_claudia_request_records,
+  m_047_prompt_cache_trace,
 ];
 
 /**

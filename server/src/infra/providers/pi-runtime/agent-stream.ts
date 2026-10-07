@@ -25,6 +25,7 @@ import {
 import { recordPiContextUsage } from './context-observer.js';
 import { wrapStreamFnWithToolSchemaCompat } from './tool-schema-compat.js';
 import { buildPiInvocationSnapshot } from './usage-snapshot.js';
+import { startPiCacheTrace } from './cache-trace.js';
 
 export async function* runPiAgentStream(input: {
   userInput: string;
@@ -38,6 +39,8 @@ export async function* runPiAgentStream(input: {
   tools: AgentTool<any>[];
   hooks: AgentHooksOutput;
   effectiveSystemPrompt: string;
+  /** Messages the token-budget trim dropped from the history (cache diagnostics). */
+  historyTrimmed?: number;
 }): AsyncGenerator<ProviderRuntimeEvent, void, void> {
   const {
     userInput,
@@ -50,6 +53,7 @@ export async function* runPiAgentStream(input: {
     tools,
     hooks,
     effectiveSystemPrompt,
+    historyTrimmed = 0,
   } = input;
 
   // Queue is created before agentOpts so the onRetry callback can push
@@ -94,6 +98,21 @@ export async function* runPiAgentStream(input: {
   // 'none' is deliberately truthy here: it rides the wrapper to actively
   // disable cache_control markers (pi-ai treats it as opt-out, not default).
   const cacheRetention = options.llmProfileConfig?.cacheRetention;
+  // Prompt-cache diagnostics: fingerprint what this run actually sends, then
+  // record each LLM call's cache split at agent_end (never affects the run).
+  const cacheTrace = startPiCacheTrace({
+    db: options.db,
+    sessionId: options.claudiaSessionId,
+    invocationId: options.usageAccounting?.invocationId,
+    runId: options.runId,
+    model: modelInfo.model.id,
+    thinkingLevel: options.thinkingLevel,
+    cacheRetention,
+    systemPrompt: effectiveSystemPrompt,
+    tools,
+    history,
+    trimmedMessages: historyTrimmed,
+  });
   const baseStreamFn: StreamFn = hooks.streamFn ?? streamSimple;
   // Normalize at the final outbound boundary on every turn. This also covers
   // concrete MCP tools loaded dynamically after the Agent was constructed.
@@ -148,6 +167,7 @@ export async function* runPiAgentStream(input: {
         sessionId: options.claudiaSessionId,
         lastCallUsage,
       });
+      cacheTrace?.finish(messages);
 
       // Surface LLM-level errors that pi-agent-core's loop quietly absorbs
       // (it routes `error` and `done` stop reasons through the same

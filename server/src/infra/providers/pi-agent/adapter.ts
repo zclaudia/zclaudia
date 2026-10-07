@@ -271,6 +271,7 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
       //    handles compaction/branch_summary boundaries natively; Route A postprocessors
       //    (image resolve + token-budget trim) run on top. Non-fatal on failure.
       let history: AgentMessage[] = [];
+      let historyTrimmed = 0;
       if (options.db && options.claudiaSessionId) {
         try {
           const session = new Session(
@@ -295,7 +296,9 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
               };
             },
           });
+          const beforeTrim = messages.length;
           messages = trimMessagesToBudget(messages, historyTokenBudget(effectiveContextWindow));
+          historyTrimmed = beforeTrim - messages.length;
           // The trailing user message is the current input, passed separately to the agent loop.
           if (
             messages.length &&
@@ -360,6 +363,7 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
         tools,
         hooks,
         effectiveSystemPrompt: promptBundle.effectiveSystemPrompt,
+        historyTrimmed,
       });
     } finally {
       toolBundle.dispose();

@@ -14,7 +14,9 @@ import type {
   ModelUsageDay,
   ModelUsageTotal,
 } from '@zclaudia/shared/core/usage-stats';
+import type { SessionCacheTimeline } from '@zclaudia/shared/core/cache-stats';
 import { initializeUsageLedger } from '../../domains/usage/register.js';
+import { CacheTraceRepository } from '../../domains/usage/cache-trace-repository.js';
 
 const DAY_MS = 86_400_000;
 /** Heatmap horizon: 26 weeks. */
@@ -319,6 +321,24 @@ export function createUsageStatsRoutes(db: Database, opts: { ttlMs?: number } = 
   router.get('/sessions/:sessionId/cache', (req: Request, res: Response) => {
     try {
       res.json({ success: true, data: usageLedger.sessionCacheStats(req.params.sessionId) });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: { code: 'STATS_ERROR', message: (error as Error).message },
+      });
+    }
+  });
+
+  // GET /api/stats/sessions/:sessionId/cache-timeline?limit= — classified
+  // per-LLM-call cache trace (pi runs; newest `limit` calls, default 50).
+  router.get('/sessions/:sessionId/cache-timeline', (req: Request, res: Response) => {
+    try {
+      const raw = Number(req.query.limit);
+      const limit = Number.isInteger(raw) && raw > 0 ? Math.min(raw, 500) : 50;
+      const data: SessionCacheTimeline = CacheTraceRepository.hasSchema(db)
+        ? new CacheTraceRepository(db).sessionTimeline(req.params.sessionId, limit)
+        : { calls: [], truncated: false };
+      res.json({ success: true, data });
     } catch (error) {
       res.status(500).json({
         success: false,

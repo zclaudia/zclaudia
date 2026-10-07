@@ -94,3 +94,50 @@ export function cacheShares(sums: CacheTokenSums | undefined | null): CacheShare
 export function hasCacheActivity(sums: CacheTokenSums | undefined | null): boolean {
   return !!sums && sums.cacheRead + sums.cacheWrite > 0;
 }
+
+// === Per-call cache timeline (GET /api/stats/sessions/:sessionId/cache-timeline) ===
+
+/**
+ * Why a call reused less of the prompt cache than the previous call wrote.
+ * Run-boundary causes come from the per-run prefix fingerprint; the last
+ * two are inferences when nothing else changed.
+ */
+export type CacheMissCause =
+  | 'prompt_changed'
+  | 'tools_changed'
+  | 'model_changed'
+  | 'thinking_changed'
+  | 'compaction'
+  | 'history_trimmed'
+  | 'history_rewritten'
+  | 'ttl_expired'
+  | 'forked'
+  | 'caching_disabled'
+  /** Older history intact, nothing else changed: the previous run's own turn was re-shaped. */
+  | 'previous_turn_rewritten'
+  | 'unknown';
+
+/** `cold` = nothing cacheable yet (a session's first traced call). */
+export type CacheCallVerdict = 'cold' | 'hit' | 'partial' | 'miss';
+
+export interface CacheTimelineCall {
+  /** Usage-ledger invocation (one run). */
+  invocationId: string;
+  /** 0-based LLM call index within the run. */
+  callIndex: number;
+  at: number;
+  model: string | null;
+  tokens: CacheTokenSums;
+  output: number;
+  /** cacheRead ÷ the previous call's input side; null without a previous call. */
+  reuse: number | null;
+  verdict: CacheCallVerdict;
+  /** Populated for `partial` / `miss` (and `cold` after a fork). */
+  causes: CacheMissCause[];
+}
+
+export interface SessionCacheTimeline {
+  /** Oldest first; the newest calls when `truncated`. */
+  calls: CacheTimelineCall[];
+  truncated: boolean;
+}

@@ -1,6 +1,6 @@
 # Prompt Cache 命中率统计与失效诊断 实施计划（草案）
 
-> 状态：Phase 0b + Phase 1 已实现（2026-10-07，未提交）；Phase 2 / 3 待做。步骤用 `- [ ]` 跟踪。
+> 状态：Phase 0b + Phase 1 已提交（42a9e1b4 / 5a23eaec）；Phase 2 已实现（2a–2d，未提交）；Phase 3 待做。步骤用 `- [ ]` 跟踪。
 
 **Goal:** 统一口径统计 prompt cache token 与命中比例（看成本），并能定位每次缓存失效的位置和原因（排查失效）。本轮聚焦 pi（及 cursor）；claude / codex 暂不考虑——统计层是 runtime 无关的，它们的账本行会照常显示，但不为它们做专门修复或逐调用采集。
 
@@ -42,10 +42,10 @@
 
 ## Phase 2 — 失效诊断
 
-- [ ] **2a pi 逐调用落库**：`agent_end` 时对本 run 每条 assistant message `appendRecord` 一条 pi `UsageRecord`（usage / model / timestamp / responseId），进现有 `session_log`，无 schema 变更。
-- [ ] **2b 前缀指纹持久化**：CacheAudit 改为每 run 写一条 custom 记录（promptHash / toolsHash / modelId / thinkingLevel / cacheRetention / trim 丢弃条数），hash 补上 model id、thinking level、实际发送的工具集；`ZCLAUDIA_CACHE_AUDIT` 日志保留。
-- [ ] **2c 失效原因分类器**（server，纯函数 + 单测）：相邻两次调用 / run 之间按优先级归因——prompt 变、tools 变、model 变、compaction、history trim、fork、间隔 > TTL（按 profile `cacheRetention`：5m / 1h）、未知。外部 runtime 只用 ledger 逐 run 数据（requested_model 变化、间隔、compaction）。
-- [ ] **2d 时间线 API + UI**：`GET /api/sessions/:id/cache-timeline`；UI 放在 Context popover 内（1e 的 session 命中率下方展开）。
+- [x] **2a pi 逐调用落库**：改为独立表（迁移 047 `prompt_cache_runs` / `prompt_cache_calls`，按账本 invocation 关联），不写 pi `session_log`——`UsageRecord` 无 model 字段、指纹无处可放，且诊断数据不该混进上下文真相源。`agent_end` 时写入（`pi-runtime/cache-trace.ts`），失败只告警不影响 run；无 input 的调用（报错/中止）不记。
+- [x] **2b 前缀指纹持久化**：每 run 一行：实际发送的 system prompt / 工具集 hash、model、thinking level、cacheRetention、trim 丢弃条数，以及逐条消息摘要算出的 history hash——下一 run 用它判断「上一 run 的历史是否原样成为本 run 的前缀」（`history_prefix_intact`）。原 `ZCLAUDIA_CACHE_AUDIT` 日志未动。
+- [x] **2c 失效原因分类器**（`domains/usage/cache-trace-classifier.ts`）：reuse = 本次 cacheRead ÷ 上次调用输入侧；≥0.8 hit、≥0.3 partial、否则 miss。run 边界归因：prompt / tools / model / thinking 变化、compaction（session_log 时间戳）、history trimmed / rewritten、间隔 > TTL（5m / long 1h）、caching 关闭、fork；都没有且旧历史完好 → `previous_turn_rewritten`（即 Phase 3 的压平问题）。外部 runtime 不做（claude / codex 本轮不考虑）。
+- [x] **2d 时间线 API + UI**：`GET /api/stats/sessions/:id/cache-timeline?limit=`；popover 的 Prompt cache 区块下：每次调用一根柱（高度 = 命中率，未命中用 warning 色）+ 按原因分组的未命中列表（次数 + 最近一次）。
 - [ ] ~~**2e 外部逐调用**~~ —— 推后（claude / codex 本轮不考虑；cursor 源头只有逐 turn）。
 
 ## Phase 3 — pi 结构性失效修复（独立立项）

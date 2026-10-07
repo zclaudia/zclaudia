@@ -3,6 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import Database from 'better-sqlite3';
 import { migration as usageLedgerMigration } from '../../../infra/storage/migrations/045_runtime_usage_records.js';
+import { migration as cacheTraceMigration } from '../../../infra/storage/migrations/047_prompt_cache_trace.js';
 import {
   computeUsageStats,
   computeStreak,
@@ -379,6 +380,26 @@ describe('GET /usage', () => {
         runs: 1,
       },
     });
+  });
+
+  it('serves the classified cache timeline, empty without the trace schema', async () => {
+    seedSession('s1');
+    const empty = await request(makeApp()).get('/api/stats/sessions/s1/cache-timeline');
+    expect(empty.body).toEqual({ success: true, data: { calls: [], truncated: false } });
+
+    db.exec(cacheTraceMigration.sql);
+    db.exec(`
+      INSERT INTO prompt_cache_runs (invocation_id, session_id, started_at, prompt_hash,
+        tools_hash, history_count, history_hash)
+      VALUES ('i1', 's1', 1, 'p', 't', 0, 'h');
+      INSERT INTO prompt_cache_calls (invocation_id, call_index, session_id, at,
+        input_uncached, cache_read, cache_write, output_tokens)
+      VALUES ('i1', 0, 's1', 10, 0, 0, 900, 5), ('i1', 1, 's1', 20, 10, 900, 50, 5),
+             ('i1', 2, 's1', 30, 10, 950, 50, 5);
+    `);
+    const res = await request(makeApp()).get('/api/stats/sessions/s1/cache-timeline?limit=2');
+    expect(res.body.data.truncated).toBe(true);
+    expect(res.body.data.calls.map((c: { verdict: string }) => c.verdict)).toEqual(['hit', 'hit']);
   });
 
   it('serves model stats with a per-range cache', async () => {
