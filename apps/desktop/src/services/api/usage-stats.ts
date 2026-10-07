@@ -6,6 +6,7 @@ import type {
   UsageStatsPayload,
   UsageStatsRange,
 } from '@zclaudia/shared/core/usage-stats';
+import type { SessionCacheTimeline } from '@zclaudia/shared/core/cache-stats';
 
 /** The device's IANA zone, shared with every backend so merged views bucket
  *  calendar days identically (runtime usage design §8). */
@@ -67,4 +68,14 @@ export async function getRuntimeUsage(
 /** One session's prompt-cache sums from the ledger (any runtime; survives restarts). */
 export async function getSessionCacheStats(sessionId: string): Promise<SessionCacheStats> {
   return apiCall<SessionCacheStats>(`/api/stats/sessions/${encodeURIComponent(sessionId)}/cache`);
+}
+
+/** Classified per-call prompt-cache trace for one session (newest `limit` calls). */
+export async function getSessionCacheTimeline(
+  sessionId: string,
+  limit = 30
+): Promise<SessionCacheTimeline> {
+  return apiCall<SessionCacheTimeline>(
+    `/api/stats/sessions/${encodeURIComponent(sessionId)}/cache-timeline?limit=${limit}`
+  );
 }

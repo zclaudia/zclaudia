@@ -8,11 +8,17 @@ import { ContextUsagePopover } from '../ContextUsagePopover';
 vi.mock('../../../services/api', () => ({
   getSessionContextUsage: vi.fn(),
   getSessionCacheStats: vi.fn(),
+  getSessionCacheTimeline: vi.fn(),
 }));
-import { getSessionCacheStats, getSessionContextUsage } from '../../../services/api';
+import {
+  getSessionCacheStats,
+  getSessionCacheTimeline,
+  getSessionContextUsage,
+} from '../../../services/api';
 
 const mockFetch = vi.mocked(getSessionContextUsage);
 const mockCacheFetch = vi.mocked(getSessionCacheStats);
+const mockTimelineFetch = vi.mocked(getSessionCacheTimeline);
 
 function payload(): ContextUsagePayload {
   return {
@@ -45,6 +51,8 @@ beforeEach(() => {
   mockCacheFetch.mockReset();
   // Default: a backend without the session cache endpoint.
   mockCacheFetch.mockRejectedValue(new Error('not found'));
+  mockTimelineFetch.mockReset();
+  mockTimelineFetch.mockRejectedValue(new Error('not found'));
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -218,6 +226,48 @@ describe('ContextUsagePopover', () => {
     expect(screen.getByTestId('cache-breakdown')).toBeTruthy();
     // The ledger section supersedes the live single-turn line.
     expect(screen.queryByTestId('popover-cache-line')).toBeNull();
+  });
+
+  it('shows the per-call trace with the latest miss and its cause', async () => {
+    mockFetch.mockResolvedValue({ available: true, ...payload() });
+    mockCacheFetch.mockResolvedValue({
+      session: { inputUncached: 100, cacheRead: 700, cacheWrite: 200 },
+      latestRun: { inputUncached: 5, cacheRead: 95, cacheWrite: 0 },
+      runs: 2,
+    });
+    mockTimelineFetch.mockResolvedValue({
+      truncated: false,
+      calls: [
+        {
+          invocationId: 'i1',
+          callIndex: 0,
+          at: 1,
+          model: 'm',
+          tokens: { inputUncached: 0, cacheRead: 0, cacheWrite: 500 },
+          output: 1,
+          reuse: null,
+          verdict: 'cold',
+          causes: [],
+        },
+        {
+          invocationId: 'i2',
+          callIndex: 0,
+          at: 2,
+          model: 'm',
+          tokens: { inputUncached: 500, cacheRead: 0, cacheWrite: 0 },
+          output: 1,
+          reuse: 0,
+          verdict: 'miss',
+          causes: ['previous_turn_rewritten'],
+        },
+      ],
+    });
+    const { container } = renderPopover();
+    fireEvent.mouseEnter(container.firstChild as HTMLElement);
+    await screen.findByTestId('cache-timeline');
+    expect(screen.getByTestId('cache-miss-row').textContent).toContain(
+      "Previous run's messages were re-shaped"
+    );
   });
 
   it('shows the cache section for runtimes without a context breakdown', async () => {

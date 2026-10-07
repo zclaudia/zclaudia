@@ -1,13 +1,22 @@
 import { useState, useRef, useCallback, type ReactNode } from 'react';
 import type { ContextUsagePayload } from '@zclaudia/shared/core/message';
 import type { SessionCacheStats } from '@zclaudia/shared/core/usage-stats';
-import { cacheInputTotal, hasCacheActivity } from '@zclaudia/shared/core/cache-stats';
-import { getSessionCacheStats, getSessionContextUsage } from '../../services/api';
+import {
+  cacheInputTotal,
+  hasCacheActivity,
+  type SessionCacheTimeline,
+} from '@zclaudia/shared/core/cache-stats';
+import {
+  getSessionCacheStats,
+  getSessionCacheTimeline,
+  getSessionContextUsage,
+} from '../../services/api';
 import { ContextUsageCard } from './ContextUsageCard';
 import { formatTokens } from '../../utils/formatTokens';
 import { SECTION_LABEL } from '../../components/ui/typography';
 import { CacheBreakdownBar } from '../../components/usage/CacheBreakdownBar';
 import { formatHitRate } from '../../components/usage/cacheFormat';
+import { CacheTimeline } from '../../components/usage/CacheTimeline';
 import { useIsMounted } from '../../hooks/useIsMounted';
 import { useLatestRef } from '../../hooks/useLatestRef';
 import { HoverPopover } from '../../components/ui/HoverPopover';
@@ -26,8 +35,8 @@ type FetchState =
   | { status: 'unavailable'; supported: boolean }
   | { status: 'error' };
 
-/** Ledger cache sums; `null` = not loaded or unsupported (older backend). */
-type CacheState = SessionCacheStats | null;
+/** Ledger cache sums + per-call trace; `null` = not loaded or unsupported (older backend). */
+type CacheState = { stats: SessionCacheStats; timeline: SessionCacheTimeline | null } | null;
 
 /**
  * Popover that reveals the full /context breakdown panel from the compact
@@ -37,7 +46,7 @@ type CacheState = SessionCacheStats | null;
 export function ContextUsagePopover({ sessionId, children, latestCacheRead }: Props) {
   const [state, setState] = useState<FetchState | null>(null);
   const [cacheStats, setCacheStats] = useState<CacheState>(null);
-  const cacheStatsRef = useRef<Map<string, SessionCacheStats>>(new Map());
+  const cacheStatsRef = useRef<Map<string, NonNullable<CacheState>>>(new Map());
   // Per-session stale-while-revalidate cache so re-hovering doesn't white-flash.
   const cacheRef = useRef<Map<string, ContextUsagePayload>>(new Map());
   const isMounted = useIsMounted();
@@ -52,10 +61,15 @@ export function ContextUsagePopover({ sessionId, children, latestCacheRead }: Pr
     const sid = sessionId;
     setCacheStats(cacheStatsRef.current.get(sid) ?? null);
     try {
-      const stats = await getSessionCacheStats(sid);
+      // The trace is optional (pi runs only, newer backends); the sums are not.
+      const [stats, timeline] = await Promise.all([
+        getSessionCacheStats(sid),
+        getSessionCacheTimeline(sid).catch(() => null),
+      ]);
       if (!isMounted() || sid !== sessionIdRef.current) return;
-      cacheStatsRef.current.set(sid, stats);
-      setCacheStats(stats);
+      const next = { stats, timeline };
+      cacheStatsRef.current.set(sid, next);
+      setCacheStats(next);
     } catch {
       // Older backend without the endpoint: keep the live single-turn line.
       if (!isMounted() || sid !== sessionIdRef.current) return;
@@ -109,7 +123,7 @@ function PopoverBody({
   cacheStats: CacheState;
   latestCacheRead?: number;
 }) {
-  const showCacheSection = !!cacheStats && cacheInputTotal(cacheStats.session) > 0;
+  const showCacheSection = !!cacheStats && cacheInputTotal(cacheStats.stats.session) > 0;
   return (
     <>
       {state?.status === 'available' && (
@@ -143,14 +157,20 @@ function PopoverBody({
         <div className="px-3 py-2.5 text-xs text-destructive">Failed to load context usage.</div>
       )}
       {showCacheSection && state && state.status !== 'loading' && (
-        <SessionCacheSection stats={cacheStats} />
+        <SessionCacheSection stats={cacheStats.stats} timeline={cacheStats.timeline} />
       )}
     </>
   );
 }
 
 /** Session-wide prompt-cache split from the usage ledger (all runtimes). */
-function SessionCacheSection({ stats }: { stats: SessionCacheStats }) {
+function SessionCacheSection({
+  stats,
+  timeline,
+}: {
+  stats: SessionCacheStats;
+  timeline: SessionCacheTimeline | null;
+}) {
   const active = hasCacheActivity(stats.session);
   return (
     <div data-testid="popover-cache-section" className="border-t border-border/40 px-3 py-2">
@@ -178,6 +198,7 @@ function SessionCacheSection({ stats }: { stats: SessionCacheStats }) {
       ) : (
         <p className="mt-1 text-3xs text-muted-foreground/60">No cache activity in this session.</p>
       )}
+      {active && timeline && <CacheTimeline timeline={timeline} />}
     </div>
   );
 }
