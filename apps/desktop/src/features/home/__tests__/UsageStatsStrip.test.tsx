@@ -169,6 +169,57 @@ describe('UsageStatsStrip', () => {
     );
   });
 
+  it('shows a Cache hit card that opens the Cache tab', async () => {
+    const runtime = await getRuntimeUsage();
+    const cache = { inputUncached: 100, cacheRead: 700, cacheWrite: 200 };
+    getUsageStats.mockResolvedValue({
+      ...payload,
+      accounting: {
+        active: true,
+        recordedTokens: 1000,
+        completeCalls: 1,
+        partialCalls: 0,
+        missingCalls: 0,
+        eligibleFinalized: 1,
+        inFlightCalls: 0,
+        legacyRecords: 0,
+        accountingSince: 1,
+        cache,
+      },
+      details: {
+        models: { days: [], models: [], trackedSince: null, capturedAt: 1 },
+        runtime: { ...runtime, totals: { ...runtime.totals, cache } },
+      },
+    });
+    render(<UsageStatsStrip />);
+    await screen.findByText('Cache hit');
+    expect(screen.getByText('70%')).toBeTruthy();
+    expect(screen.getByTestId('cache-hit-sub').textContent).toBe('700 of 1.0k input');
+    fireEvent.click(screen.getByText('Cache hit'));
+    expect(await screen.findByTestId('cache-view')).toBeTruthy();
+    expect(screen.getByTestId('cache-hit-rate').textContent).toBe('70%');
+  });
+
+  it('hides the Cache hit card on backends without cache sums', async () => {
+    getUsageStats.mockResolvedValue({
+      ...payload,
+      accounting: {
+        active: true,
+        recordedTokens: 1000,
+        completeCalls: 1,
+        partialCalls: 0,
+        missingCalls: 0,
+        eligibleFinalized: 1,
+        inFlightCalls: 0,
+        legacyRecords: 0,
+        accountingSince: 1,
+      },
+    });
+    render(<UsageStatsStrip />);
+    await screen.findByText('Recorded tokens');
+    expect(screen.queryByText('Cache hit')).toBeNull();
+  });
+
   it('the coverage line links to the Runtimes tab fed by the ledger endpoint', async () => {
     getUsageStats.mockResolvedValue({
       ...payload,

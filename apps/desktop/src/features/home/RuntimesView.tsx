@@ -8,6 +8,7 @@ import { getRuntimeUsage } from '../../services/api';
 import { useStatsBackendTargets } from './statsBackend';
 import { aggregateRuntimeUsage, type BackendRuntimeUsage } from './aggregateUsageStats';
 import { formatTokens } from '../../utils/formatTokens';
+import { runtimeLabel } from './runtimeLabel';
 
 /**
  * Runtimes tab (runtime usage design §9): the ledger view shared with the
@@ -15,18 +16,6 @@ import { formatTokens } from '../../utils/formatTokens';
  * RECORDED data only — runtimes differ in models, tasks and cache behavior,
  * so the table never ranks "efficiency".
  */
-
-const RUNTIME_LABEL_FALLBACK: Record<string, string> = {
-  pi: 'Pi',
-  claude: 'Claude Code',
-  codex: 'Codex',
-  cursor: 'Cursor',
-  legacy: 'Legacy (unknown source)',
-};
-
-function runtimeLabel(row: RuntimeUsageRuntimeRow): string {
-  return row.runtimeLabel ?? RUNTIME_LABEL_FALLBACK[row.runtimeId] ?? row.runtimeId;
-}
 
 /** Stacked daily bars, one segment per runtime (custom SVG like ModelsChart). */
 function RuntimeSeriesChart({ series }: { series: RuntimeUsagePayload['series'] }) {

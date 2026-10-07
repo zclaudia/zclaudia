@@ -399,3 +399,99 @@ describe('aggregateRuntimeUsage', () => {
     expect(merged!.runtimes.map(r => r.runtimeId)).toEqual(['claude', 'codex']);
   });
 });
+
+// === Prompt cache sums merge (prompt cache stats plan, Phase 1c) ===
+
+describe('cache sums merge', () => {
+  const a = { inputUncached: 10, cacheRead: 80, cacheWrite: 10 };
+  const b = { inputUncached: 90, cacheRead: 0, cacheWrite: 10 };
+  const ab = { inputUncached: 100, cacheRead: 80, cacheWrite: 20 };
+
+  function runtimeRow(runtimeId: string, cache?: typeof a) {
+    return {
+      runtimeId,
+      runtimeLabel: runtimeId,
+      recordedTokens: 1,
+      inputTokens: 1,
+      outputTokens: 0,
+      calls: 1,
+      completeCalls: 1,
+      partialCalls: 0,
+      missingCalls: 0,
+      legacyCalls: 0,
+      inFlightCalls: 0,
+      coverageRate: 1,
+      models: [],
+      ...(cache ? { cache } : {}),
+    };
+  }
+
+  function withCache(id: string, cache: typeof a | undefined): RuntimeUsagePayload {
+    const base = runtimePayload(id);
+    return runtimePayload(id, {
+      totals: { ...base.totals, ...(cache ? { cache } : {}) },
+      runtimes: [runtimeRow('pi', cache)],
+      series: [{ date: '2026-10-07', runtimes: { pi: 1 }, ...(cache ? { cache } : {}) }],
+    });
+  }
+
+  it('runtime payloads sum cache per total, runtime and day', () => {
+    const { merged } = aggregateRuntimeUsage([
+      { backendId: 'x', name: 'x', payload: withCache('ds-a', a) },
+      { backendId: 'y', name: 'y', payload: withCache('ds-b', b) },
+    ]);
+    expect(merged!.totals.cache).toEqual(ab);
+    expect(merged!.runtimes[0].cache).toEqual(ab);
+    expect(merged!.series[0].cache).toEqual(ab);
+  });
+
+  it('an older backend without cache fields leaves the merged cache unknown', () => {
+    const { merged } = aggregateRuntimeUsage([
+      { backendId: 'x', name: 'x', payload: withCache('ds-a', a) },
+      { backendId: 'y', name: 'y', payload: withCache('ds-b', undefined) },
+    ]);
+    expect(merged!.totals.cache).toBeUndefined();
+    expect(merged!.runtimes[0].cache).toBeUndefined();
+    expect(merged!.series[0].cache).toBeUndefined();
+  });
+
+  it('accounting summaries sum cache only when every backend reports it', () => {
+    const accounting = (cache?: typeof a) => ({
+      active: true as const,
+      recordedTokens: 1,
+      completeCalls: 1,
+      partialCalls: 0,
+      missingCalls: 0,
+      eligibleFinalized: 1,
+      inFlightCalls: 0,
+      legacyRecords: 0,
+      accountingSince: 1,
+      ...(cache ? { cache } : {}),
+    });
+    const entry = (id: string, cache?: typeof a) => ({
+      backendId: id,
+      name: id,
+      stats: stats({ datasetId: id, accounting: accounting(cache) }),
+    });
+    expect(
+      aggregateUsageStats([entry('a', a), entry('b', b)], '2026-10-07', 'all')!.accounting!.cache
+    ).toEqual(ab);
+    expect(
+      aggregateUsageStats([entry('a', a), entry('b')], '2026-10-07', 'all')!.accounting!.cache
+    ).toBeUndefined();
+  });
+
+  it('model payloads sum cache per model', () => {
+    const merged = aggregateModelStats([
+      models({
+        datasetId: 'a',
+        models: [{ model: 'm', inTokens: 100, outTokens: 0, totalTokens: 100, share: 1, cache: a }],
+      }),
+      models({
+        datasetId: 'b',
+        models: [{ model: 'm', inTokens: 100, outTokens: 0, totalTokens: 100, share: 1, cache: b }],
+      }),
+    ]);
+    expect(merged!.models[0].cache).toEqual(ab);
+  });
+});

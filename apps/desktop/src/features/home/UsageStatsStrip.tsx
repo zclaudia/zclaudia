@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { UsageStatsRange } from '@zclaudia/shared/core/usage-stats';
+import { cacheInputTotal, hasCacheActivity } from '@zclaudia/shared/core/cache-stats';
 import { getUsageStats } from '../../services/api';
 import { useStatsBackendTargets } from './statsBackend';
 import { aggregateUsageStats, type BackendUsage } from './aggregateUsageStats';
@@ -16,6 +17,8 @@ import {
 import { prettyModelName } from './modelStats';
 import { ModelsChart } from './ModelsChart';
 import { RuntimesView } from './RuntimesView';
+import { CacheView } from './CacheView';
+import { formatHitRate } from '../../components/usage/cacheFormat';
 
 const HEATMAP_WEEKS = 26;
 /** Columns kept visible below md: — the older half hides so the remaining
@@ -23,6 +26,12 @@ const HEATMAP_WEEKS = 26;
 const HEATMAP_WEEKS_MOBILE = 13;
 const RANGES: UsageStatsRange[] = ['all', '30d', '7d'];
 const RANGE_LABEL: Record<UsageStatsRange, string> = { all: 'All', '30d': '30d', '7d': '7d' };
+const TAB_LABEL = {
+  overview: 'Overview',
+  models: 'Models',
+  runtimes: 'Runtimes',
+  cache: 'Cache',
+} as const;
 
 /** Tailwind classes per heatmap intensity level (0..4). The heatmap is the
  *  panel's only color — data-viz exemption from the grayscale chrome rule. */
@@ -58,7 +67,7 @@ export function UsageStatsStrip() {
   const targets = useStatsBackendTargets();
   const targetKey = targets.map(t => t.backendId).join(',');
   const [range, setRange] = useState<UsageStatsRange>('all');
-  const [tab, setTab] = useState<'overview' | 'models' | 'runtimes'>('overview');
+  const [tab, setTab] = useState<'overview' | 'models' | 'runtimes' | 'cache'>('overview');
   const [perBackend, setPerBackend] = useState<BackendUsage[]>([]);
   const [unavailable, setUnavailable] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -157,11 +166,27 @@ export function UsageStatsStrip() {
       ? `${Math.round((accounting.completeCalls / accounting.eligibleFinalized) * 100)}% fully reported` +
         (accounting.missingCalls > 0 ? ` · ${accounting.missingCalls} missing` : '')
       : null;
+  // Prompt-cache card (absent on older backends / before any bucketed call);
+  // links to the Cache tab like the coverage line links to Runtimes.
+  const cache = accounting?.cache;
+  const cacheCard =
+    cache && cacheInputTotal(cache) > 0
+      ? {
+          label: 'Cache hit',
+          value: hasCacheActivity(cache) ? formatHitRate(cache) : '—',
+          sub: hasCacheActivity(cache)
+            ? `${formatTokens(cache.cacheRead)} of ${formatTokens(cacheInputTotal(cache))} input`
+            : 'No cache activity',
+          subTestId: 'cache-hit-sub',
+          onClick: () => setTab('cache'),
+        }
+      : null;
   const cards: Array<{
     label: string;
     value: string;
     title?: string;
     sub?: string;
+    subTestId?: string;
     onClick?: () => void;
   }> = [
     { label: 'Sessions', value: stats.sessions.toLocaleString('en-US') },
@@ -170,8 +195,10 @@ export function UsageStatsStrip() {
       label: accounting ? 'Recorded tokens' : 'Total tokens',
       value: formatTokens(stats.totalTokens),
       sub: coverageLine ?? undefined,
+      subTestId: 'recorded-tokens-coverage',
       onClick: coverageLine ? () => setTab('runtimes') : undefined,
     },
+    ...(cacheCard ? [cacheCard] : []),
     ...(typeof stats.activeDaysCount === 'number'
       ? [{ label: 'Active days', value: String(stats.activeDaysCount) }]
       : []),
@@ -225,7 +252,7 @@ export function UsageStatsStrip() {
     <div className="mt-10 border-t border-border pt-5 px-2">
       <div className="flex items-center mb-3">
         <div className="flex gap-0.5">
-          {(['overview', 'models', 'runtimes'] as const).map(t => (
+          {(['overview', 'models', 'runtimes', 'cache'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -235,7 +262,7 @@ export function UsageStatsStrip() {
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              {t === 'overview' ? 'Overview' : t === 'models' ? 'Models' : 'Runtimes'}
+              {TAB_LABEL[t]}
             </button>
           ))}
         </div>
@@ -270,7 +297,7 @@ export function UsageStatsStrip() {
                   </span>
                   {c.sub && (
                     <span
-                      data-testid="recorded-tokens-coverage"
+                      data-testid={c.subTestId}
                       className="block mt-0.5 text-[10px] text-muted-foreground/70"
                     >
                       {c.sub}
@@ -343,8 +370,10 @@ export function UsageStatsStrip() {
         </>
       ) : tab === 'models' ? (
         <ModelsChart range={range} asOf={asOf} snapshots={modelSnapshots} />
-      ) : (
+      ) : tab === 'runtimes' ? (
         <RuntimesView range={range} asOf={asOf} snapshots={runtimeSnapshots} />
+      ) : (
+        <CacheView runtimeSnapshots={runtimeSnapshots} modelSnapshots={modelSnapshots} />
       )}
     </div>
   );

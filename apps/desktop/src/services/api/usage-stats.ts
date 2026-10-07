@@ -1,7 +1,8 @@
-import { apiCallForBackend } from './unwrap';
+import { apiCall, apiCallForBackend } from './unwrap';
 import type {
   ModelUsagePayload,
   RuntimeUsagePayload,
+  SessionCacheStats,
   UsageStatsPayload,
   UsageStatsRange,
 } from '@zclaudia/shared/core/usage-stats';
@@ -61,4 +62,9 @@ export async function getRuntimeUsage(
     backendId,
     `/api/stats/runtime-usage${query ? `?${query}` : ''}`
   );
+}
+
+/** One session's prompt-cache sums from the ledger (any runtime; survives restarts). */
+export async function getSessionCacheStats(sessionId: string): Promise<SessionCacheStats> {
+  return apiCall<SessionCacheStats>(`/api/stats/sessions/${encodeURIComponent(sessionId)}/cache`);
 }

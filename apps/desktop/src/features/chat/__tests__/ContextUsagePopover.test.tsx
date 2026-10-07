@@ -7,10 +7,12 @@ import { ContextUsagePopover } from '../ContextUsagePopover';
 // The component imports the named fetch from the api index; mock just that.
 vi.mock('../../../services/api', () => ({
   getSessionContextUsage: vi.fn(),
+  getSessionCacheStats: vi.fn(),
 }));
-import { getSessionContextUsage } from '../../../services/api';
+import { getSessionCacheStats, getSessionContextUsage } from '../../../services/api';
 
 const mockFetch = vi.mocked(getSessionContextUsage);
+const mockCacheFetch = vi.mocked(getSessionCacheStats);
 
 function payload(): ContextUsagePayload {
   return {
@@ -40,6 +42,9 @@ function renderPopover() {
 
 beforeEach(() => {
   mockFetch.mockReset();
+  mockCacheFetch.mockReset();
+  // Default: a backend without the session cache endpoint.
+  mockCacheFetch.mockRejectedValue(new Error('not found'));
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -191,6 +196,55 @@ describe('ContextUsagePopover', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByTestId('context-usage-popover')).toBeNull();
+  });
+
+  it('shows the session cache hit rate and the latest run from the ledger', async () => {
+    mockFetch.mockResolvedValue({ available: true, ...payload() });
+    mockCacheFetch.mockResolvedValue({
+      session: { inputUncached: 100, cacheRead: 700, cacheWrite: 200 },
+      latestRun: { inputUncached: 5, cacheRead: 95, cacheWrite: 0 },
+      runs: 3,
+    });
+    const { container } = render(
+      <ContextUsagePopover sessionId="s1" latestCacheRead={4200}>
+        <span>indicator</span>
+      </ContextUsagePopover>
+    );
+    fireEvent.mouseEnter(container.firstChild as HTMLElement);
+    const section = await screen.findByTestId('popover-cache-section');
+    expect(mockCacheFetch).toHaveBeenCalledWith('s1');
+    expect(section.textContent).toMatch(/70%\s*hit this session/);
+    expect(section.textContent).toMatch(/Last run 95% hit · 3 runs/);
+    expect(screen.getByTestId('cache-breakdown')).toBeTruthy();
+    // The ledger section supersedes the live single-turn line.
+    expect(screen.queryByTestId('popover-cache-line')).toBeNull();
+  });
+
+  it('shows the cache section for runtimes without a context breakdown', async () => {
+    mockFetch.mockResolvedValue({ available: false, supported: false });
+    mockCacheFetch.mockResolvedValue({
+      session: { inputUncached: 10, cacheRead: 90, cacheWrite: 0 },
+      latestRun: { inputUncached: 10, cacheRead: 90, cacheWrite: 0 },
+      runs: 1,
+    });
+    const { container } = renderPopover();
+    fireEvent.mouseEnter(container.firstChild as HTMLElement);
+    await screen.findByTestId('context-usage-popover-empty');
+    expect((await screen.findByTestId('popover-cache-section')).textContent).toMatch(/90%/);
+  });
+
+  it('says "No cache activity" when the session never read or wrote cache', async () => {
+    mockFetch.mockResolvedValue({ available: true, ...payload() });
+    mockCacheFetch.mockResolvedValue({
+      session: { inputUncached: 500, cacheRead: 0, cacheWrite: 0 },
+      latestRun: { inputUncached: 500, cacheRead: 0, cacheWrite: 0 },
+      runs: 1,
+    });
+    const { container } = renderPopover();
+    fireEvent.mouseEnter(container.firstChild as HTMLElement);
+    const section = await screen.findByTestId('popover-cache-section');
+    expect(section.textContent).toMatch(/No cache activity in this session/);
+    expect(screen.queryByTestId('cache-breakdown')).toBeNull();
   });
 
   it('omits the prompt-cache line when latestCacheRead is 0 or absent', async () => {

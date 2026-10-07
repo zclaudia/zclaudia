@@ -6,6 +6,7 @@ import type {
   UsageStatsPayload,
   UsageStatsRange,
 } from '@zclaudia/shared/core/usage-stats';
+import { addCacheSums, sumCacheSums, type CacheTokenSums } from '@zclaudia/shared/core/cache-stats';
 
 export interface BackendUsage {
   backendId: string;
@@ -141,6 +142,7 @@ function mergeAccounting(summaries: AccountingSummary[]): AccountingSummary | un
   const sinceValues = summaries
     .map(s => s.accountingSince)
     .filter((v): v is number => typeof v === 'number');
+  const cache = sumCacheSums(summaries.map(s => s.cache));
   return {
     active: true,
     recordedTokens: recordedValues.length > 0 ? recordedValues.reduce((a, b) => a + b, 0) : null,
@@ -151,6 +153,7 @@ function mergeAccounting(summaries: AccountingSummary[]): AccountingSummary | un
     inFlightCalls: summaries.reduce((n, s) => n + s.inFlightCalls, 0),
     legacyRecords: summaries.reduce((n, s) => n + s.legacyRecords, 0),
     accountingSince: sinceValues.length > 0 ? Math.min(...sinceValues) : null,
+    ...(cache ? { cache } : {}),
   };
 }
 
@@ -181,13 +184,21 @@ export function aggregateModelStats(all: ModelUsagePayload[]): ModelUsagePayload
     }
   }
 
-  const totals = new Map<string, { inTokens: number; outTokens: number; totalTokens: number }>();
+  // Cache sums merge only when every backend reports them (older servers omit).
+  const cacheKnown = all.every(p => p.models.every(m => m.cache));
+  const totals = new Map<
+    string,
+    { inTokens: number; outTokens: number; totalTokens: number; cache?: CacheTokenSums }
+  >();
   for (const payload of all) {
     for (const model of payload.models) {
       const acc = totals.get(model.model) ?? { inTokens: 0, outTokens: 0, totalTokens: 0 };
       acc.inTokens += model.inTokens;
       acc.outTokens += model.outTokens;
       acc.totalTokens += model.totalTokens;
+      if (cacheKnown && model.cache) {
+        acc.cache = acc.cache ? addCacheSums(acc.cache, model.cache) : model.cache;
+      }
       totals.set(model.model, acc);
     }
   }
@@ -257,12 +268,14 @@ export function aggregateRuntimeUsage(entries: BackendRuntimeUsage[]): {
     return known.length > 0 ? known.reduce((a, b) => a + b, 0) : null;
   };
 
+  const totalsCache = sumCacheSums(all.map(p => p.totals.cache));
   const totals = {
     recordedTokens: addNullable(all.map(p => p.totals.recordedTokens)),
     completeTokens: addNullable(all.map(p => p.totals.completeTokens)),
     partialTokens: addNullable(all.map(p => p.totals.partialTokens)),
     legacyTokens: addNullable(all.map(p => p.totals.legacyTokens)),
     activeRecordedTokens: addNullable(all.map(p => p.totals.activeRecordedTokens)),
+    ...(totalsCache ? { cache: totalsCache } : {}),
   };
 
   const coverageCounts = (
@@ -321,11 +334,13 @@ function mergeRuntimeRows(all: RuntimeUsagePayload[]): RuntimeUsagePayload['runt
     legacyCalls: number;
     inFlightCalls: number;
     models: Map<string, number>;
+    cache?: CacheTokenSums;
   }
+  const cacheKnown = all.every(p => p.runtimes.every(r => r.cache));
   const accs = new Map<string, RowAcc>();
   for (const payload of all) {
     for (const row of payload.runtimes) {
-      const acc =
+      const acc: RowAcc =
         accs.get(row.runtimeId) ??
         ({
           runtimeLabel: row.runtimeLabel,
@@ -361,6 +376,9 @@ function mergeRuntimeRows(all: RuntimeUsagePayload[]): RuntimeUsagePayload['runt
       acc.missingCalls += row.missingCalls;
       acc.legacyCalls += row.legacyCalls;
       acc.inFlightCalls += row.inFlightCalls;
+      if (cacheKnown && row.cache) {
+        acc.cache = acc.cache ? addCacheSums(acc.cache, row.cache) : row.cache;
+      }
       for (const model of row.models) {
         const key = model.modelId ?? '__unknown__';
         acc.models.set(key, (acc.models.get(key) ?? 0) + model.tokens);
@@ -388,22 +406,31 @@ function mergeRuntimeRows(all: RuntimeUsagePayload[]): RuntimeUsagePayload['runt
           tokens,
         }))
         .sort((a, b) => b.tokens - a.tokens),
+      ...(acc.cache ? { cache: acc.cache } : {}),
     }))
     .sort((a, b) => (b.recordedTokens ?? 0) - (a.recordedTokens ?? 0));
 }
 
 function mergeSeries(all: RuntimeUsagePayload[]): RuntimeUsagePayload['series'] {
-  const byDate = new Map<string, Map<string, number>>();
+  const cacheKnown = all.every(p => p.series.every(point => point.cache));
+  const byDate = new Map<string, { runtimes: Map<string, number>; cache?: CacheTokenSums }>();
   for (const payload of all) {
     for (const point of payload.series) {
-      const runtimes = byDate.get(point.date) ?? new Map<string, number>();
+      const day = byDate.get(point.date) ?? { runtimes: new Map<string, number>() };
       for (const [runtimeId, tokens] of Object.entries(point.runtimes)) {
-        runtimes.set(runtimeId, (runtimes.get(runtimeId) ?? 0) + tokens);
+        day.runtimes.set(runtimeId, (day.runtimes.get(runtimeId) ?? 0) + tokens);
       }
-      byDate.set(point.date, runtimes);
+      if (cacheKnown && point.cache) {
+        day.cache = day.cache ? addCacheSums(day.cache, point.cache) : point.cache;
+      }
+      byDate.set(point.date, day);
     }
   }
   return [...byDate.entries()]
-    .map(([date, runtimes]) => ({ date, runtimes: Object.fromEntries(runtimes) }))
+    .map(([date, day]) => ({
+      date,
+      runtimes: Object.fromEntries(day.runtimes),
+      ...(day.cache ? { cache: day.cache } : {}),
+    }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
