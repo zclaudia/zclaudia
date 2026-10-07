@@ -22,12 +22,12 @@ export interface AssistantTurnData {
 }
 
 /** Build a pi user AgentMessage. Image attachments become ref-carrying image
- *  blocks (no bytes in the tree); the read-time Route A postprocessor fills `data`. */
+ *  blocks (no bytes in the tree); the read-time Route A postprocessor fills `data`.
+ *  Always the block-array shape `Agent.prompt` sends ([text, ...images]): a bare
+ *  string serializes differently, so the next run's rebuilt history would miss
+ *  the provider's prompt cache from this message on. */
 export function buildUserMessage(text: string, attachments: MessageAttachment[]): AgentMessage {
   const images = (attachments ?? []).filter(a => a.type === 'image');
-  if (images.length === 0) {
-    return { role: 'user', content: text } as AgentMessage;
-  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const content: any[] = [{ type: 'text', text }];
   for (const att of images) content.push({ type: 'image', attachmentRef: att });
@@ -80,6 +80,31 @@ export function buildAssistantTurnMessages(turn: AssistantTurnData): AgentMessag
     } as any);
   }
   return messages;
+}
+
+/**
+ * The tree's copy of one pi run, taken from the provider's own messages: every
+ * assistant message (one per LLM call) and tool result in call order, so the
+ * next run's rebuilt history is the prefix the provider already cached.
+ * User messages are dropped — the prompt and any steers were appended when
+ * they arrived. Tool-result `details` are UI-only (never sent to the provider)
+ * and stay out of the tree. Returns null when there is no assistant message,
+ * so the caller falls back to the flattened turn.
+ */
+export function providerTurnMessagesForTree(
+  messages: readonly AgentMessage[] | undefined
+): AgentMessage[] | null {
+  if (!messages?.some(m => m.role === 'assistant')) return null;
+  const out: AgentMessage[] = [];
+  for (const message of messages) {
+    if (message.role === 'assistant') {
+      out.push(message);
+    } else if (message.role === 'toolResult') {
+      const { details: _details, ...rest } = message as AgentMessage & { details?: unknown };
+      out.push(rest as AgentMessage);
+    }
+  }
+  return out;
 }
 
 /**

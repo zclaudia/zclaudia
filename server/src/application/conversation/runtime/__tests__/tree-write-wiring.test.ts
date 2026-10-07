@@ -64,6 +64,73 @@ describe('Route C tree write wiring (assistant final save)', () => {
     expect(assistantEntries).toHaveLength(1);
   });
 
+  it("persists the provider's real per-call messages instead of a flattened turn", async () => {
+    const db = makeDb();
+    const run = fakeRun(db);
+    const u1 = { input: 100, output: 5, cacheRead: 900, cacheWrite: 0, totalTokens: 1005 };
+    const u2 = { input: 20, output: 7, cacheRead: 1000, cacheWrite: 0, totalTokens: 1027 };
+    const call1 = {
+      role: 'assistant',
+      content: [
+        { type: 'thinking', thinking: 'look first', thinkingSignature: 'sig-1' },
+        { type: 'toolCall', id: 'tc1', name: 'Read', arguments: { file_path: 'a.ts' } },
+      ],
+      usage: u1,
+      stopReason: 'toolUse',
+      model: 'm',
+      timestamp: 1,
+    };
+    const call2 = {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'hello world' }],
+      usage: u2,
+      stopReason: 'stop',
+      model: 'm',
+      timestamp: 3,
+    };
+    run.providerTurnMessages = [
+      // The prompt (and any steer) is already in the tree — never re-appended.
+      { role: 'user', content: 'go', timestamp: 0 },
+      call1,
+      {
+        role: 'toolResult',
+        toolCallId: 'tc1',
+        toolName: 'Read',
+        content: [{ type: 'text', text: 'file body' }],
+        isError: false,
+        details: { huge: 'ui-only payload' },
+        timestamp: 2,
+      },
+      call2,
+    ];
+    upsertAssistantMessage(run, { indexMetadata: true });
+
+    const path = await new SqliteSessionStorage(db, 's1').getActivePath();
+    const ctx = buildSessionContext(path);
+    expect(ctx.messages.map((m: any) => m.role)).toEqual(['assistant', 'toolResult', 'assistant']);
+    // Byte-faithful: the rebuilt history is what the provider saw.
+    expect(ctx.messages[0]).toEqual(call1);
+    expect(ctx.messages[2]).toEqual(call2);
+    // UI-only tool details never reach the provider and stay out of the tree.
+    expect((ctx.messages[1] as any).details).toBeUndefined();
+    expect((ctx.messages[1] as any).content).toEqual([{ type: 'text', text: 'file body' }]);
+
+    // The UI row links to the turn's last assistant entry (fork/branch keep the whole turn).
+    const msgRow = db.prepare('SELECT tree_entry_id FROM messages WHERE id = ?').get('a1') as {
+      tree_entry_id: string;
+    };
+    expect(msgRow.tree_entry_id).toBe(path[path.length - 1].id);
+  });
+
+  it('falls back to the flattened turn when the runtime reported no assistant message', async () => {
+    const db = makeDb();
+    const run = fakeRun(db);
+    run.providerTurnMessages = [{ role: 'user', content: 'go', timestamp: 0 }];
+    upsertAssistantMessage(run, { indexMetadata: true });
+    const ctx = buildSessionContext(await new SqliteSessionStorage(db, 's1').getActivePath());
+    expect(ctx.messages.map((m: any) => m.role)).toEqual(['assistant']);
+  });
+
   it('does not append on a non-final (periodic) save', async () => {
     const db = makeDb();
     const run = fakeRun(db);

@@ -163,6 +163,13 @@ export interface RunOptions {
   onAgentReady?: (handle: SteerHandle) => void;
   /** Called when pi emits `turn_start` (after the steering queue is drained with steeringMode:'all'). Application clears pendingSteers. */
   onSteerConsumed?: () => void;
+  /**
+   * Called at pi's `agent_end` with the run's new messages exactly as the
+   * provider saw them (one assistant message per LLM call, interleaved with
+   * tool results). The application persists these to the session tree so the
+   * next run's rebuilt history keeps the provider's prompt-cache prefix.
+   */
+  onTurnMessages?: (messages: AgentMessage[]) => void;
   /** Shared run abort controller owned by the application runtime. */
   abortController?: AbortController;
   /** Resolved image attachments for this prompt (base64, ≤5MB each). */

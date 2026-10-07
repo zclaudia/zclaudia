@@ -128,58 +128,98 @@ export function projectEntriesToMessageRows(entries: Entry[]): ProjectedMessageR
       continue;
     }
     if (message.role === 'assistant') {
-      const blocks = Array.isArray(message.content) ? message.content : [];
-      const thinkingBlocks = blocks.filter(isThinkingBlock).map(block => ({
-        text: block.thinking,
-        signature: block.thinkingSignature,
-        redacted: block.redacted,
-      }));
-      const text = joinedTextFromContent(blocks);
-      const toolCallBlocks = blocks.filter(isToolCallBlock);
-
-      const toolCalls = toolCallBlocks.map(tc => {
-        let j = i + 1;
-        let matched: ToolResultMessageLike | undefined;
-        while (j < entries.length) {
-          const candidate = entries[j];
-          if (!isToolResultEntry(candidate)) break;
-          const tr = candidate.message;
-          if (tr.toolCallId === tc.id) {
-            matched = tr;
-            break;
-          }
-          j++;
-        }
-        const output = matched ? joinedTextFromContent(matched.content) : undefined;
-        return {
-          toolUseId: tc.id,
-          name: tc.name,
-          input: tc.arguments,
-          output,
-          isError: matched?.isError ?? false,
-        };
-      });
-
-      const metadata =
-        thinkingBlocks.length || toolCalls.length || message.usage
-          ? {
-              ...(thinkingBlocks.length ? { thinkingBlocks } : {}),
-              ...(toolCalls.length ? { toolCalls } : {}),
-              ...(message.usage ? { usage: message.usage } : {}),
-            }
-          : undefined;
-
-      rows.push({
-        entryId: entry.id,
-        timestamp: entry.timestamp,
-        role: 'assistant',
-        content: text,
-        metadata,
-      });
-      while (i + 1 < entries.length && isToolResultEntry(entries[i + 1])) {
-        i++;
+      // One UI row per turn: a pi run stores one assistant entry per LLM call
+      // (interleaved with tool results), the live stream shows them as one.
+      const group: MessageEntry[] = [entry];
+      let j = i + 1;
+      while (j < entries.length && continuesTurn(group, entries[j])) {
+        const next = entries[j] as MessageEntry;
+        group.push(next);
+        j++;
       }
+      i = j - 1;
+      rows.push(projectAssistantTurn(group));
     }
   }
   return rows;
+}
+
+function isAssistantEntry(entry: Entry | undefined): entry is MessageEntry {
+  return !!entry && isMessageEntry(entry) && (entry.message as MessageLike).role === 'assistant';
+}
+
+/**
+ * Whether `next` belongs to the turn in `group`: tool results always do; a
+ * following assistant does only when the turn's last call asked for tools and
+ * came from the provider (`model` set). Flattened turns written before
+ * per-call persistence carry no model, so a later run's assistant (e.g. a
+ * background follow-up) never merges into them.
+ */
+function continuesTurn(group: MessageEntry[], next: Entry): boolean {
+  if (isToolResultEntry(next)) return true;
+  if (!isAssistantEntry(next)) return false;
+  const last = [...group].reverse().find(isAssistantEntry);
+  const message = last?.message as (MessageLike & { model?: unknown }) | undefined;
+  const blocks = Array.isArray(message?.content) ? message.content : [];
+  return typeof message?.model === 'string' && blocks.some(isToolCallBlock);
+}
+
+function sumUsage(usages: unknown[]): unknown {
+  const known = usages.filter(isRecord);
+  if (known.length <= 1) return known[0];
+  const add = (a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> => {
+    const out: Record<string, unknown> = { ...a };
+    for (const [key, value] of Object.entries(b)) {
+      const current = out[key];
+      if (typeof value === 'number') {
+        out[key] = (typeof current === 'number' ? current : 0) + value;
+      } else if (isRecord(value)) {
+        out[key] = add(isRecord(current) ? current : {}, value);
+      }
+    }
+    return out;
+  };
+  return known.reduce((acc, usage) => add(acc, usage), {} as Record<string, unknown>);
+}
+
+function projectAssistantTurn(group: MessageEntry[]): ProjectedMessageRow {
+  const assistants = group.filter(isAssistantEntry);
+  const results = group.filter(isToolResultEntry).map(e => e.message);
+  const blocks = assistants.flatMap(e => {
+    const content = (e.message as MessageLike).content;
+    return Array.isArray(content) ? content : [];
+  });
+  const thinkingBlocks = blocks.filter(isThinkingBlock).map(block => ({
+    text: block.thinking,
+    signature: block.thinkingSignature,
+    redacted: block.redacted,
+  }));
+  const toolCalls = blocks.filter(isToolCallBlock).map(tc => {
+    const matched = results.find(tr => tr.toolCallId === tc.id);
+    return {
+      toolUseId: tc.id,
+      name: tc.name,
+      input: tc.arguments,
+      output: matched ? joinedTextFromContent(matched.content) : undefined,
+      isError: matched?.isError ?? false,
+    };
+  });
+  const usage = sumUsage(assistants.map(e => (e.message as MessageLike).usage));
+  const metadata =
+    thinkingBlocks.length || toolCalls.length || usage
+      ? {
+          ...(thinkingBlocks.length ? { thinkingBlocks } : {}),
+          ...(toolCalls.length ? { toolCalls } : {}),
+          ...(usage ? { usage } : {}),
+        }
+      : undefined;
+  return {
+    entryId: assistants[assistants.length - 1].id,
+    timestamp: assistants[0].timestamp,
+    role: 'assistant',
+    content: assistants
+      .map(e => joinedTextFromContent((e.message as MessageLike).content))
+      .join(''),
+    metadata,
+  };
 }

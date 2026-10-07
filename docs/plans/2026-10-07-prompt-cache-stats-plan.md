@@ -1,6 +1,6 @@
 # Prompt Cache 命中率统计与失效诊断 实施计划（草案）
 
-> 状态：Phase 0b + Phase 1 已提交（42a9e1b4 / 5a23eaec）；Phase 2 已实现（2a–2d，未提交）；Phase 3 待做。步骤用 `- [ ]` 跟踪。
+> 状态：Phase 0b + 1 已提交（42a9e1b4 / 5a23eaec）；Phase 2 已提交（94e02e17 / 022ab51f）；Phase 3 已实现（未提交，trim 阶梯化暂缓）。步骤用 `- [ ]` 跟踪。
 
 **Goal:** 统一口径统计 prompt cache token 与命中比例（看成本），并能定位每次缓存失效的位置和原因（排查失效）。本轮聚焦 pi（及 cursor）；claude / codex 暂不考虑——统计层是 runtime 无关的，它们的账本行会照常显示，但不为它们做专门修复或逐调用采集。
 
@@ -50,9 +50,9 @@
 
 ## Phase 3 — pi 结构性失效修复（独立立项）
 
-- [ ] 先用 Phase 1 / 2a 的数据量化「run 边界命中率」坐实影响。
-- [ ] 写回路径改为按真实 LLM 调用顺序保存交错的 assistant / toolResult（含 thinking signature），使下一 run 重建的历史与上一 run 发送的字节序列一致。
-- [ ] trim 改为阶梯式（按块对齐而非逐条平移），减少前缀抖动。
+- [x] 量化（本地 OpenAI 兼容 mock，按 prompt_cache_key 最长公共前缀模拟缓存；读 ~10k token 文件的两轮 + 一轮短回复）：修复前 run 边界复用率 0.27 / 0.58（`previous_turn_rewritten`），修复后 1.0 / 1.0。抓包对比实际请求体发现**两处**分叉：① 本 run 被压平；② 树里的用户消息是字符串 content，而 `Agent.prompt` 发的是 `[{type:'text'}]` 数组——从上一 run 的用户消息起就已分叉（比压平更早）。
+- [x] 写回改为 pi 的真实消息：`agent_end` 经宿主内部回调 `RunOptions.onTurnMessages` 交给 ActiveRun，final save 用 `providerTurnMessagesForTree`（逐调用 assistant + toolResult，去掉仅 UI 用的 `details`，保留 model / usage / thinking signature）；拿不到时回退压平。`buildUserMessage` 统一数组形态。消息行 `tree_entry_id` 指向本轮最后一条 assistant。投影按轮合并（工具调用后接的 assistant 且带 model 才续接，老压平条目不误并），fork/branch 后 UI 仍每轮一条、usage 为各调用之和。顺带：压缩阈值锚点 `lastAssistantPromptTokens` 不再用整轮求和（原先高估、过早压缩）；pi-ai 跨模型判断有了 model 字段。已知局限：steer 过的 run 中 steer 消息位置仍与发送顺序不同。
+- [ ] ~~trim 阶梯化~~ —— 暂缓：trim 预算 = 压缩阈值 − 余量，只在「接近阈值但未压缩」的窄区间触发；分类器已能标出 `history_trimmed`，有数据再做。
 
 ---
 
@@ -61,4 +61,4 @@
 - ~~节省估算~~ —— 2026-10-07 定：不做金额，只给 cache token 与比例。
 - ~~2e 外部逐调用~~ —— 2026-10-07 定：claude / codex 先不考虑。
 - ~~时间线位置~~ —— 2026-10-07 定：Context popover；Home 另设 Cache 标签页看总体。
-1. Phase 3 是否现在单开一条线先验证？
+- ~~Phase 3 验证~~ —— 2026-10-07 在本 session 完成。

@@ -506,6 +506,9 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   runOptions.onSteerConsumed = () => {
     activeRun.pendingSteers = [];
   };
+  runOptions.onTurnMessages = messages => {
+    activeRun.providerTurnMessages = messages;
+  };
 
   console.log(
     `[Run Debug] session=${message.sessionId} sdk_session=${sdkSessionId || 'NEW'} provider=${effectiveProviderType} mode=${modeValue} model=${effectiveAgentProfile.model || 'default'} cwd=${cwd} baseUrl=${effectiveProviderConfig?.baseUrl || 'default'}`

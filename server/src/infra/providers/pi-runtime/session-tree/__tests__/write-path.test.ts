@@ -11,8 +11,13 @@ import {
 } from '../write-path.js';
 
 describe('write-path builders', () => {
-  it('buildUserMessage: plain text', () => {
-    expect(buildUserMessage('hi', [])).toEqual({ role: 'user', content: 'hi' });
+  it('buildUserMessage: plain text uses the block array pi itself sends', () => {
+    // Agent.prompt(text) sends content: [{ type: 'text', text }]; a bare string
+    // serializes differently on the wire and breaks the provider cache prefix.
+    expect(buildUserMessage('hi', [])).toEqual({
+      role: 'user',
+      content: [{ type: 'text', text: 'hi' }],
+    });
   });
 
   it('buildUserMessage: image attachment becomes a ref-carrying image block', () => {
@@ -104,7 +109,7 @@ describe('write-path builders', () => {
       })
     );
     expect(ctx.messages.map((m: any) => m.role)).toEqual(['user', 'assistant']);
-    expect((ctx.messages[0] as any).content).toBe('q');
+    expect((ctx.messages[0] as any).content).toEqual([{ type: 'text', text: 'q' }]);
   });
 
   it('appendMessagesToTree is atomic: a mid-batch failure rolls back the whole turn + leaf', async () => {

@@ -108,6 +108,9 @@ export interface RunMessagingState {
   /** Route C: set once the turn has been appended to the session tree (final save).
    *  Guards against the multiple final-save call sites duplicating tree entries. */
   treeTurnAppended?: boolean;
+  /** Pi's real per-call turn messages (RunOptions.onTurnMessages); preferred over
+   *  the flattened turn when writing the session tree. */
+  providerTurnMessages?: AgentMessage[];
 }
 
 export interface RunLifecycleState {

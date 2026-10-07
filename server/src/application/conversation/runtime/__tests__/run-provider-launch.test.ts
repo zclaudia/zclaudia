@@ -245,6 +245,7 @@ describe('ws/run-provider-launch', () => {
         mode: 'default',
         onAgentReady: expect.any(Function),
         onSteerConsumed: expect.any(Function),
+        onTurnMessages: expect.any(Function),
       }),
       permissionCallback
     );
@@ -278,6 +279,9 @@ describe('ws/run-provider-launch', () => {
     } as never);
     runOptionsArg.onSteerConsumed();
     expect(activeRun.pendingSteers).toEqual([]);
+    const turn = [{ role: 'assistant', content: [] }];
+    (runOptionsArg as unknown as { onTurnMessages: (m: unknown[]) => void }).onTurnMessages(turn);
+    expect((activeRun as { providerTurnMessages?: unknown }).providerTurnMessages).toBe(turn);
 
     vi.advanceTimersByTime(5000);
     expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun);

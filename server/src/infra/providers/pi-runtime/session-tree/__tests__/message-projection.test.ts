@@ -58,6 +58,66 @@ describe('projectEntriesToMessageRows', () => {
     });
   });
 
+  it('merges one turn of per-call assistant entries into a single row', () => {
+    const rows = projectEntriesToMessageRows([
+      mEntry('u1', null, { role: 'user', content: 'go' }),
+      mEntry('a1', 'u1', {
+        role: 'assistant',
+        model: 'm',
+        content: [
+          { type: 'text', text: 'Reading. ' },
+          { type: 'toolCall', id: 'tc1', name: 'Read', arguments: { file_path: 'a' } },
+        ],
+        usage: { input: 10, output: 2, cacheRead: 90, cacheWrite: 0, totalTokens: 102 },
+      }),
+      mEntry('r1', 'a1', {
+        role: 'toolResult',
+        toolCallId: 'tc1',
+        toolName: 'Read',
+        content: [{ type: 'text', text: 'body' }],
+        isError: false,
+      }),
+      mEntry('a2', 'r1', {
+        role: 'assistant',
+        model: 'm',
+        content: [{ type: 'text', text: 'Done.' }],
+        usage: { input: 5, output: 3, cacheRead: 100, cacheWrite: 0, totalTokens: 108 },
+      }),
+      mEntry('u2', 'a2', { role: 'user', content: 'next' }),
+      mEntry('a3', 'u2', { role: 'assistant', content: [{ type: 'text', text: 'ok' }] }),
+    ]);
+    expect(rows.map(r => [r.role, r.entryId, r.content])).toEqual([
+      ['user', 'u1', 'go'],
+      // Linked to the turn's last assistant entry; text joins like the live stream.
+      ['assistant', 'a2', 'Reading. Done.'],
+      ['user', 'u2', 'next'],
+      ['assistant', 'a3', 'ok'],
+    ]);
+    expect(rows[1].metadata).toMatchObject({
+      toolCalls: [{ toolUseId: 'tc1', name: 'Read', output: 'body', isError: false }],
+      usage: { input: 15, output: 5, cacheRead: 190, cacheWrite: 0, totalTokens: 210 },
+    });
+  });
+
+  it('never merges a later assistant into a flattened (pre per-call) turn', () => {
+    const rows = projectEntriesToMessageRows([
+      mEntry('a1', null, {
+        role: 'assistant',
+        stopReason: 'toolUse',
+        content: [{ type: 'toolCall', id: 'tc1', name: 'Read', arguments: {} }],
+      }),
+      mEntry('r1', 'a1', {
+        role: 'toolResult',
+        toolCallId: 'tc1',
+        toolName: 'Read',
+        content: [{ type: 'text', text: 'x' }],
+      }),
+      // A background follow-up run's assistant, no user message in between.
+      mEntry('a2', 'r1', { role: 'assistant', content: [{ type: 'text', text: 'later' }] }),
+    ]);
+    expect(rows.map(r => r.entryId)).toEqual(['a1', 'a2']);
+  });
+
   it('skips non-message entries (e.g. compaction)', () => {
     const compaction = {
       type: 'compaction',

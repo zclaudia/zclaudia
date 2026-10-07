@@ -168,6 +168,13 @@ export async function* runPiAgentStream(input: {
         lastCallUsage,
       });
       cacheTrace?.finish(messages);
+      // Hand the faithful per-call messages to the host BEFORE the terminal
+      // event, so the final save writes them to the session tree.
+      try {
+        options.onTurnMessages?.(messages);
+      } catch (err) {
+        console.warn('[PiAgentProviderAdapter] onTurnMessages callback threw:', err);
+      }
 
       // Surface LLM-level errors that pi-agent-core's loop quietly absorbs
       // (it routes `error` and `done` stop reasons through the same

@@ -17,6 +17,7 @@ import { setPhase, isTerminalPhase } from './active-run-phase.js';
 import {
   appendMessagesToTree,
   buildAssistantTurnMessages,
+  providerTurnMessagesForTree,
 } from '../../../infra/providers/pi-runtime/session-tree/write-path.js';
 import { getUsageRecorder } from '../../../domains/usage/recorder.js';
 
@@ -298,7 +299,17 @@ export function upsertAssistantMessage(
   }
   if (run.collectedToolCalls.length > 0) {
     metadata.toolCalls = run.collectedToolCalls.map(
-      ({ toolUseId, parentToolUseId, name, input, output, isError, effect, startedAt, completedAt }) => ({
+      ({
+        toolUseId,
+        parentToolUseId,
+        name,
+        input,
+        output,
+        isError,
+        effect,
+        startedAt,
+        completedAt,
+      }) => ({
         toolUseId,
         ...(parentToolUseId ? { parentToolUseId } : {}),
         name,
@@ -376,19 +387,25 @@ export function upsertAssistantMessage(
     }
 
     if (willAppendTree) {
-      const entryIds = appendMessagesToTree(
-        run.db,
-        run.sessionId,
+      // Prefer the runtime's real per-call messages (pi): the flattened turn
+      // re-shapes the run, so the next run's history would miss the provider's
+      // prompt cache from this turn on.
+      const faithful = providerTurnMessagesForTree(run.providerTurnMessages);
+      const turnMessages =
+        faithful ??
         buildAssistantTurnMessages({
           fullContent: run.fullContent,
           thinkingBlocks: run.thinkingBlocks,
           collectedToolCalls: run.collectedToolCalls,
           usage: options?.usage,
-        })
-      );
+        });
+      const entryIds = appendMessagesToTree(run.db, run.sessionId, turnMessages);
+      // The UI row stands for the whole turn: link its last assistant entry so
+      // fork / branch at this message keep every call of the turn.
+      const lastAssistant = turnMessages.map(m => m.role).lastIndexOf('assistant');
       run.db
         .prepare(`UPDATE messages SET tree_entry_id = ? WHERE id = ?`)
-        .run(entryIds[0], run.assistantMessageId);
+        .run(entryIds[lastAssistant], run.assistantMessageId);
     }
   })();
   if (willAppendTree) run.treeTurnAppended = true;
