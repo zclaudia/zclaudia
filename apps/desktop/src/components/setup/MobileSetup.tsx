@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bot, Monitor, ChevronRight } from 'lucide-react';
+import { Monitor, ChevronRight } from 'lucide-react';
+import { BrandMark } from '../BrandMark';
 import { useGatewayStore } from '../../stores/gatewayStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
@@ -169,7 +170,7 @@ export function MobileSetup() {
                 onClick={handleLogoTap}
                 className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4"
               >
-                <Bot size={32} strokeWidth={1.5} className="text-primary" />
+                <BrandMark className="w-12 h-12 object-contain" />
               </button>
               <h1 className="text-xl font-bold text-foreground">Select a Server</h1>
               <p className="text-sm text-muted-foreground mt-1">Choose a backend to connect to</p>
@@ -264,7 +265,7 @@ export function MobileSetup() {
               onClick={handleLogoTap}
               className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4"
             >
-              <Bot size={32} strokeWidth={1.5} className="text-primary" />
+              <BrandMark className="w-12 h-12 object-contain" />
             </button>
             <h1 className="text-xl font-bold text-foreground">Claudia</h1>
             <p className="text-sm text-muted-foreground mt-1">Connect to your server via Gateway</p>

@@ -5,6 +5,8 @@
   "description": "A cross-platform shell for a zclaudia-owned coding agent",
   "type": "module",
   "scripts": {
+    "icons:generate": "bash scripts/with-project-node.sh node scripts/assets/regenerate-icons.mjs",
+    "icons:check": "bash scripts/with-project-node.sh node scripts/assets/regenerate-icons.mjs --check",
     "predev": "bash scripts/dev/ensure-deps.sh && pnpm plugins:build",
     "dev": "bash scripts/with-project-node.sh pnpm -r --parallel run dev",
     "start:clean": "bash scripts/dev/start-app-clean.sh",

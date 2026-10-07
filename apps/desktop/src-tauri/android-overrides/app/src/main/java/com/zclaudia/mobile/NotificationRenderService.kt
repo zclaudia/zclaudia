@@ -59,7 +59,7 @@ class NotificationRenderService : Service() {
 
   private fun buildForegroundNotification(): Notification {
     return NotificationCompat.Builder(this, FOREGROUND_CHANNEL_ID)
-      .setSmallIcon(R.mipmap.ic_launcher)
+      .setSmallIcon(R.drawable.ic_stat_claudia)
       .setContentTitle("Claudia")
       .setContentText("Rendering notification")
       .setPriority(NotificationCompat.PRIORITY_LOW)

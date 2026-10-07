@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Bot,
   Monitor,
   ChevronRight,
   Terminal,
@@ -12,6 +11,7 @@ import {
   Globe,
   ArrowLeft,
 } from 'lucide-react';
+import { BrandMark } from '../BrandMark';
 import { useWslDiscovery } from '../../hooks/useWslDiscovery';
 import { useServerStore } from '../../stores/serverStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';
@@ -247,7 +247,7 @@ export function WindowsSetup() {
           {/* Logo */}
           <div className="text-center">
             <div className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4">
-              <Bot size={32} strokeWidth={1.5} className="text-primary" />
+              <BrandMark className="w-12 h-12 object-contain" />
             </div>
             <h1 className="text-xl font-bold text-foreground">Welcome to Claudia</h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -314,7 +314,7 @@ export function WindowsSetup() {
           <div className="w-full max-w-sm space-y-6">
             <div className="text-center">
               <div className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4">
-                <Bot size={32} strokeWidth={1.5} className="text-primary" />
+                <BrandMark className="w-12 h-12 object-contain" />
               </div>
               <h1 className="text-xl font-bold text-foreground">Install WSL</h1>
               <p className="text-sm text-muted-foreground mt-1">
@@ -592,7 +592,7 @@ export function WindowsSetup() {
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center">
             <div className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4">
-              <Bot size={32} strokeWidth={1.5} className="text-primary" />
+              <BrandMark className="w-12 h-12 object-contain" />
             </div>
             <h1 className="text-xl font-bold text-foreground">Manual Connection</h1>
             <p className="text-sm text-muted-foreground mt-1">Enter the server address directly</p>

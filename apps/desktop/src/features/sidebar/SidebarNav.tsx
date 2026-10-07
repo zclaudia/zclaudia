@@ -220,15 +220,16 @@ export function SidebarNav({
         </button>
 
         {onOpenClaudia && (
-          // Claudia is a destination, not a global action — it used to be a
-          // header icon whose PNG mark painted a solid disc, the brightest
-          // thing in the drawer.
+          // Use the monochrome mark with the same color states as other destinations.
           <button
             onClick={onOpenClaudia}
             aria-label="Claudia"
             className={rowClass(!!isClaudiaActive)}
           >
-            <BrandMark className={`${iconSize} flex-shrink-0 object-contain`} />
+            <BrandMark
+              variant="monochrome"
+              className={`${iconClass(!!isClaudiaActive)} flex-shrink-0`}
+            />
             <span className="flex-1 truncate text-left">Claudia</span>
             {claudiaStatus && !isClaudiaActive && (
               <span

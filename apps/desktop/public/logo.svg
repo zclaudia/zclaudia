@@ -1,3 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <image href="/logo.png" width="512" height="512"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <path id="head" d="M 69 228 L 114 101 Q 119 90 127 100 L 150 126 Q 153 130 157 125 L 174 104 Q 181 95 188 103 L 228 170 Q 265 168 299 173 L 385 112 Q 395 106 401 117 Q 418 151 438 230 C 460 263 472 292 472 318 C 472 364 451 396 412 413 C 377 428 311 434 256 434 C 194 434 125 432 86 414 C 46 396 40 366 40 321 C 40 286 49 253 69 228 Z" fill="#2874ED" />
+  <path id="face-mask" d="M 256 242 C 199 242 148 242 121 269 C 103 287 102 321 109 352 C 117 389 174 400 256 400 C 338 400 393 389 403 353 C 411 325 411 290 397 272 C 375 245 321 242 256 242 Z" fill="#142B54" />
+  <rect id="eye-left" x="132" y="296" width="82" height="46" rx="23" fill="#FAF8F2" />
+  <rect id="eye-right" x="296" y="296" width="82" height="46" rx="23" fill="#FAF8F2" />
 </svg>

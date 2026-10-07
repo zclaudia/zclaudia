@@ -47,7 +47,7 @@ export function AppHeader({
 
         <div className="hidden md:flex items-center gap-2" data-tauri-drag-region>
           <div className="w-7 h-7 rounded-xl border border-border/70 bg-card/80 shadow-apple-sm backdrop-blur-sm flex items-center justify-center flex-shrink-0">
-            <BrandMark className="w-[1.625rem] h-[1.625rem] object-contain pointer-events-none select-none drop-shadow-sm" />
+            <BrandMark className="w-[1.625rem] h-[1.625rem] object-contain pointer-events-none select-none" />
           </div>
           <span
             className="font-semibold text-sm text-foreground leading-tight"
