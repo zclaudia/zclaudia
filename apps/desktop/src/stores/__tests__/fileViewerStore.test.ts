@@ -8,6 +8,7 @@ describe('fileViewerStore', () => {
       isOpen: false,
       filePath: null,
       projectRoot: null,
+      backendId: null,
       content: null,
       loading: false,
       error: null,
@@ -41,6 +42,34 @@ describe('fileViewerStore', () => {
   });
 
   describe('openFile', () => {
+    it('isolates identical paths and invalidation by backend while keeping legacy calls compatible', () => {
+      const store = useFileViewerStore.getState();
+      store.openFile('/project', 'same.ts', undefined, undefined, 'A');
+      store.setContent('Backend A', 1);
+      store.openFile('/project', 'same.ts', undefined, undefined, 'B');
+      expect(useFileViewerStore.getState().content).toBeNull();
+      store.setContent('Backend B', 2);
+      store.openFile('/project', 'same.ts');
+      expect(useFileViewerStore.getState().content).toBeNull();
+      store.setContent('Legacy', 3);
+      expect(store.getCached('/project', 'same.ts', 'A')).toBe('Backend A');
+      expect(store.getCached('/project', 'same.ts', 'B')).toBe('Backend B');
+      expect(store.getCached('/project', 'same.ts')).toBe('Legacy');
+      store.openFile('/project', 'same.ts', undefined, undefined, 'B');
+      expect(useFileViewerStore.getState()).toMatchObject({ backendId: 'B', content: 'Backend B', knownMtimeMs: 2 });
+      store.invalidate('/project', 'same.ts', 'A');
+      expect(store.getCached('/project', 'same.ts', 'A')).toBeUndefined();
+      expect(useFileViewerStore.getState().knownMtimeMs).toBe(2);
+    });
+
+    it('opens search with the requested scope and clears a previous backend file', () => {
+      const store = useFileViewerStore.getState();
+      store.openFile('/project', 'same.ts', undefined, undefined, 'A');
+      store.setContent('Backend A');
+      store.openSearch('/project', 'B');
+      expect(useFileViewerStore.getState()).toMatchObject({ isOpen: true, searchOpen: true, backendId: 'B', projectRoot: '/project', filePath: null, content: null });
+    });
+
     it('opens the panel and sets file path and project root', () => {
       useFileViewerStore.getState().openFile('/project', 'src/index.ts');
 

@@ -40,14 +40,16 @@ const EMPTY_SESSION: BrowserSessionView = {
 
 interface BrowserStore {
   engine: BrowserEngineView;
+  enginesByBackend: Record<string, BrowserEngineView>;
   sessions: Record<string, BrowserSessionView>;
   patchSession(sessionId: string, patch: Partial<BrowserSessionView>): void;
-  setEngine(engine: BrowserEngineView): void;
+  setEngine(engine: BrowserEngineView, backendId?: string): void;
   reset(): void;
 }
 
 export const useBrowserStore = create<BrowserStore>(set => ({
   engine: { status: 'unknown' },
+  enginesByBackend: {},
   sessions: {},
   patchSession: (sessionId, patch) =>
     set(s => ({
@@ -56,6 +58,8 @@ export const useBrowserStore = create<BrowserStore>(set => ({
         [sessionId]: { ...(s.sessions[sessionId] ?? EMPTY_SESSION), ...patch },
       },
     })),
-  setEngine: engine => set({ engine }),
-  reset: () => set({ engine: { status: 'unknown' }, sessions: {} }),
+  setEngine: (engine, backendId) => set(state => ({ engine,
+    ...(backendId ? { enginesByBackend: { ...state.enginesByBackend, [backendId]: engine } } : {}),
+  })),
+  reset: () => set({ engine: { status: 'unknown' }, enginesByBackend: {}, sessions: {} }),
 }));

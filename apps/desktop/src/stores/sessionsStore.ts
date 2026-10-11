@@ -44,6 +44,16 @@ export function resolveSessionBucketBackendId(
 interface SessionsState {
   // Remote sessions organized by backendId
   remoteSessions: Map<string, RemoteSession[]>;
+  /** Incremental events can create a bucket before its complete snapshot arrives. */
+  snapshotBackendIds: Set<string>;
+  /** Complete snapshot revisions; incremental events never advance this marker. */
+  snapshotGenerations: Map<string, number>;
+  nextSnapshotGeneration: number;
+  /** Only positive local create responses receive the one-snapshot admission grace. */
+  pendingAdmissions: Map<string, Map<string, { session: RemoteSession; missedSnapshots: number }>>;
+  deletedSessionIds: Map<string, Set<string>>;
+  /** Explicit removes outrank the first in-flight full snapshot that still contains the id. */
+  pendingDeletionConfirmations: Map<string, Map<string, number>>;
   // Single source of truth for active sessions by backend key
   // - local direct server: "__local__"
   // - gateway backend: raw backendId
@@ -51,6 +61,7 @@ interface SessionsState {
 
   // Actions
   setRemoteSessions: (backendId: string, sessions: RemoteSession[]) => void;
+  admitCreatedSession: (backendId: string, session: RemoteSession) => void;
   handleSessionEvent: (
     backendId: string,
     eventType: 'created' | 'updated' | 'deleted',
@@ -66,27 +77,102 @@ interface SessionsState {
 
 export const useSessionsStore = create<SessionsState>(set => ({
   remoteSessions: new Map(),
+  snapshotBackendIds: new Set(),
+  snapshotGenerations: new Map(),
+  nextSnapshotGeneration: 1,
+  pendingAdmissions: new Map(),
+  deletedSessionIds: new Map(),
+  pendingDeletionConfirmations: new Map(),
   activeSessionIdsByBackend: new Map(),
 
   setRemoteSessions: (backendId: string, sessions: RemoteSession[]) => {
     // Note: caller (backend_data_snapshot handler) already checks sessionsChanged
     // before calling this method, so no duplicate diff check needed here.
-    reassignSessionOwnersForBackend(
-      backendId,
-      sessions.map(s => s.id)
-    );
     set(state => {
+      const pendingDeletionConfirmations = new Map(state.pendingDeletionConfirmations);
+      const deletionConfirmations = new Map(pendingDeletionConfirmations.get(backendId));
+      const incoming = sessions.filter(session => {
+        const confirmations = deletionConfirmations.get(session.id);
+        if (confirmations === undefined) return true;
+        if (confirmations >= 1) {
+          deletionConfirmations.delete(session.id);
+          return true;
+        }
+        deletionConfirmations.set(session.id, 1);
+        return false;
+      });
+      const receivedIds = new Set(sessions.map(session => session.id));
+      for (const id of deletionConfirmations.keys()) {
+        if (!receivedIds.has(id)) deletionConfirmations.delete(id);
+      }
+      if (deletionConfirmations.size) pendingDeletionConfirmations.set(backendId, deletionConfirmations);
+      else pendingDeletionConfirmations.delete(backendId);
+      const incomingIds = new Set(incoming.map(session => session.id));
+      const pendingAdmissions = new Map(state.pendingAdmissions);
+      const pending = new Map(pendingAdmissions.get(backendId));
+      const admitted: RemoteSession[] = [];
+      // A full request can start before REST creation and finish after it.
+      // Retain only positively admitted new ids for that first missing response;
+      // a second missing full response or any explicit delete ends the grace.
+      for (const [id, admission] of pending) {
+        if (incomingIds.has(id) || admission.missedSnapshots >= 1) pending.delete(id);
+        else {
+          pending.set(id, { ...admission, missedSnapshots: 1 });
+          admitted.push(admission.session);
+        }
+      }
+      if (pending.size) pendingAdmissions.set(backendId, pending);
+      else pendingAdmissions.delete(backendId);
+      const merged = [...incoming, ...admitted];
+      reassignSessionOwnersForBackend(backendId, merged.map(session => session.id));
+      const validIds = new Set(merged.map(session => session.id));
+      const deletedSessionIds = new Map(state.deletedSessionIds);
+      const deleted = new Set(deletedSessionIds.get(backendId));
+      for (const session of state.remoteSessions.get(backendId) ?? []) {
+        if (!validIds.has(session.id)) deleted.add(session.id);
+      }
+      for (const id of validIds) deleted.delete(id);
+      deletedSessionIds.set(backendId, deleted);
       const newMap = new Map(state.remoteSessions);
-      newMap.set(backendId, sessions);
+      newMap.set(backendId, merged);
 
       // Keep active index in sync with incoming snapshot
       const newActiveMap = new Map(state.activeSessionIdsByBackend);
-      const activeIds = new Set<string>(sessions.filter(s => s.isActive).map(s => s.id));
+      const activeIds = new Set<string>(merged.filter(s => s.isActive).map(s => s.id));
       newActiveMap.set(backendId, activeIds);
 
       return {
         remoteSessions: newMap,
+        snapshotBackendIds: new Set([...state.snapshotBackendIds, backendId]),
+        snapshotGenerations: new Map(state.snapshotGenerations).set(backendId, state.nextSnapshotGeneration),
+        nextSnapshotGeneration: state.nextSnapshotGeneration + 1,
+        pendingAdmissions, deletedSessionIds, pendingDeletionConfirmations,
         activeSessionIdsByBackend: newActiveMap,
+      };
+    });
+  },
+
+  admitCreatedSession: (backendId, session) => {
+    recordSessionOwner(session.id, backendId);
+    set(state => {
+      if (state.remoteSessions.get(backendId)?.some(item => item.id === session.id)) return state;
+      const pendingAdmissions = new Map(state.pendingAdmissions);
+      const pending = new Map(pendingAdmissions.get(backendId));
+      pending.set(session.id, { session, missedSnapshots: 0 });
+      pendingAdmissions.set(backendId, pending);
+      const deletedSessionIds = new Map(state.deletedSessionIds);
+      const deleted = new Set(deletedSessionIds.get(backendId));
+      deleted.delete(session.id);
+      deletedSessionIds.set(backendId, deleted);
+      const pendingDeletionConfirmations = new Map(state.pendingDeletionConfirmations);
+      const deletionConfirmations = new Map(pendingDeletionConfirmations.get(backendId));
+      deletionConfirmations.delete(session.id);
+      if (deletionConfirmations.size) pendingDeletionConfirmations.set(backendId, deletionConfirmations);
+      else pendingDeletionConfirmations.delete(backendId);
+      return { pendingAdmissions, deletedSessionIds, pendingDeletionConfirmations,
+        remoteSessions: new Map(state.remoteSessions).set(backendId, [...state.remoteSessions.get(backendId) ?? [], session]),
+        ...(session.isActive ? { activeSessionIdsByBackend: new Map(state.activeSessionIdsByBackend)
+          .set(backendId, new Set([...state.activeSessionIdsByBackend.get(backendId) ?? [], session.id])) } : {}),
       };
     });
   },
@@ -106,11 +192,31 @@ export const useSessionsStore = create<SessionsState>(set => ({
       const backendSessions = newMap.get(backendId) || [];
       const newActiveMap = new Map(state.activeSessionIdsByBackend);
       const backendActive = new Set(newActiveMap.get(backendId) || []);
+      const pendingAdmissions = new Map(state.pendingAdmissions);
+      const pending = new Map(pendingAdmissions.get(backendId));
+      const admission = pending.get(session.id);
+      if (eventType === 'deleted') pending.delete(session.id);
+      else if (admission) pending.set(session.id, { ...admission, session: { ...admission.session, ...session } });
+      if (pending.size) pendingAdmissions.set(backendId, pending);
+      else pendingAdmissions.delete(backendId);
+      const deletedSessionIds = new Map(state.deletedSessionIds);
+      const deleted = new Set(deletedSessionIds.get(backendId));
+      if (eventType === 'deleted') deleted.add(session.id);
+      else deleted.delete(session.id);
+      deletedSessionIds.set(backendId, deleted);
+      const pendingDeletionConfirmations = new Map(state.pendingDeletionConfirmations);
+      const deletionConfirmations = new Map(pendingDeletionConfirmations.get(backendId));
+      if (eventType === 'deleted') deletionConfirmations.set(session.id, 0);
+      else deletionConfirmations.delete(session.id);
+      if (deletionConfirmations.size) pendingDeletionConfirmations.set(backendId, deletionConfirmations);
+      else pendingDeletionConfirmations.delete(backendId);
 
       if (eventType === 'created') {
         // Dedup: skip if session already exists (e.g. both WebSocket push and sessionSync detected it)
-        if (backendSessions.some(s => s.id === session.id)) return state;
-        newMap.set(backendId, [...backendSessions, session]);
+        if (backendSessions.some(s => s.id === session.id)) {
+          if (!state.pendingAdmissions.get(backendId)?.has(session.id)) return state;
+          newMap.set(backendId, backendSessions.map(item => item.id === session.id ? session : item));
+        } else newMap.set(backendId, [...backendSessions, session]);
         if (session.isActive) backendActive.add(session.id);
       } else if (eventType === 'updated') {
         // Update existing session
@@ -132,6 +238,7 @@ export const useSessionsStore = create<SessionsState>(set => ({
       newActiveMap.set(backendId, backendActive);
       return {
         remoteSessions: newMap,
+        pendingAdmissions, deletedSessionIds, pendingDeletionConfirmations,
         activeSessionIdsByBackend: newActiveMap,
       };
     });
@@ -236,8 +343,20 @@ export const useSessionsStore = create<SessionsState>(set => ({
       newMap.delete(backendId);
       const newActiveMap = new Map(state.activeSessionIdsByBackend);
       newActiveMap.delete(backendId);
+      const snapshotBackendIds = new Set(state.snapshotBackendIds);
+      snapshotBackendIds.delete(backendId);
+      const snapshotGenerations = new Map(state.snapshotGenerations);
+      snapshotGenerations.delete(backendId);
+      const pendingAdmissions = new Map(state.pendingAdmissions);
+      pendingAdmissions.delete(backendId);
+      const deletedSessionIds = new Map(state.deletedSessionIds);
+      deletedSessionIds.delete(backendId);
+      const pendingDeletionConfirmations = new Map(state.pendingDeletionConfirmations);
+      pendingDeletionConfirmations.delete(backendId);
       return {
         remoteSessions: newMap,
+        snapshotBackendIds,
+        snapshotGenerations, pendingAdmissions, deletedSessionIds, pendingDeletionConfirmations,
         activeSessionIdsByBackend: newActiveMap,
       };
     });
@@ -247,6 +366,11 @@ export const useSessionsStore = create<SessionsState>(set => ({
     clearSessionOwnership();
     set({
       remoteSessions: new Map(),
+      snapshotBackendIds: new Set(),
+      snapshotGenerations: new Map(),
+      pendingAdmissions: new Map(),
+      deletedSessionIds: new Map(),
+      pendingDeletionConfirmations: new Map(),
       activeSessionIdsByBackend: new Map(),
     });
   },

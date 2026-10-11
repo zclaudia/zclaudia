@@ -10,6 +10,7 @@ import type { Attachment } from '../MessageInput';
 
 interface UseSendQueueConsumerParams {
   sessionId: string;
+  enabled?: boolean;
   /** Ships a queued item as a brand-new run (run_start + optimistic message). */
   sendAsNewRun: (content: string, attachments?: Attachment[]) => Promise<void>;
 }
@@ -42,6 +43,7 @@ const SHIP_ACTIVE_TIMEOUT_MS = 10_000;
  */
 export function useSendQueueConsumer({
   sessionId,
+  enabled = true,
   sendAsNewRun,
 }: UseSendQueueConsumerParams): void {
   // True between "decided to ship an item" and "the shipped run went active".
@@ -56,6 +58,8 @@ export function useSendQueueConsumer({
   }, [sendAsNewRun]);
 
   useEffect(() => {
+    if (!enabled) return;
+    let disposed = false;
     const sessionIsActive = (records: Record<string, SessionRunRecord>): boolean =>
       Object.values(records).some(r => r.sessionId === sessionId && isSessionRunActive(r));
 
@@ -72,7 +76,7 @@ export function useSendQueueConsumer({
     };
 
     const drainOne = async (): Promise<void> => {
-      if (consumingRef.current) return;
+      if (disposed || consumingRef.current) return;
       const store = useSendQueueStore.getState();
       const items = (store.queues[sessionId] ?? []).filter(i => i.intent === 'queue');
       if (items.length === 0) return;
@@ -102,6 +106,7 @@ export function useSendQueueConsumer({
         // Lock stays held; the active transition (or the fallback timer) unlocks
         // it so the NEXT idle transition is treated as a fresh, distinct run end.
       } catch (err) {
+        if (disposed) return;
         console.error('[useSendQueueConsumer] failed to ship queued item:', err);
         useToastStore.getState().add({
           type: 'error',
@@ -136,8 +141,10 @@ export function useSendQueueConsumer({
     }
 
     return () => {
+      disposed = true;
       unsubscribe();
       clearUnlockTimer();
+      consumingRef.current = false;
     };
-  }, [sessionId]);
+  }, [sessionId, enabled]);
 }

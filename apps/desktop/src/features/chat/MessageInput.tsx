@@ -8,7 +8,6 @@ import { skillRefKey } from '@zclaudia/shared/core/skills';
 import * as api from '../../services/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useComposerStore } from '../../stores/composerStore';
-import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useAgentForSession } from '../../hooks/useAgentForSession';
 import type { InvocableDescriptor } from '@zclaudia/shared/providers';
 import { RichTextarea, type RichTextareaHandle } from 'rich-textarea';
@@ -84,7 +83,7 @@ export function MessageInput({
 }: MessageInputProps) {
   const isMobile = useIsMobile();
   const clearDraft = useComposerStore(s => s.clearDraft);
-  const { agent } = useAgentForSession(sessionId);
+  const { agent, backendId: agentBackendId, refresh: refreshAgent } = useAgentForSession(sessionId);
   const [value, setValue] = useState('');
   const [hoveredTokenStart, setHoveredTokenStart] = useState<number | null>(null);
   const [deleteZoneHovered, setDeleteZoneHovered] = useState(false);
@@ -621,9 +620,9 @@ export function MessageInput({
     textareaRef.current?.focus();
   };
 
-  // Toggle a skill's pin state on the active agent profile. Pins auto-load the
+  // Toggle a skill's pin state on this session's agent profile. Pins auto-load the
   // skill at session start (pi-runtime/skills.ts) and persist to agent_profiles
-  // (hence sync across devices). Optimistically updates the local cache.
+  // (hence sync across devices). Refresh the same owner's metadata afterward.
   const handleTogglePin = useCallback(
     async (ref: SkillRef, nextPinned: boolean) => {
       if (!agent) return;
@@ -636,17 +635,17 @@ export function MessageInput({
         : current.filter(r => skillRefKey(r) !== key);
       const nextSelection = { ...agent.skillSelection, pinned };
       try {
-        await api.updateAgentProfile(agent.id, { skillSelection: nextSelection });
-        useAgentProfileMetaStore.getState().invalidate(agent.id);
-        await useAgentProfileMetaStore.getState().loadAll();
+        await api.updateAgentProfileForBackend(agentBackendId, agent.id, { skillSelection: nextSelection });
       } catch (err) {
         console.error('[MessageInput] failed to toggle skill pin:', err);
-        // reload to revert optimistic state back to server truth
-        useAgentProfileMetaStore.getState().invalidate(agent.id);
-        void useAgentProfileMetaStore.getState().loadAll();
+      }
+      try {
+        await refreshAgent();
+      } catch (err) {
+        console.error('[MessageInput] failed to refresh skill pins:', err);
       }
     },
-    [agent]
+    [agent, agentBackendId, refreshAgent]
   );
 
   // Chip activation: insert the skill's slash command into the composer.

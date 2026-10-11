@@ -267,6 +267,14 @@ const messageDispatcher = createMessageDispatcher<ServerMessage, MessageDispatch
     ],
     handle: msg => dispatchFeatureMessage(msg),
   },
+  {
+    types: [
+      'browser_opened', 'browser_state', 'browser_frame', 'browser_closed', 'browser_error',
+      'browser_engine_status', 'browser_emulation', 'browser_console', 'browser_network',
+      'browser_element_picked', 'browser_agent_activity',
+    ],
+    handle: (msg, ctx) => dispatchFeatureMessage(msg, ctx.backendId ?? ctx.serverId),
+  },
 ]);
 
 // ============================================

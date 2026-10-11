@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { TextWithFileRefs, MarkdownChildrenWithFileRefs } from '../FileReference';
 import { symbolMarkupForFile } from '../../../components/filesymbols/mapping';
+import { ChatActionsProvider } from '../ChatActionsContext';
 
 const mockOpenFile = vi.fn();
 vi.mock('../../../stores/fileViewerStore', () => ({
@@ -9,6 +10,8 @@ vi.mock('../../../stores/fileViewerStore', () => ({
 }));
 
 const mockActivatePanel = vi.fn();
+const mockOpenTool = vi.fn();
+vi.mock('../../../actions/workspaceActions', () => ({ openToolInWorkspace: (...args: unknown[]) => mockOpenTool(...args) }));
 vi.mock('../../../actions/openPanel', () => ({
   activatePanel: (...args: unknown[]) => mockActivatePanel(...args),
 }));
@@ -45,6 +48,16 @@ describe('TextWithFileRefs', () => {
     fireEvent.click(screen.getByRole('button'));
     expect(mockOpenFile).toHaveBeenCalledWith('/project/root', 'src/utils/helpers.ts');
     expect(mockActivatePanel).toHaveBeenCalledWith('file-viewer');
+  });
+
+  it('opens an unfocused chat file reference in that chat worktree and backend', () => {
+    render(<ChatActionsProvider value={{ sessionId: 'other-chat', projectRoot: '/other-worktree', backendId: 'other-backend', handleSendMessage: vi.fn(), setMode: vi.fn() }}>
+      <TextWithFileRefs text="See @src/a.ts" />
+    </ChatActionsProvider>);
+    fireEvent.click(screen.getByRole('button'));
+    expect(mockOpenFile).toHaveBeenCalledWith('/other-worktree', 'src/a.ts', undefined, undefined, 'other-backend');
+    expect(mockOpenTool).toHaveBeenCalledWith('other-chat', 'file-viewer', { backendId: 'other-backend' });
+    expect(mockActivatePanel).not.toHaveBeenCalled();
   });
 
   it('handles multiple file references', () => {

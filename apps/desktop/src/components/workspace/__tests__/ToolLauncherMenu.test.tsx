@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { usePluginStore } from '../../../stores/pluginStore';
 import { useServerStore } from '../../../stores/serverStore';
 import { ToolLauncherMenu } from '../ToolLauncherMenu';
+import { WorkspaceToolProvider } from '../WorkspaceToolContext';
+import { useOwnershipStore } from '../../../stores/ownershipStore';
+import { useRightWorkspaceStore } from '../../../stores/rightWorkspaceStore';
 
 beforeEach(() => {
+  useRightWorkspaceStore.setState({ bySession: {}, order: [] });
+  useOwnershipStore.setState({ sessionBackendIds: {}, projectBackendIds: {}, taskOwners: {} });
   usePluginStore.setState({
     panels: [
       { id: 'terminal', pluginId: 'x', type: 'panel', label: 'Terminal' },
@@ -17,6 +22,34 @@ beforeEach(() => {
 });
 
 describe('ToolLauncherMenu', () => {
+  it('opens against the bound chat/backend and filters capabilities on that backend', () => {
+    const onOpen = vi.fn();
+    usePluginStore.setState({ panels: [{ id: 'terminal', label: 'Terminal', requiresFeature: 'remoteTerminal', onOpen }] as any });
+    useServerStore.setState({ activeServerId: 'other-backend', connections: {
+      'other-backend': { features: [] }, 'bound-backend': { features: ['remoteTerminal'] },
+    } } as any);
+    const anchorRef = { current: document.createElement('div') };
+    render(<WorkspaceToolProvider sessionId="bound-chat" projectId="bound-project" backendId="bound-backend" visible>
+      <ToolLauncherMenu sessionId="workspace-anchor" projectId="other-project" anchorRef={anchorRef} onPick={() => {}} />
+    </WorkspaceToolProvider>);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Terminal' }));
+    expect(onOpen).toHaveBeenCalledWith({ sessionId: 'bound-chat', projectId: 'bound-project', backendId: 'bound-backend' });
+    expect((useRightWorkspaceStore.getState().bySession['bound-chat'].root as any).tools).toEqual([
+      { toolId: 'terminal', instanceKey: 'bound-backend::bound-project' },
+    ]);
+  });
+
+  it('falls back to session ownership when a legacy launcher has no provider', () => {
+    const onOpen = vi.fn();
+    usePluginStore.setState({ panels: [{ id: 'terminal', label: 'Terminal', onOpen }] as any });
+    useOwnershipStore.getState().setSessionOwner('A', 'owner-backend');
+    useServerStore.setState({ activeServerId: 'other-backend' });
+    const anchorRef = { current: document.createElement('div') };
+    render(<ToolLauncherMenu sessionId="A" projectId="project" anchorRef={anchorRef} onPick={() => {}} />);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Terminal' }));
+    expect(onOpen).toHaveBeenCalledWith({ sessionId: 'A', projectId: 'project', backendId: 'owner-backend' });
+  });
+
   it('renders each tool as a menu item with an icon and label', () => {
     const anchorRef = { current: document.createElement('div') };
     render(<ToolLauncherMenu sessionId="A" anchorRef={anchorRef} onPick={() => {}} />);

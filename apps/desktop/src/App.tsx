@@ -26,7 +26,6 @@ import { useMobileDrawer } from './app/useMobileDrawer';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useServerLatencyMonitor } from './hooks/useServerLatencyMonitor';
 import { useActiveSessionStream } from './features/chat/hooks/useActiveSessionStream';
-import { useAppearanceStore } from './stores/appearanceStore';
 import { useMainWindowGeometry } from './hooks/useMainWindowGeometry';
 import { useAgentInitialization } from './hooks/useAgentInitialization';
 import { useDeepLinkNavigation } from './hooks/useDeepLinkNavigation';
@@ -90,7 +89,6 @@ const LazyFallback = () => (
 function AppContent() {
   const { embeddedServerStatus, embeddedServerError } = useConnection();
   const isMobile = useIsMobile();
-  const unifiedWorkspace = useAppearanceStore(s => s.unifiedWorkspace);
   // Control-plane concerns (gateway setup, readiness, localhost guards) are
   // platform-bound, not viewport-bound: an Android tablet (or landscape phone
   // ≥768px) renders the desktop layout but still has no embedded server, so it
@@ -306,7 +304,7 @@ function AppContent() {
   useTauriWindowEvents();
   useMainWindowGeometry();
   const openSidebar = useCallback(() => setSidebarOpen(true), [setSidebarOpen]);
-  useActiveSessionStream(!(unifiedWorkspace && !isMobile && selectedSessionId && topLevelView.kind === 'app'));
+  useActiveSessionStream(!(!isMobile && selectedSessionId && topLevelView.kind === 'app'));
   useAutoUpdate();
   useServerLatencyMonitor();
   useDataLoader();
@@ -643,9 +641,8 @@ function AppContent() {
                 <ClaudiaReturnLink sessionId={selectedSessionId} isMobile={isMobile} />
                 <div className="flex-1 min-h-0">
                   <SessionChatLayout
-                    key={unifiedWorkspace && !isMobile ? selectedChatProjectId ?? selectedSessionId : selectedSessionId}
+                    key={!isMobile ? selectedChatProjectId ?? selectedSessionId : selectedSessionId}
                     sessionId={selectedSessionId}
-                    sidebarCollapsed={sidebarCollapsed}
                     onOpenSidebar={openSidebar}
                     onReturnToDashboard={returnToDashboard}
                   />

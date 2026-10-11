@@ -2,6 +2,7 @@ import { useContext, useState } from 'react';
 import type { PlaceholderNode } from '../../stores/rightWorkspaceStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useServerStore } from '../../stores/serverStore';
+import { useOwnershipStore } from '../../stores/ownershipStore';
 import { fillChatSlot, fillToolSlot } from '../../actions/layoutPresetActions';
 import { useLauncherPanels } from '../../actions/openPanel';
 import { Button } from '../ui/Button';
@@ -11,8 +12,10 @@ export function WorkspacePlaceholder({ node, projectId }: { node: PlaceholderNod
   const { syncSelection = true } = useContext(WorkspaceNavigationContext);
   const catalog = useProjectStore(s => s.sessions);
   const sessions = catalog.filter(session => session.projectId === projectId && !session.archivedAt);
-  const panels = useLauncherPanels('desktop');
-  const backendId = useServerStore(s => s.activeServerId);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const ownerBackendId = useOwnershipStore(s => s.getProjectBackendId(projectId));
+  const backendId = ownerBackendId ?? activeServerId;
+  const panels = useLauncherPanels('desktop', backendId);
   const [error, setError] = useState('');
   const chat = node.accepts === 'chat';
   return (

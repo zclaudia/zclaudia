@@ -38,6 +38,8 @@ export interface PlaceholderNode {
 export type LayoutNode = PaneNode | GroupNode | PlaceholderNode;
 
 export interface SessionWorkspace {
+  /** Adopted project anchors outlive their original/last chat and bypass the legacy LRU cache. */
+  durable?: boolean;
   root: LayoutNode | null; // null = empty → launcher
   primaryPaneId: string | null; // default landing pane for openTool
   focusedPaneId: string | null;
@@ -269,7 +271,7 @@ export function removePane(root: LayoutNode, paneId: string): LayoutNode | null 
 }
 
 export function setRatioAt(root: LayoutNode, groupId: string, ratio: number): LayoutNode {
-  if (root.kind !== 'group') return root;
+  if (root.kind !== 'group' || !Number.isFinite(ratio)) return root;
   const children = root.children.map(c => setRatioAt(c, groupId, ratio)) as [
     LayoutNode,
     LayoutNode,
@@ -286,42 +288,123 @@ export function pickFirstPane(root: LayoutNode | null): string | null {
   return pickFirstPane(root.children[0]) ?? pickFirstPane(root.children[1]);
 }
 
+export function isWorkspaceSlotKind(value: unknown): value is WorkspaceSlotKind {
+  return typeof value === 'string' && (value === 'chat' ||
+    (value.startsWith('tool:') && value.length > 5 && value !== 'tool:chat'));
+}
+
+export function isToolRef(value: unknown): value is ToolRef {
+  if (!value || typeof value !== 'object') return false;
+  const ref = value as ToolRef;
+  return typeof ref.toolId === 'string' && ref.toolId.length > 0 &&
+    (ref.instanceKey === undefined || typeof ref.instanceKey === 'string') &&
+    (!isChatRef(ref) || (typeof ref.instanceKey === 'string' && ref.instanceKey.length > 0));
+}
+
+/** Validate both the shape and the identities consumed by React content hosts. */
 export function isSafeTree(node: unknown): node is LayoutNode {
-  if (!node || typeof node !== 'object') return false;
-  const n = node as { kind?: unknown };
-  if (n.kind === 'placeholder') {
-    const p = node as PlaceholderNode;
-    return typeof p.id === 'string' && p.id.length > 0 &&
-      typeof p.slotId === 'string' && p.slotId.length > 0 &&
-      typeof p.accepts === 'string' && (p.accepts === 'chat' ||
-        (p.accepts.startsWith('tool:') && p.accepts.length > 5));
-  }
-  if (n.kind === 'pane') {
-    const p = node as PaneNode;
-    return (
-      typeof p.id === 'string' &&
-      Array.isArray(p.tools) &&
-      p.tools.length > 0 &&
-      p.tools.every(t => t && typeof t.toolId === 'string') &&
-      typeof p.activeToolId === 'string' &&
-      p.activeToolId.length > 0
-    );
-  }
-  if (n.kind === 'group') {
-    const g = node as GroupNode;
-    return (
-      typeof g.id === 'string' &&
-      (g.dir === 'row' || g.dir === 'col') &&
-      typeof g.ratio === 'number' &&
-      g.ratio >= MIN_RATIO &&
-      g.ratio <= MAX_RATIO &&
-      Array.isArray(g.children) &&
-      g.children.length === 2 &&
-      isSafeTree(g.children[0]) &&
-      isSafeTree(g.children[1])
-    );
-  }
-  return false;
+  const ids = new Set<string>();
+  const refs = new Set<string>();
+  const slots = new Set<string>();
+  const visit = (value: unknown, depth: number): boolean => {
+    if (!value || typeof value !== 'object' || depth > 128) return false;
+    const n = value as LayoutNode;
+    if (typeof n.id !== 'string' || !n.id || ids.has(n.id)) return false;
+    ids.add(n.id);
+    if (n.kind === 'placeholder') {
+      if (typeof n.slotId !== 'string' || !n.slotId || slots.has(n.slotId) || !isWorkspaceSlotKind(n.accepts)) return false;
+      slots.add(n.slotId);
+      return true;
+    }
+    if (n.kind === 'pane') {
+      if (!Array.isArray(n.tools) || !n.tools.length || !n.tools.every(isToolRef) ||
+          typeof n.activeToolId !== 'string' || !n.activeToolId ||
+          (n.activeInstanceKey !== undefined && typeof n.activeInstanceKey !== 'string') ||
+          !n.tools.some(ref => sameRef(ref, n.activeToolId, n.activeInstanceKey))) return false;
+      const chat = isChatRef(n.tools[0]);
+      return n.tools.every(ref => {
+        const key = workspaceRefKey(ref);
+        if (isChatRef(ref) !== chat || refs.has(key)) return false;
+        refs.add(key);
+        return true;
+      });
+    }
+    return n.kind === 'group' && (n.dir === 'row' || n.dir === 'col') &&
+      Number.isFinite(n.ratio) && n.ratio >= MIN_RATIO && n.ratio <= MAX_RATIO &&
+      Array.isArray(n.children) && n.children.length === 2 && n.children.every(child => visit(child, depth + 1));
+  };
+  return visit(node, 0);
+}
+
+/**
+ * Recover usable siblings and refs independently. A malformed leaf must never
+ * erase the other chats or tools in a persisted project workspace. First refs
+ * win duplicate identities; distinct multi-instance scopes are retained.
+ */
+export function restoreLayoutTree(value: unknown, multiInstanceTools: ReadonlySet<string>): LayoutNode | null {
+  const objects = new WeakSet<object>();
+  const ids = new Set<string>();
+  const refs = new Set<string>();
+  const slots = new Set<string>();
+  let recovered = 0;
+  const unique = (value: unknown, seen: Set<string>, prefix: string): string => {
+    const base = typeof value === 'string' && value ? value : `${prefix}-${++recovered}`;
+    let id = base;
+    let suffix = 0;
+    while (seen.has(id)) id = `${base}-recovered-${++suffix}`;
+    seen.add(id);
+    return id;
+  };
+  const visit = (value: unknown, depth: number): LayoutNode | null => {
+    if (!value || typeof value !== 'object' || objects.has(value) || depth > 128) return null;
+    objects.add(value);
+    const node = value as LayoutNode;
+    if (node.kind === 'placeholder') {
+      if (!isWorkspaceSlotKind(node.accepts)) return null;
+      const id = unique(node.id, ids, 'recovered-placeholder');
+      const slotId = unique(node.slotId, slots, `recovered-slot-${id}`);
+      return id === node.id && slotId === node.slotId ? node : { ...node, id, slotId };
+    }
+    if (node.kind === 'pane') {
+      if (!Array.isArray(node.tools)) return null;
+      const tools = node.tools.filter(ref => {
+        if (!isToolRef(ref)) return false;
+        const key = isChatRef(ref) || multiInstanceTools.has(ref.toolId) ? workspaceRefKey(ref) : JSON.stringify([ref.toolId]);
+        if (refs.has(key)) return false;
+        refs.add(key);
+        return true;
+      });
+      if (!tools.length) return null;
+      const id = unique(node.id, ids, 'recovered-pane');
+      const pane = (id: string, tools: ToolRef[]): PaneNode => {
+        const active = tools.find(ref => sameRef(ref, node.activeToolId, node.activeInstanceKey)) ?? tools[0];
+        return { ...node, id, tools, activeToolId: active.toolId, activeInstanceKey: active.instanceKey };
+      };
+      const chats = tools.filter(isChatRef);
+      const others = tools.filter(ref => !isChatRef(ref));
+      if (chats.length && others.length) {
+        return { id: unique(`${id}-recovered-group`, ids, 'recovered-group'), kind: 'group', dir: 'row', ratio: DEFAULT_RATIO,
+          children: [pane(id, chats), pane(unique(`${id}-recovered-tools`, ids, 'recovered-pane'), others)] };
+      }
+      const next = pane(id, tools);
+      return id === node.id && tools.length === node.tools.length &&
+        next.activeToolId === node.activeToolId && next.activeInstanceKey === node.activeInstanceKey ? node : next;
+    }
+    if (node.kind !== 'group' || !Array.isArray(node.children)) return null;
+    const id = unique(node.id, ids, 'recovered-group');
+    const children = node.children.map(child => visit(child, depth + 1)).filter((child): child is LayoutNode => child !== null);
+    if (!children.length) return null;
+    if (children.length === 1) return children[0];
+    const dir = node.dir === 'col' ? 'col' : 'row';
+    const ratio = Number.isFinite(node.ratio) ? clampRatio(node.ratio) : DEFAULT_RATIO;
+    if (id === node.id && dir === node.dir && ratio === node.ratio && children.length === 2 &&
+        children.every((child, index) => child === node.children[index])) return node;
+    return children.slice(1).reduce<LayoutNode>((a, b, index) => ({
+      id: index === 0 ? id : unique(`${id}-recovered-group-${index}`, ids, 'recovered-group'),
+      kind: 'group', dir, ratio, children: [a, b],
+    }), children[0]);
+  };
+  return visit(value, 0);
 }
 
 export function isSplitWorkspace(root: LayoutNode | null): boolean {
@@ -331,3 +414,8 @@ export function isSplitWorkspace(root: LayoutNode | null): boolean {
 /** JSON tuples distinguish complete ref identities without delimiter collisions. */
 export const workspaceRefKey = (ref: ToolRef): string =>
   JSON.stringify([ref.toolId, ref.instanceKey ?? null]);
+
+/** Authoritative deletion bypasses the UI's last-chat protection and preserves every other ref. */
+export function removeChatSession(root: LayoutNode | null, sessionId: string): LayoutNode | null {
+  return pruneRefs(root, ref => !isChatRef(ref) || ref.instanceKey !== sessionId);
+}

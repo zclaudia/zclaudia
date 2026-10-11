@@ -17,6 +17,7 @@ import { openToolInWorkspace } from '../../../actions/workspaceActions';
 import { useSessionRoute } from './useSessionRoute';
 import { isMobileViewport } from '../../../hooks/useMediaQuery';
 import { useTerminalStore } from '../../../stores/terminalStore';
+import { useServerStore } from '../../../stores/serverStore';
 import * as api from '../../../services/api';
 import { finalizeRunLifecycle } from '../../../services/message-handlers/run-finalization';
 import type { MessageRole, MessageMetadata } from '@zclaudia/shared/core/message';
@@ -193,14 +194,15 @@ export function useCommandHandler({
           });
           break;
 
-        case 'reload':
+        case 'reload': {
+          const scopedBackendId = route.backendId && route.backendId !== useServerStore.getState().activeServerId ? route.backendId : undefined;
           // Re-fetch commands from server (cache already cleared server-side)
           (llmProfileId
-            ? api.getProviderCommands(llmProfileId, currentProject?.rootPath || undefined)
-            : api.getProviderTypeCommands(
-                DEFAULT_AGENT_RUNTIME,
-                currentProject?.rootPath || undefined
-              )
+            ? (scopedBackendId ? api.getProviderCommands(llmProfileId, currentProject?.rootPath || undefined, undefined, scopedBackendId)
+              : api.getProviderCommands(llmProfileId, currentProject?.rootPath || undefined))
+            : (scopedBackendId
+              ? api.getProviderTypeCommands(DEFAULT_AGENT_RUNTIME, currentProject?.rootPath || undefined, undefined, scopedBackendId)
+              : api.getProviderTypeCommands(DEFAULT_AGENT_RUNTIME, currentProject?.rootPath || undefined))
           )
             .then(cmds => {
               useLlmProfileMetaStore.getState().setProviderCommands(commandsCacheKey, cmds);
@@ -223,6 +225,7 @@ export function useCommandHandler({
               });
             });
           return; // Skip the scrollToBottom below since we handle it in the .then
+        }
 
         case 'show_panel': {
           // Plugin command: activate the panel in its effective placement (bottom or right)

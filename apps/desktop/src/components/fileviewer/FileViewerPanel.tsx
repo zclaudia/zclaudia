@@ -10,6 +10,7 @@ import {
   type TouchEvent as ReactTouchEvent,
 } from 'react';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
+import { useWorkspaceTool } from '../workspace/WorkspaceToolContext';
 import {
   Highlight,
   themes as prismThemes,
@@ -408,10 +409,10 @@ function resolveProjectBackendId(projectRoot: string): string | null {
   return useOwnershipStore.getState().getProjectBackendId(matchingProject.id);
 }
 
-async function openFileInNewWindow(filePath: string, projectRoot: string) {
+async function openFileInNewWindow(filePath: string, projectRoot: string, scopedBackendId?: string) {
   const fileName = filePath.split('/').pop() || filePath;
   const projectName = projectRoot.split('/').pop() || projectRoot;
-  const backendId = resolveProjectBackendId(projectRoot);
+  const backendId = scopedBackendId ?? resolveProjectBackendId(projectRoot);
   const conn = getConnectionParams({ backendId });
   await openPopoutWindow({
     type: 'file-viewer',
@@ -426,6 +427,7 @@ async function openFileInNewWindow(filePath: string, projectRoot: string) {
 
 /** File viewer toolbar actions (search, copy, open in new window / fullscreen) rendered in the shared BottomPanel header */
 export function FileViewerActions() {
+  const tool = useWorkspaceTool();
   const isMobile = useIsMobile();
   const {
     searchOpen,
@@ -435,6 +437,7 @@ export function FileViewerActions() {
     content,
     filePath,
     projectRoot,
+    backendId,
     setFullscreen,
     showTree,
     toggleTree,
@@ -458,11 +461,14 @@ export function FileViewerActions() {
   const handleExpand = () => {
     if (!filePath) return;
     if (isDesktopTauri() && projectRoot) {
-      openFileInNewWindow(filePath, projectRoot);
+      openFileInNewWindow(filePath, projectRoot, tool?.backendId ?? backendId ?? undefined);
     } else {
       setFullscreen(true);
     }
   };
+
+  if (tool && ((tool.projectRoot && projectRoot && tool.projectRoot !== projectRoot) ||
+    (tool.backendId && backendId && tool.backendId !== backendId))) return null;
 
   return (
     <div className="flex items-center gap-1">
@@ -580,6 +586,7 @@ function usePanelWidth(ref: React.RefObject<HTMLElement | null>): number | null 
 
 export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const visible = useWorkspaceVisible();
+  const tool = useWorkspaceTool();
   const isMobile = useIsMobile();
   const store = useFileViewerStore();
   const {
@@ -622,11 +629,12 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   // shortly; this prevents rendering stale content during the transition.
   // `error` is gated the same way: close() does not clear it, so an unrelated
   // error must not leak into the new project's panel and force read mode.
-  const projectMatches = !store.projectRoot || store.projectRoot === projectRoot;
+  const projectMatches = (!store.projectRoot || store.projectRoot === projectRoot) &&
+    (!tool?.backendId || !store.backendId || tool.backendId === store.backendId);
   const filePath = projectMatches ? store.filePath : null;
   const content = projectMatches ? store.content : null;
   const error = projectMatches ? store.error : null;
-  const fileBackendId = resolveProjectBackendId(projectRoot);
+  const fileBackendId = tool?.backendId ?? store.backendId ?? resolveProjectBackendId(projectRoot);
   const listRef = useListRef(null);
   const fileDiagnostics = useFileDiagnostics({
     projectRoot,
@@ -652,18 +660,20 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   // shown instantly and updated seamlessly in the background once the new
   // version arrives — no "Loading…" flicker for refreshes.
   //
-  // Lifecycle / session switching: this panel is mounted inside SessionChatLayout
-  // which is keyed by sessionId, so switching sessions unmounts it and the
-  // cleanup below clears the interval. When the panel tab is hidden or the
-  // top-level view changes (e.g. to Settings) the component also unmounts,
-  // stopping the poll. Mount ≡ "file is open and visible".
+  // Retained workspace panels stop polling when hidden; target changes cancel
+  // in-flight work so a previous root or file cannot overwrite the new viewer.
   useEffect(() => {
-    if (!filePath || !projectRoot) return;
+    if (!filePath || !projectRoot || !visible) return;
 
     let cancelled = false;
     // Scope the guard to this target/effect. A cancelled request must not block
     // the immediate load after a file switch or StrictMode effect restart.
     let pollInFlight = false;
+    const isCurrentTarget = () => {
+      const current = useFileViewerStore.getState();
+      return !cancelled && current.filePath === filePath && (!current.projectRoot || current.projectRoot === projectRoot) &&
+        (!current.backendId || current.backendId === fileBackendId);
+    };
 
     const checkOnce = async () => {
       if (cancelled || pollInFlight) return;
@@ -675,7 +685,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
         // Bail if the user has since switched to a different file. (A project
         // switch re-runs this effect via its props with a fresh closure + cleanup,
         // so only the file path needs guarding here.)
-        if (st.filePath !== filePath) return;
+        if (!isCurrentTarget()) return;
         const hasContent = st.content != null;
         const knownMtime = st.knownMtimeMs;
 
@@ -691,12 +701,12 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
         } catch (e) {
           // Stat failed (deleted / network). Only surface an error when there is
           // no cached content to keep showing.
-          if (!hasContent && !cancelled) {
+          if (!hasContent && isCurrentTarget()) {
             setError(e instanceof Error ? e.message : 'Failed to load file');
           }
           return;
         }
-        if (cancelled) return;
+        if (!isCurrentTarget()) return;
         if (hasContent && knownMtime != null && stat.mtimeMs <= knownMtime) return;
 
         // Stale or first load: fetch the full content.
@@ -705,10 +715,10 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
           relativePath: filePath,
           backendId: fileBackendId,
         });
-        if (cancelled) return;
+        if (!isCurrentTarget()) return;
         setContent(result.content, stat.mtimeMs);
       } catch (e) {
-        if (!cancelled && useFileViewerStore.getState().content == null) {
+        if (isCurrentTarget() && useFileViewerStore.getState().content == null) {
           setError(e instanceof Error ? e.message : 'Failed to load file');
         }
       } finally {
@@ -724,10 +734,11 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [fileBackendId, filePath, projectRoot, setContent, setError]);
+  }, [fileBackendId, filePath, projectRoot, setContent, setError, visible]);
 
   const handleSearchSelect = (relativePath: string) => {
-    openFile(projectRoot, relativePath);
+    if (fileBackendId) openFile(projectRoot, relativePath, undefined, undefined, fileBackendId);
+    else openFile(projectRoot, relativePath);
   };
 
   const lang = filePath ? detectLanguage(filePath) : 'text';
@@ -929,7 +940,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
               <span className="ml-auto flex flex-shrink-0 items-center">
                 <FileDiagnosticsSummary
                   result={fileDiagnostics}
-                  onJump={line => openFile(projectRoot, filePath, line)}
+                  onJump={line => fileBackendId ? openFile(projectRoot, filePath, line, undefined, fileBackendId) : openFile(projectRoot, filePath, line)}
                 />
               </span>
             )}

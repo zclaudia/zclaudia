@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { MULTI_INSTANCE_PANELS } from './panelInstance';
-import { workspaceStorageKey } from '../utils/workspaceStorage';
+import { recoverableJsonStorage, workspaceStorageKey } from '../utils/workspaceStorage';
 import {
   CHAT_TOOL_ID, DEFAULT_RATIO, findPane, findPaneWithTool, findToolConflict,
-  flattenPanes, genId, isPinnedPane, isSafeTree, newPane, normalizeSessionWorkspace,
+  flattenPanes, genId, isPinnedPane, newPane, normalizeSessionWorkspace, restoreLayoutTree,
   pickFirstPane, pruneTools, removePane, repairWorkspace, replaceChild, sameRef, setRatioAt,
   type GroupNode, type LayoutNode, type PaneNode, type SessionWorkspace,
   type SplitDir, type SplitResult, type WorkspaceEdge,
@@ -88,7 +88,7 @@ interface RightWorkspaceState {
  */
 function touch(order: string[], bySession: Record<string, SessionWorkspace>, sessionId: string) {
   const next = [sessionId, ...order.filter(id => id !== sessionId && bySession[id])];
-  const evictable = next.filter(id => !flattenPanes(bySession[id]?.root ?? null).some(isPinnedPane));
+  const evictable = next.filter(id => !bySession[id]?.durable && !flattenPanes(bySession[id]?.root ?? null).some(isPinnedPane));
   for (const victim of evictable.slice(MAX_LEGACY_SESSIONS)) {
     delete bySession[victim];
     next.splice(next.indexOf(victim), 1);
@@ -115,20 +115,22 @@ function insertAtEdge(target: LayoutNode, inserted: PaneNode, edge: WorkspaceEdg
 /** Both migration and merge use the same flag-independent validation. */
 function restoreWorkspaces(persisted: unknown): Pick<RightWorkspaceState, 'bySession' | 'order'> {
   const p = (persisted ?? {}) as Partial<RightWorkspaceState>;
-  const bySession: Record<string, SessionWorkspace> = {};
+  const entries: [string, SessionWorkspace][] = [];
   if (p.bySession && typeof p.bySession === 'object') {
     for (const [id, ws] of Object.entries(p.bySession)) {
-      const root = ws && isSafeTree(ws.root) ? ws.root : null;
-      bySession[id] = repairWorkspace({
+      const root = restoreLayoutTree(ws?.root, MULTI_INSTANCE_PANELS);
+      entries.push([id, repairWorkspace({
+        ...(ws?.durable === true ? { durable: true } : {}),
         root,
         primaryPaneId: root ? (ws?.primaryPaneId ?? null) : null,
         focusedPaneId: root ? (ws?.focusedPaneId ?? null) : null,
         ...(ws?.maximizedPaneId !== undefined ? { maximizedPaneId: ws.maximizedPaneId } : {}),
-      });
+      })]);
     }
   }
+  const bySession = Object.fromEntries(entries);
   const order = Array.isArray(p.order)
-    ? [...new Set(p.order.filter(id => typeof id === 'string' && id in bySession))] : [];
+    ? [...new Set(p.order.filter(id => typeof id === 'string' && Object.hasOwn(bySession, id)))] : [];
   return { bySession, order };
 }
 
@@ -173,10 +175,12 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
               if (!ws.root) return ws;
               const pane = findPane(ws.root, existing);
               if (!pane) return ws;
+              const ref = pane.tools.find(t => t.toolId === toolId && (singleton || t.instanceKey === instanceKey));
+              if (!ref) return ws;
               const root = replaceChild(ws.root, existing, {
                 ...pane,
-                activeToolId: toolId,
-                activeInstanceKey: instanceKey,
+                activeToolId: ref.toolId,
+                activeInstanceKey: ref.instanceKey,
               });
               return { ...ws, root, focusedPaneId: existing, maximizedPaneId: null };
             }
@@ -287,7 +291,7 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
 
         setRatio: (sessionId, groupId, ratio) =>
           update(sessionId, ws =>
-            ws.root ? { ...ws, root: setRatioAt(ws.root, groupId, ratio) } : ws
+            ws.root && Number.isFinite(ratio) ? { ...ws, root: setRatioAt(ws.root, groupId, ratio) } : ws
           ),
 
         focusPane: (sessionId, paneId) =>
@@ -547,6 +551,7 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
     {
       name: workspaceStorageKey('claudia-right-workspace', typeof window === 'undefined' ? '' : window.location.search),
       version: 3,
+      storage: createJSONStorage(() => recoverableJsonStorage(localStorage)),
       partialize: s => ({ bySession: s.bySession, order: s.order }),
       migrate: persisted => restoreWorkspaces(persisted),
       merge: (persisted, current) => ({ ...current, ...restoreWorkspaces(persisted) }),

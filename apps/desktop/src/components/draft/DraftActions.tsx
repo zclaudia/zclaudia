@@ -1,15 +1,24 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Send, Trash2, ExternalLink } from 'lucide-react';
 import { useDraftEditorStore } from '../../stores/draftEditorStore';
 import { isDesktopTauri } from '../../utils/platform';
 import { openDraftInNewWindow } from '../../actions/openDraftWindow';
 import { MAX_CONTENT_BYTES } from './draftConstants';
+import { useWorkspaceTool } from '../workspace/WorkspaceToolContext';
 
 const ICON_BTN =
   'inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0';
 
 /** Draft toolbar actions rendered in the shared BottomPanel header (top-right). */
 export function DraftActions() {
+  const activeSessionId = useDraftEditorStore(s => s.activeSessionId);
+  const boundSessionId = useWorkspaceTool()?.sessionId;
+  return <DraftActionControls key={JSON.stringify([activeSessionId, boundSessionId])} />;
+}
+
+function DraftActionControls() {
+  const tool = useWorkspaceTool();
+  const boundSessionId = tool?.sessionId;
   const {
     localContent,
     isSaving,
@@ -24,6 +33,12 @@ export function DraftActions() {
   } = useDraftEditorStore();
 
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionMatches = tool ? !!boundSessionId && boundSessionId === activeSessionId : true;
+
+  useEffect(() => () => {
+    if (confirmTimer.current) clearTimeout(confirmTimer.current);
+  }, []);
 
   const effectiveReadOnly = isReadOnly || sessionArchived;
   const hasContent = !!localContent.trim();
@@ -36,25 +51,32 @@ export function DraftActions() {
   else if (lastSavedAt) statusText = 'Saved';
 
   const handleSend = useCallback(() => {
-    const cb = useDraftEditorStore.getState().sendCallback;
+    const draft = useDraftEditorStore.getState();
+    if (draft.activeSessionId !== activeSessionId || (tool && (!boundSessionId || draft.activeSessionId !== boundSessionId))) return;
+    const cb = draft.sendCallback;
     if (cb) void finishDraft(cb);
-  }, [finishDraft]);
+  }, [finishDraft, activeSessionId, boundSessionId, tool]);
 
   const handleDiscard = useCallback(() => {
+    const draftSessionId = useDraftEditorStore.getState().activeSessionId;
+    if (draftSessionId !== activeSessionId || (tool && (!boundSessionId || draftSessionId !== boundSessionId))) return;
     if (!confirmingDiscard) {
       setConfirmingDiscard(true);
-      setTimeout(() => setConfirmingDiscard(false), 3000);
+      confirmTimer.current = setTimeout(() => setConfirmingDiscard(false), 3000);
       return;
     }
     setConfirmingDiscard(false);
     void discardDraft();
-  }, [confirmingDiscard, discardDraft]);
+  }, [confirmingDiscard, discardDraft, activeSessionId, boundSessionId, tool]);
 
   const handlePopOut = useCallback(async () => {
-    if (!activeSessionId) return;
+    if (!activeSessionId || useDraftEditorStore.getState().activeSessionId !== activeSessionId || (tool && (!boundSessionId || activeSessionId !== boundSessionId))) return;
     const label = await openDraftInNewWindow(activeSessionId);
+    if (useDraftEditorStore.getState().activeSessionId !== activeSessionId) return;
     useDraftEditorStore.getState().setPoppedOut(true, label);
-  }, [activeSessionId]);
+  }, [activeSessionId, boundSessionId, tool]);
+
+  if (!sessionMatches) return null;
 
   return (
     <div className="flex items-center gap-1">

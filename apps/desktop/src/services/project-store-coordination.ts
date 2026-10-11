@@ -24,6 +24,7 @@ import { useOwnershipStore } from '../stores/ownershipStore';
 import { useRunStore } from '../stores/runStore';
 import { useSelectionStore } from '../stores/selectionStore';
 import { useServerStore } from '../stores/serverStore';
+import { useSessionsStore } from '../stores/sessionsStore';
 import { parseBackendId } from '../stores/gatewayStore';
 import type { ProjectDashboardView } from '../stores/selectionTypes';
 
@@ -89,6 +90,13 @@ export function assignSessionOwners(sessions: Session[]): void {
   for (const [backendId, sessionIds] of grouped) {
     ownership.setSessionOwners(sessionIds, backendId);
   }
+}
+
+/** A positive create response is newer evidence than an already cached snapshot. */
+export function admitCreatedSession(session: Session): void {
+  const backendId = resolveOwnershipBackendIdForSession(session);
+  if (!backendId || session.archivedAt) return;
+  useSessionsStore.getState().admitCreatedSession(backendId, { ...session, isActive: Boolean(session.isActive) });
 }
 
 function resolveOwnershipBackendIdForSession(session: Session): string | null {

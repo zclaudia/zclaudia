@@ -72,6 +72,7 @@ export function ChatInterface({
   const activeServerId = useServerStore(s => s.activeServerId);
   const setDrawerOpen = useTerminalStore(s => s.setDrawerOpen);
   const poppedOutSessions = useUIStore(s => s.poppedOutSessions);
+  const poppedOutLabel = poppedOutSessions.get(sessionId);
   const route = useSessionRoute(sessionId);
   const routedBackendId = route.backendId;
   const isConnected = route.canSend;
@@ -198,15 +199,18 @@ export function ChatInterface({
   );
 
   // Auto-ship queued messages one at a time as the session's run cycles.
-  useSendQueueConsumer({ sessionId, sendAsNewRun });
+  useSendQueueConsumer({ sessionId, sendAsNewRun, enabled: !poppedOutLabel });
 
   const chatActionsValue = useMemo<ChatActionsContextValue>(
     () => ({
       sessionId,
+      backendId: routedBackendId,
+      projectRoot: fileReferenceRoot,
+      isConnected,
       handleSendMessage,
       setMode: useSessionConfigStore.getState().setMode,
     }),
-    [sessionId, handleSendMessage]
+    [sessionId, routedBackendId, fileReferenceRoot, isConnected, handleSendMessage]
   );
 
   // UI state
@@ -428,7 +432,6 @@ export function ChatInterface({
     isSessionRunning,
   });
 
-  const poppedOutLabel = poppedOutSessions.get(sessionId);
 
   // ── SP-A fork/branch handlers ──
 

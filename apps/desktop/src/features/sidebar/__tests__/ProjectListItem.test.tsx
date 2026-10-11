@@ -118,7 +118,8 @@ describe('ProjectListItem', () => {
       // ...with its git branch label (not the dir basename "feat-a")...
       expect(screen.getByText('feat/a')).toBeDefined();
       // ...and a remove-worktree affordance is reachable via the row's "…" menu.
-      fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
+      // (every desktop row has a menu now; the worktree session is the second row)
+      fireEvent.click(screen.getAllByRole('button', { name: 'Session actions' })[1]);
       expect(screen.getByRole('menuitem', { name: 'Remove worktree' })).toBeDefined();
     });
 

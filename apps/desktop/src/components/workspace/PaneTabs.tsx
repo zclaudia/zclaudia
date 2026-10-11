@@ -114,7 +114,7 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
                       multiInstance: MULTI_INSTANCE_PANELS.has(ref.toolId),
                       sourcePaneId: pane.id,
                       sourceIndex: index,
-                    });
+                    }, { x: e.clientX, y: e.clientY });
                   }}
                   className={`group flex items-center gap-1.5 px-2.5 cursor-pointer max-w-[140px] ${
                     isActive

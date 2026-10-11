@@ -78,12 +78,12 @@ describe('project workspace compatibility migration', () => {
     localStorage.setItem('claudia-project-workspace', JSON.stringify({ version: 1, state: { byProject: {
       invalid: { workspaceId: 1, focusedChatSessionId: 'A' },
       p: { workspaceId: 'A', focusedChatSessionId: 'A', toolBindings: {
-        valid: { mode: 'fixed', sessionId: 'B' }, bad: { mode: 'fixed', sessionId: 5 },
+        '["terminal","scope"]': { mode: 'fixed', sessionId: 'B' }, bad: { mode: 'fixed', sessionId: 5 },
       } },
     } } }));
     await useProjectWorkspaceStore.persist.rehydrate();
     expect(useProjectWorkspaceStore.getState().byProject.invalid).toBeUndefined();
-    expect(useProjectWorkspaceStore.getState().byProject.p.toolBindings).toEqual({ valid: { mode: 'fixed', sessionId: 'B' } });
+    expect(useProjectWorkspaceStore.getState().byProject.p.toolBindings).toEqual({ '["terminal","scope"]': { mode: 'fixed', sessionId: 'B' } });
   });
 });
 

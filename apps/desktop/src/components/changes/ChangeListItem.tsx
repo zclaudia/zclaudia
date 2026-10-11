@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { ChevronRight, ChevronDown, ExternalLink, FileText } from 'lucide-react';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
+import { useWorkspaceTool } from '../workspace/WorkspaceToolContext';
+import { openToolInWorkspace } from '../../actions/workspaceActions';
 import { timeAgo } from '../../utils/timeAgo';
 import { FragmentDiffBlock } from './FragmentDiffBlock';
 import { activatePanel } from '../../actions/openPanel';
@@ -15,6 +17,7 @@ interface ChangeListItemProps {
 
 export function ChangeListItem({ entry, projectRoot, expanded, onToggle }: ChangeListItemProps) {
   const openFile = useFileViewerStore(s => s.openFile);
+  const tool = useWorkspaceTool();
 
   const toolChips = useMemo(
     () =>
@@ -27,8 +30,10 @@ export function ChangeListItem({ entry, projectRoot, expanded, onToggle }: Chang
   const handleOpenInViewer = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!projectRoot) return;
-    openFile(projectRoot, entry.path);
-    activatePanel('file-viewer');
+    if (tool?.backendId) openFile(projectRoot, entry.path, undefined, undefined, tool.backendId);
+    else openFile(projectRoot, entry.path);
+    if (tool?.sessionId) openToolInWorkspace(tool.sessionId, 'file-viewer', { backendId: tool.backendId });
+    else activatePanel('file-viewer');
   };
 
   return (

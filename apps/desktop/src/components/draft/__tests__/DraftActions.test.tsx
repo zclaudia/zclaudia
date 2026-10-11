@@ -35,6 +35,7 @@ vi.mock('../../../actions/openDraftWindow', () => ({
 vi.mock('../../../utils/platform', () => ({ isDesktopTauri: () => true }));
 
 import { DraftActions } from '../DraftActions';
+import { WorkspaceToolContext } from '../../workspace/WorkspaceToolContext';
 
 describe('DraftActions', () => {
   beforeEach(() => {
@@ -52,6 +53,30 @@ describe('DraftActions', () => {
     render(<DraftActions />);
     fireEvent.click(screen.getByLabelText('Send to chat'));
     expect(finishDraft).toHaveBeenCalledWith(state.sendCallback);
+  });
+
+  it('does not expose actions for a different singleton draft during a binding switch', () => {
+    render(<WorkspaceToolContext.Provider value={{ sessionId: 'other-chat' }}><DraftActions /></WorkspaceToolContext.Provider>);
+    expect(screen.queryByLabelText('Send to chat')).toBeNull();
+    expect(screen.queryByLabelText('Discard draft')).toBeNull();
+    expect(screen.queryByLabelText('Open draft in new window')).toBeNull();
+  });
+
+  it('does not expose the global draft actions for an empty workspace binding', () => {
+    render(<WorkspaceToolContext.Provider value={{ sessionId: '' }}><DraftActions /></WorkspaceToolContext.Provider>);
+    expect(screen.queryByLabelText('Send to chat')).toBeNull();
+    expect(screen.queryByLabelText('Discard draft')).toBeNull();
+    expect(screen.queryByLabelText('Open draft in new window')).toBeNull();
+  });
+
+  it('resets discard confirmation when the active draft changes', () => {
+    const { rerender } = render(<DraftActions />);
+    fireEvent.click(screen.getByLabelText('Discard draft'));
+    state = { ...state, activeSessionId: 'other-chat' };
+    rerender(<DraftActions />);
+    fireEvent.click(screen.getByLabelText('Discard draft'));
+    expect(discardDraft).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Confirm discard draft')).toBeTruthy();
   });
 
   it('disables Send when content is empty', () => {
@@ -72,6 +97,16 @@ describe('DraftActions', () => {
     render(<DraftActions />);
     fireEvent.click(screen.getByLabelText('Open draft in new window'));
     expect(openDraftInNewWindow).toHaveBeenCalledWith('sess-1');
+  });
+
+  it('does not mark a newly bound draft popped out after old window creation resolves', async () => {
+    let resolve!: (label: string) => void;
+    openDraftInNewWindow.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    render(<DraftActions />);
+    fireEvent.click(screen.getByLabelText('Open draft in new window'));
+    state = { ...state, activeSessionId: 'other-chat' };
+    await act(async () => resolve('old-draft-window'));
+    expect(setPoppedOut).not.toHaveBeenCalled();
   });
 
   it('hides Send when archived', () => {

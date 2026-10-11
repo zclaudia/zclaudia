@@ -9,6 +9,8 @@ import { FileSymbol } from '../../components/filesymbols';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { activatePanel } from '../../actions/openPanel';
+import { openToolInWorkspace } from '../../actions/workspaceActions';
+import { useChatActionsOptional } from './ChatActionsContext';
 
 /**
  * Regex to match @file references in text.
@@ -47,13 +49,16 @@ export function TextWithFileRefs({
 }) {
   const openFile = useFileViewerStore(s => s.openFile);
   const projects = useProjectStore(s => s.projects);
+  const chat = useChatActionsOptional();
 
   const handleClick = (filePath: string) => {
     // Find project root from the first project with a rootPath
-    const project = Object.values(projects).find(p => p.rootPath);
-    if (project?.rootPath) {
-      openFile(project.rootPath, filePath);
-      activatePanel('file-viewer');
+    const projectRoot = chat?.projectRoot ?? Object.values(projects).find(p => p.rootPath)?.rootPath;
+    if (projectRoot) {
+      if (chat?.backendId) openFile(projectRoot, filePath, undefined, undefined, chat.backendId);
+      else openFile(projectRoot, filePath);
+      if (chat?.sessionId) openToolInWorkspace(chat.sessionId, 'file-viewer', { backendId: chat.backendId });
+      else activatePanel('file-viewer');
     }
   };
 

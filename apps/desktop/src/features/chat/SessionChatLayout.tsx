@@ -1,7 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { ChatInterface } from './ChatInterface';
 import { BottomPanel } from '../../components/BottomPanel';
-import { RightSidebar } from '../../components/RightSidebar';
 import { useProjectStore } from '../../stores/projectStore';
 import { useUIStore } from '../../stores/uiStore';
 import { usePluginStore } from '../../stores/pluginStore';
@@ -11,9 +10,6 @@ import { useTerminalStore } from '../../stores/terminalStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useGitStore } from '../git';
-import { useAppearanceStore } from '../../stores/appearanceStore';
-import { useRightSidebarStore } from '../../stores/rightSidebarStore';
-import { PaneCard } from '../../components/workspace/PaneCard';
 import { SessionWorkspaceView } from './SessionWorkspaceView';
 
 interface SessionChatLayoutProps {
@@ -22,7 +18,6 @@ interface SessionChatLayoutProps {
   syncSelection?: boolean;
   onReturnToDashboard?: (projectId: string) => void;
   onOpenSidebar?: () => void;
-  sidebarCollapsed?: boolean;
 }
 
 /**
@@ -33,14 +28,10 @@ export function SessionChatLayout({
   sessionId,
   onReturnToDashboard,
   onOpenSidebar,
-  sidebarCollapsed = false,
   workspaceScope = 'project',
   syncSelection = true,
 }: SessionChatLayoutProps) {
   const isMobile = useIsMobile();
-  const chatCard = useAppearanceStore(s => s.chatCard);
-  const unifiedWorkspace = useAppearanceStore(s => s.unifiedWorkspace);
-  const rightCollapsed = useRightSidebarStore(s => s.collapsed);
   const currentSession = useProjectStore(
     s => s.sessions.find(session => session.id === sessionId) ?? null
   );
@@ -68,25 +59,26 @@ export function SessionChatLayout({
     s => s.panels.find(p => p.id === 'draft')?.visible === true
   );
   useEffect(() => {
-    if (unifiedWorkspace && !isMobile) return;
+    // Desktop workspaces manage draft ownership per chat pane.
+    if (!isMobile) return;
     if (!draftPanelVisible) return;
     const draft = useDraftEditorStore.getState();
     if (draft.activeSessionId === sessionId) return;
     void draft.openEditor(sessionId);
-  }, [sessionId, draftPanelVisible, unifiedWorkspace, isMobile]);
+  }, [sessionId, draftPanelVisible, isMobile]);
 
   // File viewer holds a single global state. When the active project changes,
   // close the viewer so it doesn't keep showing the previous project's file.
   // The panel-level guard renders an empty state during the transition, and
   // close() will clear panel.visible so the tab disappears too.
   useEffect(() => {
-    if (unifiedWorkspace && !isMobile) return;
+    if (!isMobile) return;
     if (!projectRoot) return;
     const viewer = useFileViewerStore.getState();
     if (viewer.isOpen && viewer.projectRoot && viewer.projectRoot !== projectRoot) {
       viewer.close();
     }
-  }, [projectRoot, unifiedWorkspace, isMobile]);
+  }, [projectRoot, isMobile]);
 
   // Terminal is project + backend scoped, but its `panels.visible` flag is
   // global. Without this sync, opening a terminal in project A keeps the tab
@@ -95,7 +87,7 @@ export function SessionChatLayout({
   // drawer, so the tab only appears when it has real content.
   const activeServerId = useServerStore(s => s.activeServerId);
   useEffect(() => {
-    if (unifiedWorkspace && !isMobile) return;
+    if (!isMobile) return;
     if (!projectId) return;
     const term = useTerminalStore.getState();
     const open = term.isDrawerOpen(projectId, activeServerId);
@@ -104,11 +96,11 @@ export function SessionChatLayout({
     if (current !== open) {
       usePluginStore.getState().updatePanelVisibility('terminal', open);
     }
-  }, [projectId, activeServerId, unifiedWorkspace, isMobile]);
+  }, [projectId, activeServerId, isMobile]);
 
   const bottomPanel = useMemo(() => {
     if (poppedOutLabel) return undefined;
-    // BottomPanel is the panel host on mobile only; desktop uses RightSidebar.
+    // BottomPanel is the panel host on mobile only; desktop uses the workspace.
     if (!isMobile) return undefined;
     return (
       <BottomPanel
@@ -119,31 +111,19 @@ export function SessionChatLayout({
     );
   }, [poppedOutLabel, isMobile, projectId, projectRoot, workingDirectory]);
 
-  const chat = (
-    <ChatInterface sessionId={sessionId} onReturnToDashboard={onReturnToDashboard}
-      onOpenSidebar={onOpenSidebar} beforeComposer={bottomPanel}
-      surface={chatCard && !isMobile && !poppedOutLabel ? 'card' : undefined} />
-  );
-  return (
-    <div className="flex flex-row h-full min-w-0 bg-background">
-      {unifiedWorkspace && !isMobile ? (
+  if (!isMobile) {
+    return (
+      <div className="flex flex-row h-full min-w-0 bg-background">
         <SessionWorkspaceView sessionId={sessionId} workspaceScope={workspaceScope} syncSelection={syncSelection} projectId={projectId} projectRoot={projectRoot}
           workingDirectory={workingDirectory} branchName={branchName}
           onReturnToDashboard={onReturnToDashboard} onOpenSidebar={onOpenSidebar} />
-      ) : chatCard && !isMobile && !poppedOutLabel ? (
-        <div className={`flex flex-1 min-w-0 min-h-0 py-1.5 ${sidebarCollapsed || !onOpenSidebar ? 'pl-1.5' : ''} ${rightCollapsed || !onOpenSidebar ? 'pr-1.5' : ''}`}>
-          <PaneCard data-chat-card>{chat}</PaneCard>
-        </div>
-      ) : chat}
-      {!poppedOutLabel && !(unifiedWorkspace && !isMobile) && (
-        <RightSidebar
-          sessionId={sessionId}
-          projectId={projectId}
-          projectRoot={projectRoot}
-          workingDirectory={workingDirectory}
-          branchName={branchName}
-        />
-      )}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-row h-full min-w-0 bg-background">
+      <ChatInterface sessionId={sessionId} onReturnToDashboard={onReturnToDashboard}
+        onOpenSidebar={onOpenSidebar} beforeComposer={bottomPanel} />
     </div>
   );
 }

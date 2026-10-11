@@ -8,6 +8,13 @@ export type DropZone = 'left' | 'right' | 'top' | 'bottom' | 'center';
 /** Fraction of the pane (from the center) that counts as the center "replace" zone. */
 const CENTER_DEADZONE = 0.4; // inner 40% × 40%
 
+/**
+ * Pointer travel (px, per axis) below which a pointerup counts as a click on the
+ * drag affordance instead of a drop, so grabbing a handle without moving never
+ * commits a split.
+ */
+export const DRAG_CLICK_THRESHOLD_PX = 4;
+
 export interface Rect {
   left: number;
   top: number;
@@ -154,6 +161,8 @@ export { MULTI_INSTANCE_PANELS };
 interface DragState {
   active: ToolDragPayload | null;
   hoverRootEdge: WorkspaceEdge | null;
+  /** Pointer position where the active drag began; null for programmatic starts. */
+  origin: { x: number; y: number } | null;
   setRootHover: (edge: WorkspaceEdge | null) => void;
   /** Pane id under the pointer + its resolved zone (updated on pointermove). */
   hoverPaneId: string | null;
@@ -163,23 +172,30 @@ interface DragState {
   /** Tab strip under the pointer + the insert index within it (updated on pointermove). */
   hoverTabPaneId: string | null;
   hoverTabIndex: number | null;
-  startDrag: (payload: ToolDragPayload) => void;
+  startDrag: (payload: ToolDragPayload, origin?: { x: number; y: number }) => void;
+  /**
+   * True when the pointerup at (x, y) never left the click threshold since
+   * startDrag. Programmatic drags without an origin always count as drops.
+   */
+  isClick: (x: number, y: number) => boolean;
   setHover: (paneId: string | null, zone: DropZone | null, disabled: Set<DropZone>) => void;
   setTabHover: (paneId: string | null, index: number | null) => void;
   endDrag: () => void;
 }
 
-export const useDragSplitStore = create<DragState>(set => ({
+export const useDragSplitStore = create<DragState>()((set, get) => ({
   active: null,
   hoverRootEdge: null,
+  origin: null,
   hoverPaneId: null,
   hoverZone: null,
   disabled: new Set(),
   hoverTabPaneId: null,
   hoverTabIndex: null,
-  startDrag: payload =>
+  startDrag: (payload, origin) =>
     set({
       active: payload,
+      origin: origin ?? null,
       hoverRootEdge: null,
       hoverPaneId: null,
       hoverZone: null,
@@ -187,12 +203,18 @@ export const useDragSplitStore = create<DragState>(set => ({
       hoverTabPaneId: null,
       hoverTabIndex: null,
     }),
+  isClick: (x, y) => {
+    const origin = get().origin;
+    if (!origin) return false;
+    return Math.abs(x - origin.x) < DRAG_CLICK_THRESHOLD_PX && Math.abs(y - origin.y) < DRAG_CLICK_THRESHOLD_PX;
+  },
   setHover: (paneId, zone, disabled) => set({ hoverPaneId: paneId, hoverZone: zone, disabled }),
   setRootHover: hoverRootEdge => set({ hoverRootEdge }),
   setTabHover: (paneId, index) => set({ hoverTabPaneId: paneId, hoverTabIndex: index }),
   endDrag: () =>
     set({
       active: null,
+      origin: null,
       hoverRootEdge: null,
       hoverPaneId: null,
       hoverZone: null,

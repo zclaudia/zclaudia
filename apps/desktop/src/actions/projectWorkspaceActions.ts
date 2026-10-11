@@ -9,6 +9,7 @@ import {
   removePane,
   replaceChild,
   sameRef,
+  pruneChat,
   useRightWorkspaceStore,
   type LayoutNode,
   type PaneNode,
@@ -17,6 +18,8 @@ import {
 } from '../stores/rightWorkspaceStore';
 import { useProjectWorkspaceStore } from '../stores/projectWorkspaceStore';
 import { useProjectStore } from '../stores/projectStore';
+import { useSessionsStore } from '../stores/sessionsStore';
+import { useOwnershipStore } from '../stores/ownershipStore';
 
 /**
  * Adopt the project's most recently used S2 tree once. Older per-session trees
@@ -31,7 +34,12 @@ export function resolveProjectWorkspace(
   const projects = useProjectWorkspaceStore.getState();
   const layouts = useRightWorkspaceStore.getState();
   const existing = projects.byProject[projectId];
-  if (existing && layouts.bySession[existing.workspaceId]) return existing.workspaceId;
+  if (existing && layouts.bySession[existing.workspaceId]) {
+    if (!layouts.bySession[existing.workspaceId].durable) useRightWorkspaceStore.setState(state => ({
+      bySession: { ...state.bySession, [existing.workspaceId]: { ...state.bySession[existing.workspaceId], durable: true } },
+    }));
+    return existing.workspaceId;
+  }
   const ids = [...new Set(sessionIds)];
   const candidate = layouts.order.find(id => ids.includes(id) && layouts.bySession[id]) ??
     ids.find(id => layouts.bySession[id]);
@@ -43,6 +51,9 @@ export function resolveProjectWorkspace(
     layouts.ensureChatSession(workspaceId);
   }
   const workspace = useRightWorkspaceStore.getState().bySession[workspaceId];
+  if (!workspace.durable) useRightWorkspaceStore.setState(state => ({
+    bySession: { ...state.bySession, [workspaceId]: { ...state.bySession[workspaceId], durable: true } },
+  }));
   const chats = flattenPanes(workspace.root).filter(p => p.tools.some(isChatRef));
   const focusedPane = chats.find(p => p.id === workspace.focusedPaneId) ?? chats[0];
   const active = focusedPane ? activeToolRef(focusedPane) : undefined;
@@ -56,6 +67,20 @@ export function resolveProjectWorkspace(
 export const migrateSessionLayouts = resolveProjectWorkspace;
 
 export type ProjectChatResult = { ok: true; paneId: string } | { ok: false };
+
+/** New refs require positive catalog evidence; a known delete beats stale REST data. */
+export function isProjectChatAvailable(projectId: string, sessionId: string): boolean {
+  const local = useProjectStore.getState().sessions.find(session => session.id === sessionId);
+  if (local?.archivedAt) return false;
+  const ownership = useOwnershipStore.getState();
+  const backendId = ownership.getProjectBackendId(projectId) ?? ownership.getSessionBackendId(sessionId);
+  const sessions = useSessionsStore.getState();
+  if (backendId ? sessions.deletedSessionIds.get(backendId)?.has(sessionId) :
+      [...sessions.deletedSessionIds.values()].some(ids => ids.has(sessionId))) return false;
+  const remote = backendId ? sessions.remoteSessions.get(backendId)?.find(session => session.id === sessionId) :
+    [...sessions.remoteSessions.values()].flat().find(session => session.id === sessionId && session.projectId === projectId);
+  return remote ? remote.projectId === projectId && !remote.archivedAt : local?.projectId === projectId;
+}
 
 function chatPane(root: LayoutNode | null, sessionId: string): PaneNode | undefined {
   return flattenPanes(root).find(p => p.tools.some(ref => sameRef(ref, CHAT_TOOL_ID, sessionId)));
@@ -121,18 +146,31 @@ export function focusProjectChat(projectId: string, sessionId: string): ProjectC
   return { ok: true, paneId: pane.id };
 }
 
+/** A real deletion can leave an anchor empty or containing only tools. */
+function insertFirstChat(projectId: string, workspaceId: string, sessionId: string): ProjectChatResult {
+  const inserted = newPane(CHAT_TOOL_ID, sessionId);
+  updateWorkspace(workspaceId, current => ({ ...current,
+    root: current.root ? { id: genId('grp'), kind: 'group', dir: 'row', ratio: 0.5,
+      children: [inserted, current.root] } : inserted,
+    focusedPaneId: inserted.id, maximizedPaneId: null,
+  }));
+  useProjectWorkspaceStore.getState().setFocusedChat(projectId, sessionId);
+  return { ok: true, paneId: inserted.id };
+}
+
 /** Plain click replaces the focused chat; modifier click opens a distinct pane beside it. */
 export function selectProjectChat(
   projectId: string,
   sessionId: string,
   options: { beside?: boolean; targetPaneId?: string } = {}
 ): ProjectChatResult {
+  if (!isProjectChatAvailable(projectId, sessionId)) return { ok: false };
   const workspaceId = anchor(projectId, sessionId);
   const ws = useRightWorkspaceStore.getState().bySession[workspaceId];
-  if (!ws?.root) return { ok: false };
+  if (!ws) return { ok: false };
   if (chatPane(ws.root, sessionId)) return focusProjectChat(projectId, sessionId);
   const target = preferredChatPane(projectId, ws, options.targetPaneId);
-  if (!target) return { ok: false };
+  if (!target) return insertFirstChat(projectId, workspaceId, sessionId);
   let paneId = target.id;
   if (options.beside) {
     const inserted = newPane(CHAT_TOOL_ID, sessionId);
@@ -160,12 +198,13 @@ export function selectProjectChat(
 
 /** Add a chat tab without replacing or remounting any existing session ref. */
 export function openSessionTab(projectId: string, sessionId: string, targetPaneId?: string): ProjectChatResult {
+  if (!isProjectChatAvailable(projectId, sessionId)) return { ok: false };
   const workspaceId = anchor(projectId, sessionId);
   const ws = useRightWorkspaceStore.getState().bySession[workspaceId];
-  if (!ws?.root) return { ok: false };
+  if (!ws) return { ok: false };
   if (chatPane(ws.root, sessionId)) return focusProjectChat(projectId, sessionId);
   const target = preferredChatPane(projectId, ws, targetPaneId);
-  if (!target) return { ok: false };
+  if (!target) return insertFirstChat(projectId, workspaceId, sessionId);
   const changed = { ...target, tools: [...target.tools, { toolId: CHAT_TOOL_ID, instanceKey: sessionId }],
     activeToolId: CHAT_TOOL_ID, activeInstanceKey: sessionId };
   updateWorkspace(workspaceId, current => current.root ? activate({ ...current,
@@ -211,9 +250,8 @@ export function moveProjectChatToEdge(
   if (!project || !ws?.root || !['left', 'right', 'top', 'bottom'].includes(edge)) return { ok: false };
   const source = chatPane(ws.root, sessionId);
   if (!source) {
-    const session = useProjectStore.getState().sessions.find(s => s.id === sessionId && s.projectId === projectId && !s.archivedAt);
     const target = targetPaneId ? findPane(ws.root, targetPaneId) : ws.root;
-    if (!session || !target) return { ok: false };
+    if (!isProjectChatAvailable(projectId, sessionId) || !target) return { ok: false };
     const inserted = newPane(CHAT_TOOL_ID, sessionId);
     const first = edge === 'left' || edge === 'top';
     const split: LayoutNode = { id: genId('grp'), kind: 'group', dir: edge === 'left' || edge === 'right' ? 'row' : 'col',
@@ -314,11 +352,27 @@ export function moveProjectChatToTab(
 export function reconcileProjectChats(
   projectId: string,
   validSessionIds: string[],
-  preferredSessionId?: string
+  preferredSessionId?: string,
+  options: { authoritative?: boolean } = {}
 ): ProjectChatResult {
   const valid = new Set(validSessionIds);
-  // An empty catalog can be a temporary loading state; the owner decides when to remove the project.
-  if (!valid.size) return { ok: false };
+  // Only a complete owner snapshot can distinguish an empty project from loading.
+  if (!valid.size) {
+    if (!options.authoritative) return { ok: false };
+    const project = useProjectWorkspaceStore.getState().byProject[projectId];
+    if (!project) return { ok: false };
+    updateWorkspace(project.workspaceId, current => {
+      const root = pruneChat(current.root);
+      return root === current.root ? current : { ...current, root };
+    });
+    if (project.focusedChatSessionId !== '' || Object.values(project.toolBindings).some(binding => binding.mode === 'fixed')) {
+      useProjectWorkspaceStore.setState(state => ({ byProject: { ...state.byProject, [projectId]: {
+        ...project, focusedChatSessionId: '',
+        toolBindings: Object.fromEntries(Object.entries(project.toolBindings).map(([key]) => [key, { mode: 'follow' as const }])),
+      } } }));
+    }
+    return { ok: false };
+  }
   const workspaceId = resolveProjectWorkspace(projectId, validSessionIds, preferredSessionId);
   const ws = useRightWorkspaceStore.getState().bySession[workspaceId];
   const seen = new Set<string>();

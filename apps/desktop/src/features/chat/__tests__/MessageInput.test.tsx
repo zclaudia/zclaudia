@@ -11,9 +11,12 @@ import type { SlashCommand } from '@zclaudia/shared/features/commands';
 // namespaced command would fall through to a plain message.
 const sessionAgent = vi.hoisted(() => ({
   current: { id: 'a1', name: 'Test Agent', runtimeType: 'pi' } as any,
+  backendId: null as string | null,
+  refresh: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../../hooks/useAgentForSession', () => ({
-  useAgentForSession: () => ({ agent: sessionAgent.current, llm: undefined, loading: false }),
+  useAgentForSession: () => ({ agent: sessionAgent.current, llm: undefined, loading: false,
+    backendId: sessionAgent.backendId, refresh: sessionAgent.refresh }),
 }));
 
 vi.mock('../../../hooks/useMediaQuery', () => ({
@@ -34,12 +37,16 @@ vi.mock('../../../stores/composerStore', () => ({
 }));
 
 // Mock api
-const { mockGetWorkspaceSkillsResult } = vi.hoisted(() => ({
+const { mockGetWorkspaceSkillsResult, mockUpdateAgentProfileForBackend, mockUpdateAgentProfile } = vi.hoisted(() => ({
   mockGetWorkspaceSkillsResult: vi.fn(),
+  mockUpdateAgentProfileForBackend: vi.fn(),
+  mockUpdateAgentProfile: vi.fn(),
 }));
 vi.mock('../../../services/api', () => ({
   listDirectory: vi.fn().mockResolvedValue({ entries: [] }),
   getWorkspaceSkillsResult: mockGetWorkspaceSkillsResult,
+  updateAgentProfileForBackend: mockUpdateAgentProfileForBackend,
+  updateAgentProfile: mockUpdateAgentProfile,
 }));
 
 // Mock commands for testing
@@ -60,7 +67,67 @@ describe('MessageInput', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionAgent.current = { id: 'a1', name: 'Test Agent', runtimeType: 'pi' };
+    sessionAgent.backendId = null;
+    sessionAgent.refresh = vi.fn().mockResolvedValue(undefined);
+    mockUpdateAgentProfileForBackend.mockReset().mockResolvedValue(undefined);
     mockGetWorkspaceSkillsResult.mockResolvedValue({ skills: [], diagnostics: [] });
+  });
+
+  it('updates pinned skills on the chat owner and refreshes its metadata', async () => {
+    sessionAgent.backendId = 'owner-A';
+    sessionAgent.current.skillSelection = {
+      enabled: [{ source: 'workspace', id: 'keep' }],
+      pinned: [{ source: 'workspace', id: 'review' }],
+    };
+    render(<MessageInput {...defaultProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unpin review' }));
+
+    await waitFor(() => expect(sessionAgent.refresh).toHaveBeenCalledTimes(1));
+    expect(mockUpdateAgentProfileForBackend).toHaveBeenCalledWith('owner-A', 'a1', {
+      skillSelection: { enabled: [{ source: 'workspace', id: 'keep' }], pinned: [] },
+    });
+    expect(mockUpdateAgentProfile).not.toHaveBeenCalled();
+  });
+
+  it('keeps an in-flight pin update and refresh bound to its original chat owner', async () => {
+    let finishUpdate!: () => void;
+    mockUpdateAgentProfileForBackend.mockImplementationOnce(() => new Promise<void>(resolve => {
+      finishUpdate = resolve;
+    }));
+    sessionAgent.backendId = 'owner-A';
+    sessionAgent.current.skillSelection = { pinned: [{ source: 'workspace', id: 'review' }] };
+    const refreshOwnerA = sessionAgent.refresh;
+    const { rerender } = render(<MessageInput {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Unpin review' }));
+
+    sessionAgent.backendId = 'owner-B';
+    sessionAgent.refresh = vi.fn().mockResolvedValue(undefined);
+    rerender(<MessageInput {...defaultProps} sessionId="session-2" />);
+    finishUpdate();
+
+    await waitFor(() => expect(refreshOwnerA).toHaveBeenCalledTimes(1));
+    expect(mockUpdateAgentProfileForBackend).toHaveBeenCalledWith('owner-A', 'a1', {
+      skillSelection: { pinned: [] },
+    });
+    expect(sessionAgent.refresh).not.toHaveBeenCalled();
+  });
+
+  it('refreshes owner metadata after a failed pin update', async () => {
+    sessionAgent.backendId = 'owner-A';
+    sessionAgent.current.skillSelection = { pinned: [{ source: 'workspace', id: 'review' }] };
+    mockUpdateAgentProfileForBackend.mockRejectedValueOnce(new Error('update failed'));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<MessageInput {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Unpin review' }));
+
+    await waitFor(() => expect(sessionAgent.refresh).toHaveBeenCalledTimes(1));
+    expect(mockUpdateAgentProfileForBackend).toHaveBeenCalledWith('owner-A', 'a1', {
+      skillSelection: { pinned: [] },
+    });
+    expect(mockUpdateAgentProfile).not.toHaveBeenCalled();
+    log.mockRestore();
   });
 
   function makeFile(name: string, type: string, size: number): File {

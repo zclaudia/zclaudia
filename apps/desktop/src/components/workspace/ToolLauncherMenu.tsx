@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom';
 import { openToolInWorkspace } from '../../actions/workspaceActions';
 import { useLauncherPanels } from '../../actions/openPanel';
 import { useServerStore } from '../../stores/serverStore';
+import { useOwnershipStore } from '../../stores/ownershipStore';
 import { iconForPanel } from '../rightSidebarToolIcons';
+import { useWorkspaceTool } from './WorkspaceToolContext';
 
 interface Props {
   sessionId: string;
@@ -17,8 +19,13 @@ const GAP = 4;
 const MARGIN = 8;
 
 export function ToolLauncherMenu({ sessionId, projectId, anchorRef, onPick }: Props) {
-  const backendId = useServerStore(s => s.activeServerId);
-  const tools = useLauncherPanels('desktop');
+  const bound = useWorkspaceTool();
+  const targetSessionId = bound?.sessionId ?? sessionId;
+  const targetProjectId = bound?.projectId ?? projectId;
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const ownerBackendId = useOwnershipStore(s => s.getSessionBackendId(targetSessionId) ?? s.getProjectBackendId(targetProjectId));
+  const backendId = bound?.backendId ?? ownerBackendId ?? activeServerId;
+  const tools = useLauncherPanels('desktop', backendId);
 
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -77,7 +84,7 @@ export function ToolLauncherMenu({ sessionId, projectId, anchorRef, onPick }: Pr
             key={t.id}
             role="menuitem"
             onClick={() => {
-              openToolInWorkspace(sessionId, t.id, { projectId, backendId });
+              openToolInWorkspace(targetSessionId, t.id, { projectId: targetProjectId, backendId });
               onPick();
             }}
             className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"

@@ -2,6 +2,8 @@ import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useToastStore } from '../../stores/toastStore';
 import * as api from '../../services/api';
 import { activatePanel } from '../../actions/openPanel';
+import { openToolInWorkspace } from '../../actions/workspaceActions';
+import { useChatActionsOptional } from './ChatActionsContext';
 import { FileSymbol } from '../../components/filesymbols';
 
 /**
@@ -67,6 +69,7 @@ interface Props {
  */
 export function FileLineReference({ text, projectRoot, backendId }: Props) {
   const openFile = useFileViewerStore(s => s.openFile);
+  const chat = useChatActionsOptional();
 
   const handleClick = async () => {
     const parsed = parseInlineFileRef(text);
@@ -83,8 +86,10 @@ export function FileLineReference({ text, projectRoot, backendId }: Props) {
 
     const { pathOrName, start, end } = parsed;
     const openResolved = (relativePath: string) => {
-      openFile(projectRoot, relativePath, start, end);
-      activatePanel('file-viewer');
+      if (backendId) openFile(projectRoot, relativePath, start, end, backendId);
+      else openFile(projectRoot, relativePath, start, end);
+      if (chat?.sessionId) openToolInWorkspace(chat.sessionId, 'file-viewer', { backendId });
+      else activatePanel('file-viewer');
     };
 
     const basename = pathOrName.split('/').pop() ?? pathOrName;

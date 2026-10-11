@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import * as api from '../../../services/api';
 import { FileViewerPanel, FileViewerActions } from '../FileViewerPanel';
 import { WorkspaceVisibilityContext } from '../../workspace/WorkspaceContext';
+import { WorkspaceToolContext } from '../../workspace/WorkspaceToolContext';
 
 const scrollToRowMock = vi.hoisted(() => vi.fn());
 const mockIsMobile = vi.hoisted(() => ({ value: false }));
@@ -88,6 +89,7 @@ const mockFileViewerState = {
   showTree: true,
   fullscreen: false,
   projectRoot: null as string | null,
+  backendId: null as string | null,
   openFile: vi.fn(),
   setContent: vi.fn(),
   setError: vi.fn(),
@@ -150,6 +152,7 @@ beforeEach(() => {
   mockFileViewerState.treeWidthPx = 256;
   mockFileViewerState.compactLayout = false;
   mockFileViewerState.projectRoot = null;
+  mockFileViewerState.backendId = null;
   mockFileViewerState.knownMtimeMs = null;
   vi.mocked(api.getFileLanguageServerDiagnostics).mockResolvedValue({
     state: 'unavailable',
@@ -160,6 +163,36 @@ beforeEach(() => {
 });
 
 describe('FileViewerPanel', () => {
+  it('loads the file and tree from the bound tool backend', async () => {
+    mockFileViewerState.filePath = 'src/app.tsx';
+    mockFileViewerState.projectRoot = '/project';
+    render(<WorkspaceToolContext.Provider value={{ sessionId: 'fixed-chat', backendId: 'bound-backend' }}>
+      <FileViewerPanel projectRoot="/project" />
+    </WorkspaceToolContext.Provider>);
+    await waitFor(() => expect(api.getFileContent).toHaveBeenCalledWith({ projectRoot: '/project', relativePath: 'src/app.tsx', backendId: 'bound-backend' }));
+    expect(screen.getByTestId('file-tree')).toHaveTextContent('/project:bound-backend:src/app.tsx');
+  });
+
+  it('ignores an in-flight old root result even before the panel rerenders', async () => {
+    let resolve!: (value: { content: string }) => void;
+    vi.mocked(api.getFileContent).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    mockFileViewerState.filePath = 'src/app.tsx';
+    mockFileViewerState.projectRoot = '/project-A';
+    render(<FileViewerPanel projectRoot="/project-A" />);
+    await waitFor(() => expect(api.getFileContent).toHaveBeenCalled());
+    // A store switch can precede React's effect cleanup, and paths can match.
+    mockFileViewerState.projectRoot = '/project-B';
+    await act(async () => resolve({ content: 'Old A content' }));
+    expect(mockFileViewerState.setContent).not.toHaveBeenCalled();
+  });
+
+  it('does not poll files while retained and hidden', () => {
+    mockFileViewerState.filePath = 'src/app.tsx';
+    render(<WorkspaceVisibilityContext.Provider value={false}><FileViewerPanel projectRoot="/project" /></WorkspaceVisibilityContext.Provider>);
+    expect(api.getFileStat).not.toHaveBeenCalled();
+    expect(api.getFileContent).not.toHaveBeenCalled();
+  });
+
   it('does not capture search shortcuts while retained and hidden', () => {
     mockFileViewerState.content = 'const value = 1;';
     const { rerender } = render(

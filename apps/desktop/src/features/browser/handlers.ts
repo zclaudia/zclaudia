@@ -1,7 +1,6 @@
 import type { BrowserPickedElement } from '@zclaudia/shared/wire/messages/browser';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { useBrowserStore } from './browserStore';
-import { useAppearanceStore } from '../../stores/appearanceStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 import { openToolInWorkspace, workspaceIdForSession } from '../../actions/workspaceActions';
 import { isPanelAvailable } from '../../actions/openPanel';
@@ -21,7 +20,7 @@ export function formatPickedElement(el: BrowserPickedElement): string {
   ].join('\n');
 }
 
-export function handleBrowserMessage(msg: ServerMessage): boolean {
+export function handleBrowserMessage(msg: ServerMessage, backendId?: string): boolean {
   const store = useBrowserStore.getState();
   switch (msg.type) {
     case 'browser_opened':
@@ -46,7 +45,7 @@ export function handleBrowserMessage(msg: ServerMessage): boolean {
       if (msg.sessionId) store.patchSession(msg.sessionId, { error: msg.message });
       return true;
     case 'browser_engine_status':
-      store.setEngine({ status: msg.status, progress: msg.progress, message: msg.message });
+      store.setEngine({ status: msg.status, progress: msg.progress, message: msg.message }, backendId);
       return true;
     case 'browser_emulation':
       store.patchSession(msg.sessionId, { emulation: msg.emulation });
@@ -95,7 +94,7 @@ export function handleBrowserMessage(msg: ServerMessage): boolean {
       if (msg.active && isPanelAvailable('browser') && isSelectedSession) {
         const root = useRightWorkspaceStore.getState().bySession[workspaceIdForSession(msg.sessionId)]?.root ?? null;
         const alreadyOpen = findPaneWithTool(root, 'browser', undefined, true) !== null;
-        if (useAppearanceStore.getState().unifiedWorkspace && useRightSidebarStore.getState().collapsed) {
+        if (useRightSidebarStore.getState().collapsed) {
           useRightSidebarStore.getState().markUnread();
         } else if (!alreadyOpen) {
           openToolInWorkspace(msg.sessionId, 'browser');

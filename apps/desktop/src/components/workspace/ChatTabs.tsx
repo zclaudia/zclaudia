@@ -34,7 +34,7 @@ export function ChatTabs({ workspaceId, projectId, pane }: { workspaceId: string
                 onClick={() => activate(sessionId)}
                 onPointerDown={event => {
                   if (event.pointerType === 'mouse' && (event.buttons & 1) === 0) return;
-                  useDragSplitStore.getState().startDrag({ toolId: CHAT_TOOL_ID, instanceKey: sessionId, multiInstance: true, sourcePaneId: pane.id, sourceIndex: index });
+                  useDragSplitStore.getState().startDrag({ toolId: CHAT_TOOL_ID, instanceKey: sessionId, multiInstance: true, sourcePaneId: pane.id, sourceIndex: index }, { x: event.clientX, y: event.clientY });
                 }}
                 className={`flex min-w-0 items-center gap-1.5 px-2 text-xs ${active ? 'text-foreground shadow-[inset_0_-2px_0_hsl(var(--muted-foreground))]' : 'text-muted-foreground hover:text-foreground'}`}
               >

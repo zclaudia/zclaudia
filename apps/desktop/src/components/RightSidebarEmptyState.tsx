@@ -3,6 +3,7 @@ import { TOOL_ICONS } from './rightSidebarToolIcons';
 import { usePluginStore, selectPluginPanels } from '../stores/pluginStore';
 import { useChangesData } from './changes/useSessionChanges';
 import { useServerStore } from '../stores/serverStore';
+import { useOwnershipStore } from '../stores/ownershipStore';
 import { openToolInWorkspace } from '../actions/workspaceActions';
 
 interface RightSidebarEmptyStateProps {
@@ -54,7 +55,9 @@ export function RightSidebarEmptyState({
 }: RightSidebarEmptyStateProps) {
   const panels = usePluginStore(selectPluginPanels);
   const disabled = usePluginStore(s => s.disabledBuiltinPanels);
-  const backendId = useServerStore(s => s.activeServerId);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const ownerBackendId = useOwnershipStore(s => s.getSessionBackendId(sessionId) ?? s.getProjectBackendId(projectId));
+  const backendId = ownerBackendId ?? activeServerId;
   const { result } = useChangesData(sessionId, null, projectRoot);
   const changedCount = result.modified.length;
 

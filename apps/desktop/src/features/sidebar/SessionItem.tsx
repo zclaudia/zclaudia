@@ -3,7 +3,6 @@ import { ExternalLink, Trash2, GitBranch, Lock, MoreHorizontal, Columns2 } from 
 import type { Session } from '@zclaudia/shared/core/session';
 import { TONE_BADGE, TONE_TEXT, type Tone } from '../../components/ui/tone';
 import { DropdownMenu, type DropdownMenuEntry } from '../../components/ui/DropdownMenu';
-import { useAppearanceStore } from '../../stores/appearanceStore';
 import { selectProjectChat } from '../../actions/projectWorkspaceActions';
 import { useDragSplitStore } from '../../components/workspace/dragSplit';
 import { flattenPanes, useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
@@ -67,8 +66,7 @@ export function SessionItem({
 
   // Right-side hover actions (desktop only) collapse into a "⋯" dropdown so the
   // row stays clean — matching the project/session-header menu convention.
-  const unifiedWorkspace = useAppearanceStore(s => s.unifiedWorkspace);
-  const canArrange = unifiedWorkspace && !isMobile && Boolean(session.projectId);
+  const canArrange = !isMobile && Boolean(session.projectId);
   const cancelOwnDrag = () => {
     const active = useDragSplitStore.getState().active;
     if (active?.toolId === 'chat' && active.instanceKey === session.id) useDragSplitStore.getState().endDrag();
@@ -138,7 +136,7 @@ export function SessionItem({
             toolId: 'chat', instanceKey: session.id, projectId: session.projectId, multiInstance: true,
             sourcePaneId: source?.id,
             sourceIndex: source?.tools.findIndex(ref => ref.toolId === 'chat' && ref.instanceKey === session.id),
-          });
+          }, { x: event.clientX, y: event.clientY });
         }}
         // Mobile sits inside the always-on rail at the 44px tier; desktop keeps
         // the negative-margin pull so its hover fill spans the rail padding.

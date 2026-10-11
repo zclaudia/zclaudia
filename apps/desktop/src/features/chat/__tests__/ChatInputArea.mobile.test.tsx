@@ -42,6 +42,10 @@ vi.mock('../ContextUsagePopover', () => ({
 vi.mock('../../../services/api', () => ({
   unlockSession: vi.fn(),
 }));
+vi.mock('../../../services/api/goals', () => ({ getGoal: vi.fn().mockResolvedValue(null) }));
+vi.mock('../../../hooks/useAgentForSession', () => ({
+  useAgentForSession: () => ({ agent: undefined, llm: undefined, loading: false }),
+}));
 
 const serverStoreState = {
   activeServerSupports: vi.fn(() => false),
@@ -220,7 +224,11 @@ vi.mock('../../../stores/rightSidebarStore', () => ({
 
 const draftEditorState = {
   openEditor: vi.fn(),
-  setSendCallback: vi.fn(),
+  activeSessionId: null as string | null,
+  sendCallback: null as ((content: string) => void) | null,
+  setSendCallback: vi.fn((callback: ((content: string) => void) | null) => {
+    draftEditorState.sendCallback = callback;
+  }),
   draftExists: { 'sess-1': false } as Record<string, boolean>,
   closeEditor: vi.fn(),
 };
@@ -329,10 +337,36 @@ describe('ChatInputArea mobile selectors', () => {
     terminalStoreState.drawerOpen = {};
     terminalStoreState.terminals = {};
     bottomPanelState.activeTab = '';
+    draftEditorState.activeSessionId = null;
+    draftEditorState.sendCallback = null;
   });
 
   afterEach(() => {
     cleanup();
+  });
+
+  it('keeps draft sending owned by its session with two mounted composers', () => {
+    draftEditorState.activeSessionId = 'sess-1';
+    const sendA = vi.fn();
+    const sendB = vi.fn();
+    const { rerender, unmount } = render(<>
+      <ChatInputArea {...baseProps} onSendMessage={sendA} />
+      <ChatInputArea {...baseProps} sessionId="sess-2" onSendMessage={sendB} />
+    </>);
+    draftEditorState.sendCallback?.('A draft');
+    expect(sendA).toHaveBeenCalledExactlyOnceWith('A draft');
+    expect(sendB).not.toHaveBeenCalled();
+
+    draftEditorState.activeSessionId = 'sess-2';
+    rerender(<>
+      <ChatInputArea {...baseProps} onSendMessage={sendA} />
+      <ChatInputArea {...baseProps} sessionId="sess-2" onSendMessage={sendB} />
+    </>);
+    draftEditorState.sendCallback?.('B draft');
+    expect(sendB).toHaveBeenCalledExactlyOnceWith('B draft');
+    expect(sendA).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(draftEditorState.sendCallback).toBeNull();
   });
 
   it('shows mode selector + model selector + worktree + terminal tool on mobile', () => {

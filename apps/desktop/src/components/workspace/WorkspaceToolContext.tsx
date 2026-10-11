@@ -32,6 +32,10 @@ export function WorkspaceToolProvider({
   useEffect(() => {
     if (!visible || toolId !== 'draft') return;
     const draft = useDraftEditorStore.getState();
+    if (!sessionId) {
+      if (draft.activeSessionId) void draft.closeEditor();
+      return;
+    }
     if (draft.activeSessionId !== sessionId) void draft.openEditor(sessionId);
   }, [sessionId, toolId, visible]);
 
@@ -39,7 +43,16 @@ export function WorkspaceToolProvider({
     if (!visible || toolId !== 'file-viewer' || !projectRoot) return;
     const viewer = useFileViewerStore.getState();
     if (viewer.isOpen && viewer.projectRoot && viewer.projectRoot !== projectRoot) viewer.close();
-  }, [projectRoot, toolId, visible]);
+    if (backendId && viewer.backendId !== backendId) {
+      if (viewer.projectRoot === projectRoot && viewer.filePath && !viewer.backendId) {
+        // Adopt legacy unscoped references without mixing their cached payload.
+        viewer.openFile(projectRoot, viewer.filePath, viewer.targetLine ?? undefined, viewer.targetEndLine ?? undefined, backendId);
+      } else {
+        viewer.backToTree();
+        useFileViewerStore.setState({ projectRoot, backendId });
+      }
+    }
+  }, [projectRoot, backendId, toolId, visible]);
 
   return (
     <WorkspaceToolContext.Provider value={value}>

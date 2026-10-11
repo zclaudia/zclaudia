@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import { recoverableJsonStorage } from '../utils/workspaceStorage';
 
 // Width is stored as a FRACTION of the chat/panel container width (not absolute
 // px), so the right panel scales proportionally with the window — resizing the
@@ -47,6 +48,7 @@ export const useRightSidebarStore = create<RightSidebarState>()(
     }),
     {
       name: 'claudia-right-sidebar',
+      storage: createJSONStorage(() => recoverableJsonStorage(localStorage)),
       version: 2,
       // v0 persisted an absolute `widthPx`; convert it to a fraction of the
       // window width so existing users keep a comparable starting size.

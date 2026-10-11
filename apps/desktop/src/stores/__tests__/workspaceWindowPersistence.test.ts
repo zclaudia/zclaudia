@@ -76,4 +76,73 @@ describe('window layout persistence namespaces', () => {
     expect(localStorage.getItem('claudia-project-workspace')).toBe(mainMetadata);
     expect(useProjectWorkspaceStore.persist.getOptions().name).toBe('claudia-project-workspace:dashboard:p');
   });
+
+  it('shares saved preset definitions while isolating selected layouts and preserving main legacy selections', async () => {
+    const tree = { kind: 'slots', slotId: 'saved-pane', slots: [{ slotId: 'saved-chat', kind: 'chat' }] };
+    localStorage.setItem('claudia-layout-presets', JSON.stringify({ version: 1, state: {
+      presets: [{ id: 'shared', name: 'Shared', builtin: false, tree }], selectedByProject: { p: 'shared' },
+    } }));
+    setSearch('');
+    vi.resetModules();
+    const main = (await import('../layoutPresetStore')).useLayoutPresetStore;
+    expect(main.getState().selectedByProject.p).toBe('shared');
+    main.getState().setProjectPreset('p', 'compare');
+    const library = localStorage.getItem('claudia-layout-presets');
+    const mainSelection = localStorage.getItem('claudia-layout-preset-selection');
+
+    setSearch('?projectDashboard=p');
+    vi.resetModules();
+    const dashboard = (await import('../layoutPresetStore')).useLayoutPresetStore;
+    expect(dashboard.getState().presets.some(p => p.id === 'shared')).toBe(true);
+    expect(dashboard.getState().selectedByProject).toEqual({});
+    dashboard.getState().setProjectPreset('p', 'focus');
+    expect(localStorage.getItem('claudia-layout-presets')).toBe(library);
+    expect(localStorage.getItem('claudia-layout-preset-selection')).toBe(mainSelection);
+    expect(JSON.parse(localStorage.getItem('claudia-layout-preset-selection:dashboard:p')!).state.selectedByProject).toEqual({ p: 'focus' });
+    expect(main.getState().selectedByProject.p).toBe('compare');
+  });
+
+  it('refreshes the shared library before CRUD so a stale window cannot lose another window’s saved preset', async () => {
+    setSearch('');
+    vi.resetModules();
+    const main = (await import('../layoutPresetStore')).useLayoutPresetStore;
+    const tree = main.getState().presets[0].tree;
+    const first = main.getState().createPreset('First', tree);
+    expect(first.ok).toBe(true);
+
+    setSearch('?sessionWindow=A');
+    vi.resetModules();
+    const popup = (await import('../layoutPresetStore')).useLayoutPresetStore;
+    const second = popup.getState().createPreset('Second', tree);
+    expect(second.ok).toBe(true);
+    const sharedLibrary = localStorage.getItem('claudia-layout-presets');
+    main.getState().setProjectPreset('p', 'default');
+    expect(localStorage.getItem('claudia-layout-presets')).toBe(sharedLibrary);
+    expect(main.getState().createPreset(' second ', tree)).toEqual({ ok: false, error: 'duplicate-name' });
+    expect(main.getState().presets.filter(p => !p.builtin).map(p => p.name)).toEqual(['First', 'Second']);
+    const third = main.getState().createPreset('Third', tree);
+    expect(third.ok).toBe(true);
+    expect(JSON.parse(localStorage.getItem('claudia-layout-presets')!).state.presets.map((p: { name: string }) => p.name))
+      .toEqual(['First', 'Second', 'Third']);
+    expect(localStorage.getItem('claudia-layout-preset-selection:session:A')).not.toBeNull();
+  });
+
+  it('migrates legacy main selections before a popup edits the globally shared preset library', async () => {
+    const tree = { kind: 'slots', slotId: 'pane', slots: [{ slotId: 'chat', kind: 'chat' }] };
+    localStorage.setItem('claudia-layout-presets', JSON.stringify({ version: 1, state: {
+      presets: [{ id: 'saved', name: 'Saved', builtin: false, tree }], selectedByProject: { p: 'saved' },
+    } }));
+    // No main-window write occurs before the popup opens and edits definitions.
+    setSearch('?sessionWindow=A');
+    vi.resetModules();
+    const popup = (await import('../layoutPresetStore')).useLayoutPresetStore;
+    expect(popup.getState().selectedByProject).toEqual({});
+    expect(popup.getState().renamePreset('saved', 'Renamed').ok).toBe(true);
+    expect(JSON.parse(localStorage.getItem('claudia-layout-presets')!).state.selectedByProject).toBeUndefined();
+    setSearch('');
+    vi.resetModules();
+    const main = (await import('../layoutPresetStore')).useLayoutPresetStore;
+    expect(main.getState().selectedByProject).toEqual({ p: 'saved' });
+    expect(main.getState().presets.find(p => p.id === 'saved')?.name).toBe('Renamed');
+  });
 });

@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { usePluginStore } from '../../stores/pluginStore';
+import { useOwnershipStore } from '../../stores/ownershipStore';
 
 const gitStateMock = vi.fn();
 const changesMock = vi.fn();
@@ -24,6 +25,8 @@ import { openToolInWorkspace } from '../../actions/workspaceActions';
 
 beforeEach(() => {
   cleanup();
+  vi.clearAllMocks();
+  useOwnershipStore.setState({ sessionBackendIds: {}, projectBackendIds: {}, taskOwners: {} });
   gitStateMock.mockReturnValue({ worktrees: {}, selectedWorktree: {} });
   changesMock.mockReturnValue([]);
 
@@ -78,6 +81,15 @@ function renderEmpty(props: { branchName?: string } = {}) {
 }
 
 describe('RightSidebarEmptyState', () => {
+  it('opens tools on the displayed session owner rather than the active backend', () => {
+    useOwnershipStore.getState().setSessionOwner('s1', 'owner-backend');
+    renderEmpty();
+    fireEvent.click(screen.getByText('Terminal'));
+    expect(openToolInWorkspace).toHaveBeenCalledWith('s1', 'terminal', {
+      projectId: 'p1', backendId: 'owner-backend',
+    });
+  });
+
   it('renders one tile per registered panel with its label', () => {
     renderEmpty();
     expect(screen.getByText('Terminal')).toBeInTheDocument();

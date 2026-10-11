@@ -2,7 +2,6 @@ import { resolveProjectWorkspace } from '../../../actions/projectWorkspaceAction
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useSidebarActions } from '../useSidebarActions';
-import { useAppearanceStore } from '../../../stores/appearanceStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useRightWorkspaceStore, flattenPanes } from '../../../stores/rightWorkspaceStore';
 import { useProjectWorkspaceStore } from '../../../stores/projectWorkspaceStore';
@@ -27,7 +26,6 @@ function options(isMobile = false) {
 describe('useSidebarActions workspace selection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAppearanceStore.setState({ unifiedWorkspace: true });
     useProjectWorkspaceStore.setState({ byProject: {} });
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
     useProjectStore.setState({ sessions: [

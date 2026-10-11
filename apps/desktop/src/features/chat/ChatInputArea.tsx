@@ -146,6 +146,7 @@ export function ChatInputArea({
   const fileViewerOpen = useFileViewerStore(s => s.isOpen);
   const openDraftEditor = useDraftEditorStore(s => s.openEditor);
   const setSendCallback = useDraftEditorStore(s => s.setSendCallback);
+  const activeDraftSessionId = useDraftEditorStore(s => s.activeSessionId);
   // Registry-driven mobile tools menu: every panel declared mobile-capable
   // (and not disabled/hidden/feature-gated) is offered, so new panels never
   // silently default to unreachable on phones.
@@ -163,8 +164,13 @@ export function ChatInputArea({
   // "Finish & Send" works no matter how the Draft tool was opened. The workspace
   // launcher path doesn't set it (DraftPanel lives outside the chat's send context).
   useEffect(() => {
-    setSendCallback((content: string) => onSendMessage(content));
-  }, [onSendMessage, setSendCallback]);
+    if (activeDraftSessionId !== sessionId) return;
+    const callback = (content: string) => onSendMessage(content);
+    setSendCallback(callback);
+    return () => {
+      if (useDraftEditorStore.getState().sendCallback === callback) setSendCallback(null);
+    };
+  }, [activeDraftSessionId, sessionId, onSendMessage, setSendCallback]);
 
   // Mobile toolbar popover state
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);

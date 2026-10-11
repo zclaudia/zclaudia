@@ -7,9 +7,9 @@ import { useServerStore } from '../stores/serverStore';
 import { useRightWorkspaceStore, findPaneWithTool } from '../stores/rightWorkspaceStore';
 import { openToolInWorkspace, closeToolInWorkspace, workspaceIdForSession } from './workspaceActions';
 import { useProjectWorkspaceStore } from '../stores/projectWorkspaceStore';
-import { useAppearanceStore } from '../stores/appearanceStore';
 import { useWorkspaceRoutingStore } from '../stores/workspaceRoutingStore';
 import { useOwnershipStore } from '../stores/ownershipStore';
+import { getTerminalScopeKey } from '../stores/terminalStore';
 
 /**
  * Effective placement, viewport-aware: mobile renders every panel through the
@@ -27,10 +27,10 @@ function viewportPlacement(panelId: string): 'bottom' | 'right' {
 function currentSessionCtx() {
   const { selectedSessionId } = useSelectionStore.getState();
   const { sessions } = useProjectStore.getState();
-  const route = useAppearanceStore.getState().unifiedWorkspace && !isMobileViewport() ? useWorkspaceRoutingStore.getState().active : null;
+  const route = !isMobileViewport() ? useWorkspaceRoutingStore.getState().active : null;
   const routedSessionId = route?.sessionId ?? selectedSessionId;
   const selected = routedSessionId ? sessions.find(s => s.id === routedSessionId) : undefined;
-  const focused = useAppearanceStore.getState().unifiedWorkspace && !isMobileViewport() && (route?.projectScoped !== false) && selected?.projectId
+  const focused = !isMobileViewport() && (route?.projectScoped !== false) && selected?.projectId
     ? useProjectWorkspaceStore.getState().byProject[selected.projectId]?.focusedChatSessionId : undefined;
   const sessionId = focused ?? routedSessionId;
   const session = sessionId ? sessions.find(s => s.id === sessionId) : undefined;
@@ -52,10 +52,23 @@ function currentSessionCtx() {
  * panel-specific "open" behavior (e.g. terminal drawer, file viewer state,
  * draft store). This utility only handles the placement routing.
  */
-export function activatePanel(panelId: string): void {
+export interface PanelActivationContext {
+  sessionId?: string;
+  projectId?: string;
+  backendId?: string | null;
+}
+
+export function activatePanel(panelId: string, context?: PanelActivationContext): void {
   const placement = viewportPlacement(panelId);
   if (placement === 'right') {
-    const ctx = currentSessionCtx();
+    const current = currentSessionCtx();
+    const sessionId = context?.sessionId ?? current.sessionId;
+    const session = useProjectStore.getState().sessions.find(s => s.id === sessionId);
+    const projectId = context?.projectId ?? session?.projectId ?? current.projectId;
+    const backendId = context?.backendId !== undefined ? context.backendId :
+      useOwnershipStore.getState().getSessionBackendId(sessionId) ??
+      useOwnershipStore.getState().getProjectBackendId(projectId) ?? current.backendId;
+    const ctx = { sessionId, projectId, backendId };
     if (!ctx.sessionId) return;
     openToolInWorkspace(ctx.sessionId, panelId, {
       projectId: ctx.projectId,
@@ -74,7 +87,7 @@ export function activatePanel(panelId: string): void {
  * panel is even possible before doing so (e.g. ChatLink deciding whether to
  * intercept a click before the browser panel exists on this platform).
  */
-export function isPanelAvailable(panelId: string): boolean {
+export function isPanelAvailable(panelId: string, context?: PanelActivationContext): boolean {
   const pluginState = usePluginStore.getState();
   const panel = pluginState.panels.find(p => p.id === panelId);
   if (!panel) return false;
@@ -82,11 +95,15 @@ export function isPanelAvailable(panelId: string): boolean {
   const platform = isMobileViewport() ? 'mobile' : 'desktop';
   if (!(panel.platforms ?? ['desktop']).includes(platform)) return false;
   if (pluginState.disabledBuiltinPanels.includes(panelId)) return false;
-  if (
-    panel.requiresFeature &&
-    !useServerStore.getState().activeServerSupports(panel.requiresFeature)
-  )
-    return false;
+  if (panel.requiresFeature) {
+    const servers = useServerStore.getState();
+    const backendId = context?.backendId ?? (context ?
+      useOwnershipStore.getState().getSessionBackendId(context.sessionId) ??
+      useOwnershipStore.getState().getProjectBackendId(context.projectId) : undefined);
+    const supported = backendId ? servers.serverSupports(backendId, panel.requiresFeature) :
+      servers.activeServerSupports(panel.requiresFeature);
+    if (!supported) return false;
+  }
   return true;
 }
 
@@ -98,13 +115,18 @@ export function isPanelAvailable(panelId: string): boolean {
  * (`requiresFeature`, e.g. terminal ⇢ remoteTerminal) — live in one place
  * instead of being hand-rolled per surface.
  */
-export function useLauncherPanels(platform: 'desktop' | 'mobile'): UIExtension[] {
+export function useLauncherPanels(platform: 'desktop' | 'mobile', backendId?: string | null): UIExtension[] {
   const panels = usePluginStore(s => s.panels);
   const disabled = usePluginStore(s => s.disabledBuiltinPanels);
   // Subscribe to the active server's feature set so capability-gated panels
   // appear/disappear when the backend (or its advertised features) changes.
-  useServerStore(s => (s.activeServerId ? s.connections[s.activeServerId]?.features : undefined));
-  const supports = useServerStore.getState().activeServerSupports;
+  useServerStore(s => {
+    const id = backendId ?? s.activeServerId;
+    return id ? s.connections[id]?.features : undefined;
+  });
+  const server = useServerStore.getState();
+  const supports = (feature: Parameters<typeof server.serverSupports>[1]) =>
+    backendId ? server.serverSupports(backendId, feature) : server.activeServerSupports(feature);
   return panels
     .filter(
       p =>
@@ -120,21 +142,27 @@ export function useLauncherPanels(platform: 'desktop' | 'mobile'): UIExtension[]
  * Non-reactive check for event handlers and stores that need the same
  * placement-aware active-tab semantics as usePanelIsActive().
  */
-export function isPanelActive(panelId: string): boolean {
-  if (!isPanelAvailable(panelId)) return false;
+export function isPanelActive(panelId: string, context?: PanelActivationContext): boolean {
+  if (!isPanelAvailable(panelId, context)) return false;
   const pluginState = usePluginStore.getState();
   const panel = pluginState.panels.find(p => p.id === panelId);
   if (!panel || panel.visible === false) return false;
 
   const placement = viewportPlacement(panelId);
   if (placement === 'right') {
-    const route = useAppearanceStore.getState().unifiedWorkspace && !isMobileViewport()
+    const route = !isMobileViewport()
       ? useWorkspaceRoutingStore.getState().active : null;
     const sid = useSelectionStore.getState().selectedSessionId;
-    const workspaceId = route?.workspaceId ?? (sid ? workspaceIdForSession(sid) : null);
+    const workspaceId = context?.sessionId ? workspaceIdForSession(context.sessionId, context.projectId) :
+      route?.workspaceId ?? (sid ? workspaceIdForSession(sid) : null);
     if (!workspaceId) return false;
     const root = useRightWorkspaceStore.getState().bySession[workspaceId]?.root ?? null;
-    return findPaneWithTool(root, panelId, undefined, true) !== null;
+    const terminalBackendId = context?.backendId !== undefined ? context.backendId :
+      useOwnershipStore.getState().getSessionBackendId(context?.sessionId) ??
+      useOwnershipStore.getState().getProjectBackendId(context?.projectId) ?? useServerStore.getState().activeServerId;
+    const terminalScope = panelId === 'terminal' && context?.projectId
+      ? getTerminalScopeKey(context.projectId, terminalBackendId) : undefined;
+    return findPaneWithTool(root, panelId, terminalScope, terminalScope === undefined) !== null;
   }
   return useBottomPanelStore.getState().activeTab === panelId;
 }
@@ -173,10 +201,9 @@ export function usePanelIsActive(panelId: string): boolean {
   const bottomMatches = useBottomPanelStore(s => s.activeTab === panelId);
   const sid = useSelectionStore(s => s.selectedSessionId);
   const projectId = useProjectStore(s => s.sessions.find(session => session.id === sid)?.projectId);
-  const unified = useAppearanceStore(s => s.unifiedWorkspace);
   const routedWorkspaceId = useWorkspaceRoutingStore(s => s.active?.workspaceId);
   const anchor = useProjectWorkspaceStore(s => projectId ? s.byProject[projectId]?.workspaceId : undefined);
-  const workspaceId = unified && !isMobile ? routedWorkspaceId ?? anchor ?? sid : sid;
+  const workspaceId = !isMobile ? routedWorkspaceId ?? anchor ?? sid : sid;
   const rightMatches = useRightWorkspaceStore(s => {
     const root = workspaceId ? (s.bySession[workspaceId]?.root ?? null) : null;
     return findPaneWithTool(root, panelId, undefined, true) !== null;

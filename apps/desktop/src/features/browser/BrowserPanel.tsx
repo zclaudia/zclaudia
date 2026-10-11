@@ -3,6 +3,8 @@ import { useConnection } from '../../contexts/ConnectionContext';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useWorkspaceTool } from '../../components/workspace/WorkspaceToolContext';
 import { useWorkspaceVisible } from '../../components/workspace/WorkspaceContext';
+import { useFacadeStore } from '../../stores/facadeStore';
+import { isMobileBackendUsable } from '../../services/mobileConnectionState';
 import { isTauri } from '../../utils/platform';
 import { useBrowserStore } from './browserStore';
 import { BrowserToolbar } from './BrowserToolbar';
@@ -19,6 +21,7 @@ import type {
 import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 
 const RESIZE_DEBOUNCE_MS = 200;
+const UNKNOWN_ENGINE = { status: 'unknown' as const };
 
 export function BrowserPanel(_props: {
   projectId?: string;
@@ -26,17 +29,19 @@ export function BrowserPanel(_props: {
   workingDirectory?: string;
   panelId?: string;
 }) {
-  const { sendMessage: activeSendMessage, sendToServer, isConnected } = useConnection();
+  const { sendMessage: activeSendMessage, sendToServer, isConnected: activeConnected } = useConnection();
   const toolContext = useWorkspaceTool();
   const boundSessionId = toolContext?.sessionId;
   const backendId = toolContext?.backendId;
+  const ownerConnected = useFacadeStore(s => isMobileBackendUsable({ backendId, connectionState: s.connectionState, backends: s.backends }));
+  const isConnected = backendId ? ownerConnected : activeConnected;
   const sendMessage = useCallback((message: ClientMessage) => {
     if (backendId) sendToServer(backendId, message);
     else activeSendMessage(message);
   }, [backendId, sendToServer, activeSendMessage]);
   const visible = useWorkspaceVisible();
   const sessionId = useSelectionStore(s => boundSessionId ?? s.selectedSessionId);
-  const engine = useBrowserStore(s => s.engine);
+  const engine = useBrowserStore(s => backendId ? s.enginesByBackend[backendId] ?? UNKNOWN_ENGINE : s.engine);
   const view = useBrowserStore(s => (sessionId ? s.sessions[sessionId] : undefined));
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ width: 1024, height: 768 });

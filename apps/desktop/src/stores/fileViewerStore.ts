@@ -12,6 +12,8 @@ interface FileViewerState {
   // Currently viewed file
   filePath: string | null; // relative path from project root
   projectRoot: string | null;
+  /** Backend identity distinguishes identical filesystem paths on different servers. */
+  backendId: string | null;
   // File content
   content: string | null;
   loading: boolean;
@@ -57,8 +59,10 @@ interface FileViewerState {
     projectRoot: string,
     relativePath: string,
     targetLine?: number,
-    targetEndLine?: number
+    targetEndLine?: number,
+    backendId?: string | null
   ) => void;
+  openSearch: (projectRoot: string, backendId?: string | null) => void;
   setContent: (content: string, mtimeMs?: number) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -81,13 +85,13 @@ interface FileViewerState {
   toggleInFileSearchCaseSensitive: () => void;
   resetInFileSearch: () => void;
   toggleMarkdownSourceView: () => void;
-  getCached: (projectRoot: string, relativePath: string) => string | undefined;
+  getCached: (projectRoot: string, relativePath: string, backendId?: string | null) => string | undefined;
   /** Remove a cached entry so the next open forces a fresh fetch. */
-  invalidate: (projectRoot: string, relativePath: string) => void;
+  invalidate: (projectRoot: string, relativePath: string, backendId?: string | null) => void;
 }
 
-function cacheKey(root: string, path: string) {
-  return `${root}\0${path}`;
+function cacheKey(root: string, path: string, backendId?: string | null) {
+  return backendId ? `${backendId}\0${root}\0${path}` : `${root}\0${path}`;
 }
 
 /** Cached file payload: the text plus the mtime it was read at. */
@@ -104,6 +108,7 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   isOpen: false,
   filePath: null,
   projectRoot: null,
+  backendId: null,
   content: null,
   loading: false,
   error: null,
@@ -126,14 +131,16 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
     projectRoot: string,
     relativePath: string,
     targetLine?: number,
-    targetEndLine?: number
+    targetEndLine?: number,
+    backendId?: string | null
   ) => {
-    const key = cacheKey(projectRoot, relativePath);
+    const key = cacheKey(projectRoot, relativePath, backendId);
     const cached = get().contentCache.get(key);
     set(state => ({
       isOpen: true,
       filePath: relativePath,
       projectRoot,
+      backendId: backendId ?? null,
       content: cached?.content ?? null,
       knownMtimeMs: cached?.mtimeMs ?? null,
       // Display cached content instantly when available; the panel still runs a
@@ -153,12 +160,12 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   },
 
   setContent: (content: string, mtimeMs?: number) => {
-    const { filePath, projectRoot, contentCache } = get();
+    const { filePath, projectRoot, backendId, contentCache } = get();
     // Default to "now" when no mtime is supplied so callers that don't track
     // mtime still produce a fresh-ish cache entry.
     const stamp = mtimeMs ?? Date.now();
     if (filePath && projectRoot) {
-      const key = cacheKey(projectRoot, filePath);
+      const key = cacheKey(projectRoot, filePath, backendId);
       // LRU eviction: delete then re-insert to move to end
       contentCache.delete(key);
       contentCache.set(key, { content, mtimeMs: stamp });
@@ -168,6 +175,17 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
       }
     }
     set({ content, knownMtimeMs: stamp, loading: false });
+  },
+
+  openSearch: (projectRoot, backendId) => {
+    const state = get();
+    const scopeChanged = state.projectRoot !== projectRoot || state.backendId !== (backendId ?? null);
+    set({
+      isOpen: true, searchOpen: true, projectRoot, backendId: backendId ?? null,
+      ...(scopeChanged ? { filePath: null, content: null, knownMtimeMs: null, error: null, loading: false,
+        targetLine: null, targetEndLine: null, inFileSearchOpen: false, inFileSearchQuery: '' } : {}),
+    });
+    setBuiltinPanelVisibility('file-viewer', true);
   },
 
   setLoading: (loading: boolean) => set({ loading }),
@@ -234,16 +252,16 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
 
   toggleMarkdownSourceView: () => set(state => ({ markdownSourceView: !state.markdownSourceView })),
 
-  getCached: (projectRoot: string, relativePath: string) =>
-    get().contentCache.get(cacheKey(projectRoot, relativePath))?.content,
+  getCached: (projectRoot: string, relativePath: string, backendId?: string | null) =>
+    get().contentCache.get(cacheKey(projectRoot, relativePath, backendId))?.content,
 
-  invalidate: (projectRoot: string, relativePath: string) => {
-    const { contentCache, filePath, projectRoot: curRoot } = get();
-    contentCache.delete(cacheKey(projectRoot, relativePath));
+  invalidate: (projectRoot: string, relativePath: string, backendId?: string | null) => {
+    const { contentCache, filePath, projectRoot: curRoot, backendId: curBackend } = get();
+    contentCache.delete(cacheKey(projectRoot, relativePath, backendId));
     // If the invalidated file is the one currently displayed, drop its mtime so
     // the next staleness check treats it as unknown and forces a fresh fetch.
     const isCurrent =
-      filePath === relativePath && curRoot === projectRoot && !!filePath && !!curRoot;
+      filePath === relativePath && curRoot === projectRoot && curBackend === (backendId ?? null) && !!filePath && !!curRoot;
     set({ contentCache: new Map(contentCache), ...(isCurrent ? { knownMtimeMs: null } : {}) });
   },
 }));

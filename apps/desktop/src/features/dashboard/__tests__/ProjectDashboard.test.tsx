@@ -4,7 +4,6 @@ import { ProjectDashboard } from '../ProjectDashboard';
 import { useSupervisionStore } from '../../../features/supervision/store';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSelectionStore } from '../../../stores/selectionStore';
-import { useAppearanceStore } from '../../../stores/appearanceStore';
 
 vi.mock('../../../services/api', () => ({
   getSupervisionAgent: vi.fn().mockResolvedValue(null),
@@ -63,7 +62,6 @@ describe('ProjectDashboard', () => {
   const projectId = 'p1';
 
   beforeEach(() => {
-    useAppearanceStore.setState({ chatCard: false, unifiedWorkspace: false });
     useSupervisionStore.setState({
       tasks: {},
       agents: {},
@@ -144,7 +142,7 @@ describe('ProjectDashboard', () => {
     }
   });
 
-  it('shows supervisor workspace by default and can switch to chat', async () => {
+  it('shows the supervisor workspace by default', async () => {
     useSupervisionStore.setState({
       tasks: {},
       agents: { [projectId]: { phase: 'active', mainSessionId: 'sess-123' } },
@@ -158,16 +156,9 @@ describe('ProjectDashboard', () => {
     });
     expect(container.querySelector('[data-testid="supervisor-workspace"]')).toBeTruthy();
     expect(container.querySelector('[data-testid="chat-interface"]')).toBeFalsy();
-
-    await act(async () => {
-      fireEvent.click(getByText('Chat'));
-    });
-    expect(container.querySelector('[data-testid="chat-interface"]')).toBeTruthy();
-    expect(container.textContent).toContain('sess-123');
   });
 
   it('hosts supervisor chat through the unified layout and preserves dashboard navigation', async () => {
-    useAppearanceStore.setState({ unifiedWorkspace: true });
     useSupervisionStore.setState({ agents: { [projectId]: { phase: 'active', mainSessionId: 'supervisor-session' } } } as any);
     useProjectStore.setState({ sessions: [{ id: 'supervisor-session', projectId, type: 'background' }] as any });
     const { container, getByText } = await renderDashboard();

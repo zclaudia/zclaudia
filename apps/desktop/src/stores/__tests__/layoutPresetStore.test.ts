@@ -52,6 +52,7 @@ beforeEach(() => {
   useLayoutPresetStore.setState({ presets: [...BUILTIN_LAYOUT_PRESETS], selectedByProject: {} });
   useRightWorkspaceStore.setState({ bySession: {}, order: [] });
   localStorage.removeItem('claudia-layout-presets');
+  localStorage.removeItem('claudia-layout-preset-selection');
 });
 
 describe('one-to-one preset mapping', () => {
@@ -199,8 +200,10 @@ describe('preset persistence and CRUD', () => {
     if (!saved.ok) throw new Error('Expected created preset');
     useLayoutPresetStore.getState().setProjectPreset('project', saved.preset.id);
     const serialized = localStorage.getItem('claudia-layout-presets')!;
+    const selection = localStorage.getItem('claudia-layout-preset-selection')!;
     useLayoutPresetStore.setState({ presets: [...BUILTIN_LAYOUT_PRESETS], selectedByProject: {} });
     localStorage.setItem('claudia-layout-presets', serialized);
+    localStorage.setItem('claudia-layout-preset-selection', selection);
     await useLayoutPresetStore.persist.rehydrate();
     expect(useLayoutPresetStore.getState().presets).toHaveLength(9);
     expect(useLayoutPresetStore.getState().selectedByProject.project).toBe(saved.preset.id);

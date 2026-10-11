@@ -8,7 +8,7 @@ import { handleMetaWorkflowMessage } from './meta-workflow/handlers.js';
 import { handleOpenSpecMessage } from './openspec/handlers';
 import { handleBrowserMessage } from './browser/handlers';
 
-export type FeatureMessageHandler = (msg: ServerMessage) => boolean;
+export type FeatureMessageHandler = (msg: ServerMessage, backendId?: string) => boolean;
 
 const featureMessageHandlers: FeatureMessageHandler[] = [
   handleLocalPRMessage,
@@ -21,9 +21,9 @@ const featureMessageHandlers: FeatureMessageHandler[] = [
   handleBrowserMessage,
 ];
 
-export function dispatchFeatureMessage(msg: ServerMessage): boolean {
+export function dispatchFeatureMessage(msg: ServerMessage, backendId?: string): boolean {
   for (const handler of featureMessageHandlers) {
-    if (handler(msg)) return true;
+    if (handler(msg, backendId)) return true;
   }
   return false;
 }

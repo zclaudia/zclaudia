@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRightWorkspaceStore, findPane, flattenPanes, isChatRef, normalizeSessionWorkspace, pruneChat, type WorkspaceEdge } from '../../stores/rightWorkspaceStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useOwnershipStore } from '../../stores/ownershipStore';
+import { useServerStore } from '../../stores/serverStore';
+import { useSessionsStore } from '../../stores/sessionsStore';
 import { registerWorkspaceRoute, sessionWorkspaceId } from '../../stores/workspaceRoutingStore';
 import { useProjectWorkspaceStore } from '../../stores/projectWorkspaceStore';
-import { moveProjectChatToEdge, moveProjectChatToTab, moveScopedChatToEdge, reconcileProjectChats, selectProjectChat, resolveProjectWorkspace } from '../../actions/projectWorkspaceActions';
+import { isProjectChatAvailable, moveProjectChatToEdge, moveProjectChatToTab, moveScopedChatToEdge, reconcileProjectChats, selectProjectChat, resolveProjectWorkspace } from '../../actions/projectWorkspaceActions';
 import { ChatPane } from './ChatPane';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { RightSidebarEmptyState } from '../../components/RightSidebarEmptyState';
@@ -26,7 +29,6 @@ export function SessionWorkspaceView({ sessionId, projectId, projectRoot, workin
   const hydrated = useWorkspaceHydrated();
   const projectScoped = workspaceScope === 'project';
   const collapsed = useRightSidebarStore(s => s.collapsed);
-  const widthFraction = useRightSidebarStore(s => s.widthFraction);
   const projectWorkspace = useProjectWorkspaceStore(s => projectScoped && projectId ? s.byProject[projectId] : undefined);
   const workspaceId = projectScoped ? projectWorkspace?.workspaceId ?? sessionId : sessionWorkspaceId(sessionId);
   const ws = useRightWorkspaceStore(s => s.bySession[workspaceId]);
@@ -34,15 +36,25 @@ export function SessionWorkspaceView({ sessionId, projectId, projectRoot, workin
   const focusedSession = useProjectStore(s => s.sessions.find(session => session.id === (projectScoped ? projectWorkspace?.focusedChatSessionId : sessionId)));
   const project = useProjectStore(s => s.projects.find(item => item.id === projectId));
   const focusedRoot = focusedSession?.workingDirectory || project?.rootPath || projectRoot;
-  const ready = !!ws && flattenPanes(ws.root).some(p => p.tools.some(t => t.toolId === 'chat'));
+  const focusedSessionId = projectScoped ? projectWorkspace?.focusedChatSessionId ?? sessionId : sessionId;
+  const ownerBackendId = useOwnershipStore(s => s.getProjectBackendId(projectId) ?? s.getSessionBackendId(focusedSessionId));
+  const activeBackendId = useServerStore(s => s.activeServerId);
+  const focusedBackendId = ownerBackendId ?? activeBackendId;
+  const remoteCatalog = useSessionsStore(s => ownerBackendId ? s.remoteSessions.get(ownerBackendId) : undefined);
+  const authoritativeCatalog = useSessionsStore(s => !!ownerBackendId && s.snapshotBackendIds.has(ownerBackendId));
+  const ready = !!ws;
   const contentRef = useRef<HTMLDivElement>(null);
   const activeDrag = useDragSplitStore(s => s.active);
   const hoverRootEdge = useDragSplitStore(s => s.hoverRootEdge);
   const navigation = useMemo(() => ({ onReturnToDashboard, onOpenSidebar, syncSelection }), [onReturnToDashboard, onOpenSidebar, syncSelection]);
-  useKeyboardShortcuts({ projectId, projectRoot: focusedRoot });
+  useKeyboardShortcuts({ projectId, projectRoot: focusedRoot, sessionId: focusedSessionId, backendId: focusedBackendId });
   useEffect(() => {
     if (!hydrated) return;
+    // The sidebar fraction seeds a new workspace only. Resizing an existing
+    // layout must not reselect the route's original chat or remount its draft.
+    const widthFraction = useRightSidebarStore.getState().widthFraction;
     if (!projectScoped) {
+      const workspaceId = sessionWorkspaceId(sessionId);
       const state = useRightWorkspaceStore.getState();
       const current = state.bySession[workspaceId] ?? { root: null, primaryPaneId: null, focusedPaneId: null };
       const next = normalizeSessionWorkspace(current, sessionId, 1 - widthFraction);
@@ -56,12 +68,23 @@ export function SessionWorkspaceView({ sessionId, projectId, projectRoot, workin
       resolveProjectWorkspace(projectId, ids, sessionId);
       selectProjectChat(projectId, sessionId);
     } else useRightWorkspaceStore.getState().ensureChatSession(sessionId, 1 - widthFraction);
-  }, [hydrated, projectId, sessionId, widthFraction, projectScoped, workspaceId]);
+  }, [hydrated, projectId, sessionId, projectScoped]);
   useEffect(() => {
     if (!hydrated || !ready || !projectId || !projectScoped) return;
-    const ids = catalog.filter(s => s.projectId === projectId && !s.archivedAt).map(s => s.id);
-    reconcileProjectChats(projectId, ids, sessionId);
-  }, [catalog, hydrated, ready, projectId, sessionId, projectScoped]);
+    const source = authoritativeCatalog ? remoteCatalog ?? [] : catalog;
+    const ids = source.filter(s => s.projectId === projectId && !s.archivedAt && isProjectChatAvailable(projectId, s.id)).map(s => s.id);
+    if (!authoritativeCatalog) {
+      // REST catalogs are replaced when the active backend changes. Missing
+      // entries are not evidence of deletion while the owner snapshot is loading.
+      const current = useRightWorkspaceStore.getState().bySession[workspaceId];
+      for (const pane of flattenPanes(current?.root ?? null)) for (const ref of pane.tools) {
+        if (!isChatRef(ref) || !ref.instanceKey || ids.includes(ref.instanceKey)) continue;
+        const known = catalog.find(s => s.id === ref.instanceKey);
+        if (!known || (known.projectId === projectId && !known.archivedAt)) ids.push(ref.instanceKey);
+      }
+    }
+    reconcileProjectChats(projectId, ids, sessionId, { authoritative: authoritativeCatalog });
+  }, [catalog, remoteCatalog, authoritativeCatalog, hydrated, ready, projectId, sessionId, projectScoped, workspaceId]);
   useEffect(() => {
     if (!hydrated || !ready) return;
     return registerWorkspaceRoute({ workspaceId, sessionId, projectId, projectScoped });
@@ -135,6 +158,12 @@ export function SessionWorkspaceView({ sessionId, projectId, projectRoot, workin
   const onUp = useCallback((e: React.PointerEvent) => {
     const { active } = useDragSplitStore.getState();
     if (!active) return;
+    // A press-release without real travel is a click on the drag affordance,
+    // never a drop (e.g. grabbing a multi-tab chat handle must not split it out).
+    if (useDragSplitStore.getState().isClick(e.clientX, e.clientY)) {
+      useDragSplitStore.getState().endDrag();
+      return;
+    }
     const sidebarChat = active.toolId === 'chat' && !active.sourcePaneId;
     if (sidebarChat && (!projectScoped || !projectId || active.projectId !== projectId)) {
       useDragSplitStore.getState().endDrag();

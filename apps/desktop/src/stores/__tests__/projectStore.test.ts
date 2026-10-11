@@ -15,6 +15,7 @@ vi.mock('../sessionsStore', () => ({
   useSessionsStore: {
     getState: () => ({
       remoteSessions: new Map([['b1', [{ id: 'remote-s1', projectId: 'p-remote' }]]]),
+      admitCreatedSession: vi.fn(),
     }),
   },
 }));

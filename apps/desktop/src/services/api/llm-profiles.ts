@@ -15,6 +15,7 @@ import {
   backendSupports,
 } from './base';
 import { apiCall, apiCallForBackend, apiCallVoidForBackend } from './unwrap';
+import { getActiveServerId } from '../active-backend-coordination';
 
 /**
  * Structured result for {@link deleteLlmProfileForBackend}. The DELETE route
@@ -338,9 +339,11 @@ export async function signOutCodexOAuthForBackend(
 export async function getProviderCommands(
   llmProfileId: string,
   projectRoot?: string,
-  options?: RequestInit
+  options?: RequestInit,
+  backendId?: string | null
 ): Promise<SlashCommand[]> {
   const query = projectRoot ? `?projectRoot=${encodeURIComponent(projectRoot)}` : '';
+  if (backendId !== undefined) return apiCallForBackend<SlashCommand[]>(backendId, `/api/providers/${llmProfileId}/commands${query}`, options);
   if (activeServerSupports('providerCommands')) {
     const result = await fetchApi<SlashCommand[]>(
       `/api/providers/${llmProfileId}/commands${query}`,
@@ -360,9 +363,11 @@ export async function getProviderCommands(
 export async function getProviderTypeCommands(
   providerType: string,
   projectRoot?: string,
-  options?: RequestInit
+  options?: RequestInit,
+  backendId?: string | null
 ): Promise<SlashCommand[]> {
   const query = projectRoot ? `?projectRoot=${encodeURIComponent(projectRoot)}` : '';
+  if (backendId !== undefined) return apiCallForBackend<SlashCommand[]>(backendId, `/api/providers/type/${providerType}/commands${query}`, options);
   if (activeServerSupports('providerCommands')) {
     const result = await fetchApi<SlashCommand[]>(
       `/api/providers/type/${providerType}/commands${query}`,
@@ -384,6 +389,10 @@ export async function getProviderCapabilities(
   options?: RequestInit,
   backendId?: string | null
 ): Promise<ProviderCapabilities> {
+  // A retained chat on another backend must never inherit this device's fallback modes.
+  if (backendId && backendId !== getActiveServerId()) {
+    return apiCallForBackend<ProviderCapabilities>(backendId, `/api/providers/${llmProfileId}/capabilities`, options);
+  }
   // When a backendId is given (even null → active fallback inside the helpers),
   // the capability check and the request both target that backend instead of
   // whatever backend happens to be active. Settings pages pass the local
@@ -417,8 +426,10 @@ export async function getProviderCapabilities(
 
 export async function getProviderTypeCapabilities(
   providerType: string,
-  options?: RequestInit
+  options?: RequestInit,
+  backendId?: string | null
 ): Promise<ProviderCapabilities> {
+  if (backendId !== undefined) return apiCallForBackend<ProviderCapabilities>(backendId, `/api/providers/type/${providerType}/capabilities`, options);
   if (activeServerSupports('providerCapabilities')) {
     const result = await fetchApi<ProviderCapabilities>(
       `/api/providers/type/${providerType}/capabilities`,

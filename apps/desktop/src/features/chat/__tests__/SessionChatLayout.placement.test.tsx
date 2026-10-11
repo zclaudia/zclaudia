@@ -2,7 +2,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useEffect } from 'react';
-import { useAppearanceStore } from '../../../stores/appearanceStore';
 import { useUIStore } from '../../../stores/uiStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { usePluginStore } from '../../../stores/pluginStore';
@@ -46,9 +45,6 @@ vi.mock('../../../components/panels/PanelRenderer', () => ({
   PanelContent: () => <div data-testid="tool-content" />,
   PanelActions: () => null,
 }));
-vi.mock('../../../components/RightSidebar', () => ({
-  RightSidebar: () => <div data-testid="right" />,
-}));
 vi.mock('../../../components/BottomPanel', () => ({
   BottomPanel: () => <div data-testid="bottom" />,
 }));
@@ -60,7 +56,6 @@ describe('SessionChatLayout bottom panel placement', () => {
     vi.clearAllMocks();
     isMobileMock.mockReturnValue(false);
     streamOwners.clear();
-    useAppearanceStore.setState({ chatCard: false, unifiedWorkspace: false });
     useUIStore.setState({ poppedOutSessions: new Map() });
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
     useProjectWorkspaceStore.setState({ byProject: {} });
@@ -89,7 +84,6 @@ describe('SessionChatLayout bottom panel placement', () => {
   });
 
   it('uses one unified desktop host and preserves navigation callbacks', () => {
-    useAppearanceStore.setState({ unifiedWorkspace: true });
     const onReturnToDashboard = vi.fn();
     const { container } = render(<SessionChatLayout sessionId="s1" onReturnToDashboard={onReturnToDashboard} />);
     expect(container.querySelector('[data-session-workspace]')).toBeTruthy();
@@ -100,9 +94,8 @@ describe('SessionChatLayout bottom panel placement', () => {
     expect(onReturnToDashboard).toHaveBeenCalledWith('project');
   });
 
-  it('retains the mobile bottom host even when both desktop experiments are enabled', () => {
+  it('retains the mobile bottom host on mobile', () => {
     isMobileMock.mockReturnValue(true);
-    useAppearanceStore.setState({ chatCard: true, unifiedWorkspace: true });
     const { container } = render(<SessionChatLayout sessionId="s1" />);
     expect(container.querySelector('[data-session-workspace]')).toBeNull();
     expect(container.querySelector('[data-chat-card]')).toBeNull();
@@ -111,7 +104,6 @@ describe('SessionChatLayout bottom panel placement', () => {
   });
 
   it('keeps sibling chats and their subscriptions when one chat is popped out', () => {
-    useAppearanceStore.setState({ unifiedWorkspace: true });
     const { container } = render(<SessionChatLayout sessionId="s1" />);
     act(() => { selectProjectChat('project', 's2', { beside: true }); });
     expect(screen.getAllByTestId('chat')).toHaveLength(2);
@@ -123,20 +115,5 @@ describe('SessionChatLayout bottom panel placement', () => {
     expect(screen.getByTestId('chat')).toHaveAttribute('data-session-id', 's2');
     expect(streamOwners.get('s1')).toBe(0);
     expect(streamOwners.get('s2')).toBe(1);
-  });
-
-  it('restores legacy singleton synchronization when the unified flag is switched off', () => {
-    useAppearanceStore.setState({ unifiedWorkspace: true });
-    const openEditor = vi.fn().mockResolvedValue(undefined);
-    const close = vi.fn();
-    usePluginStore.setState({ panels: [{ id: 'draft', visible: true }] as any });
-    useDraftEditorStore.setState({ activeSessionId: 'fixed-chat', openEditor });
-    useFileViewerStore.setState({ isOpen: true, projectRoot: '/other-worktree', close });
-    render(<SessionChatLayout sessionId="s1" />);
-    expect(openEditor).not.toHaveBeenCalled();
-    expect(close).not.toHaveBeenCalled();
-    act(() => { useAppearanceStore.getState().setUnifiedWorkspace(false); });
-    expect(openEditor).toHaveBeenCalledWith('s1');
-    expect(close).toHaveBeenCalledOnce();
   });
 });

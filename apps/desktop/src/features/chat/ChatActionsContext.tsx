@@ -3,6 +3,9 @@ import type { Attachment } from './MessageInput';
 
 export interface ChatActionsContextValue {
   sessionId?: string;
+  backendId?: string | null;
+  projectRoot?: string;
+  isConnected?: boolean;
   handleSendMessage: (
     content: string,
     attachments?: Attachment[],

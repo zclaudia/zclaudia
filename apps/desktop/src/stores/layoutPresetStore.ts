@@ -1,11 +1,13 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
+import { recoverableJsonStorage, workspaceStorageKey } from '../utils/workspaceStorage';
 import {
   activeToolRef,
   flattenPanes,
   genId,
   isChatRef,
   isSafeTree,
+  isWorkspaceSlotKind,
   MAX_RATIO,
   MIN_RATIO,
   type LayoutNode,
@@ -73,14 +75,10 @@ export const BUILTIN_LAYOUT_PRESETS: LayoutPreset[] = [
     split('tabs-tools', 'col', 0.56, pane('tabs-terminal', 'tool:terminal'), pane('tabs-memory', 'tool:memory')))),
 ];
 
-function slotKind(value: unknown): value is WorkspaceSlotKind {
-  return typeof value === 'string' && (value === 'chat' || (value.startsWith('tool:') && value.length > 5));
-}
-
 export function isSafePresetTree(tree: unknown): tree is PresetNode {
   const ids = new Set<string>();
-  const visit = (value: unknown): boolean => {
-    if (!value || typeof value !== 'object') return false;
+  const visit = (value: unknown, depth: number): boolean => {
+    if (!value || typeof value !== 'object' || depth > 128) return false;
     const node = value as PresetNode;
     if (typeof node.slotId !== 'string' || !node.slotId || ids.has(node.slotId)) return false;
     ids.add(node.slotId);
@@ -90,16 +88,16 @@ export function isSafePresetTree(tree: unknown): tree is PresetNode {
       const chat = node.slots[0]?.kind === 'chat';
       return node.slots.every(slot => {
         if (!slot || typeof slot.slotId !== 'string' || !slot.slotId || ids.has(slot.slotId) ||
-            !slotKind(slot.kind) || (slot.kind === 'chat') !== chat) return false;
+            !isWorkspaceSlotKind(slot.kind) || (slot.kind === 'chat') !== chat) return false;
         ids.add(slot.slotId);
         return true;
       });
     }
     return node.kind === 'group' && (node.dir === 'row' || node.dir === 'col') &&
       typeof node.ratio === 'number' && node.ratio >= MIN_RATIO && node.ratio <= MAX_RATIO &&
-      Array.isArray(node.children) && node.children.length === 2 && node.children.every(visit);
+      Array.isArray(node.children) && node.children.length === 2 && node.children.every(child => visit(child, depth + 1));
   };
-  return visit(tree);
+  return visit(tree, 0);
 }
 
 /** Copy only the template fields; user presets never serialize live ref identities. */
@@ -154,6 +152,23 @@ export function mapLayoutPreset(
   const remainingChats = focusChat ? [focusChat, ...chats.filter(ref => ref !== focusChat)] : chats;
   const remainingTools = all.filter(ref => !isChatRef(ref));
   const usedPanes = new Set<string>();
+  const usedNodeIds = new Set<string>([`preset-overflow-${preset.id}-chats`, `preset-overflow-${preset.id}-tools`]);
+  const reserveTemplateGroups = (node: PresetNode) => {
+    if (node.kind === 'group') {
+      usedNodeIds.add(`preset-group-${preset.id}-${node.slotId}`);
+      node.children.forEach(reserveTemplateGroups);
+    } else for (let index = 0; index < node.slots.length - 1; index++) {
+      usedNodeIds.add(`preset-missing-tabs-${preset.id}-${node.slotId}-${index}`);
+    }
+  };
+  reserveTemplateGroups(preset.tree);
+  const allocateNodeId = (base: string) => {
+    let id = base;
+    let suffix = 0;
+    while (usedNodeIds.has(id)) id = `${base}-${++suffix}`;
+    usedNodeIds.add(id);
+    return id;
+  };
   const outputPanes: PaneNode[] = [];
   const originals = collectPlaceholders(ws.root);
   const priorAssignments = new Map<string, ToolRef[]>();
@@ -180,9 +195,7 @@ export function mapLayoutPreset(
   const makePane = (slotId: string, refs: ToolRef[]): PaneNode => {
     const original = originalPanes.find(p => !usedPanes.has(p.id) && p.tools.some(t => workspaceRefKey(t) === workspaceRefKey(refs[0])));
     const baseId = `preset-pane-${preset.id}-${slotId}`;
-    let id = original?.id ?? baseId;
-    let suffix = 0;
-    while (usedPanes.has(id)) id = `${baseId}-${++suffix}`;
+    const id = allocateNodeId(original?.id ?? baseId);
     usedPanes.add(id);
     const originalActive = original ? activeToolRef(original) : undefined;
     const active = refs.find(ref => isChatRef(ref) && ref === focusChat) ??
@@ -192,7 +205,7 @@ export function mapLayoutPreset(
     return result;
   };
   const placeholder = (slot: PresetSlot): PlaceholderNode => ({
-    id: originals.find(p => p.slotId === slot.slotId && p.accepts === slot.kind)?.id ?? `preset-empty-${preset.id}-${slot.slotId}`,
+    id: allocateNodeId(originals.find(p => p.slotId === slot.slotId && p.accepts === slot.kind)?.id ?? `preset-empty-${preset.id}-${slot.slotId}`),
     kind: 'placeholder', slotId: slot.slotId, accepts: slot.kind,
   });
   const visit = (node: PresetNode): LayoutNode => {
@@ -286,18 +299,74 @@ function restore(saved: unknown): Pick<LayoutPresetState, 'presets' | 'selectedB
         presets.some(existing => existing.id === p.id) || nameError(p.name, presets) || !isSafePresetTree(p.tree)) continue;
     presets.push({ id: p.id, name: p.name.trim(), builtin: false, tree: copyTemplate(p.tree) });
   }
-  const selectedByProject: Record<string, string> = {};
+  const selections: [string, string][] = [];
   if (value?.selectedByProject && typeof value.selectedByProject === 'object') {
     for (const [projectId, id] of Object.entries(value.selectedByProject)) {
-      if (presets.some(p => p.id === id)) selectedByProject[projectId] = id;
+      if (presets.some(p => p.id === id)) selections.push([projectId, id as string]);
     }
   }
-  return { presets, selectedByProject };
+  return { presets, selectedByProject: Object.fromEntries(selections) };
+}
+
+const PRESET_LIBRARY_KEY = 'claudia-layout-presets';
+const selectionKey = workspaceStorageKey('claudia-layout-preset-selection', typeof window === 'undefined' ? '' : window.location.search);
+const mainWindow = selectionKey === 'claudia-layout-preset-selection';
+
+function readSaved(key: string): { state?: Partial<LayoutPresetState>; version?: number } | null {
+  try {
+    const raw = recoverableJsonStorage(localStorage).getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+/**
+ * Definitions remain a reusable global library; selection belongs to a window's
+ * layout. Selection writes must not rewrite a stale copy of that global library.
+ */
+function presetStorage(): StateStorage {
+  let previousDefinitions = '[]';
+  return {
+    getItem: name => {
+      const library = readSaved(name);
+      // A popup may be the first window to edit the shared library after an
+      // upgrade. Move legacy main selections before any definitions-only write.
+      const mainSelectionKey = 'claudia-layout-preset-selection';
+      if (library?.state?.selectedByProject && !readSaved(mainSelectionKey)) {
+        localStorage.setItem(mainSelectionKey, JSON.stringify({ version: 1,
+          state: { selectedByProject: library.state.selectedByProject },
+        }));
+      }
+      const selections = readSaved(selectionKey);
+      const presets = Array.isArray(library?.state?.presets) ? library.state.presets : [];
+      previousDefinitions = JSON.stringify(presets);
+      if (!library && !selections) return null;
+      return JSON.stringify({ version: 1, state: { presets,
+        // Existing main-window selections migrate lazily, never into a popup.
+        selectedByProject: selections?.state?.selectedByProject ?? (mainWindow ? library?.state?.selectedByProject : {}) ?? {},
+      } });
+    },
+    setItem: (name, value) => {
+      const saved = JSON.parse(value) as { state: Pick<LayoutPresetState, 'presets' | 'selectedByProject'>; version: number };
+      const definitions = JSON.stringify(saved.state.presets);
+      if (definitions !== previousDefinitions) {
+        localStorage.setItem(name, JSON.stringify({ state: { presets: saved.state.presets }, version: saved.version }));
+        previousDefinitions = definitions;
+      }
+      localStorage.setItem(selectionKey, JSON.stringify({ state: { selectedByProject: saved.state.selectedByProject }, version: 1 }));
+    },
+    removeItem: name => {
+      localStorage.removeItem(name);
+      localStorage.removeItem(selectionKey);
+      previousDefinitions = '[]';
+    },
+  };
 }
 
 export const useLayoutPresetStore = create<LayoutPresetState>()(persist((set, get) => ({
   presets: [...BUILTIN_LAYOUT_PRESETS], selectedByProject: {},
   createPreset: (name, tree) => {
+    const saved = readSaved(PRESET_LIBRARY_KEY);
+    if (saved) set({ presets: restore(saved.state).presets });
     const error = nameError(name, get().presets);
     if (error) return { ok: false, error };
     if (!isSafePresetTree(tree)) return { ok: false, error: 'invalid-layout' };
@@ -306,6 +375,8 @@ export const useLayoutPresetStore = create<LayoutPresetState>()(persist((set, ge
     return { ok: true, preset };
   },
   renamePreset: (id, name) => {
+    const saved = readSaved(PRESET_LIBRARY_KEY);
+    if (saved) set({ presets: restore(saved.state).presets });
     const existing = get().presets.find(p => p.id === id);
     if (!existing) return { ok: false, error: 'not-found' };
     if (existing.builtin) return { ok: false, error: 'builtin' };
@@ -316,6 +387,8 @@ export const useLayoutPresetStore = create<LayoutPresetState>()(persist((set, ge
     return { ok: true, preset };
   },
   deletePreset: id => {
+    const saved = readSaved(PRESET_LIBRARY_KEY);
+    if (saved) set({ presets: restore(saved.state).presets });
     const preset = get().presets.find(p => p.id === id);
     if (!preset) return { ok: false, error: 'not-found' };
     if (preset.builtin) return { ok: false, error: 'builtin' };
@@ -328,7 +401,7 @@ export const useLayoutPresetStore = create<LayoutPresetState>()(persist((set, ge
     set(s => ({ selectedByProject: { ...s.selectedByProject, [projectId]: presetId } }));
   },
 }), {
-  name: 'claudia-layout-presets', version: 1,
+  name: PRESET_LIBRARY_KEY, version: 1, storage: createJSONStorage(presetStorage),
   partialize: s => ({ presets: s.presets.filter(p => !p.builtin), selectedByProject: s.selectedByProject }),
   migrate: saved => restore(saved),
   merge: (saved, current) => ({ ...current, ...restore(saved) }),

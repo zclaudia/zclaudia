@@ -3,10 +3,7 @@ import { useSessionsStore, type RemoteSession } from '../sessionsStore';
 
 describe('sessionsStore', () => {
   beforeEach(() => {
-    useSessionsStore.setState({
-      remoteSessions: new Map(),
-      activeSessionIdsByBackend: new Map(),
-    });
+    useSessionsStore.getState().clearAllSessions();
   });
 
   const createRemoteSession = (overrides: Partial<RemoteSession> = {}): RemoteSession => ({

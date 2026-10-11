@@ -1,22 +1,25 @@
+// @vitest-environment jsdom
 import { resolveProjectWorkspace } from '../projectWorkspaceActions';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { act, renderHook } from '@testing-library/react';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
-import { useAppearanceStore } from '../../stores/appearanceStore';
 import { useProjectWorkspaceStore } from '../../stores/projectWorkspaceStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
+import { useWorkspaceRoutingStore } from '../../stores/workspaceRoutingStore';
 import {
   openToolInWorkspace,
   closeToolInWorkspace,
   closeTabInWorkspace,
+  useToolOpenState,
 } from '../workspaceActions';
 
 beforeEach(() => {
   vi.restoreAllMocks();
-  useAppearanceStore.setState({ unifiedWorkspace: false });
   useProjectWorkspaceStore.setState({ byProject: {} });
+  useWorkspaceRoutingStore.setState({ registrations: [], active: null });
   useProjectStore.setState({ sessions: [] });
   useRightWorkspaceStore.setState({ bySession: {}, order: [] });
   useRightSidebarStore.setState({
@@ -84,6 +87,26 @@ describe('closeToolInWorkspace', () => {
 });
 
 describe('closeTabInWorkspace', () => {
+
+  it('ignores desktop bindings and routes while unified workspace is enabled on mobile', () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList);
+    const onClose = vi.fn();
+    useProjectStore.setState({ sessions: [{ id: 'A', projectId: 'project' }, { id: 'B', projectId: 'project' }] as any });
+    useProjectWorkspaceStore.setState({ byProject: {
+      project: { workspaceId: 'desktop-anchor', focusedChatSessionId: 'B', toolBindings: {} },
+    } });
+    useProjectWorkspaceStore.getState().setToolBinding('project', { toolId: 'memory' }, { mode: 'fixed', sessionId: 'B' });
+    useWorkspaceRoutingStore.setState({ active: {
+      workspaceId: 'desktop-anchor', sessionId: 'A', projectId: 'project', projectScoped: true,
+    } });
+    usePluginStore.setState({ panels: [{ id: 'memory', label: 'Memory', onClose }] as any });
+    openToolInWorkspace('A', 'memory');
+    const paneId = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    closeTabInWorkspace('A', paneId, 'memory');
+    expect(onClose).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'A', projectId: 'project' }));
+    expect(useRightWorkspaceStore.getState().bySession['desktop-anchor']).toBeUndefined();
+  });
+
   it('passes the exact terminal instance scope without closing the other ref', () => {
     const onClose = vi.fn();
     usePluginStore.setState({ panels: [{ id: 'terminal', label: 'Terminal', onClose }] as any });
@@ -108,7 +131,6 @@ describe('closeTabInWorkspace', () => {
 
   it('passes a fixed tool binding rather than the selected workspace chat', () => {
     const onClose = vi.fn();
-    useAppearanceStore.setState({ unifiedWorkspace: true });
     useProjectStore.setState({ sessions: [{ id: 'A', projectId: 'project' }, { id: 'B', projectId: 'project' }] as any });
     useOwnershipStore.getState().setSessionOwner('B', 'backend-B');
     const workspaceId = resolveProjectWorkspace('project', ['A', 'B'], 'A');
@@ -140,5 +162,35 @@ describe('closeTabInWorkspace', () => {
     closeTabInWorkspace('A', paneId, 'memory');
     expect(useRightWorkspaceStore.getState().bySession.A.root).toBeNull(); // last tab → pane gone
     expect(closed).toBe(1);
+  });
+});
+
+describe('useToolOpenState', () => {
+  it('switches from project routing to the session layout when the viewport becomes mobile', () => {
+    let mobile = false;
+    const listeners = new Set<(event: MediaQueryListEvent) => void>();
+    vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
+      get matches() { return mobile; }, media: query, onchange: null,
+      addEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => listeners.add(listener as (event: MediaQueryListEvent) => void),
+      removeEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => listeners.delete(listener as (event: MediaQueryListEvent) => void),
+      addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: () => true,
+    }) as MediaQueryList);
+    useProjectStore.setState({ sessions: [{ id: 'A', projectId: 'project' }] as any });
+    useProjectWorkspaceStore.setState({ byProject: {
+      project: { workspaceId: 'anchor', focusedChatSessionId: 'A', toolBindings: {} },
+    } });
+    useRightWorkspaceStore.getState().openTool('anchor', 'memory');
+    const { result } = renderHook(() => useToolOpenState('A', 'memory'));
+    expect(result.current).toBe(true);
+    act(() => {
+      mobile = true;
+      listeners.forEach(listener => listener({ matches: true } as MediaQueryListEvent));
+    });
+    expect(result.current).toBe(false);
+    act(() => {
+      mobile = false;
+      listeners.forEach(listener => listener({ matches: false } as MediaQueryListEvent));
+    });
+    expect(result.current).toBe(true);
   });
 });

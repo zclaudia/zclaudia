@@ -3,6 +3,7 @@ import { render, fireEvent } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => ({
   sendMessage: vi.fn(),
+  sendToServer: vi.fn(),
   openToolInWorkspace: vi.fn(),
   selectedSessionId: 's1' as string | null,
   isConnected: true,
@@ -10,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../contexts/ConnectionContext', () => ({
-  useConnection: () => ({ sendMessage: mocks.sendMessage, isConnected: mocks.isConnected }),
+  useConnection: () => ({ sendMessage: mocks.sendMessage, sendToServer: mocks.sendToServer, isConnected: mocks.isConnected }),
 }));
 vi.mock('../../../stores/selectionStore', () => ({
   useSelectionStore: (sel: (s: { selectedSessionId: string | null }) => unknown) =>
@@ -29,6 +30,7 @@ import { ChatActionsProvider } from '../../chat/ChatActionsContext';
 describe('ChatLink', () => {
   beforeEach(() => {
     mocks.sendMessage.mockClear();
+    mocks.sendToServer.mockClear();
     mocks.openToolInWorkspace.mockClear();
     mocks.selectedSessionId = 's1';
     mocks.isConnected = true;
@@ -58,6 +60,31 @@ describe('ChatLink', () => {
     fireEvent.click(getByText('bound link'));
     expect(mocks.sendMessage).toHaveBeenCalledWith({ type: 'browser_open', sessionId: 'bound-chat' });
     expect(mocks.openToolInWorkspace).toHaveBeenCalledWith('bound-chat', 'browser');
+  });
+
+  it('uses the chat backend and connection even when the active backend is disconnected', () => {
+    mocks.isConnected = false;
+    const { getByText } = render(
+      <ChatActionsProvider value={{ sessionId: 'bound-chat', backendId: 'backend-A', isConnected: true, handleSendMessage: vi.fn(), setMode: vi.fn() }}>
+        <ChatLink href="https://example.com">bound backend link</ChatLink>
+      </ChatActionsProvider>
+    );
+    expect(fireEvent.click(getByText('bound backend link'))).toBe(false);
+    expect(mocks.sendToServer).toHaveBeenNthCalledWith(1, 'backend-A', { type: 'browser_open', sessionId: 'bound-chat' });
+    expect(mocks.sendToServer).toHaveBeenNthCalledWith(2, 'backend-A', { type: 'browser_navigate', sessionId: 'bound-chat', url: 'https://example.com' });
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+    expect(mocks.openToolInWorkspace).toHaveBeenCalledWith('bound-chat', 'browser', { backendId: 'backend-A' });
+  });
+
+  it('keeps disconnected chat links external even when the active backend is connected', () => {
+    const { getByText } = render(
+      <ChatActionsProvider value={{ sessionId: 'bound-chat', backendId: 'backend-A', isConnected: false, handleSendMessage: vi.fn(), setMode: vi.fn() }}>
+        <ChatLink href="https://example.com">offline chat link</ChatLink>
+      </ChatActionsProvider>
+    );
+    expect(fireEvent.click(getByText('offline chat link'))).toBe(true);
+    expect(mocks.sendToServer).not.toHaveBeenCalled();
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
   it('modifier clicks fall through to the default anchor behavior', () => {

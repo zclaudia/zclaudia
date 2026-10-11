@@ -1,7 +1,6 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SessionItem } from '../SessionItem';
-import { useAppearanceStore } from '../../../stores/appearanceStore';
 import { useDragSplitStore } from '../../../components/workspace/dragSplit';
 import { useRightWorkspaceStore } from '../../../stores/rightWorkspaceStore';
 import { useProjectWorkspaceStore } from '../../../stores/projectWorkspaceStore';
@@ -23,14 +22,12 @@ const mockSession = {
 describe('SessionItem', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAppearanceStore.setState({ unifiedWorkspace: false });
     useDragSplitStore.getState().endDrag();
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
     useProjectWorkspaceStore.setState({ byProject: {} });
   });
 
   it('opens a distinct pane on modifier click only on unified desktop', () => {
-    useAppearanceStore.setState({ unifiedWorkspace: true });
     const onSelect = vi.fn();
     const { rerender } = render(<SessionItem session={mockSession} isSelected={false} onSelect={onSelect} hasPending={false} />);
     fireEvent.click(screen.getByText('Test Session'), { metaKey: true });
@@ -43,7 +40,6 @@ describe('SessionItem', () => {
   });
 
   it('starts unopened session drags and cancels them on normal click or release outside workspace', () => {
-    useAppearanceStore.setState({ unifiedWorkspace: true });
     render(<SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />);
     const row = screen.getByRole('button', { name: 'Test Session' });
     const pointerDown = new Event('pointerdown', { bubbles: true });
@@ -59,7 +55,6 @@ describe('SessionItem', () => {
   });
 
   it('includes an existing chat pane source and ignores mobile drag gestures', () => {
-    useAppearanceStore.setState({ unifiedWorkspace: true });
     useRightWorkspaceStore.getState().ensureChatSession('s1');
     const { rerender } = render(<SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />);
     const pointerDown = new Event('pointerdown', { bubbles: true });
@@ -73,7 +68,6 @@ describe('SessionItem', () => {
   });
 
   it('exposes arrange actions and restores focus after Escape', () => {
-    useAppearanceStore.setState({ unifiedWorkspace: true });
     render(<SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />);
     const trigger = screen.getByRole('button', { name: 'Session actions' });
     fireEvent.click(trigger);

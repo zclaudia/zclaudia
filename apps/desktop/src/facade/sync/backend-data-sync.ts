@@ -29,6 +29,7 @@ export function syncBackendDataSnapshot(
 
   const currentSessions = useSessionsStore.getState().remoteSessions.get(backendId);
   const sessionsChanged =
+    !useSessionsStore.getState().snapshotBackendIds.has(backendId) ||
     !currentSessions ||
     currentSessions.length !== mappedSessions.length ||
     currentSessions.some(

@@ -19,6 +19,11 @@ import { useComposerStore } from '../../../stores/composerStore';
 // Prevent useAgentForSession's loadAll() from hitting the real API
 vi.mock('../../../services/api/agent-profiles', () => ({
   listAgentProfiles: vi.fn().mockResolvedValue([]),
+  listAgentProfilesForBackend: vi.fn().mockResolvedValue([]),
+}));
+vi.mock('../../../services/api/llm-profiles', async importOriginal => ({
+  ...await importOriginal<Record<string, unknown>>(),
+  listLlmProfilesForBackend: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock llmProfileMetaStore

@@ -29,7 +29,9 @@ S3 新增 `projectWorkspaceStore.byProject`，保存 `{ workspaceId, focusedChat
 - `closeChatRef`：可关闭聊天 ref，但至少留下一个真实聊天；关闭最后 tab 时折叠其空 pane，修复焦点和最大化状态。
 - `moveProjectChatToEdge`：一次更新完成源 ref 移除、空 pane 折叠和目标 / 根边缘插入；单 tab pane 复用原 ID，多 tab 拆出创建新 shell，但复用内容 ref。
 - `moveProjectChatToTab`：聊天 tab strip 是独立合并目标；支持同 pane 重排和跨 pane 合并，原子搬运完整 ref，保留目标 pane ID。它只接受纯聊天 pane，普通聊天 pane 的中心区仍禁止放入工具或合并聊天。
-- `reconcileProjectChats`：项目目录加载完成后清理已删除会话和重复聊天，保留完整工具 refs；没有有效聊天时以现有目录中的会话补一个聊天。空目录暂不清空树，交由项目删除 / 空态生命周期处理，避免目录加载间隙丢布局。
+- `reconcileProjectChats`：依据项目所属后端的完整目录快照清理失效聊天，保留完整工具 refs。尚未收到完整快照时，REST 目录暂缺会话不作为删除证据；明确删除 / 归档事件立即移除对应 ref、解除失效固定绑定。完整空快照清除所有聊天订阅，保留工具和项目锚点。
+
+目录协议没有服务端 revision，因此快照竞态使用有界保护：REST 创建的会话可跨过第一份缺少它的完整快照，live created / updated 只更新保护中的内容；完整快照确认存在、明确删除或第二份缺失快照结束保护。明确删除优先于第一份仍包含该 ID 的迟到快照，后续完整快照或真实创建 / 更新事件可以重新确认其存在。未获正向目录证据的任意已保存 ref 不享受创建宽限。删除最后聊天后焦点持久化为空字符串，重载不会回退到旧锚点会话。
 
 所有布局编辑在一次 `rightWorkspaceStore.setState` 中完成，不调用聊天创建、工具 `onOpen` / `onClose`。项目焦点元数据另存；不会改变内容宿主身份。
 
@@ -44,6 +46,8 @@ S3 新增 `projectWorkspaceStore.byProject`，保存 `{ workspaceId, focusedChat
 
 全局 singleton 编辑器 / 文件查看器不复制实例；S3 保留单工具实例语义，跟随目录切换时沿用既有的上下文更新与重置路径。终端完整 scope key 和已有状态保留。需要并排打开不同 worktree 的独立编辑器时，后续应扩展工具自身实例模型，不把 pane shell 的复制当成工具状态隔离。
 
+草稿发送回调只由当前草稿所属会话注册，清理时检查回调身份。锁、保存、完成和丢弃操作的异步结果不能覆盖后来切换的草稿。文件查看器以 backend / root / path 区分缓存和请求；切换绑定或隐藏工具后，旧请求不能更新当前显示。
+
 ## 订阅、快捷键和窗口
 
 统一工作区的每个聊天内容宿主负责自己 session 的流式订阅；外层按选中会话的订阅需要关闭，避免同一会话重复订阅。快捷键只对最近聚焦聊天生效；工具调用和终端动作从聊天自身 context 取 session ID。
@@ -53,6 +57,10 @@ S3 新增 `projectWorkspaceStore.byProject`，保存 `{ workspaceId, focusedChat
 `SessionChatLayout.workspaceScope` 默认 `project`；会话弹出窗口使用 `session`，以 JSON tuple `['session-workspace', sessionId]` 为布局键，聊天 ref 仍是实际 session ID。弹出窗口只有自己的聊天，不读取项目锚点或工具固定绑定。工具与快捷键通过窗口内非持久化的 workspace route 注册表路由到当前实际会话；注册按 owner 清理，旧 effect cleanup 不会清掉新的路由。
 
 主窗口、会话弹出窗口、独立 Dashboard 窗口各自保存布局，避免多个 Tauri window 把同一个持久化 map 的旧快照互相覆盖。存储 key 在创建 store、首次 hydration 前按 URL 选择：主窗口保留原 key；`sessionWindow` 使用 `:session:<encoded sessionId>` 后缀；`projectDashboard` 使用 `:dashboard:<encoded projectId>` 后缀。workspace 树和项目归属元数据同时使用对应 namespace；弹出窗口的单会话 scope 不写项目归属元数据。主窗口仍按项目记住多聊天布局。
+
+自定义预设定义仍保存到全局 `claudia-layout-presets`；每个窗口的项目预设选择保存到对应 namespace 的 `claudia-layout-preset-selection`。选择变化不重写全局预设库；预设 CRUD 先读取最新定义，避免旧窗口覆盖其它窗口新增的预设。旧主窗口选择在首次读取时迁入独立选择 key。
+
+持久化树逐节点恢复有效内容，修复重复 ID、重复完整 ref、无效活动 tab 和混合聊天 / 工具 pane。损坏的 JSON 保留备份并完成 hydration，避免整个工作台卡在加载状态。已采用的项目锚点保持持久属性，删除最后聊天后保留的工具不进入旧布局的 LRU 淘汰范围。
 
 `syncSelection` 默认 `true`。Dashboard 嵌入及会话弹出窗口设为 `false`：内容聚焦、session tabs、比较、关闭和预设填槽可以更新本工作区的焦点，但不修改全局选中会话。这样点击 Dashboard 里的 supervisor composer 不会触发 App 的“选中会话后退出 Dashboard”逻辑。
 
@@ -65,3 +73,5 @@ S3 新增 `projectWorkspaceStore.byProject`，保存 `{ workspaceId, focusedChat
 稳定宿主与预设 UI 集成已验证草稿、选区、滚动、工具编辑内容、插件 iframe、订阅和渲染计数。隔离后端人工验证三个会话同时流式输出及工具调用，并截图全部八种预设，包括 Compare、Main + watcher、Session tabs；验证记录与未人工遍历的范围见主方案。
 
 共享 WindowRouter 为主窗口和所有独立窗口初始化内置工具目录；初始化按 panel ID 幂等，不重置已经打开的面板。终端关闭生命周期接收完整 scope，关闭一个 ref 不关闭其他后端 / 项目的 drawer；不存在或仍在使用的 ref 不触发生命周期。
+
+关闭统一工作区开关或进入移动端后，旧工具关闭路径不读取项目聊天绑定。旧终端恢复仍使用保存的 backend scope。工具启动菜单、快捷键和文件搜索取当前工作区的实际会话、目录和后端，不依赖其它窗口或全局选中聊天。

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspacePlaceholder } from '../WorkspacePlaceholder';
 import { applyLayoutPreset } from '../../../actions/layoutPresetActions';
 import { BUILTIN_LAYOUT_PRESETS, useLayoutPresetStore } from '../../../stores/layoutPresetStore';
+import { useOwnershipStore } from '../../../stores/ownershipStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useProjectWorkspaceStore } from '../../../stores/projectWorkspaceStore';
 import { flattenPanes, isChatRef, useRightWorkspaceStore, type LayoutNode, type PlaceholderNode } from '../../../stores/rightWorkspaceStore';
@@ -33,6 +34,7 @@ beforeEach(() => {
     { id: 'archived', projectId, name: 'Archived', archivedAt: 2 },
   ].map(session => ({ type: 'regular' as const, createdAt: 1, updatedAt: 1, ...session })) });
   useServerStore.setState({ activeServerId: 'be' });
+  useOwnershipStore.setState({ projectBackendIds: {}, sessionBackendIds: {} });
   usePluginStore.setState({ panels: [
     { id: 'terminal', pluginId: 'test', type: 'panel', label: 'Terminal', onOpen, onClose },
     { id: 'memory', pluginId: 'test', type: 'panel', label: 'Memory' },
@@ -81,6 +83,16 @@ describe('Workspace empty slots', () => {
     expect(onOpen).toHaveBeenCalledExactlyOnceWith({ sessionId: 'A', projectId, backendId: 'be' });
     expect(onClose).not.toHaveBeenCalled();
     expect(placeholders(current().root).some(p => p.id === empty.id)).toBe(false);
+  });
+
+  it('opens placeholder tools with the project owner backend instead of the active server', () => {
+    useOwnershipStore.getState().setProjectOwner(projectId, 'be-owner');
+    const empty = toolSlot();
+    render(<WorkspacePlaceholder node={empty} projectId={projectId} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal' }));
+    const tool = flattenPanes(current().root).flatMap(p => p.tools).find(t => t.toolId === 'terminal');
+    expect(tool).toEqual({ toolId: 'terminal', instanceKey: 'be-owner::project' });
+    expect(onOpen).toHaveBeenCalledExactlyOnceWith({ sessionId: 'A', projectId, backendId: 'be-owner' });
   });
 
   it('shows the same-project session creation guidance when the catalog has no choices', () => {

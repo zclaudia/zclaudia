@@ -139,7 +139,7 @@ export function FlatWorkspaceView({ sessionId, chatSessionId, chatComponent, pro
             <PaneCard
               key={pane.id}
               data-pane-id={pane.id}
-              focused={ws?.focusedPaneId === pane.id}
+              focused={panes.length > 1 && ws?.focusedPaneId === pane.id}
               hidden={!rect}
               inert={!rect || undefined}
               className="absolute"

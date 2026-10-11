@@ -6,6 +6,7 @@ import type { Session } from '@zclaudia/shared/core/session';
 import type { SlashCommand } from '@zclaudia/shared/features/commands';
 import {
   applyProviderCapabilities,
+  admitCreatedSession,
   applyProviderCommands,
   applyProvidersToMetaStore,
   assignSessionOwners,
@@ -323,6 +324,7 @@ export const useProjectStore = create<ProjectState>(set => ({
   addSession: session =>
     set(state => {
       assignSessionOwners([session]);
+      admitCreatedSession(session);
       return { sessions: [...state.sessions, session] };
     }),
 

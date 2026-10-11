@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { formatPickedElement, handleBrowserMessage } from '../handlers';
 import { useBrowserStore } from '../browserStore';
 import { useComposerStore } from '../../../stores/composerStore';
-import { useAppearanceStore } from '../../../stores/appearanceStore';
 import { useRightSidebarStore } from '../../../stores/rightSidebarStore';
 import { useSelectionStore } from '../../../stores/selectionStore';
 import { useRightWorkspaceStore, newPane } from '../../../stores/rightWorkspaceStore';
@@ -29,7 +28,6 @@ const state = {
 
 describe('handleBrowserMessage', () => {
   beforeEach(() => {
-    useAppearanceStore.setState({ unifiedWorkspace: false });
     useRightSidebarStore.setState({ collapsed: false, unread: false });
     useBrowserStore.getState().reset();
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
@@ -229,7 +227,6 @@ describe('handleBrowserMessage', () => {
   });
 
   it('marks activity unread while the unified workspace tools are collapsed', () => {
-    useAppearanceStore.setState({ unifiedWorkspace: true });
     useRightSidebarStore.setState({ collapsed: true });
     useSelectionStore.getState().setSelectedSessionId('s1');
     handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: true } as never);

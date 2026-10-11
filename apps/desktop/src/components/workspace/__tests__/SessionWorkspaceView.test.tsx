@@ -8,8 +8,9 @@ import {
   useRightWorkspaceStore,
   type SessionWorkspace,
 } from '../../../stores/rightWorkspaceStore';
-import { useAppearanceStore } from '../../../stores/appearanceStore';
 import { useProjectStore } from '../../../stores/projectStore';
+import { useSessionsStore } from '../../../stores/sessionsStore';
+import { useOwnershipStore } from '../../../stores/ownershipStore';
 import { useProjectWorkspaceStore } from '../../../stores/projectWorkspaceStore';
 import { useRightSidebarStore } from '../../../stores/rightSidebarStore';
 import { usePluginStore } from '../../../stores/pluginStore';
@@ -97,16 +98,17 @@ beforeEach(async () => {
   useRightWorkspaceStore.setState({ bySession: {}, order: [] });
   useProjectWorkspaceStore.setState({ byProject: {} });
   useWorkspaceRoutingStore.setState({ registrations: [], active: null });
-  useAppearanceStore.setState({ chatCard: true, unifiedWorkspace: true });
   useRightSidebarStore.setState({ collapsed: false, widthFraction: 0.26 });
   useUIStore.setState({ poppedOutSessions: new Map() });
+  useSessionsStore.getState().clearAllSessions();
+  useOwnershipStore.setState({ projectBackendIds: {}, sessionBackendIds: {} });
   useProjectStore.setState({
     selectedProjectId: 'p', selectedSessionId: 'A',
     projects: [{ id: 'p', name: 'Project', type: 'code', rootPath: '/project', createdAt: 1, updatedAt: 1 }],
     sessions: ['A', 'B', 'C'].map(id => ({ id, projectId: 'p', name: id, type: 'regular', workingDirectory: `/worktree/${id}`, createdAt: 1, updatedAt: 1 })),
   });
   usePluginStore.setState({ panels: [{ id: 'memory', pluginId: 'test', type: 'panel', label: 'Memory', component: ToolEditor }] });
-  for (const store of [useRightWorkspaceStore, useProjectWorkspaceStore, useRightSidebarStore, useAppearanceStore]) await store.persist.rehydrate();
+  for (const store of [useRightWorkspaceStore, useProjectWorkspaceStore, useRightSidebarStore]) await store.persist.rehydrate();
 });
 
 afterEach(() => {
@@ -119,6 +121,135 @@ const root = () => useRightWorkspaceStore.getState().bySession[useProjectWorkspa
 const chatPane = (id: string) => flattenPanes(root().root).find(p => p.tools.some(ref => ref.toolId === 'chat' && ref.instanceKey === id))!;
 
 describe('SessionWorkspaceView project integration', () => {
+  it('preserves restored chats when a partial REST catalog temporarily omits a session', () => {
+    render(view());
+    act(() => selectProjectChat('p', 'B', { beside: true }));
+    const draft = screen.getByLabelText('Draft B');
+    fireEvent.change(draft, { target: { value: 'persist B' } });
+    act(() => useProjectStore.setState(state => ({ sessions: state.sessions.filter(s => s.id === 'A') })));
+    expect(screen.getByLabelText('Draft B')).toBe(draft);
+    expect(draft).toHaveValue('persist B');
+    expect(metrics.unmounts.B).toBeUndefined();
+  });
+
+  it('reconciles an authoritative owner snapshot despite a stale REST catalog and preserves tools for an empty snapshot', () => {
+    useOwnershipStore.getState().setProjectOwner('p', 'owner');
+    render(view());
+    act(() => {
+      selectProjectChat('p', 'B', { beside: true });
+      useRightWorkspaceStore.getState().openTool('A', 'memory');
+      const tool = flattenPanes(root().root).flatMap(p => p.tools).find(t => t.toolId === 'memory')!;
+      useProjectWorkspaceStore.getState().setToolBinding('p', tool, { mode: 'fixed', sessionId: 'B' });
+    });
+    const edit = screen.getByLabelText('Tool edit');
+    const a = useProjectStore.getState().sessions.find(s => s.id === 'A')!;
+    act(() => useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }]));
+    expect(screen.queryByLabelText('Draft B')).not.toBeInTheDocument();
+    expect(metrics.releases.B).toBe(1);
+    expect(Object.values(useProjectWorkspaceStore.getState().byProject.p.toolBindings)).toEqual([{ mode: 'follow' }]);
+    act(() => useSessionsStore.getState().setRemoteSessions('owner', []));
+    expect(screen.queryByLabelText('Draft A')).not.toBeInTheDocument();
+    expect(metrics.releases.A).toBe(1);
+    expect(screen.getByLabelText('Tool edit')).toBe(edit);
+    expect(root().root).not.toBeNull();
+    expect(useProjectStore.getState().sessions).toHaveLength(3);
+  });
+
+  it('keeps a newly created REST chat when first mounting against an older ready owner snapshot', () => {
+    useOwnershipStore.getState().setProjectOwner('p', 'owner');
+    const a = useProjectStore.getState().sessions.find(s => s.id === 'A')!;
+    const b = useProjectStore.getState().sessions.find(s => s.id === 'B')!;
+    useProjectStore.setState({ sessions: [a] });
+    useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }]);
+    useProjectStore.getState().addSession(b);
+    render(view('B'));
+    expect(screen.getByLabelText('Draft B')).toBeInTheDocument();
+    expect(useProjectWorkspaceStore.getState().byProject.p.focusedChatSessionId).toBe('B');
+    expect(metrics.unmounts.B).toBeUndefined();
+  });
+
+  it('preserves a newly created chat across an in-flight old snapshot, then accepts confirmation and later deletion', () => {
+    useOwnershipStore.getState().setProjectOwner('p', 'owner');
+    const a = useProjectStore.getState().sessions.find(s => s.id === 'A')!;
+    const b = useProjectStore.getState().sessions.find(s => s.id === 'B')!;
+    useProjectStore.setState({ sessions: [a] });
+    useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }]);
+    const { rerender } = render(view());
+    act(() => useProjectStore.getState().addSession(b));
+    rerender(view('B'));
+    const draft = screen.getByLabelText('Draft B');
+    fireEvent.change(draft, { target: { value: 'new draft' } });
+    act(() => useSessionsStore.getState().handleSessionEvent('owner', 'created', { ...b, isActive: false }));
+    act(() => useSessionsStore.getState().handleSessionEvent('owner', 'updated', { ...b, isActive: false, name: 'live updated' }));
+    act(() => useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }]));
+    expect(screen.getByLabelText('Draft B')).toBe(draft);
+    expect(draft).toHaveValue('new draft');
+    act(() => useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }, { ...b, isActive: false }]));
+    expect(screen.getByLabelText('Draft B')).toBe(draft);
+    act(() => useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }]));
+    expect(screen.queryByLabelText('Draft B')).not.toBeInTheDocument();
+    expect(metrics.releases.B).toBe(1);
+  });
+
+  it('does not remount a deleted chat when the first late full snapshot still contains it', () => {
+    useOwnershipStore.getState().setProjectOwner('p', 'owner');
+    const a = useProjectStore.getState().sessions.find(s => s.id === 'A')!;
+    const b = useProjectStore.getState().sessions.find(s => s.id === 'B')!;
+    useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }, { ...b, isActive: false }]);
+    render(view());
+    act(() => selectProjectChat('p', 'B', { beside: true }));
+    const draftA = screen.getByLabelText('Draft A');
+    act(() => useSessionsStore.getState().handleSessionEvent('owner', 'deleted', { ...b, isActive: false }));
+    expect(screen.queryByLabelText('Draft B')).not.toBeInTheDocument();
+    act(() => useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }, { ...b, isActive: false }]));
+    expect(screen.queryByLabelText('Draft B')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Draft A')).toBe(draftA);
+    expect(metrics.mounts.B).toBe(1);
+    expect(metrics.releases.B).toBe(1);
+  });
+
+  it('recovers from an authoritative empty workspace after REST creates a new chat', () => {
+    useOwnershipStore.getState().setProjectOwner('p', 'owner');
+    const b = useProjectStore.getState().sessions.find(s => s.id === 'B')!;
+    const { rerender } = render(view());
+    act(() => useRightWorkspaceStore.getState().openTool('A', 'memory'));
+    const editor = screen.getByLabelText('Tool edit');
+    act(() => useSessionsStore.getState().setRemoteSessions('owner', []));
+    expect(screen.queryByLabelText('Draft A')).not.toBeInTheDocument();
+    act(() => useProjectStore.getState().addSession(b));
+    rerender(view('B'));
+    expect(screen.getByLabelText('Draft B')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tool edit')).toBe(editor);
+  });
+
+  it('never reseeds an explicitly deleted chat from a stale REST catalog before the first full snapshot', () => {
+    useOwnershipStore.getState().setProjectOwner('p', 'owner');
+    const b = useProjectStore.getState().sessions.find(s => s.id === 'B')!;
+    useProjectStore.getState().addSession(b);
+    render(view('B'));
+    expect(screen.getByLabelText('Draft B')).toBeInTheDocument();
+    act(() => useSessionsStore.getState().handleSessionEvent('owner', 'deleted', { ...b, isActive: false }));
+    expect(useProjectStore.getState().sessions.some(s => s.id === 'B')).toBe(true);
+    expect(screen.queryByLabelText('Draft B')).not.toBeInTheDocument();
+    expect(metrics.releases.B).toBe(1);
+    expect(useSessionsStore.getState().snapshotBackendIds.has('owner')).toBe(false);
+  });
+
+  it('keeps dashboard chat focus and content when resizing the empty tool area', () => {
+    render(<SessionWorkspaceView sessionId="A" projectId="p" syncSelection={false} />);
+    act(() => selectProjectChat('p', 'B'));
+    const draft = screen.getByLabelText('Draft B');
+    fireEvent.change(draft, { target: { value: 'keep this draft' } });
+    const layout = root().root;
+    act(() => useRightSidebarStore.getState().setWidthFraction(0.4));
+    expect(useProjectWorkspaceStore.getState().byProject.p.focusedChatSessionId).toBe('B');
+    expect(root().root).toBe(layout);
+    expect(screen.getByLabelText('Draft B')).toBe(draft);
+    expect(draft).toHaveValue('keep this draft');
+    expect(screen.queryByLabelText('Draft A')).not.toBeInTheDocument();
+    expect(metrics.unmounts.B).toBeUndefined();
+  });
+
   it('adopts the most recent project layout and uses one anchor across session selection and remount', () => {
     const tool = newPane('memory');
     useRightWorkspaceStore.setState({ bySession: {
@@ -222,6 +353,57 @@ describe('SessionWorkspaceView project integration', () => {
     expect(b).toHaveValue('keep B');
     expect(metrics.mounts.B).toBe(1);
     expect(metrics.subscriptions.B).toBe(1);
+  });
+
+  it('treats a press-release without travel as a click, not a split', () => {
+    const { container } = render(view());
+    act(() => openSessionTab('p', 'B'));
+    expect(chatPane('A').tools.map(ref => ref.instanceKey)).toEqual(['A', 'B']);
+    const wrapper = container.querySelector('[data-session-workspace]')!;
+    const paneEl = container.querySelector(`[data-pane-id="${chatPane('A').id}"]`) as HTMLElement;
+    paneEl.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, right: 1000, bottom: 700, width: 1000, height: 700, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+    const strip = container.querySelector(`[data-tab-strip][data-pane-id="${chatPane('A').id}"]`) as HTMLElement;
+    strip.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, right: 600, bottom: 32, width: 600, height: 32, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+    const before = root().root;
+    // Payload mirrors WorkspaceChatControls' drag handle: no sourceIndex, origin
+    // at the press point. SessionHeader (which hosts the handle) is mocked out here.
+    act(() => useDragSplitStore.getState().startDrag(
+      { toolId: 'chat', instanceKey: 'A', sourcePaneId: chatPane('A').id, multiInstance: true },
+      { x: 30, y: 300 },
+    ));
+    expect(useDragSplitStore.getState().active).not.toBeNull();
+    fireEvent.pointerUp(wrapper, { pointerType: 'mouse', clientX: 30, clientY: 300 });
+    expect(root().root).toBe(before);
+    expect(useDragSplitStore.getState().active).toBeNull();
+    // A real drag from the same handle still splits the active chat out.
+    act(() => useDragSplitStore.getState().startDrag(
+      { toolId: 'chat', instanceKey: 'A', sourcePaneId: chatPane('A').id, multiInstance: true },
+      { x: 30, y: 300 },
+    ));
+    fireEvent.pointerUp(wrapper, { pointerType: 'mouse', clientX: 300, clientY: 300 });
+    expect(root().root).not.toBe(before);
+    expect(chatPane('A').tools.map(ref => ref.instanceKey)).toEqual(['A']);
+    expect(chatPane('B').tools.map(ref => ref.instanceKey)).toEqual(['B']);
+  });
+
+  it('cancels a real tab pointerdown released within the click threshold', () => {
+    const { container } = render(view());
+    act(() => openSessionTab('p', 'B'));
+    const wrapper = container.querySelector('[data-session-workspace]')!;
+    const strip = container.querySelector(`[data-tab-strip][data-pane-id="${chatPane('A').id}"]`) as HTMLElement;
+    const rect = (left: number, width: number) =>
+      ({ left, right: left + width, top: 0, bottom: 32, width, height: 32, x: left, y: 0, toJSON: () => ({}) }) as DOMRect;
+    strip.getBoundingClientRect = () => rect(0, 600);
+    strip.querySelectorAll<HTMLElement>('[data-tab-index]').forEach((tab, i) => {
+      tab.getBoundingClientRect = () => rect(i * 300, 300);
+    });
+    const before = root().root;
+    fireEvent.pointerDown(screen.getByRole('tab', { name: 'B' }), { pointerType: 'mouse', buttons: 1, clientX: 450, clientY: 16 });
+    fireEvent.pointerUp(wrapper, { pointerType: 'mouse', clientX: 452, clientY: 17 });
+    expect(root().root).toBe(before);
+    expect(useDragSplitStore.getState().active).toBeNull();
   });
 
   it('clears tool maximization and an active drag when tools collapse', () => {
@@ -377,20 +559,4 @@ describe('SessionWorkspaceView project integration', () => {
     expect(metrics.subscriptions).toEqual({ A: 1 });
   });
 
-  it('preserves the complete project tree across an explicit experiment mode switch', () => {
-    function ExperimentGate() {
-      const enabled = useAppearanceStore(state => state.unifiedWorkspace);
-      return enabled ? view() : <div>Legacy surface</div>;
-    }
-    render(<ExperimentGate />);
-    act(() => { selectProjectChat('p', 'B', { beside: true }); openSessionTab('p', 'C'); });
-    const layout = root().root;
-    act(() => useAppearanceStore.getState().setUnifiedWorkspace(false));
-    expect(screen.getByText('Legacy surface')).toBeVisible();
-    expect(root().root).toBe(layout);
-    act(() => useAppearanceStore.getState().setUnifiedWorkspace(true));
-    expect(root().root).toEqual(layout);
-    expect(flattenPanes(root().root).flatMap(p => p.tools.map(ref => ref.instanceKey)).sort()).toEqual(['A', 'B', 'C']);
-    expect(metrics.mounts).toEqual({ A: 2, B: 2, C: 2 });
-  });
 });

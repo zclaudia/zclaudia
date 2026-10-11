@@ -51,6 +51,8 @@ interface DraftEditorState {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+// Async editor work may complete after switching away and even back again.
+let editorGeneration = 0;
 
 function hasDraftContent(content: string | null | undefined): boolean {
   return !!content?.trim();
@@ -94,6 +96,13 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
   sessionArchived: false,
 
   openEditor: async (sessionId: string) => {
+    // A retained host can initialize again; preserve its unsaved content and timer.
+    if (get().activeSessionId === sessionId) return;
+    const generation = ++editorGeneration;
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
     // If switching from a different active session, flush its pending save
     // and release its server lock in the background — otherwise the previous
     // draft is lost and the lock leaks until TTL.
@@ -126,20 +135,30 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
     set({
       activeSessionId: sessionId,
       localContent: '',
-      isReadOnly: false,
+      // A lock response can replace content; don't allow edits/autosaves before it arrives.
+      isReadOnly: true,
       isLocked: false,
       lockedByDevice: null,
       showLockPrompt: false,
       sessionArchived: false,
+      isSaving: false,
+      lastSavedAt: null,
     });
     showDraftPanel();
 
     // Then load draft content and acquire lock in background
     try {
       const result = await api.lockSessionDraft(sessionId, CLIENT_DEVICE_ID);
+      if (generation !== editorGeneration) {
+        if (result.locked && get().activeSessionId !== sessionId) {
+          void api.unlockSessionDraft(sessionId, CLIENT_DEVICE_ID).catch(() => {});
+        }
+        return;
+      }
 
       if (result.locked) {
         set({
+          isReadOnly: false,
           localContent: result.draft?.content || '',
           lastSavedAt: result.draft?.updatedAt || null,
           draftExists: {
@@ -162,6 +181,7 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
   },
 
   closeEditor: async () => {
+    ++editorGeneration;
     const { activeSessionId, isReadOnly, localContent } = get();
 
     // Clear pending save timer
@@ -182,6 +202,7 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
       lastSavedAt: null,
       sendCallback: null,
       sessionArchived: false,
+      isSaving: false,
     });
 
     // Save and release lock in background (don't block UI)
@@ -203,8 +224,19 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
   },
 
   forceOpen: async (sessionId: string) => {
+    const generation = ++editorGeneration;
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
     try {
       const result = await api.lockSessionDraft(sessionId, CLIENT_DEVICE_ID, true);
+      if (generation !== editorGeneration) {
+        if (result.locked && get().activeSessionId !== sessionId) {
+          void api.unlockSessionDraft(sessionId, CLIENT_DEVICE_ID).catch(() => {});
+        }
+        return;
+      }
       set({
         activeSessionId: sessionId,
         localContent: result.draft?.content || '',
@@ -223,11 +255,17 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
   },
 
   openReadOnly: (sessionId: string) => {
+    ++editorGeneration;
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
     const { localContent } = get();
     set({
       activeSessionId: sessionId,
       localContent,
       isReadOnly: true,
+      isSaving: false,
       showLockPrompt: false,
     });
     showDraftPanel();
@@ -238,22 +276,24 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
     if (!activeSessionId || isReadOnly) return;
 
     set({ localContent: content });
+    const generation = editorGeneration;
 
     // Debounced save
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
+      saveTimer = null;
+      if (generation !== editorGeneration) return;
       set({ isSaving: true });
       if (!hasDraftContent(content)) {
         try {
           await api.deleteSessionDraft(activeSessionId);
           set({
-            isSaving: false,
-            lastSavedAt: null,
+            ...(generation === editorGeneration ? { isSaving: false, lastSavedAt: null } : {}),
             draftExists: { ...get().draftExists, [activeSessionId]: false },
           });
         } catch (error) {
           console.error('[DraftEditor] Failed to delete empty draft:', error);
-          set({ isSaving: false });
+          if (generation === editorGeneration) set({ isSaving: false });
         }
         return;
       }
@@ -261,12 +301,11 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
       const draft = await saveDraftToServer(activeSessionId, content);
       if (draft) {
         set({
-          isSaving: false,
-          lastSavedAt: draft.updatedAt,
+          ...(generation === editorGeneration ? { isSaving: false, lastSavedAt: draft.updatedAt } : {}),
           draftExists: { ...get().draftExists, [activeSessionId]: true },
         });
       } else {
-        set({ isSaving: false });
+        if (generation === editorGeneration) set({ isSaving: false });
       }
     }, SAVE_DEBOUNCE_MS);
   },
@@ -285,6 +324,7 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
   finishDraft: async (sendCallback: (content: string) => void) => {
     const { activeSessionId, localContent } = get();
     if (!activeSessionId || !localContent.trim()) return;
+    const generation = editorGeneration;
 
     // Clear pending save timer
     if (saveTimer) {
@@ -302,6 +342,11 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
       console.error('[DraftEditor] Failed to archive draft:', error);
     }
 
+    if (generation !== editorGeneration) {
+      set({ draftExists: { ...get().draftExists, [activeSessionId]: false } });
+      return;
+    }
+    ++editorGeneration;
     hideDraftPanel();
 
     // Update state
@@ -321,6 +366,7 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
 
   discardDraft: async () => {
     const { activeSessionId } = get();
+    const generation = editorGeneration;
 
     // Clear pending save timer
     if (saveTimer) {
@@ -336,6 +382,11 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
       }
     }
 
+    if (generation !== editorGeneration) {
+      if (activeSessionId) set({ draftExists: { ...get().draftExists, [activeSessionId]: false } });
+      return;
+    }
+    ++editorGeneration;
     hideDraftPanel();
 
     set({
@@ -355,6 +406,7 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
   },
 
   dismissLockPrompt: () => {
+    ++editorGeneration;
     set({
       showLockPrompt: false,
       activeSessionId: null,

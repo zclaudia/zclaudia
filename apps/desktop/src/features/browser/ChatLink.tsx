@@ -19,20 +19,27 @@ const HTTP_RE = /^https?:\/\//i;
  * open/navigate messages to).
  */
 export function ChatLink({ href, children }: { href?: string; children?: ReactNode }) {
-  const { sendMessage, isConnected } = useConnection();
-  const boundSessionId = useChatActionsOptional()?.sessionId;
+  const { sendMessage, sendToServer, isConnected } = useConnection();
+  const chat = useChatActionsOptional();
+  const boundSessionId = chat?.sessionId;
   const sessionId = useSelectionStore(s => boundSessionId ?? s.selectedSessionId);
 
   const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
     if (!href || !HTTP_RE.test(href) || !sessionId) return;
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-    if (!isConnected) return;
+    if (!(chat?.isConnected ?? isConnected)) return;
     if (!isPanelAvailable('browser')) return;
     e.preventDefault();
     // open is idempotent; the server awaits the in-flight open before navigate.
-    sendMessage({ type: 'browser_open', sessionId });
-    sendMessage({ type: 'browser_navigate', sessionId, url: href });
-    openToolInWorkspace(sessionId, 'browser');
+    if (chat?.backendId) {
+      sendToServer(chat.backendId, { type: 'browser_open', sessionId });
+      sendToServer(chat.backendId, { type: 'browser_navigate', sessionId, url: href });
+      openToolInWorkspace(sessionId, 'browser', { backendId: chat.backendId });
+    } else {
+      sendMessage({ type: 'browser_open', sessionId });
+      sendMessage({ type: 'browser_navigate', sessionId, url: href });
+      openToolInWorkspace(sessionId, 'browser');
+    }
   };
 
   return (

@@ -35,18 +35,19 @@ export function useProviderCapabilities({
     : null;
 
   const agentProfilesLoaded = useAgentProfileMetaStore(s => s.loaded);
-  const { agent, llm } = useAgentForSession(currentSession?.id);
+  const { agent, llm, loading: agentLoading, backendId, scopedMetadata } = useAgentForSession(sessionId);
+  const scopedBackendId = backendId && (scopedMetadata || backendId !== activeServerId) ? backendId : undefined;
   const runtimeType = normalizeAgentRuntimeType(agent?.runtimeType);
   const usesPiMetadata = isPiAgentRuntime(runtimeType);
   const llmProfileId = usesPiMetadata ? llm?.id : undefined;
   // Wait for agent profiles only while they are still loading. An orphaned
   // agentProfileId must not block capabilities forever after load completes.
   const isBackendDataReady =
-    dataServerId != null &&
+    scopedBackendId ? !!currentSession && !agentLoading : dataServerId != null &&
     dataServerId === activeServerId &&
     (!currentSession?.agentProfileId || agentProfilesLoaded);
   const providerScopeKey =
-    resolveCanonicalBackendId(activeServerId ?? LEGACY_LOCAL_SERVER_ID, LEGACY_LOCAL_SERVER_ID) ||
+    resolveCanonicalBackendId(backendId ?? activeServerId ?? LEGACY_LOCAL_SERVER_ID, LEGACY_LOCAL_SERVER_ID) ||
     LEGACY_LOCAL_SERVER_ID;
   const metadataKey = usesPiMetadata ? llmProfileId || '_default' : `runtime:${runtimeType}`;
   const capsCacheKey = `${providerScopeKey}:${metadataKey}${runtimeType === 'cursor' ? `:${sessionId}:${currentSession?.sdkSessionId ?? 'new'}` : ''}`;
@@ -63,7 +64,7 @@ export function useProviderCapabilities({
 
     if (llmProfileId) {
       api
-        .getProviderCommands(llmProfileId, projectRoot || undefined, { signal: controller.signal })
+        .getProviderCommands(llmProfileId, projectRoot || undefined, { signal: controller.signal }, ...(scopedBackendId ? [scopedBackendId] as [string] : []))
         .then(commands => {
           setProviderCommands(commandsCacheKey, commands);
         })
@@ -75,7 +76,7 @@ export function useProviderCapabilities({
       api
         .getProviderTypeCommands(runtimeType, projectRoot || undefined, {
           signal: controller.signal,
-        })
+        }, ...(scopedBackendId ? [scopedBackendId] as [string] : []))
         .then(commands => {
           setProviderCommands(commandsCacheKey, commands);
         })
@@ -94,6 +95,7 @@ export function useProviderCapabilities({
     commandsCacheKey,
     llmProfileId,
     setProviderCommands,
+    scopedBackendId,
   ]);
 
   useEffect(() => {
@@ -102,10 +104,10 @@ export function useProviderCapabilities({
     if (providerCapabilities[capsCacheKey]) return () => controller.abort();
 
     const fetchCaps = llmProfileId
-      ? api.getProviderCapabilities(llmProfileId, { signal: controller.signal })
+      ? api.getProviderCapabilities(llmProfileId, { signal: controller.signal }, ...(scopedBackendId ? [scopedBackendId] as [string] : []))
       : runtimeType === 'cursor'
         ? api.getSessionCapabilities(sessionId, { signal: controller.signal })
-        : api.getProviderTypeCapabilities(runtimeType, { signal: controller.signal });
+        : api.getProviderTypeCapabilities(runtimeType, { signal: controller.signal }, ...(scopedBackendId ? [scopedBackendId] as [string] : []));
 
     fetchCaps
       .then(caps => {
@@ -125,9 +127,10 @@ export function useProviderCapabilities({
     isBackendDataReady,
     providerCapabilities,
     setProviderCapabilities,
+    scopedBackendId,
   ]);
 
-  const capabilities: ProviderCapabilities | null = providerCapabilities[capsCacheKey] || null;
+  const capabilities: ProviderCapabilities | null = isBackendDataReady ? providerCapabilities[capsCacheKey] || null : null;
 
   // When capabilities arrive for a session whose mode is not yet set, seed
   // the session mode from capabilities.defaultModeId so the ModeSelector shows

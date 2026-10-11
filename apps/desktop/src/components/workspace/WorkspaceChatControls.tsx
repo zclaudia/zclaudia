@@ -34,7 +34,7 @@ export function WorkspaceChatControls() {
           const ref = flattenPanes(node ?? null).find(p => p.id === pane.paneId)?.tools.find(t => t.toolId === 'chat');
           useDragSplitStore.getState().startDrag({
             toolId: 'chat', instanceKey: pane.chatSessionId ?? ref?.instanceKey, sourcePaneId: pane.paneId, multiInstance: true,
-          });
+          }, { x: e.clientX, y: e.clientY });
         }}
       >
         <GripVertical size={14} strokeWidth={1.75} />

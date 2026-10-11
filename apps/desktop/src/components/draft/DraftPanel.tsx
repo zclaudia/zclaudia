@@ -22,7 +22,8 @@ export function DraftPanel() {
 
   const selectedSessionId = useSelectionStore(s => workspaceTool?.sessionId ?? s.selectedSessionId);
   const sessionMatches =
-    !!activeSessionId && (!selectedSessionId || activeSessionId === selectedSessionId);
+    !!activeSessionId && (workspaceTool ? !!selectedSessionId && activeSessionId === selectedSessionId :
+      !selectedSessionId || activeSessionId === selectedSessionId);
 
   // Self-initialize: bind the editor to the selected session (workspace launcher
   // opens this panel without calling openEditor). Also re-converges on switch.
@@ -77,7 +78,7 @@ export function DraftPanel() {
   if (!sessionMatches) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-        Loading draft...
+        {workspaceTool && !selectedSessionId ? 'No chat selected' : 'Loading draft...'}
       </div>
     );
   }

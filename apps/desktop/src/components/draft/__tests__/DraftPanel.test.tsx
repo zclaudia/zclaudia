@@ -59,6 +59,14 @@ describe('DraftPanel', () => {
     expect(openEditor).not.toHaveBeenCalled();
   });
 
+  it('does not fall back to the global draft when a workspace has no remaining chat', () => {
+    state = { ...buildState(), localContent: 'Deleted session draft' };
+    render(<WorkspaceToolContext.Provider value={{ sessionId: '' }}><DraftPanel /></WorkspaceToolContext.Provider>);
+    expect(screen.getByText('No chat selected')).toBeTruthy();
+    expect(screen.queryByLabelText('Draft message')).toBeNull();
+    expect(openEditor).not.toHaveBeenCalled();
+  });
+
   it('does not reopen or focus an invisible retained draft', () => {
     state = { ...buildState(), activeSessionId: 'other-chat' };
     const { rerender } = render(

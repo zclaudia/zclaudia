@@ -163,7 +163,6 @@ export function SessionHeader({
   return (
     <div className="zc-session-header relative flex min-h-[48px] items-center gap-2.5 px-3 py-0 sm:min-h-[36px] sm:px-3.5 sm:py-0 bg-background safe-top-pad">
       <div className="absolute inset-x-0 top-0 hidden h-2 sm:block" data-tauri-drag-region />
-      <WorkspaceChatControls />
       {/* Mobile: hamburger menu */}
       {isMobile && onOpenSidebar && (
         <button
@@ -526,6 +525,8 @@ export function SessionHeader({
           )}
         </>
       )}
+      {/* Pane controls (workspace only) sit with the other trailing actions, never before the title */}
+      <WorkspaceChatControls />
       {/* Right-panel toggle (desktop) — far-right edge, beside the "..." menu */}
       {showRightToggle && (
         <button

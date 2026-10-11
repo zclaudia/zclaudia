@@ -18,9 +18,12 @@ export function FileSearchInput({
   onClose,
 }: FileSearchInputProps) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<FileEntry[]>([]);
+  const [resultState, setResultState] = useState<{ scope: string; entries: FileEntry[] } | null>(null);
+  const scope = JSON.stringify([projectRoot, backendId ?? null, query.trim()]);
+  const results = resultState?.scope === scope ? resultState.entries : [];
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loadingScope, setLoadingScope] = useState<string | null>(null);
+  const loading = loadingScope === scope;
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -31,6 +34,7 @@ export function FileSearchInput({
 
   // Fetch results on query change
   useEffect(() => {
+    let cancelled = false;
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (!query.trim()) {
@@ -38,7 +42,7 @@ export function FileSearchInput({
     }
 
     debounceRef.current = setTimeout(async () => {
-      setLoading(true);
+      setLoadingScope(scope);
       try {
         const result = await api.listDirectory({
           projectRoot,
@@ -46,19 +50,21 @@ export function FileSearchInput({
           query: query.trim(),
           maxResults: 20,
         });
-        setResults(result.entries.filter(e => e.type === 'file'));
+        if (cancelled) return;
+        setResultState({ scope, entries: result.entries.filter(e => e.type === 'file') });
         setSelectedIndex(0);
       } catch {
-        setResults([]);
+        if (!cancelled) setResultState({ scope, entries: [] });
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoadingScope(null);
       }
     }, 150);
 
     return () => {
+      cancelled = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [backendId, query, projectRoot]);
+  }, [backendId, query, projectRoot, scope]);
 
   const handleSelect = useCallback(
     (entry: FileEntry) => {
@@ -70,7 +76,7 @@ export function FileSearchInput({
   const handleQueryChange = (value: string) => {
     setQuery(value);
     if (!value.trim()) {
-      setResults([]);
+      setResultState(null);
       setSelectedIndex(0);
     }
   };

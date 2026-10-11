@@ -116,7 +116,7 @@ describe('FileLineReference', () => {
     fireEvent.click(screen.getByRole('button'));
 
     await waitFor(() => {
-      expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'src/foo.ts', 42, undefined);
+      expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'src/foo.ts', 42, undefined, 'b1');
     });
     expect(mockActivatePanel).toHaveBeenCalledWith('file-viewer');
     expect(mockListDirectory).not.toHaveBeenCalled();
@@ -243,7 +243,7 @@ describe('FileLineReference', () => {
     fireEvent.click(screen.getByRole('button'));
 
     await waitFor(() => {
-      expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'pkg/foo.ts', 7, undefined);
+      expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'pkg/foo.ts', 7, undefined, 'b1');
     });
     expect(mockListDirectory).toHaveBeenCalledWith({
       projectRoot: '/repo',
