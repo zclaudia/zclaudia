@@ -2,10 +2,14 @@ import { useCallback, useRef, useEffect } from 'react';
 import { useDraftEditorStore } from '../../stores/draftEditorStore';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { MAX_CONTENT_BYTES } from './draftConstants';
+import { useWorkspaceTool } from '../workspace/WorkspaceToolContext';
+import { useWorkspaceVisible } from '../workspace/WorkspaceContext';
 
 /** Draft panel content rendered inside BottomPanel. Controls live in DraftActions (header). */
 export function DraftPanel() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const workspaceTool = useWorkspaceTool();
+  const visible = useWorkspaceVisible();
 
   const {
     localContent,
@@ -16,26 +20,26 @@ export function DraftPanel() {
     finishDraft,
   } = useDraftEditorStore();
 
-  const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
+  const selectedSessionId = useSelectionStore(s => workspaceTool?.sessionId ?? s.selectedSessionId);
   const sessionMatches =
     !!activeSessionId && (!selectedSessionId || activeSessionId === selectedSessionId);
 
   // Self-initialize: bind the editor to the selected session (workspace launcher
   // opens this panel without calling openEditor). Also re-converges on switch.
   useEffect(() => {
-    if (selectedSessionId && activeSessionId !== selectedSessionId) {
+    if (visible && selectedSessionId && activeSessionId !== selectedSessionId) {
       void useDraftEditorStore.getState().openEditor(selectedSessionId);
     }
-  }, [selectedSessionId, activeSessionId]);
+  }, [selectedSessionId, activeSessionId, visible]);
 
   const effectiveReadOnly = isReadOnly || sessionArchived;
 
   // Auto-focus when shown
   useEffect(() => {
-    if (textareaRef.current && !effectiveReadOnly && sessionMatches) {
+    if (visible && textareaRef.current && !effectiveReadOnly && sessionMatches) {
       textareaRef.current.focus();
     }
-  }, [activeSessionId, effectiveReadOnly, sessionMatches]);
+  }, [activeSessionId, effectiveReadOnly, sessionMatches, visible]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {

@@ -121,3 +121,39 @@ bug. Rules:
   `triggerClassName` / `!rounded-*`.
 - `pnpm --filter @zclaudia/desktop run check:radius` (also part of `lint`)
   enforces this; `radius-conventions.test.tsx` pins the primitives.
+
+
+## 10. Cards and desktop workspaces
+
+Persistent workspace pane shells use `components/workspace/PaneCard.tsx`: the
+canvas is `--background`, cards are `--card`, with `rounded-lg`, semantic borders
+and a shared focus treatment. The opt-in chat card includes header, transcript
+and composer. Assistant messages stay flat; user messages use `--secondary`.
+The `chat-pane` container query compacts chrome and wraps selectors at 400px.
+Mobile retains its single chat / bottom-panel layout.
+
+`FlatWorkspaceView` renders pane shells and full-ref content hosts as siblings.
+Shells use pane IDs; content uses the complete `(toolId, instanceKey)` tuple.
+Tree changes only assign rectangles. Dragging, collapsing, maximizing and applying
+a preset must preserve existing content DOM and state. Hidden hosts are inert,
+ignore global shortcuts, and pass explicit visibility to tools. Closing a ref
+is the operation that ends its content lifecycle.
+
+Chats stay isolated from tool tabs. Generic delete/replace/tab operations cannot
+remove a pinned chat; dedicated project chat operations retain at least one
+real session and one ref per session. Edge moves and chat-tab moves are atomic;
+never move into a target and then split it out. Tool bindings use full refs and
+fixed session IDs, so geometry changes cannot change a worktree binding.
+
+Recursive geometry minima are 360×320 for chat (header 48, composer 152,
+transcript 120) and 240×160 for tools (header 40, content 120), with an 8px gutter.
+Each divider uses its own group's dimensions and both child minima. Undersized
+viewports scroll a virtual canvas while retaining stored ratios.
+
+Format migration and runtime chat insertion remain separate. `rightWorkspaceStore`
+v3 explicitly preserves v1/v2 layouts and adds independent placeholder leaves.
+Project ownership metadata and layout presets each use their own v1 store.
+Project adoption waits for hydration and the session catalog. Presets map existing
+complete refs once, keep overflow as tabs, and leave unfilled slots as launchers.
+They never create sessions or open tools until the user explicitly fills a slot.
+The Layout menu supports save/rename/delete and `Cmd/Ctrl+Alt+L`.

@@ -6,6 +6,8 @@ import {
   canDrop,
   disabledZones,
   resolveTabDrop,
+  resolvePointerToPane,
+  resolveRootDrop,
   type Rect,
 } from '../dragSplit';
 import { newPane } from '../../../stores/rightWorkspaceStore';
@@ -112,6 +114,63 @@ describe('canDrop', () => {
       }).allowed
     ).toBe(false);
   });
+
+  it('allows moving an existing ref to another pane edge, excluding the source identity', () => {
+    const root: GroupNode = {
+      id: 'g', kind: 'group', dir: 'row', ratio: 0.5,
+      children: [pane('chat', 'chat', 's1'), pane('tool', 'draft')],
+    };
+    expect(canDrop(root, 'chat', 'right', {
+      toolId: 'draft', sourcePaneId: 'tool', sourceIndex: 0,
+    }).allowed).toBe(true);
+    expect(canDrop(root, 'tool', 'left', {
+      toolId: 'chat', instanceKey: 's1', sourcePaneId: 'chat', sourceIndex: 0,
+    }).allowed).toBe(true);
+  });
+
+  it('keeps chat panes isolated from all center/tab merge drops', () => {
+    const root: GroupNode = {
+      id: 'g', kind: 'group', dir: 'row', ratio: 0.5,
+      children: [pane('chat', 'chat', 's1'), pane('tool', 'draft')],
+    };
+    expect(canDrop(root, 'chat', 'center', { toolId: 'memory' }).allowed).toBe(false);
+    expect(canDrop(root, 'tool', 'center', {
+      toolId: 'chat', instanceKey: 's1', sourcePaneId: 'chat', sourceIndex: 0,
+    }).allowed).toBe(false);
+    expect(canDrop(root, 'chat', 'center', {
+      toolId: 'chat', instanceKey: 's2', multiInstance: true,
+    }).allowed).toBe(false);
+  });
+
+  it('disables edges for a one-tab self move, but allows splitting a tab out of a multi-tab pane', () => {
+    const root = pane('tool', 'draft');
+    const payload = { toolId: 'draft', sourcePaneId: 'tool', sourceIndex: 0 };
+    expect(canDrop(root, 'tool', 'right', payload).allowed).toBe(false);
+    root.tools.push({ toolId: 'memory' });
+    expect(canDrop(root, 'tool', 'right', payload).allowed).toBe(true);
+  });
+
+  it('does not exclude every matching source pane ref, nor obsolete source indices', () => {
+    const source = pane('tool', 'terminal', 'scopeA');
+    source.tools.push({ toolId: 'terminal', instanceKey: 'scopeA' });
+    const root: GroupNode = {
+      id: 'g', kind: 'group', dir: 'row', ratio: 0.5,
+      children: [source, pane('chat', 'chat', 's1')],
+    };
+    const payload = { toolId: 'terminal', instanceKey: 'scopeA', multiInstance: true,
+      sourcePaneId: 'tool', sourceIndex: 0 };
+    expect(canDrop(root, 'chat', 'right', payload)).toEqual({ allowed: false, conflictPaneId: 'tool' });
+    source.tools[0] = { toolId: 'terminal', instanceKey: 'scopeB' };
+    expect(canDrop(root, 'chat', 'right', payload).allowed).toBe(false);
+    expect(canDrop(root, 'removed', 'right', payload).allowed).toBe(false);
+  });
+
+  it('matches chat conflicts by session identity, allowing distinct sessions', () => {
+    const root = pane('chat', 'chat', 's1');
+    expect(canDrop(root, 'chat', 'right', { toolId: 'chat', instanceKey: 's2' }).allowed).toBe(true);
+    expect(canDrop(root, 'chat', 'right', { toolId: 'chat', instanceKey: 's1' }).allowed).toBe(false);
+  });
+
 });
 
 describe('disabledZones', () => {
@@ -182,5 +241,40 @@ describe('resolveTabDrop', () => {
     const container = document.createElement('div');
     container.appendChild(strip('P1', [[0, 100]]));
     expect(resolveTabDrop(container, 16, 200)).toBeNull();
+  });
+});
+
+
+describe('resolvePointerToPane', () => {
+  it('uses viewport DOM rectangles so scrolled canvas hit-testing needs no extra offset', () => {
+    const container = document.createElement('div');
+    const el = document.createElement('div');
+    el.setAttribute('data-pane-id', 'p1');
+    // Canvas pane starts at x=600 but is scrolled left by 500: DOM rect x=100.
+    el.getBoundingClientRect = () => ({ left: 100, right: 400, top: -120, bottom: 200,
+      width: 300, height: 320 }) as DOMRect;
+    container.appendChild(el);
+    const hit = resolvePointerToPane(container, pane('p1', 'draft'), 390, 40, { toolId: 'memory' });
+    expect(hit?.paneId).toBe('p1');
+    expect(hit?.zone).toBe('right');
+    expect(resolvePointerToPane(container, pane('p1', 'draft'), 610, 40, { toolId: 'memory' })).toBeNull();
+  });
+});
+
+
+describe('resolveRootDrop', () => {
+  const viewport = { left: 100, top: 200, width: 1000, height: 700 };
+  it('restricts root drops to the outer viewport gutter on all four edges', () => {
+    expect(resolveRootDrop(viewport, 104, 500)).toBe('left');
+    expect(resolveRootDrop(viewport, 1096, 500)).toBe('right');
+    expect(resolveRootDrop(viewport, 500, 204)).toBe('top');
+    expect(resolveRootDrop(viewport, 500, 896)).toBe('bottom');
+    expect(resolveRootDrop(viewport, 112, 500)).toBeNull();
+    expect(resolveRootDrop(viewport, 99, 500)).toBeNull();
+    expect(resolveRootDrop(viewport, 500, 901)).toBeNull();
+  });
+  it('uses viewport coordinates independent of canvas scrolling', () => {
+    expect(resolveRootDrop({ ...viewport, left: -500, top: -300 }, -495, 0)).toBe('left');
+    expect(resolveRootDrop({ left: 0, top: 0, width: 0, height: 100 }, 0, 40)).toBeNull();
   });
 });

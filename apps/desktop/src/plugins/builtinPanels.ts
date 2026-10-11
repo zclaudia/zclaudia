@@ -7,7 +7,7 @@
  * Called once on app startup so plugin commands that trigger showPanel()
  * have a component ready to render in the bottom panel area.
  */
-import { usePluginStore } from '../stores/pluginStore';
+import { usePluginStore, type UIExtension } from '../stores/pluginStore';
 import { TerminalPanel, TerminalActions } from '../components/terminal/TerminalPanel';
 import { FileViewerPanel, FileViewerActions } from '../components/fileviewer/FileViewerPanel';
 import { DraftPanel } from '../components/draft/DraftPanel';
@@ -23,7 +23,11 @@ import { useFileViewerStore } from '../stores/fileViewerStore';
 import { useDraftEditorStore } from '../stores/draftEditorStore';
 
 export function initBuiltinPanels() {
-  const { registerPanel } = usePluginStore.getState();
+  // Preserve existing visibility and identity across StrictMode/remounted hosts.
+  const registerPanel = (panel: UIExtension) => {
+    const store = usePluginStore.getState();
+    if (!store.panels.some(existing => existing.id === panel.id)) store.registerPanel(panel);
+  };
 
   // --- Core panels ---
 
@@ -51,7 +55,11 @@ export function initBuiltinPanels() {
       // showing "No terminal session". No-op if one already exists for this scope.
       if (projectId) useTerminalStore.getState().openTerminal(projectId, backendId);
     },
-    onClose: () => {
+    onClose: ctx => {
+      if (ctx) {
+        if (ctx.projectId) useTerminalStore.getState().setDrawerOpen(ctx.projectId, false, ctx.backendId ?? 'no-backend');
+        return;
+      }
       // Close all open terminal drawers across backend/project scopes.
       const { drawerOpen } = useTerminalStore.getState();
       for (const scopeKey of Object.keys(drawerOpen)) {
@@ -61,7 +69,7 @@ export function initBuiltinPanels() {
         const backendId = separatorIndex >= 0 ? scopeKey.slice(0, separatorIndex) : undefined;
         useTerminalStore
           .getState()
-          .setDrawerOpen(projectId, false, backendId === 'no-backend' ? null : backendId);
+          .setDrawerOpen(projectId, false, backendId);
       }
     },
   });

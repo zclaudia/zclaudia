@@ -89,4 +89,21 @@ describe('ResizeDivider', () => {
     const divider = container.firstElementChild as HTMLElement;
     expect(divider.className).toContain('h-2');
   });
+
+  it('supports absolute canvas placement and cleans up document listeners on unmount', () => {
+    const onDrag = vi.fn();
+    const { container, unmount } = render(
+      <ResizeDivider dir="row" containerSize={588} onDrag={onDrag}
+        style={{ position: 'absolute', left: 898, top: 404, width: 8, height: 396 }} />
+    );
+    const divider = container.firstElementChild as HTMLElement;
+    expect(divider.style.left).toBe('898px');
+    fireEvent.pointerDown(divider, { clientX: 0, buttons: 1 });
+    fireEvent.pointerMove(document, { clientX: 58.8, buttons: 1 });
+    expect(onDrag).toHaveBeenCalledWith(expect.closeTo(0.1, 5));
+    unmount();
+    onDrag.mockClear();
+    fireEvent.pointerMove(document, { clientX: 117.6, buttons: 1 });
+    expect(onDrag).not.toHaveBeenCalled();
+  });
 });

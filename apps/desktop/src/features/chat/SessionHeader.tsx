@@ -1,4 +1,5 @@
 import { SessionSettingsDialog } from './SessionSettingsDialog';
+import { WorkspaceChatControls } from '../../components/workspace/WorkspaceChatControls';
 import { useState, type ReactNode } from 'react';
 import {
   RotateCcw,
@@ -31,7 +32,8 @@ import type { Session, SessionRuntimeEngine } from '@zclaudia/shared/core/sessio
 import type { SystemInfo } from '@zclaudia/shared/wire/messages/core';
 import { useServerStore } from '../../stores/serverStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
-import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
+import { pruneChat, useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
+import { useWorkspacePane } from '../../components/workspace/WorkspaceContext';
 import { useAgentForSession } from '../../hooks/useAgentForSession';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
@@ -108,6 +110,7 @@ export function SessionHeader({
   systemInfo = null,
   taskCenter,
 }: SessionHeaderProps) {
+  const workspacePane = useWorkspacePane();
   const [showSettings, setShowSettings] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showMobileInfo, setShowMobileInfo] = useState(false);
@@ -149,7 +152,7 @@ export function SessionHeader({
   const rightUnread = useRightSidebarStore(s => s.unread);
   const toggleRightPanel = useRightSidebarStore(s => s.toggleCollapsed);
   const rightWorkspaceHasContent = useRightWorkspaceStore(
-    s => (s.bySession[currentSession.id]?.root ?? null) !== null
+    s => pruneChat(s.bySession[workspacePane?.workspaceId ?? currentSession.id]?.root ?? null) !== null
   );
   const showRightToggle = !isMobile && currentSession.type !== 'background';
   const rightExpanded = !rightCollapsed;
@@ -158,8 +161,9 @@ export function SessionHeader({
   };
 
   return (
-    <div className="relative flex min-h-[48px] items-center gap-2.5 px-3 py-0 sm:min-h-[36px] sm:px-3.5 sm:py-0 bg-background safe-top-pad">
+    <div className="zc-session-header relative flex min-h-[48px] items-center gap-2.5 px-3 py-0 sm:min-h-[36px] sm:px-3.5 sm:py-0 bg-background safe-top-pad">
       <div className="absolute inset-x-0 top-0 hidden h-2 sm:block" data-tauri-drag-region />
+      <WorkspaceChatControls />
       {/* Mobile: hamburger menu */}
       {isMobile && onOpenSidebar && (
         <button
@@ -221,7 +225,7 @@ export function SessionHeader({
       )}
       {currentSession.type !== 'background' && chipText && (
         <span
-          className="hidden min-w-0 shrink items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-[11px] leading-none text-muted-foreground sm:inline-flex"
+          className="zc-session-topic hidden min-w-0 shrink items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-[11px] leading-none text-muted-foreground sm:inline-flex"
           title={firstUserText ?? undefined}
         >
           <MessageSquare size={11} className="shrink-0" />
@@ -246,10 +250,10 @@ export function SessionHeader({
             <Cpu size={12} className="shrink-0" />
             {/* leading-tight (not the pill's leading-none) so truncate's
                 overflow:hidden doesn't clip descenders like the "g" in "Coding" */}
-            <span className="truncate leading-tight">{agentLabel}</span>
+            <span className="zc-session-agent-label truncate leading-tight">{agentLabel}</span>
             {engineBadge && (
               <span
-                className="max-w-[140px] shrink-0 truncate rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-muted-foreground"
+                className="zc-session-engine-badge max-w-[140px] shrink-0 truncate rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-muted-foreground"
                 title={`Session run mode: ${engineBadge}`}
               >
                 {engineBadge}
@@ -533,7 +537,7 @@ export function SessionHeader({
         >
           <PanelRight size={16} strokeWidth={1.75} />
           {!rightExpanded && rightWorkspaceHasContent && rightUnread && (
-            <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
+            <span className="zc-workspace-unread absolute right-1 top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
           )}
         </button>
       )}

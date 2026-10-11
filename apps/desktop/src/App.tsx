@@ -26,6 +26,7 @@ import { useMobileDrawer } from './app/useMobileDrawer';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useServerLatencyMonitor } from './hooks/useServerLatencyMonitor';
 import { useActiveSessionStream } from './features/chat/hooks/useActiveSessionStream';
+import { useAppearanceStore } from './stores/appearanceStore';
 import { useMainWindowGeometry } from './hooks/useMainWindowGeometry';
 import { useAgentInitialization } from './hooks/useAgentInitialization';
 import { useDeepLinkNavigation } from './hooks/useDeepLinkNavigation';
@@ -51,7 +52,6 @@ import { useNotificationsModalStore } from './stores/notificationsModalStore';
 import { useGatewayStore } from './stores/gatewayStore';
 import { useHomeQuickActionsStore } from './stores/homeQuickActionsStore';
 import { isAndroid } from './utils/platform';
-import { initBuiltinPanels } from './plugins/builtinPanels';
 import { shouldShowDirectGatewaySetup } from './utils/directGatewaySetup';
 import { getMobileControlPlaneState } from './services/mobileConnectionState';
 import { PaneSkeleton } from './components/ui/Skeleton';
@@ -90,6 +90,7 @@ const LazyFallback = () => (
 function AppContent() {
   const { embeddedServerStatus, embeddedServerError } = useConnection();
   const isMobile = useIsMobile();
+  const unifiedWorkspace = useAppearanceStore(s => s.unifiedWorkspace);
   // Control-plane concerns (gateway setup, readiness, localhost guards) are
   // platform-bound, not viewport-bound: an Android tablet (or landscape phone
   // ≥768px) renders the desktop layout but still has no embedded server, so it
@@ -105,6 +106,7 @@ function AppContent() {
   const facadeBackends = useFacadeStore(s => s.backends);
   const localBackendId = useFacadeStore(s => s.localBackendId);
   const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
+  const selectedChatProjectId = useProjectStore(s => s.sessions.find(session => session.id === selectedSessionId)?.projectId);
   const projects = useProjectStore(s => s.projects);
   const selectSession = useProjectStore(s => s.selectSession);
   const setDashboardView = useSelectionStore(s => s.setDashboardView);
@@ -141,6 +143,11 @@ function AppContent() {
 
   // --- Local state ---
   const [dashboardProjectId, setDashboardProjectId] = useState<string | null>(null);
+  const returnToDashboard = useCallback((projectId: string) => {
+    selectProjectRoute(projectId);
+    selectSession(null);
+    setDashboardProjectId(projectId);
+  }, [selectProjectRoute, selectSession]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarSearchOpen, setSidebarSearchOpen] = useState(false);
   const [isFeedOpen, setFeedOpen] = useState(false);
@@ -298,15 +305,11 @@ function AppContent() {
   useMobileInit(usesMobileControlPlane);
   useTauriWindowEvents();
   useMainWindowGeometry();
-  useActiveSessionStream();
+  const openSidebar = useCallback(() => setSidebarOpen(true), [setSidebarOpen]);
+  useActiveSessionStream(!(unifiedWorkspace && !isMobile && selectedSessionId && topLevelView.kind === 'app'));
   useAutoUpdate();
   useServerLatencyMonitor();
   useDataLoader();
-
-  // Register builtin plugin panels once
-  useEffect(() => {
-    initBuiltinPanels();
-  }, []);
 
   // When a session is selected, exit the dashboard view
   const prevSessionRef = useRef(selectedSessionId);
@@ -640,14 +643,11 @@ function AppContent() {
                 <ClaudiaReturnLink sessionId={selectedSessionId} isMobile={isMobile} />
                 <div className="flex-1 min-h-0">
                   <SessionChatLayout
-                    key={selectedSessionId}
+                    key={unifiedWorkspace && !isMobile ? selectedChatProjectId ?? selectedSessionId : selectedSessionId}
                     sessionId={selectedSessionId}
-                    onOpenSidebar={() => setSidebarOpen(true)}
-                    onReturnToDashboard={projectId => {
-                      selectProjectRoute(projectId);
-                      selectSession(null);
-                      setDashboardProjectId(projectId);
-                    }}
+                    sidebarCollapsed={sidebarCollapsed}
+                    onOpenSidebar={openSidebar}
+                    onReturnToDashboard={returnToDashboard}
                   />
                 </div>
               </div>

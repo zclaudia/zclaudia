@@ -1,15 +1,18 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, type CSSProperties } from 'react';
 import type { SplitDir } from '../../stores/rightWorkspaceStore';
+import { useLatestRef } from '../../hooks/useLatestRef';
 
 interface ResizeDividerProps {
   dir: SplitDir;
-  /** Cross size of the flex container in px (width for row, height for col).
+  /** Available local split-axis size in px, excluding the divider gutter.
    *  Used to convert the pointer px delta into a ratio delta. */
   containerSize: number;
   /** Receives the incremental ratio delta (signed) to apply to the first child's share. */
   onDrag: (ratioDelta: number) => void;
   /** Opaque id of the owning group (forwarded as data-group-id for hit-testing/tests). */
   groupId?: string;
+  /** Absolute canvas placement for a flattened workspace. */
+  style?: CSSProperties;
 }
 
 /**
@@ -24,22 +27,22 @@ interface ResizeDividerProps {
  * up/cancel), matching the existing RightSidebar/BottomPanel drag style. The drag
  * is armed only on a primary-button press for mouse input.
  */
-export function ResizeDivider({ dir, containerSize, onDrag, groupId }: ResizeDividerProps) {
+export function ResizeDivider({ dir, containerSize, onDrag, groupId, style }: ResizeDividerProps) {
   const dragging = useRef(false);
   const startCoord = useRef(0);
   const cleanupRef = useRef<(() => void) | null>(null);
-  const onDragRef = useRef(onDrag);
-  onDragRef.current = onDrag;
-  const sizeRef = useRef(containerSize);
-  sizeRef.current = containerSize;
+  const onDragRef = useLatestRef(onDrag);
+  const sizeRef = useLatestRef(containerSize);
 
   const isRow = dir === 'row';
+  useEffect(() => () => cleanupRef.current?.(), []);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       // Only the primary button arms a mouse drag (buttons mask bit 0).
       if (e.pointerType === 'mouse' && (e.buttons & 1) === 0) return;
       e.preventDefault();
+      cleanupRef.current?.();
       dragging.current = true;
       startCoord.current = isRow ? e.clientX : e.clientY;
 
@@ -66,7 +69,7 @@ export function ResizeDivider({ dir, containerSize, onDrag, groupId }: ResizeDiv
       document.addEventListener('pointerup', cleanup);
       document.addEventListener('pointercancel', cleanup);
     },
-    [isRow]
+    [isRow, onDragRef, sizeRef]
   );
 
   return (
@@ -80,7 +83,7 @@ export function ResizeDivider({ dir, containerSize, onDrag, groupId }: ResizeDiv
           : 'group flex-shrink-0 h-2 flex items-center justify-center cursor-ns-resize'
       }
       onPointerDown={onPointerDown}
-      style={{ touchAction: 'none' }}
+      style={{ ...style, touchAction: 'none' }}
     >
       {/* Handle: invisible at rest, revealed on hover/drag so the gutter stays clean. */}
       <div

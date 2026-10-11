@@ -24,6 +24,7 @@ vi.mock('../../../actions/openPanel', () => ({
 }));
 
 import { ChatLink } from '../ChatLink';
+import { ChatActionsProvider } from '../../chat/ChatActionsContext';
 
 describe('ChatLink', () => {
   beforeEach(() => {
@@ -46,6 +47,17 @@ describe('ChatLink', () => {
       url: 'http://localhost:5173/',
     });
     expect(mocks.openToolInWorkspace).toHaveBeenCalledWith('s1', 'browser');
+  });
+
+  it('routes a nonfocused chat link to its own session', () => {
+    const { getByText } = render(
+      <ChatActionsProvider value={{ sessionId: 'bound-chat', handleSendMessage: vi.fn(), setMode: vi.fn() }}>
+        <ChatLink href="https://example.com">bound link</ChatLink>
+      </ChatActionsProvider>
+    );
+    fireEvent.click(getByText('bound link'));
+    expect(mocks.sendMessage).toHaveBeenCalledWith({ type: 'browser_open', sessionId: 'bound-chat' });
+    expect(mocks.openToolInWorkspace).toHaveBeenCalledWith('bound-chat', 'browser');
   });
 
   it('modifier clicks fall through to the default anchor behavior', () => {

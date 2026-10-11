@@ -943,3 +943,73 @@ button {
   margin-top: 1em;
   margin-bottom: 1em;
 }
+
+/* Opt-in desktop chat surface. Default and mobile chat keep their existing skin. */
+[data-chat-surface='card'] {
+  background: transparent;
+  container-type: inline-size;
+  container-name: chat-pane;
+}
+
+[data-chat-surface='card'] .zc-session-header {
+  background: transparent;
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+}
+
+[data-chat-surface='card'] .zc-workspace-unread {
+  --tw-ring-color: hsl(var(--card));
+}
+
+[data-chat-surface='card'] .zc-assistant-bubble {
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-chat-surface='card'] .zc-user-bubble {
+  background: hsl(var(--secondary));
+  box-shadow: none;
+}
+
+[data-chat-surface='card'] .zc-permission-actions {
+  border-top: 1px solid hsl(var(--border) / 0.5);
+}
+
+/* Panes can be narrow even in a wide desktop window. Keep selectors reachable. */
+@container chat-pane (max-width: 400px) {
+  [data-chat-surface='card'] .zc-composer-footer,
+  [data-chat-surface='card'] .zc-composer-selectors {
+    flex-wrap: wrap;
+  }
+
+  [data-chat-surface='card'] .zc-composer-selectors {
+    max-width: 100%;
+  }
+
+  [data-chat-surface='card'] .zc-composer-spacer {
+    display: none;
+  }
+
+  [data-chat-surface='card'] .zc-composer-usage {
+    margin-left: auto;
+  }
+
+}
+
+/* Title and pane controls have priority over optional header metadata. */
+@container chat-pane (max-width: 600px) {
+  [data-chat-surface='card'] .zc-session-header {
+    gap: 0.375rem;
+    padding-inline: 0.5rem;
+  }
+
+  [data-chat-surface='card'] .zc-session-header > [data-tauri-drag-region] {
+    min-width: 0;
+  }
+
+  [data-chat-surface='card'] .zc-session-topic,
+  [data-chat-surface='card'] .zc-session-agent-label,
+  [data-chat-surface='card'] .zc-session-engine-badge {
+    display: none;
+  }
+
+}

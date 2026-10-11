@@ -45,9 +45,11 @@ import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { promptText } from '../../stores/confirmDialogStore';
 import * as api from '../../services/api';
 import type { Attachment } from './MessageInput';
+import { useWorkspacePane } from '../../components/workspace/WorkspaceContext';
 
 interface ChatInterfaceProps {
   sessionId: string;
+  surface?: 'default' | 'card';
   onReturnToDashboard?: (projectId: string) => void;
   onOpenSidebar?: () => void;
   beforeComposer?: ReactNode;
@@ -55,6 +57,7 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({
   sessionId,
+  surface = 'default',
   onReturnToDashboard,
   onOpenSidebar,
   beforeComposer,
@@ -65,6 +68,7 @@ export function ChatInterface({
     handlePermissionDecision,
   } = useConnection();
   const isMobile = useIsMobile();
+  const workspacePane = useWorkspacePane();
   const activeServerId = useServerStore(s => s.activeServerId);
   const setDrawerOpen = useTerminalStore(s => s.setDrawerOpen);
   const poppedOutSessions = useUIStore(s => s.poppedOutSessions);
@@ -133,6 +137,7 @@ export function ChatInterface({
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
+    enabled: !workspacePane,
     projectId: currentSession?.projectId,
     projectRoot: currentProject?.rootPath,
   });
@@ -197,10 +202,11 @@ export function ChatInterface({
 
   const chatActionsValue = useMemo<ChatActionsContextValue>(
     () => ({
+      sessionId,
       handleSendMessage,
       setMode: useSessionConfigStore.getState().setMode,
     }),
-    [handleSendMessage]
+    [sessionId, handleSendMessage]
   );
 
   // UI state
@@ -502,7 +508,11 @@ export function ChatInterface({
 
   return (
     <ChatActionsProvider value={chatActionsValue}>
-      <div ref={chatRootRef} className="flex flex-col flex-1 min-w-0 h-full bg-background">
+      <div
+        ref={chatRootRef}
+        data-chat-surface={surface === 'card' && !isMobile ? 'card' : undefined}
+        className="flex flex-col flex-1 min-w-0 h-full bg-background"
+      >
         {/* Popped-out placeholder */}
         {poppedOutLabel && (
           <PoppedOutPlaceholder

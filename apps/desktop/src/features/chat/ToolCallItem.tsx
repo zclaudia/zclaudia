@@ -17,6 +17,8 @@ import { ToolCallCard } from './tool-call/ToolCallCard';
 import { BackgroundTaskChip } from './BackgroundTaskChip';
 import { toToolCallView } from './tool-call/toolCallView';
 import { useRunInTerminal } from './tool-call/useRunInTerminal';
+import { useChatActionsOptional } from './ChatActionsContext';
+import { useSessionRoute } from './hooks/useSessionRoute';
 
 interface ToolCallItemProps {
   toolCall: ToolCallState;
@@ -30,8 +32,10 @@ interface ToolCallItemProps {
  */
 export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallItemProps) {
   const { toolName, toolInput, result, semantic } = toolCall;
-  const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
-  const { sendMessage } = useConnection();
+  const chatSessionId = useChatActionsOptional()?.sessionId;
+  const selectedSessionId = useSelectionStore(s => chatSessionId ?? s.selectedSessionId);
+  const { sendMessage, sendToServer } = useConnection();
+  const route = useSessionRoute(selectedSessionId);
   const runInTerminal = useRunInTerminal();
   const pendingPromptRequest = usePromptRequestStore(s => {
     if (!selectedSessionId || toolName !== 'AskUserQuestion') return null;
@@ -84,13 +88,15 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
     if (!selectedSessionId || !toolCall.backgroundable) return undefined;
     return () => {
       useBackgroundRequestStore.getState().markRequested(selectedSessionId, toolCall.id);
-      sendMessage({
-        type: 'background_running_command',
+      const message = {
+        type: 'background_running_command' as const,
         sessionId: selectedSessionId,
         toolUseId: toolCall.id,
-      });
+      };
+      if (route.backendId) sendToServer(route.backendId, message);
+      else sendMessage(message);
     };
-  }, [selectedSessionId, sendMessage, toolCall.id, toolCall.backgroundable]);
+  }, [selectedSessionId, route.backendId, sendMessage, sendToServer, toolCall.id, toolCall.backgroundable]);
   // The kit locks its button while a request is in flight; the host owns that
   // state so a declined request (surfaced as a toast) unlocks it for a retry.
   const backgroundRequested = useBackgroundRequestStore(s => toolCall.id in s.pending);

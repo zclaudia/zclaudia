@@ -5,7 +5,11 @@ import { useProjectStore } from '../stores/projectStore';
 import { useSelectionStore } from '../stores/selectionStore';
 import { useServerStore } from '../stores/serverStore';
 import { useRightWorkspaceStore, findPaneWithTool } from '../stores/rightWorkspaceStore';
-import { openToolInWorkspace, closeToolInWorkspace } from './workspaceActions';
+import { openToolInWorkspace, closeToolInWorkspace, workspaceIdForSession } from './workspaceActions';
+import { useProjectWorkspaceStore } from '../stores/projectWorkspaceStore';
+import { useAppearanceStore } from '../stores/appearanceStore';
+import { useWorkspaceRoutingStore } from '../stores/workspaceRoutingStore';
+import { useOwnershipStore } from '../stores/ownershipStore';
 
 /**
  * Effective placement, viewport-aware: mobile renders every panel through the
@@ -23,11 +27,18 @@ function viewportPlacement(panelId: string): 'bottom' | 'right' {
 function currentSessionCtx() {
   const { selectedSessionId } = useSelectionStore.getState();
   const { sessions } = useProjectStore.getState();
-  const session = selectedSessionId ? sessions.find(s => s.id === selectedSessionId) : undefined;
+  const route = useAppearanceStore.getState().unifiedWorkspace && !isMobileViewport() ? useWorkspaceRoutingStore.getState().active : null;
+  const routedSessionId = route?.sessionId ?? selectedSessionId;
+  const selected = routedSessionId ? sessions.find(s => s.id === routedSessionId) : undefined;
+  const focused = useAppearanceStore.getState().unifiedWorkspace && !isMobileViewport() && (route?.projectScoped !== false) && selected?.projectId
+    ? useProjectWorkspaceStore.getState().byProject[selected.projectId]?.focusedChatSessionId : undefined;
+  const sessionId = focused ?? routedSessionId;
+  const session = sessionId ? sessions.find(s => s.id === sessionId) : undefined;
   return {
-    sessionId: selectedSessionId,
+    sessionId,
     projectId: session?.projectId,
-    backendId: useServerStore.getState().activeServerId,
+    backendId: useOwnershipStore.getState().getSessionBackendId(sessionId) ??
+      useOwnershipStore.getState().getProjectBackendId(session?.projectId) ?? useServerStore.getState().activeServerId,
   };
 }
 
@@ -117,9 +128,12 @@ export function isPanelActive(panelId: string): boolean {
 
   const placement = viewportPlacement(panelId);
   if (placement === 'right') {
+    const route = useAppearanceStore.getState().unifiedWorkspace && !isMobileViewport()
+      ? useWorkspaceRoutingStore.getState().active : null;
     const sid = useSelectionStore.getState().selectedSessionId;
-    if (!sid) return false;
-    const root = useRightWorkspaceStore.getState().bySession[sid]?.root ?? null;
+    const workspaceId = route?.workspaceId ?? (sid ? workspaceIdForSession(sid) : null);
+    if (!workspaceId) return false;
+    const root = useRightWorkspaceStore.getState().bySession[workspaceId]?.root ?? null;
     return findPaneWithTool(root, panelId, undefined, true) !== null;
   }
   return useBottomPanelStore.getState().activeTab === panelId;
@@ -158,8 +172,13 @@ export function usePanelIsActive(panelId: string): boolean {
   });
   const bottomMatches = useBottomPanelStore(s => s.activeTab === panelId);
   const sid = useSelectionStore(s => s.selectedSessionId);
+  const projectId = useProjectStore(s => s.sessions.find(session => session.id === sid)?.projectId);
+  const unified = useAppearanceStore(s => s.unifiedWorkspace);
+  const routedWorkspaceId = useWorkspaceRoutingStore(s => s.active?.workspaceId);
+  const anchor = useProjectWorkspaceStore(s => projectId ? s.byProject[projectId]?.workspaceId : undefined);
+  const workspaceId = unified && !isMobile ? routedWorkspaceId ?? anchor ?? sid : sid;
   const rightMatches = useRightWorkspaceStore(s => {
-    const root = sid ? (s.bySession[sid]?.root ?? null) : null;
+    const root = workspaceId ? (s.bySession[workspaceId]?.root ?? null) : null;
     return findPaneWithTool(root, panelId, undefined, true) !== null;
   });
   return isVisible && (placement === 'right' ? rightMatches : bottomMatches);

@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { formatPickedElement, handleBrowserMessage } from '../handlers';
 import { useBrowserStore } from '../browserStore';
 import { useComposerStore } from '../../../stores/composerStore';
+import { useAppearanceStore } from '../../../stores/appearanceStore';
+import { useRightSidebarStore } from '../../../stores/rightSidebarStore';
 import { useSelectionStore } from '../../../stores/selectionStore';
 import { useRightWorkspaceStore, newPane } from '../../../stores/rightWorkspaceStore';
 
@@ -11,6 +13,7 @@ const uiMocks = vi.hoisted(() => ({
 }));
 vi.mock('../../../actions/workspaceActions', () => ({
   openToolInWorkspace: uiMocks.openToolInWorkspace,
+  workspaceIdForSession: (id: string) => id,
 }));
 vi.mock('../../../actions/openPanel', () => ({
   isPanelAvailable: uiMocks.isPanelAvailable,
@@ -26,6 +29,8 @@ const state = {
 
 describe('handleBrowserMessage', () => {
   beforeEach(() => {
+    useAppearanceStore.setState({ unifiedWorkspace: false });
+    useRightSidebarStore.setState({ collapsed: false, unread: false });
     useBrowserStore.getState().reset();
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
     useSelectionStore.setState({ selectedSessionId: null });
@@ -221,6 +226,16 @@ describe('handleBrowserMessage', () => {
       active: true,
     } as never);
     expect(uiMocks.openToolInWorkspace).toHaveBeenCalledWith('s1', 'browser');
+  });
+
+  it('marks activity unread while the unified workspace tools are collapsed', () => {
+    useAppearanceStore.setState({ unifiedWorkspace: true });
+    useRightSidebarStore.setState({ collapsed: true });
+    useSelectionStore.getState().setSelectedSessionId('s1');
+    handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: true } as never);
+    expect(useRightSidebarStore.getState().unread).toBe(true);
+    expect(useRightSidebarStore.getState().collapsed).toBe(true);
+    expect(uiMocks.openToolInWorkspace).not.toHaveBeenCalled();
   });
 
   it('agent activity active=false does not open the panel', () => {

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useSelectionStore } from '../../stores/selectionStore';
+import { useWorkspaceTool } from '../../components/workspace/WorkspaceToolContext';
+import { useWorkspaceVisible } from '../../components/workspace/WorkspaceContext';
 import { isTauri } from '../../utils/platform';
 import { useBrowserStore } from './browserStore';
 import { BrowserToolbar } from './BrowserToolbar';
@@ -14,6 +16,7 @@ import type {
   BrowserDeviceEmulation,
   BrowserInputEvent,
 } from '@zclaudia/shared/wire/messages/browser';
+import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 
 const RESIZE_DEBOUNCE_MS = 200;
 
@@ -23,8 +26,16 @@ export function BrowserPanel(_props: {
   workingDirectory?: string;
   panelId?: string;
 }) {
-  const { sendMessage, isConnected } = useConnection();
-  const sessionId = useSelectionStore(s => s.selectedSessionId);
+  const { sendMessage: activeSendMessage, sendToServer, isConnected } = useConnection();
+  const toolContext = useWorkspaceTool();
+  const boundSessionId = toolContext?.sessionId;
+  const backendId = toolContext?.backendId;
+  const sendMessage = useCallback((message: ClientMessage) => {
+    if (backendId) sendToServer(backendId, message);
+    else activeSendMessage(message);
+  }, [backendId, sendToServer, activeSendMessage]);
+  const visible = useWorkspaceVisible();
+  const sessionId = useSelectionStore(s => boundSessionId ?? s.selectedSessionId);
   const engine = useBrowserStore(s => s.engine);
   const view = useBrowserStore(s => (sessionId ? s.sessions[sessionId] : undefined));
   const containerRef = useRef<HTMLDivElement>(null);
@@ -60,12 +71,12 @@ export function BrowserPanel(_props: {
 
   // Open + attach on mount / session change; detach on unmount.
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !visible) return;
     openAndAttach(sessionId);
     return () => {
       sendMessage({ type: 'browser_detach', sessionId });
     };
-  }, [sessionId, sendMessage, openAndAttach]);
+  }, [sessionId, sendMessage, openAndAttach, visible]);
 
   // Re-open + attach once the engine transitions into 'ready' (e.g. after the
   // download flow completes) — the initial mount-time open no-ops server-side
@@ -74,10 +85,10 @@ export function BrowserPanel(_props: {
   useEffect(() => {
     const prevStatus = prevEngineStatusRef.current;
     prevEngineStatusRef.current = engine.status;
-    if (prevStatus !== 'ready' && engine.status === 'ready' && sessionId) {
+    if (visible && prevStatus !== 'ready' && engine.status === 'ready' && sessionId) {
       openAndAttach(sessionId);
     }
-  }, [engine.status, sessionId, openAndAttach]);
+  }, [engine.status, sessionId, openAndAttach, visible]);
 
   // Re-open + attach after a WS reconnect: the server-side session/attachment
   // state is gone from this client's perspective once the socket drops.
@@ -85,17 +96,17 @@ export function BrowserPanel(_props: {
   useEffect(() => {
     const prevConnected = prevConnectedRef.current;
     prevConnectedRef.current = isConnected;
-    if (!prevConnected && isConnected && sessionId) {
+    if (visible && !prevConnected && isConnected && sessionId) {
       openAndAttach(sessionId);
     }
-  }, [isConnected, sessionId, openAndAttach]);
+  }, [isConnected, sessionId, openAndAttach, visible]);
 
   // Debounced resize → browser_resize. While device emulation is active the
   // logical viewport is pinned by the preset, so panel resizes are not sent
   // (the server ignores them too); checked at fire time via getState() so the
   // observer doesn't resubscribe on every emulation change.
   useEffect(() => {
-    if (!sessionId || !containerRef.current) return;
+    if (!sessionId || !containerRef.current || !visible) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const observer = new ResizeObserver(() => {
       if (timer) clearTimeout(timer);
@@ -113,7 +124,7 @@ export function BrowserPanel(_props: {
       if (timer) clearTimeout(timer);
       observer.disconnect();
     };
-  }, [sessionId, sendMessage, measure]);
+  }, [sessionId, sendMessage, measure, visible]);
 
   const applyEmulation = useCallback(
     (emu: BrowserDeviceEmulation | null) => {

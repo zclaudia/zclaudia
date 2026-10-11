@@ -4,3 +4,5 @@ export { MessageInput } from './MessageInput';
 export type { Attachment } from './MessageInput';
 export { InlinePermissionRequest } from './InlinePermissionRequest';
 export { SessionChatLayout } from './SessionChatLayout';
+
+export { useChatActionsOptional } from './ChatActionsContext';

@@ -1,231 +1,19 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { MULTI_INSTANCE_PANELS } from './panelInstance';
+import { workspaceStorageKey } from '../utils/workspaceStorage';
+import {
+  CHAT_TOOL_ID, DEFAULT_RATIO, findPane, findPaneWithTool, findToolConflict,
+  flattenPanes, genId, isPinnedPane, isSafeTree, newPane, normalizeSessionWorkspace,
+  pickFirstPane, pruneTools, removePane, repairWorkspace, replaceChild, sameRef, setRatioAt,
+  type GroupNode, type LayoutNode, type PaneNode, type SessionWorkspace,
+  type SplitDir, type SplitResult, type WorkspaceEdge,
+} from '../utils/workspaceLayout';
 
-export type SplitDir = 'row' | 'col';
+// Compatibility entry for existing UI consumers; stores share the pure module directly.
+export * from '../utils/workspaceLayout';
 
-/** One tool slot inside a pane. Panes hold an array (tab-ready); length 1 today. */
-export interface ToolRef {
-  toolId: string;
-  /** Per-scope key for multi-instance tools (terminal = `${backendId}::${projectId}`). */
-  instanceKey?: string;
-}
-
-export interface PaneNode {
-  id: string;
-  kind: 'pane';
-  tools: ToolRef[]; // 1..N tabs
-  activeToolId: string; // active tab's toolId
-  activeInstanceKey?: string; // active tab's instanceKey (disambiguates multi-instance tabs)
-}
-
-export interface GroupNode {
-  id: string;
-  kind: 'group';
-  dir: SplitDir;
-  ratio: number; // share of the FIRST child, clamped [MIN_RATIO, MAX_RATIO]
-  children: [LayoutNode, LayoutNode];
-}
-
-export type LayoutNode = PaneNode | GroupNode;
-
-export interface SessionWorkspace {
-  root: LayoutNode | null; // null = empty → launcher
-  primaryPaneId: string | null; // default landing pane for openTool
-  focusedPaneId: string | null;
-}
-
-export type SplitResult = { ok: true; newPaneId: string } | { ok: false; conflictPaneId: string };
-
-export const MIN_RATIO = 0.1;
-export const MAX_RATIO = 0.9;
-export const DEFAULT_RATIO = 0.5;
-const clampRatio = (r: number) => Math.max(MIN_RATIO, Math.min(MAX_RATIO, r));
-
-export function genId(prefix: string): string {
-  const rand =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  return `${prefix}_${rand}`;
-}
-
-export function newPane(toolId: string, instanceKey?: string): PaneNode {
-  return {
-    id: genId('pane'),
-    kind: 'pane',
-    tools: [{ toolId, instanceKey }],
-    activeToolId: toolId,
-    activeInstanceKey: instanceKey,
-  };
-}
-
-/** True when `t` is the tab identified by (toolId, instanceKey). */
-export function sameRef(t: ToolRef, toolId: string, instanceKey?: string): boolean {
-  return t.toolId === toolId && t.instanceKey === instanceKey;
-}
-
-/** The pane's active tool ref: exact (toolId+instanceKey) match, then toolId-only, then first slot. */
-export function activeToolRef(pane: PaneNode): ToolRef {
-  return (
-    pane.tools.find(
-      t => t.toolId === pane.activeToolId && t.instanceKey === pane.activeInstanceKey
-    ) ??
-    pane.tools.find(t => t.toolId === pane.activeToolId) ??
-    pane.tools[0]
-  );
-}
-
-export function pathTo(root: LayoutNode | null, paneId: string): string[] | null {
-  if (!root) return null;
-  if (root.kind === 'pane') return root.id === paneId ? [] : null;
-  for (const child of root.children) {
-    const sub = pathTo(child, paneId);
-    if (sub !== null) return [root.id, ...sub];
-  }
-  return null;
-}
-
-export function findPane(root: LayoutNode | null, paneId: string): PaneNode | null {
-  if (!root) return null;
-  if (root.kind === 'pane') return root.id === paneId ? root : null;
-  for (const child of root.children) {
-    const hit = findPane(child, paneId);
-    if (hit) return hit;
-  }
-  return null;
-}
-
-/** First pane that already holds the tool. Singleton: match toolId. Multi: match toolId+instanceKey. */
-export function findPaneWithTool(
-  root: LayoutNode | null,
-  toolId: string,
-  instanceKey: string | undefined,
-  singleton: boolean
-): string | null {
-  let hit: string | null = null;
-  const visit = (node: LayoutNode | null) => {
-    if (!node || hit) return;
-    if (node.kind === 'pane') {
-      for (const t of node.tools) {
-        if (t.toolId !== toolId) continue;
-        if (singleton || t.instanceKey === instanceKey) {
-          hit = node.id;
-          return;
-        }
-      }
-      return;
-    }
-    visit(node.children[0]);
-    visit(node.children[1]);
-  };
-  visit(root);
-  return hit;
-}
-
-/** Conflicting pane for placing (toolId, instanceKey), excluding `excludePaneId`. */
-export function findToolConflict(
-  root: LayoutNode | null,
-  toolId: string,
-  instanceKey: string | undefined,
-  singleton: boolean,
-  excludePaneId: string
-): string | null {
-  let conflict: string | null = null;
-  const visit = (node: LayoutNode | null) => {
-    if (!node || conflict) return;
-    if (node.kind === 'pane') {
-      if (node.id === excludePaneId) return;
-      for (const t of node.tools) {
-        if (t.toolId !== toolId) continue;
-        if (singleton || t.instanceKey === instanceKey) {
-          conflict = node.id;
-          return;
-        }
-      }
-      return;
-    }
-    visit(node.children[0]);
-    visit(node.children[1]);
-  };
-  visit(root);
-  return conflict;
-}
-
-export function replaceChild(node: LayoutNode, oldId: string, replacement: LayoutNode): LayoutNode {
-  if (node.id === oldId) return replacement;
-  if (node.kind === 'pane') return node;
-  const children = node.children.map(c => replaceChild(c, oldId, replacement)) as [
-    LayoutNode,
-    LayoutNode,
-  ];
-  return { ...node, children };
-}
-
-/** Callers only ever pass `kind:'pane'` node IDs; group nodes are never passed as `paneId`, which is why the `newA ?? a` / `newB ?? b` fallbacks are safe (a removed subtree is always a single pane, never a group that should itself be collapsed). */
-export function removePane(root: LayoutNode, paneId: string): LayoutNode | null {
-  if (root.kind === 'pane') return root.id === paneId ? null : root;
-  const [a, b] = root.children;
-  if (a.kind === 'pane' && a.id === paneId) return b;
-  if (b.kind === 'pane' && b.id === paneId) return a;
-  const newA = removePane(a, paneId);
-  const newB = removePane(b, paneId);
-  return { ...root, children: [newA ?? a, newB ?? b] };
-}
-
-export function setRatioAt(root: LayoutNode, groupId: string, ratio: number): LayoutNode {
-  if (root.kind === 'pane') return root;
-  const children = root.children.map(c => setRatioAt(c, groupId, ratio)) as [
-    LayoutNode,
-    LayoutNode,
-  ];
-  return root.id === groupId
-    ? { ...root, ratio: clampRatio(ratio), children }
-    : { ...root, children };
-}
-
-export function pickFirstPane(root: LayoutNode | null): string | null {
-  if (!root) return null;
-  if (root.kind === 'pane') return root.id;
-  return pickFirstPane(root.children[0]);
-}
-
-export function isSafeTree(node: unknown): node is LayoutNode {
-  if (!node || typeof node !== 'object') return false;
-  const n = node as { kind?: unknown };
-  if (n.kind === 'pane') {
-    const p = node as PaneNode;
-    return (
-      typeof p.id === 'string' &&
-      Array.isArray(p.tools) &&
-      p.tools.length > 0 &&
-      p.tools.every(t => t && typeof t.toolId === 'string') &&
-      typeof p.activeToolId === 'string' &&
-      p.activeToolId.length > 0
-    );
-  }
-  if (n.kind === 'group') {
-    const g = node as GroupNode;
-    return (
-      typeof g.id === 'string' &&
-      (g.dir === 'row' || g.dir === 'col') &&
-      typeof g.ratio === 'number' &&
-      g.ratio >= MIN_RATIO &&
-      g.ratio <= MAX_RATIO &&
-      Array.isArray(g.children) &&
-      g.children.length === 2 &&
-      isSafeTree(g.children[0]) &&
-      isSafeTree(g.children[1])
-    );
-  }
-  return false;
-}
-
-export function isSplitWorkspace(root: LayoutNode | null): boolean {
-  return !!root && root.kind === 'group';
-}
-
-const MAX_SESSIONS = 50;
+const MAX_LEGACY_SESSIONS = 50;
 const EMPTY: SessionWorkspace = { root: null, primaryPaneId: null, focusedPaneId: null };
 
 export interface OpenToolOpts {
@@ -240,6 +28,7 @@ interface RightWorkspaceState {
   /** MRU order of sessionIds; front = most recent. Used for LRU eviction. */
   order: string[];
   ensureSession: (sessionId: string) => void;
+  ensureChatSession: (sessionId: string, ratio?: number) => void;
   openTool: (sessionId: string, toolId: string, opts?: OpenToolOpts) => void;
   closePane: (sessionId: string, paneId: string) => void;
   splitPane: (
@@ -279,18 +68,68 @@ interface RightWorkspaceState {
     dir: SplitDir,
     insertFirst?: boolean
   ) => SplitResult;
+  moveTabToEdge: (
+    sessionId: string,
+    fromPaneId: string,
+    targetPaneId: string,
+    toolId: string,
+    instanceKey: string | undefined,
+    edge: WorkspaceEdge
+  ) => SplitResult;
+  moveChatPane: (sessionId: string, edge: WorkspaceEdge, targetPaneId?: string) => SplitResult;
+  setMaximizedPane: (sessionId: string, paneId: string | null) => void;
   resetSession: (sessionId: string) => void;
   removeSession: (sessionId: string) => void;
 }
 
-/** Bump a sessionId to the front of MRU order and evict the oldest beyond MAX. */
+/**
+ * Bound the legacy tools-only cache. Chat-bearing layouts are durable project
+ * or standalone workspaces, so selecting other sessions must never evict them.
+ */
 function touch(order: string[], bySession: Record<string, SessionWorkspace>, sessionId: string) {
-  const next = [sessionId, ...order.filter(id => id !== sessionId)];
-  while (next.length > MAX_SESSIONS) {
-    const victim = next.pop();
-    if (victim) delete bySession[victim];
+  const next = [sessionId, ...order.filter(id => id !== sessionId && bySession[id])];
+  const evictable = next.filter(id => !flattenPanes(bySession[id]?.root ?? null).some(isPinnedPane));
+  for (const victim of evictable.slice(MAX_LEGACY_SESSIONS)) {
+    delete bySession[victim];
+    next.splice(next.indexOf(victim), 1);
   }
   return next;
+}
+
+function paneWithoutTab(pane: PaneNode, index: number): PaneNode | null {
+  const tools = pane.tools.filter((_, i) => i !== index);
+  if (!tools.length) return null;
+  const active = tools.find(t => sameRef(t, pane.activeToolId, pane.activeInstanceKey)) ??
+    tools[Math.min(index, tools.length - 1)];
+  return { ...pane, tools, activeToolId: active.toolId, activeInstanceKey: active.instanceKey };
+}
+
+function insertAtEdge(target: LayoutNode, inserted: PaneNode, edge: WorkspaceEdge): GroupNode {
+  const first = edge === 'left' || edge === 'top';
+  return {
+    id: genId('grp'), kind: 'group', dir: edge === 'left' || edge === 'right' ? 'row' : 'col',
+    ratio: DEFAULT_RATIO, children: first ? [inserted, target] : [target, inserted],
+  };
+}
+
+/** Both migration and merge use the same flag-independent validation. */
+function restoreWorkspaces(persisted: unknown): Pick<RightWorkspaceState, 'bySession' | 'order'> {
+  const p = (persisted ?? {}) as Partial<RightWorkspaceState>;
+  const bySession: Record<string, SessionWorkspace> = {};
+  if (p.bySession && typeof p.bySession === 'object') {
+    for (const [id, ws] of Object.entries(p.bySession)) {
+      const root = ws && isSafeTree(ws.root) ? ws.root : null;
+      bySession[id] = repairWorkspace({
+        root,
+        primaryPaneId: root ? (ws?.primaryPaneId ?? null) : null,
+        focusedPaneId: root ? (ws?.focusedPaneId ?? null) : null,
+        ...(ws?.maximizedPaneId !== undefined ? { maximizedPaneId: ws.maximizedPaneId } : {}),
+      });
+    }
+  }
+  const order = Array.isArray(p.order)
+    ? [...new Set(p.order.filter(id => typeof id === 'string' && id in bySession))] : [];
+  return { bySession, order };
 }
 
 export const useRightWorkspaceStore = create<RightWorkspaceState>()(
@@ -301,7 +140,9 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
         set(s => {
           const bySession = { ...s.bySession };
           const current = bySession[sessionId] ?? { ...EMPTY };
-          bySession[sessionId] = mut({ ...current });
+          const next = mut(current);
+          if (next === current) return s;
+          bySession[sessionId] = repairWorkspace(next);
           const order = touch([...s.order], bySession, sessionId);
           return { bySession, order };
         });
@@ -317,8 +158,12 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
             return { bySession, order: touch([...s.order], bySession, sessionId) };
           }),
 
+        ensureChatSession: (sessionId, ratio = DEFAULT_RATIO) =>
+          update(sessionId, ws => normalizeSessionWorkspace(ws, sessionId, ratio)),
+
         openTool: (sessionId, toolId, opts = {}) =>
           update(sessionId, ws => {
+            if (toolId === CHAT_TOOL_ID) return ws;
             const singleton = !opts.multiInstance;
             const instanceKey = opts.instanceKey;
 
@@ -333,21 +178,28 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
                 activeToolId: toolId,
                 activeInstanceKey: instanceKey,
               });
-              return { ...ws, root, focusedPaneId: existing };
+              return { ...ws, root, focusedPaneId: existing, maximizedPaneId: null };
             }
 
             // 2) Empty workspace → seed as primary + focused.
             if (!ws.root) {
               const pane = newPane(toolId, instanceKey);
-              return { root: pane, primaryPaneId: pane.id, focusedPaneId: pane.id };
+              return { ...ws, root: pane, primaryPaneId: pane.id, focusedPaneId: pane.id, maximizedPaneId: null };
             }
 
             // 3) Append a tab to the focused pane (fallback: primary, then first).
+            const toolPanes = flattenPanes(ws.root).filter(p => !isPinnedPane(p));
             const targetId =
-              (ws.focusedPaneId && findPane(ws.root, ws.focusedPaneId) ? ws.focusedPaneId : null) ??
-              (ws.primaryPaneId && findPane(ws.root, ws.primaryPaneId) ? ws.primaryPaneId : null) ??
-              pickFirstPane(ws.root);
-            if (!targetId) return ws;
+              toolPanes.find(p => p.id === ws.focusedPaneId)?.id ??
+              toolPanes.find(p => p.id === ws.primaryPaneId)?.id ?? toolPanes[0]?.id;
+            if (!targetId) {
+              const pane = newPane(toolId, instanceKey);
+              const root: GroupNode = {
+                id: genId('grp'), kind: 'group', dir: 'row', ratio: DEFAULT_RATIO,
+                children: [ws.root, pane],
+              };
+              return { ...ws, root, primaryPaneId: pane.id, focusedPaneId: pane.id, maximizedPaneId: null };
+            }
             const pane = findPane(ws.root, targetId);
             if (!pane) return ws;
             const appended: PaneNode = {
@@ -360,6 +212,7 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
               ...ws,
               root: replaceChild(ws.root, targetId, appended),
               focusedPaneId: targetId,
+              maximizedPaneId: null,
             };
           }),
 
@@ -374,6 +227,7 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
         ) => {
           const ws = _get().bySession[sessionId];
           if (!ws?.root || !findPane(ws.root, fromPaneId)) return { ok: false, conflictPaneId: '' };
+          if (toolId === CHAT_TOOL_ID) return { ok: false, conflictPaneId: fromPaneId };
           const singleton = !multiInstance;
           const conflict = findToolConflict(ws.root, toolId, instanceKey, singleton, ' __new__');
           if (conflict) return { ok: false, conflictPaneId: conflict };
@@ -398,6 +252,7 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
           const ws = _get().bySession[sessionId];
           const pane = ws?.root ? findPane(ws.root, paneId) : null;
           if (!pane) return { ok: false, conflictPaneId: '' };
+          if (isPinnedPane(pane) || toolId === CHAT_TOOL_ID) return { ok: false, conflictPaneId: paneId };
           const singleton = !multiInstance;
           const conflict = findToolConflict(ws.root, toolId, instanceKey, singleton, paneId);
           if (conflict) return { ok: false, conflictPaneId: conflict };
@@ -409,6 +264,7 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
               ...p,
               tools: [{ toolId, instanceKey }],
               activeToolId: toolId,
+              activeInstanceKey: instanceKey,
             };
             return { ...w, root: replaceChild(w.root, paneId, replaced), focusedPaneId: paneId };
           });
@@ -418,13 +274,15 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
         closePane: (sessionId, paneId) =>
           update(sessionId, ws => {
             if (!ws.root) return ws;
+            const pane = findPane(ws.root, paneId);
+            if (!pane || isPinnedPane(pane)) return ws;
             const next = removePane(ws.root, paneId);
             if (next === ws.root) return ws; // not found
             const primaryPaneId =
               ws.primaryPaneId === paneId ? pickFirstPane(next) : ws.primaryPaneId;
             const focusedPaneId =
               ws.focusedPaneId === paneId ? pickFirstPane(next) : ws.focusedPaneId;
-            return { root: next, primaryPaneId, focusedPaneId };
+            return { ...ws, root: next, primaryPaneId, focusedPaneId };
           }),
 
         setRatio: (sessionId, groupId, ratio) =>
@@ -454,7 +312,7 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
           update(sessionId, ws => {
             if (!ws.root) return ws;
             const pane = findPane(ws.root, paneId);
-            if (!pane) return ws;
+            if (!pane || isPinnedPane(pane) || toolId === CHAT_TOOL_ID) return ws;
             const idx = pane.tools.findIndex(t => sameRef(t, toolId, instanceKey));
             if (idx < 0) return ws;
             const nextTools = pane.tools.filter((_, i) => i !== idx);
@@ -467,7 +325,7 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
                 ws.primaryPaneId === paneId ? pickFirstPane(next) : ws.primaryPaneId;
               const focusedPaneId =
                 ws.focusedPaneId === paneId ? pickFirstPane(next) : ws.focusedPaneId;
-              return { root: next, primaryPaneId, focusedPaneId };
+              return { ...ws, root: next, primaryPaneId, focusedPaneId };
             }
 
             // Keep current active if it survived, else the neighbor at the closed index.
@@ -513,6 +371,7 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
             const fromPane = findPane(ws.root, fromPaneId);
             const toPane = findPane(ws.root, toPaneId);
             if (!fromPane || !toPane) return ws;
+            if (isPinnedPane(fromPane) || isPinnedPane(toPane) || toolId === CHAT_TOOL_ID) return ws;
             const idx = fromPane.tools.findIndex(t => sameRef(t, toolId, instanceKey));
             if (idx < 0) return ws;
 
@@ -573,10 +432,11 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
           const ws = _get().bySession[sessionId];
           const fromPane = ws?.root ? findPane(ws.root, fromPaneId) : null;
           if (!fromPane) return { ok: false, conflictPaneId: '' };
+          if (isPinnedPane(fromPane) || toolId === CHAT_TOOL_ID) return { ok: false, conflictPaneId: fromPaneId };
           const idx = fromPane.tools.findIndex(t => sameRef(t, toolId, instanceKey));
           if (idx < 0 || fromPane.tools.length <= 1) return { ok: false, conflictPaneId: '' };
           const ref = fromPane.tools[idx];
-          const newP = newPane(ref.toolId, ref.instanceKey);
+          const newP = { ...newPane(ref.toolId, ref.instanceKey), tools: [ref] };
           update(sessionId, w => {
             if (!w.root) return w;
             const fp = findPane(w.root, fromPaneId);
@@ -606,7 +466,74 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
           return { ok: true, newPaneId: newP.id };
         },
 
-        resetSession: sessionId => update(sessionId, () => ({ ...EMPTY })),
+        moveTabToEdge: (sessionId, fromPaneId, targetPaneId, toolId, instanceKey, edge) => {
+          const ws = _get().bySession[sessionId];
+          const from = ws?.root ? findPane(ws.root, fromPaneId) : null;
+          const target = ws?.root ? findPane(ws.root, targetPaneId) : null;
+          if (!from || !target || !['left', 'right', 'top', 'bottom'].includes(edge) ||
+              isPinnedPane(from) || toolId === CHAT_TOOL_ID) {
+            return { ok: false, conflictPaneId: '' };
+          }
+          const index = from.tools.findIndex(t => sameRef(t, toolId, instanceKey));
+          if (index < 0 || (fromPaneId === targetPaneId && from.tools.length === 1)) {
+            return { ok: false, conflictPaneId: '' };
+          }
+          const conflict = findToolConflict(ws.root, toolId, instanceKey,
+            !MULTI_INSTANCE_PANELS.has(toolId), fromPaneId);
+          if (conflict) return { ok: false, conflictPaneId: conflict };
+          const ref = from.tools[index];
+          // Moving the last tab moves its shell too; a partial tab split gets a new shell.
+          const inserted = from.tools.length === 1
+            ? from : { ...newPane(ref.toolId, ref.instanceKey), tools: [ref] };
+          update(sessionId, current => {
+            if (!current.root) return current;
+            const remaining = paneWithoutTab(from, index);
+            const root = remaining
+              ? replaceChild(current.root, fromPaneId, remaining)
+              : removePane(current.root, fromPaneId);
+            if (!root) return current;
+            const destination = findPane(root, targetPaneId);
+            if (!destination) return current;
+            return {
+              ...current, root: replaceChild(root, targetPaneId, insertAtEdge(destination, inserted, edge)),
+              focusedPaneId: inserted.id, maximizedPaneId: null,
+            };
+          });
+          return { ok: true, newPaneId: inserted.id };
+        },
+
+        moveChatPane: (sessionId, edge, targetPaneId) => {
+          const ws = _get().bySession[sessionId];
+          const chat = flattenPanes(ws?.root ?? null).find(p =>
+            p.tools.some(t => sameRef(t, CHAT_TOOL_ID, sessionId)));
+          if (!ws?.root || !chat || !['left', 'right', 'top', 'bottom'].includes(edge) ||
+              targetPaneId === chat.id || (targetPaneId && !findPane(ws.root, targetPaneId))) {
+            return { ok: false, conflictPaneId: '' };
+          }
+          const rest = removePane(ws.root, chat.id);
+          if (!rest) return { ok: false, conflictPaneId: '' };
+          const target = targetPaneId ? findPane(rest, targetPaneId) : rest;
+          if (!target) return { ok: false, conflictPaneId: '' };
+          update(sessionId, current => ({
+            ...current,
+            root: targetPaneId
+              ? replaceChild(rest, targetPaneId, insertAtEdge(target, chat, edge))
+              : insertAtEdge(rest, chat, edge),
+            focusedPaneId: chat.id, maximizedPaneId: null,
+          }));
+          return { ok: true, newPaneId: chat.id };
+        },
+
+        setMaximizedPane: (sessionId, paneId) => update(sessionId, ws => {
+          if (paneId !== null && !findPane(ws.root, paneId)) return ws;
+          if (ws.maximizedPaneId === paneId) return ws;
+          return { ...ws, maximizedPaneId: paneId, ...(paneId ? { focusedPaneId: paneId } : {}) };
+        }),
+
+        resetSession: sessionId => update(sessionId, ws => {
+          const root = pruneTools(ws.root);
+          return { ...ws, root, primaryPaneId: null, focusedPaneId: pickFirstPane(root), maximizedPaneId: null };
+        }),
 
         removeSession: sessionId =>
           set(s => {
@@ -618,23 +545,11 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
       };
     },
     {
-      name: 'claudia-right-workspace',
-      version: 1,
+      name: workspaceStorageKey('claudia-right-workspace', typeof window === 'undefined' ? '' : window.location.search),
+      version: 3,
       partialize: s => ({ bySession: s.bySession, order: s.order }),
-      merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<RightWorkspaceState>;
-        const bySession: Record<string, SessionWorkspace> = {};
-        for (const [id, ws] of Object.entries(p.bySession ?? {})) {
-          const root = ws && isSafeTree(ws.root) ? ws.root : null;
-          bySession[id] = {
-            root,
-            primaryPaneId: root ? (ws?.primaryPaneId ?? null) : null,
-            focusedPaneId: root ? (ws?.focusedPaneId ?? null) : null,
-          };
-        }
-        const order = (p.order ?? []).filter(id => id in bySession);
-        return { ...current, bySession, order };
-      },
+      migrate: persisted => restoreWorkspaces(persisted),
+      merge: (persisted, current) => ({ ...current, ...restoreWorkspaces(persisted) }),
     }
   )
 );

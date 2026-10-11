@@ -3,16 +3,20 @@ import {
   dispatchClientAction,
   hasClientAction,
   legacyAliasToHostActionName,
-  setClientActionContextFactory,
+  registerClientActionContextFactory,
   type ClientActionContext,
 } from '../clientActions';
 import '../clientActionDefinitions';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../../stores/llmProfileMetaStore';
 import { useRunStore } from '../../../stores/runStore';
 import { useSessionConfigStore } from '../../../stores/sessionConfigStore';
 import { activatePanel } from '../../../actions/openPanel';
+import { openToolInWorkspace } from '../../../actions/workspaceActions';
+import { useSessionRoute } from './useSessionRoute';
+import { isMobileViewport } from '../../../hooks/useMediaQuery';
+import { useTerminalStore } from '../../../stores/terminalStore';
 import * as api from '../../../services/api';
 import { finalizeRunLifecycle } from '../../../services/message-handlers/run-finalization';
 import type { MessageRole, MessageMetadata } from '@zclaudia/shared/core/message';
@@ -70,6 +74,7 @@ export function useCommandHandler({
   commandsCacheKey,
   setDrawerOpen,
 }: UseCommandHandlerParams) {
+  const route = useSessionRoute(sessionId);
   // Handle built-in command response
   const handleBuiltInCommand = useCallback(
     (result: CommandExecuteResponse) => {
@@ -223,8 +228,10 @@ export function useCommandHandler({
           // Plugin command: activate the panel in its effective placement (bottom or right)
           const panelId = data?.panelId as string | undefined;
           if (panelId && currentProject?.id) {
-            setDrawerOpen(currentProject.id, true);
-            activatePanel(panelId);
+            if (route.backendId) useTerminalStore.getState().setDrawerOpen(currentProject.id, true, route.backendId);
+            else setDrawerOpen(currentProject.id, true);
+            if (isMobileViewport()) activatePanel(panelId);
+            else openToolInWorkspace(sessionId, panelId, { projectId: currentProject.id, backendId: route.backendId });
           }
           break;
         }
@@ -248,10 +255,10 @@ export function useCommandHandler({
       addMessage,
       scrollToBottom,
       llmProfileId,
-      currentProject?.rootPath,
+      currentProject,
       commandsCacheKey,
-      currentProject?.id,
       setDrawerOpen,
+      route.backendId,
     ]
   );
 
@@ -506,10 +513,8 @@ export function useCommandHandler({
     ]
   );
 
-  // Live context for server-dispatched client actions (invocation_result).
-  // Assigned during render: the hook is mounted per open chat session, so the
-  // factory always closes over the session that is currently wired.
-  setClientActionContextFactory((wireSessionId, wireArgs) => ({
+  // Register after commit and remove on unmount, independently for each open chat.
+  useEffect(() => registerClientActionContextFactory(sessionId, (wireSessionId, wireArgs) => ({
     sessionId: wireSessionId,
     args: wireArgs,
     addSystemMessage: (content, metadata) => {
@@ -529,7 +534,7 @@ export function useCommandHandler({
       isForcedPlanSession,
       switchWorktree: handleWorktreeChange,
     },
-  }));
+  })), [sessionId, addMessage, commands, currentSession, currentProject, isForcedPlanSession, handleWorktreeChange]);
 
   return {
     handleCommand,

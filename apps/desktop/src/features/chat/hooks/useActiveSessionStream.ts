@@ -7,7 +7,7 @@ import { useSessionRoute } from './useSessionRoute';
  * HTTP sync, which makes tool events appear all at once on session switch or
  * run completion.
  */
-export function useActiveSessionStream(): void {
+export function useActiveSessionStream(enabled = true): void {
   const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
-  useSessionRoute(selectedSessionId, { maintainDesiredState: true });
+  useSessionRoute(enabled ? selectedSessionId : null, { maintainDesiredState: enabled });
 }

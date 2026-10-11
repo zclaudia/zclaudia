@@ -61,6 +61,18 @@ export async function dispatchClientAction(
  * action ID; the live composer context is supplied here by useCommandHandler.
  */
 let liveContextFactory: ((sessionId: string, args: string) => ClientActionContext) | null = null;
+const sessionContextFactories = new Map<string, (sessionId: string, args: string) => ClientActionContext>();
+
+/** Each mounted chat owns only its own wire action context. */
+export function registerClientActionContextFactory(
+  sessionId: string,
+  factory: (sessionId: string, args: string) => ClientActionContext
+): () => void {
+  sessionContextFactories.set(sessionId, factory);
+  return () => {
+    if (sessionContextFactories.get(sessionId) === factory) sessionContextFactories.delete(sessionId);
+  };
+}
 
 export function setClientActionContextFactory(
   factory: (sessionId: string, args: string) => ClientActionContext
@@ -72,8 +84,9 @@ export async function dispatchClientActionFromWire(
   actionId: string,
   sessionId: string
 ): Promise<boolean> {
-  if (!liveContextFactory) return false;
-  return dispatchClientAction(actionId, liveContextFactory(sessionId, ''));
+  const factory = sessionContextFactories.get(sessionId) ?? liveContextFactory;
+  if (!factory) return false;
+  return dispatchClientAction(actionId, factory(sessionId, ''));
 }
 
 /** Map a legacy unqualified trigger (`/help`) to its host action name (`help`). */

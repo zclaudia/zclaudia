@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { TerminalPanel, TerminalActions } from '../TerminalPanel';
 import { useServerStore } from '../../../stores/serverStore';
+import { WorkspaceToolContext } from '../../workspace/WorkspaceToolContext';
 
 const mockSendMessage = vi.fn();
 
@@ -68,6 +69,21 @@ beforeEach(() => {
 });
 
 describe('TerminalPanel', () => {
+  it('resolves distinct terminal instances from each pane backend binding', async () => {
+    const { useTerminalStore } = await import('../../../stores/terminalStore');
+    const original = vi.mocked(useTerminalStore).getMockImplementation();
+    vi.mocked(useTerminalStore).mockImplementation((selector?: (s: any) => any) => {
+      const state = { ctrlActive: {}, getTerminalId: (_projectId: string, backendId: string) => `terminal-${backendId}` };
+      return selector ? selector(state) : state;
+    });
+    render(<>
+      <WorkspaceToolContext.Provider value={{ sessionId: 'chat-1', backendId: 'backend-1' }}><TerminalPanel projectId="proj-1" /></WorkspaceToolContext.Provider>
+      <WorkspaceToolContext.Provider value={{ sessionId: 'chat-2', backendId: 'backend-2' }}><TerminalPanel projectId="proj-1" /></WorkspaceToolContext.Provider>
+    </>);
+    expect(screen.getByText('XTerminal: terminal-backend-1')).toBeInTheDocument();
+    expect(screen.getByText('XTerminal: terminal-backend-2')).toBeInTheDocument();
+    if (original) vi.mocked(useTerminalStore).mockImplementation(original);
+  });
   it('renders "No terminal session" when no terminal exists', () => {
     render(<TerminalPanel projectId="proj-1" />);
     expect(screen.getByText('No terminal session')).toBeTruthy();

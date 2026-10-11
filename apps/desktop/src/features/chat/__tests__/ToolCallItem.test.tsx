@@ -4,8 +4,11 @@ import { ToolCallItem } from '../ToolCallItem';
 import { ToolCallList } from '../tool-call/ToolCallList';
 import type { ToolCallState } from '../../../stores/runStore';
 import { useBackgroundRequestStore } from '../../../stores/backgroundRequestStore';
+import { ChatActionsProvider } from '../ChatActionsContext';
 
 const mockSendMessage = vi.fn();
+const mockSendToServer = vi.fn();
+const { mockRoute } = vi.hoisted(() => ({ mockRoute: vi.fn(() => ({ backendId: null as string | null })) }));
 const mockHandlePromptAnswer = vi.fn();
 const mockSetDrawerOpen = vi.fn();
 const mockOpenTerminal = vi.fn();
@@ -15,6 +18,10 @@ const { mockGetDeferredDiagnostics, mockRestoreFileBackup } = vi.hoisted(() => (
   mockRestoreFileBackup: vi.fn(),
 }));
 const terminalIdsByBackend = new Map<string, string>();
+beforeEach(() => {
+  mockRoute.mockReturnValue({ backendId: null });
+  mockSendToServer.mockClear();
+});
 
 // Mock heavy sub-components
 vi.mock('../../../components/renderers/DiffViewer', () => ({
@@ -50,9 +57,11 @@ vi.mock('../../../services/api', () => ({
 vi.mock('../../../contexts/ConnectionContext', () => ({
   useConnection: () => ({
     sendMessage: mockSendMessage,
+    sendToServer: mockSendToServer,
     handlePromptAnswer: mockHandlePromptAnswer,
   }),
 }));
+vi.mock('../hooks/useSessionRoute', () => ({ useSessionRoute: mockRoute }));
 
 vi.mock('../../../stores/terminalStore', () => ({
   getTerminalScopeKey: (projectId: string, backendId: string | null | undefined) =>
@@ -1094,6 +1103,24 @@ describe('ToolCallItem', () => {
       });
     });
 
+    it('pastes commands into its own chat project when another chat is selected', async () => {
+      mockSelectionState.selectedSessionId = 'other-chat';
+      mockProjectState.sessions = [
+        { id: 'other-chat', projectId: 'other-project' },
+        { id: 'bound-chat', projectId: 'bound-project' },
+      ];
+      terminalIdsByBackend.set('backend-1:bound-project', 'bound-terminal');
+      render(
+        <ChatActionsProvider value={{ sessionId: 'bound-chat', handleSendMessage: vi.fn(), setMode: vi.fn() }}>
+          <ToolCallItem toolCall={createToolCall({ toolName: 'Bash', toolInput: { command: 'pwd' }, status: 'completed', result: '/bound' })} />
+        </ChatActionsProvider>
+      );
+      fireEvent.click(screen.getByRole('button'));
+      fireEvent.click(screen.getByTitle('Paste to terminal'));
+      expect(mockSetDrawerOpen).toHaveBeenCalledWith('bound-project', true);
+      await waitFor(() => expect(mockSendMessage).toHaveBeenCalledWith({ type: 'terminal_input', terminalId: 'bound-terminal', data: 'pwd' }));
+    });
+
     it('shows Bash error result with error styling', () => {
       const { container } = render(
         <ToolCallItem
@@ -2109,6 +2136,19 @@ describe('ToolCallItem send-to-background gating', () => {
       sessionId: 's1',
       toolUseId: 'tool-1',
     });
+  });
+
+  it('sends a background action to the originating chat backend', () => {
+    mockRoute.mockReturnValue({ backendId: 'own-backend' });
+    render(
+      <ChatActionsProvider value={{ sessionId: 'own-chat', handleSendMessage: vi.fn(), setMode: vi.fn() }}>
+        <ToolCallItem toolCall={runningBash({ backgroundable: true })} />
+      </ChatActionsProvider>
+    );
+    fireEvent.click(screen.getByText('Send to background'));
+    expect(mockRoute).toHaveBeenCalledWith('own-chat');
+    expect(mockSendToServer).toHaveBeenCalledWith('own-backend', { type: 'background_running_command', sessionId: 'own-chat', toolUseId: 'tool-1' });
+    expect(mockSendMessage).not.toHaveBeenCalled();
   });
 
   it('locks the button while the request is in flight and unlocks when the server declines', () => {

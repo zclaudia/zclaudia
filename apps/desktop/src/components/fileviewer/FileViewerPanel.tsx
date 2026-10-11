@@ -55,6 +55,7 @@ import {
 } from '../../actions/popoutWindow';
 import { useProjectStore } from '../../stores/projectStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
+import { useWorkspaceVisible } from '../workspace/WorkspaceContext';
 
 const EXT_TO_LANG: Record<string, string> = {
   ts: 'typescript',
@@ -578,6 +579,7 @@ function usePanelWidth(ref: React.RefObject<HTMLElement | null>): number | null 
 }
 
 export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
+  const visible = useWorkspaceVisible();
   const isMobile = useIsMobile();
   const store = useFileViewerStore();
   const {
@@ -775,6 +777,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
 
   // Keyboard shortcut: Cmd/Ctrl+F opens in-file search, Escape closes it.
   useEffect(() => {
+    if (!visible) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
         e.preventDefault();
@@ -787,7 +790,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [content, inFileSearchOpen, setInFileSearchOpen]);
+  }, [content, inFileSearchOpen, setInFileSearchOpen, visible]);
 
   const headerIcon = filePath ? (
     <FileSymbol

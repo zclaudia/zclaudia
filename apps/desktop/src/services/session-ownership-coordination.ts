@@ -4,6 +4,8 @@
 // live here so the stores never import each other.
 import { useOwnershipStore } from '../stores/ownershipStore';
 import { useRightWorkspaceStore } from '../stores/rightWorkspaceStore';
+import { useProjectWorkspaceStore } from '../stores/projectWorkspaceStore';
+import { sessionWorkspaceId } from '../utils/workspaceStorage';
 
 /** Replace a backend's session ownership with the given snapshot. */
 export function reassignSessionOwnersForBackend(backendId: string, sessionIds: string[]): void {
@@ -17,10 +19,18 @@ export function recordSessionOwner(sessionId: string, backendId: string): void {
   useOwnershipStore.getState().setSessionOwner(sessionId, backendId);
 }
 
-/** Forget a deleted session: ownership record plus right-workspace layout. */
+/**
+ * An adopted project layout keeps its original session key as a stable anchor.
+ * Deleting that session clears ownership, while catalog reconciliation removes
+ * its chat ref without discarding the other chats or tools in the project tree.
+ */
 export function forgetSession(sessionId: string): void {
   useOwnershipStore.getState().removeSessionOwner(sessionId);
-  useRightWorkspaceStore.getState().removeSession(sessionId);
+  const projectAnchors = new Set(Object.values(useProjectWorkspaceStore.getState().byProject)
+    .map(workspace => workspace.workspaceId));
+  for (const layoutId of [sessionId, sessionWorkspaceId(sessionId)]) {
+    if (!projectAnchors.has(layoutId)) useRightWorkspaceStore.getState().removeSession(layoutId);
+  }
 }
 
 /** Forget all session ownership recorded for a backend. */

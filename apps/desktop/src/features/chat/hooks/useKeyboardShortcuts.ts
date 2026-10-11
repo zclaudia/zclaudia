@@ -7,11 +7,13 @@ import { activatePanel, isPanelActive } from '../../../actions/openPanel';
 interface UseKeyboardShortcutsOptions {
   projectId: string | undefined;
   projectRoot: string | undefined;
+  enabled?: boolean;
 }
 
-export function useKeyboardShortcuts({ projectId, projectRoot }: UseKeyboardShortcutsOptions) {
+export function useKeyboardShortcuts({ projectId, projectRoot, enabled = true }: UseKeyboardShortcutsOptions) {
   // Ctrl+` keyboard shortcut to toggle terminal
   useEffect(() => {
+    if (!enabled) return;
     const handler = (e: KeyboardEvent) => {
       if (
         e.ctrlKey &&
@@ -36,10 +38,11 @@ export function useKeyboardShortcuts({ projectId, projectRoot }: UseKeyboardShor
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [projectId]);
+  }, [projectId, enabled]);
 
   // Cmd+P / Ctrl+P keyboard shortcut to open file search
   useEffect(() => {
+    if (!enabled) return;
     const handler = (e: KeyboardEvent) => {
       if (
         (e.metaKey || e.ctrlKey) &&
@@ -58,5 +61,5 @@ export function useKeyboardShortcuts({ projectId, projectRoot }: UseKeyboardShor
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [projectRoot]);
+  }, [projectRoot, enabled]);
 }

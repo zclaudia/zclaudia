@@ -646,7 +646,7 @@ const SegmentedContent = memo(function SegmentedContent({
                   <ThinkingBlock content={thinking} />
                 </div>
               )}
-              <div className="rounded-2xl px-3 md:px-4 py-2 w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-card text-card-foreground min-w-0">
+              <div className="zc-assistant-bubble rounded-2xl px-3 md:px-4 py-2 w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-card text-card-foreground min-w-0">
                 <AssistantContent content={mainContent} />
               </div>
             </div>
@@ -843,7 +843,7 @@ const MessageItem = memo(function MessageItem({
           </div>
         )}
         {shouldRenderFallbackContent && (
-          <div className="rounded-2xl px-3 md:px-4 py-2 mb-2 w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-card text-card-foreground min-w-0">
+          <div className="zc-assistant-bubble rounded-2xl px-3 md:px-4 py-2 mb-2 w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-card text-card-foreground min-w-0">
             <AssistantContent content={mainContent} />
           </div>
         )}
@@ -901,10 +901,10 @@ const MessageItem = memo(function MessageItem({
       <div
         className={`rounded-2xl px-3 md:px-4 py-2 ${
           isUser
-            ? 'max-w-[85%] md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-muted/60 text-foreground shadow-apple-sm'
+            ? 'zc-user-bubble max-w-[85%] md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-muted/60 text-foreground shadow-apple-sm'
             : isSystem
               ? 'max-w-[85%] md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-muted text-muted-foreground text-sm'
-              : 'w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-card text-card-foreground min-w-0'
+              : 'zc-assistant-bubble w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-card text-card-foreground min-w-0'
         }`}
       >
         {isUser ? (

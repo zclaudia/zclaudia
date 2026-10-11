@@ -73,6 +73,11 @@ export interface PanelOpenCtx {
   backendId?: string | null;
 }
 
+/** Exact instance being closed; omitted by legacy single-panel hosts. */
+export interface PanelCloseCtx extends PanelOpenCtx {
+  instanceKey?: string;
+}
+
 export interface UIExtension {
   id: string;
   pluginId: string;
@@ -90,7 +95,7 @@ export interface UIExtension {
   /** Called when the user explicitly opens this panel into the workspace (not on
    *  hidden always-mount renders). Use for per-tool init, e.g. creating a session. */
   onOpen?: (ctx: PanelOpenCtx) => void;
-  onClose?: () => void; // Called when user closes this panel
+  onClose?: (ctx?: PanelCloseCtx) => void; // Called when user closes this panel
   defaultPlacement?: PanelPlacement; // Where panel appears by default (desktop). Defaults to 'right'
   /** Right-sidebar workspace routing for openTool: 'shared' reuses the primary
    *  pane; 'dedicated' opens (or focuses) its own pane. Defaults to 'shared'. */

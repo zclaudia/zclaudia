@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useRightSidebarStore, RIGHT_SIDEBAR_LIMITS } from '../stores/rightSidebarStore';
-import { useRightWorkspaceStore, findPaneWithTool } from '../stores/rightWorkspaceStore';
+import { useRightWorkspaceStore, findPaneWithTool, pruneChat } from '../stores/rightWorkspaceStore';
+import { PaneCard } from './workspace/PaneCard';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { WorkspaceView } from './workspace/WorkspaceView';
 import { RightSidebarEmptyState } from './RightSidebarEmptyState';
@@ -31,7 +32,7 @@ export function RightSidebar({
   const collapsed = useRightSidebarStore(s => s.collapsed);
   const setWidthFraction = useRightSidebarStore(s => s.setWidthFraction);
 
-  const root = useRightWorkspaceStore(s => s.bySession[sessionId]?.root ?? null);
+  const root = pruneChat(useRightWorkspaceStore(s => s.bySession[sessionId]?.root ?? null));
 
   // Ensure a workspace entry exists for this session (no-op if present).
   useEffect(() => {
@@ -253,6 +254,7 @@ export function RightSidebar({
       >
         {root != null ? (
           <WorkspaceView
+            rootOverride={root}
             sessionId={sessionId}
             projectId={projectId}
             projectRoot={projectRoot}
@@ -260,14 +262,14 @@ export function RightSidebar({
           />
         ) : (
           <div className="absolute inset-0 flex min-w-0 min-h-0 p-2">
-            <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden rounded-lg border border-border/50 bg-card shadow-sm">
+            <PaneCard>
               <RightSidebarEmptyState
                 sessionId={sessionId}
                 projectId={projectId}
                 projectRoot={projectRoot}
                 branchName={branchName}
               />
-            </div>
+            </PaneCard>
           </div>
         )}
       </div>

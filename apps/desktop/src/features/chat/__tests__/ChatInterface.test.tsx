@@ -250,8 +250,9 @@ vi.mock('../../../contexts/ConnectionContext', () => ({
 }));
 
 // Mock useIsMobile
+const { mockIsMobile } = vi.hoisted(() => ({ mockIsMobile: vi.fn(() => false) }));
 vi.mock('../../../hooks/useMediaQuery', () => ({
-  useIsMobile: () => false,
+  useIsMobile: () => mockIsMobile(),
 }));
 
 vi.mock('../hooks/useSessionRoute', () => ({
@@ -520,6 +521,7 @@ function setDefaultStores(overrides?: {
 describe('ChatInterface', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIsMobile.mockReturnValue(false);
     vi.spyOn(console, 'log').mockImplementation(() => {});
     paginationHookState.clear();
     planStatusHookState.taskPlanStatus = null;
@@ -542,6 +544,16 @@ describe('ChatInterface', () => {
   it('renders without crashing', () => {
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     expect(container).toBeTruthy();
+  });
+
+  it('marks the card surface only for an opted-in desktop chat', () => {
+    const { container, rerender } = render(<ChatInterface sessionId="sess-1" />);
+    expect(container.querySelector('[data-chat-surface]')).toBeNull();
+    rerender(<ChatInterface sessionId="sess-1" surface="card" />);
+    expect(container.querySelector('[data-chat-surface="card"]')).toBeTruthy();
+    mockIsMobile.mockReturnValue(true);
+    rerender(<ChatInterface sessionId="sess-1" surface="card" />);
+    expect(container.querySelector('[data-chat-surface]')).toBeNull();
   });
 
   it('renders the message input area', () => {

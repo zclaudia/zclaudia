@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Terminal as TerminalIcon } from 'lucide-react';
 import { useSelectionStore } from '../../stores/selectionStore';
+import { useWorkspaceTool } from '../../components/workspace/WorkspaceToolContext';
 import { useChangesPanelStore } from '../../stores/changesPanelStore';
 import { SinceSelector } from '../../components/changes/SinceSelector';
 import { ChangeListItem } from '../../components/changes/ChangeListItem';
@@ -18,7 +19,8 @@ interface ChangesPanelProps {
 }
 
 export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
-  const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
+  const boundSessionId = useWorkspaceTool()?.sessionId;
+  const selectedSessionId = useSelectionStore(s => boundSessionId ?? s.selectedSessionId);
 
   // Per-session "since" cursor is persisted in changesPanelStore so the user's
   // pick survives panel close/reopen, session switches, and app restarts.

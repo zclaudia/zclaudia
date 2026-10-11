@@ -1,6 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SessionItem } from '../SessionItem';
+import { useAppearanceStore } from '../../../stores/appearanceStore';
+import { useDragSplitStore } from '../../../components/workspace/dragSplit';
+import { useRightWorkspaceStore } from '../../../stores/rightWorkspaceStore';
+import { useProjectWorkspaceStore } from '../../../stores/projectWorkspaceStore';
+
+const { selectProjectChat } = vi.hoisted(() => ({ selectProjectChat: vi.fn() }));
+vi.mock('../../../actions/projectWorkspaceActions', () => ({ selectProjectChat }));
 
 const mockSession = {
   id: 's1',
@@ -14,6 +21,68 @@ const mockSession = {
 } as any;
 
 describe('SessionItem', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAppearanceStore.setState({ unifiedWorkspace: false });
+    useDragSplitStore.getState().endDrag();
+    useRightWorkspaceStore.setState({ bySession: {}, order: [] });
+    useProjectWorkspaceStore.setState({ byProject: {} });
+  });
+
+  it('opens a distinct pane on modifier click only on unified desktop', () => {
+    useAppearanceStore.setState({ unifiedWorkspace: true });
+    const onSelect = vi.fn();
+    const { rerender } = render(<SessionItem session={mockSession} isSelected={false} onSelect={onSelect} hasPending={false} />);
+    fireEvent.click(screen.getByText('Test Session'), { metaKey: true });
+    expect(selectProjectChat).toHaveBeenCalledWith('p1', 's1', { beside: true });
+    expect(onSelect).toHaveBeenCalledWith('s1');
+    selectProjectChat.mockClear();
+    rerender(<SessionItem session={mockSession} isSelected={false} onSelect={onSelect} hasPending={false} isMobile />);
+    fireEvent.click(screen.getByText('Test Session'), { ctrlKey: true });
+    expect(selectProjectChat).not.toHaveBeenCalled();
+  });
+
+  it('starts unopened session drags and cancels them on normal click or release outside workspace', () => {
+    useAppearanceStore.setState({ unifiedWorkspace: true });
+    render(<SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />);
+    const row = screen.getByRole('button', { name: 'Test Session' });
+    const pointerDown = new Event('pointerdown', { bubbles: true });
+    Object.assign(pointerDown, { button: 0, pointerType: 'mouse' });
+    fireEvent(row, pointerDown);
+    expect(useDragSplitStore.getState().active).toMatchObject({ toolId: 'chat', instanceKey: 's1', projectId: 'p1', multiInstance: true });
+    expect(useDragSplitStore.getState().active?.sourcePaneId).toBeUndefined();
+    fireEvent.click(row);
+    expect(useDragSplitStore.getState().active).toBeNull();
+    fireEvent(row, pointerDown);
+    fireEvent.pointerUp(document.body);
+    expect(useDragSplitStore.getState().active).toBeNull();
+  });
+
+  it('includes an existing chat pane source and ignores mobile drag gestures', () => {
+    useAppearanceStore.setState({ unifiedWorkspace: true });
+    useRightWorkspaceStore.getState().ensureChatSession('s1');
+    const { rerender } = render(<SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />);
+    const pointerDown = new Event('pointerdown', { bubbles: true });
+    Object.assign(pointerDown, { button: 0, pointerType: 'mouse' });
+    fireEvent(screen.getByRole('button', { name: 'Test Session' }), pointerDown);
+    expect(useDragSplitStore.getState().active?.sourcePaneId).toBeTruthy();
+    rerender(<SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} isMobile />);
+    expect(useDragSplitStore.getState().active).toBeNull();
+    fireEvent(screen.getByRole('button', { name: 'Test Session' }), pointerDown);
+    expect(useDragSplitStore.getState().active).toBeNull();
+  });
+
+  it('exposes arrange actions and restores focus after Escape', () => {
+    useAppearanceStore.setState({ unifiedWorkspace: true });
+    render(<SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />);
+    const trigger = screen.getByRole('button', { name: 'Session actions' });
+    fireEvent.click(trigger);
+    expect(screen.getByRole('menuitem', { name: 'Open beside' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Compare with current chat' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(trigger).toHaveFocus();
+  });
   it('renders session name', () => {
     render(
       <SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />

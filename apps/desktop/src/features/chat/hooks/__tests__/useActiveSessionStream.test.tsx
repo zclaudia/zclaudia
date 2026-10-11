@@ -85,6 +85,19 @@ describe('useActiveSessionStream', () => {
     expect(facade.closeSessionStream).toHaveBeenCalledWith('backend-1', 'session-1');
   });
 
+  it('releases App ownership when workspace hosts take over', () => {
+    const { rerender, unmount } = renderHook(({ enabled }) => useActiveSessionStream(enabled), {
+      initialProps: { enabled: false },
+    });
+    expect(facade.openSessionStream).not.toHaveBeenCalled();
+    rerender({ enabled: true });
+    expect(facade.openSessionStream).toHaveBeenCalledOnce();
+    rerender({ enabled: false });
+    expect(facade.closeSessionStream).toHaveBeenCalledOnce();
+    unmount();
+    expect(facade.closeSessionStream).toHaveBeenCalledOnce();
+  });
+
   it('requests catch-up once the stream becomes open', () => {
     const { rerender } = renderHook(() => useActiveSessionStream());
 

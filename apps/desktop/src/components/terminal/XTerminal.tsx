@@ -9,6 +9,8 @@ import { useTerminalStore } from '../../stores/terminalStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { isMobileBackendUsable } from '../../services/mobileConnectionState';
+import { useWorkspaceVisible } from '../workspace/WorkspaceContext';
+import { useWorkspaceTool } from '../workspace/WorkspaceToolContext';
 
 /** Convert CSS HSL string "H S% L%" to hex "#rrggbb" */
 function hslToHex(hsl: string): string {
@@ -87,18 +89,23 @@ export function XTerminal({
   mode = 'open',
 }: XTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { sendMessage, connectServer } = useConnection();
+  const { sendMessage, sendToServer, connectServer } = useConnection();
+  const boundBackendId = useWorkspaceTool()?.backendId;
+  const scopedSendMessage = useCallback((message: ClientMessage) => {
+    if (boundBackendId) sendToServer(boundBackendId, message);
+    else sendMessage(message);
+  }, [boundBackendId, sendToServer, sendMessage]);
   const { resolvedTheme } = useTheme();
 
-  const activeServerId = useServerStore(s => s.activeServerId);
+  const activeServerId = useServerStore(s => boundBackendId ?? s.activeServerId);
   const facadeConnectionState = useFacadeStore(s => s.connectionState);
   const facadeBackends = useFacadeStore(s => s.backends);
 
   // sendMessage / connectServer are captured by the controller for its full lifetime.
   // Wrap them in refs so the references seen by the controller stay valid even when the
   // ConnectionContext rebuilds them.
-  const sendMessageRef = useRef(sendMessage);
-  sendMessageRef.current = sendMessage;
+  const sendMessageRef = useRef(scopedSendMessage);
+  sendMessageRef.current = scopedSendMessage;
   const connectServerRef = useRef(connectServer);
   connectServerRef.current = connectServer;
 
@@ -135,6 +142,7 @@ export function XTerminal({
   );
 
   const { controller, state } = useEnsureTerminalController(terminalId, buildDeps);
+  const visible = useWorkspaceVisible();
 
   // Theme refresh — small debounce avoids flashing during cross-fade transitions
   useEffect(() => {
@@ -164,6 +172,7 @@ export function XTerminal({
   }, [mode, terminalId]);
 
   useEffect(() => {
+    if (!visible) return;
     if (state.kind === 'idle') {
       if (mode === 'attach') {
         controller.attach();
@@ -194,6 +203,7 @@ export function XTerminal({
     activeServerId,
     facadeConnectionState,
     facadeBackends,
+    visible,
   ]);
 
   // ---- render ----

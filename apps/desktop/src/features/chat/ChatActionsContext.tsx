@@ -2,6 +2,7 @@ import { createContext, useContext, type ReactNode } from 'react';
 import type { Attachment } from './MessageInput';
 
 export interface ChatActionsContextValue {
+  sessionId?: string;
   handleSendMessage: (
     content: string,
     attachments?: Attachment[],

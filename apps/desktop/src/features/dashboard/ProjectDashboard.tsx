@@ -225,7 +225,7 @@ export function ProjectDashboard({
               {supervisorPane === 'workspace' ? (
                 <SupervisorWorkspacePanel projectId={projectId} agent={agent} />
               ) : agent?.mainSessionId ? (
-                <SessionChatLayout sessionId={agent.mainSessionId} />
+                <SessionChatLayout sessionId={agent.mainSessionId} syncSelection={false} />
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
                   <div className="text-center">

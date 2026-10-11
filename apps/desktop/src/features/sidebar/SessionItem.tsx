@@ -1,8 +1,13 @@
-import { useState } from 'react';
-import { createPortal } from 'react-dom';
-import { ExternalLink, Trash2, GitBranch, Lock, MoreHorizontal } from 'lucide-react';
+import { useEffect } from 'react';
+import { ExternalLink, Trash2, GitBranch, Lock, MoreHorizontal, Columns2 } from 'lucide-react';
 import type { Session } from '@zclaudia/shared/core/session';
 import { TONE_BADGE, TONE_TEXT, type Tone } from '../../components/ui/tone';
+import { DropdownMenu, type DropdownMenuEntry } from '../../components/ui/DropdownMenu';
+import { useAppearanceStore } from '../../stores/appearanceStore';
+import { selectProjectChat } from '../../actions/projectWorkspaceActions';
+import { useDragSplitStore } from '../../components/workspace/dragSplit';
+import { flattenPanes, useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
+import { useProjectWorkspaceStore } from '../../stores/projectWorkspaceStore';
 
 interface SessionItemProps {
   session: Session;
@@ -62,21 +67,46 @@ export function SessionItem({
 
   // Right-side hover actions (desktop only) collapse into a "⋯" dropdown so the
   // row stays clean — matching the project/session-header menu convention.
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
-  const hasRowMenu = !isMobile && Boolean(onDeleteWorktree || onPopOut);
-  const actionPadding = hasRowMenu ? 'pr-6' : 'pr-2';
-  // Micro text uses the token tiers only — text-[9px] had no tier at all.
-  const microClass = isMobile ? 'text-2xs' : 'text-3xs';
-
-  const openMenu = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (menuPos) {
-      setMenuPos(null);
-      return;
-    }
-    const r = e.currentTarget.getBoundingClientRect();
-    setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+  const unifiedWorkspace = useAppearanceStore(s => s.unifiedWorkspace);
+  const canArrange = unifiedWorkspace && !isMobile && Boolean(session.projectId);
+  const cancelOwnDrag = () => {
+    const active = useDragSplitStore.getState().active;
+    if (active?.toolId === 'chat' && active.instanceKey === session.id) useDragSplitStore.getState().endDrag();
   };
+  useEffect(() => {
+    if (!canArrange) return;
+    const onPointerUp = (event: PointerEvent) => {
+      const target = event.target;
+      if (event.type !== 'pointercancel' && target instanceof Element && target.closest('[data-session-workspace]')) return;
+      const state = useDragSplitStore.getState();
+      if (state.active?.toolId === 'chat' && state.active.instanceKey === session.id) state.endDrag();
+    };
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    return () => {
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+      const state = useDragSplitStore.getState();
+      if (state.active?.toolId === 'chat' && state.active.instanceKey === session.id) state.endDrag();
+    };
+  }, [canArrange, session.id]);
+  const openBeside = () => {
+    if (!canArrange || !session.projectId) return;
+    selectProjectChat(session.projectId, session.id, { beside: true });
+    onSelect(session.id);
+  };
+  const hasRowMenu = !isMobile && Boolean(onDeleteWorktree || onPopOut || canArrange);
+  const actionPadding = hasRowMenu ? 'pr-6' : 'pr-2';
+  const microClass = isMobile ? 'text-2xs' : 'text-3xs';
+  const entries: DropdownMenuEntry[] = [];
+  if (canArrange) {
+    entries.push(
+      { key: 'beside', label: 'Open beside', icon: <Columns2 size={13} />, onSelect: openBeside },
+      { key: 'compare', label: 'Compare with current chat', icon: <Columns2 size={13} />, onSelect: openBeside }
+    );
+  }
+  if (onPopOut) entries.push({ key: 'popout', label: 'Open in new window', icon: <ExternalLink size={13} />, onSelect: onPopOut });
+  if (onDeleteWorktree) entries.push({ key: 'remove-worktree', label: deleteWorktreeTitle, icon: <Trash2 size={13} />, onSelect: onDeleteWorktree, destructive: true });
 
   // Task items under Supervisor use lighter styling.
   const selectedClass = isTask ? 'bg-muted/60 text-foreground' : 'bg-accent text-foreground';
@@ -94,7 +124,22 @@ export function SessionItem({
   return (
     <div className="relative group" data-testid="session-item">
       <button
-        onClick={() => onSelect(session.id)}
+        onClick={event => {
+          cancelOwnDrag();
+          if (canArrange && (event.metaKey || event.ctrlKey)) openBeside();
+          else onSelect(session.id);
+        }}
+        onPointerDown={event => {
+          if (!canArrange || !session.projectId || event.button !== 0 || (event.pointerType !== 'mouse' && event.pointerType !== 'pen')) return;
+          const workspaceId = useProjectWorkspaceStore.getState().byProject[session.projectId]?.workspaceId ?? session.id;
+          const root = useRightWorkspaceStore.getState().bySession[workspaceId]?.root ?? null;
+          const source = flattenPanes(root).find(pane => pane.tools.some(ref => ref.toolId === 'chat' && ref.instanceKey === session.id));
+          useDragSplitStore.getState().startDrag({
+            toolId: 'chat', instanceKey: session.id, projectId: session.projectId, multiInstance: true,
+            sourcePaneId: source?.id,
+            sourceIndex: source?.tools.findIndex(ref => ref.toolId === 'chat' && ref.instanceKey === session.id),
+          });
+        }}
         // Mobile sits inside the always-on rail at the 44px tier; desktop keeps
         // the negative-margin pull so its hover fill spans the rail padding.
         className={`text-left rounded-md truncate flex items-center transition-colors ${
@@ -155,69 +200,25 @@ export function SessionItem({
         )}
       </button>
       {hasRowMenu && (
-        <div
-          className={`absolute right-1 top-1/2 -translate-y-1/2 transition-opacity ${
-            // Visible by default on touch; hover-revealed only from md: up.
-            menuPos ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'
-          }`}
-        >
-          <button
-            onClick={openMenu}
-            className={`relative p-0.5 rounded-md transition-colors before:absolute before:-inset-2 before:content-[''] md:before:content-none ${
-              menuPos
-                ? 'bg-muted text-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-            }`}
-            title="Session actions"
-            aria-label="Session actions"
-            aria-haspopup="menu"
-            aria-expanded={menuPos != null}
-          >
-            <MoreHorizontal size={13} strokeWidth={1.75} />
-          </button>
-        </div>
-      )}
-      {menuPos &&
-        createPortal(
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setMenuPos(null)} />
-            <div
-              role="menu"
-              className="fixed z-50 min-w-44 overflow-hidden rounded-md border border-border bg-popover py-1 shadow-md"
-              style={{ top: menuPos.top, right: menuPos.right }}
-            >
-              {onPopOut && (
-                <button
-                  role="menuitem"
-                  onClick={e => {
-                    e.stopPropagation();
-                    setMenuPos(null);
-                    onPopOut();
-                  }}
-                  className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
-                >
-                  <ExternalLink size={13} className="shrink-0 text-muted-foreground" />
-                  Open in new window
-                </button>
-              )}
-              {onDeleteWorktree && (
-                <button
-                  role="menuitem"
-                  onClick={e => {
-                    e.stopPropagation();
-                    setMenuPos(null);
-                    onDeleteWorktree();
-                  }}
-                  className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-destructive hover:bg-destructive/8"
-                >
-                  <Trash2 size={13} className="shrink-0" />
-                  {deleteWorktreeTitle}
-                </button>
-              )}
+        <DropdownMenu
+          entries={entries}
+          align="end"
+          ariaLabel="Session actions"
+          trigger={({ ref, props, open }) => (
+            <div className={`absolute right-1 top-1/2 -translate-y-1/2 transition-opacity ${open ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
+              <button
+                ref={ref}
+                {...props}
+                className={`relative p-0.5 rounded-md transition-colors before:absolute before:-inset-2 before:content-[''] md:before:content-none ${open ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                title="Session actions"
+                aria-label="Session actions"
+              >
+                <MoreHorizontal size={13} strokeWidth={1.75} />
+              </button>
             </div>
-          </>,
-          document.body
-        )}
+          )}
+        />
+      )}
     </div>
   );
 }

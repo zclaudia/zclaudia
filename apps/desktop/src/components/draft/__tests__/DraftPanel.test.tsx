@@ -34,6 +34,8 @@ vi.mock('../../../stores/selectionStore', () => ({
 }));
 
 import { DraftPanel } from '../DraftPanel';
+import { WorkspaceToolContext } from '../../workspace/WorkspaceToolContext';
+import { WorkspaceVisibilityContext } from '../../workspace/WorkspaceContext';
 
 describe('DraftPanel', () => {
   beforeEach(() => {
@@ -44,6 +46,27 @@ describe('DraftPanel', () => {
   it('shows the value-communicating empty state when empty', () => {
     render(<DraftPanel />);
     expect(screen.getByText(/auto-saves and syncs/i)).toBeTruthy();
+  });
+
+  it('uses a fixed tool binding instead of the selected chat', () => {
+    state = { ...buildState(), activeSessionId: 'fixed-chat', localContent: 'Fixed draft' };
+    render(
+      <WorkspaceToolContext.Provider value={{ sessionId: 'fixed-chat' }}>
+        <DraftPanel />
+      </WorkspaceToolContext.Provider>
+    );
+    expect(screen.getByLabelText('Draft message')).toHaveValue('Fixed draft');
+    expect(openEditor).not.toHaveBeenCalled();
+  });
+
+  it('does not reopen or focus an invisible retained draft', () => {
+    state = { ...buildState(), activeSessionId: 'other-chat' };
+    const { rerender } = render(
+      <WorkspaceVisibilityContext.Provider value={false}><DraftPanel /></WorkspaceVisibilityContext.Provider>
+    );
+    expect(openEditor).not.toHaveBeenCalled();
+    rerender(<WorkspaceVisibilityContext.Provider value><DraftPanel /></WorkspaceVisibilityContext.Provider>);
+    expect(openEditor).toHaveBeenCalledWith('sess-1');
   });
 
   it('has no footer Close or Finish buttons', () => {

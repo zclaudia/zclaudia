@@ -1,14 +1,18 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { activatePanel, deactivatePanel, isPanelActive, usePanelIsActive } from '../openPanel';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useBottomPanelStore } from '../../stores/bottomPanelStore';
-import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
+import { findPaneWithTool, useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
+import { useAppearanceStore } from '../../stores/appearanceStore';
+import { useProjectWorkspaceStore } from '../../stores/projectWorkspaceStore';
+import { registerWorkspaceRoute, useWorkspaceRoutingStore } from '../../stores/workspaceRoutingStore';
+import { sessionWorkspaceId } from '../../utils/workspaceStorage';
 
 const SESSION_ID = 'sess-1';
 const PROJECT_ID = 'proj-1';
@@ -41,6 +45,9 @@ describe('openPanel utility', () => {
     usePluginStore.setState({ panels: [], panelPlacements: {} });
     useBottomPanelStore.setState({ activeTab: '' });
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
+    useAppearanceStore.setState({ unifiedWorkspace: false });
+    useProjectWorkspaceStore.setState({ byProject: {} });
+    useWorkspaceRoutingStore.setState({ registrations: [], active: null });
     useRightSidebarStore.setState({ collapsed: false, unread: false });
     // Default: no active session — right-path returns early when sessionId is null
     useSelectionStore.setState({
@@ -233,6 +240,71 @@ describe('openPanel utility', () => {
   });
 
   describe('usePanelIsActive', () => {
+    it('tracks the standalone session route instead of the same session project anchor', () => {
+      seedSessionCtx();
+      registerPanel('foo', 'right');
+      useAppearanceStore.setState({ unifiedWorkspace: true });
+      useProjectWorkspaceStore.setState({ byProject: {
+        [PROJECT_ID]: { workspaceId: 'main-anchor', focusedChatSessionId: SESSION_ID, toolBindings: {} },
+      } });
+      const scopedId = sessionWorkspaceId(SESSION_ID);
+      useRightWorkspaceStore.getState().openTool(scopedId, 'foo');
+      const cleanup = registerWorkspaceRoute({
+        workspaceId: scopedId, sessionId: SESSION_ID, projectId: PROJECT_ID, projectScoped: false,
+      });
+
+      const { result } = renderHook(() => usePanelIsActive('foo'));
+      expect(result.current).toBe(true);
+      expect(isPanelActive('foo')).toBe(true);
+      // Closing the scoped panel must not read a tool still open in the main project.
+      act(() => {
+        useRightWorkspaceStore.getState().openTool('main-anchor', 'foo');
+        const paneId = findPaneWithTool(useRightWorkspaceStore.getState().bySession[scopedId].root, 'foo');
+        useRightWorkspaceStore.getState().closeTool(scopedId, paneId!, 'foo');
+      });
+      expect(result.current).toBe(false);
+      expect(isPanelActive('foo')).toBe(false);
+      act(cleanup);
+      expect(result.current).toBe(true);
+      expect(isPanelActive('foo')).toBe(true);
+    });
+
+    it('tracks a Dashboard route independently of global session selection', () => {
+      registerPanel('foo', 'right');
+      useAppearanceStore.setState({ unifiedWorkspace: true });
+      useRightWorkspaceStore.getState().openTool('dashboard-anchor', 'foo');
+      const cleanup = registerWorkspaceRoute({
+        workspaceId: 'dashboard-anchor', sessionId: 'dashboard-session', projectId: 'dashboard-project', projectScoped: true,
+      });
+      const { result } = renderHook(() => usePanelIsActive('foo'));
+      expect(result.current).toBe(true);
+      expect(isPanelActive('foo')).toBe(true);
+
+      act(() => useSelectionStore.setState({ selectedSessionId: 'another-session' }));
+      expect(result.current).toBe(true);
+      expect(isPanelActive('foo')).toBe(true);
+      act(cleanup);
+      expect(result.current).toBe(false);
+      expect(isPanelActive('foo')).toBe(false);
+      expect(useSelectionStore.getState().selectedSessionId).toBe('another-session');
+    });
+
+    it('ignores workspace routes while the unified workspace is disabled', () => {
+      seedSessionCtx();
+      registerPanel('foo', 'right');
+      useRightWorkspaceStore.getState().openTool(sessionWorkspaceId(SESSION_ID), 'foo');
+      const cleanup = registerWorkspaceRoute({
+        workspaceId: sessionWorkspaceId(SESSION_ID), sessionId: SESSION_ID, projectId: PROJECT_ID, projectScoped: false,
+      });
+      const { result } = renderHook(() => usePanelIsActive('foo'));
+      expect(result.current).toBe(false);
+      expect(isPanelActive('foo')).toBe(false);
+      act(() => useAppearanceStore.setState({ unifiedWorkspace: true }));
+      expect(result.current).toBe(true);
+      expect(isPanelActive('foo')).toBe(true);
+      act(cleanup);
+    });
+
     it('returns false when panel is not registered', () => {
       const { result } = renderHook(() => usePanelIsActive('missing'));
       expect(result.current).toBe(false);

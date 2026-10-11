@@ -6,12 +6,15 @@ import {
 } from '../../stores/rightWorkspaceStore';
 import { PaneView } from './PaneView';
 import { ResizeDivider } from './ResizeDivider';
+import { PaneCard } from './PaneCard';
+import { RightSidebarEmptyState } from '../RightSidebarEmptyState';
 
 interface WorkspaceViewProps {
   sessionId: string;
   projectId?: string;
   projectRoot?: string;
   workingDirectory?: string;
+  rootOverride?: LayoutNode | null;
 }
 
 export function WorkspaceView({
@@ -19,8 +22,10 @@ export function WorkspaceView({
   projectId,
   projectRoot,
   workingDirectory,
+  rootOverride,
 }: WorkspaceViewProps) {
-  const root = useRightWorkspaceStore(s => s.bySession[sessionId]?.root ?? null);
+  const storedRoot = useRightWorkspaceStore(s => s.bySession[sessionId]?.root ?? null);
+  const root = rootOverride === undefined ? storedRoot : rootOverride;
   const focusedPaneId = useRightWorkspaceStore(s => s.bySession[sessionId]?.focusedPaneId ?? null);
   const setRatio = useRightWorkspaceStore(s => s.setRatio);
 
@@ -39,6 +44,11 @@ export function WorkspaceView({
 
   const renderNode = useCallback(
     (node: LayoutNode): React.ReactNode => {
+      if (node.kind === 'placeholder') return (
+        <PaneCard key={node.id}>
+          <RightSidebarEmptyState sessionId={sessionId} projectId={projectId} projectRoot={projectRoot} />
+        </PaneCard>
+      );
       if (node.kind === 'pane') {
         return (
           <PaneView

@@ -10,6 +10,7 @@ import { useTerminalStore } from '../../stores/terminalStore';
 import { PanelContent } from '../panels/PanelRenderer';
 import { DropOverlay } from './DropOverlay';
 import { PaneTabs } from './PaneTabs';
+import { PaneCard } from './PaneCard';
 
 interface PaneViewProps {
   sessionId: string;
@@ -75,13 +76,11 @@ export function PaneView({
     ref.toolId === 'terminal' ? (decodeTerminalProjectId(ref.instanceKey) ?? projectId) : projectId;
 
   return (
-    <div
+    <PaneCard
       data-pane-id={paneId}
       data-focused={focused ? 'true' : 'false'}
       onPointerDown={onFocus}
-      className={`flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden rounded-lg border bg-card transition-shadow ${
-        focused ? 'border-muted-foreground/30 shadow-md' : 'border-border/50 shadow-sm'
-      }`}
+      focused={focused}
     >
       <PaneTabs
         sessionId={sessionId}
@@ -98,6 +97,6 @@ export function PaneView({
         />
         <DropOverlay paneId={paneId} />
       </div>
-    </div>
+    </PaneCard>
   );
 }

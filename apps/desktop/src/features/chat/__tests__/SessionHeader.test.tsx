@@ -42,6 +42,7 @@ const mockRightSidebarState = {
 };
 
 import { SessionHeader } from '../SessionHeader';
+import { WorkspacePaneContext } from '../../../components/workspace/WorkspaceContext';
 import type { Project } from '@zclaudia/shared/core/project';
 import type { Session } from '@zclaudia/shared/core/session';
 
@@ -112,6 +113,32 @@ describe('SessionHeader', () => {
   it('renders the session name', () => {
     render(<SessionHeader {...baseProps} />);
     expect(screen.getByText('Test Session')).toBeTruthy();
+  });
+
+  it('exposes surface markers without changing the default header background', () => {
+    const { container } = render(
+      <div data-chat-surface="card"><SessionHeader {...baseProps} /></div>
+    );
+    expect(container.querySelector('.zc-session-header')).toHaveClass('bg-background');
+    expect(container.querySelector('.zc-session-agent-label')).toBeTruthy();
+  });
+
+  it('counts tools in its workspace anchor and excludes chat-only leaves', () => {
+    useRightWorkspaceStore.getState().ensureChatSession('workspace-anchor');
+    useRightSidebarStore.setState({ collapsed: true, unread: true });
+    const { container, rerender } = render(
+      <WorkspacePaneContext.Provider value={{ workspaceId: 'workspace-anchor', paneId: 'chat-pane' }}>
+        <SessionHeader {...baseProps} />
+      </WorkspacePaneContext.Provider>
+    );
+    expect(container.querySelector('.zc-workspace-unread')).toBeNull();
+    useRightWorkspaceStore.getState().openTool('workspace-anchor', 'changes');
+    rerender(
+      <WorkspacePaneContext.Provider value={{ workspaceId: 'workspace-anchor', paneId: 'chat-pane' }}>
+        <SessionHeader {...baseProps} />
+      </WorkspacePaneContext.Provider>
+    );
+    expect(container.querySelector('.zc-workspace-unread')).toBeTruthy();
   });
 
   it('shows no run-mode badge for sessions without a runtime binding', () => {

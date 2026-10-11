@@ -7,6 +7,7 @@ import { isAndroid } from '../../../utils/platform';
 
 const mockSendMessage = vi.fn();
 const mockConnectServer = vi.fn();
+const mockSendToServer = vi.fn();
 
 // Polyfill ResizeObserver for jsdom
 globalThis.ResizeObserver = class ResizeObserver {
@@ -23,6 +24,7 @@ vi.mock('../../../contexts/ConnectionContext', () => ({
     activeBackend: 'local',
     setActiveBackend: vi.fn(),
     sendMessage: mockSendMessage,
+    sendToServer: mockSendToServer,
     connectServer: mockConnectServer,
   }),
 }));
@@ -73,6 +75,8 @@ vi.mock('../../../utils/platform', async importOriginal => {
 });
 
 import { XTerminal, getTerminalTheme } from '../XTerminal';
+import { WorkspaceVisibilityContext } from '../../workspace/WorkspaceContext';
+import { WorkspaceToolContext } from '../../workspace/WorkspaceToolContext';
 
 describe('XTerminal', () => {
   async function flushTerminalMount() {
@@ -114,6 +118,34 @@ describe('XTerminal', () => {
     const { container } = render(<XTerminal terminalId="term-1" projectId="proj-1" />);
     const termDiv = container.firstElementChild as HTMLElement;
     expect(termDiv).toBeTruthy();
+  });
+
+  it('opens on the pane-bound backend when another backend is active', async () => {
+    render(
+      <WorkspaceToolContext.Provider value={{ sessionId: 'bound-chat', backendId: 'backend-2' }}>
+        <XTerminal terminalId="backend-2-terminal" projectId="proj-1" />
+      </WorkspaceToolContext.Provider>
+    );
+    await flushTerminalMount();
+    expect(mockSendToServer).toHaveBeenCalledWith('backend-2', expect.objectContaining({ type: 'terminal_open', terminalId: 'backend-2-terminal' }));
+    expect(mockSendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'terminal_open' }));
+  });
+
+  it('delays opening a retained hidden terminal until it is visible', async () => {
+    const { rerender } = render(
+      <WorkspaceVisibilityContext.Provider value={false}>
+        <XTerminal terminalId="hidden-workspace-terminal" projectId="proj-1" />
+      </WorkspaceVisibilityContext.Provider>
+    );
+    await flushTerminalMount();
+    expect(mockSendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'terminal_open' }));
+    rerender(
+      <WorkspaceVisibilityContext.Provider value>
+        <XTerminal terminalId="hidden-workspace-terminal" projectId="proj-1" />
+      </WorkspaceVisibilityContext.Provider>
+    );
+    await flushTerminalMount();
+    expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'terminal_open', projectId: 'proj-1' }));
   });
 
   it('accepts optional workingDirectory prop', () => {

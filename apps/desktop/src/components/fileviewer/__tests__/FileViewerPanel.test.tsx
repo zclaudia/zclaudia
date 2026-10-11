@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as api from '../../../services/api';
 import { FileViewerPanel, FileViewerActions } from '../FileViewerPanel';
+import { WorkspaceVisibilityContext } from '../../workspace/WorkspaceContext';
 
 const scrollToRowMock = vi.hoisted(() => vi.fn());
 const mockIsMobile = vi.hoisted(() => ({ value: false }));
@@ -159,6 +160,19 @@ beforeEach(() => {
 });
 
 describe('FileViewerPanel', () => {
+  it('does not capture search shortcuts while retained and hidden', () => {
+    mockFileViewerState.content = 'const value = 1;';
+    const { rerender } = render(
+      <WorkspaceVisibilityContext.Provider value={false}><FileViewerPanel projectRoot="/project" /></WorkspaceVisibilityContext.Provider>
+    );
+    fireEvent.keyDown(window, { key: 'f', metaKey: true });
+    expect(mockFileViewerState.setInFileSearchOpen).not.toHaveBeenCalled();
+    rerender(
+      <WorkspaceVisibilityContext.Provider value><FileViewerPanel projectRoot="/project" /></WorkspaceVisibilityContext.Provider>
+    );
+    fireEvent.keyDown(window, { key: 'f', metaKey: true });
+    expect(mockFileViewerState.setInFileSearchOpen).toHaveBeenCalledWith(true);
+  });
   it('shows the search field and a full-width tree when no file is open', () => {
     render(<FileViewerPanel projectRoot="/project" />);
     expect(screen.getByTestId('file-search')).toBeInTheDocument();

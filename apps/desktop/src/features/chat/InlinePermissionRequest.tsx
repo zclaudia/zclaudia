@@ -202,7 +202,7 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
       )}
 
       {/* Header */}
-      <div className="px-3 py-2 bg-card flex items-center gap-2">
+      <div className="zc-permission-actions px-3 py-2 bg-card flex items-center gap-2">
         {isCredential ? (
           <Lock size={16} strokeWidth={2} className="text-amber-500 flex-shrink-0" />
         ) : (

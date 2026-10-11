@@ -198,6 +198,8 @@ function SessionChatContent({ sessionId, projectId }: SessionChatContentProps) {
   return (
     <SessionChatLayout
       sessionId={sessionId}
+      workspaceScope="session"
+      syncSelection={false}
       onReturnToDashboard={() => {
         void closeCurrentWindow();
       }}

@@ -3,6 +3,7 @@ import { useConnection } from '../../contexts/ConnectionContext';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { openToolInWorkspace } from '../../actions/workspaceActions';
 import { isPanelAvailable } from '../../actions/openPanel';
+import { useChatActionsOptional } from '../chat';
 
 const HTTP_RE = /^https?:\/\//i;
 
@@ -19,7 +20,8 @@ const HTTP_RE = /^https?:\/\//i;
  */
 export function ChatLink({ href, children }: { href?: string; children?: ReactNode }) {
   const { sendMessage, isConnected } = useConnection();
-  const sessionId = useSelectionStore(s => s.selectedSessionId);
+  const boundSessionId = useChatActionsOptional()?.sessionId;
+  const sessionId = useSelectionStore(s => boundSessionId ?? s.selectedSessionId);
 
   const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
     if (!href || !HTTP_RE.test(href) || !sessionId) return;

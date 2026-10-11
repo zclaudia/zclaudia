@@ -8,6 +8,7 @@ import { useServerStore } from '../../stores/serverStore';
 import { XTerminal } from './XTerminal';
 import { terminalRegistry } from '../../services/terminal/TerminalRegistry';
 import { isDesktopTauri } from '../../utils/platform';
+import { useWorkspaceTool } from '../workspace/WorkspaceToolContext';
 import {
   openPopoutWindow,
   buildWindowTitle,
@@ -27,8 +28,8 @@ interface TerminalPanelProps {
   workingDirectory?: string;
 }
 
-async function openTerminalInNewWindow(terminalId: string, projectId: string) {
-  const backendId = useServerStore.getState().activeServerId;
+async function openTerminalInNewWindow(terminalId: string, projectId: string, boundBackendId?: string) {
+  const backendId = boundBackendId ?? useServerStore.getState().activeServerId;
   const conn = getConnectionParams({ backendId });
   const label = await openPopoutWindow({
     type: 'terminal',
@@ -50,7 +51,8 @@ async function openTerminalInNewWindow(terminalId: string, projectId: string) {
 
 /** Terminal toolbar actions (reload + pop-out buttons) rendered in the shared BottomPanel header */
 export function TerminalActions({ projectId }: { projectId: string }) {
-  const activeServerId = useServerStore(s => s.activeServerId);
+  const boundBackendId = useWorkspaceTool()?.backendId;
+  const activeServerId = useServerStore(s => boundBackendId ?? s.activeServerId);
   const terminalId = useTerminalStore(s => s.getTerminalId(projectId, activeServerId));
   const isPoppedOut = useTerminalStore(s =>
     terminalId ? !!s.poppedOutTerminals[terminalId] : false
@@ -84,7 +86,7 @@ export function TerminalActions({ projectId }: { projectId: string }) {
       {/* Open in new window — kept rightmost to match the file viewer's layout. */}
       {isDesktopTauri() && terminalId && !isPoppedOut && (
         <button
-          onClick={() => openTerminalInNewWindow(terminalId, projectId)}
+            onClick={() => openTerminalInNewWindow(terminalId, projectId, boundBackendId)}
           className={actionBtn}
           title="Open in new window"
           aria-label="Open in new window"
@@ -98,19 +100,22 @@ export function TerminalActions({ projectId }: { projectId: string }) {
 
 /** Terminal content (renders inside the shared BottomPanel) */
 export function TerminalPanel({ projectId, workingDirectory }: TerminalPanelProps) {
+  const boundBackendId = useWorkspaceTool()?.backendId;
   const { ctrlActive, toggleCtrl } = useTerminalStore();
   const isMobile = useIsMobile();
-  const activeServerId = useServerStore(s => s.activeServerId);
+  const activeServerId = useServerStore(s => boundBackendId ?? s.activeServerId);
   const terminalId = useTerminalStore(s => s.getTerminalId(projectId, activeServerId));
   const isCtrl = !!(terminalId && ctrlActive[terminalId]);
-  const { sendMessage } = useConnection();
+  const { sendMessage, sendToServer } = useConnection();
 
   const sendKey = useCallback(
     (data: string) => {
       if (!terminalId) return;
-      sendMessage({ type: 'terminal_input', terminalId, data });
+      const message = { type: 'terminal_input' as const, terminalId, data };
+      if (boundBackendId) sendToServer(boundBackendId, message);
+      else sendMessage(message);
     },
-    [terminalId, sendMessage]
+    [terminalId, boundBackendId, sendMessage, sendToServer]
   );
 
   return (

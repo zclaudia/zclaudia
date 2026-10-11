@@ -1,7 +1,9 @@
 import type { BrowserPickedElement } from '@zclaudia/shared/wire/messages/browser';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages/index';
 import { useBrowserStore } from './browserStore';
-import { openToolInWorkspace } from '../../actions/workspaceActions';
+import { useAppearanceStore } from '../../stores/appearanceStore';
+import { useRightSidebarStore } from '../../stores/rightSidebarStore';
+import { openToolInWorkspace, workspaceIdForSession } from '../../actions/workspaceActions';
 import { isPanelAvailable } from '../../actions/openPanel';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useRightWorkspaceStore, findPaneWithTool } from '../../stores/rightWorkspaceStore';
@@ -91,9 +93,11 @@ export function handleBrowserMessage(msg: ServerMessage): boolean {
       // from mid-task.
       const isSelectedSession = useSelectionStore.getState().selectedSessionId === msg.sessionId;
       if (msg.active && isPanelAvailable('browser') && isSelectedSession) {
-        const root = useRightWorkspaceStore.getState().bySession[msg.sessionId]?.root ?? null;
+        const root = useRightWorkspaceStore.getState().bySession[workspaceIdForSession(msg.sessionId)]?.root ?? null;
         const alreadyOpen = findPaneWithTool(root, 'browser', undefined, true) !== null;
-        if (!alreadyOpen) {
+        if (useAppearanceStore.getState().unifiedWorkspace && useRightSidebarStore.getState().collapsed) {
+          useRightSidebarStore.getState().markUnread();
+        } else if (!alreadyOpen) {
           openToolInWorkspace(msg.sessionId, 'browser');
         }
       }

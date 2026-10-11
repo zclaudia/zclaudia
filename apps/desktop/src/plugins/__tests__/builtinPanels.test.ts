@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { usePluginStore } from '../../stores/pluginStore';
 import { initBuiltinPanels } from '../builtinPanels';
+import type { UIExtension } from '../../stores/pluginStore';
+
+const { terminal } = vi.hoisted(() => ({ terminal: {
+  drawerOpen: {} as Record<string, boolean>, setDrawerOpen: vi.fn(),
+} }));
 
 // Mock heavy component imports to prevent hangs in test environment
 vi.mock('../../components/terminal/TerminalPanel', () => ({
@@ -37,7 +42,7 @@ vi.mock('../../features/browser/BrowserPanel', () => ({
   BrowserPanel: () => null,
 }));
 vi.mock('../../stores/terminalStore', () => ({
-  useTerminalStore: { getState: () => ({ drawerOpen: {}, setDrawerOpen: vi.fn() }) },
+  useTerminalStore: { getState: () => terminal },
 }));
 vi.mock('../../stores/fileViewerStore', () => ({
   useFileViewerStore: { getState: () => ({ close: vi.fn() }) },
@@ -48,9 +53,30 @@ vi.mock('../../stores/draftEditorStore', () => ({
 
 describe('initBuiltinPanels', () => {
   beforeEach(() => {
+    terminal.drawerOpen = {};
+    terminal.setDrawerOpen.mockReset();
     usePluginStore.setState({
       panels: [],
     } as any);
+  });
+
+  it('closes only the supplied terminal scope while retaining legacy close-all', () => {
+    const panels: UIExtension[] = [];
+    usePluginStore.setState({ registerPanel: panel => { panels.push(panel); } });
+    initBuiltinPanels();
+    terminal.drawerOpen = { 'backend-A::project': true, 'backend-B::project': true, 'no-backend::offline-project': true };
+    const onClose = panels.find(panel => panel.id === 'terminal')!.onClose!;
+    onClose({ sessionId: 'chat-A', projectId: 'project', backendId: 'backend-A', instanceKey: 'backend-A::project' });
+    expect(terminal.setDrawerOpen).toHaveBeenCalledExactlyOnceWith('project', false, 'backend-A');
+    terminal.setDrawerOpen.mockClear();
+    onClose({ sessionId: 'offline-chat', projectId: 'offline-project', backendId: null, instanceKey: 'no-backend::offline-project' });
+    expect(terminal.setDrawerOpen).toHaveBeenCalledExactlyOnceWith('offline-project', false, 'no-backend');
+    terminal.setDrawerOpen.mockClear();
+    onClose({ sessionId: 'unknown-chat' });
+    expect(terminal.setDrawerOpen).not.toHaveBeenCalled();
+    onClose();
+    expect(terminal.setDrawerOpen).toHaveBeenCalledTimes(3);
+    expect(terminal.setDrawerOpen).toHaveBeenCalledWith('project', false, 'backend-B');
   });
 
   it('registers terminal, file-viewer, draft, session-changes, memory, notifications, lineage, git, and browser panels', async () => {
@@ -179,6 +205,24 @@ describe('builtinPanels openMode', () => {
   beforeEach(() => {
     usePluginStore.setState({ panels: [], registerPanel: realRegisterPanel });
     initBuiltinPanels();
+  });
+
+  it('retains registered panel identity and open state on repeated bootstrap', () => {
+    usePluginStore.getState().updatePanelVisibility('memory', true);
+    const original = usePluginStore.getState().panels;
+    initBuiltinPanels();
+    expect(usePluginStore.getState().panels).toBe(original);
+    expect(original.find(panel => panel.id === 'memory')?.visible).toBe(true);
+  });
+
+  it('restores a missing builtin without replacing other registered panels', () => {
+    const terminal = usePluginStore.getState().panels.find(panel => panel.id === 'terminal');
+    usePluginStore.getState().unregisterPanel('draft');
+    initBuiltinPanels();
+    const restored = usePluginStore.getState().panels;
+    expect(restored).toHaveLength(9);
+    expect(restored.find(panel => panel.id === 'terminal')).toBe(terminal);
+    expect(restored.find(panel => panel.id === 'draft')?.builtin).toBe(true);
   });
 
   it('marks terminal / notifications / lineage / browser as dedicated', () => {

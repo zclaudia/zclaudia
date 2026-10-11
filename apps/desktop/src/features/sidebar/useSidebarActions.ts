@@ -11,6 +11,10 @@ import { ApiError } from '../../services/api';
 import { confirm } from '../../stores/confirmDialogStore';
 import { reorderProjects } from '../../services/api/projects';
 import { reorderSessions } from '../../services/api/sessions';
+import { useAppearanceStore } from '../../stores/appearanceStore';
+import { useProjectStore } from '../../stores/projectStore';
+import { selectProjectChat, resolveProjectWorkspace } from '../../actions/projectWorkspaceActions';
+
 
 interface UseSidebarActionsOptions {
   isConnected: boolean;
@@ -212,6 +216,14 @@ export function useSidebarActions({
 
   const handleSessionSelect = useCallback(
     (sessionId: string) => {
+      if (!isMobile && useAppearanceStore.getState().unifiedWorkspace) {
+        const sessions = useProjectStore.getState().sessions;
+        const session = sessions.find(item => item.id === sessionId);
+        if (session?.projectId) {
+          resolveProjectWorkspace(session.projectId, sessions.filter(item => item.projectId === session.projectId).map(item => item.id), sessionId);
+          selectProjectChat(session.projectId, sessionId);
+        }
+      }
       selectSession(sessionId);
       if (isMobile && onClose) onClose();
     },
