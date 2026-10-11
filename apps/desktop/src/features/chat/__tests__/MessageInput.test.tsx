@@ -639,6 +639,45 @@ describe('MessageInput', () => {
       fireEvent.change(textarea, { target: { value: 'a' } });
       expect(textarea.style.height).toBe('24px');
     });
+
+    it('re-fits when only the textarea width changes (no stuck inflated height)', () => {
+      // rich-textarea creates its own observers too; only the one watching the
+      // <textarea> belongs to the auto-fit under test.
+      const watchers = new Map<Element, () => void>();
+      const originalResizeObserver = globalThis.ResizeObserver;
+      globalThis.ResizeObserver = class {
+        private cb: () => void;
+        constructor(cb: () => void) {
+          this.cb = cb;
+        }
+        observe(el: Element) {
+          watchers.set(el, this.cb);
+        }
+        unobserve() {}
+        disconnect() {}
+      } as unknown as typeof ResizeObserver;
+      try {
+        render(<MessageInput {...defaultProps} />);
+        const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+        const refit = watchers.get(textarea);
+        expect(refit).toBeDefined();
+
+        // Composer first lays out in a narrow pane: the placeholder wraps and the
+        // inflated height gets frozen inline.
+        Object.defineProperty(textarea, 'clientWidth', { configurable: true, value: 40 });
+        Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 120 });
+        refit!();
+        expect(textarea.style.height).toBe('120px');
+
+        // The pane widens; nothing else changes. Width alone must re-measure.
+        Object.defineProperty(textarea, 'clientWidth', { configurable: true, value: 424 });
+        Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 24 });
+        refit!();
+        expect(textarea.style.height).toBe('24px');
+      } finally {
+        globalThis.ResizeObserver = originalResizeObserver;
+      }
+    });
   });
 
   // ── Attachments ───────────────────────────────────────────────────────────

@@ -95,6 +95,8 @@ export function MessageInput({
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
 
   const textareaRef = useRef<RichTextareaHandle>(null);
+  // Lets us reach the real <textarea> for ResizeObserver: the RichTextarea ref is an imperative handle, not an Element.
+  const rootRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
   const mentionListRef = useRef<HTMLDivElement>(null);
@@ -225,7 +227,7 @@ export function MessageInput({
   // Auto-resize: grow from one line up to a cap, then scroll. Bidirectional —
   // resetting height to 'auto' before measuring lets it shrink as content is
   // deleted. rich-textarea's backdrop tracks the textarea size via ResizeObserver.
-  useEffect(() => {
+  const fitTextarea = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
@@ -248,7 +250,30 @@ export function MessageInput({
     textarea.style.height = `${Math.min(textarea.scrollHeight, max)}px`;
     textarea.style.maxHeight = `${max}px`;
     textarea.style.overflowY = textarea.scrollHeight > max ? 'auto' : 'hidden';
-  }, [value, isMobile, expandedInputHeight, availableViewportHeight]);
+  }, [isMobile, expandedInputHeight, availableViewportHeight]);
+
+  useEffect(() => {
+    fitTextarea();
+  }, [value, fitTextarea]);
+
+  // The measurement depends on the textarea's width (wrapped lines), but none of
+  // the effect deps change when only the width does. If the composer first
+  // lays out while its pane is still narrow, the empty placeholder wraps, the
+  // inflated height is frozen inline, and it stays until something unrelated
+  // (a window resize) re-measures. Re-fit whenever the width changes.
+  useEffect(() => {
+    const element = rootRef.current?.querySelector('textarea');
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    let lastWidth = element.clientWidth;
+    const observer = new ResizeObserver(() => {
+      const width = element.clientWidth;
+      if (width === lastWidth) return;
+      lastWidth = width;
+      fitTextarea();
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [fitTextarea]);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -664,7 +689,7 @@ export function MessageInput({
     !!onSendLiterally && value.startsWith('/') && /^\/[A-Za-z][A-Za-z0-9_-]*:[^\s]*/.test(value);
 
   return (
-    <div className="relative">
+    <div ref={rootRef} className="relative">
       {/* Cursor-style command/skill dropdown */}
       {showCommands && (
         <SlashMenu
