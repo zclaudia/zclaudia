@@ -822,7 +822,7 @@ export function MessageInput({
            while +/send use self-end to stay pinned to the bottom as it grows. */
         <div
           data-testid="composer-box"
-          className="flex items-center gap-2 rounded-2xl border border-border bg-input px-2.5 py-2 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
+          className="flex items-center gap-2 rounded-2xl border border-border bg-input px-2.5 py-2 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-focus-ring"
         >
           {/* Attachment button */}
           <button

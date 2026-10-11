@@ -77,6 +77,13 @@ describe('SessionItem', () => {
     expect(screen.queryByRole('menu')).toBeNull();
     expect(trigger).toHaveFocus();
   });
+  it('marks only the selected row with data-selected (theme hook for the leading bar)', () => {
+    const { rerender } = render(<SessionItem session={mockSession} isSelected onSelect={vi.fn()} hasPending={false} />);
+    expect(screen.getByTestId('session-item').querySelector('button')?.getAttribute('data-selected')).toBe('true');
+    rerender(<SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />);
+    expect(screen.getByTestId('session-item').querySelector('button')?.hasAttribute('data-selected')).toBe(false);
+  });
+
   it('renders session name', () => {
     render(
       <SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />

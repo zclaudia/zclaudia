@@ -63,6 +63,8 @@ export default {
         'apple-md': 'var(--shadow-md)',
         'apple-lg': 'var(--shadow-lg)',
         'apple-xl': 'var(--shadow-xl)',
+        // Focus halo for the composer; themes may add a colored ring (see --shadow-focus)
+        'focus-ring': 'var(--shadow-focus)',
       },
       fontFamily: {
         sans: ['var(--font-sans)'],

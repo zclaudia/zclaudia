@@ -26,6 +26,7 @@ export function ProjectWorkspaceItem({
     <div className="relative" data-testid="supervisor-group">
       <button
         onClick={onSelect}
+        data-selected={isSelected || undefined}
         className={`w-full flex items-center gap-1.5 px-1 h-7 rounded-md transition-colors ${
           isSelected
             ? 'bg-accent text-foreground'

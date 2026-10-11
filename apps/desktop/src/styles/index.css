@@ -90,6 +90,9 @@
     --shadow-md: 0 2px 8px -1px rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
     --shadow-lg: 0 4px 16px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
     --shadow-xl: 0 8px 32px -4px rgb(0 0 0 / 0.12), 0 4px 8px -2px rgb(0 0 0 / 0.06);
+
+    /* Composer focus: elevation only by default; themes can layer a halo on top. */
+    --shadow-focus: var(--shadow-md);
   }
 
   /* Light theme — cool (counterpart of dark-cool) */
@@ -251,6 +254,25 @@
     --shadow-md: 0 2px 10px -1px rgb(30 30 90 / 0.07), 0 1px 2px -1px rgb(30 30 90 / 0.05);
     --shadow-lg: 0 4px 18px -2px rgb(30 30 90 / 0.1), 0 2px 4px -2px rgb(30 30 90 / 0.05);
     --shadow-xl: 0 8px 32px -4px rgb(30 30 90 / 0.14), 0 4px 8px -2px rgb(30 30 90 / 0.06);
+
+    /* Soft indigo halo around the focused composer */
+    --shadow-focus: 0 0 0 3px hsl(var(--primary) / 0.16), var(--shadow-md);
+  }
+
+  /* Indigo: selected sidebar rows (sessions, nav, workspace) carry a 2px primary
+   * bar on the leading edge. Rows opt in with data-selected; other themes ignore it. */
+  .light-indigo [data-selected='true'] {
+    position: relative;
+  }
+  .light-indigo [data-selected='true']::before {
+    content: '';
+    position: absolute;
+    left: 0.25rem;
+    top: 0.375rem;
+    bottom: 0.375rem;
+    width: 2px;
+    border-radius: 2px;
+    background: hsl(var(--primary));
   }
 
   /* Dark theme — Neutral (default fallback), warm charcoal */

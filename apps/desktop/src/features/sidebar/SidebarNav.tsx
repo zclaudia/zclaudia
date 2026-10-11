@@ -120,6 +120,7 @@ function ModeTabsNav<K extends string>({
               type="button"
               onClick={() => onSelect(key)}
               aria-label={label}
+              data-selected={active || undefined}
               className={rowClass(active)}
             >
               <Icon className={iconClass(active)} strokeWidth={1.75} />
@@ -214,7 +215,12 @@ export function SidebarNav({
   return (
     <>
       <div className="p-2 space-y-0.5">
-        <button onClick={onHome} aria-label="Home" className={rowClass(!!isHomeActive)}>
+        <button
+          onClick={onHome}
+          aria-label="Home"
+          data-selected={isHomeActive || undefined}
+          className={rowClass(!!isHomeActive)}
+        >
           <Home className={iconClass(!!isHomeActive)} strokeWidth={1.75} />
           Home
         </button>
@@ -224,6 +230,7 @@ export function SidebarNav({
           <button
             onClick={onOpenClaudia}
             aria-label="Claudia"
+            data-selected={isClaudiaActive || undefined}
             className={rowClass(!!isClaudiaActive)}
           >
             <BrandMark

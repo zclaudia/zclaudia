@@ -138,6 +138,7 @@ export function SessionItem({
             sourceIndex: source?.tools.findIndex(ref => ref.toolId === 'chat' && ref.instanceKey === session.id),
           }, { x: event.clientX, y: event.clientY });
         }}
+        data-selected={isSelected || undefined}
         // Mobile sits inside the always-on rail at the 44px tier; desktop keeps
         // the negative-margin pull so its hover fill spans the rail padding.
         className={`text-left rounded-md truncate flex items-center transition-colors ${
