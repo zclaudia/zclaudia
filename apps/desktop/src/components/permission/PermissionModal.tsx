@@ -262,7 +262,7 @@ export function PermissionModal({ request, queueSize = 0, onDecision }: Permissi
                     setPromoteRuleText('');
                   }
                 }}
-                className="w-5 h-5 rounded-md border-input bg-background text-primary focus:ring-primary"
+                className="w-5 h-5 rounded-md border-border bg-background text-primary focus:ring-primary"
               />
               <span className="text-sm text-foreground">
                 Remember this decision for this session
@@ -286,7 +286,7 @@ export function PermissionModal({ request, queueSize = 0, onDecision }: Permissi
                     setPromoteRuleText('');
                   }
                 }}
-                className="w-5 h-5 rounded-md border-input bg-background text-primary focus:ring-primary"
+                className="w-5 h-5 rounded-md border-border bg-background text-primary focus:ring-primary"
               />
               <span className="text-sm text-foreground">Always allow in this project</span>
             </label>

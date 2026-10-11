@@ -243,6 +243,51 @@ export const themes = [
     accents: { ...lightAccents, ...lightCode(225, 10) },
   },
   {
+    // Layered light theme with one signature color. Compared with `light`
+    // the surface ladder is wider (sidebar 92.5 / background 98.5 / card 100),
+    // the neutrals carry a visible blue-violet tint, and primary is indigo so
+    // send, focus ring, active tab and selected row finally have a colored
+    // anchor. Radius and shadows are theme-level (see `.light-indigo` in
+    // index.css), not generated.
+    name: 'light-indigo',
+    selector: '.light-indigo',
+    hue: 235,
+    neutrals: {
+      background: [235, 25, 98.5],
+      foreground: [235, 14, 10],
+      card: [235, 20, 100],
+      sidebar: [235, 26, 92.5],
+      'card-foreground': [235, 14, 10],
+      popover: [235, 20, 100],
+      'popover-foreground': [235, 14, 10],
+      secondary: [235, 20, 92],
+      'secondary-foreground': [235, 14, 20],
+      muted: [235, 20, 94],
+      'muted-foreground': [235, 8, 40],
+      // hover / selected-row wash: the indigo tint from the mockup
+      accent: [235, 60, 95],
+      'accent-foreground': [235, 14, 20],
+      border: [235, 18, 88],
+      // `bg-input` (composer, fields) is the field fill, not a border: keep it
+      // lighter than the sidebar and let `border-border` draw the outline.
+      input: [235, 30, 96],
+      'scrollbar-thumb': [235, 12, 78],
+      'scrollbar-thumb-hover': [235, 12, 64],
+      'terminal-bg': [235, 25, 96],
+      'terminal-fg': [235, 14, 10],
+    },
+    accents: {
+      ...lightAccents,
+      primary: [238, 62, 58],
+      ring: [238, 62, 58],
+      // thinking moves off 265 so it stays distinguishable from indigo primary
+      thinking: [292, 40, 47],
+      'terminal-cursor': [238, 62, 58],
+      'terminal-selection': [238, 65, 90],
+      ...lightCode(235, 20),
+    },
+  },
+  {
     name: 'dark',
     selector: '.dark',
     hue: 35,

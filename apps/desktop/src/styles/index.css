@@ -169,6 +169,90 @@
     /* @generated:tokens end */
   }
 
+  /* Light theme — indigo (layered surfaces, one signature color) */
+  .light-indigo {
+    /* @generated:tokens light-indigo — edit apps/desktop/scripts/tokens/config.mjs, run pnpm gen:tokens */
+    --background: 235 25% 98.5%;
+    --foreground: 235 14% 10%;
+    --card: 235 20% 100%;
+    --sidebar: 235 26% 92.5%;
+    --card-foreground: 235 14% 10%;
+    --popover: 235 20% 100%;
+    --popover-foreground: 235 14% 10%;
+    --secondary: 235 20% 92%;
+    --secondary-foreground: 235 14% 20%;
+    --muted: 235 20% 94%;
+    --muted-foreground: 235 8% 40%;
+    --accent: 235 60% 95%;
+    --accent-foreground: 235 14% 20%;
+    --border: 235 18% 88%;
+    --input: 235 30% 96%;
+    --scrollbar-thumb: 235 12% 78%;
+    --scrollbar-thumb-hover: 235 12% 64%;
+    --terminal-bg: 235 25% 96%;
+    --terminal-fg: 235 14% 10%;
+    --primary: 238 62% 58%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 238 62% 58%;
+    --destructive: 4 66% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 150 48% 33%;
+    --success-foreground: 150 40% 97%;
+    --warning: 38 80% 44%;
+    --warning-foreground: 35 80% 12%;
+    --thinking: 292 40% 47%;
+    --thinking-foreground: 265 60% 97%;
+    --terminal-cursor: 238 62% 58%;
+    --terminal-selection: 238 65% 90%;
+    --glyph-red: 4 60% 48%;
+    --glyph-orange: 24 70% 46%;
+    --glyph-amber: 42 72% 44%;
+    --glyph-green: 150 45% 38%;
+    --glyph-teal: 180 45% 38%;
+    --glyph-blue: 214 65% 48%;
+    --glyph-purple: 265 45% 52%;
+    --glyph-pink: 330 55% 52%;
+    --glyph-gray: 45 5% 50%;
+    --terminal-ansi-black: 45 8% 16%;
+    --terminal-ansi-red: 4 66% 45%;
+    --terminal-ansi-green: 150 48% 33%;
+    --terminal-ansi-yellow: 38 80% 38%;
+    --terminal-ansi-blue: 214 70% 45%;
+    --terminal-ansi-magenta: 285 45% 48%;
+    --terminal-ansi-cyan: 190 65% 32%;
+    --terminal-ansi-white: 45 6% 78%;
+    --terminal-ansi-bright-black: 45 5% 43%;
+    --terminal-ansi-bright-red: 4 70% 52%;
+    --terminal-ansi-bright-green: 150 45% 40%;
+    --terminal-ansi-bright-yellow: 40 78% 45%;
+    --terminal-ansi-bright-blue: 214 70% 56%;
+    --terminal-ansi-bright-magenta: 285 50% 58%;
+    --terminal-ansi-bright-cyan: 190 60% 40%;
+    --terminal-ansi-bright-white: 45 10% 88%;
+    --code-bg: 235 20% 95%;
+    --code-comment: 235 5% 45%;
+    --code-punctuation: 235 5% 38%;
+    --code-keyword: 265 45% 48%;
+    --code-string: 150 48% 30%;
+    --code-function: 214 70% 42%;
+    --code-number: 24 70% 40%;
+    --code-class: 42 72% 34%;
+    --code-variable: 190 60% 30%;
+    --code-tag: 4 60% 44%;
+    --code-attr: 24 65% 40%;
+    --code-regex: 190 55% 32%;
+    --code-deleted: 4 66% 45%;
+    --code-inserted: 150 48% 33%;
+    /* @generated:tokens end */
+
+    /* Larger radius and tinted, softer shadows than the default light theme */
+    --radius: 1rem;
+    --shadow-sm: 0 1px 2px 0 rgb(30 30 90 / 0.05);
+    --shadow-md: 0 2px 10px -1px rgb(30 30 90 / 0.07), 0 1px 2px -1px rgb(30 30 90 / 0.05);
+    --shadow-lg: 0 4px 18px -2px rgb(30 30 90 / 0.1), 0 2px 4px -2px rgb(30 30 90 / 0.05);
+    --shadow-xl: 0 8px 32px -4px rgb(30 30 90 / 0.14), 0 4px 8px -2px rgb(30 30 90 / 0.06);
+  }
+
   /* Dark theme — Neutral (default fallback), warm charcoal */
   .dark {
     /* @generated:tokens dark — edit apps/desktop/scripts/tokens/config.mjs, run pnpm gen:tokens */

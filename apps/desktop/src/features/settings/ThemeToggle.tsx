@@ -5,6 +5,7 @@ import {
   Moon,
   Flame,
   Snowflake,
+  Palette,
   Monitor,
   Check,
   ChevronDown,
@@ -15,6 +16,7 @@ import { DropdownMenu, type DropdownMenuEntry } from '../../components/ui/Dropdo
 const THEME_OPTIONS: { value: Theme; label: string; icon: LucideIcon }[] = [
   { value: 'light', label: 'Light', icon: Sun },
   { value: 'light-cool', label: 'Light Cool', icon: SunSnow },
+  { value: 'light-indigo', label: 'Light Indigo', icon: Palette },
   { value: 'dark-neutral', label: 'Dark', icon: Moon },
   { value: 'dark-warm', label: 'Dark Warm', icon: Flame },
   { value: 'dark-cool', label: 'Dark Cool', icon: Snowflake },
@@ -24,6 +26,7 @@ const THEME_OPTIONS: { value: Theme; label: string; icon: LucideIcon }[] = [
 function getButtonIcon(theme: Theme, resolvedTheme: string): LucideIcon {
   if (theme === 'system') return Monitor;
   if (theme === 'light-cool') return SunSnow;
+  if (theme === 'light-indigo') return Palette;
   if (isDarkTheme(resolvedTheme as any)) return Moon;
   return Sun;
 }
@@ -31,7 +34,8 @@ function getButtonIcon(theme: Theme, resolvedTheme: string): LucideIcon {
 export function ThemeToggle() {
   const { theme, resolvedTheme, setTheme } = useTheme();
 
-  const currentOption = THEME_OPTIONS.find(opt => opt.value === theme) || THEME_OPTIONS[5];
+  const currentOption =
+    THEME_OPTIONS.find(opt => opt.value === theme) || THEME_OPTIONS[THEME_OPTIONS.length - 1];
   const ButtonIcon = getButtonIcon(theme, resolvedTheme);
 
   const entries: DropdownMenuEntry[] = THEME_OPTIONS.map(option => {

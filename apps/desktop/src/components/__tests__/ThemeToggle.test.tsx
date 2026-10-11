@@ -53,10 +53,10 @@ describe('ThemeToggle', () => {
     expect(screen.getByText('System')).toBeTruthy();
   });
 
-  it('renders all six theme options in the menu', () => {
+  it('renders all seven theme options in the menu', () => {
     render(<ThemeToggle />);
     openMenu();
-    expect(screen.getAllByRole('menuitem').length).toBe(6);
+    expect(screen.getAllByRole('menuitem').length).toBe(7);
   });
 
   it('closes the menu when the toggle button is clicked again', () => {
@@ -100,6 +100,13 @@ describe('ThemeToggle', () => {
     openMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Light Cool' }));
     expect(mockSetTheme).toHaveBeenCalledWith('light-cool');
+  });
+
+  it('selects light-indigo theme', () => {
+    render(<ThemeToggle />);
+    openMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Light Indigo' }));
+    expect(mockSetTheme).toHaveBeenCalledWith('light-indigo');
   });
 
   it('marks the current theme option with primary styling', () => {

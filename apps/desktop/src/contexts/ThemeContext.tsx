@@ -1,7 +1,20 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
-export type Theme = 'light' | 'light-cool' | 'dark-neutral' | 'dark-warm' | 'dark-cool' | 'system';
-export type ResolvedTheme = 'light' | 'light-cool' | 'dark-neutral' | 'dark-warm' | 'dark-cool';
+export type Theme =
+  | 'light'
+  | 'light-cool'
+  | 'light-indigo'
+  | 'dark-neutral'
+  | 'dark-warm'
+  | 'dark-cool'
+  | 'system';
+export type ResolvedTheme =
+  | 'light'
+  | 'light-cool'
+  | 'light-indigo'
+  | 'dark-neutral'
+  | 'dark-warm'
+  | 'dark-cool';
 
 export function isDarkTheme(theme: ResolvedTheme): boolean {
   return theme === 'dark-neutral' || theme === 'dark-warm' || theme === 'dark-cool';
@@ -18,10 +31,11 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 const STORAGE_KEY = 'zclaudia-theme';
 const DEFAULT_DARK: ResolvedTheme = 'dark-neutral';
 const DARK_VARIANT_CLASSES = ['dark-neutral', 'dark-warm', 'dark-cool'];
-const LIGHT_VARIANT_CLASSES = ['light-cool'];
+const LIGHT_VARIANT_CLASSES = ['light-cool', 'light-indigo'];
 const VALID_THEMES: Theme[] = [
   'light',
   'light-cool',
+  'light-indigo',
   'dark-neutral',
   'dark-warm',
   'dark-cool',
@@ -32,6 +46,7 @@ const VALID_THEMES: Theme[] = [
 const THEME_META_COLORS: Record<ResolvedTheme, string> = {
   light: '#f9f8f5',
   'light-cool': '#f6f7f8',
+  'light-indigo': '#fafafc',
   'dark-neutral': '#171614',
   'dark-warm': '#171614',
   'dark-cool': '#131418',
@@ -58,9 +73,8 @@ function resolveTheme(theme: Theme): ResolvedTheme {
  * clear the light appearance. Best-effort: absent (non-Android) → no-op.
  */
 function syncAndroidSystemBars(resolved: ResolvedTheme) {
-  const bridge = (
-    window as { AndroidSystemBars?: { setLight?: (light: boolean) => void } }
-  ).AndroidSystemBars;
+  const bridge = (window as { AndroidSystemBars?: { setLight?: (light: boolean) => void } })
+    .AndroidSystemBars;
   bridge?.setLight?.(!isDarkTheme(resolved));
 }
 

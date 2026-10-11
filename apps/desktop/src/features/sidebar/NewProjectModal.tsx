@@ -204,7 +204,7 @@ export function NewProjectModal({
 
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] font-medium text-muted-foreground">Working directory</span>
-            <div className="flex h-9 items-center overflow-hidden rounded-md border border-input bg-background/70 transition-colors focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
+            <div className="flex h-9 items-center overflow-hidden rounded-md border border-border bg-background/70 transition-colors focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
               <input
                 type="text"
                 aria-label="Working directory"

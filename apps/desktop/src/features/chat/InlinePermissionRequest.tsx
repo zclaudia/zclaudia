@@ -325,7 +325,7 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
               type="checkbox"
               checked={remember}
               onChange={e => setRemember(e.target.checked)}
-              className="w-3.5 h-3.5 rounded-md border-input bg-background text-primary focus:ring-primary"
+              className="w-3.5 h-3.5 rounded-md border-border bg-background text-primary focus:ring-primary"
             />
             Remember
           </label>
