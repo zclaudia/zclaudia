@@ -875,7 +875,10 @@ export function MessageInput({
               (kills the inline-block baseline gap) so the single line is
               vertically centered; the +/send buttons use self-end to anchor
               to the bottom as the box grows. */}
-          <div className="flex-1 relative flex items-center">
+          {/* -ml-3 cancels the textarea's 0.6em left padding (kept so the
+              overflow:hidden root doesn't clip the caret/glyph edge) plus part of
+              the flex gap, tightening the +-to-text distance. */}
+          <div className="relative -ml-3 flex flex-1 items-center">
             <RichTextarea
               data-testid="message-input"
               ref={textareaRef}
