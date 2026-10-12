@@ -127,6 +127,9 @@ if [ "$INSTALL_ONLY" = true ]; then
   [ -z "$OUTPUT" ] && { echo "ERROR: No APK found in $APK_DIR"; exit 1; }
 else
   APK_NAME="zclaudia-${VERSION}"
+  if [ "$DEV" = true ] && [[ "$VERSION" != *-dev* ]]; then
+    APK_NAME="${APK_NAME}-dev"
+  fi
   OUTPUT="$APK_DIR/${APK_NAME}.apk"
 fi
 
@@ -174,9 +177,16 @@ mkdir -p "$ANDROID_APP_DIR/java/$ANDROID_APP_PACKAGE_PATH"
 cp "$ANDROID_OVERRIDES_DIR/java/$ANDROID_SOURCE_PACKAGE_PATH/"*.kt "$ANDROID_APP_DIR/java/$ANDROID_APP_PACKAGE_PATH/"
 cp "$ANDROID_OVERRIDES_DIR/res/xml/file_paths.xml" "$ANDROID_APP_DIR/res/xml/file_paths.xml"
 cp "$ANDROID_OVERRIDES_DIR/res/xml/network_security_config.xml" "$ANDROID_APP_DIR/res/xml/network_security_config.xml"
+mkdir -p "$ANDROID_RES_DIR/values"
+cp "$ANDROID_OVERRIDES_DIR/res/values/strings.xml" "$ANDROID_RES_DIR/values/strings.xml"
 cp -R apps/desktop/src-tauri/icons/android/. "$ANDROID_RES_DIR/"
 
 ANDROID_MANIFEST="$ANDROID_APP_DIR/AndroidManifest.xml"
+if [ -f "$ANDROID_MANIFEST" ] && grep -q 'android:label="@string/main_activity_title"' "$ANDROID_MANIFEST"; then
+  TMP_MANIFEST="$(mktemp)"
+  awk '{ sub(/android:label="@string\/main_activity_title"/, "android:label=\"@string/app_name\""); print }' "$ANDROID_MANIFEST" > "$TMP_MANIFEST"
+  mv "$TMP_MANIFEST" "$ANDROID_MANIFEST"
+fi
 if [ -f "$ANDROID_MANIFEST" ]; then
   missing_notification_permission=0
   missing_fgs_permission=0
@@ -432,6 +442,26 @@ if [ -f "$GRADLE_FILE" ] && ! grep -q "isDevBuild" "$GRADLE_FILE"; then
   mv "$TMP_GRADLE_FILE" "$GRADLE_FILE"
   echo "  Added applicationIdSuffix .dev for dev builds"
   echo ""
+fi
+
+# Keep existing generated projects aligned with the current Dev branding.
+if [ -f "$GRADLE_FILE" ]; then
+  ADD_DEV_ICONS=0
+  grep -q 'manifestPlaceholders\["appIcon"\] = "@mipmap/ic_launcher_dev"' "$GRADLE_FILE" || ADD_DEV_ICONS=1
+  TMP_GRADLE_FILE="$(mktemp)"
+  awk -v add_dev_icons="$ADD_DEV_ICONS" '
+    /resValue\("string", "app_name", "(ZClaudia|Claudia) Dev"\)/ {
+      sub(/"ZClaudia Dev"/, "\"Claudia Dev\"")
+      print
+      if (add_dev_icons == 1) {
+        print "                manifestPlaceholders[\"appIcon\"] = \"@mipmap/ic_launcher_dev\""
+        print "                manifestPlaceholders[\"appRoundIcon\"] = \"@mipmap/ic_launcher_dev_round\""
+      }
+      next
+    }
+    { print }
+  ' "$GRADLE_FILE" > "$TMP_GRADLE_FILE"
+  mv "$TMP_GRADLE_FILE" "$GRADLE_FILE"
 fi
 
 # --- Build ---

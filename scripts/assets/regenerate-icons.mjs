@@ -15,6 +15,8 @@ const DESKTOP = path.join(ROOT, 'apps/desktop');
 const ICONS = 'apps/desktop/src-tauri/icons';
 const PUBLIC = 'apps/desktop/public';
 const BACKGROUND = '#F4F6FA';
+// Reduce mobile mascot width and height by 15% around the icon center.
+const MOBILE_HEAD_SCALE = 0.85;
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
 const IOS_SIZES = {
   'AppIcon-20x20@1x.png': 20,
@@ -107,10 +109,16 @@ async function main() {
     '<rect width="512" height="512" rx="104" fill="' + BACKGROUND + '" />' + scaled(0.88)
   );
   const mobileSvg = svg(
+    '<rect width="512" height="512" fill="' + BACKGROUND + '" />' +
+      scaled(0.88 * MOBILE_HEAD_SCALE)
+  );
+  // macOS 26 applies its own rounded mask. Transparent, pre-rounded corners
+  // make legacy ICNS icons receive a second system background around the art.
+  const macosSvg = svg(
     '<rect width="512" height="512" fill="' + BACKGROUND + '" />' + scaled(0.88)
   );
   // Keep the adaptive foreground inside Android's central safe area.
-  const adaptiveSvg = svg(scaled(0.72));
+  const adaptiveSvg = svg(scaled(0.72 * MOBILE_HEAD_SCALE));
   const outputs = new Map();
   const put = (relative, content) =>
     outputs.set(relative, Buffer.isBuffer(content) ? content : Buffer.from(content));
@@ -140,6 +148,7 @@ async function main() {
   );
   put('assets/zclaudia.svg', source);
   put('apps/desktop/app-icon.svg', appSvg);
+  put('apps/desktop/app-icon-macos.svg', macosSvg);
   put('assets/branding/mascot-c2-monochrome.svg', mono('#000000'));
   await png('assets/branding/mascot-c2-flat.png', source, 1024);
   for (const name of ['logo.png', 'logo-transparent.png', 'logo-transparent-dark.png']) {
@@ -149,6 +158,7 @@ async function main() {
   await png(PUBLIC + '/favicon.png', source, 64);
   await png(PUBLIC + '/apple-touch-icon.png', mobileSvg, 180, true);
   await png('apps/desktop/app-icon.png', appSvg, 1024);
+  await png('apps/desktop/app-icon-macos.png', macosSvg, 1024, true);
   for (const [name, size] of Object.entries({
     '32x32.png': 32,
     '64x64.png': 64,
@@ -171,7 +181,11 @@ async function main() {
     const dir = ICONS + '/android/mipmap-' + density;
     await png(dir + '/ic_launcher.png', mobileSvg, 48 * factor, true);
     await png(dir + '/ic_launcher_foreground.png', adaptiveSvg, 108 * factor);
-    await png(dir + '/ic_launcher_monochrome.png', mono('#FFFFFF', 0.72), 108 * factor);
+    await png(
+      dir + '/ic_launcher_monochrome.png',
+      mono('#FFFFFF', 0.72 * MOBILE_HEAD_SCALE),
+      108 * factor
+    );
     await png(
       ICONS + '/android/drawable-' + density + '/ic_stat_claudia.png',
       mono('#FFFFFF'),
@@ -182,7 +196,7 @@ async function main() {
       '<defs><clipPath id="round"><circle cx="256" cy="256" r="256" /></clipPath></defs><g clip-path="url(#round)"><rect width="512" height="512" fill="' +
         BACKGROUND +
         '" />' +
-        scaled(0.8) +
+        scaled(0.8 * MOBILE_HEAD_SCALE) +
         '</g>'
     );
     await png(dir + '/ic_launcher_round.png', roundSvg, 48 * factor);
@@ -212,12 +226,16 @@ async function main() {
       outputs.get('apps/desktop/app-icon.png')
     );
     await fs.writeFile(
+      path.join(temporary, 'macos-icon.png'),
+      outputs.get('apps/desktop/app-icon-macos.png')
+    );
+    await fs.writeFile(
       path.join(temporary, 'favicon.png'),
       await sharp(Buffer.from(source), { density: 288 }).resize(1024, 1024).png().toBuffer()
     );
     const requireDesktop = createRequire(path.join(DESKTOP, 'package.json'));
     const cli = requireDesktop.resolve('@tauri-apps/cli/tauri.js');
-    for (const name of ['app-icon', 'favicon']) {
+    for (const name of ['app-icon', 'macos-icon', 'favicon']) {
       const destination = path.join(temporary, name);
       const result = spawnSync(
         process.execPath,
@@ -230,7 +248,7 @@ async function main() {
     }
     put(
       ICONS + '/icon.icns',
-      canonicalIcns(await fs.readFile(path.join(temporary, 'app-icon/icon.icns')))
+      canonicalIcns(await fs.readFile(path.join(temporary, 'macos-icon/icon.icns')))
     );
     put(ICONS + '/icon.ico', await fs.readFile(path.join(temporary, 'app-icon/icon.ico')));
     put(PUBLIC + '/favicon.ico', await fs.readFile(path.join(temporary, 'favicon/icon.ico')));
