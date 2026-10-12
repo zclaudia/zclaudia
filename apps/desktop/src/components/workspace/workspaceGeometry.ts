@@ -45,9 +45,7 @@ export interface WorkspaceGeometry extends Size {
 export function flattenPanes(root: LayoutNode | null): PaneNode[] {
   if (!root) return [];
   if (root.kind === 'placeholder') return [];
-  return root.kind === 'pane'
-    ? [root]
-    : root.children.flatMap(child => flattenPanes(child));
+  return root.kind === 'pane' ? [root] : root.children.flatMap(child => flattenPanes(child));
 }
 
 export function minimumWorkspaceSize(root: LayoutNode | null): Size {
@@ -64,7 +62,10 @@ export function minimumWorkspaceSize(root: LayoutNode | null): Size {
     : { width: Math.max(a.width, b.width), height: a.height + b.height + WORKSPACE_GUTTER };
 }
 
-export function clampGeometryRatio(ratio: number, group: Pick<GroupGeometry, 'minRatio' | 'maxRatio'>): number {
+export function clampGeometryRatio(
+  ratio: number,
+  group: Pick<GroupGeometry, 'minRatio' | 'maxRatio'>
+): number {
   return Math.max(group.minRatio, Math.min(group.maxRatio, Number.isFinite(ratio) ? ratio : 0.5));
 }
 

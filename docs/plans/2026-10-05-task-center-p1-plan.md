@@ -43,13 +43,13 @@ features/task-center/
 
 ## 2. Store 改动 — `stores/backgroundTaskStore.ts`
 
-| 改动 | 说明 |
-|---|---|
-| 删除 `AUTO_REMOVE_DELAY_MS` / `scheduleAutoRemove` / `autoRemoveTimers` | 终态任务不再自动消失；HMR/beforeunload 清理逻辑同步简化 |
-| 新增 `clearTerminalTasks(sessionId?: string)` | "清除已完成"：仅移除 completed/failed/stopped；不带 sessionId 时清当前 server 全部 |
-| 新增 selector `selectRunningCount` | 运行中任务计数。**范围决策：当前 server 全部会话**（任务带 `serverId`/`sessionId`，跨会话条目在 P1 就渲染会话标签；点击跳转依赖会话导航 action，若成本超预期则降级为 P2，P1 先只读展示） |
-| 新增 selector `selectTasksGrouped(sessionId)` | 返回 `{ running, paused, terminal }` 三段，供 `useTaskCenter` 消费 |
-| 保留 PID monitor 不变 | `startPidMonitor`/`stopPidMonitor` 逻辑不动 |
+| 改动                                                                    | 说明                                                                                                                                                                                     |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 删除 `AUTO_REMOVE_DELAY_MS` / `scheduleAutoRemove` / `autoRemoveTimers` | 终态任务不再自动消失；HMR/beforeunload 清理逻辑同步简化                                                                                                                                  |
+| 新增 `clearTerminalTasks(sessionId?: string)`                           | "清除已完成"：仅移除 completed/failed/stopped；不带 sessionId 时清当前 server 全部                                                                                                       |
+| 新增 selector `selectRunningCount`                                      | 运行中任务计数。**范围决策：当前 server 全部会话**（任务带 `serverId`/`sessionId`，跨会话条目在 P1 就渲染会话标签；点击跳转依赖会话导航 action，若成本超预期则降级为 P2，P1 先只读展示） |
+| 新增 selector `selectTasksGrouped(sessionId)`                           | 返回 `{ running, paused, terminal }` 三段，供 `useTaskCenter` 消费                                                                                                                       |
+| 保留 PID monitor 不变                                                   | `startPidMonitor`/`stopPidMonitor` 逻辑不动                                                                                                                                              |
 
 `upsertBackgroundTask`（`services/message-handlers/background-task-messages.ts`）无需改动；四类消息处理不变。
 
@@ -81,23 +81,23 @@ features/task-center/
 
 ## 4. 行为对照表（现状 → P1）
 
-| 行为 | 现状 | P1 |
-|---|---|---|
-| 入口 | 聊天底部横条（常驻占位） | Header Pill（无任务不渲染）+ 底部一行 strip（仅运行中） |
-| 终态任务 | 15 秒自动移除 | 保留至手动 dismiss / 清除已完成 |
-| 列表形态 | 扁平列表 `max-h-40` | 分组 Popover `max-h-[60vh]` |
-| PID 展示 | 行内 `[pid]` 徽标 + hover 查询 | 详情区内联展示，展开时查询 |
-| 计数范围 | 当前会话 | 当前 server 全部会话（跨会话带会话标签） |
+| 行为     | 现状                           | P1                                                      |
+| -------- | ------------------------------ | ------------------------------------------------------- |
+| 入口     | 聊天底部横条（常驻占位）       | Header Pill（无任务不渲染）+ 底部一行 strip（仅运行中） |
+| 终态任务 | 15 秒自动移除                  | 保留至手动 dismiss / 清除已完成                         |
+| 列表形态 | 扁平列表 `max-h-40`            | 分组 Popover `max-h-[60vh]`                             |
+| PID 展示 | 行内 `[pid]` 徽标 + hover 查询 | 详情区内联展示，展开时查询                              |
+| 计数范围 | 当前会话                       | 当前 server 全部会话（跨会话带会话标签）                |
 
 ## 5. 测试
 
-| 文件 | 改动 |
-|---|---|
-| `stores/__tests__/backgroundTaskStore.test.ts` | 删自动移除用例；新增 `clearTerminalTasks`（含 sessionId 过滤）、`selectRunningCount`、`selectTasksGrouped` 用例 |
-| 新增 `features/task-center/__tests__/TaskCenterView.test.tsx` | 分组顺序、hover 操作显隐、详情展开、清除已完成回调 |
-| 新增 `features/task-center/__tests__/TaskPill.test.tsx` | 计数渲染、无任务不渲染、点击开合 |
-| `features/chat/__tests__/ChatInterface.test.tsx` | 更新：BackgroundTaskPanel → TaskAmbientStrip 的挂载断言 |
-| 手动验证 | `pnpm desktop:dev`：跑 `run_in_background` 命令 + 杀进程验证 PID monitor 标 stopped 后任务**不消失** |
+| 文件                                                          | 改动                                                                                                            |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `stores/__tests__/backgroundTaskStore.test.ts`                | 删自动移除用例；新增 `clearTerminalTasks`（含 sessionId 过滤）、`selectRunningCount`、`selectTasksGrouped` 用例 |
+| 新增 `features/task-center/__tests__/TaskCenterView.test.tsx` | 分组顺序、hover 操作显隐、详情展开、清除已完成回调                                                              |
+| 新增 `features/task-center/__tests__/TaskPill.test.tsx`       | 计数渲染、无任务不渲染、点击开合                                                                                |
+| `features/chat/__tests__/ChatInterface.test.tsx`              | 更新：BackgroundTaskPanel → TaskAmbientStrip 的挂载断言                                                         |
+| 手动验证                                                      | `pnpm desktop:dev`：跑 `run_in_background` 命令 + 杀进程验证 PID monitor 标 stopped 后任务**不消失**            |
 
 ## 6. 实施顺序（可独立 review 的提交）
 

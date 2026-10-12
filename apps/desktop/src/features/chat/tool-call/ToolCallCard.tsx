@@ -13,7 +13,8 @@ import { bashDescription, renameSummary } from './toolFormatters';
 function subagentType(input: unknown): string | undefined {
   if (!input || typeof input !== 'object') return undefined;
   const raw =
-    (input as Record<string, unknown>).subagent_type ?? (input as Record<string, unknown>).agentType;
+    (input as Record<string, unknown>).subagent_type ??
+    (input as Record<string, unknown>).agentType;
   return typeof raw === 'string' && raw.length > 0 ? raw : undefined;
 }
 

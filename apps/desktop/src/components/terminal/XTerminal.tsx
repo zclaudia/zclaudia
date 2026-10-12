@@ -91,10 +91,13 @@ export function XTerminal({
   const containerRef = useRef<HTMLDivElement>(null);
   const { sendMessage, sendToServer, connectServer } = useConnection();
   const boundBackendId = useWorkspaceTool()?.backendId;
-  const scopedSendMessage = useCallback((message: ClientMessage) => {
-    if (boundBackendId) sendToServer(boundBackendId, message);
-    else sendMessage(message);
-  }, [boundBackendId, sendToServer, sendMessage]);
+  const scopedSendMessage = useCallback(
+    (message: ClientMessage) => {
+      if (boundBackendId) sendToServer(boundBackendId, message);
+      else sendMessage(message);
+    },
+    [boundBackendId, sendToServer, sendMessage]
+  );
   const { resolvedTheme } = useTheme();
 
   const activeServerId = useServerStore(s => boundBackendId ?? s.activeServerId);

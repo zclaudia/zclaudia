@@ -108,13 +108,16 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
                   onClick={() => onActivate(ref)}
                   onPointerDown={e => {
                     if (e.pointerType === 'mouse' && (e.buttons & 1) === 0) return;
-                    useDragSplitStore.getState().startDrag({
-                      toolId: ref.toolId,
-                      instanceKey: ref.instanceKey,
-                      multiInstance: MULTI_INSTANCE_PANELS.has(ref.toolId),
-                      sourcePaneId: pane.id,
-                      sourceIndex: index,
-                    }, { x: e.clientX, y: e.clientY });
+                    useDragSplitStore.getState().startDrag(
+                      {
+                        toolId: ref.toolId,
+                        instanceKey: ref.instanceKey,
+                        multiInstance: MULTI_INSTANCE_PANELS.has(ref.toolId),
+                        sourcePaneId: pane.id,
+                        sourceIndex: index,
+                      },
+                      { x: e.clientX, y: e.clientY }
+                    );
                   }}
                   className={`group flex items-center gap-1.5 px-2.5 cursor-pointer max-w-[140px] ${
                     isActive

@@ -23,7 +23,9 @@ export function ToolLauncherMenu({ sessionId, projectId, anchorRef, onPick }: Pr
   const targetSessionId = bound?.sessionId ?? sessionId;
   const targetProjectId = bound?.projectId ?? projectId;
   const activeServerId = useServerStore(s => s.activeServerId);
-  const ownerBackendId = useOwnershipStore(s => s.getSessionBackendId(targetSessionId) ?? s.getProjectBackendId(targetProjectId));
+  const ownerBackendId = useOwnershipStore(
+    s => s.getSessionBackendId(targetSessionId) ?? s.getProjectBackendId(targetProjectId)
+  );
   const backendId = bound?.backendId ?? ownerBackendId ?? activeServerId;
   const tools = useLauncherPanels('desktop', backendId);
 

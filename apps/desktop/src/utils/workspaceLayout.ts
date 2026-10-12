@@ -68,22 +68,23 @@ export function flattenPanes(root: LayoutNode | null): PaneNode[] {
 function pruneRefs(root: LayoutNode | null, keep: (ref: ToolRef) => boolean): LayoutNode | null {
   if (!root) return null;
   if (root.kind === 'placeholder') {
-    return keep({ toolId: root.accepts === 'chat' ? CHAT_TOOL_ID : root.accepts.slice(5) }) ? root : null;
+    return keep({ toolId: root.accepts === 'chat' ? CHAT_TOOL_ID : root.accepts.slice(5) })
+      ? root
+      : null;
   }
   if (root.kind === 'pane') {
     const tools = root.tools.filter(keep);
     if (!tools.length) return null;
     if (tools.length === root.tools.length) return root;
-    const active = tools.find(t => sameRef(t, root.activeToolId, root.activeInstanceKey)) ?? tools[0];
+    const active =
+      tools.find(t => sameRef(t, root.activeToolId, root.activeInstanceKey)) ?? tools[0];
     return { ...root, tools, activeToolId: active.toolId, activeInstanceKey: active.instanceKey };
   }
   const a = pruneRefs(root.children[0], keep);
   const b = pruneRefs(root.children[1], keep);
   if (!a) return b;
   if (!b) return a;
-  return a === root.children[0] && b === root.children[1]
-    ? root
-    : { ...root, children: [a, b] };
+  return a === root.children[0] && b === root.children[1] ? root : { ...root, children: [a, b] };
 }
 
 /** Remove chat refs for the legacy, tools-only workspace. */
@@ -91,21 +92,28 @@ export const pruneChat = (root: LayoutNode | null): LayoutNode | null =>
   pruneRefs(root, ref => !isChatRef(ref));
 
 /** Chat-only geometry for collapsed tools; this is not a content mount list. */
-export const pruneTools = (root: LayoutNode | null): LayoutNode | null => pruneRefs(root, isChatRef);
+export const pruneTools = (root: LayoutNode | null): LayoutNode | null =>
+  pruneRefs(root, isChatRef);
 
 export function withChat(
   root: LayoutNode | null,
   sessionId: string,
   ratio = DEFAULT_RATIO
 ): LayoutNode {
-  if (root && flattenPanes(root).some(p => p.tools.some(t => sameRef(t, CHAT_TOOL_ID, sessionId)))) {
+  if (
+    root &&
+    flattenPanes(root).some(p => p.tools.some(t => sameRef(t, CHAT_TOOL_ID, sessionId)))
+  ) {
     return root;
   }
   const chat = newPane(CHAT_TOOL_ID, sessionId);
   if (!root) return chat;
   return {
-    id: genId('grp'), kind: 'group', dir: 'row',
-    ratio: clampRatio(Number.isFinite(ratio) ? ratio : DEFAULT_RATIO), children: [chat, root],
+    id: genId('grp'),
+    kind: 'group',
+    dir: 'row',
+    ratio: clampRatio(Number.isFinite(ratio) ? ratio : DEFAULT_RATIO),
+    children: [chat, root],
   };
 }
 
@@ -114,15 +122,23 @@ export function repairWorkspace(ws: SessionWorkspace): SessionWorkspace {
   const panes = flattenPanes(ws.root);
   const tools = panes.filter(p => !isPinnedPane(p));
   const primary = tools.some(p => p.id === ws.primaryPaneId)
-    ? ws.primaryPaneId : (tools[0]?.id ?? null);
+    ? ws.primaryPaneId
+    : (tools[0]?.id ?? null);
   const focused = panes.some(p => p.id === ws.focusedPaneId)
-    ? ws.focusedPaneId : (tools[0]?.id ?? panes[0]?.id ?? null);
-  const maximized = ws.maximizedPaneId && panes.some(p => p.id === ws.maximizedPaneId)
-    ? ws.maximizedPaneId : null;
-  if (primary === ws.primaryPaneId && focused === ws.focusedPaneId &&
-      (ws.maximizedPaneId === undefined || maximized === ws.maximizedPaneId)) return ws;
+    ? ws.focusedPaneId
+    : (tools[0]?.id ?? panes[0]?.id ?? null);
+  const maximized =
+    ws.maximizedPaneId && panes.some(p => p.id === ws.maximizedPaneId) ? ws.maximizedPaneId : null;
+  if (
+    primary === ws.primaryPaneId &&
+    focused === ws.focusedPaneId &&
+    (ws.maximizedPaneId === undefined || maximized === ws.maximizedPaneId)
+  )
+    return ws;
   return {
-    ...ws, primaryPaneId: primary, focusedPaneId: focused,
+    ...ws,
+    primaryPaneId: primary,
+    focusedPaneId: focused,
     ...(ws.maximizedPaneId !== undefined ? { maximizedPaneId: maximized } : {}),
   };
 }
@@ -289,16 +305,21 @@ export function pickFirstPane(root: LayoutNode | null): string | null {
 }
 
 export function isWorkspaceSlotKind(value: unknown): value is WorkspaceSlotKind {
-  return typeof value === 'string' && (value === 'chat' ||
-    (value.startsWith('tool:') && value.length > 5 && value !== 'tool:chat'));
+  return (
+    typeof value === 'string' &&
+    (value === 'chat' || (value.startsWith('tool:') && value.length > 5 && value !== 'tool:chat'))
+  );
 }
 
 export function isToolRef(value: unknown): value is ToolRef {
   if (!value || typeof value !== 'object') return false;
   const ref = value as ToolRef;
-  return typeof ref.toolId === 'string' && ref.toolId.length > 0 &&
+  return (
+    typeof ref.toolId === 'string' &&
+    ref.toolId.length > 0 &&
     (ref.instanceKey === undefined || typeof ref.instanceKey === 'string') &&
-    (!isChatRef(ref) || (typeof ref.instanceKey === 'string' && ref.instanceKey.length > 0));
+    (!isChatRef(ref) || (typeof ref.instanceKey === 'string' && ref.instanceKey.length > 0))
+  );
 }
 
 /** Validate both the shape and the identities consumed by React content hosts. */
@@ -312,15 +333,27 @@ export function isSafeTree(node: unknown): node is LayoutNode {
     if (typeof n.id !== 'string' || !n.id || ids.has(n.id)) return false;
     ids.add(n.id);
     if (n.kind === 'placeholder') {
-      if (typeof n.slotId !== 'string' || !n.slotId || slots.has(n.slotId) || !isWorkspaceSlotKind(n.accepts)) return false;
+      if (
+        typeof n.slotId !== 'string' ||
+        !n.slotId ||
+        slots.has(n.slotId) ||
+        !isWorkspaceSlotKind(n.accepts)
+      )
+        return false;
       slots.add(n.slotId);
       return true;
     }
     if (n.kind === 'pane') {
-      if (!Array.isArray(n.tools) || !n.tools.length || !n.tools.every(isToolRef) ||
-          typeof n.activeToolId !== 'string' || !n.activeToolId ||
-          (n.activeInstanceKey !== undefined && typeof n.activeInstanceKey !== 'string') ||
-          !n.tools.some(ref => sameRef(ref, n.activeToolId, n.activeInstanceKey))) return false;
+      if (
+        !Array.isArray(n.tools) ||
+        !n.tools.length ||
+        !n.tools.every(isToolRef) ||
+        typeof n.activeToolId !== 'string' ||
+        !n.activeToolId ||
+        (n.activeInstanceKey !== undefined && typeof n.activeInstanceKey !== 'string') ||
+        !n.tools.some(ref => sameRef(ref, n.activeToolId, n.activeInstanceKey))
+      )
+        return false;
       const chat = isChatRef(n.tools[0]);
       return n.tools.every(ref => {
         const key = workspaceRefKey(ref);
@@ -329,9 +362,16 @@ export function isSafeTree(node: unknown): node is LayoutNode {
         return true;
       });
     }
-    return n.kind === 'group' && (n.dir === 'row' || n.dir === 'col') &&
-      Number.isFinite(n.ratio) && n.ratio >= MIN_RATIO && n.ratio <= MAX_RATIO &&
-      Array.isArray(n.children) && n.children.length === 2 && n.children.every(child => visit(child, depth + 1));
+    return (
+      n.kind === 'group' &&
+      (n.dir === 'row' || n.dir === 'col') &&
+      Number.isFinite(n.ratio) &&
+      n.ratio >= MIN_RATIO &&
+      n.ratio <= MAX_RATIO &&
+      Array.isArray(n.children) &&
+      n.children.length === 2 &&
+      n.children.every(child => visit(child, depth + 1))
+    );
   };
   return visit(node, 0);
 }
@@ -341,7 +381,10 @@ export function isSafeTree(node: unknown): node is LayoutNode {
  * erase the other chats or tools in a persisted project workspace. First refs
  * win duplicate identities; distinct multi-instance scopes are retained.
  */
-export function restoreLayoutTree(value: unknown, multiInstanceTools: ReadonlySet<string>): LayoutNode | null {
+export function restoreLayoutTree(
+  value: unknown,
+  multiInstanceTools: ReadonlySet<string>
+): LayoutNode | null {
   const objects = new WeakSet<object>();
   const ids = new Set<string>();
   const refs = new Set<string>();
@@ -369,7 +412,10 @@ export function restoreLayoutTree(value: unknown, multiInstanceTools: ReadonlySe
       if (!Array.isArray(node.tools)) return null;
       const tools = node.tools.filter(ref => {
         if (!isToolRef(ref)) return false;
-        const key = isChatRef(ref) || multiInstanceTools.has(ref.toolId) ? workspaceRefKey(ref) : JSON.stringify([ref.toolId]);
+        const key =
+          isChatRef(ref) || multiInstanceTools.has(ref.toolId)
+            ? workspaceRefKey(ref)
+            : JSON.stringify([ref.toolId]);
         if (refs.has(key)) return false;
         refs.add(key);
         return true;
@@ -377,32 +423,65 @@ export function restoreLayoutTree(value: unknown, multiInstanceTools: ReadonlySe
       if (!tools.length) return null;
       const id = unique(node.id, ids, 'recovered-pane');
       const pane = (id: string, tools: ToolRef[]): PaneNode => {
-        const active = tools.find(ref => sameRef(ref, node.activeToolId, node.activeInstanceKey)) ?? tools[0];
-        return { ...node, id, tools, activeToolId: active.toolId, activeInstanceKey: active.instanceKey };
+        const active =
+          tools.find(ref => sameRef(ref, node.activeToolId, node.activeInstanceKey)) ?? tools[0];
+        return {
+          ...node,
+          id,
+          tools,
+          activeToolId: active.toolId,
+          activeInstanceKey: active.instanceKey,
+        };
       };
       const chats = tools.filter(isChatRef);
       const others = tools.filter(ref => !isChatRef(ref));
       if (chats.length && others.length) {
-        return { id: unique(`${id}-recovered-group`, ids, 'recovered-group'), kind: 'group', dir: 'row', ratio: DEFAULT_RATIO,
-          children: [pane(id, chats), pane(unique(`${id}-recovered-tools`, ids, 'recovered-pane'), others)] };
+        return {
+          id: unique(`${id}-recovered-group`, ids, 'recovered-group'),
+          kind: 'group',
+          dir: 'row',
+          ratio: DEFAULT_RATIO,
+          children: [
+            pane(id, chats),
+            pane(unique(`${id}-recovered-tools`, ids, 'recovered-pane'), others),
+          ],
+        };
       }
       const next = pane(id, tools);
-      return id === node.id && tools.length === node.tools.length &&
-        next.activeToolId === node.activeToolId && next.activeInstanceKey === node.activeInstanceKey ? node : next;
+      return id === node.id &&
+        tools.length === node.tools.length &&
+        next.activeToolId === node.activeToolId &&
+        next.activeInstanceKey === node.activeInstanceKey
+        ? node
+        : next;
     }
     if (node.kind !== 'group' || !Array.isArray(node.children)) return null;
     const id = unique(node.id, ids, 'recovered-group');
-    const children = node.children.map(child => visit(child, depth + 1)).filter((child): child is LayoutNode => child !== null);
+    const children = node.children
+      .map(child => visit(child, depth + 1))
+      .filter((child): child is LayoutNode => child !== null);
     if (!children.length) return null;
     if (children.length === 1) return children[0];
     const dir = node.dir === 'col' ? 'col' : 'row';
     const ratio = Number.isFinite(node.ratio) ? clampRatio(node.ratio) : DEFAULT_RATIO;
-    if (id === node.id && dir === node.dir && ratio === node.ratio && children.length === 2 &&
-        children.every((child, index) => child === node.children[index])) return node;
-    return children.slice(1).reduce<LayoutNode>((a, b, index) => ({
-      id: index === 0 ? id : unique(`${id}-recovered-group-${index}`, ids, 'recovered-group'),
-      kind: 'group', dir, ratio, children: [a, b],
-    }), children[0]);
+    if (
+      id === node.id &&
+      dir === node.dir &&
+      ratio === node.ratio &&
+      children.length === 2 &&
+      children.every((child, index) => child === node.children[index])
+    )
+      return node;
+    return children.slice(1).reduce<LayoutNode>(
+      (a, b, index) => ({
+        id: index === 0 ? id : unique(`${id}-recovered-group-${index}`, ids, 'recovered-group'),
+        kind: 'group',
+        dir,
+        ratio,
+        children: [a, b],
+      }),
+      children[0]
+    );
   };
   return visit(value, 0);
 }

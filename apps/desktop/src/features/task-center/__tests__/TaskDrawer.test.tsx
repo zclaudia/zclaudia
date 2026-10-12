@@ -26,13 +26,19 @@ describe('TaskDrawer', () => {
   });
 
   it('falls back to a generic badge label without an agent type', () => {
-    render(<TaskDrawer task={makeTask({ agentType: undefined })} detail={null} onClose={() => {}} />);
+    render(
+      <TaskDrawer task={makeTask({ agentType: undefined })} detail={null} onClose={() => {}} />
+    );
     expect(screen.getByRole('dialog')).toHaveTextContent('agent');
   });
 
   it('shows the live activity line only for a running task with activity', () => {
     const { rerender } = render(
-      <TaskDrawer task={makeTask({ activity: 'Reading src/index.ts' })} detail={null} onClose={() => {}} />
+      <TaskDrawer
+        task={makeTask({ activity: 'Reading src/index.ts' })}
+        detail={null}
+        onClose={() => {}}
+      />
     );
     expect(screen.getByText('Activity')).toBeInTheDocument();
     expect(screen.getByText('Reading src/index.ts')).toBeInTheDocument();
@@ -49,7 +55,11 @@ describe('TaskDrawer', () => {
 
   it('renders the prompt when the originating Task call supplied one', () => {
     render(
-      <TaskDrawer task={makeTask()} detail={{ prompt: 'Map every call site of verifyToken' }} onClose={() => {}} />
+      <TaskDrawer
+        task={makeTask()}
+        detail={{ prompt: 'Map every call site of verifyToken' }}
+        onClose={() => {}}
+      />
     );
     expect(screen.getByText('Prompt')).toBeInTheDocument();
     expect(screen.getByText('Map every call site of verifyToken')).toBeInTheDocument();
@@ -58,7 +68,11 @@ describe('TaskDrawer', () => {
   it('labels the summary section Result for terminal tasks and prefers task.summary', () => {
     render(
       <TaskDrawer
-        task={makeTask({ status: 'completed', completedAt: Date.now(), summary: 'Found 3 call sites.' })}
+        task={makeTask({
+          status: 'completed',
+          completedAt: Date.now(),
+          summary: 'Found 3 call sites.',
+        })}
         detail={{ resultText: 'raw result' }}
         onClose={() => {}}
       />
@@ -82,7 +96,9 @@ describe('TaskDrawer', () => {
   it('offers Stop only when the host wires it, and reports clicks', () => {
     const onStop = vi.fn();
     const task = makeTask();
-    const { rerender } = render(<TaskDrawer task={task} detail={null} onStop={onStop} onClose={() => {}} />);
+    const { rerender } = render(
+      <TaskDrawer task={task} detail={null} onStop={onStop} onClose={() => {}} />
+    );
     fireEvent.click(screen.getByText('Stop'));
     expect(onStop).toHaveBeenCalledWith(task);
 
@@ -124,7 +140,12 @@ describe('TaskDrawer', () => {
         task={makeTask()}
         detail={null}
         steps={[
-          { id: 'i1', toolName: 'Read', toolInput: { file_path: '/src/auth/login.ts' }, status: 'completed' },
+          {
+            id: 'i1',
+            toolName: 'Read',
+            toolInput: { file_path: '/src/auth/login.ts' },
+            status: 'completed',
+          },
           { id: 'i2', toolName: 'Grep', toolInput: { pattern: 'verifyToken' }, status: 'running' },
         ]}
         onClose={() => {}}

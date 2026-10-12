@@ -29,23 +29,45 @@ describe('SessionItem', () => {
 
   it('opens a distinct pane on modifier click only on unified desktop', () => {
     const onSelect = vi.fn();
-    const { rerender } = render(<SessionItem session={mockSession} isSelected={false} onSelect={onSelect} hasPending={false} />);
+    const { rerender } = render(
+      <SessionItem
+        session={mockSession}
+        isSelected={false}
+        onSelect={onSelect}
+        hasPending={false}
+      />
+    );
     fireEvent.click(screen.getByText('Test Session'), { metaKey: true });
     expect(selectProjectChat).toHaveBeenCalledWith('p1', 's1', { beside: true });
     expect(onSelect).toHaveBeenCalledWith('s1');
     selectProjectChat.mockClear();
-    rerender(<SessionItem session={mockSession} isSelected={false} onSelect={onSelect} hasPending={false} isMobile />);
+    rerender(
+      <SessionItem
+        session={mockSession}
+        isSelected={false}
+        onSelect={onSelect}
+        hasPending={false}
+        isMobile
+      />
+    );
     fireEvent.click(screen.getByText('Test Session'), { ctrlKey: true });
     expect(selectProjectChat).not.toHaveBeenCalled();
   });
 
   it('starts unopened session drags and cancels them on normal click or release outside workspace', () => {
-    render(<SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />);
+    render(
+      <SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />
+    );
     const row = screen.getByRole('button', { name: 'Test Session' });
     const pointerDown = new Event('pointerdown', { bubbles: true });
     Object.assign(pointerDown, { button: 0, pointerType: 'mouse' });
     fireEvent(row, pointerDown);
-    expect(useDragSplitStore.getState().active).toMatchObject({ toolId: 'chat', instanceKey: 's1', projectId: 'p1', multiInstance: true });
+    expect(useDragSplitStore.getState().active).toMatchObject({
+      toolId: 'chat',
+      instanceKey: 's1',
+      projectId: 'p1',
+      multiInstance: true,
+    });
     expect(useDragSplitStore.getState().active?.sourcePaneId).toBeUndefined();
     fireEvent.click(row);
     expect(useDragSplitStore.getState().active).toBeNull();
@@ -56,19 +78,31 @@ describe('SessionItem', () => {
 
   it('includes an existing chat pane source and ignores mobile drag gestures', () => {
     useRightWorkspaceStore.getState().ensureChatSession('s1');
-    const { rerender } = render(<SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />);
+    const { rerender } = render(
+      <SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />
+    );
     const pointerDown = new Event('pointerdown', { bubbles: true });
     Object.assign(pointerDown, { button: 0, pointerType: 'mouse' });
     fireEvent(screen.getByRole('button', { name: 'Test Session' }), pointerDown);
     expect(useDragSplitStore.getState().active?.sourcePaneId).toBeTruthy();
-    rerender(<SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} isMobile />);
+    rerender(
+      <SessionItem
+        session={mockSession}
+        isSelected={false}
+        onSelect={vi.fn()}
+        hasPending={false}
+        isMobile
+      />
+    );
     expect(useDragSplitStore.getState().active).toBeNull();
     fireEvent(screen.getByRole('button', { name: 'Test Session' }), pointerDown);
     expect(useDragSplitStore.getState().active).toBeNull();
   });
 
   it('exposes arrange actions and restores focus after Escape', () => {
-    render(<SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />);
+    render(
+      <SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />
+    );
     const trigger = screen.getByRole('button', { name: 'Session actions' });
     fireEvent.click(trigger);
     expect(screen.getByRole('menuitem', { name: 'Open beside' })).toBeInTheDocument();
@@ -78,10 +112,18 @@ describe('SessionItem', () => {
     expect(trigger).toHaveFocus();
   });
   it('marks only the selected row with data-selected (theme hook for the leading bar)', () => {
-    const { rerender } = render(<SessionItem session={mockSession} isSelected onSelect={vi.fn()} hasPending={false} />);
-    expect(screen.getByTestId('session-item').querySelector('button')?.getAttribute('data-selected')).toBe('true');
-    rerender(<SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />);
-    expect(screen.getByTestId('session-item').querySelector('button')?.hasAttribute('data-selected')).toBe(false);
+    const { rerender } = render(
+      <SessionItem session={mockSession} isSelected onSelect={vi.fn()} hasPending={false} />
+    );
+    expect(
+      screen.getByTestId('session-item').querySelector('button')?.getAttribute('data-selected')
+    ).toBe('true');
+    rerender(
+      <SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />
+    );
+    expect(
+      screen.getByTestId('session-item').querySelector('button')?.hasAttribute('data-selected')
+    ).toBe(false);
   });
 
   it('renders session name', () => {

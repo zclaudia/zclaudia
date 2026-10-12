@@ -58,8 +58,12 @@ export const useBrowserStore = create<BrowserStore>(set => ({
         [sessionId]: { ...(s.sessions[sessionId] ?? EMPTY_SESSION), ...patch },
       },
     })),
-  setEngine: (engine, backendId) => set(state => ({ engine,
-    ...(backendId ? { enginesByBackend: { ...state.enginesByBackend, [backendId]: engine } } : {}),
-  })),
+  setEngine: (engine, backendId) =>
+    set(state => ({
+      engine,
+      ...(backendId
+        ? { enginesByBackend: { ...state.enginesByBackend, [backendId]: engine } }
+        : {}),
+    })),
   reset: () => set({ engine: { status: 'unknown' }, enginesByBackend: {}, sessions: {} }),
 }));

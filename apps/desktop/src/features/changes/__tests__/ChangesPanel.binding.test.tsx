@@ -10,7 +10,9 @@ vi.mock('../../../components/changes/useSessionChanges', () => ({
   useUserMessageOptions: () => [],
   isTurnEmpty: () => true,
 }));
-vi.mock('../../../components/changes/SinceSelector', () => ({ SinceSelector: () => <span>Since</span> }));
+vi.mock('../../../components/changes/SinceSelector', () => ({
+  SinceSelector: () => <span>Since</span>,
+}));
 vi.mock('../SummarySection', () => ({ SummarySection: () => null }));
 
 describe('ChangesPanel binding', () => {
@@ -22,7 +24,9 @@ describe('ChangesPanel binding', () => {
 
   it('reads changes from its fixed chat worktree even when another chat is selected', () => {
     render(
-      <WorkspaceToolContext.Provider value={{ sessionId: 'fixed-chat', projectRoot: '/fixed-worktree' }}>
+      <WorkspaceToolContext.Provider
+        value={{ sessionId: 'fixed-chat', projectRoot: '/fixed-worktree' }}
+      >
         <ChangesPanel projectRoot="/fixed-worktree" />
       </WorkspaceToolContext.Provider>
     );

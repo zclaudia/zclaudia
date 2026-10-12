@@ -3,10 +3,7 @@ import { fireEvent, render } from '@testing-library/react';
 import { TaskCenterView, type TaskCenterViewProps } from '../TaskCenterView';
 import type { BackgroundTask, GroupedBackgroundTasks } from '../../../stores/backgroundTaskStore';
 
-const makeTask = (
-  id: string,
-  overrides: Partial<BackgroundTask> = {}
-): BackgroundTask => ({
+const makeTask = (id: string, overrides: Partial<BackgroundTask> = {}): BackgroundTask => ({
   id,
   sessionId: 'sess-1',
   description: `Task ${id}`,
@@ -116,10 +113,7 @@ describe('TaskCenterView', () => {
   it('offers Stop only for stoppable running tasks', () => {
     const props = makeProps({
       groups: makeGroups({
-        running: [
-          makeTask('sdk', { stoppable: true }),
-          makeTask('bg', { stoppable: false }),
-        ],
+        running: [makeTask('sdk', { stoppable: true }), makeTask('bg', { stoppable: false })],
       }),
     });
     const { getAllByText } = render(<TaskCenterView {...props} />);

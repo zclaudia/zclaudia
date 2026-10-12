@@ -127,8 +127,13 @@ describe('XTerminal', () => {
       </WorkspaceToolContext.Provider>
     );
     await flushTerminalMount();
-    expect(mockSendToServer).toHaveBeenCalledWith('backend-2', expect.objectContaining({ type: 'terminal_open', terminalId: 'backend-2-terminal' }));
-    expect(mockSendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'terminal_open' }));
+    expect(mockSendToServer).toHaveBeenCalledWith(
+      'backend-2',
+      expect.objectContaining({ type: 'terminal_open', terminalId: 'backend-2-terminal' })
+    );
+    expect(mockSendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'terminal_open' })
+    );
   });
 
   it('delays opening a retained hidden terminal until it is visible', async () => {
@@ -138,14 +143,18 @@ describe('XTerminal', () => {
       </WorkspaceVisibilityContext.Provider>
     );
     await flushTerminalMount();
-    expect(mockSendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'terminal_open' }));
+    expect(mockSendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'terminal_open' })
+    );
     rerender(
       <WorkspaceVisibilityContext.Provider value>
         <XTerminal terminalId="hidden-workspace-terminal" projectId="proj-1" />
       </WorkspaceVisibilityContext.Provider>
     );
     await flushTerminalMount();
-    expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'terminal_open', projectId: 'proj-1' }));
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'terminal_open', projectId: 'proj-1' })
+    );
   });
 
   it('accepts optional workingDirectory prop', () => {

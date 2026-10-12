@@ -122,7 +122,6 @@ bug. Rules:
 - `pnpm --filter @zclaudia/desktop run check:radius` (also part of `lint`)
   enforces this; `radius-conventions.test.tsx` pins the primitives.
 
-
 ## 10. Cards and desktop workspaces
 
 Persistent workspace pane shells use `components/workspace/PaneCard.tsx`: the

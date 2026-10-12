@@ -195,14 +195,31 @@ export function useCommandHandler({
           break;
 
         case 'reload': {
-          const scopedBackendId = route.backendId && route.backendId !== useServerStore.getState().activeServerId ? route.backendId : undefined;
+          const scopedBackendId =
+            route.backendId && route.backendId !== useServerStore.getState().activeServerId
+              ? route.backendId
+              : undefined;
           // Re-fetch commands from server (cache already cleared server-side)
           (llmProfileId
-            ? (scopedBackendId ? api.getProviderCommands(llmProfileId, currentProject?.rootPath || undefined, undefined, scopedBackendId)
-              : api.getProviderCommands(llmProfileId, currentProject?.rootPath || undefined))
-            : (scopedBackendId
-              ? api.getProviderTypeCommands(DEFAULT_AGENT_RUNTIME, currentProject?.rootPath || undefined, undefined, scopedBackendId)
-              : api.getProviderTypeCommands(DEFAULT_AGENT_RUNTIME, currentProject?.rootPath || undefined))
+            ? scopedBackendId
+              ? api.getProviderCommands(
+                  llmProfileId,
+                  currentProject?.rootPath || undefined,
+                  undefined,
+                  scopedBackendId
+                )
+              : api.getProviderCommands(llmProfileId, currentProject?.rootPath || undefined)
+            : scopedBackendId
+              ? api.getProviderTypeCommands(
+                  DEFAULT_AGENT_RUNTIME,
+                  currentProject?.rootPath || undefined,
+                  undefined,
+                  scopedBackendId
+                )
+              : api.getProviderTypeCommands(
+                  DEFAULT_AGENT_RUNTIME,
+                  currentProject?.rootPath || undefined
+                )
           )
             .then(cmds => {
               useLlmProfileMetaStore.getState().setProviderCommands(commandsCacheKey, cmds);
@@ -231,10 +248,15 @@ export function useCommandHandler({
           // Plugin command: activate the panel in its effective placement (bottom or right)
           const panelId = data?.panelId as string | undefined;
           if (panelId && currentProject?.id) {
-            if (route.backendId) useTerminalStore.getState().setDrawerOpen(currentProject.id, true, route.backendId);
+            if (route.backendId)
+              useTerminalStore.getState().setDrawerOpen(currentProject.id, true, route.backendId);
             else setDrawerOpen(currentProject.id, true);
             if (isMobileViewport()) activatePanel(panelId);
-            else openToolInWorkspace(sessionId, panelId, { projectId: currentProject.id, backendId: route.backendId });
+            else
+              openToolInWorkspace(sessionId, panelId, {
+                projectId: currentProject.id,
+                backendId: route.backendId,
+              });
           }
           break;
         }
@@ -517,27 +539,39 @@ export function useCommandHandler({
   );
 
   // Register after commit and remove on unmount, independently for each open chat.
-  useEffect(() => registerClientActionContextFactory(sessionId, (wireSessionId, wireArgs) => ({
-    sessionId: wireSessionId,
-    args: wireArgs,
-    addSystemMessage: (content, metadata) => {
-      addMessage(wireSessionId, {
-        id: crypto.randomUUID(),
+  useEffect(
+    () =>
+      registerClientActionContextFactory(sessionId, (wireSessionId, wireArgs) => ({
         sessionId: wireSessionId,
-        role: 'system',
-        content,
-        metadata,
-        createdAt: Date.now(),
-      });
-    },
-    services: {
+        args: wireArgs,
+        addSystemMessage: (content, metadata) => {
+          addMessage(wireSessionId, {
+            id: crypto.randomUUID(),
+            sessionId: wireSessionId,
+            role: 'system',
+            content,
+            metadata,
+            createdAt: Date.now(),
+          });
+        },
+        services: {
+          commands,
+          currentSession,
+          currentProject,
+          isForcedPlanSession,
+          switchWorktree: handleWorktreeChange,
+        },
+      })),
+    [
+      sessionId,
+      addMessage,
       commands,
       currentSession,
       currentProject,
       isForcedPlanSession,
-      switchWorktree: handleWorktreeChange,
-    },
-  })), [sessionId, addMessage, commands, currentSession, currentProject, isForcedPlanSession, handleWorktreeChange]);
+      handleWorktreeChange,
+    ]
+  );
 
   return {
     handleCommand,

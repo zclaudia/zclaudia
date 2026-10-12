@@ -50,7 +50,9 @@ export const useAgentProfileMetaStore = create<AgentProfileMetaState>((set, get)
       // Mark as "loaded" even on failure to avoid an infinite refetch loop —
       // consumers can call invalidate() to retry.
       set({
-        loaded: true, loading: false, backendId,
+        loaded: true,
+        loading: false,
+        backendId,
         ...(get().backendId !== backendId ? { profiles: {} } : {}),
       });
     }

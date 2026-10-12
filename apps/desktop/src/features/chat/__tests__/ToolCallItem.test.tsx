@@ -8,7 +8,9 @@ import { ChatActionsProvider } from '../ChatActionsContext';
 
 const mockSendMessage = vi.fn();
 const mockSendToServer = vi.fn();
-const { mockRoute } = vi.hoisted(() => ({ mockRoute: vi.fn(() => ({ backendId: null as string | null })) }));
+const { mockRoute } = vi.hoisted(() => ({
+  mockRoute: vi.fn(() => ({ backendId: null as string | null })),
+}));
 const mockHandlePromptAnswer = vi.fn();
 const mockSetDrawerOpen = vi.fn();
 const mockOpenTerminal = vi.fn();
@@ -1111,14 +1113,29 @@ describe('ToolCallItem', () => {
       ];
       terminalIdsByBackend.set('backend-1:bound-project', 'bound-terminal');
       render(
-        <ChatActionsProvider value={{ sessionId: 'bound-chat', handleSendMessage: vi.fn(), setMode: vi.fn() }}>
-          <ToolCallItem toolCall={createToolCall({ toolName: 'Bash', toolInput: { command: 'pwd' }, status: 'completed', result: '/bound' })} />
+        <ChatActionsProvider
+          value={{ sessionId: 'bound-chat', handleSendMessage: vi.fn(), setMode: vi.fn() }}
+        >
+          <ToolCallItem
+            toolCall={createToolCall({
+              toolName: 'Bash',
+              toolInput: { command: 'pwd' },
+              status: 'completed',
+              result: '/bound',
+            })}
+          />
         </ChatActionsProvider>
       );
       fireEvent.click(screen.getByRole('button'));
       fireEvent.click(screen.getByTitle('Paste to terminal'));
       expect(mockSetDrawerOpen).toHaveBeenCalledWith('bound-project', true);
-      await waitFor(() => expect(mockSendMessage).toHaveBeenCalledWith({ type: 'terminal_input', terminalId: 'bound-terminal', data: 'pwd' }));
+      await waitFor(() =>
+        expect(mockSendMessage).toHaveBeenCalledWith({
+          type: 'terminal_input',
+          terminalId: 'bound-terminal',
+          data: 'pwd',
+        })
+      );
     });
 
     it('shows Bash error result with error styling', () => {
@@ -2141,13 +2158,19 @@ describe('ToolCallItem send-to-background gating', () => {
   it('sends a background action to the originating chat backend', () => {
     mockRoute.mockReturnValue({ backendId: 'own-backend' });
     render(
-      <ChatActionsProvider value={{ sessionId: 'own-chat', handleSendMessage: vi.fn(), setMode: vi.fn() }}>
+      <ChatActionsProvider
+        value={{ sessionId: 'own-chat', handleSendMessage: vi.fn(), setMode: vi.fn() }}
+      >
         <ToolCallItem toolCall={runningBash({ backgroundable: true })} />
       </ChatActionsProvider>
     );
     fireEvent.click(screen.getByText('Send to background'));
     expect(mockRoute).toHaveBeenCalledWith('own-chat');
-    expect(mockSendToServer).toHaveBeenCalledWith('own-backend', { type: 'background_running_command', sessionId: 'own-chat', toolUseId: 'tool-1' });
+    expect(mockSendToServer).toHaveBeenCalledWith('own-backend', {
+      type: 'background_running_command',
+      sessionId: 'own-chat',
+      toolUseId: 'tool-1',
+    });
     expect(mockSendMessage).not.toHaveBeenCalled();
   });
 

@@ -23,20 +23,38 @@ describe('FileSearchInput', () => {
     try {
       const { listDirectory } = await import('../../../services/api');
       let resolveOld!: (value: { entries: typeof mockEntries }) => void;
-      vi.mocked(listDirectory).mockReturnValueOnce(new Promise(done => { resolveOld = done; }))
+      vi.mocked(listDirectory)
+        .mockReturnValueOnce(
+          new Promise(done => {
+            resolveOld = done;
+          })
+        )
         .mockResolvedValueOnce({ entries: [{ path: 'B/new.ts', type: 'file' }] } as any);
       const onSelect = vi.fn();
-      const { rerender } = render(<FileSearchInput projectRoot="/A" backendId="A" onSelect={onSelect} onClose={() => {}} />);
-      fireEvent.change(screen.getByPlaceholderText('Search files by name...'), { target: { value: 'ts' } });
+      const { rerender } = render(
+        <FileSearchInput projectRoot="/A" backendId="A" onSelect={onSelect} onClose={() => {}} />
+      );
+      fireEvent.change(screen.getByPlaceholderText('Search files by name...'), {
+        target: { value: 'ts' },
+      });
       await act(async () => vi.advanceTimersByTimeAsync(150));
-      rerender(<FileSearchInput projectRoot="/B" backendId="B" onSelect={onSelect} onClose={() => {}} />);
+      rerender(
+        <FileSearchInput projectRoot="/B" backendId="B" onSelect={onSelect} onClose={() => {}} />
+      );
       await act(async () => vi.advanceTimersByTimeAsync(150));
       await act(async () => resolveOld({ entries: mockEntries }));
       expect(screen.queryByText('src/index.ts')).toBeNull();
       fireEvent.click(screen.getByText('B/new.ts'));
       expect(onSelect).toHaveBeenCalledExactlyOnceWith('B/new.ts');
-      expect(listDirectory).toHaveBeenLastCalledWith({ projectRoot: '/B', backendId: 'B', query: 'ts', maxResults: 20 });
-    } finally { vi.useRealTimers(); }
+      expect(listDirectory).toHaveBeenLastCalledWith({
+        projectRoot: '/B',
+        backendId: 'B',
+        query: 'ts',
+        maxResults: 20,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not restore results when the query is cleared during an in-flight search', async () => {
@@ -44,7 +62,11 @@ describe('FileSearchInput', () => {
     try {
       const { listDirectory } = await import('../../../services/api');
       let resolve!: (value: { entries: typeof mockEntries }) => void;
-      vi.mocked(listDirectory).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+      vi.mocked(listDirectory).mockReturnValueOnce(
+        new Promise(done => {
+          resolve = done;
+        })
+      );
       render(<FileSearchInput projectRoot="/A" onSelect={vi.fn()} onClose={() => {}} />);
       const input = screen.getByPlaceholderText('Search files by name...');
       fireEvent.change(input, { target: { value: 'ts' } });
@@ -53,7 +75,9 @@ describe('FileSearchInput', () => {
       expect(screen.queryByText('...')).toBeNull();
       await act(async () => resolve({ entries: mockEntries }));
       expect(screen.queryByText('src/index.ts')).toBeNull();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('renders search input and auto-focuses', () => {

@@ -8,7 +8,9 @@ const { route } = vi.hoisted(() => ({ route: vi.fn() }));
 vi.mock('../../../features/chat/hooks/useSessionRoute', () => ({ useSessionRoute: route }));
 vi.mock('../../../features/chat/ChatInterface', () => ({
   ChatInterface: (props: { sessionId: string; surface: string; onOpenSidebar?: () => void }) => (
-    <button data-surface={props.surface} onClick={props.onOpenSidebar}>{props.sessionId}</button>
+    <button data-surface={props.surface} onClick={props.onOpenSidebar}>
+      {props.sessionId}
+    </button>
   ),
 }));
 

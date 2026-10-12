@@ -26,7 +26,9 @@ vi.mock('../../../../services/api/agent-profiles', () => ({
   listAgentProfiles: vi.fn().mockResolvedValue([]),
   listAgentProfilesForBackend: vi.fn().mockResolvedValue([]),
 }));
-vi.mock('../../../../services/api/llm-profiles', () => ({ listLlmProfilesForBackend: vi.fn().mockResolvedValue([]) }));
+vi.mock('../../../../services/api/llm-profiles', () => ({
+  listLlmProfilesForBackend: vi.fn().mockResolvedValue([]),
+}));
 
 describe('useProviderCapabilities', () => {
   beforeEach(() => {
@@ -236,16 +238,39 @@ describe('useProviderCapabilities', () => {
   });
 
   it('loads owner A commands and mode defaults while active B has a conflicting profile', async () => {
-    useProjectStore.setState({ sessions: [{ id: 'sess-1', projectId: 'proj-1', agentProfileId: 'same-agent' }] } as any);
-    useOwnershipStore.setState({ projectBackendIds: { 'proj-1': 'owner-A' }, sessionBackendIds: { 'sess-1': 'owner-A' } });
-    useAgentProfileMetaStore.setState({ profiles: { 'same-agent': { id: 'same-agent', runtimeType: 'claude', status: 'readonly' } }, loaded: true } as any);
-    vi.mocked(agentApi.listAgentProfilesForBackend).mockResolvedValue([{ id: 'same-agent', runtimeType: 'pi', llmProfileId: 'A-llm' }] as any);
+    useProjectStore.setState({
+      sessions: [{ id: 'sess-1', projectId: 'proj-1', agentProfileId: 'same-agent' }],
+    } as any);
+    useOwnershipStore.setState({
+      projectBackendIds: { 'proj-1': 'owner-A' },
+      sessionBackendIds: { 'sess-1': 'owner-A' },
+    });
+    useAgentProfileMetaStore.setState({
+      profiles: { 'same-agent': { id: 'same-agent', runtimeType: 'claude', status: 'readonly' } },
+      loaded: true,
+    } as any);
+    vi.mocked(agentApi.listAgentProfilesForBackend).mockResolvedValue([
+      { id: 'same-agent', runtimeType: 'pi', llmProfileId: 'A-llm' },
+    ] as any);
     vi.mocked(llmApi.listLlmProfilesForBackend).mockResolvedValue([{ id: 'A-llm' }] as any);
-    vi.mocked(api.getProviderCapabilities).mockResolvedValue({ defaultModeId: 'owner-mode' } as any);
-    const { result } = renderHook(() => useProviderCapabilities({ sessionId: 'sess-1', isConnected: true }));
+    vi.mocked(api.getProviderCapabilities).mockResolvedValue({
+      defaultModeId: 'owner-mode',
+    } as any);
+    const { result } = renderHook(() =>
+      useProviderCapabilities({ sessionId: 'sess-1', isConnected: true })
+    );
     await waitFor(() => expect(result.current.capabilities?.defaultModeId).toBe('owner-mode'));
-    expect(api.getProviderCommands).toHaveBeenCalledWith('A-llm', '/test', expect.any(Object), 'owner-A');
-    expect(api.getProviderCapabilities).toHaveBeenCalledWith('A-llm', expect.any(Object), 'owner-A');
+    expect(api.getProviderCommands).toHaveBeenCalledWith(
+      'A-llm',
+      '/test',
+      expect.any(Object),
+      'owner-A'
+    );
+    expect(api.getProviderCapabilities).toHaveBeenCalledWith(
+      'A-llm',
+      expect.any(Object),
+      'owner-A'
+    );
     expect(api.getProviderTypeCapabilities).not.toHaveBeenCalled();
     expect(api.getProviderTypeCommands).not.toHaveBeenCalled();
     expect(result.current.commandsCacheKey).toBe('owner-A:A-llm');

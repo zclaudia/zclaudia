@@ -49,7 +49,10 @@ export function TaskDetail({ task }: { task: BackgroundTask }) {
       {task.taskCommand && (
         <div className="flex gap-2">
           <span className="w-14 shrink-0 text-muted-foreground/60">Command</span>
-          <span className="min-w-0 flex-1 truncate font-mono text-foreground" title={task.taskCommand}>
+          <span
+            className="min-w-0 flex-1 truncate font-mono text-foreground"
+            title={task.taskCommand}
+          >
             $ {task.taskCommand}
           </span>
         </div>
@@ -61,7 +64,10 @@ export function TaskDetail({ task }: { task: BackgroundTask }) {
       {processLine && (
         <div className="flex gap-2">
           <span className="w-14 shrink-0 text-muted-foreground/60">Process</span>
-          <span className="min-w-0 flex-1 truncate font-mono text-muted-foreground" title={processLine}>
+          <span
+            className="min-w-0 flex-1 truncate font-mono text-muted-foreground"
+            title={processLine}
+          >
             {processLine}
           </span>
         </div>

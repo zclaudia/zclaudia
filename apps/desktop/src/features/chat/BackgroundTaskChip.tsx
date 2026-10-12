@@ -5,7 +5,7 @@ import {
   taskKind,
   type BackgroundTask,
 } from '../../stores/backgroundTaskStore';
-import { useTaskCenterUiStore } from '../task-center/taskCenterUiStore';
+import { useTaskCenterUiStore } from '../task-center';
 import { Button } from '../../components/ui/Button';
 
 function statusLabel(task: BackgroundTask): string {
@@ -28,7 +28,9 @@ function ChipIcon({ task }: { task: BackgroundTask }) {
   switch (task.status) {
     case 'started':
     case 'in_progress':
-      return <Loader2 size={11} strokeWidth={1.75} className="shrink-0 animate-spin text-primary" />;
+      return (
+        <Loader2 size={11} strokeWidth={1.75} className="shrink-0 animate-spin text-primary" />
+      );
     case 'paused':
       return <PauseCircle size={11} strokeWidth={1.75} className="shrink-0 text-warning" />;
     case 'failed':

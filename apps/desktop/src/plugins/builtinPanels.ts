@@ -57,7 +57,10 @@ export function initBuiltinPanels() {
     },
     onClose: ctx => {
       if (ctx) {
-        if (ctx.projectId) useTerminalStore.getState().setDrawerOpen(ctx.projectId, false, ctx.backendId ?? 'no-backend');
+        if (ctx.projectId)
+          useTerminalStore
+            .getState()
+            .setDrawerOpen(ctx.projectId, false, ctx.backendId ?? 'no-backend');
         return;
       }
       // Close all open terminal drawers across backend/project scopes.
@@ -67,9 +70,7 @@ export function initBuiltinPanels() {
         const separatorIndex = scopeKey.indexOf('::');
         const projectId = separatorIndex >= 0 ? scopeKey.slice(separatorIndex + 2) : scopeKey;
         const backendId = separatorIndex >= 0 ? scopeKey.slice(0, separatorIndex) : undefined;
-        useTerminalStore
-          .getState()
-          .setDrawerOpen(projectId, false, backendId);
+        useTerminalStore.getState().setDrawerOpen(projectId, false, backendId);
       }
     },
   });

@@ -1,29 +1,64 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { activeToolRef, findPane, flattenPanes, normalizeSessionWorkspace, useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
+import {
+  activeToolRef,
+  findPane,
+  flattenPanes,
+  normalizeSessionWorkspace,
+  useRightWorkspaceStore,
+} from '../../stores/rightWorkspaceStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionsStore } from '../../stores/sessionsStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { sessionWorkspaceId } from '../../stores/workspaceRoutingStore';
-import { resolveToolBindingSession, useProjectWorkspaceStore } from '../../stores/projectWorkspaceStore';
-import { closeChatRef, focusProjectChat, moveScopedChatToEdge, moveProjectChatToEdge, moveProjectChatToTab, openSessionTab, reconcileProjectChats, selectProjectChat, resolveProjectWorkspace } from '../projectWorkspaceActions';
+import {
+  resolveToolBindingSession,
+  useProjectWorkspaceStore,
+} from '../../stores/projectWorkspaceStore';
+import {
+  closeChatRef,
+  focusProjectChat,
+  moveScopedChatToEdge,
+  moveProjectChatToEdge,
+  moveProjectChatToTab,
+  openSessionTab,
+  reconcileProjectChats,
+  selectProjectChat,
+  resolveProjectWorkspace,
+} from '../projectWorkspaceActions';
 
 beforeEach(() => {
   useSessionsStore.getState().clearAllSessions();
   useOwnershipStore.setState({ projectBackendIds: {}, sessionBackendIds: {} });
-  useProjectStore.setState({ sessions: ['A', 'B', 'C', 'D'].map(id => ({
-    id, projectId: 'p', type: 'regular', createdAt: 1, updatedAt: 1,
-  })) });
+  useProjectStore.setState({
+    sessions: ['A', 'B', 'C', 'D'].map(id => ({
+      id,
+      projectId: 'p',
+      type: 'regular',
+      createdAt: 1,
+      updatedAt: 1,
+    })),
+  });
   useProjectWorkspaceStore.setState({ byProject: {} });
   useRightWorkspaceStore.setState({ bySession: {}, order: [] });
   resolveProjectWorkspace('p', ['A'], 'A');
 });
 const workspace = () => useRightWorkspaceStore.getState().bySession.A;
-const sessions = () => flattenPanes(workspace().root).flatMap(p => p.tools.filter(t => t.toolId === 'chat').map(t => t.instanceKey));
-const paneFor = (sessionId: string) => flattenPanes(workspace().root).find(p => p.tools.some(t => t.toolId === 'chat' && t.instanceKey === sessionId))!;
+const sessions = () =>
+  flattenPanes(workspace().root).flatMap(p =>
+    p.tools.filter(t => t.toolId === 'chat').map(t => t.instanceKey)
+  );
+const paneFor = (sessionId: string) =>
+  flattenPanes(workspace().root).find(p =>
+    p.tools.some(t => t.toolId === 'chat' && t.instanceKey === sessionId)
+  )!;
 
 describe('project chat selection', () => {
-  it.each([['select', selectProjectChat], ['tab', openSessionTab]] as const)(
-    '%s opens a real new chat into a deleted empty anchor without relying on mounted UI', (_name, action) => {
+  it.each([
+    ['select', selectProjectChat],
+    ['tab', openSessionTab],
+  ] as const)(
+    '%s opens a real new chat into a deleted empty anchor without relying on mounted UI',
+    (_name, action) => {
       reconcileProjectChats('p', [], undefined, { authoritative: true });
       expect(workspace().root).toBeNull();
       expect(useProjectWorkspaceStore.getState().byProject.p.focusedChatSessionId).toBe('');
@@ -33,8 +68,12 @@ describe('project chat selection', () => {
     }
   );
 
-  it.each([['select', selectProjectChat], ['tab', openSessionTab]] as const)(
-    '%s inserts a real new chat beside tools after the last chat was deleted', (_name, action) => {
+  it.each([
+    ['select', selectProjectChat],
+    ['tab', openSessionTab],
+  ] as const)(
+    '%s inserts a real new chat beside tools after the last chat was deleted',
+    (_name, action) => {
       useRightWorkspaceStore.getState().openTool('A', 'memory');
       const memory = flattenPanes(workspace().root).find(p => p.tools[0].toolId === 'memory')!;
       reconcileProjectChats('p', [], undefined, { authoritative: true });
@@ -47,10 +86,20 @@ describe('project chat selection', () => {
   );
 
   it('rejects foreign, archived and nonexistent new refs without changing the layout', () => {
-    useProjectStore.setState(state => ({ sessions: [...state.sessions,
-      { id: 'foreign', projectId: 'other', type: 'regular', createdAt: 1, updatedAt: 1 },
-      { id: 'archived', projectId: 'p', type: 'regular', createdAt: 1, updatedAt: 1, archivedAt: 2 },
-    ] }));
+    useProjectStore.setState(state => ({
+      sessions: [
+        ...state.sessions,
+        { id: 'foreign', projectId: 'other', type: 'regular', createdAt: 1, updatedAt: 1 },
+        {
+          id: 'archived',
+          projectId: 'p',
+          type: 'regular',
+          createdAt: 1,
+          updatedAt: 1,
+          archivedAt: 2,
+        },
+      ],
+    }));
     const before = workspace();
     for (const id of ['foreign', 'archived', 'missing']) {
       expect(selectProjectChat('p', id)).toEqual({ ok: false });
@@ -62,11 +111,21 @@ describe('project chat selection', () => {
   it('accepts positive live remote catalog refs and refuses deleted refs from stale REST catalogs', () => {
     useOwnershipStore.getState().setProjectOwner('p', 'owner');
     useSessionsStore.getState().handleSessionEvent('owner', 'created', {
-      id: 'remote', projectId: 'p', type: 'regular', createdAt: 1, updatedAt: 1, isActive: false,
+      id: 'remote',
+      projectId: 'p',
+      type: 'regular',
+      createdAt: 1,
+      updatedAt: 1,
+      isActive: false,
     });
     expect(openSessionTab('p', 'remote').ok).toBe(true);
     useSessionsStore.getState().handleSessionEvent('owner', 'deleted', {
-      id: 'B', projectId: 'p', type: 'regular', createdAt: 1, updatedAt: 1, isActive: false,
+      id: 'B',
+      projectId: 'p',
+      type: 'regular',
+      createdAt: 1,
+      updatedAt: 1,
+      isActive: false,
     });
     expect(useProjectStore.getState().sessions.some(s => s.id === 'B')).toBe(true);
     expect(selectProjectChat('p', 'B')).toEqual({ ok: false });
@@ -85,7 +144,10 @@ describe('project chat selection', () => {
     const root = workspace().root!;
     expect(root.kind).toBe('group');
     expect(sessions()).toEqual(['A', 'B']);
-    expect(selectProjectChat('p', 'A', { beside: true })).toEqual({ ok: true, paneId: paneFor('A').id });
+    expect(selectProjectChat('p', 'A', { beside: true })).toEqual({
+      ok: true,
+      paneId: paneFor('A').id,
+    });
     expect(sessions()).toEqual(['A', 'B']);
     expect(workspace().focusedPaneId).toBe(paneFor('A').id);
   });
@@ -93,14 +155,17 @@ describe('project chat selection', () => {
   it('remembers chat focus when a tool pane receives focus, then replaces that chat', () => {
     selectProjectChat('p', 'B', { beside: true });
     focusProjectChat('p', 'A');
-    useRightWorkspaceStore.getState().openTool('A', 'terminal', { instanceKey: 'be::p', multiInstance: true });
+    useRightWorkspaceStore
+      .getState()
+      .openTool('A', 'terminal', { instanceKey: 'be::p', multiInstance: true });
     const toolRoot = workspace().root;
     const tool = flattenPanes(toolRoot).find(p => p.tools.some(t => t.toolId === 'terminal'))!;
     useRightWorkspaceStore.getState().focusPane('A', tool.id);
     selectProjectChat('p', 'C');
     expect(sessions()).toEqual(['C', 'B']);
-    expect(flattenPanes(workspace().root).find(p => p.id === tool.id)?.tools)
-      .toEqual([{ toolId: 'terminal', instanceKey: 'be::p' }]);
+    expect(flattenPanes(workspace().root).find(p => p.id === tool.id)?.tools).toEqual([
+      { toolId: 'terminal', instanceKey: 'be::p' },
+    ]);
   });
 
   it('opens session tabs and activates an existing inactive ref without adding duplicates', () => {
@@ -196,7 +261,9 @@ describe('chat closing and moving', () => {
   it('preserves fixed worktree bindings when chats move, close their pane, or become tabs', () => {
     selectProjectChat('p', 'B', { beside: true });
     const tool = { toolId: 'terminal', instanceKey: 'be::worktreeB' };
-    useProjectWorkspaceStore.getState().setToolBinding('p', tool, { mode: 'fixed', sessionId: 'B' });
+    useProjectWorkspaceStore
+      .getState()
+      .setToolBinding('p', tool, { mode: 'fixed', sessionId: 'B' });
     moveProjectChatToEdge('p', 'B', 'bottom');
     closeChatRef('p', 'B');
     expect(resolveToolBindingSession('p', tool)).toBe('B');
@@ -206,14 +273,19 @@ describe('chat closing and moving', () => {
   });
 });
 
-
 describe('project catalog reconciliation', () => {
   it('removes deleted chat refs, preserves tools and repairs deleted fixed bindings', () => {
     selectProjectChat('p', 'B', { beside: true });
-    useRightWorkspaceStore.getState().openTool('A', 'terminal', { instanceKey: 'scope', multiInstance: true });
+    useRightWorkspaceStore
+      .getState()
+      .openTool('A', 'terminal', { instanceKey: 'scope', multiInstance: true });
     const tool = { toolId: 'terminal', instanceKey: 'scope' };
-    const original = flattenPanes(workspace().root).find(p => p.tools.some(t => t.toolId === 'terminal'))!;
-    useProjectWorkspaceStore.getState().setToolBinding('p', tool, { mode: 'fixed', sessionId: 'B' });
+    const original = flattenPanes(workspace().root).find(p =>
+      p.tools.some(t => t.toolId === 'terminal')
+    )!;
+    useProjectWorkspaceStore
+      .getState()
+      .setToolBinding('p', tool, { mode: 'fixed', sessionId: 'B' });
     reconcileProjectChats('p', ['A'], 'A');
     expect(sessions()).toEqual(['A']);
     expect(flattenPanes(workspace().root).find(p => p.id === original.id)).toBe(original);
@@ -240,7 +312,6 @@ describe('project catalog reconciliation', () => {
     unsubscribe();
   });
 });
-
 
 describe('chat strip moves', () => {
   it('merges panes into session tabs in one layout update with the original ref', () => {
@@ -302,14 +373,15 @@ describe('chat strip moves', () => {
   });
 });
 
-
 describe('catalog and standalone chat edge moves', () => {
   it('opens only real same-project unarchived catalog sessions', () => {
-    useProjectStore.setState({ sessions: [
-      { id: 'B', projectId: 'p', type: 'regular', createdAt: 1, updatedAt: 1 },
-      { id: 'C', projectId: 'p', type: 'regular', archivedAt: 1, createdAt: 1, updatedAt: 1 },
-      { id: 'foreign', projectId: 'other', type: 'regular', createdAt: 1, updatedAt: 1 },
-    ] });
+    useProjectStore.setState({
+      sessions: [
+        { id: 'B', projectId: 'p', type: 'regular', createdAt: 1, updatedAt: 1 },
+        { id: 'C', projectId: 'p', type: 'regular', archivedAt: 1, createdAt: 1, updatedAt: 1 },
+        { id: 'foreign', projectId: 'other', type: 'regular', createdAt: 1, updatedAt: 1 },
+      ],
+    });
     const before = workspace();
     expect(moveProjectChatToEdge('p', 'missing', 'right').ok).toBe(false);
     expect(moveProjectChatToEdge('p', 'foreign', 'right').ok).toBe(false);
@@ -322,7 +394,10 @@ describe('catalog and standalone chat edge moves', () => {
   it('moves a standalone real chat under its synthetic key without changing project metadata', () => {
     const scopedId = sessionWorkspaceId('A');
     const state = useRightWorkspaceStore.getState();
-    const scoped = normalizeSessionWorkspace({ root: null, primaryPaneId: null, focusedPaneId: null }, 'A');
+    const scoped = normalizeSessionWorkspace(
+      { root: null, primaryPaneId: null, focusedPaneId: null },
+      'A'
+    );
     const chat = flattenPanes(scoped.root)[0];
     useRightWorkspaceStore.setState(s => ({ bySession: { ...s.bySession, [scopedId]: scoped } }));
     state.openTool(scopedId, 'memory');

@@ -61,7 +61,10 @@ export async function dispatchClientAction(
  * action ID; the live composer context is supplied here by useCommandHandler.
  */
 let liveContextFactory: ((sessionId: string, args: string) => ClientActionContext) | null = null;
-const sessionContextFactories = new Map<string, (sessionId: string, args: string) => ClientActionContext>();
+const sessionContextFactories = new Map<
+  string,
+  (sessionId: string, args: string) => ClientActionContext
+>();
 
 /** Each mounted chat owns only its own wire action context. */
 export function registerClientActionContextFactory(
@@ -70,7 +73,8 @@ export function registerClientActionContextFactory(
 ): () => void {
   sessionContextFactories.set(sessionId, factory);
   return () => {
-    if (sessionContextFactories.get(sessionId) === factory) sessionContextFactories.delete(sessionId);
+    if (sessionContextFactories.get(sessionId) === factory)
+      sessionContextFactories.delete(sessionId);
   };
 }
 

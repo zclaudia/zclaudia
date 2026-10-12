@@ -56,7 +56,9 @@ export function RightSidebarEmptyState({
   const panels = usePluginStore(selectPluginPanels);
   const disabled = usePluginStore(s => s.disabledBuiltinPanels);
   const activeServerId = useServerStore(s => s.activeServerId);
-  const ownerBackendId = useOwnershipStore(s => s.getSessionBackendId(sessionId) ?? s.getProjectBackendId(projectId));
+  const ownerBackendId = useOwnershipStore(
+    s => s.getSessionBackendId(sessionId) ?? s.getProjectBackendId(projectId)
+  );
   const backendId = ownerBackendId ?? activeServerId;
   const { result } = useChangesData(sessionId, null, projectRoot);
   const changedCount = result.modified.length;

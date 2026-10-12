@@ -1,7 +1,14 @@
-import { migrateSessionLayouts, resolveProjectWorkspace } from '../../actions/projectWorkspaceActions';
+import {
+  migrateSessionLayouts,
+  resolveProjectWorkspace,
+} from '../../actions/projectWorkspaceActions';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { newPane, useRightWorkspaceStore, type LayoutNode } from '../rightWorkspaceStore';
-import { resolveToolBindingSession, useProjectWorkspaceStore, workspaceRefKey } from '../projectWorkspaceStore';
+import {
+  resolveToolBindingSession,
+  useProjectWorkspaceStore,
+  workspaceRefKey,
+} from '../projectWorkspaceStore';
 
 beforeEach(() => {
   localStorage.clear();
@@ -11,7 +18,10 @@ beforeEach(() => {
 
 function seed(sessionId: string, root: LayoutNode) {
   useRightWorkspaceStore.setState(state => ({
-    bySession: { ...state.bySession, [sessionId]: { root, primaryPaneId: root.id, focusedPaneId: root.id } },
+    bySession: {
+      ...state.bySession,
+      [sessionId]: { root, primaryPaneId: root.id, focusedPaneId: root.id },
+    },
     order: [sessionId, ...state.order],
   }));
 }
@@ -21,7 +31,13 @@ describe('project workspace compatibility migration', () => {
     seed('A', newPane('memory'));
     const left = newPane('terminal', 'remote::worktreeA');
     const right = newPane('terminal', 'remote::worktreeB');
-    const tree: LayoutNode = { id: 'saved-split', kind: 'group', dir: 'col', ratio: 0.63, children: [left, right] };
+    const tree: LayoutNode = {
+      id: 'saved-split',
+      kind: 'group',
+      dir: 'col',
+      ratio: 0.63,
+      children: [left, right],
+    };
     seed('B', tree);
     seed('unrelated', newPane('draft'));
     const originalA = useRightWorkspaceStore.getState().bySession.A;
@@ -53,7 +69,9 @@ describe('project workspace compatibility migration', () => {
   it('restores project metadata and bindings through real persist hydration', async () => {
     resolveProjectWorkspace('p', ['A'], 'A');
     const terminal = { toolId: 'terminal', instanceKey: 'be::worktree' };
-    useProjectWorkspaceStore.getState().setToolBinding('p', terminal, { mode: 'fixed', sessionId: 'B' });
+    useProjectWorkspaceStore
+      .getState()
+      .setToolBinding('p', terminal, { mode: 'fixed', sessionId: 'B' });
     const saved = localStorage.getItem('claudia-project-workspace')!;
     expect(JSON.parse(saved).version).toBe(1);
     useProjectWorkspaceStore.setState({ byProject: {} });
@@ -65,25 +83,49 @@ describe('project workspace compatibility migration', () => {
 
   it('hydrates v1 session-only storage before adopting it without deleting compatibility entries', async () => {
     const tree = newPane('terminal', 'be::scope');
-    localStorage.setItem('claudia-right-workspace', JSON.stringify({ version: 1, state: {
-      bySession: { A: { root: tree, focusedPaneId: tree.id, primaryPaneId: tree.id } }, order: ['A'],
-    } }));
+    localStorage.setItem(
+      'claudia-right-workspace',
+      JSON.stringify({
+        version: 1,
+        state: {
+          bySession: { A: { root: tree, focusedPaneId: tree.id, primaryPaneId: tree.id } },
+          order: ['A'],
+        },
+      })
+    );
     await useRightWorkspaceStore.persist.rehydrate();
     expect(resolveProjectWorkspace('p', ['A'], 'A')).toBe('A');
-    expect(JSON.parse(localStorage.getItem('claudia-right-workspace')!).state.bySession.A).toBeDefined();
+    expect(
+      JSON.parse(localStorage.getItem('claudia-right-workspace')!).state.bySession.A
+    ).toBeDefined();
     expect(useRightWorkspaceStore.getState().bySession.A.root?.kind).toBe('group');
   });
 
   it('filters malformed persisted ownership and binding metadata', async () => {
-    localStorage.setItem('claudia-project-workspace', JSON.stringify({ version: 1, state: { byProject: {
-      invalid: { workspaceId: 1, focusedChatSessionId: 'A' },
-      p: { workspaceId: 'A', focusedChatSessionId: 'A', toolBindings: {
-        '["terminal","scope"]': { mode: 'fixed', sessionId: 'B' }, bad: { mode: 'fixed', sessionId: 5 },
-      } },
-    } } }));
+    localStorage.setItem(
+      'claudia-project-workspace',
+      JSON.stringify({
+        version: 1,
+        state: {
+          byProject: {
+            invalid: { workspaceId: 1, focusedChatSessionId: 'A' },
+            p: {
+              workspaceId: 'A',
+              focusedChatSessionId: 'A',
+              toolBindings: {
+                '["terminal","scope"]': { mode: 'fixed', sessionId: 'B' },
+                bad: { mode: 'fixed', sessionId: 5 },
+              },
+            },
+          },
+        },
+      })
+    );
     await useProjectWorkspaceStore.persist.rehydrate();
     expect(useProjectWorkspaceStore.getState().byProject.invalid).toBeUndefined();
-    expect(useProjectWorkspaceStore.getState().byProject.p.toolBindings).toEqual({ '["terminal","scope"]': { mode: 'fixed', sessionId: 'B' } });
+    expect(useProjectWorkspaceStore.getState().byProject.p.toolBindings).toEqual({
+      '["terminal","scope"]': { mode: 'fixed', sessionId: 'B' },
+    });
   });
 });
 
@@ -101,10 +143,13 @@ describe('tool chat bindings', () => {
   });
 
   it('uses collision-free content identities and does not bind chat refs', () => {
-    expect(workspaceRefKey({ toolId: 'a::b', instanceKey: 'c' }))
-      .not.toBe(workspaceRefKey({ toolId: 'a', instanceKey: 'b::c' }));
+    expect(workspaceRefKey({ toolId: 'a::b', instanceKey: 'c' })).not.toBe(
+      workspaceRefKey({ toolId: 'a', instanceKey: 'b::c' })
+    );
     resolveProjectWorkspace('p', ['A'], 'A');
-    useProjectWorkspaceStore.getState().setToolBinding('p', { toolId: 'chat', instanceKey: 'A' }, { mode: 'fixed', sessionId: 'B' });
+    useProjectWorkspaceStore
+      .getState()
+      .setToolBinding('p', { toolId: 'chat', instanceKey: 'A' }, { mode: 'fixed', sessionId: 'B' });
     expect(useProjectWorkspaceStore.getState().byProject.p.toolBindings).toEqual({});
   });
 });

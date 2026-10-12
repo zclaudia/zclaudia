@@ -29,19 +29,30 @@ export function BrowserPanel(_props: {
   workingDirectory?: string;
   panelId?: string;
 }) {
-  const { sendMessage: activeSendMessage, sendToServer, isConnected: activeConnected } = useConnection();
+  const {
+    sendMessage: activeSendMessage,
+    sendToServer,
+    isConnected: activeConnected,
+  } = useConnection();
   const toolContext = useWorkspaceTool();
   const boundSessionId = toolContext?.sessionId;
   const backendId = toolContext?.backendId;
-  const ownerConnected = useFacadeStore(s => isMobileBackendUsable({ backendId, connectionState: s.connectionState, backends: s.backends }));
+  const ownerConnected = useFacadeStore(s =>
+    isMobileBackendUsable({ backendId, connectionState: s.connectionState, backends: s.backends })
+  );
   const isConnected = backendId ? ownerConnected : activeConnected;
-  const sendMessage = useCallback((message: ClientMessage) => {
-    if (backendId) sendToServer(backendId, message);
-    else activeSendMessage(message);
-  }, [backendId, sendToServer, activeSendMessage]);
+  const sendMessage = useCallback(
+    (message: ClientMessage) => {
+      if (backendId) sendToServer(backendId, message);
+      else activeSendMessage(message);
+    },
+    [backendId, sendToServer, activeSendMessage]
+  );
   const visible = useWorkspaceVisible();
   const sessionId = useSelectionStore(s => boundSessionId ?? s.selectedSessionId);
-  const engine = useBrowserStore(s => backendId ? s.enginesByBackend[backendId] ?? UNKNOWN_ENGINE : s.engine);
+  const engine = useBrowserStore(s =>
+    backendId ? (s.enginesByBackend[backendId] ?? UNKNOWN_ENGINE) : s.engine
+  );
   const view = useBrowserStore(s => (sessionId ? s.sessions[sessionId] : undefined));
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ width: 1024, height: 768 });

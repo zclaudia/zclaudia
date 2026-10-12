@@ -76,7 +76,9 @@ export function TaskCenterView({
 
       {groups.running.length > 0 && (
         <>
-          <h4 className={`${SECTION_LABEL} px-3 pb-0.5 pt-1.5`}>Running · {groups.running.length}</h4>
+          <h4 className={`${SECTION_LABEL} px-3 pb-0.5 pt-1.5`}>
+            Running · {groups.running.length}
+          </h4>
           {groups.running.map(renderRow)}
         </>
       )}

@@ -2,8 +2,19 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { useSessionsStore, type RemoteSession } from '../sessionsStore';
 import { useOwnershipStore } from '../ownershipStore';
 
-const session = (id: string): RemoteSession => ({ id, projectId: 'p', type: 'regular', createdAt: 1, updatedAt: 1, isActive: false });
-const ids = () => useSessionsStore.getState().remoteSessions.get('owner')?.map(s => s.id);
+const session = (id: string): RemoteSession => ({
+  id,
+  projectId: 'p',
+  type: 'regular',
+  createdAt: 1,
+  updatedAt: 1,
+  isActive: false,
+});
+const ids = () =>
+  useSessionsStore
+    .getState()
+    .remoteSessions.get('owner')
+    ?.map(s => s.id);
 
 beforeEach(() => useSessionsStore.getState().clearAllSessions());
 
@@ -50,7 +61,12 @@ describe('workspace REST creation admission', () => {
     expect(useSessionsStore.getState().pendingAdmissions.get('owner')?.has('B')).toBe(true);
     store.setRemoteSessions('owner', [session('A')]);
     expect(ids()).toEqual(['A', 'B']);
-    expect(useSessionsStore.getState().remoteSessions.get('owner')?.find(s => s.id === 'B')?.name).toBe('live-updated');
+    expect(
+      useSessionsStore
+        .getState()
+        .remoteSessions.get('owner')
+        ?.find(s => s.id === 'B')?.name
+    ).toBe('live-updated');
     store.setRemoteSessions('owner', [session('A'), session('B')]);
     expect(useSessionsStore.getState().pendingAdmissions.has('owner')).toBe(false);
   });

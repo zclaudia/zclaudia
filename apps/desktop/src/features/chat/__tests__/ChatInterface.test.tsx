@@ -22,7 +22,7 @@ vi.mock('../../../services/api/agent-profiles', () => ({
   listAgentProfilesForBackend: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('../../../services/api/llm-profiles', async importOriginal => ({
-  ...await importOriginal<Record<string, unknown>>(),
+  ...(await importOriginal<Record<string, unknown>>()),
   listLlmProfilesForBackend: vi.fn().mockResolvedValue([]),
 }));
 
@@ -190,10 +190,9 @@ vi.mock('../../task-center', () => ({
     <div data-testid="task-center-entry" data-session-id={props.sessionId} />
   ),
   TaskDrawerHost: () => null,
-  useTaskCenterUiStore: Object.assign(
-    (selector: any) => selector({ popoverOpen: false }),
-    { getState: () => ({ popoverOpen: false, setPopoverOpen: vi.fn(), togglePopover: vi.fn() }) }
-  ),
+  useTaskCenterUiStore: Object.assign((selector: any) => selector({ popoverOpen: false }), {
+    getState: () => ({ popoverOpen: false, setPopoverOpen: vi.fn(), togglePopover: vi.fn() }),
+  }),
 }));
 
 // Mock services - use importOriginal to auto-stub all exports

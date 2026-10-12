@@ -38,8 +38,7 @@ describe('resolveDataDir', () => {
 });
 
 describe('seedFromLegacyFile', () => {
-  const seedTempFiles = (dir: string) =>
-    readdirSync(dir).filter((name) => name.includes('.seed-'));
+  const seedTempFiles = (dir: string) => readdirSync(dir).filter(name => name.includes('.seed-'));
 
   it('copies the legacy file into place when the target is missing', () => {
     const dir = mkdtempSync(join(tmpdir(), 'zc-seed-'));

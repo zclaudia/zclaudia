@@ -93,8 +93,12 @@ describe('ResizeDivider', () => {
   it('supports absolute canvas placement and cleans up document listeners on unmount', () => {
     const onDrag = vi.fn();
     const { container, unmount } = render(
-      <ResizeDivider dir="row" containerSize={588} onDrag={onDrag}
-        style={{ position: 'absolute', left: 898, top: 404, width: 8, height: 396 }} />
+      <ResizeDivider
+        dir="row"
+        containerSize={588}
+        onDrag={onDrag}
+        style={{ position: 'absolute', left: 898, top: 404, width: 8, height: 396 }}
+      />
     );
     const divider = container.firstElementChild as HTMLElement;
     expect(divider.style.left).toBe('898px');

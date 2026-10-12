@@ -22,8 +22,10 @@ export function DraftPanel() {
 
   const selectedSessionId = useSelectionStore(s => workspaceTool?.sessionId ?? s.selectedSessionId);
   const sessionMatches =
-    !!activeSessionId && (workspaceTool ? !!selectedSessionId && activeSessionId === selectedSessionId :
-      !selectedSessionId || activeSessionId === selectedSessionId);
+    !!activeSessionId &&
+    (workspaceTool
+      ? !!selectedSessionId && activeSessionId === selectedSessionId
+      : !selectedSessionId || activeSessionId === selectedSessionId);
 
   // Self-initialize: bind the editor to the selected session (workspace launcher
   // opens this panel without calling openEditor). Also re-converges on switch.

@@ -32,7 +32,8 @@ export function ChangeListItem({ entry, projectRoot, expanded, onToggle }: Chang
     if (!projectRoot) return;
     if (tool?.backendId) openFile(projectRoot, entry.path, undefined, undefined, tool.backendId);
     else openFile(projectRoot, entry.path);
-    if (tool?.sessionId) openToolInWorkspace(tool.sessionId, 'file-viewer', { backendId: tool.backendId });
+    if (tool?.sessionId)
+      openToolInWorkspace(tool.sessionId, 'file-viewer', { backendId: tool.backendId });
     else activatePanel('file-viewer');
   };
 

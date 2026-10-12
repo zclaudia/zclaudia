@@ -86,13 +86,10 @@ export function LanguageServerIndicator({
     // Ask again at `delay` when the window is visible; a hidden window waits
     // an extra settled interval first, so background tabs stay quiet.
     const repoll = (delay: number) => {
-      timer = setTimeout(
-        () => {
-          if (document.visibilityState === 'visible') void refresh();
-          else timer = setTimeout(() => void refresh(), POLL_SETTLED_MS);
-        },
-        delay
-      );
+      timer = setTimeout(() => {
+        if (document.visibilityState === 'visible') void refresh();
+        else timer = setTimeout(() => void refresh(), POLL_SETTLED_MS);
+      }, delay);
     };
 
     const refresh = async () => {

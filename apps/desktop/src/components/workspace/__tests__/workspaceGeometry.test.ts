@@ -9,19 +9,35 @@ import {
   clampGeometryRatio,
 } from '../workspaceGeometry';
 
-const pane = (id: string, toolId = 'draft') => ({ ...newPane(toolId, toolId === 'chat' ? id : undefined), id });
-const group = (id: string, dir: GroupNode['dir'], a: LayoutNode, b: LayoutNode, ratio = 0.5): GroupNode =>
-  ({ id, kind: 'group', dir, ratio, children: [a, b] });
+const pane = (id: string, toolId = 'draft') => ({
+  ...newPane(toolId, toolId === 'chat' ? id : undefined),
+  id,
+});
+const group = (
+  id: string,
+  dir: GroupNode['dir'],
+  a: LayoutNode,
+  b: LayoutNode,
+  ratio = 0.5
+): GroupNode => ({ id, kind: 'group', dir, ratio, children: [a, b] });
 
 // Three mixed levels: chat | (memory / (draft | terminal)).
-const mixed = () => group('outer', 'row', pane('chat', 'chat'),
-  group('stack', 'col', pane('memory'), group('inner', 'row', pane('draft'), pane('terminal'))));
+const mixed = () =>
+  group(
+    'outer',
+    'row',
+    pane('chat', 'chat'),
+    group('stack', 'col', pane('memory'), group('inner', 'row', pane('draft'), pane('terminal')))
+  );
 
 describe('workspace geometry', () => {
   it('lays out independent chat/tool placeholders without inventing pane refs', () => {
-    const tree = group('g', 'row',
+    const tree = group(
+      'g',
+      'row',
       { id: 'chat-slot', kind: 'placeholder', slotId: 'chat-2', accepts: 'chat' },
-      { id: 'tool-slot', kind: 'placeholder', slotId: 'files', accepts: 'tool:file-viewer' });
+      { id: 'tool-slot', kind: 'placeholder', slotId: 'files', accepts: 'tool:file-viewer' }
+    );
     expect(flattenPanes(tree)).toEqual([]);
     expect(minimumWorkspaceSize(tree)).toEqual({ width: 608, height: 320 });
     const solved = solveWorkspaceGeometry(tree, { width: 100, height: 100 });
@@ -41,8 +57,10 @@ describe('workspace geometry', () => {
   it('aggregates recursive row and column minima including each gutter', () => {
     expect(minimumWorkspaceSize(mixed())).toEqual({ width: 856, height: 328 });
     expect(flattenPanes(mixed()).map(p => p.id)).toEqual(['chat', 'memory', 'draft', 'terminal']);
-    expect(minimumWorkspaceSize(group('stack', 'col', pane('a'), pane('b'))))
-      .toEqual({ width: TOOL_MIN_SIZE.width, height: TOOL_MIN_SIZE.height * 2 + 8 });
+    expect(minimumWorkspaceSize(group('stack', 'col', pane('a'), pane('b')))).toEqual({
+      width: TOOL_MIN_SIZE.width,
+      height: TOOL_MIN_SIZE.height * 2 + 8,
+    });
   });
 
   it('uses a nested group axis minus its own gutter, with contiguous pane rectangles', () => {
@@ -54,8 +72,9 @@ describe('workspace geometry', () => {
     expect(inner.axisSize).toBe(588);
     const divider = layout.dividers.find(d => d.groupId === 'inner')!;
     expect(divider.rect).toEqual({ left: 898, top: 404, width: 8, height: 396 });
-    expect(layout.panes.get('draft')!.left + layout.panes.get('draft')!.width)
-      .toBe(divider.rect.left);
+    expect(layout.panes.get('draft')!.left + layout.panes.get('draft')!.width).toBe(
+      divider.rect.left
+    );
     expect(layout.panes.get('terminal')!.left).toBe(divider.rect.left + 8);
     // 59px movement is ten percent locally; it would be only five percent at root.
     expect(58.8 / inner.axisSize).toBeCloseTo(0.1);
@@ -82,8 +101,10 @@ describe('workspace geometry', () => {
   it('bounds extreme ratios by both subtrees on both split axes', () => {
     for (const dir of ['row', 'col'] as const) {
       for (const ratio of [-100, 100, Number.NaN]) {
-        const layout = solveWorkspaceGeometry(group('g', dir, pane('chat', 'chat'), pane('tool'), ratio),
-          { width: 1000, height: 700 });
+        const layout = solveWorkspaceGeometry(
+          group('g', dir, pane('chat', 'chat'), pane('tool'), ratio),
+          { width: 1000, height: 700 }
+        );
         const g = layout.groups.get('g')!;
         expect(g.ratio).toBeGreaterThanOrEqual(g.minRatio);
         expect(g.ratio).toBeLessThanOrEqual(g.maxRatio);

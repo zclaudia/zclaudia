@@ -70,7 +70,15 @@ interface TaskRowProps {
  * accent per ui-conventions §5 — or Dismiss for terminal ones). PIDs live in
  * the expandable detail, never inline.
  */
-export function TaskRow({ task, isOtherSession, sessionLabel, onStop, onDismiss, onLocate, onView }: TaskRowProps) {
+export function TaskRow({
+  task,
+  isOtherSession,
+  sessionLabel,
+  onStop,
+  onDismiss,
+  onLocate,
+  onView,
+}: TaskRowProps) {
   const [expanded, setExpanded] = useState(false);
   const isRunning = task.status === 'started' || task.status === 'in_progress';
   const canStop = isRunning && task.stoppable !== false;
@@ -84,7 +92,11 @@ export function TaskRow({ task, isOtherSession, sessionLabel, onStop, onDismiss,
   const usage = formatUsage(task);
   // Sub-agent rows lead with their live activity ("what is the agent doing
   // right now"); shell tasks lead with elapsed time.
-  const meta = [isRunning && task.activity ? task.activity : null, formatTimeAgo(task.startedAt), usage]
+  const meta = [
+    isRunning && task.activity ? task.activity : null,
+    formatTimeAgo(task.startedAt),
+    usage,
+  ]
     .filter(Boolean)
     .join(' · ');
 

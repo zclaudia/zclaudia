@@ -1,10 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BackgroundTaskChip } from '../BackgroundTaskChip';
-import {
-  useBackgroundTaskStore,
-  type BackgroundTask,
-} from '../../../stores/backgroundTaskStore';
+import { useBackgroundTaskStore, type BackgroundTask } from '../../../stores/backgroundTaskStore';
 import { useTaskCenterUiStore } from '../../task-center/taskCenterUiStore';
 
 function makeTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {

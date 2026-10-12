@@ -218,7 +218,12 @@ describe('AutomationService trigger validation', () => {
   }
 
   function svcOver(database: Database.Database) {
-    return new AutomationService(database, () => {}, fakeEngine() as any, fakeWorkflowLookup() as any);
+    return new AutomationService(
+      database,
+      () => {},
+      fakeEngine() as any,
+      fakeWorkflowLookup() as any
+    );
   }
 
   it('rejects an invalid cron on create without persisting anything', () => {
@@ -246,9 +251,9 @@ describe('AutomationService trigger validation', () => {
       action: { kind: 'activity', ref: 'shell' },
     });
 
-    expect(() =>
-      svc.updateAutomation(a.id, { trigger: { type: 'cron', cron: 'nope' } })
-    ).toThrow(InvalidAutomationTriggerError);
+    expect(() => svc.updateAutomation(a.id, { trigger: { type: 'cron', cron: 'nope' } })).toThrow(
+      InvalidAutomationTriggerError
+    );
     expect(svc.getAutomation(a.id)?.trigger).toEqual({ type: 'cron', cron: '0 9 * * *' });
   });
 
@@ -261,8 +266,10 @@ describe('AutomationService trigger validation', () => {
       action: { kind: 'activity', ref: 'shell' },
     });
     // Simulate a row written before validation existed.
-    db.prepare('UPDATE automations SET trigger = ? WHERE id = ?')
-      .run(JSON.stringify({ type: 'cron', cron: 'not-a-cron ' }), a.id);
+    db.prepare('UPDATE automations SET trigger = ? WHERE id = ?').run(
+      JSON.stringify({ type: 'cron', cron: 'not-a-cron ' }),
+      a.id
+    );
 
     const disabled = svc.updateAutomation(a.id, { enabled: false });
     expect(disabled.enabled).toBe(false);
@@ -276,8 +283,10 @@ describe('AutomationService trigger validation', () => {
       trigger: { type: 'cron', cron: '0 9 * * *' },
       action: { kind: 'activity', ref: 'shell' },
     });
-    db.prepare('UPDATE automations SET trigger = ? WHERE id = ?')
-      .run(JSON.stringify({ type: 'cron', cron: 'not-a-cron ' }), a.id);
+    db.prepare('UPDATE automations SET trigger = ? WHERE id = ?').run(
+      JSON.stringify({ type: 'cron', cron: 'not-a-cron ' }),
+      a.id
+    );
 
     expect(() => svc.initialize()).not.toThrow();
   });

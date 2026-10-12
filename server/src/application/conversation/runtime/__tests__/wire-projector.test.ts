@@ -88,9 +88,7 @@ describe('wire projector', () => {
           input: { pattern: 'verifyToken' },
         })
       )
-    ).toEqual([
-      expect.objectContaining({ type: 'tool_use', parentToolUseId: 'task-call-1' }),
-    ]);
+    ).toEqual([expect.objectContaining({ type: 'tool_use', parentToolUseId: 'task-call-1' })]);
 
     expect(
       projectRunDomainEventToWireMessages(
@@ -101,9 +99,7 @@ describe('wire projector', () => {
           output: '3 matches',
         })
       )
-    ).toEqual([
-      expect.objectContaining({ type: 'tool_result', parentToolUseId: 'task-call-1' }),
-    ]);
+    ).toEqual([expect.objectContaining({ type: 'tool_result', parentToolUseId: 'task-call-1' })]);
 
     // Untagged events must not grow the field at all.
     const [started] = projectRunDomainEventToWireMessages(

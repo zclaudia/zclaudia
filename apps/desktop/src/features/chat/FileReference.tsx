@@ -53,11 +53,13 @@ export function TextWithFileRefs({
 
   const handleClick = (filePath: string) => {
     // Find project root from the first project with a rootPath
-    const projectRoot = chat?.projectRoot ?? Object.values(projects).find(p => p.rootPath)?.rootPath;
+    const projectRoot =
+      chat?.projectRoot ?? Object.values(projects).find(p => p.rootPath)?.rootPath;
     if (projectRoot) {
       if (chat?.backendId) openFile(projectRoot, filePath, undefined, undefined, chat.backendId);
       else openFile(projectRoot, filePath);
-      if (chat?.sessionId) openToolInWorkspace(chat.sessionId, 'file-viewer', { backendId: chat.backendId });
+      if (chat?.sessionId)
+        openToolInWorkspace(chat.sessionId, 'file-viewer', { backendId: chat.backendId });
       else activatePanel('file-viewer');
     }
   };

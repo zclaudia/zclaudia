@@ -30,25 +30,45 @@ function restoreProjects(persisted: unknown): Record<string, ProjectWorkspace> {
     if (!candidate || typeof candidate !== 'object') continue;
     const ws = candidate as Partial<ProjectWorkspace>;
     if (typeof ws.workspaceId !== 'string' || !ws.workspaceId) continue;
-    const focusedChatSessionId = typeof ws.focusedChatSessionId === 'string'
-      ? ws.focusedChatSessionId : ws.workspaceId;
+    const focusedChatSessionId =
+      typeof ws.focusedChatSessionId === 'string' ? ws.focusedChatSessionId : ws.workspaceId;
     const bindings: [string, ToolChatBinding][] = [];
     if (ws.toolBindings && typeof ws.toolBindings === 'object') {
       for (const [key, binding] of Object.entries(ws.toolBindings)) {
         let refKey: string;
         try {
           const tuple: unknown = JSON.parse(key);
-          if (!Array.isArray(tuple) || tuple.length !== 2 || typeof tuple[0] !== 'string' || !tuple[0] ||
-              tuple[0] === 'chat' || (tuple[1] !== null && typeof tuple[1] !== 'string')) continue;
+          if (
+            !Array.isArray(tuple) ||
+            tuple.length !== 2 ||
+            typeof tuple[0] !== 'string' ||
+            !tuple[0] ||
+            tuple[0] === 'chat' ||
+            (tuple[1] !== null && typeof tuple[1] !== 'string')
+          )
+            continue;
           refKey = workspaceRefKey({ toolId: tuple[0], instanceKey: tuple[1] ?? undefined });
-        } catch { continue; }
+        } catch {
+          continue;
+        }
         if (binding?.mode === 'follow') bindings.push([refKey, { mode: 'follow' }]);
-        if (binding?.mode === 'fixed' && typeof binding.sessionId === 'string' && binding.sessionId) {
+        if (
+          binding?.mode === 'fixed' &&
+          typeof binding.sessionId === 'string' &&
+          binding.sessionId
+        ) {
           bindings.push([refKey, { mode: 'fixed', sessionId: binding.sessionId }]);
         }
       }
     }
-    entries.push([projectId, { workspaceId: ws.workspaceId, focusedChatSessionId, toolBindings: Object.fromEntries(bindings) }]);
+    entries.push([
+      projectId,
+      {
+        workspaceId: ws.workspaceId,
+        focusedChatSessionId,
+        toolBindings: Object.fromEntries(bindings),
+      },
+    ]);
   }
   return Object.fromEntries(entries);
 }
@@ -57,27 +77,44 @@ export const useProjectWorkspaceStore = create<ProjectWorkspaceState>()(
   persist(
     set => ({
       byProject: {},
-      setFocusedChat: (projectId, sessionId) => set(state => {
-        const ws = state.byProject[projectId];
-        if (!ws || ws.focusedChatSessionId === sessionId) return state;
-        return { byProject: { ...state.byProject, [projectId]: { ...ws, focusedChatSessionId: sessionId } } };
-      }),
-      setToolBinding: (projectId, ref, binding) => set(state => {
-        const ws = state.byProject[projectId];
-        if (!ws || isChatRef(ref)) return state;
-        return { byProject: { ...state.byProject, [projectId]: {
-          ...ws, toolBindings: { ...ws.toolBindings, [workspaceRefKey(ref)]: binding },
-        } } };
-      }),
-      removeProject: projectId => set(state => {
-        if (!state.byProject[projectId]) return state;
-        const byProject = { ...state.byProject };
-        delete byProject[projectId];
-        return { byProject };
-      }),
+      setFocusedChat: (projectId, sessionId) =>
+        set(state => {
+          const ws = state.byProject[projectId];
+          if (!ws || ws.focusedChatSessionId === sessionId) return state;
+          return {
+            byProject: {
+              ...state.byProject,
+              [projectId]: { ...ws, focusedChatSessionId: sessionId },
+            },
+          };
+        }),
+      setToolBinding: (projectId, ref, binding) =>
+        set(state => {
+          const ws = state.byProject[projectId];
+          if (!ws || isChatRef(ref)) return state;
+          return {
+            byProject: {
+              ...state.byProject,
+              [projectId]: {
+                ...ws,
+                toolBindings: { ...ws.toolBindings, [workspaceRefKey(ref)]: binding },
+              },
+            },
+          };
+        }),
+      removeProject: projectId =>
+        set(state => {
+          if (!state.byProject[projectId]) return state;
+          const byProject = { ...state.byProject };
+          delete byProject[projectId];
+          return { byProject };
+        }),
     }),
     {
-      name: workspaceStorageKey('claudia-project-workspace', typeof window === 'undefined' ? '' : window.location.search),
+      name: workspaceStorageKey(
+        'claudia-project-workspace',
+        typeof window === 'undefined' ? '' : window.location.search
+      ),
       version: 1,
       storage: createJSONStorage(() => recoverableJsonStorage(localStorage)),
       partialize: state => ({ byProject: state.byProject }),
@@ -94,5 +131,7 @@ export function resolveToolBindingSession(
 ): string | undefined {
   const ws = useProjectWorkspaceStore.getState().byProject[projectId];
   const binding = ws?.toolBindings[workspaceRefKey(ref)];
-  return binding?.mode === 'fixed' ? binding.sessionId : ws?.focusedChatSessionId ?? fallbackSessionId;
+  return binding?.mode === 'fixed'
+    ? binding.sessionId
+    : (ws?.focusedChatSessionId ?? fallbackSessionId);
 }

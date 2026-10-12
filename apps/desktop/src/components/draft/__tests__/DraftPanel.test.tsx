@@ -61,7 +61,11 @@ describe('DraftPanel', () => {
 
   it('does not fall back to the global draft when a workspace has no remaining chat', () => {
     state = { ...buildState(), localContent: 'Deleted session draft' };
-    render(<WorkspaceToolContext.Provider value={{ sessionId: '' }}><DraftPanel /></WorkspaceToolContext.Provider>);
+    render(
+      <WorkspaceToolContext.Provider value={{ sessionId: '' }}>
+        <DraftPanel />
+      </WorkspaceToolContext.Provider>
+    );
     expect(screen.getByText('No chat selected')).toBeTruthy();
     expect(screen.queryByLabelText('Draft message')).toBeNull();
     expect(openEditor).not.toHaveBeenCalled();
@@ -70,10 +74,16 @@ describe('DraftPanel', () => {
   it('does not reopen or focus an invisible retained draft', () => {
     state = { ...buildState(), activeSessionId: 'other-chat' };
     const { rerender } = render(
-      <WorkspaceVisibilityContext.Provider value={false}><DraftPanel /></WorkspaceVisibilityContext.Provider>
+      <WorkspaceVisibilityContext.Provider value={false}>
+        <DraftPanel />
+      </WorkspaceVisibilityContext.Provider>
     );
     expect(openEditor).not.toHaveBeenCalled();
-    rerender(<WorkspaceVisibilityContext.Provider value><DraftPanel /></WorkspaceVisibilityContext.Provider>);
+    rerender(
+      <WorkspaceVisibilityContext.Provider value>
+        <DraftPanel />
+      </WorkspaceVisibilityContext.Provider>
+    );
     expect(openEditor).toHaveBeenCalledWith('sess-1');
   });
 

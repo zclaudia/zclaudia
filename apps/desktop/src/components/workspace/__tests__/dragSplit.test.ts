@@ -117,29 +117,53 @@ describe('canDrop', () => {
 
   it('allows moving an existing ref to another pane edge, excluding the source identity', () => {
     const root: GroupNode = {
-      id: 'g', kind: 'group', dir: 'row', ratio: 0.5,
+      id: 'g',
+      kind: 'group',
+      dir: 'row',
+      ratio: 0.5,
       children: [pane('chat', 'chat', 's1'), pane('tool', 'draft')],
     };
-    expect(canDrop(root, 'chat', 'right', {
-      toolId: 'draft', sourcePaneId: 'tool', sourceIndex: 0,
-    }).allowed).toBe(true);
-    expect(canDrop(root, 'tool', 'left', {
-      toolId: 'chat', instanceKey: 's1', sourcePaneId: 'chat', sourceIndex: 0,
-    }).allowed).toBe(true);
+    expect(
+      canDrop(root, 'chat', 'right', {
+        toolId: 'draft',
+        sourcePaneId: 'tool',
+        sourceIndex: 0,
+      }).allowed
+    ).toBe(true);
+    expect(
+      canDrop(root, 'tool', 'left', {
+        toolId: 'chat',
+        instanceKey: 's1',
+        sourcePaneId: 'chat',
+        sourceIndex: 0,
+      }).allowed
+    ).toBe(true);
   });
 
   it('keeps chat panes isolated from all center/tab merge drops', () => {
     const root: GroupNode = {
-      id: 'g', kind: 'group', dir: 'row', ratio: 0.5,
+      id: 'g',
+      kind: 'group',
+      dir: 'row',
+      ratio: 0.5,
       children: [pane('chat', 'chat', 's1'), pane('tool', 'draft')],
     };
     expect(canDrop(root, 'chat', 'center', { toolId: 'memory' }).allowed).toBe(false);
-    expect(canDrop(root, 'tool', 'center', {
-      toolId: 'chat', instanceKey: 's1', sourcePaneId: 'chat', sourceIndex: 0,
-    }).allowed).toBe(false);
-    expect(canDrop(root, 'chat', 'center', {
-      toolId: 'chat', instanceKey: 's2', multiInstance: true,
-    }).allowed).toBe(false);
+    expect(
+      canDrop(root, 'tool', 'center', {
+        toolId: 'chat',
+        instanceKey: 's1',
+        sourcePaneId: 'chat',
+        sourceIndex: 0,
+      }).allowed
+    ).toBe(false);
+    expect(
+      canDrop(root, 'chat', 'center', {
+        toolId: 'chat',
+        instanceKey: 's2',
+        multiInstance: true,
+      }).allowed
+    ).toBe(false);
   });
 
   it('disables edges for a one-tab self move, but allows splitting a tab out of a multi-tab pane', () => {
@@ -154,12 +178,23 @@ describe('canDrop', () => {
     const source = pane('tool', 'terminal', 'scopeA');
     source.tools.push({ toolId: 'terminal', instanceKey: 'scopeA' });
     const root: GroupNode = {
-      id: 'g', kind: 'group', dir: 'row', ratio: 0.5,
+      id: 'g',
+      kind: 'group',
+      dir: 'row',
+      ratio: 0.5,
       children: [source, pane('chat', 'chat', 's1')],
     };
-    const payload = { toolId: 'terminal', instanceKey: 'scopeA', multiInstance: true,
-      sourcePaneId: 'tool', sourceIndex: 0 };
-    expect(canDrop(root, 'chat', 'right', payload)).toEqual({ allowed: false, conflictPaneId: 'tool' });
+    const payload = {
+      toolId: 'terminal',
+      instanceKey: 'scopeA',
+      multiInstance: true,
+      sourcePaneId: 'tool',
+      sourceIndex: 0,
+    };
+    expect(canDrop(root, 'chat', 'right', payload)).toEqual({
+      allowed: false,
+      conflictPaneId: 'tool',
+    });
     source.tools[0] = { toolId: 'terminal', instanceKey: 'scopeB' };
     expect(canDrop(root, 'chat', 'right', payload).allowed).toBe(false);
     expect(canDrop(root, 'removed', 'right', payload).allowed).toBe(false);
@@ -167,10 +202,13 @@ describe('canDrop', () => {
 
   it('matches chat conflicts by session identity, allowing distinct sessions', () => {
     const root = pane('chat', 'chat', 's1');
-    expect(canDrop(root, 'chat', 'right', { toolId: 'chat', instanceKey: 's2' }).allowed).toBe(true);
-    expect(canDrop(root, 'chat', 'right', { toolId: 'chat', instanceKey: 's1' }).allowed).toBe(false);
+    expect(canDrop(root, 'chat', 'right', { toolId: 'chat', instanceKey: 's2' }).allowed).toBe(
+      true
+    );
+    expect(canDrop(root, 'chat', 'right', { toolId: 'chat', instanceKey: 's1' }).allowed).toBe(
+      false
+    );
   });
-
 });
 
 describe('disabledZones', () => {
@@ -244,23 +282,23 @@ describe('resolveTabDrop', () => {
   });
 });
 
-
 describe('resolvePointerToPane', () => {
   it('uses viewport DOM rectangles so scrolled canvas hit-testing needs no extra offset', () => {
     const container = document.createElement('div');
     const el = document.createElement('div');
     el.setAttribute('data-pane-id', 'p1');
     // Canvas pane starts at x=600 but is scrolled left by 500: DOM rect x=100.
-    el.getBoundingClientRect = () => ({ left: 100, right: 400, top: -120, bottom: 200,
-      width: 300, height: 320 }) as DOMRect;
+    el.getBoundingClientRect = () =>
+      ({ left: 100, right: 400, top: -120, bottom: 200, width: 300, height: 320 }) as DOMRect;
     container.appendChild(el);
     const hit = resolvePointerToPane(container, pane('p1', 'draft'), 390, 40, { toolId: 'memory' });
     expect(hit?.paneId).toBe('p1');
     expect(hit?.zone).toBe('right');
-    expect(resolvePointerToPane(container, pane('p1', 'draft'), 610, 40, { toolId: 'memory' })).toBeNull();
+    expect(
+      resolvePointerToPane(container, pane('p1', 'draft'), 610, 40, { toolId: 'memory' })
+    ).toBeNull();
   });
 });
-
 
 describe('resolveRootDrop', () => {
   const viewport = { left: 100, top: 200, width: 1000, height: 700 };

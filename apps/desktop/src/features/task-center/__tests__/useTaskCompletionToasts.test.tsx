@@ -73,7 +73,9 @@ describe('useTaskCompletionToasts', () => {
 
   it('toasts a task added directly in a terminal state', () => {
     renderHook(() => useTaskCompletionToasts());
-    useBackgroundTaskStore.getState().addTask(makeTask('t1', { sessionId: 'sess-2', status: 'stopped' }));
+    useBackgroundTaskStore
+      .getState()
+      .addTask(makeTask('t1', { sessionId: 'sess-2', status: 'stopped' }));
 
     expect(useToastStore.getState().toasts).toHaveLength(1);
   });

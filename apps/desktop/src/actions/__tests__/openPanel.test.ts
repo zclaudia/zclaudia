@@ -10,7 +10,10 @@ import { useSelectionStore } from '../../stores/selectionStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 import { useProjectWorkspaceStore } from '../../stores/projectWorkspaceStore';
-import { registerWorkspaceRoute, useWorkspaceRoutingStore } from '../../stores/workspaceRoutingStore';
+import {
+  registerWorkspaceRoute,
+  useWorkspaceRoutingStore,
+} from '../../stores/workspaceRoutingStore';
 import { sessionWorkspaceId } from '../../utils/workspaceStorage';
 
 const SESSION_ID = 'sess-1';
@@ -241,13 +244,22 @@ describe('openPanel utility', () => {
     it('tracks the standalone session route instead of the same session project anchor', () => {
       seedSessionCtx();
       registerPanel('foo', 'right');
-      useProjectWorkspaceStore.setState({ byProject: {
-        [PROJECT_ID]: { workspaceId: 'main-anchor', focusedChatSessionId: SESSION_ID, toolBindings: {} },
-      } });
+      useProjectWorkspaceStore.setState({
+        byProject: {
+          [PROJECT_ID]: {
+            workspaceId: 'main-anchor',
+            focusedChatSessionId: SESSION_ID,
+            toolBindings: {},
+          },
+        },
+      });
       const scopedId = sessionWorkspaceId(SESSION_ID);
       useRightWorkspaceStore.getState().openTool(scopedId, 'foo');
       const cleanup = registerWorkspaceRoute({
-        workspaceId: scopedId, sessionId: SESSION_ID, projectId: PROJECT_ID, projectScoped: false,
+        workspaceId: scopedId,
+        sessionId: SESSION_ID,
+        projectId: PROJECT_ID,
+        projectScoped: false,
       });
 
       const { result } = renderHook(() => usePanelIsActive('foo'));
@@ -256,7 +268,10 @@ describe('openPanel utility', () => {
       // Closing the scoped panel must not read a tool still open in the main project.
       act(() => {
         useRightWorkspaceStore.getState().openTool('main-anchor', 'foo');
-        const paneId = findPaneWithTool(useRightWorkspaceStore.getState().bySession[scopedId].root, 'foo');
+        const paneId = findPaneWithTool(
+          useRightWorkspaceStore.getState().bySession[scopedId].root,
+          'foo'
+        );
         useRightWorkspaceStore.getState().closeTool(scopedId, paneId!, 'foo');
       });
       expect(result.current).toBe(false);
@@ -270,7 +285,10 @@ describe('openPanel utility', () => {
       registerPanel('foo', 'right');
       useRightWorkspaceStore.getState().openTool('dashboard-anchor', 'foo');
       const cleanup = registerWorkspaceRoute({
-        workspaceId: 'dashboard-anchor', sessionId: 'dashboard-session', projectId: 'dashboard-project', projectScoped: true,
+        workspaceId: 'dashboard-anchor',
+        sessionId: 'dashboard-session',
+        projectId: 'dashboard-project',
+        projectScoped: true,
       });
       const { result } = renderHook(() => usePanelIsActive('foo'));
       expect(result.current).toBe(true);

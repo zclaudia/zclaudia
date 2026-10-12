@@ -308,9 +308,7 @@ describe('Interval validation', () => {
 
 describe('Scope switches (E2E R01/C01)', () => {
   it('refetches when the project scope changes, without a manual refresh', async () => {
-    const api = installApi('b1', async url =>
-      url.startsWith('/api/automations') ? [ALPHA] : []
-    );
+    const api = installApi('b1', async url => (url.startsWith('/api/automations') ? [ALPHA] : []));
     const { rerender } = render(
       <AutomationsTab scope={makeScope([makeBackend('b1')], { projectId: 'p1' })} />
     );
@@ -354,13 +352,9 @@ describe('Scope switches (E2E R01/C01)', () => {
 
 describe('Row action feedback (E2E R05)', () => {
   it('ignores a second Run now click while the first is still in flight', async () => {
-    const api = installApi('b1', async url =>
-      url.startsWith('/api/automations') ? [ALPHA] : []
-    );
+    const api = installApi('b1', async url => (url.startsWith('/api/automations') ? [ALPHA] : []));
     let resolveRun: (() => void) | undefined;
-    api.post.mockImplementation(
-      () => new Promise(resolve => (resolveRun = () => resolve({})))
-    );
+    api.post.mockImplementation(() => new Promise(resolve => (resolveRun = () => resolve({}))));
     render(<AutomationsTab scope={makeScope([makeBackend('b1')])} />);
     const run = await screen.findByRole('button', { name: 'Run now' });
 
@@ -413,9 +407,7 @@ describe('Create form catalog failures (E2E R06)', () => {
       target: { value: 'Blocked' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
-    expect(
-      await screen.findByText(/action catalog didn't load/)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/action catalog didn't load/)).toBeInTheDocument();
     expect(api.post).not.toHaveBeenCalled();
 
     api.get.mockImplementation(async (url: string) =>

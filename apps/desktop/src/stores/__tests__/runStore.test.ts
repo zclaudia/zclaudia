@@ -57,7 +57,16 @@ describe('runStore', () => {
     useRunStore.getState().addToolCall('r1', 'task-1', 'Task', { description: 'd' });
     useRunStore
       .getState()
-      .addToolCall('r1', 'inner-1', 'Read', { file_path: 'x' }, undefined, undefined, undefined, 'task-1');
+      .addToolCall(
+        'r1',
+        'inner-1',
+        'Read',
+        { file_path: 'x' },
+        undefined,
+        undefined,
+        undefined,
+        'task-1'
+      );
     const calls = useRunStore.getState().activeToolCalls.r1;
     expect(calls['inner-1'].parentToolUseId).toBe('task-1');
     expect(calls['task-1'].parentToolUseId).toBeUndefined();

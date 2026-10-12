@@ -10,29 +10,42 @@ import { FlatWorkspaceView } from '../FlatWorkspaceView';
 const counts = vi.hoisted(() => ({ chat: 0, tool: 0, closed: 0 }));
 vi.mock('../../../features/chat/ChatPane', () => ({
   ChatPane: () => {
-    useEffect(() => { counts.chat++; }, []);
+    useEffect(() => {
+      counts.chat++;
+    }, []);
     return <textarea aria-label="Chat draft" defaultValue="draft" />;
   },
 }));
 
 function Editor() {
   const [value, setValue] = useState('original');
-  useEffect(() => { counts.tool++; return () => { counts.closed++; }; }, []);
+  useEffect(() => {
+    counts.tool++;
+    return () => {
+      counts.closed++;
+    };
+  }, []);
   return <input aria-label="Tool edit" value={value} onChange={e => setValue(e.target.value)} />;
 }
 
 beforeEach(() => {
-  counts.chat = 0; counts.tool = 0; counts.closed = 0;
+  counts.chat = 0;
+  counts.tool = 0;
+  counts.closed = 0;
   useRightWorkspaceStore.setState({ bySession: {}, order: [] });
   useRightSidebarStore.setState({ collapsed: false });
-  usePluginStore.setState({ panels: [{ id: 'memory', pluginId: 'test', type: 'panel', label: 'Memory', component: Editor }] });
+  usePluginStore.setState({
+    panels: [{ id: 'memory', pluginId: 'test', type: 'panel', label: 'Memory', component: Editor }],
+  });
   useRightWorkspaceStore.getState().ensureChatSession('s');
   useRightWorkspaceStore.getState().openTool('s', 'memory');
 });
 
 describe('stable workspace content', () => {
   it('keeps chat and editor DOM/state through moves, collapse and maximize', () => {
-    const { rerender } = render(<FlatWorkspaceView chatComponent={ChatPane} sessionId="s" collapsed={false} />);
+    const { rerender } = render(
+      <FlatWorkspaceView chatComponent={ChatPane} sessionId="s" collapsed={false} />
+    );
     const chat = screen.getByLabelText('Chat draft');
     const tool = screen.getByLabelText('Tool edit');
     fireEvent.change(tool, { target: { value: 'unsaved edit' } });
@@ -43,7 +56,9 @@ describe('stable workspace content', () => {
     expect(screen.getByLabelText('Tool edit')).toBe(tool);
     expect(tool.closest('[data-content-ref]')).not.toBeVisible();
     rerender(<FlatWorkspaceView chatComponent={ChatPane} sessionId="s" collapsed={false} />);
-    const pane = flattenPanes(useRightWorkspaceStore.getState().bySession.s.root).find(p => p.tools[0].toolId === 'memory')!;
+    const pane = flattenPanes(useRightWorkspaceStore.getState().bySession.s.root).find(
+      p => p.tools[0].toolId === 'memory'
+    )!;
     act(() => state.setMaximizedPane('s', pane.id));
     expect(chat.closest('[data-content-ref]')).not.toBeVisible();
     act(() => state.setMaximizedPane('s', null));
@@ -61,21 +76,36 @@ describe('stable workspace content', () => {
     const panes = flattenPanes(useRightWorkspaceStore.getState().bySession.s.root);
     const source = panes.find(p => p.tools.some(t => t.toolId === 'memory'))!;
     const chat = panes.find(p => p.tools[0].toolId === 'chat')!;
-    act(() => useRightWorkspaceStore.getState().moveTabToEdge('s', source.id, chat.id, 'memory', undefined, 'top'));
+    act(() =>
+      useRightWorkspaceStore
+        .getState()
+        .moveTabToEdge('s', source.id, chat.id, 'memory', undefined, 'top')
+    );
     expect(screen.getByLabelText('Tool edit')).toBe(tool);
     expect(tool).toHaveValue('keep');
     expect(counts.tool).toBe(1);
     expect(counts.closed).toBe(0);
-    const moved = flattenPanes(useRightWorkspaceStore.getState().bySession.s.root).find(p => p.tools.some(t => t.toolId === 'memory'))!;
+    const moved = flattenPanes(useRightWorkspaceStore.getState().bySession.s.root).find(p =>
+      p.tools.some(t => t.toolId === 'memory')
+    )!;
     act(() => useRightWorkspaceStore.getState().closeTool('s', moved.id, 'memory'));
     expect(screen.queryByLabelText('Tool edit')).toBeNull();
     expect(counts.closed).toBe(1);
   });
 
   it('provides a virtual empty launcher without persisting its geometry nodes', () => {
-    const pane = flattenPanes(useRightWorkspaceStore.getState().bySession.s.root).find(p => p.tools[0].toolId === 'memory')!;
+    const pane = flattenPanes(useRightWorkspaceStore.getState().bySession.s.root).find(
+      p => p.tools[0].toolId === 'memory'
+    )!;
     useRightWorkspaceStore.getState().closePane('s', pane.id);
-    render(<FlatWorkspaceView chatComponent={ChatPane} sessionId="s" collapsed={false} emptyState={<div>Open a tool</div>} />);
+    render(
+      <FlatWorkspaceView
+        chatComponent={ChatPane}
+        sessionId="s"
+        collapsed={false}
+        emptyState={<div>Open a tool</div>}
+      />
+    );
     expect(screen.getByText('Open a tool')).toBeVisible();
     expect(flattenPanes(useRightWorkspaceStore.getState().bySession.s.root)).toHaveLength(1);
   });

@@ -1,31 +1,13 @@
 import type { Database } from 'better-sqlite3';
 import type { CacheTokenSums, SessionCacheTimeline } from '@zclaudia/shared/core/cache-stats';
+import type {
+  CacheTraceCallRow,
+  CacheTraceRunRow,
+  PiCacheTraceStore,
+} from '../../infra/providers/types.js';
 import { classifyCacheTimeline, type TraceCall, type TraceRun } from './cache-trace-classifier.js';
 
-export interface CacheTraceRunRow {
-  invocationId: string;
-  runId: string | null;
-  sessionId: string;
-  startedAt: number;
-  model: string | null;
-  thinkingLevel: string | null;
-  cacheRetention: string | null;
-  promptHash: string;
-  toolsHash: string;
-  historyCount: number;
-  historyHash: string;
-  historyPrefixIntact: boolean | null;
-  trimmedMessages: number;
-}
-
-export interface CacheTraceCallRow {
-  callIndex: number;
-  at: number;
-  model: string | null;
-  tokens: CacheTokenSums;
-  output: number;
-  stopReason: string | null;
-}
+export type { CacheTraceRunRow, CacheTraceCallRow };
 
 function tableExists(db: Database, name: string): boolean {
   return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
@@ -36,7 +18,7 @@ function tableExists(db: Database, name: string): boolean {
  * diagnostics only: callers swallow failures so a trace problem never
  * affects the run that produced it.
  */
-export class CacheTraceRepository {
+export class CacheTraceRepository implements PiCacheTraceStore {
   constructor(private readonly db: Database) {}
 
   static hasSchema(db: Database): boolean {

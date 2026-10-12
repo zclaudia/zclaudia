@@ -13,7 +13,13 @@ interface UseKeyboardShortcutsOptions {
   enabled?: boolean;
 }
 
-export function useKeyboardShortcuts({ projectId, projectRoot, sessionId, backendId, enabled = true }: UseKeyboardShortcutsOptions) {
+export function useKeyboardShortcuts({
+  projectId,
+  projectRoot,
+  sessionId,
+  backendId,
+  enabled = true,
+}: UseKeyboardShortcutsOptions) {
   // Ctrl+` keyboard shortcut to toggle terminal
   useEffect(() => {
     if (!enabled) return;
@@ -27,7 +33,10 @@ export function useKeyboardShortcuts({ projectId, projectRoot, sessionId, backen
       ) {
         e.preventDefault();
         const store = useTerminalStore.getState();
-        const context = sessionId !== undefined || backendId !== undefined ? { sessionId, projectId, backendId } : undefined;
+        const context =
+          sessionId !== undefined || backendId !== undefined
+            ? { sessionId, projectId, backendId }
+            : undefined;
         if (store.isDrawerOpen(projectId, backendId) && isPanelActive('terminal', context)) {
           store.setDrawerOpen(projectId, false, backendId);
         } else if (store.isDrawerOpen(projectId, backendId)) {
@@ -59,7 +68,10 @@ export function useKeyboardShortcuts({ projectId, projectRoot, sessionId, backen
         e.preventDefault();
         const store = useFileViewerStore.getState();
         store.openSearch(projectRoot, backendId);
-        const context = sessionId !== undefined || backendId !== undefined ? { sessionId, projectId, backendId } : undefined;
+        const context =
+          sessionId !== undefined || backendId !== undefined
+            ? { sessionId, projectId, backendId }
+            : undefined;
         activatePanel('file-viewer', context);
       }
     };

@@ -96,7 +96,9 @@ export function assignSessionOwners(sessions: Session[]): void {
 export function admitCreatedSession(session: Session): void {
   const backendId = resolveOwnershipBackendIdForSession(session);
   if (!backendId || session.archivedAt) return;
-  useSessionsStore.getState().admitCreatedSession(backendId, { ...session, isActive: Boolean(session.isActive) });
+  useSessionsStore
+    .getState()
+    .admitCreatedSession(backendId, { ...session, isActive: Boolean(session.isActive) });
 }
 
 function resolveOwnershipBackendIdForSession(session: Session): string | null {

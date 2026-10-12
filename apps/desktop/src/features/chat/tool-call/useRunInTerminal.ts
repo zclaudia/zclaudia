@@ -24,7 +24,9 @@ export function useRunInTerminal(): ((command: string) => void) | undefined {
   const route = useSessionRoute(sessionId);
   const activeBackendId = useServerStore(s => s.activeServerId);
   const backendId = route.backendId ?? activeBackendId;
-  const backendFeatures = useServerStore(s => backendId ? s.connections?.[backendId]?.features : undefined);
+  const backendFeatures = useServerStore(s =>
+    backendId ? s.connections?.[backendId]?.features : undefined
+  );
   const hasTerminal = backendFeatures
     ? backendFeatures.includes('remoteTerminal')
     : backendId && backendId !== activeBackendId
@@ -39,16 +41,21 @@ export function useRunInTerminal(): ((command: string) => void) | undefined {
         if (!session?.projectId) return;
 
         const store = useTerminalStore.getState();
-        const getTerminalId = () => backendId
-          ? useTerminalStore.getState().getTerminalId(session.projectId, backendId)
-          : useTerminalStore.getState().getTerminalId(session.projectId);
+        const getTerminalId = () =>
+          backendId
+            ? useTerminalStore.getState().getTerminalId(session.projectId, backendId)
+            : useTerminalStore.getState().getTerminalId(session.projectId);
         if (!getTerminalId()) {
           if (backendId) store.openTerminal(session.projectId, backendId);
           else store.openTerminal(session.projectId);
         }
         if (backendId) store.setDrawerOpen(session.projectId, true, backendId);
         else store.setDrawerOpen(session.projectId, true);
-        if (chatSessionId) openToolInWorkspace(chatSessionId, 'terminal', { projectId: session.projectId, backendId });
+        if (chatSessionId)
+          openToolInWorkspace(chatSessionId, 'terminal', {
+            projectId: session.projectId,
+            backendId,
+          });
         else activatePanel('terminal');
 
         const terminalId = getTerminalId();

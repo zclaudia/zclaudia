@@ -72,13 +72,13 @@ zclaudia 的 `pnpm-workspace.yaml` 把 `@zclaudia/plugin-sdk` override 钉在 `0
 
 ## 3. 测试与验证
 
-| 层 | 内容 |
-|---|---|
-| plugin-sdk | `pnpm check` 全绿 |
-| runner | transform 透传用例（带/不带 parent） |
-| server | translator/projector 透传用例 + 现有套件 |
-| desktop | meta 链路（addToolCall→ToolCallState 投影）、hydration round-trip、ToolCallList 三种模式过滤、drawer steps 渲染与排序；全量 vitest + tsc + radius |
-| E2E | WS 注入带 `parentToolUseId` 的 tool_use/tool_result：主 transcript 只见 1 张 Task 卡、抽屉 Steps 实时列出内层步骤；真 claude 后端的手动验证留给发布后 |
+| 层         | 内容                                                                                                                                                  |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| plugin-sdk | `pnpm check` 全绿                                                                                                                                     |
+| runner     | transform 透传用例（带/不带 parent）                                                                                                                  |
+| server     | translator/projector 透传用例 + 现有套件                                                                                                              |
+| desktop    | meta 链路（addToolCall→ToolCallState 投影）、hydration round-trip、ToolCallList 三种模式过滤、drawer steps 渲染与排序；全量 vitest + tsc + radius     |
+| E2E        | WS 注入带 `parentToolUseId` 的 tool_use/tool_result：主 transcript 只见 1 张 Task 卡、抽屉 Steps 实时列出内层步骤；真 claude 后端的手动验证留给发布后 |
 
 ## 4. 风险与备注
 

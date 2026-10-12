@@ -166,16 +166,30 @@ describe('FileViewerPanel', () => {
   it('loads the file and tree from the bound tool backend', async () => {
     mockFileViewerState.filePath = 'src/app.tsx';
     mockFileViewerState.projectRoot = '/project';
-    render(<WorkspaceToolContext.Provider value={{ sessionId: 'fixed-chat', backendId: 'bound-backend' }}>
-      <FileViewerPanel projectRoot="/project" />
-    </WorkspaceToolContext.Provider>);
-    await waitFor(() => expect(api.getFileContent).toHaveBeenCalledWith({ projectRoot: '/project', relativePath: 'src/app.tsx', backendId: 'bound-backend' }));
+    render(
+      <WorkspaceToolContext.Provider
+        value={{ sessionId: 'fixed-chat', backendId: 'bound-backend' }}
+      >
+        <FileViewerPanel projectRoot="/project" />
+      </WorkspaceToolContext.Provider>
+    );
+    await waitFor(() =>
+      expect(api.getFileContent).toHaveBeenCalledWith({
+        projectRoot: '/project',
+        relativePath: 'src/app.tsx',
+        backendId: 'bound-backend',
+      })
+    );
     expect(screen.getByTestId('file-tree')).toHaveTextContent('/project:bound-backend:src/app.tsx');
   });
 
   it('ignores an in-flight old root result even before the panel rerenders', async () => {
     let resolve!: (value: { content: string }) => void;
-    vi.mocked(api.getFileContent).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    vi.mocked(api.getFileContent).mockReturnValueOnce(
+      new Promise(done => {
+        resolve = done;
+      })
+    );
     mockFileViewerState.filePath = 'src/app.tsx';
     mockFileViewerState.projectRoot = '/project-A';
     render(<FileViewerPanel projectRoot="/project-A" />);
@@ -188,7 +202,11 @@ describe('FileViewerPanel', () => {
 
   it('does not poll files while retained and hidden', () => {
     mockFileViewerState.filePath = 'src/app.tsx';
-    render(<WorkspaceVisibilityContext.Provider value={false}><FileViewerPanel projectRoot="/project" /></WorkspaceVisibilityContext.Provider>);
+    render(
+      <WorkspaceVisibilityContext.Provider value={false}>
+        <FileViewerPanel projectRoot="/project" />
+      </WorkspaceVisibilityContext.Provider>
+    );
     expect(api.getFileStat).not.toHaveBeenCalled();
     expect(api.getFileContent).not.toHaveBeenCalled();
   });
@@ -196,12 +214,16 @@ describe('FileViewerPanel', () => {
   it('does not capture search shortcuts while retained and hidden', () => {
     mockFileViewerState.content = 'const value = 1;';
     const { rerender } = render(
-      <WorkspaceVisibilityContext.Provider value={false}><FileViewerPanel projectRoot="/project" /></WorkspaceVisibilityContext.Provider>
+      <WorkspaceVisibilityContext.Provider value={false}>
+        <FileViewerPanel projectRoot="/project" />
+      </WorkspaceVisibilityContext.Provider>
     );
     fireEvent.keyDown(window, { key: 'f', metaKey: true });
     expect(mockFileViewerState.setInFileSearchOpen).not.toHaveBeenCalled();
     rerender(
-      <WorkspaceVisibilityContext.Provider value><FileViewerPanel projectRoot="/project" /></WorkspaceVisibilityContext.Provider>
+      <WorkspaceVisibilityContext.Provider value>
+        <FileViewerPanel projectRoot="/project" />
+      </WorkspaceVisibilityContext.Provider>
     );
     fireEvent.keyDown(window, { key: 'f', metaKey: true });
     expect(mockFileViewerState.setInFileSearchOpen).toHaveBeenCalledWith(true);

@@ -349,19 +349,23 @@ describe('ChatInputArea mobile selectors', () => {
     draftEditorState.activeSessionId = 'sess-1';
     const sendA = vi.fn();
     const sendB = vi.fn();
-    const { rerender, unmount } = render(<>
-      <ChatInputArea {...baseProps} onSendMessage={sendA} />
-      <ChatInputArea {...baseProps} sessionId="sess-2" onSendMessage={sendB} />
-    </>);
+    const { rerender, unmount } = render(
+      <>
+        <ChatInputArea {...baseProps} onSendMessage={sendA} />
+        <ChatInputArea {...baseProps} sessionId="sess-2" onSendMessage={sendB} />
+      </>
+    );
     draftEditorState.sendCallback?.('A draft');
     expect(sendA).toHaveBeenCalledExactlyOnceWith('A draft');
     expect(sendB).not.toHaveBeenCalled();
 
     draftEditorState.activeSessionId = 'sess-2';
-    rerender(<>
-      <ChatInputArea {...baseProps} onSendMessage={sendA} />
-      <ChatInputArea {...baseProps} sessionId="sess-2" onSendMessage={sendB} />
-    </>);
+    rerender(
+      <>
+        <ChatInputArea {...baseProps} onSendMessage={sendA} />
+        <ChatInputArea {...baseProps} sessionId="sess-2" onSendMessage={sendB} />
+      </>
+    );
     draftEditorState.sendCallback?.('B draft');
     expect(sendB).toHaveBeenCalledExactlyOnceWith('B draft');
     expect(sendA).toHaveBeenCalledTimes(1);

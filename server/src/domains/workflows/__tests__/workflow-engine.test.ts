@@ -125,7 +125,13 @@ function createEngineWithDb(mockDb: any, mockBroadcast: ReturnType<typeof vi.fn>
   composite.register(new ActivityStepExecutorAdapter(activityRegistry, mockAgentLoopRunner));
   composite.registerPlugin(new PluginStepExecutor(mockWorkflowStepRegistry as any));
 
-  const workflowEngine = new WorkflowEngine(mockDb, mockBroadcast, composite, undefined, mockProjectRepo);
+  const workflowEngine = new WorkflowEngine(
+    mockDb,
+    mockBroadcast,
+    composite,
+    undefined,
+    mockProjectRepo
+  );
   composite.register(new WaitStepExecutor(workflowEngine));
   return workflowEngine;
 }

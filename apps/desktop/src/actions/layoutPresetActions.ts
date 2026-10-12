@@ -26,10 +26,20 @@ import { getTerminalScopeKey } from '../stores/terminalStore';
 import { focusProjectChat } from './projectWorkspaceActions';
 import type { OpenToolCtx } from './workspaceActions';
 
-export type ApplyPresetResult = { ok: true; workspaceId: string } |
-  { ok: false; error: 'not-found' | 'workspace-not-found' | 'invalid-layout' };
-export type FillSlotResult = { ok: true; paneId: string } |
-  { ok: false; error: 'slot-not-found' | 'wrong-slot-kind' | 'workspace-not-found' | 'panel-not-found' | 'session-not-found' };
+export type ApplyPresetResult =
+  | { ok: true; workspaceId: string }
+  | { ok: false; error: 'not-found' | 'workspace-not-found' | 'invalid-layout' };
+export type FillSlotResult =
+  | { ok: true; paneId: string }
+  | {
+      ok: false;
+      error:
+        | 'slot-not-found'
+        | 'wrong-slot-kind'
+        | 'workspace-not-found'
+        | 'panel-not-found'
+        | 'session-not-found';
+    };
 
 function projectWorkspace(projectId: string) {
   const project = useProjectWorkspaceStore.getState().byProject[projectId];
@@ -70,7 +80,9 @@ export function applyLayoutPreset(projectId: string, presetId: string): ApplyPre
 export function saveCurrentLayoutPreset(projectId: string, name: string): PresetMutationResult {
   const current = projectWorkspace(projectId);
   if (!current?.ws.root) return { ok: false, error: 'invalid-layout' };
-  const result = useLayoutPresetStore.getState().createPreset(name, presetTreeFromLayout(current.ws.root));
+  const result = useLayoutPresetStore
+    .getState()
+    .createPreset(name, presetTreeFromLayout(current.ws.root));
   if (result.ok) useLayoutPresetStore.getState().setProjectPreset(projectId, result.preset.id);
   return result;
 }
@@ -81,7 +93,11 @@ function findPlaceholder(root: LayoutNode | null, id: string): PlaceholderNode |
   return findPlaceholder(root.children[0], id) ?? findPlaceholder(root.children[1], id);
 }
 
-export function fillChatSlot(projectId: string, placeholderId: string, sessionId: string): FillSlotResult {
+export function fillChatSlot(
+  projectId: string,
+  placeholderId: string,
+  sessionId: string
+): FillSlotResult {
   const current = projectWorkspace(projectId);
   if (!current?.ws.root) return { ok: false, error: 'workspace-not-found' };
   const placeholder = findPlaceholder(current.ws.root, placeholderId);
@@ -96,8 +112,10 @@ export function fillChatSlot(projectId: string, placeholderId: string, sessionId
   if (existing.ok) return existing;
   const pane = newPane(CHAT_TOOL_ID, sessionId);
   commit(current.project.workspaceId, {
-    ...current.ws, root: replaceChild(current.ws.root, placeholderId, pane),
-    focusedPaneId: pane.id, maximizedPaneId: null,
+    ...current.ws,
+    root: replaceChild(current.ws.root, placeholderId, pane),
+    focusedPaneId: pane.id,
+    maximizedPaneId: null,
   });
   useProjectWorkspaceStore.getState().setFocusedChat(projectId, sessionId);
   return { ok: true, paneId: pane.id };
@@ -114,27 +132,49 @@ export function fillToolSlot(
   if (!current?.ws.root) return { ok: false, error: 'workspace-not-found' };
   const placeholder = findPlaceholder(current.ws.root, placeholderId);
   if (!placeholder) return { ok: false, error: 'slot-not-found' };
-  if (placeholder.accepts === 'chat' || toolId === CHAT_TOOL_ID ||
-      (placeholder.accepts !== 'tool:*' && placeholder.accepts !== `tool:${toolId}`)) {
+  if (
+    placeholder.accepts === 'chat' ||
+    toolId === CHAT_TOOL_ID ||
+    (placeholder.accepts !== 'tool:*' && placeholder.accepts !== `tool:${toolId}`)
+  ) {
     return { ok: false, error: 'wrong-slot-kind' };
   }
   const panel = usePluginStore.getState().panels.find(p => p.id === toolId);
   if (!panel) return { ok: false, error: 'panel-not-found' };
-  const instanceKey = toolId === 'terminal' ? getTerminalScopeKey(ctx.projectId ?? projectId, ctx.backendId) : undefined;
-  const existing = findPaneWithTool(current.ws.root, toolId, instanceKey, !MULTI_INSTANCE_PANELS.has(toolId));
+  const instanceKey =
+    toolId === 'terminal'
+      ? getTerminalScopeKey(ctx.projectId ?? projectId, ctx.backendId)
+      : undefined;
+  const existing = findPaneWithTool(
+    current.ws.root,
+    toolId,
+    instanceKey,
+    !MULTI_INSTANCE_PANELS.has(toolId)
+  );
   if (existing) {
-    useRightWorkspaceStore.getState().setActiveTool(current.project.workspaceId, existing, toolId, instanceKey);
+    useRightWorkspaceStore
+      .getState()
+      .setActiveTool(current.project.workspaceId, existing, toolId, instanceKey);
     useRightWorkspaceStore.getState().setMaximizedPane(current.project.workspaceId, null);
     useRightSidebarStore.getState().setCollapsed(false);
     return { ok: true, paneId: existing };
   }
   const pane = newPane(toolId, instanceKey);
-  const primary = flattenPanes(current.ws.root).find(p => p.id === current.ws.primaryPaneId && !p.tools.some(isChatRef));
+  const primary = flattenPanes(current.ws.root).find(
+    p => p.id === current.ws.primaryPaneId && !p.tools.some(isChatRef)
+  );
   commit(current.project.workspaceId, {
-    ...current.ws, root: replaceChild(current.ws.root, placeholderId, pane),
-    primaryPaneId: primary?.id ?? pane.id, focusedPaneId: pane.id, maximizedPaneId: null,
+    ...current.ws,
+    root: replaceChild(current.ws.root, placeholderId, pane),
+    primaryPaneId: primary?.id ?? pane.id,
+    focusedPaneId: pane.id,
+    maximizedPaneId: null,
   });
   useRightSidebarStore.getState().setCollapsed(false);
-  panel.onOpen?.({ sessionId: current.project.focusedChatSessionId, projectId: ctx.projectId ?? projectId, backendId: ctx.backendId });
+  panel.onOpen?.({
+    sessionId: current.project.focusedChatSessionId,
+    projectId: ctx.projectId ?? projectId,
+    backendId: ctx.backendId,
+  });
   return { ok: true, paneId: pane.id };
 }

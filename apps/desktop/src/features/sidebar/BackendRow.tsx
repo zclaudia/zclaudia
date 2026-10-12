@@ -110,11 +110,7 @@ export function BackendRow({
             title="New project"
             aria-label="New project"
           >
-            <Plus
-              size={isMobile ? 16 : 14}
-              strokeWidth={1.75}
-              className="text-muted-foreground"
-            />
+            <Plus size={isMobile ? 16 : 14} strokeWidth={1.75} className="text-muted-foreground" />
           </button>
         )}
       </div>

@@ -21,7 +21,12 @@ import { listAgentProfilesForBackend } from '../services/api/agent-profiles';
 import { listLlmProfilesForBackend } from '../services/api/llm-profiles';
 import { useFacadeStore } from '../stores/facadeStore';
 
-type ScopedMetadata = { backendId: string; agents: AgentProfileConfig[]; llms: LlmProfileConfig[]; failed?: boolean };
+type ScopedMetadata = {
+  backendId: string;
+  agents: AgentProfileConfig[];
+  llms: LlmProfileConfig[];
+  failed?: boolean;
+};
 // Profile edits affect every visible session using that owner's profile. Keep
 // notifications keyed by owner so an old action cannot update a newly bound hook.
 const scopedRefreshListeners = new Map<string, Set<(metadata: ScopedMetadata) => void>>();
@@ -49,15 +54,23 @@ export function useAgentForSession(sessionId: string | undefined): AgentForSessi
   const loadAllAgents = useAgentProfileMetaStore(s => s.loadAll);
 
   const activeServerId = useServerStore(s => s.activeServerId);
-  const backendId = useOwnershipStore(() => resolveSessionOwnerBackendId(sessionId)) ?? activeServerId;
-  const ownerRuntimeState = useFacadeStore(s => s.backends.find(backend => backend.backendId === backendId)?.runtimeState);
-  const ownerOpenState = useFacadeStore(s => s.backends.find(backend => backend.backendId === backendId)?.openState);
+  const backendId =
+    useOwnershipStore(() => resolveSessionOwnerBackendId(sessionId)) ?? activeServerId;
+  const ownerRuntimeState = useFacadeStore(
+    s => s.backends.find(backend => backend.backendId === backendId)?.runtimeState
+  );
+  const ownerOpenState = useFacadeStore(
+    s => s.backends.find(backend => backend.backendId === backendId)?.openState
+  );
   const connectionState = useFacadeStore(s => s.connectionState);
   const reconnectGeneration = useFacadeStore(s => s.reconnectGeneration);
   const cachedLlmProfiles = useLlmProfileMetaStore(s => s.getProviders(backendId));
   const [scoped, setScoped] = useState<ScopedMetadata | null>(null);
-  const needsScopedMetadata = !!backendId && (backendId !== activeServerId ||
-    (!!agentDataBackendId && agentDataBackendId !== backendId) || scoped?.backendId === backendId);
+  const needsScopedMetadata =
+    !!backendId &&
+    (backendId !== activeServerId ||
+      (!!agentDataBackendId && agentDataBackendId !== backendId) ||
+      scoped?.backendId === backendId);
   const scopedReady = scoped?.backendId === backendId && !scoped?.failed;
   const requestGeneration = useRef(0);
 
@@ -71,7 +84,8 @@ export function useAgentForSession(sessionId: string | undefined): AgentForSessi
     const generation = (scopedRefreshGenerations.get(backendId) ?? 0) + 1;
     scopedRefreshGenerations.set(backendId, generation);
     const [agents, llms] = await Promise.all([
-      listAgentProfilesForBackend(backendId), listLlmProfilesForBackend(backendId),
+      listAgentProfilesForBackend(backendId),
+      listLlmProfilesForBackend(backendId),
     ]);
     if (scopedRefreshGenerations.get(backendId) !== generation) return;
     if (useServerStore.getState().activeServerId === backendId) {
@@ -93,11 +107,19 @@ export function useAgentForSession(sessionId: string | undefined): AgentForSessi
     };
     listeners.add(update);
     const unsubscribeGlobal = useAgentProfileMetaStore.subscribe((state, previous) => {
-      if (!scopedReady || state.backendId !== backendId || !state.loaded || state.profiles === previous.profiles) return;
+      if (
+        !scopedReady ||
+        state.backendId !== backendId ||
+        !state.loaded ||
+        state.profiles === previous.profiles
+      )
+        return;
       requestGeneration.current++;
-      setScoped(current => current?.backendId === backendId
-        ? { ...current, agents: Object.values(state.profiles), failed: false }
-        : current);
+      setScoped(current =>
+        current?.backendId === backendId
+          ? { ...current, agents: Object.values(state.profiles), failed: false }
+          : current
+      );
     });
     return () => {
       unsubscribeGlobal();
@@ -115,17 +137,31 @@ export function useAgentForSession(sessionId: string | undefined): AgentForSessi
       .then(([agents, llms]) => {
         if (!cancelled && generation === requestGeneration.current) {
           const global = useAgentProfileMetaStore.getState();
-          const latestAgents = global.loaded && global.backendId === backendId && global.profiles !== initialGlobalProfiles
-            ? Object.values(global.profiles) : agents;
+          const latestAgents =
+            global.loaded &&
+            global.backendId === backendId &&
+            global.profiles !== initialGlobalProfiles
+              ? Object.values(global.profiles)
+              : agents;
           setScoped({ backendId, agents: latestAgents, llms });
         }
       })
       .catch(error => {
         console.error('[useAgentForSession] Scoped metadata load failed:', error);
-        if (!cancelled && generation === requestGeneration.current) setScoped({ backendId, agents: [], llms: [], failed: true });
+        if (!cancelled && generation === requestGeneration.current)
+          setScoped({ backendId, agents: [], llms: [], failed: true });
       });
-    return () => { cancelled = true; };
-  }, [backendId, needsScopedMetadata, ownerRuntimeState, ownerOpenState, connectionState, reconnectGeneration]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    backendId,
+    needsScopedMetadata,
+    ownerRuntimeState,
+    ownerOpenState,
+    connectionState,
+    reconnectGeneration,
+  ]);
 
   useEffect(() => {
     if (!needsScopedMetadata && !agentLoaded && !agentLoading) {
@@ -133,10 +169,18 @@ export function useAgentForSession(sessionId: string | undefined): AgentForSessi
     }
   }, [agentLoaded, agentLoading, loadAllAgents, needsScopedMetadata]);
 
-  const agent = agentProfileId ? (needsScopedMetadata
-    ? (scopedReady ? scoped?.agents.find(profile => profile.id === agentProfileId) : undefined)
-    : agentProfiles[agentProfileId]) : undefined;
-  const llmProfiles = needsScopedMetadata ? (scopedReady ? scoped?.llms ?? [] : []) : cachedLlmProfiles;
+  const agent = agentProfileId
+    ? needsScopedMetadata
+      ? scopedReady
+        ? scoped?.agents.find(profile => profile.id === agentProfileId)
+        : undefined
+      : agentProfiles[agentProfileId]
+    : undefined;
+  const llmProfiles = needsScopedMetadata
+    ? scopedReady
+      ? (scoped?.llms ?? [])
+      : []
+    : cachedLlmProfiles;
   const llm = agent ? llmProfiles.find(p => p.id === agent.llmProfileId) : undefined;
   // loading is only meaningful when this session actually needs something:
   //   - agentLoading matters only when a profile is expected (agentProfileId set) and not yet resolved

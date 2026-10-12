@@ -6,7 +6,7 @@ import { SECTION_LABEL } from '../../components/ui/typography';
 import { Button, IconButton } from '../../components/ui/Button';
 import { Icon } from '../../components/ui/Icon';
 import { getToolIcon } from '../../config/icons';
-import { getToolCallSummary } from '../chat/tool-call/ToolCallList';
+import { getToolCallSummary } from '../../config/toolCallSummary';
 import type { SubagentDetail } from './useSubagentDetail';
 
 function formatDuration(ms: number): string {
@@ -35,7 +35,8 @@ function useDuration(task: BackgroundTask): string {
 function usageStats(task: BackgroundTask, duration: string): string[] {
   const stats = [duration];
   const tokens = task.usage?.total_tokens ?? 0;
-  if (tokens > 0) stats.push(tokens >= 1000 ? `${Math.round(tokens / 1000)}k tokens` : `${tokens} tokens`);
+  if (tokens > 0)
+    stats.push(tokens >= 1000 ? `${Math.round(tokens / 1000)}k tokens` : `${tokens} tokens`);
   if ((task.usage?.tool_uses ?? 0) > 0) stats.push(`${task.usage!.tool_uses} tool calls`);
   return stats;
 }

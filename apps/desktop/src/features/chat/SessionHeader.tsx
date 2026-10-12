@@ -152,7 +152,8 @@ export function SessionHeader({
   const rightUnread = useRightSidebarStore(s => s.unread);
   const toggleRightPanel = useRightSidebarStore(s => s.toggleCollapsed);
   const rightWorkspaceHasContent = useRightWorkspaceStore(
-    s => pruneChat(s.bySession[workspacePane?.workspaceId ?? currentSession.id]?.root ?? null) !== null
+    s =>
+      pruneChat(s.bySession[workspacePane?.workspaceId ?? currentSession.id]?.root ?? null) !== null
   );
   const showRightToggle = !isMobile && currentSession.type !== 'background';
   const rightExpanded = !rightCollapsed;

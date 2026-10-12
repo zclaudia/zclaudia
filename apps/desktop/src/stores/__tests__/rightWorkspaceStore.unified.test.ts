@@ -21,10 +21,17 @@ const store = useRightWorkspaceStore;
 const state = () => store.getState();
 const workspace = () => state().bySession.A;
 const chatPane = () => flattenPanes(workspace().root).find(isPinnedPane)!;
-const refs = (root: LayoutNode | null) => flattenPanes(root).flatMap(p => p.tools)
-  .map(t => JSON.stringify([t.toolId, t.instanceKey])).sort();
+const refs = (root: LayoutNode | null) =>
+  flattenPanes(root)
+    .flatMap(p => p.tools)
+    .map(t => JSON.stringify([t.toolId, t.instanceKey]))
+    .sort();
 const group = (a: LayoutNode, b: LayoutNode): GroupNode => ({
-  id: `group-${a.id}-${b.id}`, kind: 'group', dir: 'row', ratio: 0.6, children: [a, b],
+  id: `group-${a.id}-${b.id}`,
+  kind: 'group',
+  dir: 'row',
+  ratio: 0.6,
+  children: [a, b],
 });
 
 beforeEach(() => {
@@ -113,15 +120,25 @@ describe('unified workspace normalization and persistence', () => {
 
   it('repairs invalid persisted references and maximum while retaining a valid tree', async () => {
     const root = newPane('files');
-    localStorage.setItem('claudia-right-workspace', JSON.stringify({
-      version: 2,
-      state: {
-        bySession: { A: { root, primaryPaneId: 'gone', focusedPaneId: 'gone', maximizedPaneId: 'gone' } },
-        order: ['missing', 'A'],
-      },
-    }));
+    localStorage.setItem(
+      'claudia-right-workspace',
+      JSON.stringify({
+        version: 2,
+        state: {
+          bySession: {
+            A: { root, primaryPaneId: 'gone', focusedPaneId: 'gone', maximizedPaneId: 'gone' },
+          },
+          order: ['missing', 'A'],
+        },
+      })
+    );
     await store.persist.rehydrate();
-    expect(workspace()).toEqual({ root, primaryPaneId: root.id, focusedPaneId: root.id, maximizedPaneId: null });
+    expect(workspace()).toEqual({
+      root,
+      primaryPaneId: root.id,
+      focusedPaneId: root.id,
+      maximizedPaneId: null,
+    });
     expect(state().order).toEqual(['A']);
   });
 });
@@ -137,7 +154,10 @@ describe('pinned chat and tool landing rules', () => {
     expect(workspace().root).toMatchObject({ dir: 'row', children: [chat, tools] });
     state().focusPane('A', chat.id);
     state().openTool('A', 'memory');
-    expect(findPane(workspace().root, tools.id)?.tools.map(t => t.toolId)).toEqual(['files', 'memory']);
+    expect(findPane(workspace().root, tools.id)?.tools.map(t => t.toolId)).toEqual([
+      'files',
+      'memory',
+    ]);
     expect(chatPane().tools).toHaveLength(1);
     state().closePane('A', tools.id);
     expect(workspace().root).toBe(chat);
@@ -188,7 +208,8 @@ describe('pinned chat and tool landing rules', () => {
 
 describe('atomic edge movement', () => {
   it.each<WorkspaceEdge>(['left', 'right', 'top', 'bottom'])(
-    'moves a last tool tab to chat %s in one submission and retains pane/ref identity', edge => {
+    'moves a last tool tab to chat %s in one submission and retains pane/ref identity',
+    edge => {
       state().ensureChatSession('A');
       state().openTool('A', 'terminal', { instanceKey: 'backend::project', multiInstance: true });
       const chat = chatPane();
@@ -196,7 +217,14 @@ describe('atomic edge movement', () => {
       const beforeRefs = refs(workspace().root);
       const listener = vi.fn();
       const unsubscribe = store.subscribe(listener);
-      const result = state().moveTabToEdge('A', from.id, chat.id, 'terminal', 'backend::project', edge);
+      const result = state().moveTabToEdge(
+        'A',
+        from.id,
+        chat.id,
+        'terminal',
+        'backend::project',
+        edge
+      );
       unsubscribe();
       expect(result).toEqual({ ok: true, newPaneId: from.id });
       expect(listener).toHaveBeenCalledTimes(1);
@@ -211,7 +239,8 @@ describe('atomic edge movement', () => {
   );
 
   it.each<WorkspaceEdge>(['left', 'right', 'top', 'bottom'])(
-    'moves chat to a tool or root %s without changing its pane ID', edge => {
+    'moves chat to a tool or root %s without changing its pane ID',
+    edge => {
       state().ensureChatSession('A');
       state().openTool('A', 'files');
       const chat = chatPane();
@@ -252,9 +281,14 @@ describe('atomic edge movement', () => {
     const source = newPane('memory');
     const target = newPane('files');
     const root = group(chat, group(source, target));
-    store.setState({ bySession: { A: { root, primaryPaneId: source.id, focusedPaneId: source.id } }, order: ['A'] });
+    store.setState({
+      bySession: { A: { root, primaryPaneId: source.id, focusedPaneId: source.id } },
+      order: ['A'],
+    });
     const before = refs(root);
-    expect(state().moveTabToEdge('A', source.id, target.id, 'memory', undefined, 'bottom').ok).toBe(true);
+    expect(state().moveTabToEdge('A', source.id, target.id, 'memory', undefined, 'bottom').ok).toBe(
+      true
+    );
     expect(refs(workspace().root)).toEqual(before);
     expect(workspace().primaryPaneId).toBe(source.id);
     state().openTool('A', 'search');
@@ -268,15 +302,30 @@ describe('atomic edge movement', () => {
     const source = newPane('memory');
     const duplicate = newPane('memory');
     const root = group(chat, group(source, duplicate));
-    store.setState({ bySession: { A: { root, primaryPaneId: source.id, focusedPaneId: source.id } }, order: ['A'] });
+    store.setState({
+      bySession: { A: { root, primaryPaneId: source.id, focusedPaneId: source.id } },
+      order: ['A'],
+    });
     const before = workspace();
     const listener = vi.fn();
     const unsubscribe = store.subscribe(listener);
-    expect(state().moveTabToEdge('A', source.id, 'gone', 'memory', undefined, 'left').ok).toBe(false);
-    expect(state().moveTabToEdge('A', source.id, chat.id, 'memory', undefined, 'center' as WorkspaceEdge).ok).toBe(false);
-    expect(state().moveTabToEdge('A', chat.id, source.id, CHAT_TOOL_ID, 'A', 'left').ok).toBe(false);
-    expect(state().moveTabToEdge('A', source.id, chat.id, 'memory', undefined, 'left')).toEqual({ ok: false, conflictPaneId: duplicate.id });
-    expect(state().moveTabToEdge('A', source.id, source.id, 'memory', undefined, 'right').ok).toBe(false);
+    expect(state().moveTabToEdge('A', source.id, 'gone', 'memory', undefined, 'left').ok).toBe(
+      false
+    );
+    expect(
+      state().moveTabToEdge('A', source.id, chat.id, 'memory', undefined, 'center' as WorkspaceEdge)
+        .ok
+    ).toBe(false);
+    expect(state().moveTabToEdge('A', chat.id, source.id, CHAT_TOOL_ID, 'A', 'left').ok).toBe(
+      false
+    );
+    expect(state().moveTabToEdge('A', source.id, chat.id, 'memory', undefined, 'left')).toEqual({
+      ok: false,
+      conflictPaneId: duplicate.id,
+    });
+    expect(state().moveTabToEdge('A', source.id, source.id, 'memory', undefined, 'right').ok).toBe(
+      false
+    );
     expect(state().moveChatPane('A', 'left', 'gone').ok).toBe(false);
     expect(state().moveChatPane('A', 'left', chat.id).ok).toBe(false);
     unsubscribe();

@@ -104,7 +104,9 @@ function AppContent() {
   const facadeBackends = useFacadeStore(s => s.backends);
   const localBackendId = useFacadeStore(s => s.localBackendId);
   const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
-  const selectedChatProjectId = useProjectStore(s => s.sessions.find(session => session.id === selectedSessionId)?.projectId);
+  const selectedChatProjectId = useProjectStore(
+    s => s.sessions.find(session => session.id === selectedSessionId)?.projectId
+  );
   const projects = useProjectStore(s => s.projects);
   const selectSession = useProjectStore(s => s.selectSession);
   const setDashboardView = useSelectionStore(s => s.setDashboardView);
@@ -141,11 +143,14 @@ function AppContent() {
 
   // --- Local state ---
   const [dashboardProjectId, setDashboardProjectId] = useState<string | null>(null);
-  const returnToDashboard = useCallback((projectId: string) => {
-    selectProjectRoute(projectId);
-    selectSession(null);
-    setDashboardProjectId(projectId);
-  }, [selectProjectRoute, selectSession]);
+  const returnToDashboard = useCallback(
+    (projectId: string) => {
+      selectProjectRoute(projectId);
+      selectSession(null);
+      setDashboardProjectId(projectId);
+    },
+    [selectProjectRoute, selectSession]
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarSearchOpen, setSidebarSearchOpen] = useState(false);
   const [isFeedOpen, setFeedOpen] = useState(false);
@@ -641,7 +646,9 @@ function AppContent() {
                 <ClaudiaReturnLink sessionId={selectedSessionId} isMobile={isMobile} />
                 <div className="flex-1 min-h-0">
                   <SessionChatLayout
-                    key={!isMobile ? selectedChatProjectId ?? selectedSessionId : selectedSessionId}
+                    key={
+                      !isMobile ? (selectedChatProjectId ?? selectedSessionId) : selectedSessionId
+                    }
                     sessionId={selectedSessionId}
                     onOpenSidebar={openSidebar}
                     onReturnToDashboard={returnToDashboard}

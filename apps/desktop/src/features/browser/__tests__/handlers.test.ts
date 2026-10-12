@@ -229,7 +229,11 @@ describe('handleBrowserMessage', () => {
   it('marks activity unread while the unified workspace tools are collapsed', () => {
     useRightSidebarStore.setState({ collapsed: true });
     useSelectionStore.getState().setSelectedSessionId('s1');
-    handleBrowserMessage({ type: 'browser_agent_activity', sessionId: 's1', active: true } as never);
+    handleBrowserMessage({
+      type: 'browser_agent_activity',
+      sessionId: 's1',
+      active: true,
+    } as never);
     expect(useRightSidebarStore.getState().unread).toBe(true);
     expect(useRightSidebarStore.getState().collapsed).toBe(true);
     expect(uiMocks.openToolInWorkspace).not.toHaveBeenCalled();

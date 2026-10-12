@@ -69,15 +69,22 @@ export function SessionItem({
   const canArrange = !isMobile && Boolean(session.projectId);
   const cancelOwnDrag = () => {
     const active = useDragSplitStore.getState().active;
-    if (active?.toolId === 'chat' && active.instanceKey === session.id) useDragSplitStore.getState().endDrag();
+    if (active?.toolId === 'chat' && active.instanceKey === session.id)
+      useDragSplitStore.getState().endDrag();
   };
   useEffect(() => {
     if (!canArrange) return;
     const onPointerUp = (event: PointerEvent) => {
       const target = event.target;
-      if (event.type !== 'pointercancel' && target instanceof Element && target.closest('[data-session-workspace]')) return;
+      if (
+        event.type !== 'pointercancel' &&
+        target instanceof Element &&
+        target.closest('[data-session-workspace]')
+      )
+        return;
       const state = useDragSplitStore.getState();
-      if (state.active?.toolId === 'chat' && state.active.instanceKey === session.id) state.endDrag();
+      if (state.active?.toolId === 'chat' && state.active.instanceKey === session.id)
+        state.endDrag();
     };
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
@@ -85,7 +92,8 @@ export function SessionItem({
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
       const state = useDragSplitStore.getState();
-      if (state.active?.toolId === 'chat' && state.active.instanceKey === session.id) state.endDrag();
+      if (state.active?.toolId === 'chat' && state.active.instanceKey === session.id)
+        state.endDrag();
     };
   }, [canArrange, session.id]);
   const openBeside = () => {
@@ -100,11 +108,29 @@ export function SessionItem({
   if (canArrange) {
     entries.push(
       { key: 'beside', label: 'Open beside', icon: <Columns2 size={13} />, onSelect: openBeside },
-      { key: 'compare', label: 'Compare with current chat', icon: <Columns2 size={13} />, onSelect: openBeside }
+      {
+        key: 'compare',
+        label: 'Compare with current chat',
+        icon: <Columns2 size={13} />,
+        onSelect: openBeside,
+      }
     );
   }
-  if (onPopOut) entries.push({ key: 'popout', label: 'Open in new window', icon: <ExternalLink size={13} />, onSelect: onPopOut });
-  if (onDeleteWorktree) entries.push({ key: 'remove-worktree', label: deleteWorktreeTitle, icon: <Trash2 size={13} />, onSelect: onDeleteWorktree, destructive: true });
+  if (onPopOut)
+    entries.push({
+      key: 'popout',
+      label: 'Open in new window',
+      icon: <ExternalLink size={13} />,
+      onSelect: onPopOut,
+    });
+  if (onDeleteWorktree)
+    entries.push({
+      key: 'remove-worktree',
+      label: deleteWorktreeTitle,
+      icon: <Trash2 size={13} />,
+      onSelect: onDeleteWorktree,
+      destructive: true,
+    });
 
   // Task items under Supervisor use lighter styling.
   const selectedClass = isTask ? 'bg-muted/60 text-foreground' : 'bg-accent text-foreground';
@@ -128,15 +154,33 @@ export function SessionItem({
           else onSelect(session.id);
         }}
         onPointerDown={event => {
-          if (!canArrange || !session.projectId || event.button !== 0 || (event.pointerType !== 'mouse' && event.pointerType !== 'pen')) return;
-          const workspaceId = useProjectWorkspaceStore.getState().byProject[session.projectId]?.workspaceId ?? session.id;
+          if (
+            !canArrange ||
+            !session.projectId ||
+            event.button !== 0 ||
+            (event.pointerType !== 'mouse' && event.pointerType !== 'pen')
+          )
+            return;
+          const workspaceId =
+            useProjectWorkspaceStore.getState().byProject[session.projectId]?.workspaceId ??
+            session.id;
           const root = useRightWorkspaceStore.getState().bySession[workspaceId]?.root ?? null;
-          const source = flattenPanes(root).find(pane => pane.tools.some(ref => ref.toolId === 'chat' && ref.instanceKey === session.id));
-          useDragSplitStore.getState().startDrag({
-            toolId: 'chat', instanceKey: session.id, projectId: session.projectId, multiInstance: true,
-            sourcePaneId: source?.id,
-            sourceIndex: source?.tools.findIndex(ref => ref.toolId === 'chat' && ref.instanceKey === session.id),
-          }, { x: event.clientX, y: event.clientY });
+          const source = flattenPanes(root).find(pane =>
+            pane.tools.some(ref => ref.toolId === 'chat' && ref.instanceKey === session.id)
+          );
+          useDragSplitStore.getState().startDrag(
+            {
+              toolId: 'chat',
+              instanceKey: session.id,
+              projectId: session.projectId,
+              multiInstance: true,
+              sourcePaneId: source?.id,
+              sourceIndex: source?.tools.findIndex(
+                ref => ref.toolId === 'chat' && ref.instanceKey === session.id
+              ),
+            },
+            { x: event.clientX, y: event.clientY }
+          );
         }}
         data-selected={isSelected || undefined}
         // Mobile sits inside the always-on rail at the 44px tier; desktop keeps
@@ -204,7 +248,9 @@ export function SessionItem({
           align="end"
           ariaLabel="Session actions"
           trigger={({ ref, props, open }) => (
-            <div className={`absolute right-1 top-1/2 -translate-y-1/2 transition-opacity ${open ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
+            <div
+              className={`absolute right-1 top-1/2 -translate-y-1/2 transition-opacity ${open ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}
+            >
               <button
                 ref={ref}
                 {...props}

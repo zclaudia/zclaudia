@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import { migration as cacheTraceMigration } from '../../../storage/migrations/047_prompt_cache_trace.js';
 import { CacheTraceRepository } from '../../../../domains/usage/cache-trace-repository.js';
+import { createPiCacheTraceStore } from '../../../../application/conversation/runtime/pi-cache-trace-store.js';
 import { piCallRows, startPiCacheTrace } from '../cache-trace.js';
 
 function createDb(): Database.Database {
@@ -28,7 +29,7 @@ function assistant(at: number, usage: { input: number; cacheRead: number; cacheW
 
 function trace(db: Database.Database, invocationId: string, history: AgentMessage[], over = {}) {
   return startPiCacheTrace({
-    db,
+    store: createPiCacheTraceStore(db),
     sessionId: 's1',
     invocationId,
     model: 'claude-sonnet-4-5',
@@ -84,7 +85,7 @@ describe('pi prompt-cache trace', () => {
   });
 
   it('is a no-op without a database, session or trace schema', () => {
-    expect(trace(db, 'inv-1', [], { db: undefined })).toBeNull();
+    expect(trace(db, 'inv-1', [], { store: undefined })).toBeNull();
     expect(trace(db, 'inv-1', [], { sessionId: undefined })).toBeNull();
     expect(trace(db, 'inv-1', [], { sessionId: 'playground-1' })).toBeNull();
     expect(trace(new Database(':memory:'), 'inv-1', [])).toBeNull();

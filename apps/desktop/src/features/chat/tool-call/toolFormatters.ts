@@ -8,20 +8,9 @@ import {
   isPushFileTool,
   isPlanProposalTool,
 } from './toolClassifiers';
+import { normalizeToolInput } from '../../../config/toolCallSummary';
 
 const ansiUp = new AnsiUp();
-
-// Normalize tool input: some providers send stringified JSON instead of objects
-function normalizeToolInput(input: unknown): unknown {
-  if (typeof input === 'string') {
-    try {
-      return JSON.parse(input);
-    } catch {
-      return input;
-    }
-  }
-  return input;
-}
 
 // Safely extract questions array from AskUserQuestion input
 function extractQuestions(raw: unknown): Array<{

@@ -45,7 +45,10 @@ export function handleBrowserMessage(msg: ServerMessage, backendId?: string): bo
       if (msg.sessionId) store.patchSession(msg.sessionId, { error: msg.message });
       return true;
     case 'browser_engine_status':
-      store.setEngine({ status: msg.status, progress: msg.progress, message: msg.message }, backendId);
+      store.setEngine(
+        { status: msg.status, progress: msg.progress, message: msg.message },
+        backendId
+      );
       return true;
     case 'browser_emulation':
       store.patchSession(msg.sessionId, { emulation: msg.emulation });
@@ -92,7 +95,9 @@ export function handleBrowserMessage(msg: ServerMessage, backendId?: string): bo
       // from mid-task.
       const isSelectedSession = useSelectionStore.getState().selectedSessionId === msg.sessionId;
       if (msg.active && isPanelAvailable('browser') && isSelectedSession) {
-        const root = useRightWorkspaceStore.getState().bySession[workspaceIdForSession(msg.sessionId)]?.root ?? null;
+        const root =
+          useRightWorkspaceStore.getState().bySession[workspaceIdForSession(msg.sessionId)]?.root ??
+          null;
         const alreadyOpen = findPaneWithTool(root, 'browser', undefined, true) !== null;
         if (useRightSidebarStore.getState().collapsed) {
           useRightSidebarStore.getState().markUnread();

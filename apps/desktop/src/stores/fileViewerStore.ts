@@ -85,7 +85,11 @@ interface FileViewerState {
   toggleInFileSearchCaseSensitive: () => void;
   resetInFileSearch: () => void;
   toggleMarkdownSourceView: () => void;
-  getCached: (projectRoot: string, relativePath: string, backendId?: string | null) => string | undefined;
+  getCached: (
+    projectRoot: string,
+    relativePath: string,
+    backendId?: string | null
+  ) => string | undefined;
   /** Remove a cached entry so the next open forces a fresh fetch. */
   invalidate: (projectRoot: string, relativePath: string, backendId?: string | null) => void;
 }
@@ -179,11 +183,26 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
 
   openSearch: (projectRoot, backendId) => {
     const state = get();
-    const scopeChanged = state.projectRoot !== projectRoot || state.backendId !== (backendId ?? null);
+    const scopeChanged =
+      state.projectRoot !== projectRoot || state.backendId !== (backendId ?? null);
     set({
-      isOpen: true, searchOpen: true, projectRoot, backendId: backendId ?? null,
-      ...(scopeChanged ? { filePath: null, content: null, knownMtimeMs: null, error: null, loading: false,
-        targetLine: null, targetEndLine: null, inFileSearchOpen: false, inFileSearchQuery: '' } : {}),
+      isOpen: true,
+      searchOpen: true,
+      projectRoot,
+      backendId: backendId ?? null,
+      ...(scopeChanged
+        ? {
+            filePath: null,
+            content: null,
+            knownMtimeMs: null,
+            error: null,
+            loading: false,
+            targetLine: null,
+            targetEndLine: null,
+            inFileSearchOpen: false,
+            inFileSearchQuery: '',
+          }
+        : {}),
     });
     setBuiltinPanelVisibility('file-viewer', true);
   },
@@ -261,7 +280,11 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
     // If the invalidated file is the one currently displayed, drop its mtime so
     // the next staleness check treats it as unknown and forces a fresh fetch.
     const isCurrent =
-      filePath === relativePath && curRoot === projectRoot && curBackend === (backendId ?? null) && !!filePath && !!curRoot;
+      filePath === relativePath &&
+      curRoot === projectRoot &&
+      curBackend === (backendId ?? null) &&
+      !!filePath &&
+      !!curRoot;
     set({ contentCache: new Map(contentCache), ...(isCurrent ? { knownMtimeMs: null } : {}) });
   },
 }));

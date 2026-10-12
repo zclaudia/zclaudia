@@ -96,7 +96,14 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
       if (route.backendId) sendToServer(route.backendId, message);
       else sendMessage(message);
     };
-  }, [selectedSessionId, route.backendId, sendMessage, sendToServer, toolCall.id, toolCall.backgroundable]);
+  }, [
+    selectedSessionId,
+    route.backendId,
+    sendMessage,
+    sendToServer,
+    toolCall.id,
+    toolCall.backgroundable,
+  ]);
   // The kit locks its button while a request is in flight; the host owns that
   // state so a declined request (surfaced as a toast) unlocks it for a retry.
   const backgroundRequested = useBackgroundRequestStore(s => toolCall.id in s.pending);

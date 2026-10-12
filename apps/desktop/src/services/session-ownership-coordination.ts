@@ -6,7 +6,12 @@ import { useOwnershipStore } from '../stores/ownershipStore';
 import { useRightWorkspaceStore } from '../stores/rightWorkspaceStore';
 import { useProjectWorkspaceStore } from '../stores/projectWorkspaceStore';
 import { sessionWorkspaceId } from '../utils/workspaceStorage';
-import { flattenPanes, isChatRef, removeChatSession, repairWorkspace } from '../utils/workspaceLayout';
+import {
+  flattenPanes,
+  isChatRef,
+  removeChatSession,
+  repairWorkspace,
+} from '../utils/workspaceLayout';
 
 /** Replace a backend's session ownership with the given snapshot. */
 export function reassignSessionOwnersForBackend(backendId: string, sessionIds: string[]): void {
@@ -27,8 +32,11 @@ export function recordSessionOwner(sessionId: string, backendId: string): void {
  */
 export function forgetSession(sessionId: string): void {
   useOwnershipStore.getState().removeSessionOwner(sessionId);
-  const projectAnchors = new Set(Object.values(useProjectWorkspaceStore.getState().byProject)
-    .map(workspace => workspace.workspaceId));
+  const projectAnchors = new Set(
+    Object.values(useProjectWorkspaceStore.getState().byProject).map(
+      workspace => workspace.workspaceId
+    )
+  );
   useRightWorkspaceStore.setState(state => {
     const bySession = { ...state.bySession };
     let changed = false;
@@ -51,10 +59,13 @@ export function forgetSession(sessionId: string): void {
     const byProject = { ...state.byProject };
     let changed = false;
     for (const [projectId, project] of Object.entries(state.byProject)) {
-      const chats = flattenPanes(useRightWorkspaceStore.getState().bySession[project.workspaceId]?.root ?? null)
-        .flatMap(pane => pane.tools.filter(isChatRef));
-      const focusedChatSessionId = project.focusedChatSessionId === sessionId
-        ? chats[0]?.instanceKey ?? '' : project.focusedChatSessionId;
+      const chats = flattenPanes(
+        useRightWorkspaceStore.getState().bySession[project.workspaceId]?.root ?? null
+      ).flatMap(pane => pane.tools.filter(isChatRef));
+      const focusedChatSessionId =
+        project.focusedChatSessionId === sessionId
+          ? (chats[0]?.instanceKey ?? '')
+          : project.focusedChatSessionId;
       const toolBindings = { ...project.toolBindings };
       let bindingsChanged = false;
       for (const [key, binding] of Object.entries(toolBindings)) {

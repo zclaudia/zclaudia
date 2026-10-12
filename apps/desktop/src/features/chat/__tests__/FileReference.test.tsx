@@ -11,7 +11,9 @@ vi.mock('../../../stores/fileViewerStore', () => ({
 
 const mockActivatePanel = vi.fn();
 const mockOpenTool = vi.fn();
-vi.mock('../../../actions/workspaceActions', () => ({ openToolInWorkspace: (...args: unknown[]) => mockOpenTool(...args) }));
+vi.mock('../../../actions/workspaceActions', () => ({
+  openToolInWorkspace: (...args: unknown[]) => mockOpenTool(...args),
+}));
 vi.mock('../../../actions/openPanel', () => ({
   activatePanel: (...args: unknown[]) => mockActivatePanel(...args),
 }));
@@ -51,12 +53,30 @@ describe('TextWithFileRefs', () => {
   });
 
   it('opens an unfocused chat file reference in that chat worktree and backend', () => {
-    render(<ChatActionsProvider value={{ sessionId: 'other-chat', projectRoot: '/other-worktree', backendId: 'other-backend', handleSendMessage: vi.fn(), setMode: vi.fn() }}>
-      <TextWithFileRefs text="See @src/a.ts" />
-    </ChatActionsProvider>);
+    render(
+      <ChatActionsProvider
+        value={{
+          sessionId: 'other-chat',
+          projectRoot: '/other-worktree',
+          backendId: 'other-backend',
+          handleSendMessage: vi.fn(),
+          setMode: vi.fn(),
+        }}
+      >
+        <TextWithFileRefs text="See @src/a.ts" />
+      </ChatActionsProvider>
+    );
     fireEvent.click(screen.getByRole('button'));
-    expect(mockOpenFile).toHaveBeenCalledWith('/other-worktree', 'src/a.ts', undefined, undefined, 'other-backend');
-    expect(mockOpenTool).toHaveBeenCalledWith('other-chat', 'file-viewer', { backendId: 'other-backend' });
+    expect(mockOpenFile).toHaveBeenCalledWith(
+      '/other-worktree',
+      'src/a.ts',
+      undefined,
+      undefined,
+      'other-backend'
+    );
+    expect(mockOpenTool).toHaveBeenCalledWith('other-chat', 'file-viewer', {
+      backendId: 'other-backend',
+    });
     expect(mockActivatePanel).not.toHaveBeenCalled();
   });
 

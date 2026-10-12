@@ -28,7 +28,11 @@ interface TerminalPanelProps {
   workingDirectory?: string;
 }
 
-async function openTerminalInNewWindow(terminalId: string, projectId: string, boundBackendId?: string) {
+async function openTerminalInNewWindow(
+  terminalId: string,
+  projectId: string,
+  boundBackendId?: string
+) {
   const backendId = boundBackendId ?? useServerStore.getState().activeServerId;
   const conn = getConnectionParams({ backendId });
   const label = await openPopoutWindow({
@@ -86,7 +90,7 @@ export function TerminalActions({ projectId }: { projectId: string }) {
       {/* Open in new window — kept rightmost to match the file viewer's layout. */}
       {isDesktopTauri() && terminalId && !isPoppedOut && (
         <button
-            onClick={() => openTerminalInNewWindow(terminalId, projectId, boundBackendId)}
+          onClick={() => openTerminalInNewWindow(terminalId, projectId, boundBackendId)}
           className={actionBtn}
           title="Open in new window"
           aria-label="Open in new window"

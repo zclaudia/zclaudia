@@ -86,7 +86,8 @@ describe('RightSidebarEmptyState', () => {
     renderEmpty();
     fireEvent.click(screen.getByText('Terminal'));
     expect(openToolInWorkspace).toHaveBeenCalledWith('s1', 'terminal', {
-      projectId: 'p1', backendId: 'owner-backend',
+      projectId: 'p1',
+      backendId: 'owner-backend',
     });
   });
 

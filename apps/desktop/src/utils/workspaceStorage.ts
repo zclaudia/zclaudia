@@ -1,4 +1,5 @@
-export const sessionWorkspaceId = (sessionId: string): string => JSON.stringify(['session-workspace', sessionId]);
+export const sessionWorkspaceId = (sessionId: string): string =>
+  JSON.stringify(['session-workspace', sessionId]);
 
 /** Chosen during store creation, before persist hydration or any window edits. */
 export function workspaceStorageKey(baseName: string, search: string): string {
@@ -10,7 +11,9 @@ export function workspaceStorageKey(baseName: string, search: string): string {
 }
 
 /** Preserve corrupt bytes and let Zustand finish hydration with an empty snapshot. */
-export function recoverableJsonStorage(storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> {
+export function recoverableJsonStorage(
+  storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
+): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> {
   return {
     getItem: key => {
       const raw = storage.getItem(key);
@@ -29,7 +32,9 @@ export function recoverableJsonStorage(storage: Pick<Storage, 'getItem' | 'setIt
             storage.setItem(target, raw);
           }
           storage.removeItem(key);
-        } catch { /* If backup storage fails, keep the original bytes in place. */ }
+        } catch {
+          /* If backup storage fails, keep the original bytes in place. */
+        }
         return null;
       }
     },

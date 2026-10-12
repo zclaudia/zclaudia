@@ -1,8 +1,5 @@
 import { useEffect } from 'react';
-import {
-  useBackgroundTaskStore,
-  type BackgroundTask,
-} from '../../stores/backgroundTaskStore';
+import { useBackgroundTaskStore, type BackgroundTask } from '../../stores/backgroundTaskStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
@@ -40,18 +37,14 @@ export function useTaskCompletionToasts(): void {
         if (!becameTerminal) continue;
 
         const selectedSessionId = useSelectionStore.getState().selectedSessionId;
-        const windowUnfocused =
-          typeof document !== 'undefined' && !document.hasFocus();
+        const windowUnfocused = typeof document !== 'undefined' && !document.hasFocus();
         const isOtherSession =
           selectedSessionId !== undefined && task.sessionId !== selectedSessionId;
         if (!windowUnfocused && !isOtherSession) continue;
 
         useToastStore.getState().add({
           title: task.description || 'Background Task',
-          message:
-            task.summary?.slice(0, 100) ??
-            TERMINAL_LABEL[task.status] ??
-            'Task finished',
+          message: task.summary?.slice(0, 100) ?? TERMINAL_LABEL[task.status] ?? 'Task finished',
           type: task.status === 'completed' ? 'success' : 'error',
           icon: task.status === 'completed' ? 'task' : 'error',
           sessionId: task.sessionId,

@@ -3,19 +3,35 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LayoutMenu } from '../LayoutMenu';
 import { WorkspacePaneContext } from '../WorkspaceContext';
 import { BUILTIN_LAYOUT_PRESETS, useLayoutPresetStore } from '../../../stores/layoutPresetStore';
-import { flattenPanes, isChatRef, useRightWorkspaceStore } from '../../../stores/rightWorkspaceStore';
+import {
+  flattenPanes,
+  isChatRef,
+  useRightWorkspaceStore,
+} from '../../../stores/rightWorkspaceStore';
 import { useProjectWorkspaceStore, workspaceRefKey } from '../../../stores/projectWorkspaceStore';
-import { selectProjectChat, resolveProjectWorkspace } from '../../../actions/projectWorkspaceActions';
+import {
+  selectProjectChat,
+  resolveProjectWorkspace,
+} from '../../../actions/projectWorkspaceActions';
 import { usePluginStore } from '../../../stores/pluginStore';
 
-const { promptText, onOpen, onClose } = vi.hoisted(() => ({ promptText: vi.fn(), onOpen: vi.fn(), onClose: vi.fn() }));
+const { promptText, onOpen, onClose } = vi.hoisted(() => ({
+  promptText: vi.fn(),
+  onOpen: vi.fn(),
+  onClose: vi.fn(),
+}));
 vi.mock('../../../stores/confirmDialogStore', async importOriginal => ({
-  ...await importOriginal<Record<string, unknown>>(), promptText,
+  ...(await importOriginal<Record<string, unknown>>()),
+  promptText,
 }));
 
 const projectId = 'project';
 const current = () => useRightWorkspaceStore.getState().bySession.A;
-const refKeys = () => flattenPanes(current().root).flatMap(p => p.tools).map(workspaceRefKey).sort();
+const refKeys = () =>
+  flattenPanes(current().root)
+    .flatMap(p => p.tools)
+    .map(workspaceRefKey)
+    .sort();
 function selectMenuItem(name: string) {
   fireEvent.click(screen.getByRole('button', { name: 'Layout' }));
   fireEvent.click(screen.getByRole('menuitem', { name }));
@@ -27,7 +43,9 @@ beforeEach(() => {
   useRightWorkspaceStore.setState({ bySession: {}, order: [] });
   useProjectWorkspaceStore.setState({ byProject: {} });
   useLayoutPresetStore.setState({ presets: [...BUILTIN_LAYOUT_PRESETS], selectedByProject: {} });
-  usePluginStore.setState({ panels: [{ id: 'memory', pluginId: 'test', type: 'panel', label: 'Memory', onOpen, onClose }] });
+  usePluginStore.setState({
+    panels: [{ id: 'memory', pluginId: 'test', type: 'panel', label: 'Memory', onOpen, onClose }],
+  });
   resolveProjectWorkspace(projectId, ['A', 'B'], 'A');
   selectProjectChat(projectId, 'B', { beside: true });
   useRightWorkspaceStore.getState().openTool('A', 'memory');
@@ -38,7 +56,8 @@ describe('Layout menu integration', () => {
     const before = refKeys();
     render(<LayoutMenu projectId={projectId} />);
     fireEvent.click(screen.getByRole('button', { name: 'Layout' }));
-    for (const preset of BUILTIN_LAYOUT_PRESETS) expect(screen.getByRole('menuitem', { name: preset.name })).toBeVisible();
+    for (const preset of BUILTIN_LAYOUT_PRESETS)
+      expect(screen.getByRole('menuitem', { name: preset.name })).toBeVisible();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Compare' }));
     expect(screen.queryByRole('menu')).toBeNull();
     expect(useLayoutPresetStore.getState().selectedByProject.project).toBe('compare');
@@ -51,14 +70,28 @@ describe('Layout menu integration', () => {
     render(<LayoutMenu projectId={projectId} />);
     promptText.mockResolvedValueOnce('My review');
     selectMenuItem('Save current layout…');
-    await waitFor(() => expect(useLayoutPresetStore.getState().presets.some(p => p.name === 'My review')).toBe(true));
-    expect(promptText).toHaveBeenLastCalledWith({ title: 'Save layout', placeholder: 'Layout name', confirmLabel: 'Save' });
+    await waitFor(() =>
+      expect(useLayoutPresetStore.getState().presets.some(p => p.name === 'My review')).toBe(true)
+    );
+    expect(promptText).toHaveBeenLastCalledWith({
+      title: 'Save layout',
+      placeholder: 'Layout name',
+      confirmLabel: 'Save',
+    });
     selectMenuItem('My review');
     const selected = useLayoutPresetStore.getState().selectedByProject.project;
     promptText.mockResolvedValueOnce('Renamed review');
     selectMenuItem('Rename layout…');
-    await waitFor(() => expect(useLayoutPresetStore.getState().presets.find(p => p.id === selected)?.name).toBe('Renamed review'));
-    expect(promptText).toHaveBeenLastCalledWith({ title: 'Rename layout', defaultValue: 'My review', confirmLabel: 'Rename' });
+    await waitFor(() =>
+      expect(useLayoutPresetStore.getState().presets.find(p => p.id === selected)?.name).toBe(
+        'Renamed review'
+      )
+    );
+    expect(promptText).toHaveBeenLastCalledWith({
+      title: 'Rename layout',
+      defaultValue: 'My review',
+      confirmLabel: 'Rename',
+    });
     selectMenuItem('Delete saved layout');
     expect(useLayoutPresetStore.getState().presets).toHaveLength(8);
     expect(useLayoutPresetStore.getState().selectedByProject.project).toBeUndefined();
@@ -69,7 +102,9 @@ describe('Layout menu integration', () => {
     render(<LayoutMenu projectId={projectId} />);
     promptText.mockResolvedValueOnce(' Default ');
     selectMenuItem('Save current layout…');
-    expect(await screen.findByRole('alert')).toHaveTextContent('A layout with this name already exists.');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'A layout with this name already exists.'
+    );
     expect(useLayoutPresetStore.getState().presets).toHaveLength(8);
     promptText.mockResolvedValueOnce('Mine');
     selectMenuItem('Save current layout…');
@@ -79,7 +114,9 @@ describe('Layout menu integration', () => {
     const id = useLayoutPresetStore.getState().selectedByProject.project;
     promptText.mockResolvedValueOnce('review');
     selectMenuItem('Rename layout…');
-    expect(await screen.findByRole('alert')).toHaveTextContent('A layout with this name already exists.');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'A layout with this name already exists.'
+    );
     expect(useLayoutPresetStore.getState().presets.find(p => p.id === id)?.name).toBe('Mine');
   });
 
@@ -89,7 +126,9 @@ describe('Layout menu integration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Layout' }));
     expect(screen.queryByRole('menuitem', { name: 'Rename layout…' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: 'Delete saved layout' })).toBeNull();
-    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: 'Save current layout…' })); });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Save current layout…' }));
+    });
     expect(useLayoutPresetStore.getState().presets).toHaveLength(8);
     expect(screen.queryByRole('alert')).toBeNull();
   });
@@ -98,7 +137,11 @@ describe('Layout menu integration', () => {
     const chat = flattenPanes(current().root).find(p => p.tools.some(isChatRef))!;
     useRightWorkspaceStore.getState().focusPane('A', chat.id);
     const context = { workspaceId: 'A', paneId: chat.id, projectId };
-    const { rerender } = render(<WorkspacePaneContext.Provider value={context}><LayoutMenu projectId={projectId} /></WorkspacePaneContext.Provider>);
+    const { rerender } = render(
+      <WorkspacePaneContext.Provider value={context}>
+        <LayoutMenu projectId={projectId} />
+      </WorkspacePaneContext.Provider>
+    );
     fireEvent.keyDown(window, { key: 'l', ctrlKey: true, altKey: true });
     expect(screen.getByRole('menu', { name: 'Layout' })).toBeVisible();
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
@@ -107,7 +150,13 @@ describe('Layout menu integration', () => {
     fireEvent.keyDown(window, { key: 'l', ctrlKey: true, altKey: true });
     expect(screen.queryByRole('menu')).toBeNull();
     act(() => useRightWorkspaceStore.getState().focusPane('A', chat.id));
-    rerender(<WorkspacePaneContext.Provider value={context}><div hidden><LayoutMenu projectId={projectId} /></div></WorkspacePaneContext.Provider>);
+    rerender(
+      <WorkspacePaneContext.Provider value={context}>
+        <div hidden>
+          <LayoutMenu projectId={projectId} />
+        </div>
+      </WorkspacePaneContext.Provider>
+    );
     fireEvent.keyDown(window, { key: 'l', metaKey: true, altKey: true });
     expect(screen.queryByRole('menu')).toBeNull();
   });

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { registerWorkspaceRoute, sessionWorkspaceId, useWorkspaceRoutingStore } from '../workspaceRoutingStore';
+import {
+  registerWorkspaceRoute,
+  sessionWorkspaceId,
+  useWorkspaceRoutingStore,
+} from '../workspaceRoutingStore';
 
 beforeEach(() => useWorkspaceRoutingStore.setState({ registrations: [], active: null }));
 
@@ -12,7 +16,12 @@ describe('window-local workspace routing', () => {
 
   it('keeps the newest owner active when an earlier registration cleans up', () => {
     const a = { workspaceId: 'A', sessionId: 'A', projectId: 'p', projectScoped: true };
-    const b = { workspaceId: sessionWorkspaceId('B'), sessionId: 'B', projectId: 'p', projectScoped: false };
+    const b = {
+      workspaceId: sessionWorkspaceId('B'),
+      sessionId: 'B',
+      projectId: 'p',
+      projectScoped: false,
+    };
     const unregisterA = registerWorkspaceRoute(a);
     const unregisterB = registerWorkspaceRoute(b);
     unregisterA();
@@ -24,7 +33,11 @@ describe('window-local workspace routing', () => {
   it('restores the earlier owner after nested scope cleanup and tolerates duplicate cleanup', () => {
     const a = { workspaceId: 'A', sessionId: 'A', projectScoped: true };
     const unregisterA = registerWorkspaceRoute(a);
-    const unregisterB = registerWorkspaceRoute({ workspaceId: 'B', sessionId: 'B', projectScoped: false });
+    const unregisterB = registerWorkspaceRoute({
+      workspaceId: 'B',
+      sessionId: 'B',
+      projectScoped: false,
+    });
     unregisterB();
     unregisterB();
     expect(useWorkspaceRoutingStore.getState().active).toBe(a);

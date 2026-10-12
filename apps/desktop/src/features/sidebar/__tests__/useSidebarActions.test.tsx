@@ -13,13 +13,28 @@ vi.mock('../../../hooks/useSelectionCoordinator', () => ({
 
 function options(isMobile = false) {
   return {
-    isConnected: true, isMobile, onClose: vi.fn(), addProject: vi.fn(), addSession: vi.fn(),
-    deleteProject: vi.fn(), storeReorderProjects: vi.fn(), storeReorderSessions: vi.fn(),
-    getFilteredSessionsForProject: () => [], setExpandedProjects: vi.fn(),
-    setNewProjectName: vi.fn(), setNewProjectRootPath: vi.fn(), setShowNewProjectForm: vi.fn(),
-    setNewSessionName: vi.fn(), setNewSessionAgentProfileId: vi.fn(), setCreatingSessionForProject: vi.fn(),
-    setCreatingProject: vi.fn(), setContextMenuProject: vi.fn(), newProjectName: '', newProjectRootPath: '',
-    newSessionName: '', newSessionAgentProfileId: '',
+    isConnected: true,
+    isMobile,
+    onClose: vi.fn(),
+    addProject: vi.fn(),
+    addSession: vi.fn(),
+    deleteProject: vi.fn(),
+    storeReorderProjects: vi.fn(),
+    storeReorderSessions: vi.fn(),
+    getFilteredSessionsForProject: () => [],
+    setExpandedProjects: vi.fn(),
+    setNewProjectName: vi.fn(),
+    setNewProjectRootPath: vi.fn(),
+    setShowNewProjectForm: vi.fn(),
+    setNewSessionName: vi.fn(),
+    setNewSessionAgentProfileId: vi.fn(),
+    setCreatingSessionForProject: vi.fn(),
+    setCreatingProject: vi.fn(),
+    setContextMenuProject: vi.fn(),
+    newProjectName: '',
+    newProjectRootPath: '',
+    newSessionName: '',
+    newSessionAgentProfileId: '',
   };
 }
 
@@ -28,10 +43,12 @@ describe('useSidebarActions workspace selection', () => {
     vi.clearAllMocks();
     useProjectWorkspaceStore.setState({ byProject: {} });
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
-    useProjectStore.setState({ sessions: [
-      { id: 'old-chat', projectId: 'project' },
-      { id: 'new-chat', projectId: 'project' },
-    ] as any });
+    useProjectStore.setState({
+      sessions: [
+        { id: 'old-chat', projectId: 'project' },
+        { id: 'new-chat', projectId: 'project' },
+      ] as any,
+    });
   });
 
   it('adopts the existing project layout before replacing its focused chat', () => {
@@ -41,8 +58,9 @@ describe('useSidebarActions workspace selection', () => {
     const project = useProjectWorkspaceStore.getState().byProject.project;
     expect(project.workspaceId).toBe('old-chat');
     expect(project.focusedChatSessionId).toBe('new-chat');
-    expect(flattenPanes(useRightWorkspaceStore.getState().bySession['old-chat'].root)[0].tools)
-      .toEqual([{ toolId: 'chat', instanceKey: 'new-chat' }]);
+    expect(
+      flattenPanes(useRightWorkspaceStore.getState().bySession['old-chat'].root)[0].tools
+    ).toEqual([{ toolId: 'chat', instanceKey: 'new-chat' }]);
     expect(selectSession).toHaveBeenCalledWith('new-chat');
   });
 
@@ -51,7 +69,9 @@ describe('useSidebarActions workspace selection', () => {
     const props = options(true);
     const { result } = renderHook(() => useSidebarActions(props));
     result.current.handleSessionSelect('new-chat');
-    expect(useProjectWorkspaceStore.getState().byProject.project.focusedChatSessionId).toBe('old-chat');
+    expect(useProjectWorkspaceStore.getState().byProject.project.focusedChatSessionId).toBe(
+      'old-chat'
+    );
     expect(selectSession).toHaveBeenCalledWith('new-chat');
     expect(props.onClose).toHaveBeenCalledOnce();
   });

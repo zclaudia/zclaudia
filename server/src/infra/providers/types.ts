@@ -79,6 +79,47 @@ export interface SubagentMessenger {
   notify(sessionId: string, text: string): { delivery: 'steered' | 'queued' };
 }
 
+/** One prompt-cache trace run fingerprint (see migration 047). */
+export interface CacheTraceRunRow {
+  invocationId: string;
+  runId: string | null;
+  sessionId: string;
+  startedAt: number;
+  model: string | null;
+  thinkingLevel: string | null;
+  cacheRetention: string | null;
+  promptHash: string;
+  toolsHash: string;
+  historyCount: number;
+  historyHash: string;
+  historyPrefixIntact: boolean | null;
+  trimmedMessages: number;
+}
+
+/** One LLM call's prompt-cache token split within a traced run. */
+export interface CacheTraceCallRow {
+  callIndex: number;
+  at: number;
+  model: string | null;
+  tokens: { inputUncached: number; cacheRead: number; cacheWrite: number };
+  output: number;
+  stopReason: string | null;
+}
+
+/**
+ * Persistence for the prompt-cache trace, adapted from the usage domain's
+ * CacheTraceRepository by the application runtime (see
+ * application/conversation/runtime/pi-cache-trace-store.ts) so infra never
+ * imports domains. Absent = the run is simply not traced.
+ */
+export interface PiCacheTraceStore {
+  sessionExists(sessionId: string): boolean;
+  /** The session's latest traced run, for the next run's history-prefix check. */
+  lastRun(sessionId: string): { historyCount: number; historyHash: string } | null;
+  /** Replace one run's fingerprint and calls atomically. */
+  recordRun(run: CacheTraceRunRow, calls: CacheTraceCallRow[]): void;
+}
+
 /** An agent profile offered as a `subagent_type` by the Agent tool. */
 export interface SubagentType {
   id: string;
@@ -143,6 +184,8 @@ export interface RunOptions {
   automationPort?: AutomationPort;
   /** Host lookups for TodoRead / RespondToCoordinator / ReadSessionContext / Agent. */
   toolLookups?: PiToolLookupPort;
+  /** Prompt-cache trace persistence (absent or no trace schema = run not traced). */
+  cacheTraceStore?: PiCacheTraceStore;
   /** Language-server port for LSPTool (absent or no server for cwd = tool not registered). */
   languageServerPort?: LanguageServerPort;
   /** Language-server manager: write diagnostics for the Pi runtime (absent = none). */

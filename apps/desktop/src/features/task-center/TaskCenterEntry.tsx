@@ -77,10 +77,7 @@ export function TaskCenterEntry({ sessionId }: { sessionId: string }) {
   if (isMobile) {
     return open ? (
       <div>
-        <div
-          className="fixed inset-0 z-modal bg-black/40"
-          onClick={() => setOpen(false)}
-        />
+        <div className="fixed inset-0 z-modal bg-black/40" onClick={() => setOpen(false)} />
         <div
           role="dialog"
           aria-label="Task center"

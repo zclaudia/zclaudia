@@ -301,7 +301,9 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
       const draft = await saveDraftToServer(activeSessionId, content);
       if (draft) {
         set({
-          ...(generation === editorGeneration ? { isSaving: false, lastSavedAt: draft.updatedAt } : {}),
+          ...(generation === editorGeneration
+            ? { isSaving: false, lastSavedAt: draft.updatedAt }
+            : {}),
           draftExists: { ...get().draftExists, [activeSessionId]: true },
         });
       } else {

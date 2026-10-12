@@ -660,7 +660,9 @@ export function MessageInput({
         : current.filter(r => skillRefKey(r) !== key);
       const nextSelection = { ...agent.skillSelection, pinned };
       try {
-        await api.updateAgentProfileForBackend(agentBackendId, agent.id, { skillSelection: nextSelection });
+        await api.updateAgentProfileForBackend(agentBackendId, agent.id, {
+          skillSelection: nextSelection,
+        });
       } catch (err) {
         console.error('[MessageInput] failed to toggle skill pin:', err);
       }

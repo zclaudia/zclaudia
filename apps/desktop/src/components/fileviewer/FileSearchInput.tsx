@@ -18,7 +18,9 @@ export function FileSearchInput({
   onClose,
 }: FileSearchInputProps) {
   const [query, setQuery] = useState('');
-  const [resultState, setResultState] = useState<{ scope: string; entries: FileEntry[] } | null>(null);
+  const [resultState, setResultState] = useState<{ scope: string; entries: FileEntry[] } | null>(
+    null
+  );
   const scope = JSON.stringify([projectRoot, backendId ?? null, query.trim()]);
   const results = resultState?.scope === scope ? resultState.entries : [];
   const [selectedIndex, setSelectedIndex] = useState(0);

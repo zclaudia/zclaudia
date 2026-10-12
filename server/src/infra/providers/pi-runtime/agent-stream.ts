@@ -101,7 +101,7 @@ export async function* runPiAgentStream(input: {
   // Prompt-cache diagnostics: fingerprint what this run actually sends, then
   // record each LLM call's cache split at agent_end (never affects the run).
   const cacheTrace = startPiCacheTrace({
-    db: options.db,
+    store: options.cacheTraceStore,
     sessionId: options.claudiaSessionId,
     invocationId: options.usageAccounting?.invocationId,
     runId: options.runId,

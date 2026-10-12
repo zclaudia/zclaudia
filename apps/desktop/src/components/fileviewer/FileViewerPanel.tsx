@@ -409,7 +409,11 @@ function resolveProjectBackendId(projectRoot: string): string | null {
   return useOwnershipStore.getState().getProjectBackendId(matchingProject.id);
 }
 
-async function openFileInNewWindow(filePath: string, projectRoot: string, scopedBackendId?: string) {
+async function openFileInNewWindow(
+  filePath: string,
+  projectRoot: string,
+  scopedBackendId?: string
+) {
   const fileName = filePath.split('/').pop() || filePath;
   const projectName = projectRoot.split('/').pop() || projectRoot;
   const backendId = scopedBackendId ?? resolveProjectBackendId(projectRoot);
@@ -467,8 +471,12 @@ export function FileViewerActions() {
     }
   };
 
-  if (tool && ((tool.projectRoot && projectRoot && tool.projectRoot !== projectRoot) ||
-    (tool.backendId && backendId && tool.backendId !== backendId))) return null;
+  if (
+    tool &&
+    ((tool.projectRoot && projectRoot && tool.projectRoot !== projectRoot) ||
+      (tool.backendId && backendId && tool.backendId !== backendId))
+  )
+    return null;
 
   return (
     <div className="flex items-center gap-1">
@@ -629,7 +637,8 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   // shortly; this prevents rendering stale content during the transition.
   // `error` is gated the same way: close() does not clear it, so an unrelated
   // error must not leak into the new project's panel and force read mode.
-  const projectMatches = (!store.projectRoot || store.projectRoot === projectRoot) &&
+  const projectMatches =
+    (!store.projectRoot || store.projectRoot === projectRoot) &&
     (!tool?.backendId || !store.backendId || tool.backendId === store.backendId);
   const filePath = projectMatches ? store.filePath : null;
   const content = projectMatches ? store.content : null;
@@ -671,8 +680,12 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
     let pollInFlight = false;
     const isCurrentTarget = () => {
       const current = useFileViewerStore.getState();
-      return !cancelled && current.filePath === filePath && (!current.projectRoot || current.projectRoot === projectRoot) &&
-        (!current.backendId || current.backendId === fileBackendId);
+      return (
+        !cancelled &&
+        current.filePath === filePath &&
+        (!current.projectRoot || current.projectRoot === projectRoot) &&
+        (!current.backendId || current.backendId === fileBackendId)
+      );
     };
 
     const checkOnce = async () => {
@@ -940,7 +953,11 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
               <span className="ml-auto flex flex-shrink-0 items-center">
                 <FileDiagnosticsSummary
                   result={fileDiagnostics}
-                  onJump={line => fileBackendId ? openFile(projectRoot, filePath, line, undefined, fileBackendId) : openFile(projectRoot, filePath, line)}
+                  onJump={line =>
+                    fileBackendId
+                      ? openFile(projectRoot, filePath, line, undefined, fileBackendId)
+                      : openFile(projectRoot, filePath, line)
+                  }
                 />
               </span>
             )}

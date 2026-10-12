@@ -4,10 +4,17 @@ import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 import { useProjectWorkspaceStore } from '../../stores/projectWorkspaceStore';
 
-const stores = [useRightWorkspaceStore, useRightSidebarStore, useProjectWorkspaceStore, useLayoutPresetStore];
+const stores = [
+  useRightWorkspaceStore,
+  useRightSidebarStore,
+  useProjectWorkspaceStore,
+  useLayoutPresetStore,
+];
 const isHydrated = () => stores.every(store => !store.persist || store.persist.hasHydrated());
 const subscribe = (notify: () => void) => {
-  const cleanups = stores.flatMap(store => store.persist ? [store.persist.onHydrate(notify), store.persist.onFinishHydration(notify)] : []);
+  const cleanups = stores.flatMap(store =>
+    store.persist ? [store.persist.onHydrate(notify), store.persist.onFinishHydration(notify)] : []
+  );
   return () => cleanups.forEach(cleanup => cleanup());
 };
 

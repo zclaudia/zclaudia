@@ -1,10 +1,6 @@
 import { createHash } from 'node:crypto';
-import type Database from 'better-sqlite3';
 import type { AgentMessage, AgentTool } from '@earendil-works/pi-agent-core';
-import {
-  CacheTraceRepository,
-  type CacheTraceCallRow,
-} from '../../../domains/usage/cache-trace-repository.js';
+import type { CacheTraceCallRow, PiCacheTraceStore } from '../types.js';
 
 function sha(text: string): string {
   return createHash('sha256').update(text).digest('hex').slice(0, 16);
@@ -16,7 +12,7 @@ function hashDigests(digests: readonly string[]): string {
 }
 
 export interface PiCacheTraceInput {
-  db?: Database.Database;
+  store?: PiCacheTraceStore;
   sessionId?: string;
   /** Usage-ledger invocation; falls back to the run id. */
   invocationId?: string;
@@ -44,19 +40,17 @@ export interface PiCacheTrace {
  * fingerprint is taken from what the Agent actually receives; the history is
  * digested per message so the next run can tell whether this run's history
  * survived as its prefix. Returns null when the run can't be traced (no
- * database / session, or a database without migration 047).
+ * store / session, or a database without migration 047).
  */
 export function startPiCacheTrace(input: PiCacheTraceInput): PiCacheTrace | null {
-  const { db, sessionId } = input;
+  const { store, sessionId } = input;
   const invocationId = input.invocationId ?? input.runId;
-  if (!db || !sessionId || !invocationId) return null;
+  if (!store || !sessionId || !invocationId) return null;
   try {
-    if (!CacheTraceRepository.hasSchema(db)) return null;
-    const repository = new CacheTraceRepository(db);
     // Synthetic session ids (agent playground) have no row to hang a trace on.
-    if (!repository.sessionExists(sessionId)) return null;
+    if (!store.sessionExists(sessionId)) return null;
     const digests = input.history.map(message => sha(JSON.stringify(message)));
-    const previous = repository.lastRun(sessionId);
+    const previous = store.lastRun(sessionId);
     const historyPrefixIntact =
       previous === null
         ? null
@@ -82,7 +76,7 @@ export function startPiCacheTrace(input: PiCacheTraceInput): PiCacheTrace | null
     return {
       finish(messages) {
         try {
-          repository.recordRun(run, piCallRows(messages));
+          store.recordRun(run, piCallRows(messages));
         } catch (error) {
           console.warn('[CacheTrace] failed to record run:', error);
         }

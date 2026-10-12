@@ -14,7 +14,6 @@ import { reorderSessions } from '../../services/api/sessions';
 import { useProjectStore } from '../../stores/projectStore';
 import { selectProjectChat, resolveProjectWorkspace } from '../../actions/projectWorkspaceActions';
 
-
 interface UseSidebarActionsOptions {
   isConnected: boolean;
   isMobile?: boolean;
@@ -219,7 +218,11 @@ export function useSidebarActions({
         const sessions = useProjectStore.getState().sessions;
         const session = sessions.find(item => item.id === sessionId);
         if (session?.projectId) {
-          resolveProjectWorkspace(session.projectId, sessions.filter(item => item.projectId === session.projectId).map(item => item.id), sessionId);
+          resolveProjectWorkspace(
+            session.projectId,
+            sessions.filter(item => item.projectId === session.projectId).map(item => item.id),
+            sessionId
+          );
           selectProjectChat(session.projectId, sessionId);
         }
       }

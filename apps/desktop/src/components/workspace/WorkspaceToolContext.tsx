@@ -46,7 +46,13 @@ export function WorkspaceToolProvider({
     if (backendId && viewer.backendId !== backendId) {
       if (viewer.projectRoot === projectRoot && viewer.filePath && !viewer.backendId) {
         // Adopt legacy unscoped references without mixing their cached payload.
-        viewer.openFile(projectRoot, viewer.filePath, viewer.targetLine ?? undefined, viewer.targetEndLine ?? undefined, backendId);
+        viewer.openFile(
+          projectRoot,
+          viewer.filePath,
+          viewer.targetLine ?? undefined,
+          viewer.targetEndLine ?? undefined,
+          backendId
+        );
       } else {
         viewer.backToTree();
         useFileViewerStore.setState({ projectRoot, backendId });
@@ -56,7 +62,9 @@ export function WorkspaceToolProvider({
 
   return (
     <WorkspaceToolContext.Provider value={value}>
-      <WorkspaceVisibilityContext.Provider value={visible}>{children}</WorkspaceVisibilityContext.Provider>
+      <WorkspaceVisibilityContext.Provider value={visible}>
+        {children}
+      </WorkspaceVisibilityContext.Provider>
     </WorkspaceToolContext.Provider>
   );
 }

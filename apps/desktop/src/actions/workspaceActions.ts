@@ -1,6 +1,15 @@
 import { usePluginStore, type PanelCloseCtx } from '../stores/pluginStore';
-import { useRightWorkspaceStore, findPaneWithTool, findPane, flattenPanes, sameRef } from '../stores/rightWorkspaceStore';
-import { resolveToolBindingSession, useProjectWorkspaceStore } from '../stores/projectWorkspaceStore';
+import {
+  useRightWorkspaceStore,
+  findPaneWithTool,
+  findPane,
+  flattenPanes,
+  sameRef,
+} from '../stores/rightWorkspaceStore';
+import {
+  resolveToolBindingSession,
+  useProjectWorkspaceStore,
+} from '../stores/projectWorkspaceStore';
 import { useWorkspaceRoutingStore } from '../stores/workspaceRoutingStore';
 import { useProjectStore } from '../stores/projectStore';
 import { isMobileViewport, useIsMobile } from '../hooks/useMediaQuery';
@@ -19,9 +28,13 @@ export interface OpenToolCtx {
 export function workspaceIdForSession(sessionId: string, projectId?: string): string {
   if (isMobileViewport()) return sessionId;
   const route = useWorkspaceRoutingStore.getState().active;
-  if (route && (route.sessionId === sessionId || route.workspaceId === sessionId)) return route.workspaceId;
-  const pid = projectId ?? useProjectStore.getState().sessions.find(s => s.id === sessionId)?.projectId;
-  return (pid ? useProjectWorkspaceStore.getState().byProject[pid]?.workspaceId : undefined) ?? sessionId;
+  if (route && (route.sessionId === sessionId || route.workspaceId === sessionId))
+    return route.workspaceId;
+  const pid =
+    projectId ?? useProjectStore.getState().sessions.find(s => s.id === sessionId)?.projectId;
+  return (
+    (pid ? useProjectWorkspaceStore.getState().byProject[pid]?.workspaceId : undefined) ?? sessionId
+  );
 }
 
 /** Resolve the instanceKey for a multi-instance tool from context (terminal only today). */
@@ -75,32 +88,49 @@ export function closeTabInWorkspace(
 ): void {
   const workspaceId = workspaceIdForSession(sessionId);
   const before = useRightWorkspaceStore.getState().bySession[workspaceId]?.root;
-  const ref = before ? findPane(before, paneId)?.tools.find(t => t.toolId === toolId && t.instanceKey === instanceKey) : undefined;
+  const ref = before
+    ? findPane(before, paneId)?.tools.find(
+        t => t.toolId === toolId && t.instanceKey === instanceKey
+      )
+    : undefined;
   if (!ref) return;
   useRightWorkspaceStore.getState().closeTool(workspaceId, paneId, toolId, instanceKey);
   const after = useRightWorkspaceStore.getState().bySession[workspaceId]?.root;
-  if (flattenPanes(after ?? null).some(pane => pane.tools.some(tool => sameRef(tool, toolId, instanceKey)))) return;
+  if (
+    flattenPanes(after ?? null).some(pane =>
+      pane.tools.some(tool => sameRef(tool, toolId, instanceKey))
+    )
+  )
+    return;
   const unified = !isMobileViewport();
   const projects = unified ? useProjectWorkspaceStore.getState().byProject : {};
   const route = unified ? useWorkspaceRoutingStore.getState().active : null;
   const sessions = useProjectStore.getState().sessions;
-  const projectId = sessions.find(session => session.id === sessionId)?.projectId ??
+  const projectId =
+    sessions.find(session => session.id === sessionId)?.projectId ??
     Object.entries(projects).find(([, project]) => project.workspaceId === workspaceId)?.[0] ??
     (route?.workspaceId === workspaceId ? route.projectId : undefined);
-  const boundSessionId = route?.workspaceId === workspaceId && !route.projectScoped
-    ? route.sessionId
-    : unified && projectId ? resolveToolBindingSession(projectId, ref, sessionId) ?? sessionId : sessionId;
-  const boundProjectId = sessions.find(session => session.id === boundSessionId)?.projectId ?? projectId;
+  const boundSessionId =
+    route?.workspaceId === workspaceId && !route.projectScoped
+      ? route.sessionId
+      : unified && projectId
+        ? (resolveToolBindingSession(projectId, ref, sessionId) ?? sessionId)
+        : sessionId;
+  const boundProjectId =
+    sessions.find(session => session.id === boundSessionId)?.projectId ?? projectId;
   const ctx: PanelCloseCtx = {
     sessionId: boundSessionId,
     projectId: boundProjectId,
-    backendId: useOwnershipStore.getState().getSessionBackendId(boundSessionId) ?? useServerStore.getState().activeServerId,
+    backendId:
+      useOwnershipStore.getState().getSessionBackendId(boundSessionId) ??
+      useServerStore.getState().activeServerId,
     instanceKey,
   };
   if (toolId === 'terminal' && instanceKey) {
     const separator = instanceKey.indexOf('::');
     if (separator >= 0) {
-      ctx.backendId = instanceKey.slice(0, separator) === 'no-backend' ? null : instanceKey.slice(0, separator);
+      ctx.backendId =
+        instanceKey.slice(0, separator) === 'no-backend' ? null : instanceKey.slice(0, separator);
       ctx.projectId = instanceKey.slice(separator + 2);
     }
   }
@@ -114,10 +144,13 @@ export function closeTabInWorkspace(
 export function useToolOpenState(sessionId: string, toolId: string): boolean {
   const isMobile = useIsMobile();
   const pid = useProjectStore(s => s.sessions.find(session => session.id === sessionId)?.projectId);
-  const anchor = useProjectWorkspaceStore(s => pid ? s.byProject[pid]?.workspaceId : undefined);
+  const anchor = useProjectWorkspaceStore(s => (pid ? s.byProject[pid]?.workspaceId : undefined));
   const route = useWorkspaceRoutingStore(s => s.active);
-  const scoped = route && (route.sessionId === sessionId || route.workspaceId === sessionId) ? route.workspaceId : undefined;
-  const workspaceId = !isMobile ? scoped ?? anchor ?? sessionId : sessionId;
+  const scoped =
+    route && (route.sessionId === sessionId || route.workspaceId === sessionId)
+      ? route.workspaceId
+      : undefined;
+  const workspaceId = !isMobile ? (scoped ?? anchor ?? sessionId) : sessionId;
   return useRightWorkspaceStore(s => {
     const root = s.bySession[workspaceId]?.root ?? null;
     return findPaneWithTool(root, toolId, undefined, true) !== null;

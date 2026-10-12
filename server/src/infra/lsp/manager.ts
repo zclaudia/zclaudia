@@ -695,7 +695,7 @@ export class LanguageServerManager implements LanguageServerService {
       return {
         action: 'workspaceSymbols',
         symbols,
-        ...(truncated ? { truncated : true } : {}),
+        ...(truncated ? { truncated: true } : {}),
         ...(notes.length > 0 ? { note: notes.join(' ') } : {}),
       };
     }

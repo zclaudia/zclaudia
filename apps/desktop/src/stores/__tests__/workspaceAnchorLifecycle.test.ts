@@ -1,10 +1,20 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { useRightWorkspaceStore, flattenPanes, isChatRef, normalizeSessionWorkspace, newPane } from '../rightWorkspaceStore';
+import {
+  useRightWorkspaceStore,
+  flattenPanes,
+  isChatRef,
+  normalizeSessionWorkspace,
+  newPane,
+} from '../rightWorkspaceStore';
 import { useProjectWorkspaceStore } from '../projectWorkspaceStore';
 import { useProjectStore } from '../projectStore';
 import { useOwnershipStore } from '../ownershipStore';
 import { forgetSession } from '../../services/session-ownership-coordination';
-import { reconcileProjectChats, selectProjectChat, resolveProjectWorkspace } from '../../actions/projectWorkspaceActions';
+import {
+  reconcileProjectChats,
+  selectProjectChat,
+  resolveProjectWorkspace,
+} from '../../actions/projectWorkspaceActions';
 import { sessionWorkspaceId } from '../workspaceRoutingStore';
 import { useSessionsStore } from '../sessionsStore';
 import { syncBackendDataEvent } from '../../facade/sync/backend-data-sync';
@@ -19,9 +29,15 @@ beforeEach(() => {
   useProjectWorkspaceStore.setState({ byProject: {} });
   useSessionsStore.setState({ remoteSessions: new Map(), activeSessionIdsByBackend: new Map() });
   useOwnershipStore.setState({ sessionBackendIds: {}, sessionOwnershipVersions: {} });
-  useProjectStore.setState({ sessions: ['A', 'B'].map(id => ({
-    id, projectId: 'project', type: 'regular' as const, createdAt: 1, updatedAt: 1,
-  })) });
+  useProjectStore.setState({
+    sessions: ['A', 'B'].map(id => ({
+      id,
+      projectId: 'project',
+      type: 'regular' as const,
+      createdAt: 1,
+      updatedAt: 1,
+    })),
+  });
 });
 
 describe('durable normalized workspace lifetime', () => {
@@ -109,7 +125,11 @@ describe('deleted session ownership and adopted layout', () => {
     const before = state().bySession.A;
     forgetSession('A');
     expect(state().bySession.A).toBe(before);
-    expect(refs().filter(isChatRef).map(ref => ref.instanceKey)).toEqual(['B']);
+    expect(
+      refs()
+        .filter(isChatRef)
+        .map(ref => ref.instanceKey)
+    ).toEqual(['B']);
     expect(refs().some(ref => ref.toolId === 'memory')).toBe(true);
   });
 
@@ -132,7 +152,11 @@ describe('deleted session ownership and adopted layout', () => {
     expect(state().bySession.B).toBeUndefined();
     expect(state().bySession.A).toBeDefined();
     reconcileProjectChats('project', ['A'], 'A');
-    expect(refs().filter(isChatRef).map(ref => ref.instanceKey)).toEqual(['A']);
+    expect(
+      refs()
+        .filter(isChatRef)
+        .map(ref => ref.instanceKey)
+    ).toEqual(['A']);
     expect(refs().find(ref => ref.toolId === 'memory')).toBe(memory);
   });
 
@@ -140,13 +164,23 @@ describe('deleted session ownership and adopted layout', () => {
     resolveProjectWorkspace('project', ['A', 'B'], 'A');
     selectProjectChat('project', 'B', { beside: true });
     const scopedId = sessionWorkspaceId('A');
-    const standalone = normalizeSessionWorkspace({ root: null, primaryPaneId: null, focusedPaneId: null }, 'A');
-    useRightWorkspaceStore.setState(s => ({ bySession: { ...s.bySession, [scopedId]: standalone }, order: [scopedId, ...s.order] }));
+    const standalone = normalizeSessionWorkspace(
+      { root: null, primaryPaneId: null, focusedPaneId: null },
+      'A'
+    );
+    useRightWorkspaceStore.setState(s => ({
+      bySession: { ...s.bySession, [scopedId]: standalone },
+      order: [scopedId, ...s.order],
+    }));
     const adopted = state().bySession.A;
     forgetSession('A');
     expect(state().bySession.A).toBeDefined();
     expect(state().bySession.A).not.toBe(adopted);
-    expect(refs().filter(isChatRef).map(ref => ref.instanceKey)).toEqual(['B']);
+    expect(
+      refs()
+        .filter(isChatRef)
+        .map(ref => ref.instanceKey)
+    ).toEqual(['B']);
     expect(state().bySession[scopedId]).toBeUndefined();
     expect(state().order).not.toContain(scopedId);
   });
@@ -156,24 +190,43 @@ describe('deleted session ownership and adopted layout', () => {
     selectProjectChat('project', 'B', { beside: true });
     selectProjectChat('project', 'A');
     state().openTool('A', 'terminal', { instanceKey: 'be::project', multiInstance: true });
-    const paneA = flattenPanes(root()).find(pane => pane.tools.some(ref => ref.instanceKey === 'A'))!;
+    const paneA = flattenPanes(root()).find(pane =>
+      pane.tools.some(ref => ref.instanceKey === 'A')
+    )!;
     state().focusPane('A', paneA.id);
     state().setMaximizedPane('A', paneA.id);
     const remainingChat = refs().find(ref => ref.instanceKey === 'B');
     const terminal = refs().find(ref => ref.toolId === 'terminal')!;
-    useProjectWorkspaceStore.getState().setToolBinding('project', terminal, { mode: 'fixed', sessionId: 'A' });
-    useSessionsStore.getState().setRemoteSessions('be', useProjectStore.getState().sessions.map(session => ({ ...session, isActive: true })));
-    const deleted = useSessionsStore.getState().remoteSessions.get('be')!.find(session => session.id === 'A')!;
+    useProjectWorkspaceStore
+      .getState()
+      .setToolBinding('project', terminal, { mode: 'fixed', sessionId: 'A' });
+    useSessionsStore.getState().setRemoteSessions(
+      'be',
+      useProjectStore.getState().sessions.map(session => ({ ...session, isActive: true }))
+    );
+    const deleted = useSessionsStore
+      .getState()
+      .remoteSessions.get('be')!
+      .find(session => session.id === 'A')!;
     useSessionsStore.getState().handleSessionEvent('be', 'deleted', deleted);
     expect(useProjectStore.getState().sessions.map(session => session.id)).toEqual(['A', 'B']);
-    expect(useSessionsStore.getState().remoteSessions.get('be')!.map(session => session.id)).toEqual(['B']);
+    expect(
+      useSessionsStore
+        .getState()
+        .remoteSessions.get('be')!
+        .map(session => session.id)
+    ).toEqual(['B']);
     expect(refs().filter(isChatRef)).toEqual([remainingChat]);
     expect(refs().find(ref => ref.toolId === 'terminal')).toBe(terminal);
     expect(state().bySession.A.maximizedPaneId).toBeNull();
     expect(state().bySession.A.focusedPaneId).not.toBe(paneA.id);
-    expect(flattenPanes(root()).some(pane => pane.id === state().bySession.A.focusedPaneId)).toBe(true);
+    expect(flattenPanes(root()).some(pane => pane.id === state().bySession.A.focusedPaneId)).toBe(
+      true
+    );
     expect(useProjectWorkspaceStore.getState().byProject.project).toMatchObject({
-      workspaceId: 'A', focusedChatSessionId: 'B', toolBindings: { [JSON.stringify(['terminal', 'be::project'])]: { mode: 'follow' } },
+      workspaceId: 'A',
+      focusedChatSessionId: 'B',
+      toolBindings: { [JSON.stringify(['terminal', 'be::project'])]: { mode: 'follow' } },
     });
   });
 
@@ -181,41 +234,99 @@ describe('deleted session ownership and adopted layout', () => {
     resolveProjectWorkspace('project', ['A', 'B'], 'A');
     state().openTool('A', 'memory');
     const memory = refs().find(ref => ref.toolId === 'memory');
-    useSessionsStore.getState().setRemoteSessions('be', [{ ...useProjectStore.getState().sessions[0], isActive: true }]);
-    syncBackendDataEvent({ type: 'backend_data_event', backendId: 'be', event: {
-      resourceType: 'session', op: 'upsert', resourceId: 'A', resource: {
-        sessionId: 'A', projectId: 'project', createdAt: 1, updatedAt: 2, runStatus: 'idle', archived: true,
+    useSessionsStore
+      .getState()
+      .setRemoteSessions('be', [{ ...useProjectStore.getState().sessions[0], isActive: true }]);
+    syncBackendDataEvent({
+      type: 'backend_data_event',
+      backendId: 'be',
+      event: {
+        resourceType: 'session',
+        op: 'upsert',
+        resourceId: 'A',
+        resource: {
+          sessionId: 'A',
+          projectId: 'project',
+          createdAt: 1,
+          updatedAt: 2,
+          runStatus: 'idle',
+          archived: true,
+        },
       },
-    } } as any);
+    } as any);
     expect(useProjectStore.getState().sessions.map(session => session.id)).toEqual(['A', 'B']);
     expect(refs().filter(isChatRef)).toEqual([]);
     expect(refs()).toEqual([memory]);
     expect(useSessionsStore.getState().remoteSessions.get('be')).toEqual([]);
-    expect(useProjectWorkspaceStore.getState().byProject.project).toMatchObject({ workspaceId: 'A', focusedChatSessionId: '' });
+    expect(useProjectWorkspaceStore.getState().byProject.project).toMatchObject({
+      workspaceId: 'A',
+      focusedChatSessionId: '',
+    });
   });
 
   it('keeps an empty adopted anchor after a real final-chat delete and removes matching refs from every project tree', () => {
     resolveProjectWorkspace('project', ['A', 'B'], 'A');
     const otherChat = newPane('chat', 'other-chat');
     const sharedDeleted = newPane('chat', 'A');
-    const otherRoot = { id: 'other-group', kind: 'group' as const, dir: 'row' as const, ratio: 0.6, children: [sharedDeleted, otherChat] as [typeof sharedDeleted, typeof otherChat] };
-    useRightWorkspaceStore.setState(s => ({ bySession: { ...s.bySession, other: { root: otherRoot, primaryPaneId: null, focusedPaneId: sharedDeleted.id } } }));
-    useProjectWorkspaceStore.setState(s => ({ byProject: { ...s.byProject, other: { workspaceId: 'other', focusedChatSessionId: 'A', toolBindings: {} } } }));
-    useSessionsStore.getState().handleSessionEvent('be', 'deleted', { ...useProjectStore.getState().sessions[0], isActive: false });
-    expect(state().bySession.A).toMatchObject({ root: null, primaryPaneId: null, focusedPaneId: null });
+    const otherRoot = {
+      id: 'other-group',
+      kind: 'group' as const,
+      dir: 'row' as const,
+      ratio: 0.6,
+      children: [sharedDeleted, otherChat] as [typeof sharedDeleted, typeof otherChat],
+    };
+    useRightWorkspaceStore.setState(s => ({
+      bySession: {
+        ...s.bySession,
+        other: { root: otherRoot, primaryPaneId: null, focusedPaneId: sharedDeleted.id },
+      },
+    }));
+    useProjectWorkspaceStore.setState(s => ({
+      byProject: {
+        ...s.byProject,
+        other: { workspaceId: 'other', focusedChatSessionId: 'A', toolBindings: {} },
+      },
+    }));
+    useSessionsStore.getState().handleSessionEvent('be', 'deleted', {
+      ...useProjectStore.getState().sessions[0],
+      isActive: false,
+    });
+    expect(state().bySession.A).toMatchObject({
+      root: null,
+      primaryPaneId: null,
+      focusedPaneId: null,
+    });
     expect(state().bySession.other.root).toBe(otherChat);
-    expect(useProjectWorkspaceStore.getState().byProject.other.focusedChatSessionId).toBe('other-chat');
+    expect(useProjectWorkspaceStore.getState().byProject.other.focusedChatSessionId).toBe(
+      'other-chat'
+    );
   });
 
   it('pure removal repairs the active chat tab and preserves surviving ref/placeholder identity', () => {
     const a = { toolId: 'chat', instanceKey: 'A' };
     const b = { toolId: 'chat', instanceKey: 'B' };
     const pane = { ...newPane('chat', 'A'), tools: [a, b] };
-    const slot = { id: 'slot', kind: 'placeholder' as const, slotId: 'slot', accepts: 'chat' as const };
-    const original = { id: 'group', kind: 'group' as const, dir: 'row' as const, ratio: 0.7, children: [pane, slot] as [typeof pane, typeof slot] };
+    const slot = {
+      id: 'slot',
+      kind: 'placeholder' as const,
+      slotId: 'slot',
+      accepts: 'chat' as const,
+    };
+    const original = {
+      id: 'group',
+      kind: 'group' as const,
+      dir: 'row' as const,
+      ratio: 0.7,
+      children: [pane, slot] as [typeof pane, typeof slot],
+    };
     const next = removeChatSession(original, 'A');
     expect(next?.kind).toBe('group');
-    expect(flattenPanes(next)[0]).toMatchObject({ id: pane.id, activeToolId: 'chat', activeInstanceKey: 'B', tools: [b] });
+    expect(flattenPanes(next)[0]).toMatchObject({
+      id: pane.id,
+      activeToolId: 'chat',
+      activeInstanceKey: 'B',
+      tools: [b],
+    });
     expect(flattenPanes(next)[0].tools[0]).toBe(b);
     if (next?.kind === 'group') expect(next.children[1]).toBe(slot);
     expect(removeChatSession(next, 'absent')).toBe(next);

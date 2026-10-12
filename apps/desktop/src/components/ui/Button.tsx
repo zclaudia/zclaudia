@@ -71,8 +71,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   { size = 'md', className = '', type = 'button', ...rest },
   ref
 ) {
-  const dim =
-    size === 'sm' ? 'h-6 w-6 max-md:h-8 max-md:w-8' : 'h-7 w-7 max-md:h-9 max-md:w-9';
+  const dim = size === 'sm' ? 'h-6 w-6 max-md:h-8 max-md:w-8' : 'h-7 w-7 max-md:h-9 max-md:w-9';
   return (
     <button
       ref={ref}

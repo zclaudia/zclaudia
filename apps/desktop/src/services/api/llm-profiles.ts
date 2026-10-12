@@ -343,7 +343,12 @@ export async function getProviderCommands(
   backendId?: string | null
 ): Promise<SlashCommand[]> {
   const query = projectRoot ? `?projectRoot=${encodeURIComponent(projectRoot)}` : '';
-  if (backendId !== undefined) return apiCallForBackend<SlashCommand[]>(backendId, `/api/providers/${llmProfileId}/commands${query}`, options);
+  if (backendId !== undefined)
+    return apiCallForBackend<SlashCommand[]>(
+      backendId,
+      `/api/providers/${llmProfileId}/commands${query}`,
+      options
+    );
   if (activeServerSupports('providerCommands')) {
     const result = await fetchApi<SlashCommand[]>(
       `/api/providers/${llmProfileId}/commands${query}`,
@@ -367,7 +372,12 @@ export async function getProviderTypeCommands(
   backendId?: string | null
 ): Promise<SlashCommand[]> {
   const query = projectRoot ? `?projectRoot=${encodeURIComponent(projectRoot)}` : '';
-  if (backendId !== undefined) return apiCallForBackend<SlashCommand[]>(backendId, `/api/providers/type/${providerType}/commands${query}`, options);
+  if (backendId !== undefined)
+    return apiCallForBackend<SlashCommand[]>(
+      backendId,
+      `/api/providers/type/${providerType}/commands${query}`,
+      options
+    );
   if (activeServerSupports('providerCommands')) {
     const result = await fetchApi<SlashCommand[]>(
       `/api/providers/type/${providerType}/commands${query}`,
@@ -391,7 +401,11 @@ export async function getProviderCapabilities(
 ): Promise<ProviderCapabilities> {
   // A retained chat on another backend must never inherit this device's fallback modes.
   if (backendId && backendId !== getActiveServerId()) {
-    return apiCallForBackend<ProviderCapabilities>(backendId, `/api/providers/${llmProfileId}/capabilities`, options);
+    return apiCallForBackend<ProviderCapabilities>(
+      backendId,
+      `/api/providers/${llmProfileId}/capabilities`,
+      options
+    );
   }
   // When a backendId is given (even null → active fallback inside the helpers),
   // the capability check and the request both target that backend instead of
@@ -429,7 +443,12 @@ export async function getProviderTypeCapabilities(
   options?: RequestInit,
   backendId?: string | null
 ): Promise<ProviderCapabilities> {
-  if (backendId !== undefined) return apiCallForBackend<ProviderCapabilities>(backendId, `/api/providers/type/${providerType}/capabilities`, options);
+  if (backendId !== undefined)
+    return apiCallForBackend<ProviderCapabilities>(
+      backendId,
+      `/api/providers/type/${providerType}/capabilities`,
+      options
+    );
   if (activeServerSupports('providerCapabilities')) {
     const result = await fetchApi<ProviderCapabilities>(
       `/api/providers/type/${providerType}/capabilities`,

@@ -44,7 +44,10 @@ describe('useSendQueueConsumer', () => {
   it('leaves the queue untouched in a popped-out placeholder and resumes when brought back', async () => {
     enqueue('first');
     const sendAsNewRun = vi.fn().mockResolvedValue(undefined);
-    const { rerender } = renderHook(({ enabled }) => useSendQueueConsumer({ sessionId: SESSION, sendAsNewRun, enabled }), { initialProps: { enabled: false } });
+    const { rerender } = renderHook(
+      ({ enabled }) => useSendQueueConsumer({ sessionId: SESSION, sendAsNewRun, enabled }),
+      { initialProps: { enabled: false } }
+    );
     expect(sendAsNewRun).not.toHaveBeenCalled();
     expect(useSendQueueStore.getState().queues[SESSION]).toHaveLength(1);
     rerender({ enabled: true });
@@ -53,9 +56,14 @@ describe('useSendQueueConsumer', () => {
 
   it('releases the previous shipping lock when the mounted session changes', async () => {
     enqueue('A item');
-    useSendQueueStore.getState().enqueue({ sessionId: 'session-2', content: 'B item', attachments: [], intent: 'queue' });
+    useSendQueueStore
+      .getState()
+      .enqueue({ sessionId: 'session-2', content: 'B item', attachments: [], intent: 'queue' });
     const sendAsNewRun = vi.fn().mockResolvedValue(undefined);
-    const { rerender } = renderHook(({ sessionId }) => useSendQueueConsumer({ sessionId, sendAsNewRun }), { initialProps: { sessionId: SESSION } });
+    const { rerender } = renderHook(
+      ({ sessionId }) => useSendQueueConsumer({ sessionId, sendAsNewRun }),
+      { initialProps: { sessionId: SESSION } }
+    );
     await waitFor(() => expect(sendAsNewRun).toHaveBeenCalledWith('A item', []));
     rerender({ sessionId: 'session-2' });
     await waitFor(() => expect(sendAsNewRun).toHaveBeenCalledWith('B item', []));

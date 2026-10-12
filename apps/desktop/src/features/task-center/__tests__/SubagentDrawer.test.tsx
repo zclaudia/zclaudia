@@ -72,7 +72,12 @@ describe('useSubagentDetail', () => {
         'run-1': [
           taskCall({
             status: 'completed',
-            result: { content: [{ type: 'text', text: 'Part A. ' }, { type: 'text', text: 'Part B.' }] },
+            result: {
+              content: [
+                { type: 'text', text: 'Part A. ' },
+                { type: 'text', text: 'Part B.' },
+              ],
+            },
           }),
         ],
       },
@@ -95,9 +100,15 @@ describe('useSubagentDetail', () => {
         'run-1': { 'tool-9': { ...taskCall({ id: 'tool-9', toolName: 'Bash' }) } },
       },
     });
-    expect(renderHook(() => useSubagentDetail(makeTask({ toolUseId: undefined }))).result.current).toBeNull();
-    expect(renderHook(() => useSubagentDetail(makeTask({ toolUseId: 'tool-missing' }))).result.current).toBeNull();
-    expect(renderHook(() => useSubagentDetail(makeTask({ toolUseId: 'tool-9' }))).result.current).toBeNull();
+    expect(
+      renderHook(() => useSubagentDetail(makeTask({ toolUseId: undefined }))).result.current
+    ).toBeNull();
+    expect(
+      renderHook(() => useSubagentDetail(makeTask({ toolUseId: 'tool-missing' }))).result.current
+    ).toBeNull();
+    expect(
+      renderHook(() => useSubagentDetail(makeTask({ toolUseId: 'tool-9' }))).result.current
+    ).toBeNull();
   });
 
   it('returns null when the task itself is null', () => {
@@ -107,11 +118,7 @@ describe('useSubagentDetail', () => {
   it('falls back to finalized chat messages once the run store discards the run', () => {
     useChatMessageStore.setState({
       messages: {
-        s1: [
-          finalizedMessage('m1', [
-            taskCall({ status: 'completed', result: 'Late report' }),
-          ]),
-        ],
+        s1: [finalizedMessage('m1', [taskCall({ status: 'completed', result: 'Late report' })])],
       },
     });
     const { result } = renderHook(() => useSubagentDetail(makeTask()));
@@ -136,7 +143,11 @@ describe('useSubagentSteps', () => {
   it('collects inner steps naming the task’s toolUseId, oldest first', () => {
     useRunStore.setState({
       toolCallsHistory: {
-        'run-1': [step('task-1', undefined, 'Task'), step('inner-1', 'task-1'), step('inner-2', 'task-1')],
+        'run-1': [
+          step('task-1', undefined, 'Task'),
+          step('inner-1', 'task-1'),
+          step('inner-2', 'task-1'),
+        ],
       },
     });
     const { result } = renderHook(() => useSubagentSteps(stepsTask()));
@@ -155,7 +166,9 @@ describe('useSubagentSteps', () => {
   });
 
   it('returns empty without a toolUseId or any matching steps', () => {
-    expect(renderHook(() => useSubagentSteps(makeTask({ toolUseId: undefined }))).result.current).toEqual([]);
+    expect(
+      renderHook(() => useSubagentSteps(makeTask({ toolUseId: undefined }))).result.current
+    ).toEqual([]);
     useRunStore.setState({ toolCallsHistory: { 'run-1': [step('plain', undefined)] } });
     expect(renderHook(() => useSubagentSteps(stepsTask())).result.current).toEqual([]);
   });
@@ -182,9 +195,7 @@ describe('useSubagentSteps', () => {
     });
     useChatMessageStore.setState({
       messages: {
-        s1: [
-          finalizedMessage('m1', [step('inner-1', 'task-1'), step('inner-2', 'task-1')]),
-        ],
+        s1: [finalizedMessage('m1', [step('inner-1', 'task-1'), step('inner-2', 'task-1')])],
       },
     });
     const { result } = renderHook(() => useSubagentSteps(stepsTask()));
@@ -219,7 +230,10 @@ describe('taskCenterUiStore drawer state', () => {
   it('openDrawer names the task and closes the popover', () => {
     useTaskCenterUiStore.setState({ popoverOpen: true });
     useTaskCenterUiStore.getState().openDrawer('task-1');
-    expect(useTaskCenterUiStore.getState()).toMatchObject({ drawerTaskId: 'task-1', popoverOpen: false });
+    expect(useTaskCenterUiStore.getState()).toMatchObject({
+      drawerTaskId: 'task-1',
+      popoverOpen: false,
+    });
     useTaskCenterUiStore.getState().closeDrawer();
     expect(useTaskCenterUiStore.getState().drawerTaskId).toBeNull();
   });

@@ -36,9 +36,12 @@ function DraftActionControls() {
   const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionMatches = tool ? !!boundSessionId && boundSessionId === activeSessionId : true;
 
-  useEffect(() => () => {
-    if (confirmTimer.current) clearTimeout(confirmTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (confirmTimer.current) clearTimeout(confirmTimer.current);
+    },
+    []
+  );
 
   const effectiveReadOnly = isReadOnly || sessionArchived;
   const hasContent = !!localContent.trim();
@@ -52,14 +55,22 @@ function DraftActionControls() {
 
   const handleSend = useCallback(() => {
     const draft = useDraftEditorStore.getState();
-    if (draft.activeSessionId !== activeSessionId || (tool && (!boundSessionId || draft.activeSessionId !== boundSessionId))) return;
+    if (
+      draft.activeSessionId !== activeSessionId ||
+      (tool && (!boundSessionId || draft.activeSessionId !== boundSessionId))
+    )
+      return;
     const cb = draft.sendCallback;
     if (cb) void finishDraft(cb);
   }, [finishDraft, activeSessionId, boundSessionId, tool]);
 
   const handleDiscard = useCallback(() => {
     const draftSessionId = useDraftEditorStore.getState().activeSessionId;
-    if (draftSessionId !== activeSessionId || (tool && (!boundSessionId || draftSessionId !== boundSessionId))) return;
+    if (
+      draftSessionId !== activeSessionId ||
+      (tool && (!boundSessionId || draftSessionId !== boundSessionId))
+    )
+      return;
     if (!confirmingDiscard) {
       setConfirmingDiscard(true);
       confirmTimer.current = setTimeout(() => setConfirmingDiscard(false), 3000);
@@ -70,7 +81,12 @@ function DraftActionControls() {
   }, [confirmingDiscard, discardDraft, activeSessionId, boundSessionId, tool]);
 
   const handlePopOut = useCallback(async () => {
-    if (!activeSessionId || useDraftEditorStore.getState().activeSessionId !== activeSessionId || (tool && (!boundSessionId || activeSessionId !== boundSessionId))) return;
+    if (
+      !activeSessionId ||
+      useDraftEditorStore.getState().activeSessionId !== activeSessionId ||
+      (tool && (!boundSessionId || activeSessionId !== boundSessionId))
+    )
+      return;
     const label = await openDraftInNewWindow(activeSessionId);
     if (useDraftEditorStore.getState().activeSessionId !== activeSessionId) return;
     useDraftEditorStore.getState().setPoppedOut(true, label);

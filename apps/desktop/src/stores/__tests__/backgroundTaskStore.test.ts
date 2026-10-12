@@ -190,7 +190,11 @@ describe('backgroundTaskStore', () => {
         t1: { ...makeTask('t1', 'sess-1', 'started'), startedAt: base },
         t2: { ...makeTask('t2', 'sess-1', 'in_progress'), startedAt: base - 1000 },
         t3: { ...makeTask('t3', 'sess-1', 'paused'), startedAt: base - 500 },
-        t4: { ...makeTask('t4', 'sess-1', 'completed'), startedAt: base - 4000, completedAt: base - 100 },
+        t4: {
+          ...makeTask('t4', 'sess-1', 'completed'),
+          startedAt: base - 4000,
+          completedAt: base - 100,
+        },
         t5: { ...makeTask('t5', 'sess-1', 'failed'), startedAt: base - 3000, completedAt: base },
         t6: { ...makeTask('t6', 'sess-1', 'stopped'), startedAt: base - 2000 },
       },

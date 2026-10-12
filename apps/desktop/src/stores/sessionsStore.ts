@@ -105,7 +105,8 @@ export const useSessionsStore = create<SessionsState>(set => ({
       for (const id of deletionConfirmations.keys()) {
         if (!receivedIds.has(id)) deletionConfirmations.delete(id);
       }
-      if (deletionConfirmations.size) pendingDeletionConfirmations.set(backendId, deletionConfirmations);
+      if (deletionConfirmations.size)
+        pendingDeletionConfirmations.set(backendId, deletionConfirmations);
       else pendingDeletionConfirmations.delete(backendId);
       const incomingIds = new Set(incoming.map(session => session.id));
       const pendingAdmissions = new Map(state.pendingAdmissions);
@@ -124,7 +125,10 @@ export const useSessionsStore = create<SessionsState>(set => ({
       if (pending.size) pendingAdmissions.set(backendId, pending);
       else pendingAdmissions.delete(backendId);
       const merged = [...incoming, ...admitted];
-      reassignSessionOwnersForBackend(backendId, merged.map(session => session.id));
+      reassignSessionOwnersForBackend(
+        backendId,
+        merged.map(session => session.id)
+      );
       const validIds = new Set(merged.map(session => session.id));
       const deletedSessionIds = new Map(state.deletedSessionIds);
       const deleted = new Set(deletedSessionIds.get(backendId));
@@ -144,9 +148,14 @@ export const useSessionsStore = create<SessionsState>(set => ({
       return {
         remoteSessions: newMap,
         snapshotBackendIds: new Set([...state.snapshotBackendIds, backendId]),
-        snapshotGenerations: new Map(state.snapshotGenerations).set(backendId, state.nextSnapshotGeneration),
+        snapshotGenerations: new Map(state.snapshotGenerations).set(
+          backendId,
+          state.nextSnapshotGeneration
+        ),
         nextSnapshotGeneration: state.nextSnapshotGeneration + 1,
-        pendingAdmissions, deletedSessionIds, pendingDeletionConfirmations,
+        pendingAdmissions,
+        deletedSessionIds,
+        pendingDeletionConfirmations,
         activeSessionIdsByBackend: newActiveMap,
       };
     });
@@ -167,12 +176,25 @@ export const useSessionsStore = create<SessionsState>(set => ({
       const pendingDeletionConfirmations = new Map(state.pendingDeletionConfirmations);
       const deletionConfirmations = new Map(pendingDeletionConfirmations.get(backendId));
       deletionConfirmations.delete(session.id);
-      if (deletionConfirmations.size) pendingDeletionConfirmations.set(backendId, deletionConfirmations);
+      if (deletionConfirmations.size)
+        pendingDeletionConfirmations.set(backendId, deletionConfirmations);
       else pendingDeletionConfirmations.delete(backendId);
-      return { pendingAdmissions, deletedSessionIds, pendingDeletionConfirmations,
-        remoteSessions: new Map(state.remoteSessions).set(backendId, [...state.remoteSessions.get(backendId) ?? [], session]),
-        ...(session.isActive ? { activeSessionIdsByBackend: new Map(state.activeSessionIdsByBackend)
-          .set(backendId, new Set([...state.activeSessionIdsByBackend.get(backendId) ?? [], session.id])) } : {}),
+      return {
+        pendingAdmissions,
+        deletedSessionIds,
+        pendingDeletionConfirmations,
+        remoteSessions: new Map(state.remoteSessions).set(backendId, [
+          ...(state.remoteSessions.get(backendId) ?? []),
+          session,
+        ]),
+        ...(session.isActive
+          ? {
+              activeSessionIdsByBackend: new Map(state.activeSessionIdsByBackend).set(
+                backendId,
+                new Set([...(state.activeSessionIdsByBackend.get(backendId) ?? []), session.id])
+              ),
+            }
+          : {}),
       };
     });
   },
@@ -196,7 +218,8 @@ export const useSessionsStore = create<SessionsState>(set => ({
       const pending = new Map(pendingAdmissions.get(backendId));
       const admission = pending.get(session.id);
       if (eventType === 'deleted') pending.delete(session.id);
-      else if (admission) pending.set(session.id, { ...admission, session: { ...admission.session, ...session } });
+      else if (admission)
+        pending.set(session.id, { ...admission, session: { ...admission.session, ...session } });
       if (pending.size) pendingAdmissions.set(backendId, pending);
       else pendingAdmissions.delete(backendId);
       const deletedSessionIds = new Map(state.deletedSessionIds);
@@ -208,14 +231,18 @@ export const useSessionsStore = create<SessionsState>(set => ({
       const deletionConfirmations = new Map(pendingDeletionConfirmations.get(backendId));
       if (eventType === 'deleted') deletionConfirmations.set(session.id, 0);
       else deletionConfirmations.delete(session.id);
-      if (deletionConfirmations.size) pendingDeletionConfirmations.set(backendId, deletionConfirmations);
+      if (deletionConfirmations.size)
+        pendingDeletionConfirmations.set(backendId, deletionConfirmations);
       else pendingDeletionConfirmations.delete(backendId);
 
       if (eventType === 'created') {
         // Dedup: skip if session already exists (e.g. both WebSocket push and sessionSync detected it)
         if (backendSessions.some(s => s.id === session.id)) {
           if (!state.pendingAdmissions.get(backendId)?.has(session.id)) return state;
-          newMap.set(backendId, backendSessions.map(item => item.id === session.id ? session : item));
+          newMap.set(
+            backendId,
+            backendSessions.map(item => (item.id === session.id ? session : item))
+          );
         } else newMap.set(backendId, [...backendSessions, session]);
         if (session.isActive) backendActive.add(session.id);
       } else if (eventType === 'updated') {
@@ -238,7 +265,9 @@ export const useSessionsStore = create<SessionsState>(set => ({
       newActiveMap.set(backendId, backendActive);
       return {
         remoteSessions: newMap,
-        pendingAdmissions, deletedSessionIds, pendingDeletionConfirmations,
+        pendingAdmissions,
+        deletedSessionIds,
+        pendingDeletionConfirmations,
         activeSessionIdsByBackend: newActiveMap,
       };
     });
@@ -356,7 +385,10 @@ export const useSessionsStore = create<SessionsState>(set => ({
       return {
         remoteSessions: newMap,
         snapshotBackendIds,
-        snapshotGenerations, pendingAdmissions, deletedSessionIds, pendingDeletionConfirmations,
+        snapshotGenerations,
+        pendingAdmissions,
+        deletedSessionIds,
+        pendingDeletionConfirmations,
         activeSessionIdsByBackend: newActiveMap,
       };
     });

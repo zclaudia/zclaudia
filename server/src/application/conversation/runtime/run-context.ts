@@ -25,6 +25,7 @@ import { resolveProjectMemoryDir } from '../../../utils/memory-paths.js';
 import { workspaceService } from '../../services/workspace.js';
 import { mapPermissionMode } from '../../../infra/providers/pcp-permission.js';
 import type { LanguageServerService } from '../../../infra/lsp/index.js';
+import { createPiCacheTraceStore } from './pi-cache-trace-store.js';
 import { createPiToolLookups } from './pi-tool-lookups.js';
 
 interface SessionContext {
@@ -122,6 +123,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     automationPort,
     languageServers,
     toolLookups: createPiToolLookups(db),
+    cacheTraceStore: createPiCacheTraceStore(db),
     llmProfileConfig: providerConfig,
     agentProfile,
     enabledTools,

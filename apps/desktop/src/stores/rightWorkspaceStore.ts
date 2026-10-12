@@ -3,11 +3,31 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { MULTI_INSTANCE_PANELS } from './panelInstance';
 import { recoverableJsonStorage, workspaceStorageKey } from '../utils/workspaceStorage';
 import {
-  CHAT_TOOL_ID, DEFAULT_RATIO, findPane, findPaneWithTool, findToolConflict,
-  flattenPanes, genId, isPinnedPane, newPane, normalizeSessionWorkspace, restoreLayoutTree,
-  pickFirstPane, pruneTools, removePane, repairWorkspace, replaceChild, sameRef, setRatioAt,
-  type GroupNode, type LayoutNode, type PaneNode, type SessionWorkspace,
-  type SplitDir, type SplitResult, type WorkspaceEdge,
+  CHAT_TOOL_ID,
+  DEFAULT_RATIO,
+  findPane,
+  findPaneWithTool,
+  findToolConflict,
+  flattenPanes,
+  genId,
+  isPinnedPane,
+  newPane,
+  normalizeSessionWorkspace,
+  restoreLayoutTree,
+  pickFirstPane,
+  pruneTools,
+  removePane,
+  repairWorkspace,
+  replaceChild,
+  sameRef,
+  setRatioAt,
+  type GroupNode,
+  type LayoutNode,
+  type PaneNode,
+  type SessionWorkspace,
+  type SplitDir,
+  type SplitResult,
+  type WorkspaceEdge,
 } from '../utils/workspaceLayout';
 
 // Compatibility entry for existing UI consumers; stores share the pure module directly.
@@ -88,7 +108,9 @@ interface RightWorkspaceState {
  */
 function touch(order: string[], bySession: Record<string, SessionWorkspace>, sessionId: string) {
   const next = [sessionId, ...order.filter(id => id !== sessionId && bySession[id])];
-  const evictable = next.filter(id => !bySession[id]?.durable && !flattenPanes(bySession[id]?.root ?? null).some(isPinnedPane));
+  const evictable = next.filter(
+    id => !bySession[id]?.durable && !flattenPanes(bySession[id]?.root ?? null).some(isPinnedPane)
+  );
   for (const victim of evictable.slice(MAX_LEGACY_SESSIONS)) {
     delete bySession[victim];
     next.splice(next.indexOf(victim), 1);
@@ -99,7 +121,8 @@ function touch(order: string[], bySession: Record<string, SessionWorkspace>, ses
 function paneWithoutTab(pane: PaneNode, index: number): PaneNode | null {
   const tools = pane.tools.filter((_, i) => i !== index);
   if (!tools.length) return null;
-  const active = tools.find(t => sameRef(t, pane.activeToolId, pane.activeInstanceKey)) ??
+  const active =
+    tools.find(t => sameRef(t, pane.activeToolId, pane.activeInstanceKey)) ??
     tools[Math.min(index, tools.length - 1)];
   return { ...pane, tools, activeToolId: active.toolId, activeInstanceKey: active.instanceKey };
 }
@@ -107,8 +130,11 @@ function paneWithoutTab(pane: PaneNode, index: number): PaneNode | null {
 function insertAtEdge(target: LayoutNode, inserted: PaneNode, edge: WorkspaceEdge): GroupNode {
   const first = edge === 'left' || edge === 'top';
   return {
-    id: genId('grp'), kind: 'group', dir: edge === 'left' || edge === 'right' ? 'row' : 'col',
-    ratio: DEFAULT_RATIO, children: first ? [inserted, target] : [target, inserted],
+    id: genId('grp'),
+    kind: 'group',
+    dir: edge === 'left' || edge === 'right' ? 'row' : 'col',
+    ratio: DEFAULT_RATIO,
+    children: first ? [inserted, target] : [target, inserted],
   };
 }
 
@@ -119,18 +145,22 @@ function restoreWorkspaces(persisted: unknown): Pick<RightWorkspaceState, 'bySes
   if (p.bySession && typeof p.bySession === 'object') {
     for (const [id, ws] of Object.entries(p.bySession)) {
       const root = restoreLayoutTree(ws?.root, MULTI_INSTANCE_PANELS);
-      entries.push([id, repairWorkspace({
-        ...(ws?.durable === true ? { durable: true } : {}),
-        root,
-        primaryPaneId: root ? (ws?.primaryPaneId ?? null) : null,
-        focusedPaneId: root ? (ws?.focusedPaneId ?? null) : null,
-        ...(ws?.maximizedPaneId !== undefined ? { maximizedPaneId: ws.maximizedPaneId } : {}),
-      })]);
+      entries.push([
+        id,
+        repairWorkspace({
+          ...(ws?.durable === true ? { durable: true } : {}),
+          root,
+          primaryPaneId: root ? (ws?.primaryPaneId ?? null) : null,
+          focusedPaneId: root ? (ws?.focusedPaneId ?? null) : null,
+          ...(ws?.maximizedPaneId !== undefined ? { maximizedPaneId: ws.maximizedPaneId } : {}),
+        }),
+      ]);
     }
   }
   const bySession = Object.fromEntries(entries);
   const order = Array.isArray(p.order)
-    ? [...new Set(p.order.filter(id => typeof id === 'string' && Object.hasOwn(bySession, id)))] : [];
+    ? [...new Set(p.order.filter(id => typeof id === 'string' && Object.hasOwn(bySession, id)))]
+    : [];
   return { bySession, order };
 }
 
@@ -175,7 +205,9 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
               if (!ws.root) return ws;
               const pane = findPane(ws.root, existing);
               if (!pane) return ws;
-              const ref = pane.tools.find(t => t.toolId === toolId && (singleton || t.instanceKey === instanceKey));
+              const ref = pane.tools.find(
+                t => t.toolId === toolId && (singleton || t.instanceKey === instanceKey)
+              );
               if (!ref) return ws;
               const root = replaceChild(ws.root, existing, {
                 ...pane,
@@ -188,21 +220,37 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
             // 2) Empty workspace → seed as primary + focused.
             if (!ws.root) {
               const pane = newPane(toolId, instanceKey);
-              return { ...ws, root: pane, primaryPaneId: pane.id, focusedPaneId: pane.id, maximizedPaneId: null };
+              return {
+                ...ws,
+                root: pane,
+                primaryPaneId: pane.id,
+                focusedPaneId: pane.id,
+                maximizedPaneId: null,
+              };
             }
 
             // 3) Append a tab to the focused pane (fallback: primary, then first).
             const toolPanes = flattenPanes(ws.root).filter(p => !isPinnedPane(p));
             const targetId =
               toolPanes.find(p => p.id === ws.focusedPaneId)?.id ??
-              toolPanes.find(p => p.id === ws.primaryPaneId)?.id ?? toolPanes[0]?.id;
+              toolPanes.find(p => p.id === ws.primaryPaneId)?.id ??
+              toolPanes[0]?.id;
             if (!targetId) {
               const pane = newPane(toolId, instanceKey);
               const root: GroupNode = {
-                id: genId('grp'), kind: 'group', dir: 'row', ratio: DEFAULT_RATIO,
+                id: genId('grp'),
+                kind: 'group',
+                dir: 'row',
+                ratio: DEFAULT_RATIO,
                 children: [ws.root, pane],
               };
-              return { ...ws, root, primaryPaneId: pane.id, focusedPaneId: pane.id, maximizedPaneId: null };
+              return {
+                ...ws,
+                root,
+                primaryPaneId: pane.id,
+                focusedPaneId: pane.id,
+                maximizedPaneId: null,
+              };
             }
             const pane = findPane(ws.root, targetId);
             if (!pane) return ws;
@@ -256,7 +304,8 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
           const ws = _get().bySession[sessionId];
           const pane = ws?.root ? findPane(ws.root, paneId) : null;
           if (!pane) return { ok: false, conflictPaneId: '' };
-          if (isPinnedPane(pane) || toolId === CHAT_TOOL_ID) return { ok: false, conflictPaneId: paneId };
+          if (isPinnedPane(pane) || toolId === CHAT_TOOL_ID)
+            return { ok: false, conflictPaneId: paneId };
           const singleton = !multiInstance;
           const conflict = findToolConflict(ws.root, toolId, instanceKey, singleton, paneId);
           if (conflict) return { ok: false, conflictPaneId: conflict };
@@ -291,7 +340,9 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
 
         setRatio: (sessionId, groupId, ratio) =>
           update(sessionId, ws =>
-            ws.root && Number.isFinite(ratio) ? { ...ws, root: setRatioAt(ws.root, groupId, ratio) } : ws
+            ws.root && Number.isFinite(ratio)
+              ? { ...ws, root: setRatioAt(ws.root, groupId, ratio) }
+              : ws
           ),
 
         focusPane: (sessionId, paneId) =>
@@ -375,7 +426,8 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
             const fromPane = findPane(ws.root, fromPaneId);
             const toPane = findPane(ws.root, toPaneId);
             if (!fromPane || !toPane) return ws;
-            if (isPinnedPane(fromPane) || isPinnedPane(toPane) || toolId === CHAT_TOOL_ID) return ws;
+            if (isPinnedPane(fromPane) || isPinnedPane(toPane) || toolId === CHAT_TOOL_ID)
+              return ws;
             const idx = fromPane.tools.findIndex(t => sameRef(t, toolId, instanceKey));
             if (idx < 0) return ws;
 
@@ -436,7 +488,8 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
           const ws = _get().bySession[sessionId];
           const fromPane = ws?.root ? findPane(ws.root, fromPaneId) : null;
           if (!fromPane) return { ok: false, conflictPaneId: '' };
-          if (isPinnedPane(fromPane) || toolId === CHAT_TOOL_ID) return { ok: false, conflictPaneId: fromPaneId };
+          if (isPinnedPane(fromPane) || toolId === CHAT_TOOL_ID)
+            return { ok: false, conflictPaneId: fromPaneId };
           const idx = fromPane.tools.findIndex(t => sameRef(t, toolId, instanceKey));
           if (idx < 0 || fromPane.tools.length <= 1) return { ok: false, conflictPaneId: '' };
           const ref = fromPane.tools[idx];
@@ -474,21 +527,33 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
           const ws = _get().bySession[sessionId];
           const from = ws?.root ? findPane(ws.root, fromPaneId) : null;
           const target = ws?.root ? findPane(ws.root, targetPaneId) : null;
-          if (!from || !target || !['left', 'right', 'top', 'bottom'].includes(edge) ||
-              isPinnedPane(from) || toolId === CHAT_TOOL_ID) {
+          if (
+            !from ||
+            !target ||
+            !['left', 'right', 'top', 'bottom'].includes(edge) ||
+            isPinnedPane(from) ||
+            toolId === CHAT_TOOL_ID
+          ) {
             return { ok: false, conflictPaneId: '' };
           }
           const index = from.tools.findIndex(t => sameRef(t, toolId, instanceKey));
           if (index < 0 || (fromPaneId === targetPaneId && from.tools.length === 1)) {
             return { ok: false, conflictPaneId: '' };
           }
-          const conflict = findToolConflict(ws.root, toolId, instanceKey,
-            !MULTI_INSTANCE_PANELS.has(toolId), fromPaneId);
+          const conflict = findToolConflict(
+            ws.root,
+            toolId,
+            instanceKey,
+            !MULTI_INSTANCE_PANELS.has(toolId),
+            fromPaneId
+          );
           if (conflict) return { ok: false, conflictPaneId: conflict };
           const ref = from.tools[index];
           // Moving the last tab moves its shell too; a partial tab split gets a new shell.
-          const inserted = from.tools.length === 1
-            ? from : { ...newPane(ref.toolId, ref.instanceKey), tools: [ref] };
+          const inserted =
+            from.tools.length === 1
+              ? from
+              : { ...newPane(ref.toolId, ref.instanceKey), tools: [ref] };
           update(sessionId, current => {
             if (!current.root) return current;
             const remaining = paneWithoutTab(from, index);
@@ -499,8 +564,10 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
             const destination = findPane(root, targetPaneId);
             if (!destination) return current;
             return {
-              ...current, root: replaceChild(root, targetPaneId, insertAtEdge(destination, inserted, edge)),
-              focusedPaneId: inserted.id, maximizedPaneId: null,
+              ...current,
+              root: replaceChild(root, targetPaneId, insertAtEdge(destination, inserted, edge)),
+              focusedPaneId: inserted.id,
+              maximizedPaneId: null,
             };
           });
           return { ok: true, newPaneId: inserted.id };
@@ -509,9 +576,15 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
         moveChatPane: (sessionId, edge, targetPaneId) => {
           const ws = _get().bySession[sessionId];
           const chat = flattenPanes(ws?.root ?? null).find(p =>
-            p.tools.some(t => sameRef(t, CHAT_TOOL_ID, sessionId)));
-          if (!ws?.root || !chat || !['left', 'right', 'top', 'bottom'].includes(edge) ||
-              targetPaneId === chat.id || (targetPaneId && !findPane(ws.root, targetPaneId))) {
+            p.tools.some(t => sameRef(t, CHAT_TOOL_ID, sessionId))
+          );
+          if (
+            !ws?.root ||
+            !chat ||
+            !['left', 'right', 'top', 'bottom'].includes(edge) ||
+            targetPaneId === chat.id ||
+            (targetPaneId && !findPane(ws.root, targetPaneId))
+          ) {
             return { ok: false, conflictPaneId: '' };
           }
           const rest = removePane(ws.root, chat.id);
@@ -523,21 +596,30 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
             root: targetPaneId
               ? replaceChild(rest, targetPaneId, insertAtEdge(target, chat, edge))
               : insertAtEdge(rest, chat, edge),
-            focusedPaneId: chat.id, maximizedPaneId: null,
+            focusedPaneId: chat.id,
+            maximizedPaneId: null,
           }));
           return { ok: true, newPaneId: chat.id };
         },
 
-        setMaximizedPane: (sessionId, paneId) => update(sessionId, ws => {
-          if (paneId !== null && !findPane(ws.root, paneId)) return ws;
-          if (ws.maximizedPaneId === paneId) return ws;
-          return { ...ws, maximizedPaneId: paneId, ...(paneId ? { focusedPaneId: paneId } : {}) };
-        }),
+        setMaximizedPane: (sessionId, paneId) =>
+          update(sessionId, ws => {
+            if (paneId !== null && !findPane(ws.root, paneId)) return ws;
+            if (ws.maximizedPaneId === paneId) return ws;
+            return { ...ws, maximizedPaneId: paneId, ...(paneId ? { focusedPaneId: paneId } : {}) };
+          }),
 
-        resetSession: sessionId => update(sessionId, ws => {
-          const root = pruneTools(ws.root);
-          return { ...ws, root, primaryPaneId: null, focusedPaneId: pickFirstPane(root), maximizedPaneId: null };
-        }),
+        resetSession: sessionId =>
+          update(sessionId, ws => {
+            const root = pruneTools(ws.root);
+            return {
+              ...ws,
+              root,
+              primaryPaneId: null,
+              focusedPaneId: pickFirstPane(root),
+              maximizedPaneId: null,
+            };
+          }),
 
         removeSession: sessionId =>
           set(s => {
@@ -549,7 +631,10 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
       };
     },
     {
-      name: workspaceStorageKey('claudia-right-workspace', typeof window === 'undefined' ? '' : window.location.search),
+      name: workspaceStorageKey(
+        'claudia-right-workspace',
+        typeof window === 'undefined' ? '' : window.location.search
+      ),
       version: 3,
       storage: createJSONStorage(() => recoverableJsonStorage(localStorage)),
       partialize: s => ({ bySession: s.bySession, order: s.order }),

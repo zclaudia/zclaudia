@@ -35,9 +35,9 @@ export function resolveGatewayBackendUrl(backendId: string): string | null {
   // Mobile fallback: direct connection to gateway
   const { gatewayUrl } = useGatewayStore.getState();
   if (!gatewayUrl) return null;
-  const gwAddr = normalizeGatewayUrl(gatewayUrl.includes('://')
-    ? gatewayUrl.replace(/^ws/, 'http')
-    : `http://${gatewayUrl}`);
+  const gwAddr = normalizeGatewayUrl(
+    gatewayUrl.includes('://') ? gatewayUrl.replace(/^ws/, 'http') : `http://${gatewayUrl}`
+  );
   return `${gwAddr}/api/proxy/${backendId}`;
 }
 
@@ -64,9 +64,9 @@ export function resolveGatewayDirectUrl(path: string): string | null {
   // Mobile fallback: direct connection to gateway
   const { gatewayUrl } = useGatewayStore.getState();
   if (!gatewayUrl) return null;
-  const gwAddr = normalizeGatewayUrl(gatewayUrl.includes('://')
-    ? gatewayUrl.replace(/^ws/, 'http')
-    : `http://${gatewayUrl}`);
+  const gwAddr = normalizeGatewayUrl(
+    gatewayUrl.includes('://') ? gatewayUrl.replace(/^ws/, 'http') : `http://${gatewayUrl}`
+  );
   return `${gwAddr}${path}`;
 }
 

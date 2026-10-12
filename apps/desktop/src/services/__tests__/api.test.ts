@@ -506,10 +506,26 @@ describe('api', () => {
 
   describe('LlmProfiles API', () => {
     it.each([
-      ['profile commands', () => getProviderCommands('same-profile', '/repo', undefined, 'gw:owner-A'), '/api/providers/same-profile/commands?projectRoot=%2Frepo'],
-      ['runtime commands', () => getProviderTypeCommands('claude', '/repo', undefined, 'gw:owner-A'), '/api/providers/type/claude/commands?projectRoot=%2Frepo'],
-      ['profile capabilities', () => getProviderCapabilities('same-profile', undefined, 'gw:owner-A'), '/api/providers/same-profile/capabilities'],
-      ['runtime capabilities', () => getProviderTypeCapabilities('claude', undefined, 'gw:owner-A'), '/api/providers/type/claude/capabilities'],
+      [
+        'profile commands',
+        () => getProviderCommands('same-profile', '/repo', undefined, 'gw:owner-A'),
+        '/api/providers/same-profile/commands?projectRoot=%2Frepo',
+      ],
+      [
+        'runtime commands',
+        () => getProviderTypeCommands('claude', '/repo', undefined, 'gw:owner-A'),
+        '/api/providers/type/claude/commands?projectRoot=%2Frepo',
+      ],
+      [
+        'profile capabilities',
+        () => getProviderCapabilities('same-profile', undefined, 'gw:owner-A'),
+        '/api/providers/same-profile/capabilities',
+      ],
+      [
+        'runtime capabilities',
+        () => getProviderTypeCapabilities('claude', undefined, 'gw:owner-A'),
+        '/api/providers/type/claude/capabilities',
+      ],
     ] as const)('pins %s to the supplied backend', async (_label, request, path) => {
       mockControlPlaneMode = 'gateway-direct';
       mockResponse([]);

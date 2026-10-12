@@ -3,9 +3,12 @@ import { usePluginStore } from '../../stores/pluginStore';
 import { initBuiltinPanels } from '../builtinPanels';
 import type { UIExtension } from '../../stores/pluginStore';
 
-const { terminal } = vi.hoisted(() => ({ terminal: {
-  drawerOpen: {} as Record<string, boolean>, setDrawerOpen: vi.fn(),
-} }));
+const { terminal } = vi.hoisted(() => ({
+  terminal: {
+    drawerOpen: {} as Record<string, boolean>,
+    setDrawerOpen: vi.fn(),
+  },
+}));
 
 // Mock heavy component imports to prevent hangs in test environment
 vi.mock('../../components/terminal/TerminalPanel', () => ({
@@ -62,15 +65,37 @@ describe('initBuiltinPanels', () => {
 
   it('closes only the supplied terminal scope while retaining legacy close-all', () => {
     const panels: UIExtension[] = [];
-    usePluginStore.setState({ registerPanel: panel => { panels.push(panel); } });
+    usePluginStore.setState({
+      registerPanel: panel => {
+        panels.push(panel);
+      },
+    });
     initBuiltinPanels();
-    terminal.drawerOpen = { 'backend-A::project': true, 'backend-B::project': true, 'no-backend::offline-project': true };
+    terminal.drawerOpen = {
+      'backend-A::project': true,
+      'backend-B::project': true,
+      'no-backend::offline-project': true,
+    };
     const onClose = panels.find(panel => panel.id === 'terminal')!.onClose!;
-    onClose({ sessionId: 'chat-A', projectId: 'project', backendId: 'backend-A', instanceKey: 'backend-A::project' });
+    onClose({
+      sessionId: 'chat-A',
+      projectId: 'project',
+      backendId: 'backend-A',
+      instanceKey: 'backend-A::project',
+    });
     expect(terminal.setDrawerOpen).toHaveBeenCalledExactlyOnceWith('project', false, 'backend-A');
     terminal.setDrawerOpen.mockClear();
-    onClose({ sessionId: 'offline-chat', projectId: 'offline-project', backendId: null, instanceKey: 'no-backend::offline-project' });
-    expect(terminal.setDrawerOpen).toHaveBeenCalledExactlyOnceWith('offline-project', false, 'no-backend');
+    onClose({
+      sessionId: 'offline-chat',
+      projectId: 'offline-project',
+      backendId: null,
+      instanceKey: 'no-backend::offline-project',
+    });
+    expect(terminal.setDrawerOpen).toHaveBeenCalledExactlyOnceWith(
+      'offline-project',
+      false,
+      'no-backend'
+    );
     terminal.setDrawerOpen.mockClear();
     onClose({ sessionId: 'unknown-chat' });
     expect(terminal.setDrawerOpen).not.toHaveBeenCalled();

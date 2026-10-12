@@ -114,16 +114,28 @@ export function SessionChatLayout({
   if (!isMobile) {
     return (
       <div className="flex flex-row h-full min-w-0 bg-background">
-        <SessionWorkspaceView sessionId={sessionId} workspaceScope={workspaceScope} syncSelection={syncSelection} projectId={projectId} projectRoot={projectRoot}
-          workingDirectory={workingDirectory} branchName={branchName}
-          onReturnToDashboard={onReturnToDashboard} onOpenSidebar={onOpenSidebar} />
+        <SessionWorkspaceView
+          sessionId={sessionId}
+          workspaceScope={workspaceScope}
+          syncSelection={syncSelection}
+          projectId={projectId}
+          projectRoot={projectRoot}
+          workingDirectory={workingDirectory}
+          branchName={branchName}
+          onReturnToDashboard={onReturnToDashboard}
+          onOpenSidebar={onOpenSidebar}
+        />
       </div>
     );
   }
   return (
     <div className="flex flex-row h-full min-w-0 bg-background">
-      <ChatInterface sessionId={sessionId} onReturnToDashboard={onReturnToDashboard}
-        onOpenSidebar={onOpenSidebar} beforeComposer={bottomPanel} />
+      <ChatInterface
+        sessionId={sessionId}
+        onReturnToDashboard={onReturnToDashboard}
+        onOpenSidebar={onOpenSidebar}
+        beforeComposer={bottomPanel}
+      />
     </div>
   );
 }

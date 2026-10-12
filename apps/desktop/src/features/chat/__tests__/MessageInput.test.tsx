@@ -15,8 +15,13 @@ const sessionAgent = vi.hoisted(() => ({
   refresh: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../../hooks/useAgentForSession', () => ({
-  useAgentForSession: () => ({ agent: sessionAgent.current, llm: undefined, loading: false,
-    backendId: sessionAgent.backendId, refresh: sessionAgent.refresh }),
+  useAgentForSession: () => ({
+    agent: sessionAgent.current,
+    llm: undefined,
+    loading: false,
+    backendId: sessionAgent.backendId,
+    refresh: sessionAgent.refresh,
+  }),
 }));
 
 vi.mock('../../../hooks/useMediaQuery', () => ({
@@ -37,11 +42,12 @@ vi.mock('../../../stores/composerStore', () => ({
 }));
 
 // Mock api
-const { mockGetWorkspaceSkillsResult, mockUpdateAgentProfileForBackend, mockUpdateAgentProfile } = vi.hoisted(() => ({
-  mockGetWorkspaceSkillsResult: vi.fn(),
-  mockUpdateAgentProfileForBackend: vi.fn(),
-  mockUpdateAgentProfile: vi.fn(),
-}));
+const { mockGetWorkspaceSkillsResult, mockUpdateAgentProfileForBackend, mockUpdateAgentProfile } =
+  vi.hoisted(() => ({
+    mockGetWorkspaceSkillsResult: vi.fn(),
+    mockUpdateAgentProfileForBackend: vi.fn(),
+    mockUpdateAgentProfile: vi.fn(),
+  }));
 vi.mock('../../../services/api', () => ({
   listDirectory: vi.fn().mockResolvedValue({ entries: [] }),
   getWorkspaceSkillsResult: mockGetWorkspaceSkillsResult,
@@ -93,9 +99,12 @@ describe('MessageInput', () => {
 
   it('keeps an in-flight pin update and refresh bound to its original chat owner', async () => {
     let finishUpdate!: () => void;
-    mockUpdateAgentProfileForBackend.mockImplementationOnce(() => new Promise<void>(resolve => {
-      finishUpdate = resolve;
-    }));
+    mockUpdateAgentProfileForBackend.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          finishUpdate = resolve;
+        })
+    );
     sessionAgent.backendId = 'owner-A';
     sessionAgent.current.skillSelection = { pinned: [{ source: 'workspace', id: 'review' }] };
     const refreshOwnerA = sessionAgent.refresh;

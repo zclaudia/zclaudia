@@ -56,14 +56,22 @@ describe('DraftActions', () => {
   });
 
   it('does not expose actions for a different singleton draft during a binding switch', () => {
-    render(<WorkspaceToolContext.Provider value={{ sessionId: 'other-chat' }}><DraftActions /></WorkspaceToolContext.Provider>);
+    render(
+      <WorkspaceToolContext.Provider value={{ sessionId: 'other-chat' }}>
+        <DraftActions />
+      </WorkspaceToolContext.Provider>
+    );
     expect(screen.queryByLabelText('Send to chat')).toBeNull();
     expect(screen.queryByLabelText('Discard draft')).toBeNull();
     expect(screen.queryByLabelText('Open draft in new window')).toBeNull();
   });
 
   it('does not expose the global draft actions for an empty workspace binding', () => {
-    render(<WorkspaceToolContext.Provider value={{ sessionId: '' }}><DraftActions /></WorkspaceToolContext.Provider>);
+    render(
+      <WorkspaceToolContext.Provider value={{ sessionId: '' }}>
+        <DraftActions />
+      </WorkspaceToolContext.Provider>
+    );
     expect(screen.queryByLabelText('Send to chat')).toBeNull();
     expect(screen.queryByLabelText('Discard draft')).toBeNull();
     expect(screen.queryByLabelText('Open draft in new window')).toBeNull();
@@ -101,7 +109,11 @@ describe('DraftActions', () => {
 
   it('does not mark a newly bound draft popped out after old window creation resolves', async () => {
     let resolve!: (label: string) => void;
-    openDraftInNewWindow.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    openDraftInNewWindow.mockReturnValueOnce(
+      new Promise(done => {
+        resolve = done;
+      })
+    );
     render(<DraftActions />);
     fireEvent.click(screen.getByLabelText('Open draft in new window'));
     state = { ...state, activeSessionId: 'other-chat' };

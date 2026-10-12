@@ -1,5 +1,10 @@
 import { create } from 'zustand';
-import { findPane, sameRef, type LayoutNode, type WorkspaceEdge } from '../../stores/rightWorkspaceStore';
+import {
+  findPane,
+  sameRef,
+  type LayoutNode,
+  type WorkspaceEdge,
+} from '../../stores/rightWorkspaceStore';
 import { MULTI_INSTANCE_PANELS } from '../../stores/panelInstance';
 
 /** A drop zone within a pane. `center` = replace; edges = split in that direction. */
@@ -23,11 +28,22 @@ export interface Rect {
 }
 
 /** Only the viewport's outer gutter is a root target; pane edges remain independent. */
-export function resolveRootDrop(rect: Rect, pointerX: number, pointerY: number, gutter = 8): WorkspaceEdge | null {
+export function resolveRootDrop(
+  rect: Rect,
+  pointerX: number,
+  pointerY: number,
+  gutter = 8
+): WorkspaceEdge | null {
   const x = pointerX - rect.left;
   const y = pointerY - rect.top;
-  if (rect.width <= 0 || rect.height <= 0 || x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
-  const edges: Array<[WorkspaceEdge, number]> = [['left', x], ['right', rect.width - x], ['top', y], ['bottom', rect.height - y]];
+  if (rect.width <= 0 || rect.height <= 0 || x < 0 || y < 0 || x > rect.width || y > rect.height)
+    return null;
+  const edges: Array<[WorkspaceEdge, number]> = [
+    ['left', x],
+    ['right', rect.width - x],
+    ['top', y],
+    ['bottom', rect.height - y],
+  ];
   edges.sort((a, b) => a[1] - b[1]);
   return edges[0][1] <= gutter ? edges[0][0] : null;
 }
@@ -101,9 +117,13 @@ export function canDrop(
   }
 
   const source = payload.sourcePaneId ? findPane(root, payload.sourcePaneId) : null;
-  const sourceIndex = payload.sourceIndex ?? source?.tools.findIndex(ref =>
-    sameRef(ref, payload.toolId, payload.instanceKey));
-  const moving = source && sourceIndex !== undefined && sourceIndex >= 0 &&
+  const sourceIndex =
+    payload.sourceIndex ??
+    source?.tools.findIndex(ref => sameRef(ref, payload.toolId, payload.instanceKey));
+  const moving =
+    source &&
+    sourceIndex !== undefined &&
+    sourceIndex >= 0 &&
     sameRef(source.tools[sourceIndex] ?? { toolId: '' }, payload.toolId, payload.instanceKey);
   // Never turn an obsolete source/index into an unintended new tool instance.
   if (payload.sourcePaneId && !moving) return { allowed: false, conflictPaneId: null };
@@ -206,7 +226,10 @@ export const useDragSplitStore = create<DragState>()((set, get) => ({
   isClick: (x, y) => {
     const origin = get().origin;
     if (!origin) return false;
-    return Math.abs(x - origin.x) < DRAG_CLICK_THRESHOLD_PX && Math.abs(y - origin.y) < DRAG_CLICK_THRESHOLD_PX;
+    return (
+      Math.abs(x - origin.x) < DRAG_CLICK_THRESHOLD_PX &&
+      Math.abs(y - origin.y) < DRAG_CLICK_THRESHOLD_PX
+    );
   },
   setHover: (paneId, zone, disabled) => set({ hoverPaneId: paneId, hoverZone: zone, disabled }),
   setRootHover: hoverRootEdge => set({ hoverRootEdge }),

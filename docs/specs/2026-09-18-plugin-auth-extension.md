@@ -22,7 +22,7 @@ these same files unless the seam is inverted.
 
 ## Why not now
 
-`@zclaudia/plugin-sdk@0.4.0` has auth *probing* (`ManagedRuntimeAuthProbe`,
+`@zclaudia/plugin-sdk@0.4.0` has auth _probing_ (`ManagedRuntimeAuthProbe`,
 `ManagedRuntimeAuthState = authenticated | auth-required | unknown |
 probe-failed` — see `plugin-sdk/dist/managed-runtimes.d.ts`) but **no
 interactive login contribution**: a plugin cannot declare a login UI or an

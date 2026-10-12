@@ -27,16 +27,26 @@ const refs = (root: LayoutNode | null) => flattenPanes(root).flatMap(p => p.tool
 const keys = (root: LayoutNode | null) => refs(root).map(workspaceRefKey).sort();
 const placeholders = (root: LayoutNode | null): PlaceholderNode[] => {
   if (!root || root.kind === 'pane') return [];
-  return root.kind === 'placeholder' ? [root] : [...placeholders(root.children[0]), ...placeholders(root.children[1])];
+  return root.kind === 'placeholder'
+    ? [root]
+    : [...placeholders(root.children[0]), ...placeholders(root.children[1])];
 };
 const split = (a: LayoutNode, b: LayoutNode): LayoutNode => ({
-  id: `group-${a.id}-${b.id}`, kind: 'group', dir: 'row', ratio: 0.6, children: [a, b],
+  id: `group-${a.id}-${b.id}`,
+  kind: 'group',
+  dir: 'row',
+  ratio: 0.6,
+  children: [a, b],
 });
-function workspace(sessionIds = ['A', 'B', 'C'], tools: ToolRef[] = [
-  { toolId: 'terminal', instanceKey: 'be::project' },
-  { toolId: 'terminal', instanceKey: 'be::worktree' },
-  { toolId: 'file-viewer' }, { toolId: 'memory' },
-]): SessionWorkspace {
+function workspace(
+  sessionIds = ['A', 'B', 'C'],
+  tools: ToolRef[] = [
+    { toolId: 'terminal', instanceKey: 'be::project' },
+    { toolId: 'terminal', instanceKey: 'be::worktree' },
+    { toolId: 'file-viewer' },
+    { toolId: 'memory' },
+  ]
+): SessionWorkspace {
   const chatPanes = sessionIds.map(id => newPane(CHAT_TOOL_ID, id));
   let root: LayoutNode = chatPanes.reduce(split);
   let primaryPaneId: string | null = null;
@@ -56,28 +66,39 @@ beforeEach(() => {
 });
 
 describe('one-to-one preset mapping', () => {
-  it.each(BUILTIN_LAYOUT_PRESETS)('$name preserves all complete refs and is exactly idempotent', layout => {
-    const original = workspace();
-    const next = mapLayoutPreset(original, layout, 'C');
-    expect(isSafeTree(next.root)).toBe(true);
-    expect(keys(next.root)).toEqual(keys(original.root));
-    for (const ref of refs(original.root)) expect(refs(next.root).find(t => workspaceRefKey(t) === workspaceRefKey(ref))).toBe(ref);
-    expect(mapLayoutPreset(next, layout, 'C')).toBe(next);
-    const ids = flattenPanes(next.root).map(p => p.id);
-    expect(new Set(ids).size).toBe(ids.length);
-    // Mapping never changes or mutates the input pane/tool arrays.
-    expect(refs(original.root).map(t => t.instanceKey).filter(Boolean)).toEqual(['A', 'B', 'C', 'be::project', 'be::worktree']);
-  });
+  it.each(BUILTIN_LAYOUT_PRESETS)(
+    '$name preserves all complete refs and is exactly idempotent',
+    layout => {
+      const original = workspace();
+      const next = mapLayoutPreset(original, layout, 'C');
+      expect(isSafeTree(next.root)).toBe(true);
+      expect(keys(next.root)).toEqual(keys(original.root));
+      for (const ref of refs(original.root))
+        expect(refs(next.root).find(t => workspaceRefKey(t) === workspaceRefKey(ref))).toBe(ref);
+      expect(mapLayoutPreset(next, layout, 'C')).toBe(next);
+      const ids = flattenPanes(next.root).map(p => p.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      // Mapping never changes or mutates the input pane/tool arrays.
+      expect(
+        refs(original.root)
+          .map(t => t.instanceKey)
+          .filter(Boolean)
+      ).toEqual(['A', 'B', 'C', 'be::project', 'be::worktree']);
+    }
+  );
 
-  it.each(['compare', 'main-watcher'])('%s prioritizes focus and keeps extra chats as tabs in the first chat pane', id => {
-    const next = mapLayoutPreset(workspace(['A', 'B', 'C'], []), preset(id), 'C');
-    const chats = flattenPanes(next.root).filter(p => p.tools.some(isChatRef));
-    expect(chats).toHaveLength(2);
-    expect(chats[0].tools.map(t => t.instanceKey)).toEqual(['C', 'B']);
-    expect(chats[1].tools.map(t => t.instanceKey)).toEqual(['A']);
-    expect(chats[0].activeInstanceKey).toBe('C');
-    expect(next.focusedPaneId).toBe(chats[0].id);
-  });
+  it.each(['compare', 'main-watcher'])(
+    '%s prioritizes focus and keeps extra chats as tabs in the first chat pane',
+    id => {
+      const next = mapLayoutPreset(workspace(['A', 'B', 'C'], []), preset(id), 'C');
+      const chats = flattenPanes(next.root).filter(p => p.tools.some(isChatRef));
+      expect(chats).toHaveLength(2);
+      expect(chats[0].tools.map(t => t.instanceKey)).toEqual(['C', 'B']);
+      expect(chats[1].tools.map(t => t.instanceKey)).toEqual(['A']);
+      expect(chats[0].activeInstanceKey).toBe('C');
+      expect(next.focusedPaneId).toBe(chats[0].id);
+    }
+  );
 
   it('merges three chats into session tabs without duplicating or changing session identities', () => {
     const next = mapLayoutPreset(workspace(['A', 'B', 'C'], []), preset('session-tabs'), 'B');
@@ -100,7 +121,11 @@ describe('one-to-one preset mapping', () => {
   it('represents empty tab slots independently while keeping filled chats in one tab pane', () => {
     const next = mapLayoutPreset(workspace(['A', 'B'], []), preset('session-tabs'), 'A');
     expect(flattenPanes(next.root)).toHaveLength(1);
-    expect(refs(next.root).filter(isChatRef).map(t => t.instanceKey)).toEqual(['A', 'B']);
+    expect(
+      refs(next.root)
+        .filter(isChatRef)
+        .map(t => t.instanceKey)
+    ).toEqual(['A', 'B']);
     expect(placeholders(next.root).filter(p => p.accepts === 'chat')).toHaveLength(1);
   });
 
@@ -115,18 +140,29 @@ describe('one-to-one preset mapping', () => {
   });
 
   it('does not copy a singleton into repeated template slots and retains multi-instance tool keys', () => {
-    const repeated: LayoutPreset = { id: 'repeat', name: 'Repeat', builtin: false, tree: {
-      kind: 'slots', slotId: 'tools', slots: [
-        { slotId: 'memory-1', kind: 'tool:memory' },
-        { slotId: 'memory-2', kind: 'tool:memory' },
-        { slotId: 'term-1', kind: 'tool:terminal' },
-        { slotId: 'term-2', kind: 'tool:terminal' },
-      ],
-    } };
+    const repeated: LayoutPreset = {
+      id: 'repeat',
+      name: 'Repeat',
+      builtin: false,
+      tree: {
+        kind: 'slots',
+        slotId: 'tools',
+        slots: [
+          { slotId: 'memory-1', kind: 'tool:memory' },
+          { slotId: 'memory-2', kind: 'tool:memory' },
+          { slotId: 'term-1', kind: 'tool:terminal' },
+          { slotId: 'term-2', kind: 'tool:terminal' },
+        ],
+      },
+    };
     const original = workspace(['A']);
     const next = mapLayoutPreset(original, repeated, 'A');
     expect(refs(next.root).filter(t => t.toolId === 'memory')).toHaveLength(1);
-    expect(refs(next.root).filter(t => t.toolId === 'terminal').map(t => t.instanceKey)).toEqual(['be::project', 'be::worktree']);
+    expect(
+      refs(next.root)
+        .filter(t => t.toolId === 'terminal')
+        .map(t => t.instanceKey)
+    ).toEqual(['be::project', 'be::worktree']);
     expect(placeholders(next.root).map(p => p.slotId)).toContain('memory-2');
     expect(keys(next.root)).toEqual(keys(original.root));
   });
@@ -136,12 +172,21 @@ describe('one-to-one preset mapping', () => {
     const tools = flattenPanes(original.root).find(p => !p.tools.some(isChatRef))!;
     tools.activeToolId = 'terminal';
     tools.activeInstanceKey = 'be::worktree';
-    const simple: LayoutPreset = { id: 'simple', name: 'Simple', builtin: false, tree: {
-      kind: 'group', slotId: 'root', dir: 'row', ratio: 0.5, children: [
-        { kind: 'slots', slotId: 'chat', slots: [{ slotId: 'chat-1', kind: 'chat' }] },
-        { kind: 'slots', slotId: 'tools', slots: [{ slotId: 'tool-1', kind: 'tool:*' }] },
-      ],
-    } };
+    const simple: LayoutPreset = {
+      id: 'simple',
+      name: 'Simple',
+      builtin: false,
+      tree: {
+        kind: 'group',
+        slotId: 'root',
+        dir: 'row',
+        ratio: 0.5,
+        children: [
+          { kind: 'slots', slotId: 'chat', slots: [{ slotId: 'chat-1', kind: 'chat' }] },
+          { kind: 'slots', slotId: 'tools', slots: [{ slotId: 'tool-1', kind: 'tool:*' }] },
+        ],
+      },
+    };
     const next = mapLayoutPreset(original, simple, 'A');
     const mappedTools = flattenPanes(next.root).find(p => !p.tools.some(isChatRef))!;
     expect(mappedTools.id).toBe(tools.id);
@@ -160,7 +205,10 @@ describe('one-to-one preset mapping', () => {
 
 describe('preset persistence and CRUD', () => {
   it('saves geometry and tab kinds without sessions, instance keys or bindings', () => {
-    const original = workspace(['private-session'], [{ toolId: 'terminal', instanceKey: 'private-backend::private-project' }]);
+    const original = workspace(
+      ['private-session'],
+      [{ toolId: 'terminal', instanceKey: 'private-backend::private-project' }]
+    );
     const template = presetTreeFromLayout(original.root!);
     expect(isSafePresetTree(template)).toBe(true);
     const result = useLayoutPresetStore.getState().createPreset('My layout', template);
@@ -174,12 +222,24 @@ describe('preset persistence and CRUD', () => {
 
   it('handles trimmed name conflicts and protects builtins', () => {
     const api = useLayoutPresetStore.getState();
-    expect(api.createPreset(' review ', preset('focus').tree)).toEqual({ ok: false, error: 'duplicate-name' });
-    expect(api.createPreset('   ', preset('focus').tree)).toEqual({ ok: false, error: 'empty-name' });
+    expect(api.createPreset(' review ', preset('focus').tree)).toEqual({
+      ok: false,
+      error: 'duplicate-name',
+    });
+    expect(api.createPreset('   ', preset('focus').tree)).toEqual({
+      ok: false,
+      error: 'empty-name',
+    });
     const saved = api.createPreset('Mine', preset('focus').tree);
     if (!saved.ok) throw new Error('Expected created preset');
-    expect(api.renamePreset(saved.preset.id, ' default ')).toEqual({ ok: false, error: 'duplicate-name' });
-    expect(api.renamePreset(saved.preset.id, ' Updated ')).toMatchObject({ ok: true, preset: { name: 'Updated' } });
+    expect(api.renamePreset(saved.preset.id, ' default ')).toEqual({
+      ok: false,
+      error: 'duplicate-name',
+    });
+    expect(api.renamePreset(saved.preset.id, ' Updated ')).toMatchObject({
+      ok: true,
+      preset: { name: 'Updated' },
+    });
     expect(api.renamePreset('focus', 'Else')).toEqual({ ok: false, error: 'builtin' });
     expect(api.deletePreset('default')).toEqual({ ok: false, error: 'builtin' });
     api.setProjectPreset('project', saved.preset.id);
@@ -188,11 +248,18 @@ describe('preset persistence and CRUD', () => {
   });
 
   it('rejects mixed pane slots and duplicate slot identities', () => {
-    const mixed: PresetNode = { kind: 'slots', slotId: 'mixed', slots: [
-      { slotId: 'chat', kind: 'chat' }, { slotId: 'tool', kind: 'tool:terminal' },
-    ] };
+    const mixed: PresetNode = {
+      kind: 'slots',
+      slotId: 'mixed',
+      slots: [
+        { slotId: 'chat', kind: 'chat' },
+        { slotId: 'tool', kind: 'tool:terminal' },
+      ],
+    };
     expect(isSafePresetTree(mixed)).toBe(false);
-    expect(isSafePresetTree({ kind: 'slots', slotId: 'pane', slots: [{ slotId: 'pane', kind: 'chat' }] })).toBe(false);
+    expect(
+      isSafePresetTree({ kind: 'slots', slotId: 'pane', slots: [{ slotId: 'pane', kind: 'chat' }] })
+    ).toBe(false);
   });
 
   it('rehydrates custom presets and remembered project selection without duplicating builtins', async () => {
@@ -211,7 +278,10 @@ describe('preset persistence and CRUD', () => {
 
   it('hydrates v2 to v3 preserving complete references and persists/reloads placeholder trees', async () => {
     const original = workspace(['A']);
-    localStorage.setItem('claudia-right-workspace', JSON.stringify({ version: 2, state: { bySession: { A: original }, order: ['A'] } }));
+    localStorage.setItem(
+      'claudia-right-workspace',
+      JSON.stringify({ version: 2, state: { bySession: { A: original }, order: ['A'] } })
+    );
     await useRightWorkspaceStore.persist.rehydrate();
     expect(useRightWorkspaceStore.getState().bySession.A).toEqual(original);
     expect(JSON.parse(localStorage.getItem('claudia-right-workspace')!).version).toBe(3);

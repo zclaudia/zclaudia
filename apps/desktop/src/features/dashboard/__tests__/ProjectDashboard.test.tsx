@@ -39,7 +39,10 @@ vi.mock('../../chat/ChatInterface', () => ({
   ChatInterface: (props: any) => <div data-testid="chat-interface">{props.sessionId}</div>,
 }));
 vi.mock('../../chat/SessionWorkspaceView', () => ({
-  SessionWorkspaceView: (props: { sessionId: string; onReturnToDashboard?: (projectId: string) => void }) => (
+  SessionWorkspaceView: (props: {
+    sessionId: string;
+    onReturnToDashboard?: (projectId: string) => void;
+  }) => (
     <div data-testid="dashboard-unified-workspace" data-session-id={props.sessionId}>
       <button onClick={() => props.onReturnToDashboard?.('p1')}>Return from unified chat</button>
     </div>
@@ -159,16 +162,32 @@ describe('ProjectDashboard', () => {
   });
 
   it('hosts supervisor chat through the unified layout and preserves dashboard navigation', async () => {
-    useSupervisionStore.setState({ agents: { [projectId]: { phase: 'active', mainSessionId: 'supervisor-session' } } } as any);
-    useProjectStore.setState({ sessions: [{ id: 'supervisor-session', projectId, type: 'background' }] as any });
+    useSupervisionStore.setState({
+      agents: { [projectId]: { phase: 'active', mainSessionId: 'supervisor-session' } },
+    } as any);
+    useProjectStore.setState({
+      sessions: [{ id: 'supervisor-session', projectId, type: 'background' }] as any,
+    });
     const { container, getByText } = await renderDashboard();
-    await act(async () => { fireEvent.click(getByText('go-supervisor')); });
-    await act(async () => { fireEvent.click(getByText('Chat')); });
-    expect(container.querySelector('[data-testid="dashboard-unified-workspace"]')).toHaveAttribute('data-session-id', 'supervisor-session');
+    await act(async () => {
+      fireEvent.click(getByText('go-supervisor'));
+    });
+    await act(async () => {
+      fireEvent.click(getByText('Chat'));
+    });
+    expect(container.querySelector('[data-testid="dashboard-unified-workspace"]')).toHaveAttribute(
+      'data-session-id',
+      'supervisor-session'
+    );
     expect(container.querySelector('[data-testid="chat-interface"]')).toBeNull();
-    const back = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Dashboard') && button.querySelector('svg'));
+    const back = Array.from(container.querySelectorAll('button')).find(
+      button => button.textContent?.includes('Dashboard') && button.querySelector('svg')
+    );
     expect(back).toBeTruthy();
-    if (back) await act(async () => { fireEvent.click(back); });
+    if (back)
+      await act(async () => {
+        fireEvent.click(back);
+      });
     expect(container.querySelector('[data-testid="dashboard-home"]')).toBeTruthy();
   });
 

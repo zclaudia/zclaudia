@@ -56,7 +56,11 @@ describe('fileViewerStore', () => {
       expect(store.getCached('/project', 'same.ts', 'B')).toBe('Backend B');
       expect(store.getCached('/project', 'same.ts')).toBe('Legacy');
       store.openFile('/project', 'same.ts', undefined, undefined, 'B');
-      expect(useFileViewerStore.getState()).toMatchObject({ backendId: 'B', content: 'Backend B', knownMtimeMs: 2 });
+      expect(useFileViewerStore.getState()).toMatchObject({
+        backendId: 'B',
+        content: 'Backend B',
+        knownMtimeMs: 2,
+      });
       store.invalidate('/project', 'same.ts', 'A');
       expect(store.getCached('/project', 'same.ts', 'A')).toBeUndefined();
       expect(useFileViewerStore.getState().knownMtimeMs).toBe(2);
@@ -67,7 +71,14 @@ describe('fileViewerStore', () => {
       store.openFile('/project', 'same.ts', undefined, undefined, 'A');
       store.setContent('Backend A');
       store.openSearch('/project', 'B');
-      expect(useFileViewerStore.getState()).toMatchObject({ isOpen: true, searchOpen: true, backendId: 'B', projectRoot: '/project', filePath: null, content: null });
+      expect(useFileViewerStore.getState()).toMatchObject({
+        isOpen: true,
+        searchOpen: true,
+        backendId: 'B',
+        projectRoot: '/project',
+        filePath: null,
+        content: null,
+      });
     });
 
     it('opens the panel and sets file path and project root', () => {

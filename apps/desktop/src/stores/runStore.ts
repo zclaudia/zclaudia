@@ -301,7 +301,16 @@ export const useRunStore = create<RunState>((set, get) => ({
 
   // ── Tool call actions (per run) ────────────────────────────────
 
-  addToolCall: (runId, toolUseId, toolName, toolInput, semantic, effect, backgroundable, parentToolUseId) =>
+  addToolCall: (
+    runId,
+    toolUseId,
+    toolName,
+    toolInput,
+    semantic,
+    effect,
+    backgroundable,
+    parentToolUseId
+  ) =>
     set(state => {
       const meta =
         effect || backgroundable || parentToolUseId

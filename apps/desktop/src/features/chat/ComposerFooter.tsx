@@ -14,7 +14,9 @@ export function ComposerFooter({ left, right }: ComposerFooterProps) {
     >
       <div className="zc-composer-selectors flex min-w-0 items-center gap-1.5">{left}</div>
       <span className="zc-composer-spacer flex-1 min-w-[8px]" />
-      {right && <div className="zc-composer-usage flex flex-shrink-0 items-center gap-2">{right}</div>}
+      {right && (
+        <div className="zc-composer-usage flex flex-shrink-0 items-center gap-2">{right}</div>
+      )}
     </div>
   );
 }

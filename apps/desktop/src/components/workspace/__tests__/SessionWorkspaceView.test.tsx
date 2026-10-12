@@ -23,7 +23,10 @@ import {
   selectProjectChat,
 } from '../../../actions/projectWorkspaceActions';
 import { SessionWorkspaceView } from '../../../features/chat/SessionWorkspaceView';
-import { sessionWorkspaceId, useWorkspaceRoutingStore } from '../../../stores/workspaceRoutingStore';
+import {
+  sessionWorkspaceId,
+  useWorkspaceRoutingStore,
+} from '../../../stores/workspaceRoutingStore';
 import { openToolInWorkspace } from '../../../actions/workspaceActions';
 import { applyLayoutPreset } from '../../../actions/layoutPresetActions';
 import { useDragSplitStore } from '../dragSplit';
@@ -42,7 +45,13 @@ const metrics = vi.hoisted(() => ({
 // Keep the real ChatPane and FlatWorkspaceView. Replace the network/large chat
 // surface with independently stateful endpoints, so the test measures host identity.
 vi.mock('../../../features/chat/ChatInterface', () => ({
-  ChatInterface: memo(function TestChat({ sessionId, surface }: { sessionId: string; surface: string }) {
+  ChatInterface: memo(function TestChat({
+    sessionId,
+    surface,
+  }: {
+    sessionId: string;
+    surface: string;
+  }) {
     const [draft, setDraft] = useState('');
     const [token, setToken] = useState('');
     useEffect(() => {
@@ -53,12 +62,20 @@ vi.mock('../../../features/chat/ChatInterface', () => ({
     });
     useEffect(() => {
       metrics.mounts[sessionId] = (metrics.mounts[sessionId] ?? 0) + 1;
-      return () => { metrics.unmounts[sessionId] = (metrics.unmounts[sessionId] ?? 0) + 1; };
+      return () => {
+        metrics.unmounts[sessionId] = (metrics.unmounts[sessionId] ?? 0) + 1;
+      };
     }, [sessionId]);
-    return <div data-chat-surface={surface}>
-      <textarea aria-label={`Draft ${sessionId}`} value={draft} onChange={event => setDraft(event.target.value)} />
-      <output aria-label={`Stream ${sessionId}`}>{token}</output>
-    </div>;
+    return (
+      <div data-chat-surface={surface}>
+        <textarea
+          aria-label={`Draft ${sessionId}`}
+          value={draft}
+          onChange={event => setDraft(event.target.value)}
+        />
+        <output aria-label={`Stream ${sessionId}`}>{token}</output>
+      </div>
+    );
   }),
 }));
 vi.mock('../../../features/chat/hooks/useSessionRoute', () => ({
@@ -66,29 +83,57 @@ vi.mock('../../../features/chat/hooks/useSessionRoute', () => ({
     useEffect(() => {
       if (!options.maintainDesiredState) return;
       metrics.subscriptions[sessionId] = (metrics.subscriptions[sessionId] ?? 0) + 1;
-      return () => { metrics.releases[sessionId] = (metrics.releases[sessionId] ?? 0) + 1; };
+      return () => {
+        metrics.releases[sessionId] = (metrics.releases[sessionId] ?? 0) + 1;
+      };
     }, [sessionId, options.maintainDesiredState]);
   },
 }));
-vi.mock('../../../features/chat/hooks/useKeyboardShortcuts', () => ({ useKeyboardShortcuts: vi.fn() }));
-vi.mock('../../../hooks/useSelectionCoordinator', () => ({
-  useSelectionCoordinator: () => ({ selectSession: (sessionId: string) => useProjectStore.setState({ selectedSessionId: sessionId }) }),
+vi.mock('../../../features/chat/hooks/useKeyboardShortcuts', () => ({
+  useKeyboardShortcuts: vi.fn(),
 }));
-vi.mock('../../RightSidebarEmptyState', () => ({ RightSidebarEmptyState: () => <div>Tool launcher</div> }));
+vi.mock('../../../hooks/useSelectionCoordinator', () => ({
+  useSelectionCoordinator: () => ({
+    selectSession: (sessionId: string) =>
+      useProjectStore.setState({ selectedSessionId: sessionId }),
+  }),
+}));
+vi.mock('../../RightSidebarEmptyState', () => ({
+  RightSidebarEmptyState: () => <div>Tool launcher</div>,
+}));
 
 function ToolEditor({ projectRoot }: { projectRoot?: string }) {
   const [value, setValue] = useState('');
   useEffect(() => {
     metrics.toolMounts++;
-    return () => { metrics.toolUnmounts++; };
+    return () => {
+      metrics.toolUnmounts++;
+    };
   }, []);
-  return <label>Tool edit<input aria-label="Tool edit" value={value} onChange={event => setValue(event.target.value)} /><output aria-label="Tool root">{projectRoot}</output></label>;
+  return (
+    <label>
+      Tool edit
+      <input
+        aria-label="Tool edit"
+        value={value}
+        onChange={event => setValue(event.target.value)}
+      />
+      <output aria-label="Tool root">{projectRoot}</output>
+    </label>
+  );
 }
 
 const originalStorage = useRightWorkspaceStore.persist.getOptions().storage;
 
 beforeEach(async () => {
-  for (const map of [metrics.mounts, metrics.unmounts, metrics.renders, metrics.subscriptions, metrics.releases, metrics.emit]) {
+  for (const map of [
+    metrics.mounts,
+    metrics.unmounts,
+    metrics.renders,
+    metrics.subscriptions,
+    metrics.releases,
+    metrics.emit,
+  ]) {
     Object.keys(map).forEach(key => delete map[key]);
   }
   metrics.toolMounts = 0;
@@ -103,12 +148,28 @@ beforeEach(async () => {
   useSessionsStore.getState().clearAllSessions();
   useOwnershipStore.setState({ projectBackendIds: {}, sessionBackendIds: {} });
   useProjectStore.setState({
-    selectedProjectId: 'p', selectedSessionId: 'A',
-    projects: [{ id: 'p', name: 'Project', type: 'code', rootPath: '/project', createdAt: 1, updatedAt: 1 }],
-    sessions: ['A', 'B', 'C'].map(id => ({ id, projectId: 'p', name: id, type: 'regular', workingDirectory: `/worktree/${id}`, createdAt: 1, updatedAt: 1 })),
+    selectedProjectId: 'p',
+    selectedSessionId: 'A',
+    projects: [
+      { id: 'p', name: 'Project', type: 'code', rootPath: '/project', createdAt: 1, updatedAt: 1 },
+    ],
+    sessions: ['A', 'B', 'C'].map(id => ({
+      id,
+      projectId: 'p',
+      name: id,
+      type: 'regular',
+      workingDirectory: `/worktree/${id}`,
+      createdAt: 1,
+      updatedAt: 1,
+    })),
   });
-  usePluginStore.setState({ panels: [{ id: 'memory', pluginId: 'test', type: 'panel', label: 'Memory', component: ToolEditor }] });
-  for (const store of [useRightWorkspaceStore, useProjectWorkspaceStore, useRightSidebarStore]) await store.persist.rehydrate();
+  usePluginStore.setState({
+    panels: [
+      { id: 'memory', pluginId: 'test', type: 'panel', label: 'Memory', component: ToolEditor },
+    ],
+  });
+  for (const store of [useRightWorkspaceStore, useProjectWorkspaceStore, useRightSidebarStore])
+    await store.persist.rehydrate();
 });
 
 afterEach(() => {
@@ -116,9 +177,17 @@ afterEach(() => {
   useRightWorkspaceStore.persist.setOptions({ storage: originalStorage });
 });
 
-const view = (sessionId = 'A') => <SessionWorkspaceView sessionId={sessionId} projectId="p" projectRoot="/project" />;
-const root = () => useRightWorkspaceStore.getState().bySession[useProjectWorkspaceStore.getState().byProject.p.workspaceId];
-const chatPane = (id: string) => flattenPanes(root().root).find(p => p.tools.some(ref => ref.toolId === 'chat' && ref.instanceKey === id))!;
+const view = (sessionId = 'A') => (
+  <SessionWorkspaceView sessionId={sessionId} projectId="p" projectRoot="/project" />
+);
+const root = () =>
+  useRightWorkspaceStore.getState().bySession[
+    useProjectWorkspaceStore.getState().byProject.p.workspaceId
+  ];
+const chatPane = (id: string) =>
+  flattenPanes(root().root).find(p =>
+    p.tools.some(ref => ref.toolId === 'chat' && ref.instanceKey === id)
+  )!;
 
 describe('SessionWorkspaceView project integration', () => {
   it('preserves restored chats when a partial REST catalog temporarily omits a session', () => {
@@ -126,7 +195,9 @@ describe('SessionWorkspaceView project integration', () => {
     act(() => selectProjectChat('p', 'B', { beside: true }));
     const draft = screen.getByLabelText('Draft B');
     fireEvent.change(draft, { target: { value: 'persist B' } });
-    act(() => useProjectStore.setState(state => ({ sessions: state.sessions.filter(s => s.id === 'A') })));
+    act(() =>
+      useProjectStore.setState(state => ({ sessions: state.sessions.filter(s => s.id === 'A') }))
+    );
     expect(screen.getByLabelText('Draft B')).toBe(draft);
     expect(draft).toHaveValue('persist B');
     expect(metrics.unmounts.B).toBeUndefined();
@@ -138,15 +209,21 @@ describe('SessionWorkspaceView project integration', () => {
     act(() => {
       selectProjectChat('p', 'B', { beside: true });
       useRightWorkspaceStore.getState().openTool('A', 'memory');
-      const tool = flattenPanes(root().root).flatMap(p => p.tools).find(t => t.toolId === 'memory')!;
-      useProjectWorkspaceStore.getState().setToolBinding('p', tool, { mode: 'fixed', sessionId: 'B' });
+      const tool = flattenPanes(root().root)
+        .flatMap(p => p.tools)
+        .find(t => t.toolId === 'memory')!;
+      useProjectWorkspaceStore
+        .getState()
+        .setToolBinding('p', tool, { mode: 'fixed', sessionId: 'B' });
     });
     const edit = screen.getByLabelText('Tool edit');
     const a = useProjectStore.getState().sessions.find(s => s.id === 'A')!;
     act(() => useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }]));
     expect(screen.queryByLabelText('Draft B')).not.toBeInTheDocument();
     expect(metrics.releases.B).toBe(1);
-    expect(Object.values(useProjectWorkspaceStore.getState().byProject.p.toolBindings)).toEqual([{ mode: 'follow' }]);
+    expect(Object.values(useProjectWorkspaceStore.getState().byProject.p.toolBindings)).toEqual([
+      { mode: 'follow' },
+    ]);
     act(() => useSessionsStore.getState().setRemoteSessions('owner', []));
     expect(screen.queryByLabelText('Draft A')).not.toBeInTheDocument();
     expect(metrics.releases.A).toBe(1);
@@ -179,12 +256,23 @@ describe('SessionWorkspaceView project integration', () => {
     rerender(view('B'));
     const draft = screen.getByLabelText('Draft B');
     fireEvent.change(draft, { target: { value: 'new draft' } });
-    act(() => useSessionsStore.getState().handleSessionEvent('owner', 'created', { ...b, isActive: false }));
-    act(() => useSessionsStore.getState().handleSessionEvent('owner', 'updated', { ...b, isActive: false, name: 'live updated' }));
+    act(() =>
+      useSessionsStore.getState().handleSessionEvent('owner', 'created', { ...b, isActive: false })
+    );
+    act(() =>
+      useSessionsStore
+        .getState()
+        .handleSessionEvent('owner', 'updated', { ...b, isActive: false, name: 'live updated' })
+    );
     act(() => useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }]));
     expect(screen.getByLabelText('Draft B')).toBe(draft);
     expect(draft).toHaveValue('new draft');
-    act(() => useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }, { ...b, isActive: false }]));
+    act(() =>
+      useSessionsStore.getState().setRemoteSessions('owner', [
+        { ...a, isActive: false },
+        { ...b, isActive: false },
+      ])
+    );
     expect(screen.getByLabelText('Draft B')).toBe(draft);
     act(() => useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }]));
     expect(screen.queryByLabelText('Draft B')).not.toBeInTheDocument();
@@ -195,13 +283,23 @@ describe('SessionWorkspaceView project integration', () => {
     useOwnershipStore.getState().setProjectOwner('p', 'owner');
     const a = useProjectStore.getState().sessions.find(s => s.id === 'A')!;
     const b = useProjectStore.getState().sessions.find(s => s.id === 'B')!;
-    useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }, { ...b, isActive: false }]);
+    useSessionsStore.getState().setRemoteSessions('owner', [
+      { ...a, isActive: false },
+      { ...b, isActive: false },
+    ]);
     render(view());
     act(() => selectProjectChat('p', 'B', { beside: true }));
     const draftA = screen.getByLabelText('Draft A');
-    act(() => useSessionsStore.getState().handleSessionEvent('owner', 'deleted', { ...b, isActive: false }));
+    act(() =>
+      useSessionsStore.getState().handleSessionEvent('owner', 'deleted', { ...b, isActive: false })
+    );
     expect(screen.queryByLabelText('Draft B')).not.toBeInTheDocument();
-    act(() => useSessionsStore.getState().setRemoteSessions('owner', [{ ...a, isActive: false }, { ...b, isActive: false }]));
+    act(() =>
+      useSessionsStore.getState().setRemoteSessions('owner', [
+        { ...a, isActive: false },
+        { ...b, isActive: false },
+      ])
+    );
     expect(screen.queryByLabelText('Draft B')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Draft A')).toBe(draftA);
     expect(metrics.mounts.B).toBe(1);
@@ -228,7 +326,9 @@ describe('SessionWorkspaceView project integration', () => {
     useProjectStore.getState().addSession(b);
     render(view('B'));
     expect(screen.getByLabelText('Draft B')).toBeInTheDocument();
-    act(() => useSessionsStore.getState().handleSessionEvent('owner', 'deleted', { ...b, isActive: false }));
+    act(() =>
+      useSessionsStore.getState().handleSessionEvent('owner', 'deleted', { ...b, isActive: false })
+    );
     expect(useProjectStore.getState().sessions.some(s => s.id === 'B')).toBe(true);
     expect(screen.queryByLabelText('Draft B')).not.toBeInTheDocument();
     expect(metrics.releases.B).toBe(1);
@@ -252,10 +352,13 @@ describe('SessionWorkspaceView project integration', () => {
 
   it('adopts the most recent project layout and uses one anchor across session selection and remount', () => {
     const tool = newPane('memory');
-    useRightWorkspaceStore.setState({ bySession: {
-      A: { root: null, primaryPaneId: null, focusedPaneId: null },
-      B: { root: tool, primaryPaneId: tool.id, focusedPaneId: tool.id },
-    }, order: ['B', 'A'] });
+    useRightWorkspaceStore.setState({
+      bySession: {
+        A: { root: null, primaryPaneId: null, focusedPaneId: null },
+        B: { root: tool, primaryPaneId: tool.id, focusedPaneId: tool.id },
+      },
+      order: ['B', 'A'],
+    });
     const { rerender, unmount } = render(view());
     expect(useProjectWorkspaceStore.getState().byProject.p.workspaceId).toBe('B');
     expect(screen.getByLabelText('Draft A')).toBeVisible();
@@ -321,9 +424,19 @@ describe('SessionWorkspaceView project integration', () => {
   });
 
   it('commits a chat strip drop through the real pointer handler while preserving content hosts', () => {
-    useProjectStore.setState(state => ({ sessions: [...state.sessions, {
-      id: 'D', projectId: 'p', name: 'D', type: 'regular', createdAt: 1, updatedAt: 1,
-    }] }));
+    useProjectStore.setState(state => ({
+      sessions: [
+        ...state.sessions,
+        {
+          id: 'D',
+          projectId: 'p',
+          name: 'D',
+          type: 'regular',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    }));
     const { container } = render(view());
     act(() => {
       openSessionTab('p', 'B');
@@ -333,14 +446,31 @@ describe('SessionWorkspaceView project integration', () => {
     const b = screen.getByLabelText('Draft B');
     fireEvent.change(b, { target: { value: 'keep B' } });
     const target = chatPane('C');
-    const strip = container.querySelector(`[data-tab-strip][data-pane-id="${target.id}"]`) as HTMLElement;
-    const rect = (left: number, width: number) => ({ left, right: left + width, top: 20, bottom: 52,
-      width, height: 32, x: left, y: 20, toJSON: () => ({}) }) as DOMRect;
+    const strip = container.querySelector(
+      `[data-tab-strip][data-pane-id="${target.id}"]`
+    ) as HTMLElement;
+    const rect = (left: number, width: number) =>
+      ({
+        left,
+        right: left + width,
+        top: 20,
+        bottom: 52,
+        width,
+        height: 32,
+        x: left,
+        y: 20,
+        toJSON: () => ({}),
+      }) as DOMRect;
     strip.getBoundingClientRect = () => rect(300, 300);
     strip.querySelectorAll<HTMLElement>('[data-tab-index]').forEach((tab, i) => {
       tab.getBoundingClientRect = () => rect(300 + i * 100, 100);
     });
-    fireEvent.pointerDown(screen.getByRole('tab', { name: 'B' }), { pointerType: 'mouse', buttons: 1, clientX: 100, clientY: 30 });
+    fireEvent.pointerDown(screen.getByRole('tab', { name: 'B' }), {
+      pointerType: 'mouse',
+      buttons: 1,
+      clientX: 100,
+      clientY: 30,
+    });
     const wrapper = container.querySelector('[data-session-workspace]')!;
     fireEvent.pointerMove(wrapper, { pointerType: 'mouse', buttons: 1, clientX: 310, clientY: 30 });
     expect(useDragSplitStore.getState().hoverTabPaneId).toBe(target.id);
@@ -362,26 +492,56 @@ describe('SessionWorkspaceView project integration', () => {
     const wrapper = container.querySelector('[data-session-workspace]')!;
     const paneEl = container.querySelector(`[data-pane-id="${chatPane('A').id}"]`) as HTMLElement;
     paneEl.getBoundingClientRect = () =>
-      ({ left: 0, top: 0, right: 1000, bottom: 700, width: 1000, height: 700, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
-    const strip = container.querySelector(`[data-tab-strip][data-pane-id="${chatPane('A').id}"]`) as HTMLElement;
+      ({
+        left: 0,
+        top: 0,
+        right: 1000,
+        bottom: 700,
+        width: 1000,
+        height: 700,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    const strip = container.querySelector(
+      `[data-tab-strip][data-pane-id="${chatPane('A').id}"]`
+    ) as HTMLElement;
     strip.getBoundingClientRect = () =>
-      ({ left: 0, top: 0, right: 600, bottom: 32, width: 600, height: 32, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+      ({
+        left: 0,
+        top: 0,
+        right: 600,
+        bottom: 32,
+        width: 600,
+        height: 32,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
     const before = root().root;
     // Payload mirrors WorkspaceChatControls' drag handle: no sourceIndex, origin
     // at the press point. SessionHeader (which hosts the handle) is mocked out here.
-    act(() => useDragSplitStore.getState().startDrag(
-      { toolId: 'chat', instanceKey: 'A', sourcePaneId: chatPane('A').id, multiInstance: true },
-      { x: 30, y: 300 },
-    ));
+    act(() =>
+      useDragSplitStore
+        .getState()
+        .startDrag(
+          { toolId: 'chat', instanceKey: 'A', sourcePaneId: chatPane('A').id, multiInstance: true },
+          { x: 30, y: 300 }
+        )
+    );
     expect(useDragSplitStore.getState().active).not.toBeNull();
     fireEvent.pointerUp(wrapper, { pointerType: 'mouse', clientX: 30, clientY: 300 });
     expect(root().root).toBe(before);
     expect(useDragSplitStore.getState().active).toBeNull();
     // A real drag from the same handle still splits the active chat out.
-    act(() => useDragSplitStore.getState().startDrag(
-      { toolId: 'chat', instanceKey: 'A', sourcePaneId: chatPane('A').id, multiInstance: true },
-      { x: 30, y: 300 },
-    ));
+    act(() =>
+      useDragSplitStore
+        .getState()
+        .startDrag(
+          { toolId: 'chat', instanceKey: 'A', sourcePaneId: chatPane('A').id, multiInstance: true },
+          { x: 30, y: 300 }
+        )
+    );
     fireEvent.pointerUp(wrapper, { pointerType: 'mouse', clientX: 300, clientY: 300 });
     expect(root().root).not.toBe(before);
     expect(chatPane('A').tools.map(ref => ref.instanceKey)).toEqual(['A']);
@@ -392,15 +552,32 @@ describe('SessionWorkspaceView project integration', () => {
     const { container } = render(view());
     act(() => openSessionTab('p', 'B'));
     const wrapper = container.querySelector('[data-session-workspace]')!;
-    const strip = container.querySelector(`[data-tab-strip][data-pane-id="${chatPane('A').id}"]`) as HTMLElement;
+    const strip = container.querySelector(
+      `[data-tab-strip][data-pane-id="${chatPane('A').id}"]`
+    ) as HTMLElement;
     const rect = (left: number, width: number) =>
-      ({ left, right: left + width, top: 0, bottom: 32, width, height: 32, x: left, y: 0, toJSON: () => ({}) }) as DOMRect;
+      ({
+        left,
+        right: left + width,
+        top: 0,
+        bottom: 32,
+        width,
+        height: 32,
+        x: left,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
     strip.getBoundingClientRect = () => rect(0, 600);
     strip.querySelectorAll<HTMLElement>('[data-tab-index]').forEach((tab, i) => {
       tab.getBoundingClientRect = () => rect(i * 300, 300);
     });
     const before = root().root;
-    fireEvent.pointerDown(screen.getByRole('tab', { name: 'B' }), { pointerType: 'mouse', buttons: 1, clientX: 450, clientY: 16 });
+    fireEvent.pointerDown(screen.getByRole('tab', { name: 'B' }), {
+      pointerType: 'mouse',
+      buttons: 1,
+      clientX: 450,
+      clientY: 16,
+    });
     fireEvent.pointerUp(wrapper, { pointerType: 'mouse', clientX: 452, clientY: 17 });
     expect(root().root).toBe(before);
     expect(useDragSplitStore.getState().active).toBeNull();
@@ -412,7 +589,9 @@ describe('SessionWorkspaceView project integration', () => {
     const pane = flattenPanes(root().root).find(p => p.tools[0].toolId === 'memory')!;
     act(() => {
       useRightWorkspaceStore.getState().setMaximizedPane('A', pane.id);
-      useDragSplitStore.getState().startDrag({ toolId: 'memory', sourcePaneId: pane.id, sourceIndex: 0 });
+      useDragSplitStore
+        .getState()
+        .startDrag({ toolId: 'memory', sourcePaneId: pane.id, sourceIndex: 0 });
     });
     expect(screen.getByLabelText('Draft A').closest('[data-content-ref]')).not.toBeVisible();
     act(() => useRightSidebarStore.getState().setCollapsed(true));
@@ -423,12 +602,24 @@ describe('SessionWorkspaceView project integration', () => {
 
   it('moves a chat to the root gutter without nesting it at a pane edge', () => {
     const { container } = render(view());
-    act(() => { selectProjectChat('p', 'B', { beside: true }); selectProjectChat('p', 'C', { beside: true }); });
+    act(() => {
+      selectProjectChat('p', 'B', { beside: true });
+      selectProjectChat('p', 'C', { beside: true });
+    });
     const wrapper = container.querySelector<HTMLElement>('[data-session-workspace]')!;
-    wrapper.getBoundingClientRect = () => ({ left: 100, top: 100, width: 1000, height: 700, right: 1100, bottom: 800 }) as DOMRect;
+    wrapper.getBoundingClientRect = () =>
+      ({ left: 100, top: 100, width: 1000, height: 700, right: 1100, bottom: 800 }) as DOMRect;
     const source = chatPane('C');
     const c = screen.getByLabelText('Draft C');
-    act(() => useDragSplitStore.getState().startDrag({ toolId: 'chat', instanceKey: 'C', sourcePaneId: source.id, sourceIndex: 0, multiInstance: true }));
+    act(() =>
+      useDragSplitStore.getState().startDrag({
+        toolId: 'chat',
+        instanceKey: 'C',
+        sourcePaneId: source.id,
+        sourceIndex: 0,
+        multiInstance: true,
+      })
+    );
     fireEvent.pointerMove(wrapper, { clientX: 600, clientY: 103, buttons: 1 });
     expect(container.querySelector('[data-root-drop="top"]')).not.toBeNull();
     const changes = vi.fn();
@@ -441,7 +632,9 @@ describe('SessionWorkspaceView project integration', () => {
     if (tree.kind === 'group') {
       expect(tree.dir).toBe('col');
       expect(tree.children[0].id).toBe(source.id);
-      expect(flattenPanes(tree.children[1]).flatMap(p => p.tools.map(ref => ref.instanceKey))).toEqual(['A', 'B']);
+      expect(
+        flattenPanes(tree.children[1]).flatMap(p => p.tools.map(ref => ref.instanceKey))
+      ).toEqual(['A', 'B']);
     }
     expect(screen.getByLabelText('Draft C')).toBe(c);
     expect(metrics.subscriptions.C).toBe(1);
@@ -451,13 +644,25 @@ describe('SessionWorkspaceView project integration', () => {
   it('opens an unopened same-project catalog session at a root edge and rejects foreign sessions', () => {
     const { container } = render(view());
     const wrapper = container.querySelector<HTMLElement>('[data-session-workspace]')!;
-    wrapper.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1000, height: 700, right: 1000, bottom: 700 }) as DOMRect;
-    act(() => useDragSplitStore.getState().startDrag({ toolId: 'chat', instanceKey: 'B', projectId: 'p', multiInstance: true }));
+    wrapper.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 1000, height: 700, right: 1000, bottom: 700 }) as DOMRect;
+    act(() =>
+      useDragSplitStore
+        .getState()
+        .startDrag({ toolId: 'chat', instanceKey: 'B', projectId: 'p', multiInstance: true })
+    );
     fireEvent.pointerUp(wrapper, { clientX: 996, clientY: 300 });
     expect(screen.getByLabelText('Draft B')).toBeVisible();
     expect(useProjectStore.getState().selectedSessionId).toBe('B');
     const saved = root().root;
-    act(() => useDragSplitStore.getState().startDrag({ toolId: 'chat', instanceKey: 'foreign', projectId: 'another', multiInstance: true }));
+    act(() =>
+      useDragSplitStore.getState().startDrag({
+        toolId: 'chat',
+        instanceKey: 'foreign',
+        projectId: 'another',
+        multiInstance: true,
+      })
+    );
     fireEvent.pointerUp(wrapper, { clientX: 4, clientY: 300 });
     expect(root().root).toBe(saved);
     expect(useDragSplitStore.getState().active).toBeNull();
@@ -466,7 +671,13 @@ describe('SessionWorkspaceView project integration', () => {
   it('cancels an internal drag on pointer release outside the viewport and on pointercancel', () => {
     render(view());
     const source = chatPane('A');
-    const payload = { toolId: 'chat', instanceKey: 'A', sourcePaneId: source.id, sourceIndex: 0, multiInstance: true };
+    const payload = {
+      toolId: 'chat',
+      instanceKey: 'A',
+      sourcePaneId: source.id,
+      sourceIndex: 0,
+      multiInstance: true,
+    };
     const saved = root().root;
     act(() => useDragSplitStore.getState().startDrag(payload));
     fireEvent.pointerUp(document.body, { clientX: -10, clientY: -10 });
@@ -480,11 +691,20 @@ describe('SessionWorkspaceView project integration', () => {
   it('isolates a standalone session from a project anchor with the same real session id', () => {
     // Build a normal project layout before opening its A chat in a standalone surface.
     useRightWorkspaceStore.getState().ensureChatSession('A');
-    useProjectWorkspaceStore.setState({ byProject: { p: { workspaceId: 'A', focusedChatSessionId: 'A', toolBindings: {} } } });
+    useProjectWorkspaceStore.setState({
+      byProject: { p: { workspaceId: 'A', focusedChatSessionId: 'A', toolBindings: {} } },
+    });
     selectProjectChat('p', 'B', { beside: true });
     useProjectStore.setState({ selectedSessionId: 'B' });
     const mainTree = root().root;
-    const { unmount } = render(<SessionWorkspaceView sessionId="A" projectId="p" workspaceScope="session" syncSelection={false} />);
+    const { unmount } = render(
+      <SessionWorkspaceView
+        sessionId="A"
+        projectId="p"
+        workspaceScope="session"
+        syncSelection={false}
+      />
+    );
     expect(screen.getByLabelText('Draft A')).toBeVisible();
     expect(screen.queryByLabelText('Draft B')).toBeNull();
     const scopedId = sessionWorkspaceId('A');
@@ -492,8 +712,11 @@ describe('SessionWorkspaceView project integration', () => {
     expect(useProjectWorkspaceStore.getState().byProject.p.focusedChatSessionId).toBe('B');
     act(() => openToolInWorkspace('A', 'memory', { projectId: 'p' }));
     expect(screen.getByLabelText('Tool root')).toHaveTextContent('/worktree/A');
-    expect(flattenPanes(useRightWorkspaceStore.getState().bySession[scopedId].root)
-      .flatMap(pane => pane.tools.map(ref => ref.toolId)).sort()).toEqual(['chat', 'memory']);
+    expect(
+      flattenPanes(useRightWorkspaceStore.getState().bySession[scopedId].root)
+        .flatMap(pane => pane.tools.map(ref => ref.toolId))
+        .sort()
+    ).toEqual(['chat', 'memory']);
     fireEvent.pointerDown(screen.getByLabelText('Draft A'), { buttons: 1 });
     expect(useProjectStore.getState().selectedSessionId).toBe('B');
     expect(root().root).toBe(mainTree);
@@ -538,25 +761,43 @@ describe('SessionWorkspaceView project integration', () => {
 
   it('waits for real persist hydration before normalizing a restored tree', async () => {
     let finishStorage: (saved: string | null) => void = () => {};
-    const pending = new Promise<string | null>(resolve => { finishStorage = resolve; });
-    useRightWorkspaceStore.persist.setOptions({ storage: createJSONStorage<{ bySession: Record<string, SessionWorkspace>; order: string[] }>(() => ({
-      getItem: () => pending, setItem: () => {}, removeItem: () => {},
-    })) });
+    const pending = new Promise<string | null>(resolve => {
+      finishStorage = resolve;
+    });
+    useRightWorkspaceStore.persist.setOptions({
+      storage: createJSONStorage<{ bySession: Record<string, SessionWorkspace>; order: string[] }>(
+        () => ({
+          getItem: () => pending,
+          setItem: () => {},
+          removeItem: () => {},
+        })
+      ),
+    });
     let hydration: Promise<void> | void;
-    act(() => { hydration = useRightWorkspaceStore.persist.rehydrate(); });
+    act(() => {
+      hydration = useRightWorkspaceStore.persist.rehydrate();
+    });
     const tool = newPane('memory');
-    const saved = JSON.stringify({ version: 1, state: { bySession: {
-      A: { root: tool, primaryPaneId: tool.id, focusedPaneId: tool.id },
-    }, order: ['A'] } });
+    const saved = JSON.stringify({
+      version: 1,
+      state: {
+        bySession: {
+          A: { root: tool, primaryPaneId: tool.id, focusedPaneId: tool.id },
+        },
+        order: ['A'],
+      },
+    });
     const { container } = render(view());
     expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
     expect(screen.queryByLabelText('Draft A')).toBeNull();
     expect(useProjectWorkspaceStore.getState().byProject.p).toBeUndefined();
-    await act(async () => { finishStorage(saved); await hydration; });
+    await act(async () => {
+      finishStorage(saved);
+      await hydration;
+    });
     expect(screen.getByLabelText('Draft A')).toBeVisible();
     expect(screen.getByLabelText('Tool edit')).toBeVisible();
     expect(flattenPanes(root().root).find(p => p.id === tool.id)?.tools).toEqual(tool.tools);
     expect(metrics.subscriptions).toEqual({ A: 1 });
   });
-
 });

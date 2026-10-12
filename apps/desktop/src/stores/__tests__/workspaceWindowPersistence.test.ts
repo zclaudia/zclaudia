@@ -5,22 +5,38 @@ const originalLocation = window.location;
 
 beforeEach(() => localStorage.clear());
 afterEach(() => {
-  Object.defineProperty(window, 'location', { configurable: true, writable: true, value: originalLocation });
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    writable: true,
+    value: originalLocation,
+  });
   vi.resetModules();
 });
 
 function setSearch(search: string) {
-  Object.defineProperty(window, 'location', { configurable: true, writable: true, value: { ...originalLocation, search } });
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    writable: true,
+    value: { ...originalLocation, search },
+  });
 }
 
 function layout(sessionId: string) {
-  const root = { id: `pane-${sessionId}`, kind: 'pane', tools: [{ toolId: 'chat', instanceKey: sessionId }],
-    activeToolId: 'chat', activeInstanceKey: sessionId };
+  const root = {
+    id: `pane-${sessionId}`,
+    kind: 'pane',
+    tools: [{ toolId: 'chat', instanceKey: sessionId }],
+    activeToolId: 'chat',
+    activeInstanceKey: sessionId,
+  };
   return { root, primaryPaneId: null, focusedPaneId: root.id };
 }
 
 function savedLayouts(sessionId: string) {
-  return JSON.stringify({ version: 3, state: { bySession: { [sessionId]: layout(sessionId) }, order: [sessionId] } });
+  return JSON.stringify({
+    version: 3,
+    state: { bySession: { [sessionId]: layout(sessionId) }, order: [sessionId] },
+  });
 }
 
 describe('window layout persistence namespaces', () => {
@@ -29,7 +45,9 @@ describe('window layout persistence namespaces', () => {
     expect(workspaceStorageKey('layout', '?projectId=p')).toBe('layout');
     expect(workspaceStorageKey('layout', '?sessionWindow=A')).toBe('layout:session:A');
     expect(workspaceStorageKey('layout', '?projectDashboard=P')).toBe('layout:dashboard:P');
-    expect(workspaceStorageKey('layout', '?sessionWindow=a%3Ab%2Fc')).toBe('layout:session:a%3Ab%2Fc');
+    expect(workspaceStorageKey('layout', '?sessionWindow=a%3Ab%2Fc')).toBe(
+      'layout:session:a%3Ab%2Fc'
+    );
     expect(workspaceStorageKey('layout', '?projectDashboardWindow=P')).toBe('layout');
   });
 
@@ -41,7 +59,9 @@ describe('window layout persistence namespaces', () => {
     setSearch('?sessionWindow=A&projectId=p');
     vi.resetModules();
     const { useRightWorkspaceStore } = await import('../rightWorkspaceStore');
-    expect(useRightWorkspaceStore.persist.getOptions().name).toBe('claudia-right-workspace:session:A');
+    expect(useRightWorkspaceStore.persist.getOptions().name).toBe(
+      'claudia-right-workspace:session:A'
+    );
     expect(useRightWorkspaceStore.persist.hasHydrated()).toBe(true);
     expect(useRightWorkspaceStore.getState().bySession.A).toEqual(layout('A'));
     expect(useRightWorkspaceStore.getState().bySession.main).toBeUndefined();
@@ -53,12 +73,22 @@ describe('window layout persistence namespaces', () => {
   it('hydrates dashboard layout and project metadata independently from the main project anchor', async () => {
     const mainLayout = savedLayouts('main');
     const dashboardLayout = savedLayouts('dash');
-    const mainMetadata = JSON.stringify({ version: 1, state: { byProject: {
-      p: { workspaceId: 'main', focusedChatSessionId: 'main', toolBindings: {} },
-    } } });
-    const dashboardMetadata = JSON.stringify({ version: 1, state: { byProject: {
-      p: { workspaceId: 'dash', focusedChatSessionId: 'dash', toolBindings: {} },
-    } } });
+    const mainMetadata = JSON.stringify({
+      version: 1,
+      state: {
+        byProject: {
+          p: { workspaceId: 'main', focusedChatSessionId: 'main', toolBindings: {} },
+        },
+      },
+    });
+    const dashboardMetadata = JSON.stringify({
+      version: 1,
+      state: {
+        byProject: {
+          p: { workspaceId: 'dash', focusedChatSessionId: 'dash', toolBindings: {} },
+        },
+      },
+    });
     localStorage.setItem('claudia-right-workspace', mainLayout);
     localStorage.setItem('claudia-right-workspace:dashboard:p', dashboardLayout);
     localStorage.setItem('claudia-project-workspace', mainMetadata);
@@ -66,7 +96,8 @@ describe('window layout persistence namespaces', () => {
     setSearch('?projectDashboard=p');
     vi.resetModules();
     const [{ useRightWorkspaceStore }, { useProjectWorkspaceStore }] = await Promise.all([
-      import('../rightWorkspaceStore'), import('../projectWorkspaceStore'),
+      import('../rightWorkspaceStore'),
+      import('../projectWorkspaceStore'),
     ]);
     expect(useRightWorkspaceStore.getState().bySession.dash).toEqual(layout('dash'));
     expect(useProjectWorkspaceStore.getState().byProject.p.workspaceId).toBe('dash');
@@ -74,14 +105,27 @@ describe('window layout persistence namespaces', () => {
     useProjectWorkspaceStore.getState().setFocusedChat('p', 'another-chat');
     expect(localStorage.getItem('claudia-right-workspace')).toBe(mainLayout);
     expect(localStorage.getItem('claudia-project-workspace')).toBe(mainMetadata);
-    expect(useProjectWorkspaceStore.persist.getOptions().name).toBe('claudia-project-workspace:dashboard:p');
+    expect(useProjectWorkspaceStore.persist.getOptions().name).toBe(
+      'claudia-project-workspace:dashboard:p'
+    );
   });
 
   it('shares saved preset definitions while isolating selected layouts and preserving main legacy selections', async () => {
-    const tree = { kind: 'slots', slotId: 'saved-pane', slots: [{ slotId: 'saved-chat', kind: 'chat' }] };
-    localStorage.setItem('claudia-layout-presets', JSON.stringify({ version: 1, state: {
-      presets: [{ id: 'shared', name: 'Shared', builtin: false, tree }], selectedByProject: { p: 'shared' },
-    } }));
+    const tree = {
+      kind: 'slots',
+      slotId: 'saved-pane',
+      slots: [{ slotId: 'saved-chat', kind: 'chat' }],
+    };
+    localStorage.setItem(
+      'claudia-layout-presets',
+      JSON.stringify({
+        version: 1,
+        state: {
+          presets: [{ id: 'shared', name: 'Shared', builtin: false, tree }],
+          selectedByProject: { p: 'shared' },
+        },
+      })
+    );
     setSearch('');
     vi.resetModules();
     const main = (await import('../layoutPresetStore')).useLayoutPresetStore;
@@ -98,7 +142,10 @@ describe('window layout persistence namespaces', () => {
     dashboard.getState().setProjectPreset('p', 'focus');
     expect(localStorage.getItem('claudia-layout-presets')).toBe(library);
     expect(localStorage.getItem('claudia-layout-preset-selection')).toBe(mainSelection);
-    expect(JSON.parse(localStorage.getItem('claudia-layout-preset-selection:dashboard:p')!).state.selectedByProject).toEqual({ p: 'focus' });
+    expect(
+      JSON.parse(localStorage.getItem('claudia-layout-preset-selection:dashboard:p')!).state
+        .selectedByProject
+    ).toEqual({ p: 'focus' });
     expect(main.getState().selectedByProject.p).toBe('compare');
   });
 
@@ -118,27 +165,47 @@ describe('window layout persistence namespaces', () => {
     const sharedLibrary = localStorage.getItem('claudia-layout-presets');
     main.getState().setProjectPreset('p', 'default');
     expect(localStorage.getItem('claudia-layout-presets')).toBe(sharedLibrary);
-    expect(main.getState().createPreset(' second ', tree)).toEqual({ ok: false, error: 'duplicate-name' });
-    expect(main.getState().presets.filter(p => !p.builtin).map(p => p.name)).toEqual(['First', 'Second']);
+    expect(main.getState().createPreset(' second ', tree)).toEqual({
+      ok: false,
+      error: 'duplicate-name',
+    });
+    expect(
+      main
+        .getState()
+        .presets.filter(p => !p.builtin)
+        .map(p => p.name)
+    ).toEqual(['First', 'Second']);
     const third = main.getState().createPreset('Third', tree);
     expect(third.ok).toBe(true);
-    expect(JSON.parse(localStorage.getItem('claudia-layout-presets')!).state.presets.map((p: { name: string }) => p.name))
-      .toEqual(['First', 'Second', 'Third']);
+    expect(
+      JSON.parse(localStorage.getItem('claudia-layout-presets')!).state.presets.map(
+        (p: { name: string }) => p.name
+      )
+    ).toEqual(['First', 'Second', 'Third']);
     expect(localStorage.getItem('claudia-layout-preset-selection:session:A')).not.toBeNull();
   });
 
   it('migrates legacy main selections before a popup edits the globally shared preset library', async () => {
     const tree = { kind: 'slots', slotId: 'pane', slots: [{ slotId: 'chat', kind: 'chat' }] };
-    localStorage.setItem('claudia-layout-presets', JSON.stringify({ version: 1, state: {
-      presets: [{ id: 'saved', name: 'Saved', builtin: false, tree }], selectedByProject: { p: 'saved' },
-    } }));
+    localStorage.setItem(
+      'claudia-layout-presets',
+      JSON.stringify({
+        version: 1,
+        state: {
+          presets: [{ id: 'saved', name: 'Saved', builtin: false, tree }],
+          selectedByProject: { p: 'saved' },
+        },
+      })
+    );
     // No main-window write occurs before the popup opens and edits definitions.
     setSearch('?sessionWindow=A');
     vi.resetModules();
     const popup = (await import('../layoutPresetStore')).useLayoutPresetStore;
     expect(popup.getState().selectedByProject).toEqual({});
     expect(popup.getState().renamePreset('saved', 'Renamed').ok).toBe(true);
-    expect(JSON.parse(localStorage.getItem('claudia-layout-presets')!).state.selectedByProject).toBeUndefined();
+    expect(
+      JSON.parse(localStorage.getItem('claudia-layout-presets')!).state.selectedByProject
+    ).toBeUndefined();
     setSearch('');
     vi.resetModules();
     const main = (await import('../layoutPresetStore')).useLayoutPresetStore;

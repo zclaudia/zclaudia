@@ -73,13 +73,22 @@ describe('TerminalPanel', () => {
     const { useTerminalStore } = await import('../../../stores/terminalStore');
     const original = vi.mocked(useTerminalStore).getMockImplementation();
     vi.mocked(useTerminalStore).mockImplementation((selector?: (s: any) => any) => {
-      const state = { ctrlActive: {}, getTerminalId: (_projectId: string, backendId: string) => `terminal-${backendId}` };
+      const state = {
+        ctrlActive: {},
+        getTerminalId: (_projectId: string, backendId: string) => `terminal-${backendId}`,
+      };
       return selector ? selector(state) : state;
     });
-    render(<>
-      <WorkspaceToolContext.Provider value={{ sessionId: 'chat-1', backendId: 'backend-1' }}><TerminalPanel projectId="proj-1" /></WorkspaceToolContext.Provider>
-      <WorkspaceToolContext.Provider value={{ sessionId: 'chat-2', backendId: 'backend-2' }}><TerminalPanel projectId="proj-1" /></WorkspaceToolContext.Provider>
-    </>);
+    render(
+      <>
+        <WorkspaceToolContext.Provider value={{ sessionId: 'chat-1', backendId: 'backend-1' }}>
+          <TerminalPanel projectId="proj-1" />
+        </WorkspaceToolContext.Provider>
+        <WorkspaceToolContext.Provider value={{ sessionId: 'chat-2', backendId: 'backend-2' }}>
+          <TerminalPanel projectId="proj-1" />
+        </WorkspaceToolContext.Provider>
+      </>
+    );
     expect(screen.getByText('XTerminal: terminal-backend-1')).toBeInTheDocument();
     expect(screen.getByText('XTerminal: terminal-backend-2')).toBeInTheDocument();
     if (original) vi.mocked(useTerminalStore).mockImplementation(original);
