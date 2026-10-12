@@ -379,7 +379,10 @@ describe('Sidebar', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
     const outer = container.querySelector('[data-testid="sidebar-card"]')?.parentElement;
     expect(outer?.className).toContain('bg-background');
-    expect(outer?.className).toContain('p-1.5');
+    // No right padding: the workspace canvas's own 8px gutter is the only gap
+    // between the sidebar card and the chat card, matching the chat-to-tools gap.
+    expect(outer?.className).toContain('pl-1.5');
+    expect(outer?.className).not.toContain('pr-');
     expect(outer?.className).not.toContain('border-r');
   });
 

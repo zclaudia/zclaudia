@@ -630,12 +630,12 @@ export function Sidebar({
   return (
     <>
       <div
-        className="relative flex flex-shrink-0 flex-col bg-background p-1.5"
+        className="relative flex flex-shrink-0 flex-col bg-background py-1.5 pl-1.5"
         style={{ width: clampedSidebarWidth }}
       >
         {/* Resize handle on the right edge */}
         <div
-          className="absolute top-0 right-0 z-20 h-full w-1 cursor-ew-resize hover:bg-muted"
+          className="absolute top-0 -right-1 z-20 h-full w-1 cursor-ew-resize hover:bg-muted"
           onMouseDown={onResizeStart}
           onTouchStart={onResizeStart}
           onKeyDown={onResizeKeyDown}
