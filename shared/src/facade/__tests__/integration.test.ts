@@ -88,10 +88,10 @@ describe('Integration: full backend lifecycle', () => {
     snap = core.getSnapshot();
     const stream = Object.values(snap.sessionStreams).find(s => s.sessionId === 's1');
     expect(stream).toBeDefined();
-    expect(stream!.state).toBe('opening');
+    expect(stream!.state).toBe('open');
     commandLog.length = 0;
 
-    // 5. Content patch received → stream becomes open
+    // 5. Content patches update the stream after readiness has already opened it
     emit({
       type: 'content_patch_received',
       backendId: 'remote-1',
@@ -221,9 +221,9 @@ describe('Integration: backend disconnect and auto-resume', () => {
     b = snap.backends.find(b => b.backendId === 'b1')!;
     expect(b.runtimeState).toBe('ready');
 
-    // Stream should have been auto-resumed (opening state)
+    // Stream should have been auto-resumed as soon as backend data is ready
     stream = Object.values(snap.sessionStreams).find(s => s.sessionId === 's1');
-    expect(stream!.state).toBe('opening');
+    expect(stream!.state).toBe('open');
   });
 
   it('does not resume closed streams after reconnect', () => {

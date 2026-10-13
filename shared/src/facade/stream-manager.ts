@@ -70,7 +70,7 @@ export class FacadeStreamManager {
   requestOpen(
     backendId: string,
     sessionId: string,
-    _context: { backendReady: boolean; latestKnownOffset?: number }
+    context: { backendReady: boolean; latestKnownOffset?: number }
   ): StreamManagerResult {
     const key = streamKey(backendId, sessionId);
     const now = Date.now();
@@ -112,8 +112,10 @@ export class FacadeStreamManager {
     // If already open, idempotent
     if (runtime.state === 'open') return result;
 
-    // Transition to opening
-    runtime.state = 'opening';
+    // Once the backend is ready, the stream is locally active immediately.
+    // Waiting for a run/content event leaves idle sessions stuck in `opening`
+    // forever after reconnect, so consumers never issue their catch-up.
+    runtime.state = context.backendReady ? 'open' : 'opening';
     runtime.lastError = undefined;
     runtime.openedAt = now;
     runtime.updatedAt = now;
@@ -189,7 +191,9 @@ export class FacadeStreamManager {
         updatedAt: now,
       };
 
-      rt.state = 'opening';
+      // Backend readiness is the acknowledgement for this local-only stream
+      // subscription. Promote idle sessions too; they may have no run event.
+      rt.state = 'open';
       rt.lastError = undefined;
       rt.openedAt = now;
       rt.updatedAt = now;

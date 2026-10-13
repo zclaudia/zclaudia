@@ -21,7 +21,7 @@ describe('FacadeStreamManager', () => {
 
       const stream = mgr.getStream('b1', 's1');
       expect(stream).toBeDefined();
-      expect(stream!.state).toBe('opening');
+      expect(stream!.state).toBe('open');
     });
 
     it('creates desired state but no command when backend not ready', () => {
@@ -82,6 +82,8 @@ describe('FacadeStreamManager', () => {
       // No commands — stream open is local-only
       expect(result.commands).toHaveLength(0);
       expect(result.events).toHaveLength(2);
+      expect(mgr.getStream('b1', 's1')!.state).toBe('open');
+      expect(mgr.getStream('b1', 's2')!.state).toBe('open');
     });
 
     it('does not resume already open streams', () => {

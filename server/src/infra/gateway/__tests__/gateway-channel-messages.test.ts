@@ -26,14 +26,16 @@ describe('gateway-channel-messages', () => {
 
   function setup() {
     const onMessage = vi.fn();
+    const onOpened = vi.fn();
     const onClosed = vi.fn();
     const channels = new GatewayMessageChannels({
       resolveWsBase: () => `ws://127.0.0.1:${wsPort}`,
       createAgent: () => undefined,
+      onOpened,
       onMessage,
       onClosed,
     });
-    return { channels, onMessage, onClosed };
+    return { channels, onOpened, onMessage, onClosed };
   }
 
   function nextConnection(): Promise<WebSocket> {
@@ -61,6 +63,17 @@ describe('gateway-channel-messages', () => {
 
     expect(onMessage).toHaveBeenNthCalledWith(1, 'ch-1', { type: 'ping', n: 1 });
     expect(onMessage).toHaveBeenNthCalledWith(2, 'ch-1', { type: 'ping', n: 2 });
+  });
+
+  test('notifies when an idle channel opens, before any business frame', async () => {
+    const { channels, onOpened, onMessage } = setup();
+    const connP = nextConnection();
+    channels.handleOffer(makeOffer('idle-channel'));
+    await connP;
+    await until(() => onOpened.mock.calls.length === 1);
+
+    expect(onOpened).toHaveBeenCalledWith('idle-channel');
+    expect(onMessage).not.toHaveBeenCalled();
   });
 
   test('send routes to the right channel and returns false for unknown/closed ones', async () => {
@@ -91,6 +104,26 @@ describe('gateway-channel-messages', () => {
     await until(() => onClosed.mock.calls.length === 1);
     expect(onClosed).toHaveBeenCalledWith('ch-c');
     expect(channels.send('ch-c', { type: 'state' })).toBe(false);
+  });
+
+  test('replacing a channel retires the old socket without letting it close the new one', async () => {
+    const { channels, onClosed, onOpened } = setup();
+    const firstP = nextConnection();
+    channels.handleOffer(makeOffer('reused-channel'));
+    const first = await firstP;
+    await until(() => onOpened.mock.calls.length === 1);
+
+    const secondP = nextConnection();
+    channels.handleOffer(makeOffer('reused-channel'));
+    await secondP;
+    await until(() => onOpened.mock.calls.length === 2);
+    await until(() => first.readyState === WebSocket.CLOSED);
+
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    expect(onClosed).toHaveBeenCalledWith('reused-channel');
+    expect(channels.has('reused-channel')).toBe(true);
+    channels.closeAll();
+    expect(onClosed).toHaveBeenCalledTimes(2);
   });
 
   test('outgoing: frames queue before channel_ready, flush after dial, replies route back', async () => {

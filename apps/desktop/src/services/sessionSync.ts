@@ -7,6 +7,7 @@
  */
 
 import { useSessionsStore, type RemoteSession } from '../stores/sessionsStore';
+import { useFacadeStore } from '../stores/facadeStore';
 import { useServerStore } from '../stores/serverStore';
 
 import { resolveGatewayBackendUrl, getGatewayAuthHeaders } from './gatewayProxy';
@@ -387,35 +388,75 @@ export async function eagerSyncCurrentSession(_backendId: string): Promise<void>
  * chat cache. This recovers partial assistant bodies and middle gaps inside the
  * latest message window, which plain afterOffset sync cannot repair.
  *
- * Deduplication: if the same session already has a pending recovery request,
- * the call is coalesced — only one HTTP request is in-flight per session at a time,
- * and at most one trailing request is queued.
+ * Deduplication: requests for the same session and connection generation are
+ * coalesced, with at most one trailing request. New connection generations
+ * start immediately and supersede old responses.
  */
-const pendingRecovery = new Map<string, Promise<void>>();
+const pendingRecovery = new Map<string, Promise<boolean>>();
 const trailingRecovery = new Set<string>();
+const SESSION_TAIL_RECOVERY_TIMEOUT_MS = 8_000;
+const recoveryFacadeIds = new WeakMap<object, number>();
+let nextRecoveryFacadeId = 1;
+
+function getRecoveryFacadeId(facade: object | null | undefined): number | 'none' {
+  if (!facade) return 'none';
+  const existingId = recoveryFacadeIds.get(facade);
+  if (existingId != null) return existingId;
+  const id = nextRecoveryFacadeId++;
+  recoveryFacadeIds.set(facade, id);
+  return id;
+}
 
 export async function recoverCurrentSessionTail(
   targetServerId: string,
   sessionId?: string
-): Promise<void> {
+): Promise<boolean> {
   const currentSessionId = useSelectionStore.getState().selectedSessionId;
   const activeServerId = useServerStore.getState().activeServerId;
   const targetSessionId = sessionId ?? currentSessionId;
 
-  if (!targetSessionId || currentSessionId !== targetSessionId) return;
-  if (!activeServerId || activeServerId !== targetServerId) return;
+  if (!targetSessionId || currentSessionId !== targetSessionId) return false;
+  if (!activeServerId || activeServerId !== targetServerId) return false;
 
-  const key = `${targetServerId}:${targetSessionId}`;
+  const recoveryFacade = useFacadeStore.getState().facade;
+  const reconnectGeneration = useFacadeStore.getState().reconnectGeneration;
+  const recoveryFacadeId = getRecoveryFacadeId(recoveryFacade);
+  // A newer connection generation must start its own request immediately; it
+  // cannot be coalesced behind an older generation's potentially stuck fetch.
+  const key = `${targetServerId}:${targetSessionId}:${reconnectGeneration ?? 'initial'}:${recoveryFacadeId}`;
 
-  // Already in-flight: mark trailing so we re-run once after the current finishes
-  if (pendingRecovery.has(key)) {
+  const isStillCurrent = () => {
+    const currentFacade = useFacadeStore.getState();
+    return (
+      useSelectionStore.getState().selectedSessionId === targetSessionId &&
+      useServerStore.getState().activeServerId === targetServerId &&
+      currentFacade.facade === recoveryFacade &&
+      (reconnectGeneration == null || currentFacade.reconnectGeneration === reconnectGeneration)
+    );
+  };
+
+  // Coalesce duplicate triggers and allow one trailing snapshot if a reconnect
+  // or session update arrives while the first request is still in flight.
+  const pending = pendingRecovery.get(key);
+  if (pending) {
     trailingRecovery.add(key);
-    return;
+    return pending;
   }
 
-  const run = async () => {
+  const run = async (): Promise<boolean> => {
+    const controller = new AbortController();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      const result = await api.getSessionMessages(targetSessionId, { limit: 100 });
+      const result = await Promise.race([
+        api.getSessionMessages(targetSessionId, { limit: 100, signal: controller.signal }),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => {
+            controller.abort();
+            reject(new Error('Session tail recovery timed out'));
+          }, SESSION_TAIL_RECOVERY_TIMEOUT_MS);
+        }),
+      ]);
+      if (!isStillCurrent()) return false;
       // Hydrate top-level contentBlocks/toolCalls from metadata: the segmented
       // message view renders from them, so merging raw wire messages would
       // repair `content` invisibly while the rendered blocks stay truncated.
@@ -425,17 +466,25 @@ export async function recoverCurrentSessionTail(
       console.log(
         `[SessionSync] Recovered tail snapshot for session ${targetSessionId}: ${result.messages.length} messages`
       );
+      return true;
     } catch (error) {
       console.error('[SessionSync] Failed to recover current session tail:', error);
+      return false;
     } finally {
-      pendingRecovery.delete(key);
-      // If trailing requests accumulated, run exactly one more
-      if (trailingRecovery.delete(key)) {
-        void recoverCurrentSessionTail(targetServerId, targetSessionId);
-      }
+      if (timeout) clearTimeout(timeout);
     }
   };
 
-  const promise = run();
+  const promise = (async () => {
+    let recovered = await run();
+    if (trailingRecovery.delete(key) && isStillCurrent()) {
+      recovered = (await run()) || recovered;
+    }
+    return recovered;
+  })().finally(() => {
+    trailingRecovery.delete(key);
+    pendingRecovery.delete(key);
+  });
   pendingRecovery.set(key, promise);
+  return promise;
 }

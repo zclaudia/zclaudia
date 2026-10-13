@@ -121,6 +121,10 @@ export class GatewayBackendDataPublisher {
         updatedAt: item.updatedAt,
       };
       this.emit(msg, false);
+      // The resources topic retains one payload per publisher. Keep its
+      // retained payload authoritative instead of replacing the snapshot with
+      // an unretained delta that reconnecting subscribers cannot replay.
+      this.publishSnapshot();
       return;
     }
 
@@ -131,6 +135,7 @@ export class GatewayBackendDataPublisher {
       resourceId: session.id,
     };
     this.emit(msg, false);
+    this.publishSnapshot();
   }
 
   broadcastSessionEvent(
@@ -152,6 +157,7 @@ export class GatewayBackendDataPublisher {
         resourceId: project.id,
       };
       this.emit(msg, false);
+      this.publishSnapshot();
       return;
     }
 
@@ -164,6 +170,7 @@ export class GatewayBackendDataPublisher {
       resource: item,
     };
     this.emit(msg, false);
+    this.publishSnapshot();
   }
 
   private loadSessionItems(db: BetterDatabase): SessionItem[] {
@@ -211,6 +218,7 @@ export class GatewayBackendDataPublisher {
       name: (session.name as string) || undefined,
       createdAt: session.createdAt as number,
       updatedAt: session.updatedAt as number,
+      lastRunStatus: session.lastRunStatus as string | null,
     });
   }
 

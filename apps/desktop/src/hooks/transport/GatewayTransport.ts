@@ -40,6 +40,11 @@ import type { ProjectItem, SessionItem, SessionMessage } from '@zclaudia/protoco
 
 /** Max frames queued per backend while its message channel (re)opens. */
 const MAX_PENDING_CHANNEL_FRAMES = 100;
+const CHANNEL_OPEN_TIMEOUT_MS = 10_000;
+const DATA_CHANNEL_OPEN_TIMEOUT_MS = 10_000;
+const DATA_CHANNEL_IDLE_TIMEOUT_MS = 90_000;
+const CONTROL_CONNECT_TIMEOUT_MS = 15_000;
+const CONTROL_HANDSHAKE_TIMEOUT_MS = 10_000;
 
 // ============================================================================
 // Config & Callbacks
@@ -91,6 +96,7 @@ export class GatewayTransport {
   private intentionalClose = false;
   private reconnectAttempt = 0;
   private healthProbeTimeout: ReturnType<typeof setTimeout> | null = null;
+  private controlPhaseTimer: ReturnType<typeof setTimeout> | null = null;
 
   private peerSessionId: string | null = null;
   private recoveryToken: string | null = null;
@@ -113,6 +119,17 @@ export class GatewayTransport {
   private pendingChannelOpens: string[] = [];
   private channelOpenInFlight = false;
   private channelOpenTimer: ReturnType<typeof setTimeout> | null = null;
+  private controlGeneration = 0;
+  private dialingChannels = new Map<
+    WebSocket,
+    { backendId: string; generation: number; timer: ReturnType<typeof setTimeout> }
+  >();
+  private dataChannelIdleTimers = new Map<WebSocket, ReturnType<typeof setTimeout>>();
+  private pendingBackendReady = new Map<string, { epoch: number; capabilities: string[] }>();
+  private pendingResourceMessages = new Map<
+    string,
+    Array<BackendResourceSnapshotMessage | BackendResourceEventMessage>
+  >();
   /**
    * Frames waiting for the backend's channel to (re)open. The channel is
    * the only targeted path in the v4 data plane, so setup/reopen gaps queue
@@ -130,6 +147,9 @@ export class GatewayTransport {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    this.clearControlPhaseTimer();
+    this.controlGeneration++;
+    this.closeAllMessageChannels();
     if (this.ws) {
       this.expectedCloseWs = this.ws;
       this.ws.close();
@@ -161,11 +181,13 @@ export class GatewayTransport {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    this.clearControlPhaseTimer();
     if (this.ws) {
       this.expectedCloseWs = this.ws;
       this.ws.close();
       this.ws = null;
     }
+    this.controlGeneration++;
     this.cleanup();
   }
 
@@ -259,7 +281,7 @@ export class GatewayTransport {
     this.healthProbeTimeout = setTimeout(() => {
       this.healthProbeTimeout = null;
       console.warn('[GatewayTransport] Health probe timeout — closing stale connection');
-      this.ws?.close(4000, 'health probe timeout');
+      this.restartControlConnection('health probe timeout');
     }, 10_000);
   }
 
@@ -296,21 +318,35 @@ export class GatewayTransport {
 
   private setupWebSocket(ws: WebSocket): void {
     const currentWs = ws;
+    const generation = this.controlGeneration;
+    this.armControlPhaseTimer(
+      currentWs,
+      generation,
+      'control connect timeout',
+      CONTROL_CONNECT_TIMEOUT_MS
+    );
     ws.onopen = () => {
       console.log('[GatewayTransport] WebSocket opened');
-      if (this.ws !== currentWs) return;
+      if (this.ws !== currentWs || generation !== this.controlGeneration) return;
+      this.armControlPhaseTimer(
+        currentWs,
+        generation,
+        'peer_ready handshake timeout',
+        CONTROL_HANDSHAKE_TIMEOUT_MS
+      );
       this.sendPeerHello();
     };
     ws.onclose = event => {
       console.log(
         `[GatewayTransport] WebSocket closed: code=${event.code} reason=${event.reason} wasClean=${event.wasClean}`
       );
-      this.clearHealthProbe();
       const expectedClose = this.expectedCloseWs === currentWs;
       if (expectedClose) {
         this.expectedCloseWs = null;
       }
-      if (this.ws !== null && this.ws !== currentWs) return;
+      if (this.ws !== currentWs || generation !== this.controlGeneration) return;
+      this.clearControlPhaseTimer();
+      this.clearHealthProbe();
       this.ws = null;
       this.authenticated = false;
       this.closeAllMessageChannels();
@@ -323,10 +359,12 @@ export class GatewayTransport {
       }
     };
     ws.onerror = error => {
+      if (this.ws !== currentWs || generation !== this.controlGeneration) return;
       console.error('[GatewayTransport] WebSocket error:', error);
       this.config.onError(error);
     };
     ws.onmessage = (event: MessageEvent) => {
+      if (this.ws !== currentWs || generation !== this.controlGeneration) return;
       try {
         this.handleMessage(JSON.parse(event.data));
       } catch (error) {
@@ -390,7 +428,8 @@ export class GatewayTransport {
         this.handleTopicMessage(message);
         break;
       // Fallback targeted path (used while a message channel reopens);
-      // resource data and content patches ride on topics/channels.
+      // legacy gateway peers may still send these; v4 resource data and
+      // content patches use topics/channels.
       case 'backend_server_message':
         this.handleBackendServerMessage(message);
         break;
@@ -413,6 +452,7 @@ export class GatewayTransport {
 
   // --- Handshake ---
   private handlePeerReady(msg: PeerReadyMessage): void {
+    this.clearControlPhaseTimer();
     this.reconnectAttempt = 0;
     this.authenticated = true;
     this.peerSessionId = msg.peerSessionId;
@@ -485,13 +525,16 @@ export class GatewayTransport {
     if (msg.topic !== RESOURCES_TOPIC) return;
     this.subscribedBackends.add(msg.backendId);
     const presence = this.registryItems.get(msg.backendId);
-    this.config.onBackendSubscribed(
-      msg.backendId,
-      presence?.epoch ?? 0,
-      presence?.capabilities ?? []
-    );
+    this.pendingBackendReady.set(msg.backendId, {
+      epoch: presence?.epoch ?? 0,
+      capabilities: presence?.capabilities ?? [],
+    });
     // The dedicated message channel opens alongside the subscription
-    this.maybeOpenMessageChannel(msg.backendId);
+    if (this.messageChannels.get(msg.backendId)?.ws.readyState === WebSocket.OPEN) {
+      this.finishBackendSubscription(msg.backendId);
+    } else {
+      this.maybeOpenMessageChannel(msg.backendId);
+    }
   }
 
   private handleTopicUnsubscribed(msg: TopicUnsubscribedMessage): void {
@@ -508,15 +551,34 @@ export class GatewayTransport {
     // the topic envelope.
     const payload = msg.payload as { type?: string } | undefined;
     if (!payload) return;
+    if (this.subscribedBackends.has(msg.backendId) && !this.backendChannelIsOpen(msg.backendId)) {
+      let queue = this.pendingResourceMessages.get(msg.backendId);
+      if (!queue) {
+        queue = [];
+        this.pendingResourceMessages.set(msg.backendId, queue);
+      }
+      if (queue.length >= MAX_PENDING_CHANNEL_FRAMES) {
+        this.restartControlConnection(
+          `resource messages overflow while channel opens: ${msg.backendId}`
+        );
+        return;
+      }
+      queue.push(payload as BackendResourceSnapshotMessage | BackendResourceEventMessage);
+      return;
+    }
+    this.dispatchResourcePayload(msg.backendId, payload);
+  }
+
+  private dispatchResourcePayload(backendId: string, payload: { type?: string }): void {
     if (payload.type === 'backend_resource_snapshot') {
       this.handleBackendDataSnapshot({
         ...(payload as BackendResourceSnapshotMessage),
-        backendId: msg.backendId,
+        backendId,
       });
     } else if (payload.type === 'backend_resource_event') {
       this.handleBackendDataEvent({
         ...(payload as BackendResourceEventMessage),
-        backendId: msg.backendId,
+        backendId,
       });
     }
   }
@@ -535,6 +597,7 @@ export class GatewayTransport {
   private maybeOpenMessageChannel(backendId: string): void {
     if (!this.isV4Backend(backendId)) return;
     if (this.messageChannels.has(backendId)) return;
+    if ([...this.dialingChannels.values()].some(dialing => dialing.backendId === backendId)) return;
     if (this.pendingChannelOpens.includes(backendId)) return;
     this.pendingChannelOpens.push(backendId);
     this.pumpChannelOpens();
@@ -549,12 +612,15 @@ export class GatewayTransport {
     this.channelOpenInFlight = true;
     const backendId = this.pendingChannelOpens[0];
     this.send({ type: 'channel_open', target: backendId, kind: MESSAGE_CHANNEL_KIND });
-    // No reply within the pairing budget: drop and move on (v3 path keeps
-    // working; the next sendToBackend retries the open).
-    this.channelOpenTimer = setTimeout(() => this.settleChannelOpen(), 10_000);
+    // channel_ready has no request id. Reset this control generation on timeout
+    // so a delayed reply cannot be mistaken for the next backend's response.
+    this.channelOpenTimer = setTimeout(
+      () => this.restartControlConnection('channel_open timeout'),
+      CHANNEL_OPEN_TIMEOUT_MS
+    );
   }
 
-  /** Consume the FIFO head after channel_ready / error / timeout. */
+  /** Consume the FIFO head after its channel_ready response. */
   private settleChannelOpen(): string | undefined {
     if (this.channelOpenTimer) {
       clearTimeout(this.channelOpenTimer);
@@ -571,13 +637,36 @@ export class GatewayTransport {
     if (!backendId) return;
     const base = (this.resolvedUrl ?? '').replace(/\/ws$/, '');
     const dataWs = new WebSocket(`${base}${msg.dataPath}?ticket=${encodeURIComponent(msg.ticket)}`);
+    const generation = this.controlGeneration;
+    const dialTimer = setTimeout(() => {
+      if (this.dialingChannels.has(dataWs) && generation === this.controlGeneration) {
+        this.restartControlConnection(`data channel open timeout: ${backendId}`);
+      }
+    }, DATA_CHANNEL_OPEN_TIMEOUT_MS);
+    this.dialingChannels.set(dataWs, { backendId, generation, timer: dialTimer });
     dataWs.onopen = () => {
+      const dialing = this.dialingChannels.get(dataWs);
+      if (
+        !dialing ||
+        dialing.generation !== this.controlGeneration ||
+        generation !== this.controlGeneration
+      ) {
+        dataWs.close();
+        return;
+      }
+      clearTimeout(dialing.timer);
+      this.dialingChannels.delete(dataWs);
       // The backend may have gone away while dialing
       if (!this.subscribedBackends.has(backendId)) {
         dataWs.close();
         return;
       }
       this.messageChannels.set(backendId, { channelId: msg.channelId, ws: dataWs });
+      this.armDataChannelIdleTimeout(backendId, dataWs, generation);
+      // Older backends register an incoming channel on its first business
+      // frame. This harmless ping initializes them even for read-only users.
+      dataWs.send(JSON.stringify({ type: 'ping' } satisfies ClientMessage));
+      this.finishBackendSubscription(backendId);
       // Flush frames queued while the channel was (re)opening
       const queued = this.pendingChannelFrames.get(backendId);
       if (queued) {
@@ -586,6 +675,13 @@ export class GatewayTransport {
       }
     };
     dataWs.onmessage = (event: MessageEvent) => {
+      if (
+        generation !== this.controlGeneration ||
+        this.messageChannels.get(backendId)?.ws !== dataWs ||
+        !this.subscribedBackends.has(backendId)
+      )
+        return;
+      this.armDataChannelIdleTimeout(backendId, dataWs, generation);
       if (typeof event.data !== 'string') return;
       try {
         this.routeChannelFrame(backendId, JSON.parse(event.data));
@@ -594,11 +690,22 @@ export class GatewayTransport {
       }
     };
     dataWs.onclose = () => {
+      const dialing = this.dialingChannels.get(dataWs);
+      if (dialing) {
+        clearTimeout(dialing.timer);
+        this.dialingChannels.delete(dataWs);
+        if (generation === this.controlGeneration && this.subscribedBackends.has(backendId)) {
+          this.restartControlConnection(`data channel closed while dialing: ${backendId}`);
+        }
+        return;
+      }
       const current = this.messageChannels.get(backendId);
-      if (current?.ws === dataWs) {
+      if (current?.ws === dataWs && generation === this.controlGeneration) {
+        this.clearDataChannelIdleTimeout(dataWs);
         this.messageChannels.delete(backendId);
-        // Targeted messages transparently fall back to the v3 path; the
-        // next sendToBackend queues a reopen.
+        if (this.subscribedBackends.has(backendId)) {
+          this.restartControlConnection(`data channel closed: ${backendId}`);
+        }
       }
     };
     dataWs.onerror = () => {
@@ -632,6 +739,9 @@ export class GatewayTransport {
       if (channel.channelId === msg.channelId) {
         this.messageChannels.delete(backendId);
         channel.ws.close();
+        if (this.subscribedBackends.has(backendId)) {
+          this.restartControlConnection(`gateway closed data channel: ${backendId}`);
+        }
         break;
       }
     }
@@ -641,19 +751,40 @@ export class GatewayTransport {
     const channel = this.messageChannels.get(backendId);
     if (channel) {
       this.messageChannels.delete(backendId);
+      this.clearDataChannelIdleTimeout(channel.ws);
       channel.ws.close();
+    }
+    for (const [ws, dialing] of this.dialingChannels) {
+      if (dialing.backendId !== backendId) continue;
+      clearTimeout(dialing.timer);
+      this.dialingChannels.delete(ws);
+      ws.close();
+    }
+    if (this.channelOpenInFlight && this.pendingChannelOpens[0] === backendId) {
+      this.restartControlConnection(`channel_open cancelled: ${backendId}`);
+      return;
     }
     this.pendingChannelOpens = this.pendingChannelOpens.filter(id => id !== backendId);
     this.pendingChannelFrames.delete(backendId);
+    this.pendingBackendReady.delete(backendId);
+    this.pendingResourceMessages.delete(backendId);
   }
 
   private closeAllMessageChannels(): void {
     for (const channel of this.messageChannels.values()) {
+      this.clearDataChannelIdleTimeout(channel.ws);
       channel.ws.close();
     }
     this.messageChannels.clear();
+    for (const [ws, dialing] of this.dialingChannels) {
+      clearTimeout(dialing.timer);
+      ws.close();
+    }
+    this.dialingChannels.clear();
     this.pendingChannelOpens = [];
     this.pendingChannelFrames.clear();
+    this.pendingBackendReady.clear();
+    this.pendingResourceMessages.clear();
     this.channelOpenInFlight = false;
     if (this.channelOpenTimer) {
       clearTimeout(this.channelOpenTimer);
@@ -670,13 +801,13 @@ export class GatewayTransport {
   private handleGatewayError(msg: GatewayErrorMessage): void {
     console.error(`[GatewayTransport] Error: ${msg.code} — ${msg.message}`);
     // A failed channel_open answers with BACKEND_OFFLINE / RATE_LIMITED and
-    // no recovery hint; consume it as the FIFO reply instead of escalating —
-    // targeted messages keep flowing on the v3 path.
+    // no request id, so reset the connection to keep the FIFO response mapping
+    // unambiguous for the next channel_open.
     if (
       this.channelOpenInFlight &&
       (msg.code === 'BACKEND_OFFLINE' || msg.code === 'RATE_LIMITED')
     ) {
-      this.settleChannelOpen();
+      this.restartControlConnection(`channel_open failed: ${msg.code}`);
       return;
     }
     if (msg.recovery) {
@@ -705,11 +836,94 @@ export class GatewayTransport {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
   }
   private cleanup(): void {
+    this.clearControlPhaseTimer();
     this.authenticated = false;
     this.peerSessionId = null;
     this.recoveryToken = null;
     this.subscribedBackends.clear();
     this.closeAllMessageChannels();
     this.clearHealthProbe();
+  }
+
+  private backendChannelIsOpen(backendId: string): boolean {
+    return this.messageChannels.get(backendId)?.ws.readyState === WebSocket.OPEN;
+  }
+
+  private finishBackendSubscription(backendId: string): void {
+    if (!this.backendChannelIsOpen(backendId)) return;
+    const ready = this.pendingBackendReady.get(backendId);
+    if (ready) {
+      this.pendingBackendReady.delete(backendId);
+      this.config.onBackendSubscribed(backendId, ready.epoch, ready.capabilities);
+    }
+    const queued = this.pendingResourceMessages.get(backendId);
+    if (queued) {
+      this.pendingResourceMessages.delete(backendId);
+      for (const payload of queued) this.dispatchResourcePayload(backendId, payload);
+    }
+  }
+
+  private armDataChannelIdleTimeout(backendId: string, ws: WebSocket, generation: number): void {
+    this.clearDataChannelIdleTimeout(ws);
+    this.dataChannelIdleTimers.set(
+      ws,
+      setTimeout(() => {
+        this.dataChannelIdleTimers.delete(ws);
+        if (
+          generation === this.controlGeneration &&
+          this.messageChannels.get(backendId)?.ws === ws &&
+          this.subscribedBackends.has(backendId)
+        ) {
+          this.restartControlConnection(`data channel idle timeout: ${backendId}`);
+        }
+      }, DATA_CHANNEL_IDLE_TIMEOUT_MS)
+    );
+  }
+
+  private clearDataChannelIdleTimeout(ws: WebSocket): void {
+    const timer = this.dataChannelIdleTimers.get(ws);
+    if (timer) clearTimeout(timer);
+    this.dataChannelIdleTimers.delete(ws);
+  }
+
+  private armControlPhaseTimer(
+    ws: WebSocket,
+    generation: number,
+    reason: string,
+    timeoutMs: number
+  ): void {
+    this.clearControlPhaseTimer();
+    this.controlPhaseTimer = setTimeout(() => {
+      this.controlPhaseTimer = null;
+      if (this.ws === ws && generation === this.controlGeneration) {
+        this.restartControlConnection(reason);
+      }
+    }, timeoutMs);
+  }
+
+  private clearControlPhaseTimer(): void {
+    if (this.controlPhaseTimer) clearTimeout(this.controlPhaseTimer);
+    this.controlPhaseTimer = null;
+  }
+
+  /** Invalidate this control generation immediately, then use the normal
+   * reconnect backoff so channel failures cannot create a retry hot loop. */
+  private restartControlConnection(reason: string): void {
+    const ws = this.ws;
+    if (!ws || this.intentionalClose) return;
+    console.warn(`[GatewayTransport] Resetting control connection: ${reason}`);
+    this.expectedCloseWs = ws;
+    this.ws = null;
+    this.controlGeneration++;
+    this.clearControlPhaseTimer();
+    this.clearHealthProbe();
+    this.authenticated = false;
+    this.peerSessionId = null;
+    this.recoveryToken = null;
+    this.closeAllMessageChannels();
+    this.config.onDisconnected();
+    this.subscribedBackends.clear();
+    ws.close(4001, reason);
+    this.scheduleReconnect();
   }
 }

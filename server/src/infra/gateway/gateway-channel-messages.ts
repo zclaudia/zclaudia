@@ -19,12 +19,16 @@ export interface MessageChannelDeps {
   createAgent: () => SocksProxyAgent | undefined;
   /** A parsed JSON text frame arrived from the client on this channel. */
   onMessage: (channelId: string, message: unknown) => void;
+  /** The offered data socket is open and ready to receive server frames. */
+  onOpened: (channelId: string) => void;
   /** The channel closed (client gone, epoch change, teardown). */
   onClosed: (channelId: string) => void;
 }
 
 export class GatewayMessageChannels {
+  /** Includes sockets that are still dialing so a replacement offer can retire them. */
   private readonly channels = new Map<string, WebSocket>();
+  private readonly openedChannels = new Set<string>();
 
   constructor(private readonly deps: MessageChannelDeps) {}
 
@@ -35,11 +39,22 @@ export class GatewayMessageChannels {
     const proxyAgent = this.deps.createAgent();
     if (proxyAgent) wsOptions.agent = proxyAgent;
     const ws = new WebSocket(url, wsOptions);
+    const previous = this.channels.get(offer.channelId);
+    if (previous) {
+      this.channels.delete(offer.channelId);
+      if (this.openedChannels.delete(offer.channelId)) this.deps.onClosed(offer.channelId);
+    }
+    this.channels.set(offer.channelId, ws);
+    if (previous && previous !== ws) previous.close(1000);
 
     ws.on('open', () => {
-      this.channels.set(offer.channelId, ws);
+      if (this.channels.get(offer.channelId) === ws) {
+        this.openedChannels.add(offer.channelId);
+        this.deps.onOpened(offer.channelId);
+      }
     });
     ws.on('message', (data: Buffer, isBinary: boolean) => {
+      if (this.channels.get(offer.channelId) !== ws) return;
       // Business messages are JSON text frames; binary frames are reserved.
       if (isBinary) return;
       let message: unknown;
@@ -51,8 +66,10 @@ export class GatewayMessageChannels {
       this.deps.onMessage(offer.channelId, message);
     });
     ws.on('close', () => {
-      if (this.channels.delete(offer.channelId)) {
-        this.deps.onClosed(offer.channelId);
+      // A retired socket must not unregister the replacement channel.
+      if (this.channels.get(offer.channelId) === ws) {
+        this.channels.delete(offer.channelId);
+        if (this.openedChannels.delete(offer.channelId)) this.deps.onClosed(offer.channelId);
       }
     });
     ws.on('error', error => {
@@ -78,7 +95,12 @@ export class GatewayMessageChannels {
 
   /** Close every channel (control-connection teardown). */
   closeAll(): void {
-    for (const ws of this.channels.values()) {
+    const channels = [...this.channels.values()];
+    const openedChannels = [...this.openedChannels];
+    this.channels.clear();
+    this.openedChannels.clear();
+    for (const channelId of openedChannels) this.deps.onClosed(channelId);
+    for (const ws of channels) {
       ws.close(1000);
     }
   }

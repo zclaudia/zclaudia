@@ -41,6 +41,7 @@ export default defineConfig({
       'src/hooks/__tests__/useAgentForSession.test.ts',
       'src/features/chat/hooks/__tests__/useProviderCapabilities.test.ts',
       'src/features/chat/hooks/__tests__/useMobileViewport.test.tsx',
+      'src/features/chat/hooks/__tests__/useSessionRoute.test.ts',
       'src/features/chat/hooks/__tests__/useCommandHandler.goal.test.ts',
     ],
     exclude: ['**/node_modules/**', '**/src-tauri/**'],

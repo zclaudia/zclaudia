@@ -118,6 +118,8 @@ export interface GatewayClientCommands {
   channel: {
     /** Send a message to a specific client (channelId = peerSessionId). */
     sendToIncoming(channelId: string, message: ServerMessage): void;
+    /** Register handler invoked when an incoming message channel is ready. */
+    onIncomingOpened(handler: BackendClosedHandler): void;
     /** Register handler for incoming channel messages. */
     onIncomingMessage(handler: BackendMessageHandler): void;
     /** Register handler for incoming channel closures. */
@@ -251,6 +253,7 @@ export class GatewayClient {
     | null = null;
   private onBackendMessageHandler: BackendMessageHandler | null = null;
   private onBackendClosedHandler: BackendClosedHandler | null = null;
+  private onBackendChannelOpenedHandler: BackendClosedHandler | null = null;
   private messageChannels: GatewayMessageChannels;
   private outgoingChannels: GatewayOutgoingChannels;
 
@@ -288,7 +291,11 @@ export class GatewayClient {
     this.messageChannels = new GatewayMessageChannels({
       resolveWsBase: () => this.config.gatewayUrl.replace(/^http/, 'ws'),
       createAgent: () => this.createHttpAgent(),
+      onOpened: channelId => this.onBackendChannelOpenedHandler?.(channelId),
       onMessage: (channelId, message) => {
+        // Keep registration as a fallback for a frame racing the open callback
+        // or a transport that delivers before its open notification.
+        this.onBackendChannelOpenedHandler?.(channelId);
         // Content catch-up is served in-band on v4 channels: the patch goes
         // back over the same channel instead of a gateway broadcast.
         const typed = message as { type?: string };
@@ -328,6 +335,7 @@ export class GatewayClient {
       },
       channel: {
         sendToIncoming: (channelId, message) => this.sendToChannel(channelId, message),
+        onIncomingOpened: handler => this.onChannelOpened(handler),
         onIncomingMessage: handler => this.onChannelMessage(handler),
         onIncomingClosed: handler => this.onChannelClosed(handler),
         onCatchUp: handler => this.onCatchUp(handler),
@@ -443,6 +451,10 @@ export class GatewayClient {
 
   onChannelClosed(handler: BackendClosedHandler): void {
     this.onBackendClosedHandler = handler;
+  }
+
+  onChannelOpened(handler: BackendClosedHandler): void {
+    this.onBackendChannelOpenedHandler = handler;
   }
 
   /** Send a message to a subscribing client. Prefers the client's v4 message

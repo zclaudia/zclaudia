@@ -401,7 +401,7 @@ describe('GatewayTransport', () => {
       expect(storeMocks.removeProjectOwnersByBackend).not.toHaveBeenCalled();
     });
 
-    it('handles topic_subscribed (synthesizes backend_subscribed from presence)', () => {
+    it('reports topic_subscribed only after the data channel is open', async () => {
       const mockWs = (transport as any).ws;
       (transport as any).authenticated = true;
       seedV4Backend('backend-123', { epoch: 5, capabilities: ['run'] });
@@ -416,6 +416,17 @@ describe('GatewayTransport', () => {
 
       expect(transport.subscribedBackends.has('backend-123')).toBe(true);
       expect(transport.isBackendSubscribed('backend-123')).toBe(true);
+      expect(mockConfig.onBackendSubscribed).not.toHaveBeenCalled();
+
+      mockWs.onmessage({
+        data: JSON.stringify({
+          type: 'channel_ready',
+          channelId: 'channel-1',
+          ticket: 'ticket-1',
+          dataPath: '/channel/channel-1',
+        }),
+      } as MessageEvent);
+      await Promise.resolve();
       expect(mockConfig.onBackendSubscribed).toHaveBeenCalledWith('backend-123', 5, ['run']);
     });
 
@@ -679,10 +690,11 @@ describe('GatewayTransport', () => {
       const dataWs = wsInstances.find((w: any) => String(w.url).includes('/channel/'));
       expect(dataWs).toBeDefined();
       expect(dataWs.url).toBe('ws://gateway.example.com/channel/ch-1?ticket=tk1');
-      expect(JSON.parse(dataWs.send.mock.calls[0][0])).toEqual({ type: 'early' });
+      expect(JSON.parse(dataWs.send.mock.calls[0][0])).toEqual({ type: 'ping' });
+      expect(JSON.parse(dataWs.send.mock.calls[1][0])).toEqual({ type: 'early' });
 
       transport.sendToBackend('b4', { type: 'ping' } as ClientMessage);
-      expect(JSON.parse(dataWs.send.mock.calls[1][0])).toEqual({ type: 'ping' });
+      expect(JSON.parse(dataWs.send.mock.calls[2][0])).toEqual({ type: 'ping' });
 
       // Inbound frames: server messages and in-band content patches
       dataWs.onmessage({ data: JSON.stringify({ type: 'state_heartbeat' }) });
@@ -701,7 +713,7 @@ describe('GatewayTransport', () => {
       expect(mockConfig.onContentPatch).toHaveBeenCalledWith('b4', 'sess-1', [{ offset: 7 }], 7);
     });
 
-    it('queues frames and reopens when the channel drops', async () => {
+    it('resets the control connection when the channel drops', async () => {
       const ctl = await connectReady([presence('b4', 4)]);
       subscribeAndConfirm(ctl, 'b4');
       await flush();
@@ -717,29 +729,10 @@ describe('GatewayTransport', () => {
       const dataWs = wsInstances.find((w: any) => String(w.url).includes('/channel/'));
       dataWs.onclose(new CloseEvent('close'));
 
-      ctl.send.mockClear();
-      transport.sendToBackend('b4', { type: 'ping' } as ClientMessage);
-      await flush();
-
-      // No v3 fallback exists any more: the frame waits for the reopen
-      const queued = (transport as any).pendingChannelFrames.get('b4');
-      expect(queued).toHaveLength(1);
-      const sent = ctl.send.mock.calls.map((c: any[]) => JSON.parse(c[0]));
-      expect(sent.some((m: any) => m.type === 'channel_open')).toBe(true);
-      expect(sent.some((m: any) => m.type === 'backend_client_message')).toBe(false);
-
-      // Reopen completes: the queued frame flushes on the new socket
-      ctl.onmessage({
-        data: JSON.stringify({
-          type: 'channel_ready',
-          channelId: 'ch-2',
-          ticket: 'tk2',
-          dataPath: '/channel/ch-2',
-        }),
-      });
-      await flush();
-      const dataWs2 = wsInstances.find((w: any) => String(w.url).includes('/channel/ch-2'));
-      expect(JSON.parse(dataWs2.send.mock.calls[0][0])).toEqual({ type: 'ping' });
+      expect(mockConfig.onDisconnected).toHaveBeenCalled();
+      expect((transport as any).ws).toBeNull();
+      expect((transport as any).reconnectTimer).not.toBeNull();
+      expect(ctl.close).toHaveBeenCalledWith(4001, 'data channel closed: b4');
     });
 
     it('consumes channel-open failures without escalating onError', async () => {

@@ -13,6 +13,9 @@ vi.mock('../gateway-client.js', () => ({
         disconnect: vi.fn(),
       },
       channel: {
+        onIncomingOpened: vi.fn((listener: (channelId: string) => void) => {
+          this.onIncomingOpened = listener;
+        }),
         onIncomingMessage: vi.fn(
           (listener: (channelId: string, message: unknown) => Promise<void>) => {
             this.onIncomingMessage = listener;
@@ -53,6 +56,7 @@ vi.mock('../gateway-client.js', () => ({
     };
 
     public onIncomingMessage?: (channelId: string, message: unknown) => Promise<void>;
+    public onIncomingOpened?: (channelId: string) => void;
     public onIncomingClosed?: (channelId: string) => void;
     public onCatchUp?: (sessionId: string, afterOffset: number) => Promise<unknown[]>;
     public outgoingEvents?: { onConnectionStateChanged?: (connected: boolean) => void };
@@ -301,6 +305,56 @@ describe('GatewayManager', () => {
 
     expect(run.clientId).toBe('old-channel');
     expect(run.client).toBe(orphanedClient);
+  });
+
+  it('registers an idle incoming channel and sends its initial heartbeat on open', async () => {
+    const { manager, connectedClients, serverContext } = createManager();
+
+    await manager.connect({
+      id: 1,
+      enabled: true,
+      gatewayUrl: 'ws://gateway.example.com',
+      gatewaySecret: 'secret',
+      backendName: 'backend',
+      gatewayBackendId: null,
+      registerAsBackend: true,
+      createdAt: 0,
+      updatedAt: 0,
+    });
+
+    const client = gatewayClientInstances.at(-1)!;
+    client.onIncomingOpened?.('idle-channel');
+
+    expect(connectedClients.has('idle-channel')).toBe(true);
+    expect(serverContext.getStateHeartbeat).toHaveBeenCalledTimes(1);
+    expect(client.commands.channel.sendToIncoming).toHaveBeenCalledWith(
+      'idle-channel',
+      expect.objectContaining({ type: 'state_heartbeat' })
+    );
+  });
+
+  it('registers a catch-up-only channel through the first-message fallback', async () => {
+    const { manager, connectedClients, serverContext } = createManager();
+    await manager.connect({
+      id: 1,
+      enabled: true,
+      gatewayUrl: 'ws://gateway.example.com',
+      gatewaySecret: 'secret',
+      backendName: 'backend',
+      gatewayBackendId: null,
+      registerAsBackend: true,
+      createdAt: 0,
+      updatedAt: 0,
+    });
+
+    const client = gatewayClientInstances.at(-1)!;
+    await client.onIncomingMessage?.('catch-up-channel', { type: 'catch_up_content' });
+
+    expect(connectedClients.has('catch-up-channel')).toBe(true);
+    expect(serverContext.getStateHeartbeat).toHaveBeenCalledTimes(1);
+    expect(serverContext.handleMessage).toHaveBeenCalledWith(expect.anything(), {
+      type: 'catch_up_content',
+    });
   });
 
   it('passes getStateHeartbeat to GatewayClient config for targeted state replay', async () => {

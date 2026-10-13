@@ -128,6 +128,7 @@ function resetMockState() {
   serverState.localServerPort = 3100;
 
   facadeState.localBackendId = 'local-standalone';
+  facadeState.reconnectGeneration = 0;
   facadeState.backends = [
     {
       backendId: 'local-standalone',
@@ -396,7 +397,10 @@ describe('services/sessionSync', () => {
       const { recoverCurrentSessionTail } = await import('../sessionSync.js');
       await recoverCurrentSessionTail('backend-1', 'session-1');
 
-      expect(mockGetSessionMessages).toHaveBeenCalledWith('session-1', { limit: 100 });
+      expect(mockGetSessionMessages).toHaveBeenCalledWith(
+        'session-1',
+        expect.objectContaining({ limit: 100, signal: expect.any(AbortSignal) })
+      );
       expect(chatState.mergeMessages).toHaveBeenCalledWith('session-1', [{ id: 'message-10' }], {
         maxOffset: 10,
       });
@@ -481,6 +485,127 @@ describe('services/sessionSync', () => {
 
       expect(mockGetSessionMessages).toHaveBeenCalledTimes(2);
       expect(chatState.mergeMessages).toHaveBeenCalledTimes(2);
+    });
+
+    it('aborts a slow recovery and allows a later retry', async () => {
+      selectionState.selectedSessionId = 'session-1';
+      serverState.activeServerId = 'backend-1';
+      vi.useFakeTimers();
+
+      let signal: AbortSignal | undefined;
+      mockGetSessionMessages
+        .mockImplementationOnce((_sessionId: string, options: { signal: AbortSignal }) => {
+          signal = options.signal;
+          return new Promise(() => {});
+        })
+        .mockResolvedValueOnce({
+          messages: [{ id: 'message-11' }],
+          pagination: { maxOffset: 11 },
+        });
+
+      const { recoverCurrentSessionTail } = await import('../sessionSync.js');
+      const slowRecovery = recoverCurrentSessionTail('backend-1', 'session-1');
+      await vi.advanceTimersByTimeAsync(8_000);
+      await slowRecovery;
+
+      expect(signal?.aborted).toBe(true);
+      expect(chatState.mergeMessages).not.toHaveBeenCalled();
+
+      await recoverCurrentSessionTail('backend-1', 'session-1');
+      expect(mockGetSessionMessages).toHaveBeenCalledTimes(2);
+      expect(chatState.mergeMessages).toHaveBeenCalledWith('session-1', [{ id: 'message-11' }], {
+        maxOffset: 11,
+      });
+    });
+
+    it('does not merge a response from an older reconnect generation', async () => {
+      selectionState.selectedSessionId = 'session-1';
+      serverState.activeServerId = 'backend-1';
+      facadeState.reconnectGeneration = 1;
+      let resolveRequest: ((value: unknown) => void) | undefined;
+      mockGetSessionMessages.mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveRequest = resolve;
+          })
+      );
+
+      const { recoverCurrentSessionTail } = await import('../sessionSync.js');
+      const recovery = recoverCurrentSessionTail('backend-1', 'session-1');
+      facadeState.reconnectGeneration = 2;
+      resolveRequest?.({ messages: [{ id: 'stale' }], pagination: { maxOffset: 10 } });
+      await recovery;
+
+      expect(chatState.mergeMessages).not.toHaveBeenCalled();
+    });
+
+    it('starts a fresh recovery immediately for a newer generation', async () => {
+      selectionState.selectedSessionId = 'session-1';
+      serverState.activeServerId = 'backend-1';
+      facadeState.reconnectGeneration = 1;
+      let resolveOld: ((value: unknown) => void) | undefined;
+      mockGetSessionMessages
+        .mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              resolveOld = resolve;
+            })
+        )
+        .mockResolvedValueOnce({
+          messages: [{ id: 'current-message' }],
+          pagination: { maxOffset: 12 },
+        });
+
+      const { recoverCurrentSessionTail } = await import('../sessionSync.js');
+      const oldRecovery = recoverCurrentSessionTail('backend-1', 'session-1');
+      facadeState.reconnectGeneration = 2;
+      const currentRecovery = recoverCurrentSessionTail('backend-1', 'session-1');
+      await currentRecovery;
+      resolveOld?.({ messages: [{ id: 'old-message' }], pagination: { maxOffset: 11 } });
+      await oldRecovery;
+
+      expect(mockGetSessionMessages).toHaveBeenCalledTimes(2);
+      expect(chatState.mergeMessages).toHaveBeenCalledTimes(1);
+      expect(chatState.mergeMessages).toHaveBeenCalledWith(
+        'session-1',
+        [{ id: 'current-message' }],
+        { maxOffset: 12 }
+      );
+    });
+
+    it('does not merge a tail fetched by a replaced facade instance', async () => {
+      selectionState.selectedSessionId = 'session-1';
+      serverState.activeServerId = 'backend-1';
+      facadeState.reconnectGeneration = 3;
+      facadeState.facade = { instance: 1 };
+      let resolveOld: ((value: unknown) => void) | undefined;
+      mockGetSessionMessages
+        .mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              resolveOld = resolve;
+            })
+        )
+        .mockResolvedValueOnce({
+          messages: [{ id: 'new-facade-message' }],
+          pagination: { maxOffset: 13 },
+        });
+
+      const { recoverCurrentSessionTail } = await import('../sessionSync.js');
+      const oldRecovery = recoverCurrentSessionTail('backend-1', 'session-1');
+      facadeState.facade = { instance: 2 };
+      const currentRecovery = recoverCurrentSessionTail('backend-1', 'session-1');
+      await currentRecovery;
+      resolveOld?.({ messages: [{ id: 'old-facade-message' }], pagination: { maxOffset: 12 } });
+      await oldRecovery;
+
+      expect(mockGetSessionMessages).toHaveBeenCalledTimes(2);
+      expect(chatState.mergeMessages).toHaveBeenCalledTimes(1);
+      expect(chatState.mergeMessages).toHaveBeenCalledWith(
+        'session-1',
+        [{ id: 'new-facade-message' }],
+        { maxOffset: 13 }
+      );
     });
 
     it('skips recovery when session or backend does not match current selection', async () => {

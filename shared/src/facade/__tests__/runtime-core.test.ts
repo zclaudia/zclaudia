@@ -253,7 +253,8 @@ describe('BackendFacadeRuntimeCore', () => {
       const snapshot = core.getSnapshot();
       const stream = Object.values(snapshot.sessionStreams).find(s => s.sessionId === 's1');
       expect(stream).toBeDefined();
-      expect(stream!.state).toBe('opening');
+      expect(stream!.state).toBe('open');
+      expect(events.some(e => e.type === 'run_event' || e.type === 'content_patch')).toBe(false);
     });
 
     it('content_patch promotes stream and emits event', () => {
@@ -341,7 +342,7 @@ describe('BackendFacadeRuntimeCore', () => {
       const snapshot = core.getSnapshot();
       const stream = Object.values(snapshot.sessionStreams).find(s => s.sessionId === 's1');
       expect(stream).toBeDefined();
-      expect(stream!.state).toBe('opening');
+      expect(stream!.state).toBe('open');
     });
   });
 

@@ -646,6 +646,33 @@ describe('GatewayClient', () => {
     });
   });
 
+  describe('incoming message channels', () => {
+    it('registers catch-up-only channels before the catch-up early return', async () => {
+      client = new GatewayClient(mockConfig);
+      const opened = vi.fn();
+      const caughtUp = vi.fn(async () => []);
+      client.commands.channel.onIncomingOpened(opened);
+      client.commands.channel.onCatchUp(caughtUp);
+      const send = vi.spyOn((client as any).messageChannels, 'send').mockReturnValue(true);
+      const messageChannels = (client as any).messageChannels;
+
+      messageChannels.deps.onMessage('catch-up-only', {
+        type: 'catch_up_content',
+        backendId: 'backend-1',
+        contentStreamId: 'session-1',
+        afterOffset: 4,
+      });
+      await Promise.resolve();
+
+      expect(opened).toHaveBeenCalledExactlyOnceWith('catch-up-only');
+      expect(caughtUp).toHaveBeenCalledExactlyOnceWith('session-1', 4);
+      expect(send).toHaveBeenCalledWith(
+        'catch-up-only',
+        expect.objectContaining({ type: 'content_patch', latestOffset: 4 })
+      );
+    });
+  });
+
   describe('edge cases', () => {
     it('handles close without existing WebSocket', () => {
       client = new GatewayClient(mockConfig);

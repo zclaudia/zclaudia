@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useSessionRoute } from '../useSessionRoute';
 import { useFacadeStore } from '../../../../stores/facadeStore';
@@ -7,9 +7,22 @@ import { useServerStore } from '../../../../stores/serverStore';
 import { useChatMessageStore } from '../../../../stores/chatMessageStore';
 import { useRecoveryStore } from '../../../../stores/recoveryStore';
 
+const { mockRecoverCurrentSessionTail } = vi.hoisted(() => ({
+  mockRecoverCurrentSessionTail: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock('../../../../services/sessionSync', () => ({
+  recoverCurrentSessionTail: (...args: unknown[]) => mockRecoverCurrentSessionTail(...args),
+}));
+
 describe('useSessionRoute', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRecoverCurrentSessionTail.mockResolvedValue(true);
 
     const facade = {
       openBackend: vi.fn(),
@@ -159,5 +172,58 @@ describe('useSessionRoute', () => {
     expect(facade.openBackend).toHaveBeenCalledWith('backend-1');
     expect(facade.openSessionStream).toHaveBeenCalledWith('backend-1', 'session-1');
     expect(facade.catchUpContent).toHaveBeenCalledWith('backend-1', 'session-1', 0);
+    expect(mockRecoverCurrentSessionTail).toHaveBeenCalledWith('backend-1', 'session-1');
+  });
+
+  it('waits for backend readiness before reconnect tail recovery', () => {
+    const { rerender } = renderHook(() =>
+      useSessionRoute('session-1', { maintainDesiredState: true })
+    );
+    mockRecoverCurrentSessionTail.mockClear();
+
+    act(() => {
+      useFacadeStore.setState(state => ({
+        ...state,
+        reconnectGeneration: 2,
+        backends: [{ ...state.backends[0], runtimeState: 'connecting' } as any],
+      }));
+    });
+    rerender();
+    expect(mockRecoverCurrentSessionTail).not.toHaveBeenCalled();
+
+    act(() => {
+      useFacadeStore.setState(state => ({
+        ...state,
+        backends: [{ ...state.backends[0], runtimeState: 'ready' } as any],
+      }));
+    });
+    rerender();
+    expect(mockRecoverCurrentSessionTail).toHaveBeenCalledWith('backend-1', 'session-1');
+  });
+
+  it('retries a transient tail failure once in the same generation after StrictMode cleanup', async () => {
+    vi.useFakeTimers();
+    let resolveInitial: ((recovered: boolean) => void) | undefined;
+    const initialRecovery = new Promise<boolean>(resolve => {
+      resolveInitial = resolve;
+    });
+    mockRecoverCurrentSessionTail.mockImplementation(() =>
+      mockRecoverCurrentSessionTail.mock.calls.length <= 2 ? initialRecovery : Promise.resolve(true)
+    );
+    useFacadeStore.setState(state => ({ ...state, reconnectGeneration: 2 }));
+
+    renderHook(() => useSessionRoute('session-1', { maintainDesiredState: true }), {
+      reactStrictMode: true,
+    });
+    // StrictMode replays the mount effect; sessionSync coalesces these calls.
+    expect(mockRecoverCurrentSessionTail).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveInitial?.(false);
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(1_500);
+    });
+
+    expect(mockRecoverCurrentSessionTail).toHaveBeenCalledTimes(3);
   });
 });

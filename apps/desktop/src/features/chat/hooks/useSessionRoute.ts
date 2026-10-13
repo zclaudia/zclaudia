@@ -13,6 +13,7 @@ import {
   getMobileBackendViewState,
   isMobileBackendUsable,
 } from '../../../services/mobileConnectionState';
+import { recoverCurrentSessionTail } from '../../../services/sessionSync';
 
 function getStreamKey(backendId: string, sessionId: string): string {
   return `${backendId}:${sessionId}`;
@@ -96,9 +97,15 @@ export function useSessionRoute(
   const catchUpSignatureRef = useRef<string | null>(null);
   const prevStreamStateRef = useRef<string | undefined>(undefined);
   const lastRecoveryGenerationRef = useRef(0);
+  const lastTailRecoveryRef = useRef<{
+    signature: string;
+    facade: typeof facade;
+    promise: Promise<boolean>;
+  } | null>(null);
 
   useEffect(() => {
     catchUpSignatureRef.current = null;
+    lastTailRecoveryRef.current = null;
   }, [streamKey]);
 
   // Reset catch-up signature when stream transitions back to 'open' (e.g. after reconnect).
@@ -134,6 +141,53 @@ export function useSessionRoute(
     facade.openSessionStream(backendId, sessionId);
   }, [backendId, facade, maintainDesiredState, reconnectGeneration, sessionId]);
 
+  // A reconnect can restore the backend and idle stream without a new run
+  // event. Refresh the selected session's latest persisted window so in-place
+  // assistant updates (which keep the same offset) become visible as well.
+  useEffect(() => {
+    if (
+      !maintainDesiredState ||
+      !backendId ||
+      !sessionId ||
+      !streamKey ||
+      backend?.runtimeState !== 'ready' ||
+      reconnectGeneration === 0
+    ) {
+      return;
+    }
+
+    const signature = `${streamKey}:${reconnectGeneration}`;
+    const promise =
+      lastTailRecoveryRef.current?.signature === signature &&
+      lastTailRecoveryRef.current.facade === facade
+        ? lastTailRecoveryRef.current.promise
+        : recoverCurrentSessionTail(backendId, sessionId);
+    lastTailRecoveryRef.current = { signature, facade, promise };
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    void promise.then(recovered => {
+      // Allow one bounded retry for a transient HTTP failure within the same
+      // connection generation. A later reconnect gets its own attempt.
+      if (!recovered && !cancelled) {
+        retryTimer = setTimeout(() => {
+          if (!cancelled) void recoverCurrentSessionTail(backendId, sessionId);
+        }, 1_500);
+      }
+    });
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [
+    backend?.runtimeState,
+    backendId,
+    facade,
+    maintainDesiredState,
+    reconnectGeneration,
+    sessionId,
+    streamKey,
+  ]);
+
   useEffect(() => {
     if (!maintainDesiredState || !facade || !backendId || !sessionId) return;
 
@@ -146,6 +200,7 @@ export function useSessionRoute(
 
   useEffect(() => {
     if (!maintainDesiredState || !facade || !backendId || !sessionId || !streamKey) return;
+    if (backend?.runtimeState !== 'ready') return;
     if (stream?.state !== 'open') return;
 
     const signature = `${streamKey}:${maxOffset}`;
@@ -154,6 +209,7 @@ export function useSessionRoute(
     facade.catchUpContent(backendId, sessionId, maxOffset);
   }, [
     backendId,
+    backend?.runtimeState,
     facade,
     maintainDesiredState,
     maxOffset,

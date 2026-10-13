@@ -258,7 +258,7 @@ export class GatewayManager {
       },
     });
 
-    this.gatewayClient.commands.channel.onIncomingMessage(async (channelId, message) => {
+    const registerIncomingChannel = (channelId: string): ConnectedClient => {
       let virtualClient = this.virtualClients.get(channelId);
       if (!virtualClient) {
         virtualClient = this.createVirtualClient(channelId, {
@@ -277,6 +277,17 @@ export class GatewayManager {
         const heartbeat = serverContext.getStateHeartbeat();
         this.gatewayClient?.commands.channel.sendToIncoming(channelId, heartbeat);
       }
+      return virtualClient;
+    };
+
+    // Register as soon as the data socket is usable so an idle mobile client
+    // receives heartbeat and run broadcasts without sending a business frame.
+    this.gatewayClient.commands.channel.onIncomingOpened(channelId => {
+      registerIncomingChannel(channelId);
+    });
+
+    this.gatewayClient.commands.channel.onIncomingMessage(async (channelId, message) => {
+      const virtualClient = registerIncomingChannel(channelId);
 
       await serverContext.handleMessage(virtualClient, message);
     });
