@@ -38,15 +38,17 @@ export interface UseHorizontalDragOptions {
 
 type GesturePhase = 'idle' | 'pending' | 'dragging';
 
+interface PositionSample {
+  x: number;
+  time: number;
+}
+
 interface GestureState {
   phase: GesturePhase;
   touchId: number | null;
   startX: number;
   startY: number;
-  lastX: number;
-  lastTime: number;
-  lastVelocity: number;
-  lastVelocityTime: number;
+  samples: PositionSample[];
 }
 
 const INITIAL_STATE: GestureState = {
@@ -54,11 +56,15 @@ const INITIAL_STATE: GestureState = {
   touchId: null,
   startX: 0,
   startY: 0,
-  lastX: 0,
-  lastTime: 0,
-  lastVelocity: 0,
-  lastVelocityTime: 0,
+  samples: [],
 };
+
+/** Release velocity is measured over at most this much recent movement. */
+const VELOCITY_WINDOW_MS = 100;
+/** A finger held still this long before lifting releases with no velocity. */
+const VELOCITY_STOP_MS = 80;
+/** Floor for the measured span so two coalesced events can't spike the result. */
+const VELOCITY_MIN_SPAN_MS = 8;
 
 const INTERACTIVE_START_SELECTOR =
   'input, textarea, button, a, select, option, [contenteditable]:not([contenteditable="false"]), [role="button"], [data-horizontal-drag-ignore]';
@@ -79,6 +85,46 @@ function findTouch(touches: TouchList, identifier: number): Touch | null {
     if (touch?.identifier === identifier) return touch;
   }
   return null;
+}
+
+/** Event time in ms; touch events carry their input timestamp, which tracks the finger more closely than handler time. */
+function eventTime(event: Event): number {
+  return event.timeStamp > 0 ? event.timeStamp : performance.now();
+}
+
+function recordSample(samples: PositionSample[], x: number, time: number) {
+  samples.push({ x, time });
+  while (samples.length > 2 && time - samples[0].time > VELOCITY_WINDOW_MS) samples.shift();
+}
+
+/**
+ * Raw (rightward-positive) release velocity in px/ms. A single move segment
+ * undercounts a flick because fingers decelerate just before lifting, so this
+ * averages the final run of movement in one direction across the recent
+ * window — the push the user actually made, not its tail.
+ */
+function releaseVelocity(samples: PositionSample[], x: number, time: number): number {
+  const last = samples[samples.length - 1];
+  if (!last) return 0;
+  if (x !== last.x) recordSample(samples, x, time);
+  else if (time - last.time > VELOCITY_STOP_MS) return 0;
+
+  const newest = samples[samples.length - 1];
+  let oldest = samples.length - 1;
+  let runSign = 0;
+  for (let index = samples.length - 2; index >= 0; index -= 1) {
+    if (newest.time - samples[index].time > VELOCITY_WINDOW_MS) break;
+    const stepSign = Math.sign(samples[index + 1].x - samples[index].x);
+    if (stepSign !== 0) {
+      if (runSign === 0) runSign = stepSign;
+      else if (stepSign !== runSign) break;
+    }
+    oldest = index;
+  }
+
+  const span = newest.time - samples[oldest].time;
+  if (span <= 0) return 0;
+  return (newest.x - samples[oldest].x) / Math.max(span, VELOCITY_MIN_SPAN_MS);
 }
 
 function directionalDelta(direction: HorizontalDragDirection, startX: number, x: number): number {
@@ -138,16 +184,12 @@ export function useHorizontalDrag<E extends HTMLElement = HTMLDivElement>(
 
         const touch = touchAt(event.touches, 0);
         if (!touch) return;
-        const now = Date.now();
         stateRef.current = {
           phase: 'pending',
           touchId: touch.identifier,
           startX: touch.clientX,
           startY: touch.clientY,
-          lastX: touch.clientX,
-          lastTime: now,
-          lastVelocity: 0,
-          lastVelocityTime: now,
+          samples: [{ x: touch.clientX, time: eventTime(event) }],
         };
       };
 
@@ -170,6 +212,9 @@ export function useHorizontalDrag<E extends HTMLElement = HTMLDivElement>(
         const rawY = touch.clientY - state.startY;
         const absoluteX = Math.abs(rawX);
         const absoluteY = Math.abs(rawY);
+        // Sample before claiming: on a short flick the activation travel is a
+        // good share of the whole gesture's speed.
+        recordSample(state.samples, touch.clientX, eventTime(event));
         const activationDistance = current.activationDistance ?? 8;
         const axisDominanceRatio = current.axisDominanceRatio ?? 1.2;
 
@@ -189,16 +234,6 @@ export function useHorizontalDrag<E extends HTMLElement = HTMLDivElement>(
           state.phase = 'dragging';
           current.onDragStart?.();
         }
-
-        const now = Date.now();
-        const elapsed = now - state.lastTime;
-        if (elapsed > 0) {
-          state.lastVelocity =
-            directionalDelta(current.direction, state.lastX, touch.clientX) / elapsed;
-          state.lastVelocityTime = now;
-        }
-        state.lastX = touch.clientX;
-        state.lastTime = now;
 
         const maxDistance = Math.max(1, current.maxDistance);
         const distance = clampDelta(
@@ -222,21 +257,14 @@ export function useHorizontalDrag<E extends HTMLElement = HTMLDivElement>(
           return;
         }
 
-        const now = Date.now();
         const maxDistance = Math.max(1, current.maxDistance);
         const distance = clampDelta(
           current.direction,
           directionalDelta(current.direction, state.startX, touch.clientX),
           maxDistance
         );
-        const elapsed = now - state.lastTime;
-        const endSegment = directionalDelta(current.direction, state.lastX, touch.clientX);
-        const velocity =
-          elapsed > 0 && endSegment !== 0
-            ? endSegment / elapsed
-            : now - state.lastVelocityTime <= 100
-              ? state.lastVelocity
-              : 0;
+        const rawVelocity = releaseVelocity(state.samples, touch.clientX, eventTime(event));
+        const velocity = current.direction === 'left' ? -rawVelocity : rawVelocity;
         const completionThreshold = current.completionThreshold ?? 0.32;
         const velocityThreshold = current.velocityThreshold ?? 0.45;
         // Single-direction drags only complete when the release pushed the way

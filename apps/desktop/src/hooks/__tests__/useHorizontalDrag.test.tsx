@@ -65,6 +65,8 @@ function dispatchTouch(
     touches: isEnd ? [] : [touch],
     changedTouches: [touch],
   });
+  // The hook reads the input timestamp; tie it to the (possibly faked) clock.
+  Object.defineProperty(event, 'timeStamp', { value: Date.now() });
   act(() => target.dispatchEvent(event));
   return event;
 }
@@ -182,6 +184,43 @@ describe('useHorizontalDrag', () => {
     expect(fast.onEnd.mock.calls[0][0].distance).toBe(20);
     expect(fast.onEnd.mock.calls[0][0].velocity).toBeGreaterThanOrEqual(0.45);
     expect(fast.onEnd.mock.calls[0][0].shouldComplete).toBe(true);
+  });
+
+  it('measures a decelerating flick by its push, not its slow tail', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1000);
+    const { content, onEnd } = setup({ maxDistance: 300 });
+    dispatchTouch(content, 'touchstart', 10, 50);
+    vi.setSystemTime(1016);
+    dispatchTouch(content, 'touchmove', 30, 50);
+    vi.setSystemTime(1032);
+    dispatchTouch(content, 'touchmove', 46, 50);
+    vi.setSystemTime(1048);
+    dispatchTouch(content, 'touchmove', 52, 50);
+    vi.setSystemTime(1064);
+    dispatchTouch(content, 'touchmove', 54, 50);
+    vi.setSystemTime(1070);
+    dispatchTouch(content, 'touchend', 54, 50);
+
+    // The final segment alone is 2px/16ms ≈ 0.13; the push averages ~0.69.
+    const { velocity, shouldComplete } = onEnd.mock.calls[0][0];
+    expect(velocity).toBeCloseTo(44 / 64, 5);
+    expect(shouldComplete).toBe(true);
+  });
+
+  it('releases with no velocity when the finger stopped before lifting', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1000);
+    const { content, onEnd } = setup({ maxDistance: 300 });
+    dispatchTouch(content, 'touchstart', 10, 50);
+    vi.setSystemTime(1016);
+    dispatchTouch(content, 'touchmove', 40, 50);
+    vi.setSystemTime(1032);
+    dispatchTouch(content, 'touchmove', 70, 50);
+    vi.setSystemTime(1200);
+    dispatchTouch(content, 'touchend', 70, 50);
+
+    expect(onEnd.mock.calls[0][0].velocity).toBe(0);
   });
 
   it('reports signed distance in both directions when direction is "both"', () => {

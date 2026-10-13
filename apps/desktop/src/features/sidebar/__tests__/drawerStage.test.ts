@@ -61,7 +61,22 @@ describe('resolveDrawerStage', () => {
 
   it('advances one detent on a rightward flick', () => {
     expect(resolveDrawerStage(20, 0.6, PHONE)).toBe('peek');
+    expect(resolveDrawerStage(12, 0.3, PHONE)).toBe('peek');
     expect(resolveDrawerStage(DRAWER_PEEK_WIDTH_PX, 0.6, PHONE)).toBe('full');
+  });
+
+  it('coasts on release momentum past the midpoint of a short swipe', () => {
+    // 110px of travel alone falls back to closed; 0.25px/ms (below a flick)
+    // coasts another 50px, past the 150px midpoint.
+    expect(resolveDrawerStage(110, 0, PHONE)).toBe('closed');
+    expect(resolveDrawerStage(110, 0.25, PHONE)).toBe('peek');
+    expect(resolveDrawerStage(190, 0, PHONE)).toBe('peek');
+    expect(resolveDrawerStage(190, -0.25, PHONE)).toBe('closed');
+  });
+
+  it('lets a barely-moving release settle where the finger left it', () => {
+    expect(resolveDrawerStage(60, 0.05, PHONE)).toBe('closed');
+    expect(resolveDrawerStage(260, -0.05, PHONE)).toBe('peek');
   });
 
   it('never jumps straight to full on a flick from closed', () => {

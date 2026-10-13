@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isInteractiveHorizontalDragStart, useHorizontalDrag } from '../hooks/useHorizontalDrag';
 import {
+  DRAWER_FLICK_VELOCITY,
   DRAWER_PEEK_WIDTH_PX,
   drawerExpandedWidth,
   drawerStagePosition,
@@ -111,7 +112,7 @@ export function useMobileDrawer({
     direction: drawerStage === 'closed' ? 'right' : 'both',
     maxDistance: viewportDrawerWidth(),
     completionThreshold: 0.32,
-    velocityThreshold: 0.45,
+    velocityThreshold: DRAWER_FLICK_VELOCITY,
     shouldStart: target => sidebarOpen || !isInteractiveHorizontalDragStart(target),
     onDragStart: () => {
       dragStartPositionRef.current = drawerStagePosition(drawerStage, viewportDrawerWidth());
