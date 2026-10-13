@@ -6,13 +6,9 @@ export {
   type ToolsetContext,
 } from './toolsets.js';
 export {
-  LightweightAgentRunner,
-  type LightweightAgentRunnerDeps,
-  type AgentLoopExecutor,
-} from './lightweight-agent-runner.js';
-export {
   AgentLoopTimeoutError,
   runPiAgentLoop,
+  type AgentLoopExecutor,
   type AgentLoopExecutorInput,
   type AgentLoopExecutorResult,
 } from './pi-agent-loop-executor.js';

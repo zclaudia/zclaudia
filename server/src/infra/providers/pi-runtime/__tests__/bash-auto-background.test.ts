@@ -6,6 +6,7 @@ import Database from 'better-sqlite3';
 import { runBash, killProcessTree } from '../bash-runner.js';
 import { buildTools } from '../tool-bridge.js';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
+import { createTaskAdapter } from '../../../../application/tasks/task-adapter.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
 import {
   commandTaskLogPath,
@@ -159,7 +160,12 @@ describe('Bash auto-background (tool integration)', () => {
   });
 
   function bashTool(dir: string, options: Record<string, unknown> = {}): any {
-    return buildTools(dir, { enabled: ['Bash'], ...options }).find((t: any) => t.name === 'Bash');
+    const dbContext = options.db as Database.Database | undefined;
+    return buildTools(dir, {
+      enabled: ['Bash'],
+      ...options,
+      ...(dbContext ? { taskPort: createTaskAdapter(dbContext) } : {}),
+    }).find((t: any) => t.name === 'Bash');
   }
 
   it('moves a long-running foreground command into a background task', async () => {

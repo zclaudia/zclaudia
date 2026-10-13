@@ -2,8 +2,7 @@ import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
 
-import { TaskRepository } from '../../../domains/tasks/repository.js';
-import { TaskService } from '../../../domains/tasks/task-service.js';
+import type { TaskPort } from '../../../utils/task-port.js';
 import type { TaskExecutor } from '../../../utils/task-executor-types.js';
 import type { PiToolLookupPort, SubagentMessenger, SubagentType } from '../types.js';
 import {
@@ -88,10 +87,10 @@ function describeSubagentTypes(roster: SubagentType[]): string {
   return `\n\nAvailable subagent_type values (agent profiles):\n${lines.join('\n')}`;
 }
 
-export type TaskRuntimeRegistryFactory = (repo: TaskRepository) => TaskRuntimeRegistry;
+export type TaskRuntimeRegistryFactory = (tasks: TaskPort) => TaskRuntimeRegistry;
 
-export function createDefaultTaskRuntimeRegistry(repo: TaskRepository): TaskRuntimeRegistry {
-  return createTaskRuntimeRegistry([new CommandTaskRuntime(repo), new EvalTaskRuntime(repo)]);
+export function createDefaultTaskRuntimeRegistry(tasks: TaskPort): TaskRuntimeRegistry {
+  return createTaskRuntimeRegistry([new CommandTaskRuntime(tasks), new EvalTaskRuntime(tasks)]);
 }
 
 export function createAgentTool(
@@ -101,7 +100,8 @@ export function createAgentTool(
   db?: Database.Database,
   permissionOverride?: Partial<UnifiedPermissionPolicy>,
   agentTaskExecutor?: TaskExecutor,
-  lookups?: Pick<PiToolLookupPort, 'listSubagentTypes'>
+  lookups?: Pick<PiToolLookupPort, 'listSubagentTypes'>,
+  taskPort?: TaskPort
 ): AgentTool {
   const roster = listSubagentTypes(lookups);
   return {
@@ -147,7 +147,8 @@ export function createAgentTool(
       const args = toolParams(toolCallId, params);
       if (!agentTaskExecutor)
         return errorResult('missing_task_executor', 'Agent tool requires a task executor');
-      if (!db) return errorResult('missing_db_context', 'Agent tool requires database context');
+      if (!taskPort)
+        return errorResult('missing_db_context', 'Agent tool requires database context');
       if (typeof args.prompt !== 'string' || !args.prompt.trim()) {
         return errorResult('missing_prompt', 'Agent requires a prompt');
       }
@@ -173,8 +174,7 @@ export function createAgentTool(
       }
 
       const projectId = resolveProjectIdForSession(db, sessionId);
-      const taskService = new TaskService(new TaskRepository(db));
-      const task = taskService.createTask({
+      const task = taskPort.createTask({
         type: 'agent',
         title: taskTitleFromArgs(args),
         parentSessionId: sessionId,
@@ -199,7 +199,7 @@ export function createAgentTool(
         const started = await agentTaskExecutor.start(task);
         // Persist the sub-agent's session id: SendMessage resolves task_id →
         // session through it, and the UI links the task to its transcript.
-        const running = taskService.startTask(task.id, {
+        const running = taskPort.startTask(task.id, {
           executorRef: started.executorRef,
           sessionId: started.sessionId,
         });
@@ -215,10 +215,10 @@ export function createAgentTool(
         const result = await agentTaskExecutor.wait(task.id);
         const updated =
           result.status === 'completed'
-            ? taskService.completeTask(task.id, result.result ?? {})
+            ? taskPort.completeTask(task.id, result.result ?? {})
             : result.status === 'stopped'
-              ? taskService.stopTask(task.id, result.result)
-              : taskService.failTask(task.id, result.result ?? { error: 'Agent task failed' });
+              ? taskPort.stopTask(task.id, result.result)
+              : taskPort.failTask(task.id, result.result ?? { error: 'Agent task failed' });
         return jsonResult({
           ok: true,
           taskId: task.id,
@@ -227,7 +227,7 @@ export function createAgentTool(
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        taskService.failTask(task.id, { error: message });
+        taskPort.failTask(task.id, { error: message });
         return errorResult('agent_delegate_failed', message, { taskId: task.id });
       }
     },
@@ -235,7 +235,7 @@ export function createAgentTool(
 }
 
 export function createTaskOutputTool(
-  db?: Database.Database,
+  taskPort?: TaskPort,
   runtimeRegistryFactory: TaskRuntimeRegistryFactory = createDefaultTaskRuntimeRegistry
 ): AgentTool {
   return {
@@ -269,23 +269,23 @@ export function createTaskOutputTool(
     }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
-      if (!db) return errorResult('missing_db_context', 'TaskOutput requires database context');
+      if (!taskPort)
+        return errorResult('missing_db_context', 'TaskOutput requires database context');
       const taskId = args.task_id ?? args.taskId;
       if (typeof taskId !== 'string' || !taskId.trim()) {
         return errorResult('missing_task_id', 'TaskOutput requires task_id');
       }
 
-      const repo = new TaskRepository(db);
-      const registry = runtimeRegistryFactory(repo);
+      const registry = runtimeRegistryFactory(taskPort);
       const isTerminal = (status: string): boolean => status !== 'running' && status !== 'pending';
 
       const readOnce = async (): Promise<TaskToolResult | undefined> => {
-        const task = repo.findById(taskId.trim());
+        const task = taskPort.findById(taskId.trim());
         if (!task) return undefined;
         const runtime = registry.get(task.type);
         if (runtime?.readOutput) return runtime.readOutput(task, args);
         const includeEvents = args.include_events !== false;
-        const events = includeEvents ? repo.listEvents(task.id) : [];
+        const events = includeEvents ? taskPort.listEvents(task.id) : [];
         return textResult(JSON.stringify({ task, events }, null, 2), {
           ok: true,
           taskId: task.id,
@@ -326,7 +326,7 @@ export function createMonitorTool(
   // positions kept so tool-catalog's call site stays stable.
   _sessionId?: string,
   _runId?: string,
-  db?: Database.Database,
+  taskPort?: TaskPort,
   runtimeRegistryFactory: TaskRuntimeRegistryFactory = createDefaultTaskRuntimeRegistry
 ): AgentTool {
   return {
@@ -354,9 +354,7 @@ export function createMonitorTool(
     }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
-      if (!db) return errorResult('missing_db_context', 'Monitor requires database context');
-      const repo = new TaskRepository(db);
-      const service = new TaskService(repo);
+      if (!taskPort) return errorResult('missing_db_context', 'Monitor requires database context');
       const action = typeof args.action === 'string' ? args.action : 'start';
       const taskId = args.task_id ?? args.taskId;
 
@@ -377,16 +375,16 @@ export function createMonitorTool(
       if (typeof taskId !== 'string' || !taskId.trim()) {
         return errorResult('missing_task_id', `Monitor action "${action}" requires task_id`);
       }
-      const task = repo.findById(taskId.trim());
+      const task = taskPort.findById(taskId.trim());
       if (!task)
         return errorResult('task_not_found', `Monitor task not found: ${taskId}`, { taskId });
 
       if (action === 'status') {
-        return jsonResult({ ok: true, task, events: repo.listEvents(task.id) });
+        return jsonResult({ ok: true, task, events: taskPort.listEvents(task.id) });
       }
       if (action === 'stop') {
         try {
-          const runtime = runtimeRegistryFactory(repo).get(task.type);
+          const runtime = runtimeRegistryFactory(taskPort).get(task.type);
           if (runtime?.stop) {
             const update = await runtime.stop(
               task,
@@ -394,7 +392,7 @@ export function createMonitorTool(
             );
             return jsonResult({ ok: true, taskId: task.id, status: update.status });
           }
-          const stopped = service.stopTask(task.id, {
+          const stopped = taskPort.stopTask(task.id, {
             error: typeof args.reason === 'string' ? args.reason : undefined,
           });
           return jsonResult({ ok: true, taskId: stopped.id, status: stopped.status });
@@ -419,6 +417,7 @@ export interface SendMessageToolDeps {
   permissionOverride?: Partial<UnifiedPermissionPolicy>;
   agentTaskExecutor?: TaskExecutor;
   messenger?: SubagentMessenger;
+  taskPort?: TaskPort;
 }
 
 /**
@@ -433,7 +432,8 @@ export interface SendMessageToolDeps {
  * a prompt-injected sub-agent must not be able to redirect its siblings.
  */
 export function createSendMessageTool(deps: SendMessageToolDeps): AgentTool {
-  const { cwd, sessionId, runId, db, permissionOverride, agentTaskExecutor, messenger } = deps;
+  const { cwd, sessionId, runId, db, permissionOverride, agentTaskExecutor, messenger, taskPort } =
+    deps;
   return {
     name: 'SendMessage',
     label: 'SendMessage',
@@ -454,7 +454,8 @@ export function createSendMessageTool(deps: SendMessageToolDeps): AgentTool {
     }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
-      if (!db) return errorResult('missing_db_context', 'SendMessage requires database context');
+      if (!taskPort)
+        return errorResult('missing_db_context', 'SendMessage requires database context');
       if (!messenger) {
         return errorResult('missing_messenger', 'SendMessage requires the session messenger');
       }
@@ -463,8 +464,7 @@ export function createSendMessageTool(deps: SendMessageToolDeps): AgentTool {
       const message = typeof args.message === 'string' ? args.message.trim() : '';
       if (!message) return errorResult('missing_message', 'SendMessage requires a message');
 
-      const repo = new TaskRepository(db);
-      const task = repo.findById(taskId);
+      const task = taskPort.findById(taskId);
       if (!task) return errorResult('task_not_found', `Task not found: ${taskId}`);
       if (task.type !== 'agent') {
         return errorResult('not_an_agent_task', `Task ${taskId} is a ${task.type} task`);
@@ -511,8 +511,7 @@ export function createSendMessageTool(deps: SendMessageToolDeps): AgentTool {
         );
       }
       const previous = task.metadata ?? {};
-      const taskService = new TaskService(repo);
-      const resumed = taskService.createTask({
+      const resumed = taskPort.createTask({
         type: 'agent',
         title:
           typeof args.summary === 'string' && args.summary.trim()
@@ -540,7 +539,7 @@ export function createSendMessageTool(deps: SendMessageToolDeps): AgentTool {
       });
       try {
         const started = await agentTaskExecutor.start(resumed);
-        taskService.startTask(resumed.id, {
+        taskPort.startTask(resumed.id, {
           executorRef: started.executorRef,
           sessionId: started.sessionId ?? task.sessionId,
         });
@@ -553,7 +552,7 @@ export function createSendMessageTool(deps: SendMessageToolDeps): AgentTool {
         });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        taskService.failTask(resumed.id, { error: errorMessage });
+        taskPort.failTask(resumed.id, { error: errorMessage });
         return errorResult('subagent_resume_failed', errorMessage, { taskId: resumed.id });
       }
     },
@@ -564,6 +563,7 @@ export interface RespondToCoordinatorToolDeps {
   sessionId?: string;
   db?: Database.Database;
   messenger?: SubagentMessenger;
+  taskPort?: TaskPort;
 }
 
 export function buildCoordinatorNotice(input: {
@@ -586,7 +586,7 @@ export function buildCoordinatorNotice(input: {
  * or queued for its next run. Does not end the sub-agent's turn.
  */
 export function createRespondToCoordinatorTool(deps: RespondToCoordinatorToolDeps): AgentTool {
-  const { sessionId, db, messenger } = deps;
+  const { sessionId, messenger, taskPort } = deps;
   return {
     name: 'RespondToCoordinator',
     label: 'RespondToCoordinator',
@@ -603,7 +603,7 @@ export function createRespondToCoordinatorTool(deps: RespondToCoordinatorToolDep
     }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
-      if (!db) {
+      if (!taskPort) {
         return errorResult('missing_db_context', 'RespondToCoordinator requires database context');
       }
       if (!messenger) {
@@ -620,7 +620,7 @@ export function createRespondToCoordinatorTool(deps: RespondToCoordinatorToolDep
       if (!summary || !response) {
         return errorResult('missing_fields', 'RespondToCoordinator requires summary and response');
       }
-      const task = new TaskRepository(db).findLatestAgentTaskForSession(sessionId);
+      const task = taskPort.findLatestAgentTaskForSession(sessionId);
       if (!task?.parentSessionId) {
         return errorResult(
           'no_coordinator',

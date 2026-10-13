@@ -111,7 +111,10 @@ import {
   GitStageActivity,
   GenerateCommitMessageActivity,
 } from './domains/activities/index.js';
-import { LightweightAgentRunner } from './infra/providers/pi-runtime/agent-loop/index.js';
+import { createPiAgentLoopRunner } from './application/agent-loop/lightweight-agent-runner.js';
+import { DefaultWorkflowAgentRuntimeResolver } from './application/workflows/workflow-agent-runtime-resolver.js';
+import { createTaskAdapter } from './application/tasks/task-adapter.js';
+import { createPlanModePort } from './application/conversation/runtime/plan-mode-port.js';
 
 interface RegisterFeatureDomainsDeps {
   db: ReturnType<typeof initDatabase>;
@@ -189,7 +192,10 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
   activityRegistry.register(new GitCommitActivity());
   activityRegistry.register(new GitStageActivity());
   activityRegistry.register(new GenerateCommitMessageActivity());
-  const sharedAgentLoopRunner = new LightweightAgentRunner({ db });
+  const sharedAgentLoopRunner = createPiAgentLoopRunner(db, {
+    taskPort: createTaskAdapter(db),
+    planModePort: createPlanModePort(db),
+  });
 
   registerProjectsDomain({
     db,
@@ -390,7 +396,11 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     systemTaskRegistry: workflowScheduling,
     aiRunPort: workflowAiRunPort,
     permissionBridge,
-    getPermissionWorkflowResolver: () => permissionWorkflowResolverRef.current,
+    agentRuntime: DefaultWorkflowAgentRuntimeResolver.withWorkflowPermissions(db, {
+      db,
+      permissionBridge,
+      getPermissionWorkflowResolver: () => permissionWorkflowResolverRef.current,
+    }),
     taskExecutorRegistry,
     activityRegistry,
     agentLoopRunner: sharedAgentLoopRunner,

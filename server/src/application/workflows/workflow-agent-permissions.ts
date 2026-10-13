@@ -1,13 +1,13 @@
 import type Database from 'better-sqlite3';
 import { DEFAULT_UNIFIED_POLICY } from '@zclaudia/shared/interaction/permissions';
 import type { PermissionRequest } from '@zclaudia/shared/interaction/permissions';
-import type { PermissionBridgePort } from '../ports/step-executor.js';
+import type { PermissionBridgePort } from '../../domains/workflows/ports/step-executor.js';
 import type {
   AgentLoopPermissionCallback,
   AgentLoopPermissionDecision,
-} from '../../agent-loop/index.js';
-import type { PermissionWorkflowResolver } from '../permission-workflow-resolver.js';
-import { providerRegistry } from '../../../infra/providers/registry.js';
+} from '../../domains/agent-loop/index.js';
+import type { PermissionWorkflowResolver } from '../../domains/workflows/permission-workflow-resolver.js';
+import { providerRegistry } from '../../infra/providers/registry.js';
 import {
   classify,
   getAgentPermissionPolicy,
@@ -15,7 +15,7 @@ import {
   getProjectPermissionOverride,
   mergePolicy,
   PermissionEvaluator,
-} from '../../../application/conversation/agent/permission-evaluator.js';
+} from '../conversation/agent/permission-evaluator.js';
 
 type PolicyDb = Parameters<typeof getAgentPermissionPolicy>[0];
 const DEFAULT_WORKFLOW_PERMISSION_TIMEOUT_MS = 5 * 60 * 1000;

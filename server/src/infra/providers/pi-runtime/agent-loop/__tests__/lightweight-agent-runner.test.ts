@@ -3,7 +3,36 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { migration as m001 } from '../../../../storage/migrations/001_initial_schema.js';
 import { migration as m003 } from '../../../../storage/migrations/003_llm_profile_models.js';
 import { migration as m028 } from '../../../../storage/migrations/028_agent_loop_contexts.js';
-import { LightweightAgentRunner, type AgentLoopExecutor } from '../lightweight-agent-runner.js';
+import { LightweightAgentRunner } from '../../../../../application/agent-loop/lightweight-agent-runner.js';
+import type { AgentLoopExecutionResult } from '../../../../../utils/agent-loop-runtime-types.js';
+import { buildAgentHooks } from '../../agent-hooks.js';
+import { PendingArgOverrides } from '../../pending-arg-overrides.js';
+import { buildModel } from '../../build-model.js';
+import {
+  AgentLoopTimeoutError,
+  runPiAgentLoop,
+  type AgentLoopExecutor,
+} from '../pi-agent-loop-executor.js';
+import { buildAgentLoopTools, getAgentLoopToolsetDescriptor } from '../toolsets.js';
+
+function createRunner(
+  db: Database.Database,
+  executeAgentLoop: AgentLoopExecutor = runPiAgentLoop,
+  now?: () => number
+) {
+  const runtime = {
+    executeAgentLoop: executeAgentLoop as unknown as (
+      input: Parameters<AgentLoopExecutor>[0]
+    ) => Promise<AgentLoopExecutionResult>,
+    buildModel,
+    getToolsetDescriptor: getAgentLoopToolsetDescriptor,
+    createArgOverrides: () => new PendingArgOverrides(),
+    buildTools: buildAgentLoopTools,
+    buildHooks: buildAgentHooks,
+    isTimeoutError: (error: unknown) => error instanceof AgentLoopTimeoutError,
+  };
+  return new LightweightAgentRunner({ db, runtime, now });
+}
 
 describe('LightweightAgentRunner', () => {
   let db: Database.Database;
@@ -27,7 +56,7 @@ describe('LightweightAgentRunner', () => {
       messages: [],
       usage: { output: 5 },
     }));
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute, now: () => 2_000 });
+    const runner = createRunner(db, execute, () => 2_000);
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -82,7 +111,7 @@ describe('LightweightAgentRunner', () => {
       text: '{"result":"done"}',
       messages: [],
     }));
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -127,7 +156,7 @@ describe('LightweightAgentRunner', () => {
         messages: [],
         usage: { input: 5, output: 2 },
       });
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -177,7 +206,7 @@ describe('LightweightAgentRunner', () => {
         messages: [],
       };
     });
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -232,7 +261,7 @@ describe('LightweightAgentRunner', () => {
         messages: [],
       };
     });
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -270,7 +299,7 @@ describe('LightweightAgentRunner', () => {
       .fn()
       .mockResolvedValueOnce({ text: '{}', messages: [] })
       .mockResolvedValueOnce({ text: '{"result":"repaired"}', messages: [] });
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
 
     await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -299,14 +328,11 @@ describe('LightweightAgentRunner', () => {
   });
 
   it('returns contract_failed when repair still fails', async () => {
-    const runner = new LightweightAgentRunner({
-      db,
-      executeAgentLoop: vi.fn(async () => ({
+    const runner = createRunner(db, vi.fn(async () => ({
         text: 'still bad',
         messages: [],
         usage: { totalTokens: 7 },
-      })),
-    });
+      })));
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -337,7 +363,7 @@ describe('LightweightAgentRunner', () => {
 
   it('fails unknown toolsets before calling the model', async () => {
     const execute = vi.fn();
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -359,7 +385,7 @@ describe('LightweightAgentRunner', () => {
 
   it('fails future output contracts before calling the model', async () => {
     const execute = vi.fn();
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -382,7 +408,7 @@ describe('LightweightAgentRunner', () => {
 
   it('fails fast for structured input arrays and never calls the executor', async () => {
     const execute = vi.fn();
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -408,7 +434,7 @@ describe('LightweightAgentRunner', () => {
       text: '{"result":"done"}',
       messages: [],
     }));
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
     const abortController = new AbortController();
     abortController.abort();
 
@@ -445,7 +471,7 @@ describe('LightweightAgentRunner', () => {
       text: '{"result":"done"}',
       messages: [],
     }));
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
 
     await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -477,7 +503,7 @@ describe('LightweightAgentRunner', () => {
       text: '{"result":"done"}',
       messages: [],
     }));
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute, now: () => 2_000 });
+    const runner = createRunner(db, execute, () => 2_000);
 
     await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -536,7 +562,7 @@ describe('LightweightAgentRunner', () => {
       text: '{"result":"done"}',
       messages: [],
     }));
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute, now: () => 2_000 });
+    const runner = createRunner(db, execute, () => 2_000);
 
     const request = (input: string) =>
       runner.run({
@@ -596,7 +622,7 @@ describe('LightweightAgentRunner', () => {
         messages: [],
       };
     });
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -625,7 +651,7 @@ describe('LightweightAgentRunner', () => {
 
   it('fails permission modes that do not match the toolset descriptor', async () => {
     const execute = vi.fn();
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -650,7 +676,7 @@ describe('LightweightAgentRunner', () => {
 
   it('fails unsupported permission modes before calling the model', async () => {
     const execute = vi.fn();
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -676,7 +702,7 @@ describe('LightweightAgentRunner', () => {
       text: '{"result":"done"}',
       messages: [],
     }));
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
     const caller = new AbortController();
 
     const result = await runner.run({
@@ -714,7 +740,7 @@ describe('LightweightAgentRunner', () => {
       text: '{"result":"done"}',
       messages: [],
     }));
-    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const runner = createRunner(db, execute);
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },

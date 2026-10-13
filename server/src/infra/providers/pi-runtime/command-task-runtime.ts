@@ -1,12 +1,6 @@
 import type { TaskRecord } from '@zclaudia/shared/core/task';
 
-import { type TaskRepository } from '../../../domains/tasks/repository.js';
-import { TaskService } from '../../../domains/tasks/task-service.js';
-import {
-  CommandTaskExecutor,
-  commandTaskLogPath,
-  pidAlive,
-} from '../../../domains/tasks/executors/command-executor.js';
+import type { TaskPort } from '../../../utils/task-port.js';
 import {
   extractBashOutputInsights,
   formatBashResultText,
@@ -60,25 +54,29 @@ function commandTaskDurationMs(createdAt: number, updatedAt: number, status: str
 export class CommandTaskRuntime implements TaskRuntime {
   readonly type = 'command';
 
-  constructor(private readonly repo: TaskRepository) {}
+  constructor(private readonly tasks: TaskPort) {}
 
   async stop(task: TaskRecord, reason?: string) {
-    return new CommandTaskExecutor(this.repo).stop(task.id, reason);
+    return this.tasks.commandTasks.stop(task.id, reason);
   }
 
   async readOutput(task: TaskRecord, args: Record<string, unknown>) {
     let current = task;
     const pid = task.executorRef?.pid;
-    if (task.status === 'running' && typeof pid === 'number' && !pidAlive(pid)) {
+    if (
+      task.status === 'running' &&
+      typeof pid === 'number' &&
+      !this.tasks.commandTasks.pidAlive(pid)
+    ) {
       try {
-        current = new TaskService(this.repo).completeTask(task.id, {
+        current = this.tasks.completeTask(task.id, {
           text: 'Process exited (exit code unknown; observed after restart)',
         });
       } catch {
-        current = this.repo.findById(task.id) ?? task;
+        current = this.tasks.findById(task.id) ?? task;
       }
     }
-    const logPath = commandTaskLogPath(task.id);
+    const logPath = this.tasks.commandTasks.logPath(task.id);
     const window = readTaskLogWindow(logPath, args);
     if (!window.ok) {
       return errorResult(window.code, window.message, window.details);
@@ -124,6 +122,6 @@ export class CommandTaskRuntime implements TaskRuntime {
   }
 
   reconcile(): void {
-    new CommandTaskExecutor(this.repo).reconcile();
+    this.tasks.commandTasks.reconcile();
   }
 }

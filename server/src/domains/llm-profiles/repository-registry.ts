@@ -5,7 +5,12 @@
  * importing this domain.
  */
 import type { LlmProfileRepository } from './repository.js';
-import { registerLlmProfileWriter } from '../../utils/llm-profile-registry.js';
+import { refreshIfNeeded } from './codex-oauth-service.js';
+import {
+  getLlmProfileWriter,
+  registerCodexCredentialsResolver,
+  registerLlmProfileWriter,
+} from '../../utils/llm-profile-registry.js';
 
 export type {
   LlmProfileWriterRepo,
@@ -15,4 +20,5 @@ export { getLlmProfileWriter } from '../../utils/llm-profile-registry.js';
 
 export function registerLlmProfileRepository(repo: LlmProfileRepository): void {
   registerLlmProfileWriter(repo);
+  registerCodexCredentialsResolver(profile => refreshIfNeeded(profile, getLlmProfileWriter()));
 }

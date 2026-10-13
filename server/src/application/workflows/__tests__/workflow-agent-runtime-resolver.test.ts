@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
-import { AgentProfileRepository } from '../../agent-profiles/repository.js';
-import { LlmProfileRepository } from '../../llm-profiles/repository.js';
-import { ProjectRepository } from '../../projects/repository.js';
-import { workspaceService } from '../../../application/services/workspace.js';
-import { DefaultWorkflowAgentRuntimeResolver } from '../step-executors/workflow-agent-runtime-resolver.js';
+import { AgentProfileRepository } from '../../../domains/agent-profiles/repository.js';
+import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
+import { ProjectRepository } from '../../../domains/projects/repository.js';
+import { workspaceService } from '../../services/workspace.js';
+import { DefaultWorkflowAgentRuntimeResolver } from '../workflow-agent-runtime-resolver.js';
 
-vi.mock('../../../application/services/workspace.js', () => ({
+vi.mock('../../services/workspace.js', () => ({
   workspaceService: {
     assembleSystemPrompt: vi.fn(async () => 'workspace instructions'),
   },

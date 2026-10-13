@@ -21,6 +21,7 @@ import { useOnlineBackends } from './onlineBackends';
 import { useBackendConnectionLifecycle } from './useBackendConnectionLifecycle';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useServerStore } from '../../stores/serverStore';
+import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useGatewayStore } from '../../stores/gatewayStore';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
 import { resolveCanonicalBackendId } from '../../actions/controlPlane';
@@ -259,6 +260,7 @@ export function Sidebar({
   // --- Actions ---
   const actions = useSidebarActions({
     isConnected,
+    isBackendReachable: data.isBackendReachable,
     isMobile,
     onClose,
     addProject,
@@ -375,7 +377,9 @@ export function Sidebar({
                 setNewSessionRequest({ projectId: project.id, pickerEnabled: false })
               );
             }}
-            isConnected={isConnected}
+            isConnected={data.isBackendReachable(
+              useOwnershipStore.getState().getProjectBackendId(project.id)
+            )}
             onPopOutSession={actions.handlePopOutSession}
           />
         </SortableItem>
@@ -423,7 +427,7 @@ export function Sidebar({
                     setNewProjectBackendId(backend.backendId);
                     setShowNewProjectForm(true);
                   }}
-                  newProjectDisabled={!isConnected}
+                  newProjectDisabled={!data.isBackendReachable(backend.backendId)}
                 >
                   {backendProjects.length === 0 ? (
                     <p className="px-2 py-1 text-xs text-muted-foreground">No projects yet</p>
@@ -460,7 +464,11 @@ export function Sidebar({
         name: b.name,
         online: b.online,
       }))}
-      isConnected={isConnected}
+      isConnected={data.isBackendReachable(
+        newSession.request
+          ? useOwnershipStore.getState().getProjectBackendId(newSession.request.projectId)
+          : newProjectBackendId
+      )}
       isMobile={isMobile}
     />
   );

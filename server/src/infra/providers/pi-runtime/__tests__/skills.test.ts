@@ -3,10 +3,12 @@ import {
   buildActiveSkillContext,
   buildSkillCatalog,
   buildSkillMetaTools,
-  createSkillRuntimeState,
+  createSkillRuntimeState as createSkillRuntimeStateWithPort,
   executePreparedDirectSkillInvocation,
   prepareDirectSkillInvocation,
   resolveSkillExecutionPolicy,
+  type RuntimeDiscoveredSkill,
+  type SkillRef,
 } from '../skills.js';
 
 const { loadDiscoveredSkillContentMock, recordSkillUsageMock } = vi.hoisted(() => ({
@@ -14,10 +16,15 @@ const { loadDiscoveredSkillContentMock, recordSkillUsageMock } = vi.hoisted(() =
   recordSkillUsageMock: vi.fn(),
 }));
 
-vi.mock('../../../../application/plugins/skill-tools.js', () => ({
-  loadDiscoveredSkillContent: loadDiscoveredSkillContentMock,
-  recordSkillUsage: recordSkillUsageMock,
-}));
+function createSkillRuntimeState(
+  skills: RuntimeDiscoveredSkill[],
+  pinned: SkillRef[] = []
+) {
+  return createSkillRuntimeStateWithPort(skills, pinned, {
+    loadContent: loadDiscoveredSkillContentMock,
+    recordUsage: recordSkillUsageMock,
+  });
+}
 
 function textFrom(result: unknown): string {
   const content = (result as { content?: Array<{ text?: string }> }).content ?? [];

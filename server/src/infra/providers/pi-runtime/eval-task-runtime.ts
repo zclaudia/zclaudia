@@ -3,11 +3,10 @@ import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import * as path from 'path';
 import type { TaskRecord, TaskStatus } from '@zclaudia/shared/core/task';
 
-import { type TaskRepository } from '../../../domains/tasks/repository.js';
-import { TaskService } from '../../../domains/tasks/task-service.js';
+import type { TaskPort } from '../../../utils/task-port.js';
+import { resolveDataDir } from '../../../utils/data-dir.js';
 import type { TaskExecutorUpdate } from '../../../utils/task-executor-types.js';
 import { killProcessTree } from './bash-runner.js';
-import { pidAlive, resolveDataDir } from '../../../domains/tasks/executors/command-executor.js';
 import * as sandbox from './sandbox.js';
 import { networkGrantToAllowedDomain, type SandboxGrant } from './sandbox-execution/index.js';
 import { readTaskLogWindow } from './task-output-window.js';
@@ -115,12 +114,9 @@ function parseResult(
 
 export class EvalTaskRuntime implements TaskRuntime {
   readonly type = 'eval' as const;
-  private readonly service: TaskService;
   private readonly reconcileWatches = new Set<string>();
 
-  constructor(private readonly repo: TaskRepository) {
-    this.service = new TaskService(repo);
-  }
+  constructor(private readonly tasks: TaskPort) {}
 
   async start(task: TaskRecord): Promise<TaskExecutorUpdate> {
     const metadata = (task.metadata ?? {}) as Record<string, unknown>;
@@ -168,7 +164,7 @@ export class EvalTaskRuntime implements TaskRuntime {
     if (!wrap.sandboxed && readOnly) {
       throw new Error('Eval task in read-only mode requires the sandbox, which is not available.');
     }
-    this.repo.update(task.id, { metadata: { sandboxed: wrap.sandboxed, logPath, resultPath } });
+    this.tasks.update(task.id, { metadata: { sandboxed: wrap.sandboxed, logPath, resultPath } });
     const child = wrap.sandboxed
       ? spawn(wrap.argv![0], wrap.argv!.slice(1), {
           cwd: workspaceRoot,
@@ -201,22 +197,22 @@ export class EvalTaskRuntime implements TaskRuntime {
 
   private finalize(taskId: string, exitCode: number | null, errorNote?: string): void {
     try {
-      const current = this.repo.findById(taskId);
+      const current = this.tasks.findById(taskId);
       if (!current || TERMINAL.has(current.status)) return;
       const metadata = (current.metadata ?? {}) as Record<string, unknown>;
       const resultPath =
         typeof metadata.resultPath === 'string' ? metadata.resultPath : evalTaskResultPath(taskId);
       const result = parseResult(resultPath);
       if (errorNote) {
-        this.service.failTask(taskId, { error: errorNote });
+        this.tasks.failTask(taskId, { error: errorNote });
       } else if (result?.ok === true) {
-        this.service.completeTask(taskId, { text: result.text });
+        this.tasks.completeTask(taskId, { text: result.text });
       } else if (result?.ok === false) {
-        this.service.failTask(taskId, { error: result.error });
+        this.tasks.failTask(taskId, { error: result.error });
       } else if (exitCode === 0) {
-        this.service.completeTask(taskId, { text: 'Eval task completed' });
+        this.tasks.completeTask(taskId, { text: 'Eval task completed' });
       } else {
-        this.service.failTask(taskId, { error: `Eval task exited with code ${exitCode}` });
+        this.tasks.failTask(taskId, { error: `Eval task exited with code ${exitCode}` });
       }
       removeSettledTaskFiles(taskId);
     } catch {
@@ -225,7 +221,7 @@ export class EvalTaskRuntime implements TaskRuntime {
   }
 
   private settleObservedExit(task: TaskRecord, fallbackError: string): TaskRecord {
-    const current = this.repo.findById(task.id) ?? task;
+    const current = this.tasks.findById(task.id) ?? task;
     if (TERMINAL.has(current.status)) return current;
     const metadata = (current.metadata ?? {}) as Record<string, unknown>;
     const resultPath =
@@ -235,10 +231,10 @@ export class EvalTaskRuntime implements TaskRuntime {
     const result = parseResult(resultPath);
     const settled =
       result?.ok === true
-        ? this.service.completeTask(current.id, { text: result.text })
+        ? this.tasks.completeTask(current.id, { text: result.text })
         : result?.ok === false
-          ? this.service.failTask(current.id, { error: result.error })
-          : this.service.stopTask(current.id, { error: fallbackError });
+          ? this.tasks.failTask(current.id, { error: result.error })
+          : this.tasks.stopTask(current.id, { error: fallbackError });
     removeSettledTaskFiles(current.id);
     return settled;
   }
@@ -264,13 +260,13 @@ export class EvalTaskRuntime implements TaskRuntime {
       this.reconcileWatches.delete(task.id);
     };
     const check = () => {
-      const current = this.repo.findById(task.id);
+      const current = this.tasks.findById(task.id);
       if (!current || TERMINAL.has(current.status)) {
         clearWatch();
         return;
       }
       const currentPid = current.executorRef?.pid;
-      if (typeof currentPid !== 'number' || !pidAlive(currentPid)) {
+      if (typeof currentPid !== 'number' || !this.tasks.commandTasks.pidAlive(currentPid)) {
         try {
           this.settleObservedExit(current, 'eval process not found after server restart');
         } catch {
@@ -296,20 +292,20 @@ export class EvalTaskRuntime implements TaskRuntime {
     if (typeof pid === 'number') killProcessTree(pid);
     if (!TERMINAL.has(task.status)) {
       try {
-        this.service.stopTask(task.id, reason ? { error: reason } : undefined);
+        this.tasks.stopTask(task.id, reason ? { error: reason } : undefined);
         removeSettledTaskFiles(task.id);
       } catch {
         // already terminal
       }
     }
-    const after = this.repo.findById(task.id);
+    const after = this.tasks.findById(task.id);
     return { status: after?.status ?? 'stopped', result: after?.result };
   }
 
   async wait(taskId: string, options?: { timeoutMs?: number }): Promise<TaskExecutorUpdate> {
     const deadline = Date.now() + (options?.timeoutMs ?? 24 * 60 * 60 * 1000);
     for (;;) {
-      const task = this.repo.findById(taskId);
+      const task = this.tasks.findById(taskId);
       if (!task) return { status: 'stopped' };
       if (TERMINAL.has(task.status)) return { status: task.status, result: task.result };
       if (Date.now() >= deadline) return { status: task.status };
@@ -320,11 +316,15 @@ export class EvalTaskRuntime implements TaskRuntime {
   async readOutput(task: TaskRecord, args: Record<string, unknown>) {
     let current = task;
     const pid = task.executorRef?.pid;
-    if (task.status === 'running' && typeof pid === 'number' && !pidAlive(pid)) {
+    if (
+      task.status === 'running' &&
+      typeof pid === 'number' &&
+      !this.tasks.commandTasks.pidAlive(pid)
+    ) {
       try {
         current = this.settleObservedExit(task, 'eval process not found after server restart');
       } catch {
-        current = this.repo.findById(task.id) ?? task;
+        current = this.tasks.findById(task.id) ?? task;
       }
     }
     const metadata = (current.metadata ?? {}) as Record<string, unknown>;
@@ -366,14 +366,14 @@ export class EvalTaskRuntime implements TaskRuntime {
   }
 
   reconcile(): void {
-    for (const task of this.repo.listByTypeAndStatuses('eval', ['queued', 'running'])) {
+    for (const task of this.tasks.listByTypeAndStatuses('eval', ['queued', 'running'])) {
       try {
         const pid = task.executorRef?.pid;
         if (task.status === 'queued') {
-          this.service.stopTask(task.id, {
+          this.tasks.stopTask(task.id, {
             error: 'eval task was still queued after server restart',
           });
-        } else if (typeof pid !== 'number' || !pidAlive(pid)) {
+        } else if (typeof pid !== 'number' || !this.tasks.commandTasks.pidAlive(pid)) {
           this.settleObservedExit(task, 'eval process not found after server restart');
         } else {
           this.watchReconciledTask(task);

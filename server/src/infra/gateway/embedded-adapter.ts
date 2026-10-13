@@ -18,6 +18,7 @@ import type {
 } from '@zclaudia/shared/facade/index';
 import type { BackendPresenceV4 as BackendPresence } from '@zclaudia/gateway-protocol';
 import type { SessionItem, ProjectItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
+import type { BackendResourceEventMessage } from '@zclaudia/protocol/sync';
 import type { ClientMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { GatewayClient } from './gateway-client.js';
 
@@ -37,6 +38,7 @@ export interface LocalBackendHandler {
   onStreamClose(sessionId: string): void;
   onCatchUp(sessionId: string, afterOffset: number): Promise<SessionMessage[]>;
   onServerEvent(listener: (message: ServerMessage) => void): () => void;
+  onBackendDataEvent(listener: (event: BackendResourceEventMessage) => void): () => void;
   getSessionItems(): SessionItem[];
   getProjectItems(): ProjectItem[];
   getCapabilities(): string[];
@@ -51,6 +53,7 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
   private localBackendId: string | null = null;
   private serverPort: number;
   private localSubscribed = false;
+  private unsubscribeLocalDataEvents: (() => void) | null = null;
 
   constructor(
     private readonly gatewayClient: GatewayClient,
@@ -167,9 +170,19 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
   readonly events: FacadeAdapterEventBus = {
     subscribe: listener => {
       this.listeners.push(listener);
+      if (!this.unsubscribeLocalDataEvents && this.localHandler) {
+        this.unsubscribeLocalDataEvents = this.localHandler.onBackendDataEvent(event => {
+          if (!this.localBackendId || !this.localSubscribed) return;
+          this.emit({ type: 'backend_data_event_received', backendId: this.localBackendId, event });
+        });
+      }
       return () => {
         const idx = this.listeners.indexOf(listener);
         if (idx >= 0) this.listeners.splice(idx, 1);
+        if (this.listeners.length === 0) {
+          this.unsubscribeLocalDataEvents?.();
+          this.unsubscribeLocalDataEvents = null;
+        }
       };
     },
   };

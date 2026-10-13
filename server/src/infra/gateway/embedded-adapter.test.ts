@@ -17,6 +17,7 @@ function createLocalHandler(): TestLocalHandler {
       return () => listeners.delete(listener);
     },
     getSessionItems: vi.fn(() => []),
+    onBackendDataEvent: vi.fn(() => () => {}),
     getProjectItems: vi.fn(() => []),
     getCapabilities: vi.fn(() => []),
     emit(message: ServerMessage) {

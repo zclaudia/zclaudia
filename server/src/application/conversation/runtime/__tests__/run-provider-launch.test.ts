@@ -874,6 +874,8 @@ describe('ws/run-provider-launch', () => {
       expect.objectContaining({
         cwd: '/tmp/project',
         enabledTools: ['Read', 'Grep', 'Write'],
+        taskPort: expect.objectContaining({ createTask: expect.any(Function) }),
+        planModePort: expect.objectContaining({ review: expect.any(Function) }),
         agentProfile: expect.any(Object),
         llmProfileConfig: expect.any(Object),
         permissionCallback: expect.any(Function),

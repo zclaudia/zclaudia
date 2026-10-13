@@ -24,6 +24,28 @@ export function isMobileBackendUsable(input: {
   );
 }
 
+/**
+ * Whether REST calls can reach the backend through the gateway. Unlike
+ * `isMobileBackendUsable`, this does not require the backend to be subscribed
+ * (`ready`) — creating a project/session is a plain proxied request, so a
+ * merely `visible` backend is enough.
+ */
+export function isMobileBackendReachable(input: {
+  backendId: string | null | undefined;
+  connectionState: BackendConnectionState;
+  backends: BackendSnapshot[];
+}): boolean {
+  const { backendId, connectionState, backends } = input;
+  if (!backendId) return false;
+  if (connectionState !== 'connected') return false;
+  return backends.some(
+    backend =>
+      backend.backendId === backendId &&
+      backend.runtimeState !== 'offline' &&
+      backend.runtimeState !== 'error'
+  );
+}
+
 export function getUsableMobileBackendIds(
   connectionState: BackendConnectionState,
   backends: BackendSnapshot[]

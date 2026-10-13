@@ -65,6 +65,8 @@ export {
   type SkillExecutionDependencies,
   type SkillExecutionMode,
   type SkillExecutionPolicy,
+  type RuntimeDiscoveredSkill,
+  type SkillContentPort,
   type SkillRuntimeState,
 } from './skills.js';
 // Enumerated explicitly (no `export *`) so a growing agent-loop surface can
@@ -73,12 +75,10 @@ export {
   BUILTIN_AGENT_LOOP_TOOLSETS,
   buildAgentLoopTools,
   getAgentLoopToolsetDescriptor,
-  LightweightAgentRunner,
   AgentLoopTimeoutError,
   runPiAgentLoop,
   type AgentLoopToolsetDescriptor,
   type ToolsetContext,
-  type LightweightAgentRunnerDeps,
   type AgentLoopExecutor,
   type AgentLoopExecutorInput,
   type AgentLoopExecutorResult,

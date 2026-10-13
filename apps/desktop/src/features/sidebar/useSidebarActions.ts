@@ -16,6 +16,8 @@ import { selectProjectChat, resolveProjectWorkspace } from '../../actions/projec
 
 interface UseSidebarActionsOptions {
   isConnected: boolean;
+  /** Per-target reachability; falls back to `isConnected` when omitted. */
+  isBackendReachable?: (backendId: string | null | undefined) => boolean;
   isMobile?: boolean;
   onClose?: () => void;
   addProject: (project: Project) => void;
@@ -45,6 +47,7 @@ interface UseSidebarActionsOptions {
  */
 export function useSidebarActions({
   isConnected,
+  isBackendReachable,
   isMobile,
   onClose,
   addProject,
@@ -68,12 +71,17 @@ export function useSidebarActions({
   newSessionAgentProfileId,
   onAgentNotReady,
 }: UseSidebarActionsOptions) {
+  const canReach = useCallback(
+    (backendId: string | null | undefined) =>
+      isBackendReachable ? isBackendReachable(backendId) : isConnected,
+    [isBackendReachable, isConnected]
+  );
   const requestMessageJump = useUIStore(s => s.requestMessageJump);
   const { selectProject, selectSession } = useSelectionCoordinator();
 
   const handleCreateProject = useCallback(
     async (backendId?: string | null, defaultAgentProfileId?: string) => {
-      if (!newProjectName.trim() || !isConnected) return;
+      if (!newProjectName.trim() || !canReach(backendId)) return;
       setCreatingProject(true);
       try {
         const project = await api.createProject(
@@ -104,7 +112,7 @@ export function useSidebarActions({
     [
       newProjectName,
       newProjectRootPath,
-      isConnected,
+      canReach,
       addProject,
       selectProject,
       setCreatingProject,
@@ -118,7 +126,7 @@ export function useSidebarActions({
 
   const handleCreateSession = useCallback(
     async (projectId: string) => {
-      if (!isConnected) return;
+      if (!canReach(useOwnershipStore.getState().getProjectBackendId(projectId))) return;
       try {
         const session = await api.createSession({
           projectId,
@@ -139,7 +147,7 @@ export function useSidebarActions({
       }
     },
     [
-      isConnected,
+      canReach,
       newSessionName,
       newSessionAgentProfileId,
       addSession,
@@ -153,7 +161,7 @@ export function useSidebarActions({
 
   const handleDeleteProject = useCallback(
     async (projectId: string, projectName?: string) => {
-      if (!isConnected) return;
+      if (!canReach(useOwnershipStore.getState().getProjectBackendId(projectId))) return;
       // Explicit confirmation — deleting a project also removes all of its sessions
       // and is irreversible. (Previously this fired with no prompt at all.)
       const ok = await confirm({
@@ -174,7 +182,7 @@ export function useSidebarActions({
         console.error('Failed to delete project:', error);
       }
     },
-    [isConnected, deleteProject, setContextMenuProject]
+    [canReach, deleteProject, setContextMenuProject]
   );
 
   const handleReorderProjects = useCallback(

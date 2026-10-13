@@ -3,12 +3,7 @@ import type Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
 
 import type { PlanReviewInteractionMessage } from '@zclaudia/shared/interaction/forms';
-import { interactionDispatcher } from '../../../application/conversation/interactions/interaction-dispatcher.js';
-import {
-  enterPlanMode as applyEnterPlanMode,
-  exitPlanMode as applyExitPlanMode,
-} from '../../../domains/sessions/plan-mode-toggle.js';
-import { SessionRepository } from '../../../domains/sessions/repository.js';
+import type { PlanModePort } from './plan-mode-port.js';
 import { agentToolParameters, errorResult, textResult } from './tool-common.js';
 
 const MAX_PLAN_BYTES = 128 * 1024;
@@ -18,6 +13,7 @@ const MAX_ALLOWED_PROMPT_PROMPT_CHARS = 2_000;
 
 export interface ModeToolOptions {
   db?: Database.Database;
+  planModePort?: PlanModePort;
   sessionId?: string;
 }
 
@@ -116,11 +112,11 @@ export function createEnterPlanModeTool(_cwd: string, options?: ModeToolOptions)
       'Switch the session into plan mode: analyze and design before changing anything. From your next turn on, only read-only tools are available. Produce a plan, then call ExitPlanMode (with the plan) for the user to approve before any changes are made.',
     parameters: agentToolParameters({ type: 'object', properties: {} }),
     execute: async (_toolCallId: string) => {
-      const db = options?.db;
+      const port = options?.planModePort;
       const sessionId = options?.sessionId;
-      if (!db || !sessionId)
+      if (!port || !sessionId)
         return errorResult('missing_session_context', 'EnterPlanMode requires session context');
-      const result = applyEnterPlanMode(new SessionRepository(db), sessionId);
+      const result = port.enter(sessionId);
       if (!result.ok)
         return errorResult(
           result.error ?? 'enter_plan_failed',
@@ -164,11 +160,10 @@ export function createExitPlanModeTool(_cwd: string, options?: ModeToolOptions):
       },
     }),
     execute: async (toolCallId: string, params: unknown) => {
-      const db = options?.db;
+      const port = options?.planModePort;
       const sessionId = options?.sessionId;
-      if (!db || !sessionId)
+      if (!port || !sessionId)
         return errorResult('missing_session_context', 'ExitPlanMode requires session context');
-      const repo = new SessionRepository(db);
       const args = params && typeof params === 'object' ? (params as Record<string, unknown>) : {};
       const plan = typeof args.plan === 'string' ? args.plan.trim() : '';
 
@@ -177,8 +172,7 @@ export function createExitPlanModeTool(_cwd: string, options?: ModeToolOptions):
         // for user approval. A missing or whitespace-only plan would bypass
         // the human plan-approval gate entirely. When plan mode is not active
         // the call stays a harmless no-op.
-        const session = repo.findById(sessionId);
-        if (session?.planStatus === 'planning') {
+        if (port.isPlanning(sessionId)) {
           return errorResult(
             'plan_required',
             'ExitPlanMode requires a non-empty `plan` (markdown): the user must review and approve a plan before plan mode can exit. Missing or whitespace-only plans are not accepted. If the user wants to leave plan mode without approving a plan, ask them to switch modes in the UI.'
@@ -202,17 +196,7 @@ export function createExitPlanModeTool(_cwd: string, options?: ModeToolOptions):
           plan,
           ...(allowedPrompts.value !== undefined ? { allowedPrompts: allowedPrompts.value } : {}),
         };
-        // A re-issued plan review replaces any earlier one still pending for
-        // this session, so clients never stack two live review cards.
-        interactionDispatcher.supersede(sessionId, 'interaction_plan_review');
-        // Plan approval is a human-in-the-loop gate: wait indefinitely. The
-        // pending entry is cleaned up via cancelBySession when the run ends.
-        const response = await interactionDispatcher.dispatchAndWait(
-          interactionId,
-          sessionId,
-          event,
-          null
-        );
+        const response = await port.review(event);
         if (response.error) {
           const error = String(response.error);
           if (error === 'superseded') {
@@ -242,7 +226,7 @@ export function createExitPlanModeTool(_cwd: string, options?: ModeToolOptions):
               : 'Plan rejected by the user.';
           return errorResult('plan_rejected', feedback);
         }
-        const exitResult = applyExitPlanMode(repo, sessionId);
+        const exitResult = port.exit(sessionId);
         if (!exitResult.ok) {
           return errorResult(
             exitResult.error ?? 'exit_plan_failed',

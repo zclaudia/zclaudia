@@ -11,8 +11,7 @@ import {
   findRegistryProvidersForModel,
   type RegistryHit,
 } from './registry-search.js';
-import { refreshIfNeeded } from '../../../domains/llm-profiles/codex-oauth-service.js';
-import { getLlmProfileWriter } from '../../../utils/llm-profile-registry.js';
+import { resolveCodexCredentials } from '../../../utils/llm-profile-registry.js';
 import { resolveEnvModel } from './env-model.js';
 import { providerIdFor } from './models-registry.js';
 
@@ -361,7 +360,7 @@ export function buildModel(
   let getApiKey: BuiltModel['getApiKey'];
   if (profile?.providerType === 'openai-codex') {
     getApiKey = async () => {
-      const fresh = await refreshIfNeeded(profile, getLlmProfileWriter());
+      const fresh = await resolveCodexCredentials(profile);
       return fresh.access;
     };
   } else if (profile?.apiKey) {

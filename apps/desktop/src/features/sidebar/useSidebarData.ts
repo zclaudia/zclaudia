@@ -12,7 +12,7 @@ import { useClaudiaStore } from '../../stores/claudiaStore';
 import { useNotificationFeedStore } from '../../stores/notificationFeedStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useClaudiaStatus } from '../../hooks/useClaudiaStatus';
-import { isMobileBackendUsable } from '../../services/mobileConnectionState';
+import { isMobileBackendReachable, isMobileBackendUsable } from '../../services/mobileConnectionState';
 import { selectProjectIdsForBackend } from './projectGrouping';
 
 /**
@@ -38,6 +38,17 @@ export function useSidebarData() {
     connectionState: facadeConnectionState,
     backends: facadeBackends,
   });
+  // Per-target gate for create actions: the backend the action targets, not
+  // whichever one is active/subscribed.
+  const isBackendReachable = useCallback(
+    (backendId: string | null | undefined) =>
+      isMobileBackendReachable({
+        backendId: backendId ?? activeServerId,
+        connectionState: facadeConnectionState,
+        backends: facadeBackends,
+      }),
+    [activeServerId, facadeConnectionState, facadeBackends]
+  );
   const scopedProviders = useLlmProfileMetaStore(s => s.getProviders(activeServerId));
   const providers = scopedProviders.length > 0 ? scopedProviders : legacyProviders;
 
@@ -187,6 +198,7 @@ export function useSidebarData() {
     selectedSessionId,
     activeServerId,
     isConnected,
+    isBackendReachable,
     providers,
     supervisorAgents,
     notificationUnreadCount,

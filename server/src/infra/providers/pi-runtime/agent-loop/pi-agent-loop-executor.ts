@@ -14,6 +14,8 @@ import type { AgentHooksOutput } from '../agent-hooks.js';
 import { withStreamRetry } from '../retry-stream.js';
 import { extractErrorStop, extractLastCallUsage, extractUsage } from '../usage-extractor.js';
 import { wrapStreamFnWithToolSchemaCompat } from '../tool-schema-compat.js';
+import { AgentLoopTimeoutError } from '../../../../utils/agent-loop-runtime-types.js';
+export { AgentLoopTimeoutError } from '../../../../utils/agent-loop-runtime-types.js';
 
 export interface AgentLoopExecutorInput {
   systemPrompt: string;
@@ -42,13 +44,6 @@ export interface AgentLoopExecutorResult {
 }
 
 export type AgentLoopExecutor = (input: AgentLoopExecutorInput) => Promise<AgentLoopExecutorResult>;
-
-export class AgentLoopTimeoutError extends Error {
-  constructor(timeoutMs: number) {
-    super(`Lightweight agent loop timed out after ${timeoutMs}ms`);
-    this.name = 'AgentLoopTimeoutError';
-  }
-}
 
 export const runPiAgentLoop: AgentLoopExecutor = async input => {
   const baseStreamFn: StreamFn = wrapStreamFnWithToolSchemaCompat(

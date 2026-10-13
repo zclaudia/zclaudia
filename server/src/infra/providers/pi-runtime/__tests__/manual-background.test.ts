@@ -1,3 +1,4 @@
+import { createTaskAdapter } from '../../../../application/tasks/task-adapter.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -147,7 +148,7 @@ describe('manual backgrounding (tool integration)', () => {
 
   it('converts a waiting foreground command via the registry', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-manualbg-ws-'));
-    const bash = buildTools(dir, { enabled: ['Bash'], db, sessionId: 's1' }).find(
+    const bash = buildTools(dir, { enabled: ['Bash'], db, taskPort: createTaskAdapter(db), sessionId: 's1' }).find(
       (t: any) => t.name === 'Bash'
     ) as any;
 
@@ -178,7 +179,7 @@ describe('manual backgrounding (tool integration)', () => {
 
   it('manual conversion works even with an explicit timeout', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-manualbg-ws-'));
-    const bash = buildTools(dir, { enabled: ['Bash'], db, sessionId: 's1' }).find(
+    const bash = buildTools(dir, { enabled: ['Bash'], db, taskPort: createTaskAdapter(db), sessionId: 's1' }).find(
       (t: any) => t.name === 'Bash'
     ) as any;
 
@@ -195,7 +196,7 @@ describe('manual backgrounding (tool integration)', () => {
 
   it('a normally-completing command leaves no registry residue', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-manualbg-ws-'));
-    const bash = buildTools(dir, { enabled: ['Bash'], db, sessionId: 's1' }).find(
+    const bash = buildTools(dir, { enabled: ['Bash'], db, taskPort: createTaskAdapter(db), sessionId: 's1' }).find(
       (t: any) => t.name === 'Bash'
     ) as any;
     const res = await bash.execute('mb3', { command: 'echo quick' });

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { interactionDispatcher } from '../../../../application/conversation/interactions/interaction-dispatcher.js';
 import { exitPlanMode } from '../../../../domains/sessions/plan-mode-toggle.js';
 import { createExitPlanModeTool } from '../mode-tools.js';
+import { createPlanModePort } from '../../../../application/conversation/runtime/plan-mode-port.js';
 
 vi.mock('../../../../application/conversation/interactions/interaction-dispatcher.js', () => ({
   interactionDispatcher: {
@@ -23,7 +24,7 @@ describe('ExitPlanMode tool boundaries', () => {
 
   function tool() {
     return createExitPlanModeTool('/tmp/project', {
-      db: {} as never,
+      planModePort: createPlanModePort({} as never),
       sessionId: 'session-1',
     }) as any;
   }

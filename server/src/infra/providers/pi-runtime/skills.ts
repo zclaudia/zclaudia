@@ -11,19 +11,17 @@ import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
 import type {
+  SkillSource,
+  SkillRef,
   SkillExecutionMode as SharedSkillExecutionMode,
   SkillExecutionOverride,
   SkillForkToolPolicy,
 } from '@zclaudia/shared/core/skills';
 import { ALL_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools';
-import {
-  type DiscoveredSkill,
-  type SkillRef,
-  loadDiscoveredSkillContent,
-  recordSkillUsage,
-} from '../../../application/plugins/skill-tools.js';
+import type { TaskPort } from '../../../utils/task-port.js';
 import type { PermissionCallback } from '../message-types.js';
 import type { PiToolLookupPort } from '../types.js';
+import type { PlanModePort } from './plan-mode-port.js';
 import { buildModel } from './build-model.js';
 import { buildTools } from './tool-bridge.js';
 import { applyToolScheduler } from './tool-scheduler.js';
@@ -31,6 +29,41 @@ import { agentToolParameters, textResult, type ToolContent } from './tool-common
 import { wrapStreamFnWithToolSchemaCompat } from './tool-schema-compat.js';
 
 export type SkillExecutionMode = 'inline' | 'fork';
+
+export interface RuntimeDiscoveredSkill {
+  id: string;
+  name: string;
+  description: string;
+  source: SkillSource;
+  filePath: string;
+  dirPath: string;
+  eligible?: boolean;
+  requirements?: { os?: string[]; binaries?: string[]; env?: string[] };
+  metadata?: {
+    whenToUse?: string;
+    allowedTools?: string[];
+    paths?: string[];
+    arguments?: string[];
+    argumentHint?: string;
+    userInvocable?: boolean;
+    hookTriggers?: { tools?: string[]; paths?: string[] };
+  };
+  execution?: {
+    allowedModes?: SharedSkillExecutionMode[];
+    defaultMode?: SharedSkillExecutionMode;
+    forkToolPolicy?: SkillForkToolPolicy;
+  };
+}
+
+export interface SkillContentPort {
+  loadContent(ref: SkillRef): Promise<string | null>;
+  recordUsage(ref: SkillRef): void;
+}
+
+const EMPTY_SKILL_CONTENT_PORT: SkillContentPort = {
+  loadContent: async () => null,
+  recordUsage: () => undefined,
+};
 
 export interface SkillExecutionPolicy {
   modes: SkillExecutionMode[];
@@ -42,10 +75,11 @@ export interface SkillExecutionPolicy {
 }
 
 export interface SkillRuntimeState {
-  discoverableSkills: DiscoveredSkill[];
+  discoverableSkills: RuntimeDiscoveredSkill[];
   pinnedSkills: SkillRef[];
   loadedSkills: SkillRef[];
   loadedSkillContents: Record<string, string>;
+  contentPort: SkillContentPort;
 }
 
 export interface SkillRuntimeOptions {
@@ -108,6 +142,8 @@ type NestedAgentLike = {
 export interface SkillExecutionDependencies {
   cwd: string;
   db?: Database.Database;
+  planModePort?: PlanModePort;
+  taskPort?: TaskPort;
   /** Host lookups forwarded to the forked skill's built-in tools. */
   toolLookups?: PiToolLookupPort;
   enabledTools?: string[];
@@ -136,11 +172,11 @@ function isLoaded(state: SkillRuntimeState, ref: SkillRef): boolean {
   return state.loadedSkills.some(loaded => skillRefKey(loaded) === key);
 }
 
-function findSkill(state: SkillRuntimeState, ref: SkillRef): DiscoveredSkill | undefined {
+function findSkill(state: SkillRuntimeState, ref: SkillRef): RuntimeDiscoveredSkill | undefined {
   return state.discoverableSkills.find(skill => skill.source === ref.source && skill.id === ref.id);
 }
 
-function findSkillById(state: SkillRuntimeState, id: string): DiscoveredSkill | undefined {
+function findSkillById(state: SkillRuntimeState, id: string): RuntimeDiscoveredSkill | undefined {
   return state.discoverableSkills.find(skill => skill.id === id || skill.name === id);
 }
 
@@ -158,14 +194,16 @@ function normalizeSkillRef(input: unknown): SkillRef | undefined {
 }
 
 export function createSkillRuntimeState(
-  discoverableSkills: DiscoveredSkill[],
-  pinnedSkills: SkillRef[] = []
+  discoverableSkills: RuntimeDiscoveredSkill[],
+  pinnedSkills: SkillRef[] = [],
+  contentPort: SkillContentPort = EMPTY_SKILL_CONTENT_PORT
 ): SkillRuntimeState {
   return {
     discoverableSkills,
     pinnedSkills,
     loadedSkills: [...pinnedSkills],
     loadedSkillContents: {},
+    contentPort,
   };
 }
 
@@ -233,14 +271,14 @@ const INLINE_KEYWORDS = [
   'standard',
 ];
 
-function keywordMatch(skill: DiscoveredSkill, keywords: string[]): string | undefined {
+function keywordMatch(skill: RuntimeDiscoveredSkill, keywords: string[]): string | undefined {
   const haystack =
     `${skill.id} ${skill.name} ${skill.description} ${skill.metadata?.whenToUse ?? ''}`.toLowerCase();
   return keywords.find(keyword => haystack.includes(keyword));
 }
 
 export function resolveSkillExecutionPolicy(
-  skill: DiscoveredSkill,
+  skill: RuntimeDiscoveredSkill,
   contentStats?: { estimatedTokens?: number; contentLength?: number },
   agentProfile?: AgentProfileConfig
 ): SkillExecutionPolicy {
@@ -261,7 +299,7 @@ export function resolveSkillExecutionPolicy(
 }
 
 function resolveBaseSkillExecutionPolicy(
-  skill: DiscoveredSkill,
+  skill: RuntimeDiscoveredSkill,
   contentStats?: { estimatedTokens?: number; contentLength?: number }
 ): SkillExecutionPolicy {
   if (skill.source === 'plugin') {
@@ -323,7 +361,7 @@ function resolveBaseSkillExecutionPolicy(
 
 function findSkillExecutionOverride(
   agentProfile: AgentProfileConfig | undefined,
-  skill: DiscoveredSkill
+  skill: RuntimeDiscoveredSkill
 ): SkillExecutionOverride | undefined {
   return agentProfile?.skillExecution?.overrides?.find(
     override => override.ref.source === skill.source && override.ref.id === skill.id
@@ -421,7 +459,7 @@ export function buildActiveSkillContext(state: SkillRuntimeState): string {
 
 function skillSummary(
   state: SkillRuntimeState,
-  skill: DiscoveredSkill,
+  skill: RuntimeDiscoveredSkill,
   agentProfile?: AgentProfileConfig
 ): Record<string, unknown> {
   const ref: SkillRef = { source: skill.source, id: skill.id };
@@ -486,7 +524,7 @@ async function loadSkillStructured(
     };
   }
 
-  const content = await loadDiscoveredSkillContent(ref);
+  const content = await state.contentPort.loadContent(ref);
   if (!content) {
     return {
       ok: false,
@@ -650,6 +688,8 @@ function buildForkSkillTools(
       enabled,
       db: execution.db,
       toolLookups: execution.toolLookups,
+      planModePort: execution.planModePort,
+      taskPort: execution.taskPort,
       permissionOverride: execution.permissionOverride,
       permissionCallback: execution.permissionCallback,
     })
@@ -878,7 +918,7 @@ async function runSkill(
     );
   }
 
-  const content = await loadDiscoveredSkillContent(ref);
+  const content = await state.contentPort.loadContent(ref);
   if (!content) {
     return jsonResult(
       {
@@ -1091,7 +1131,7 @@ export async function prepareDirectSkillInvocation(
       message: outcome.message,
     };
   }
-  recordSkillUsage(ref);
+  state.contentPort.recordUsage(ref);
   return {
     matched: true,
     ok: true,
@@ -1126,7 +1166,7 @@ export async function executePreparedDirectSkillInvocation(
     message?: string;
   };
   if (payload.ok && payload.mode === 'fork' && typeof payload.result === 'string') {
-    recordSkillUsage(prepared.ref);
+    state.contentPort.recordUsage(prepared.ref);
     return {
       ok: true,
       mode: 'fork',

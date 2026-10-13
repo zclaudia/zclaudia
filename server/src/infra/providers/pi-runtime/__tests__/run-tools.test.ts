@@ -1,3 +1,4 @@
+import { createTaskAdapter } from '../../../../application/tasks/task-adapter.js';
 import { describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 
@@ -148,6 +149,7 @@ describe('buildPiRunToolBundle backgroundable tool announcement', () => {
       options: {
         cwd: '/tmp',
         db: input.db,
+        taskPort: input.db ? createTaskAdapter(input.db) : undefined,
         claudiaSessionId: input.sessionId,
       } as never,
       effectiveTools: input.tools as never,

@@ -29,6 +29,7 @@ export class StandaloneFacadeAdapter implements FacadeRuntimeGatewayAdapter {
   private readonly backendId: string;
   private readonly localHandler: LocalBackendHandler | null;
   private localSubscribed = false;
+  private unsubscribeLocalDataEvents: (() => void) | null = null;
 
   constructor(options: {
     serverPort: number;
@@ -171,9 +172,19 @@ export class StandaloneFacadeAdapter implements FacadeRuntimeGatewayAdapter {
   readonly events: FacadeAdapterEventBus = {
     subscribe: listener => {
       this.listeners.push(listener);
+      if (!this.unsubscribeLocalDataEvents && this.localHandler) {
+        this.unsubscribeLocalDataEvents = this.localHandler.onBackendDataEvent(event => {
+          if (!this.localSubscribed) return;
+          this.emit({ type: 'backend_data_event_received', backendId: this.backendId, event });
+        });
+      }
       return () => {
         const idx = this.listeners.indexOf(listener);
         if (idx >= 0) this.listeners.splice(idx, 1);
+        if (this.listeners.length === 0) {
+          this.unsubscribeLocalDataEvents?.();
+          this.unsubscribeLocalDataEvents = null;
+        }
       };
     },
   };

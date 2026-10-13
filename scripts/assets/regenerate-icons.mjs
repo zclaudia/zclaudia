@@ -15,6 +15,9 @@ const DESKTOP = path.join(ROOT, 'apps/desktop');
 const ICONS = 'apps/desktop/src-tauri/icons';
 const PUBLIC = 'apps/desktop/public';
 const BACKGROUND = '#F4F6FA';
+const DEV_BACKGROUND = '#F3F1FC';
+const DEV_HEAD = '#6861DA';
+const DEV_FACE = '#29264D';
 // Reduce mobile mascot width and height by 15% around the icon center.
 const MOBILE_HEAD_SCALE = 0.85;
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
@@ -91,8 +94,11 @@ async function main() {
     '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">' +
     content +
     '</svg>\n';
-  const scaled = scale =>
-    '<g transform="translate(256 256) scale(' + scale + ') translate(-256 -256)">' + inner + '</g>';
+  const scaled = (scale, shapes = inner) =>
+    '<g transform="translate(256 256) scale(' + scale + ') translate(-256 -256)">' + shapes + '</g>';
+  const devInner = inner
+    .replace(head, head.replace(/fill="[^"]+"/, 'fill="' + DEV_HEAD + '"'))
+    .replace(faceMask, faceMask.replace(/fill="[^"]+"/, 'fill="' + DEV_FACE + '"'));
   const mono = (color, scale = 1) =>
     svg(
       '<defs><mask id="silhouette" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">' +
@@ -119,6 +125,16 @@ async function main() {
   );
   // Keep the adaptive foreground inside Android's central safe area.
   const adaptiveSvg = svg(scaled(0.72 * MOBILE_HEAD_SCALE));
+  const devMobileSvg = svg(
+    '<rect width="512" height="512" fill="' + DEV_BACKGROUND + '" />' +
+      scaled(0.88 * MOBILE_HEAD_SCALE, devInner)
+  );
+  const devAdaptiveSvg = svg(scaled(0.72 * MOBILE_HEAD_SCALE, devInner));
+  // Pre-adaptive launchers need circular fallbacks with transparent corners.
+  const roundSvg = (background, shapes = inner) => svg(
+    '<defs><clipPath id="round"><circle cx="256" cy="256" r="256" /></clipPath></defs><g clip-path="url(#round)"><rect width="512" height="512" fill="' +
+      background + '" />' + scaled(0.8 * MOBILE_HEAD_SCALE, shapes) + '</g>'
+  );
   const outputs = new Map();
   const put = (relative, content) =>
     outputs.set(relative, Buffer.isBuffer(content) ? content : Buffer.from(content));
@@ -181,6 +197,9 @@ async function main() {
     const dir = ICONS + '/android/mipmap-' + density;
     await png(dir + '/ic_launcher.png', mobileSvg, 48 * factor, true);
     await png(dir + '/ic_launcher_foreground.png', adaptiveSvg, 108 * factor);
+    await png(dir + '/ic_launcher_dev.png', devMobileSvg, 48 * factor, true);
+    await png(dir + '/ic_launcher_dev_foreground.png', devAdaptiveSvg, 108 * factor);
+    await png(dir + '/ic_launcher_dev_round.png', roundSvg(DEV_BACKGROUND, devInner), 48 * factor);
     await png(
       dir + '/ic_launcher_monochrome.png',
       mono('#FFFFFF', 0.72 * MOBILE_HEAD_SCALE),
@@ -191,15 +210,7 @@ async function main() {
       mono('#FFFFFF'),
       24 * factor
     );
-    // Pre-adaptive launchers need a genuinely circular fallback with transparent corners.
-    const roundSvg = svg(
-      '<defs><clipPath id="round"><circle cx="256" cy="256" r="256" /></clipPath></defs><g clip-path="url(#round)"><rect width="512" height="512" fill="' +
-        BACKGROUND +
-        '" />' +
-        scaled(0.8 * MOBILE_HEAD_SCALE) +
-        '</g>'
-    );
-    await png(dir + '/ic_launcher_round.png', roundSvg, 48 * factor);
+    await png(dir + '/ic_launcher_round.png', roundSvg(BACKGROUND), 48 * factor);
   }
   const adaptiveXml =
     '<?xml version="1.0" encoding="utf-8"?>\n<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n  <background android:drawable="@color/ic_launcher_background" />\n  <foreground android:drawable="@mipmap/ic_launcher_foreground" />\n</adaptive-icon>\n';
@@ -210,11 +221,23 @@ async function main() {
   for (const name of ['ic_launcher.xml', 'ic_launcher_round.xml']) {
     put(ICONS + '/android/mipmap-anydpi-v26/' + name, adaptiveXml);
     put(ICONS + '/android/mipmap-anydpi-v33/' + name, themedXml);
+    const devName = name.replace('ic_launcher', 'ic_launcher_dev');
+    const devXml = adaptiveXml
+      .replace('@color/ic_launcher_background', '@color/ic_launcher_dev_background')
+      .replace('@mipmap/ic_launcher_foreground', '@mipmap/ic_launcher_dev_foreground');
+    // Themed icons share the same silhouette and follow the user's theme colors.
+    const devThemedXml = devXml.replace(
+      '</adaptive-icon>',
+      '  <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />\n</adaptive-icon>'
+    );
+    put(ICONS + '/android/mipmap-anydpi-v26/' + devName, devXml);
+    put(ICONS + '/android/mipmap-anydpi-v33/' + devName, devThemedXml);
   }
   put(
     ICONS + '/android/values/ic_launcher_background.xml',
     '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n  <color name="ic_launcher_background">' +
       BACKGROUND +
+      '</color>\n  <color name="ic_launcher_dev_background">' + DEV_BACKGROUND +
       '</color>\n</resources>\n'
   );
 

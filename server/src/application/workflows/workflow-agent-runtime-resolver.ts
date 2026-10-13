@@ -1,18 +1,25 @@
 import type Database from 'better-sqlite3';
-import { buildSkillDirectoryHint } from '../../../application/plugins/index.js';
-import { createContextEngine } from '../../../application/conversation/context/engine.js';
-import { buildMemoryContext } from '../../../application/conversation/context/memory-context.js';
-import { workspaceService } from '../../../application/services/workspace.js';
-import { resolveUserHooks } from '../../../application/conversation/runtime/resolve-user-hooks.js';
-import { resolveProjectMemoryDir } from '../../../utils/memory-paths.js';
-import { NoAgentAvailableError, resolveAgentForSession } from '../../sessions/agent-resolver.js';
-import { LlmProfileRepository } from '../../llm-profiles/repository.js';
+import { buildSkillDirectoryHint } from '../plugins/index.js';
+import { createContextEngine } from '../conversation/context/engine.js';
+import { buildMemoryContext } from '../conversation/context/memory-context.js';
+import { workspaceService } from '../services/workspace.js';
+import { resolveUserHooks } from '../conversation/runtime/resolve-user-hooks.js';
+import { resolveProjectMemoryDir } from '../../utils/memory-paths.js';
+import {
+  NoAgentAvailableError,
+  resolveAgentForSession,
+} from '../../domains/sessions/agent-resolver.js';
+import { LlmProfileRepository } from '../../domains/llm-profiles/repository.js';
 import type {
   WorkflowAgentRuntime,
   WorkflowAgentRuntimePort,
   WorkflowAgentRuntimeRequest,
-} from '../ports/step-executor.js';
-import type { WorkflowAgentPermissionCallbackFactory } from './workflow-agent-permissions.js';
+} from '../../domains/workflows/ports/step-executor.js';
+import {
+  createWorkflowAgentPermissionCallbackFactory,
+  type WorkflowAgentPermissionCallbackFactory,
+  type WorkflowAgentPermissionDeps,
+} from './workflow-agent-permissions.js';
 
 type UserHookDb = Parameters<typeof resolveUserHooks>[0];
 
@@ -28,6 +35,15 @@ export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntime
     private readonly options: DefaultWorkflowAgentRuntimeResolverOptions = {}
   ) {
     this.llmProfileRepository = new LlmProfileRepository(db);
+  }
+
+  static withWorkflowPermissions(
+    db: Database.Database,
+    permissionDeps: WorkflowAgentPermissionDeps
+  ): DefaultWorkflowAgentRuntimeResolver {
+    return new DefaultWorkflowAgentRuntimeResolver(db, {
+      permissionCallbackFactory: createWorkflowAgentPermissionCallbackFactory(permissionDeps),
+    });
   }
 
   async resolve(request: WorkflowAgentRuntimeRequest): Promise<WorkflowAgentRuntime> {

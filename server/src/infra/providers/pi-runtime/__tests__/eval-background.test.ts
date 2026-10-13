@@ -7,6 +7,7 @@ import path from 'path';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
 import { TaskService } from '../../../../domains/tasks/task-service.js';
+import { createTaskAdapter } from '../../../../application/tasks/task-adapter.js';
 import { createEvalBridgeTool } from '../eval-tool.js';
 import { EvalTaskRuntime } from '../eval-task-runtime.js';
 import { createTaskOutputTool } from '../task-tools.js';
@@ -23,6 +24,7 @@ async function eventually<T>(fn: () => T, predicate: (value: T) => boolean): Pro
 
 describe('Eval background runtime', () => {
   let db: Database.Database | undefined;
+  let tasks: ReturnType<typeof createTaskAdapter> | undefined;
   let dir: string | undefined;
   let dataDir: string | undefined;
   let prevDataDir: string | undefined;
@@ -31,6 +33,7 @@ describe('Eval background runtime', () => {
     db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
+    tasks = createTaskAdapter(db);
     dir = mkdtempSync(path.join(tmpdir(), 'zc-eval-bg-work-'));
     dataDir = mkdtempSync(path.join(tmpdir(), 'zc-eval-bg-data-'));
     prevDataDir = process.env.ZCLAUDIA_DATA_DIR;
@@ -48,7 +51,7 @@ describe('Eval background runtime', () => {
   it('runs isolated one-shot code as a task readable through TaskOutput', async () => {
     expect(db).toBeDefined();
     expect(dir).toBeDefined();
-    const evalTool = createEvalBridgeTool(dir!, { sessionId: 's1', runId: 'r1', db: db! }) as any;
+    const evalTool = createEvalBridgeTool(dir!, { sessionId: 's1', runId: 'r1', db: db!, taskPort: tasks! }) as any;
     const start = await evalTool.execute('eval-bg-1', {
       code: "console.log('hello from eval'); 21 * 2",
       run_in_background: true,
@@ -75,7 +78,7 @@ describe('Eval background runtime', () => {
       status: 'completed',
     });
 
-    const outputTool = createTaskOutputTool(db!) as any;
+    const outputTool = createTaskOutputTool(tasks!) as any;
     const output = await outputTool.execute('eval-bg-output-1', { task_id: taskId });
     expect(output.details).toMatchObject({
       ok: true,
@@ -97,6 +100,7 @@ describe('Eval background runtime', () => {
       sessionId: 's1',
       runId: 'r1',
       db: db!,
+      taskPort: tasks!,
       sandboxAllowedDomains: ['granted.example.com', 'other.example.com'],
     }) as any;
 
@@ -121,7 +125,7 @@ describe('Eval background runtime', () => {
     expect(db).toBeDefined();
     expect(dir).toBeDefined();
     expect(dataDir).toBeDefined();
-    const evalTool = createEvalBridgeTool(dir!, { sessionId: 's1', runId: 'r1', db: db! }) as any;
+    const evalTool = createEvalBridgeTool(dir!, { sessionId: 's1', runId: 'r1', db: db!, taskPort: tasks! }) as any;
     const start = await evalTool.execute('eval-bg-cleanup', {
       code: "'cleanup probe'",
       run_in_background: true,
@@ -186,7 +190,7 @@ describe('Eval background runtime', () => {
     });
     service.startTask(failure.id, { executorRef: { pid: 999999, command: 'eval' } });
 
-    new EvalTaskRuntime(repo).reconcile();
+    new EvalTaskRuntime(createTaskAdapter(db!)).reconcile();
 
     expect(repo.findById(success.id)).toMatchObject({
       status: 'completed',

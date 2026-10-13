@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { buildTools } from '../tool-bridge.js';
+import { createPlanModePort } from '../../../../application/conversation/runtime/plan-mode-port.js';
 import { interactionDispatcher } from '../../../../application/conversation/interactions/interaction-dispatcher.js';
 
 describe('EnterPlanMode / ExitPlanMode builtins', () => {
@@ -23,7 +24,7 @@ describe('EnterPlanMode / ExitPlanMode builtins', () => {
   });
 
   function tools(): Record<string, any> {
-    const built = buildTools('/tmp', { enabled: ['EnterPlanMode', 'ExitPlanMode'], db, sessionId });
+    const built = buildTools('/tmp', { enabled: ['EnterPlanMode', 'ExitPlanMode'], db, sessionId, planModePort: createPlanModePort(db) });
     return Object.fromEntries(built.map(t => [t.name, t]));
   }
 

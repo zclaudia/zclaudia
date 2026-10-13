@@ -37,3 +37,20 @@ export function getLlmProfileWriter(): OAuthCredentialsWriter {
     },
   };
 }
+
+/** Host-owned credential refresh policy consumed by provider model construction. */
+export type CodexCredentialsResolver = (
+  profile: LlmProfileConfig
+) => Promise<CodexOAuthCredentials>;
+let codexCredentialsResolver: CodexCredentialsResolver | null = null;
+
+export function registerCodexCredentialsResolver(resolver: CodexCredentialsResolver): void {
+  codexCredentialsResolver = resolver;
+}
+
+export function resolveCodexCredentials(profile: LlmProfileConfig): Promise<CodexOAuthCredentials> {
+  if (!codexCredentialsResolver) {
+    throw new Error('Codex credential resolver not registered');
+  }
+  return codexCredentialsResolver(profile);
+}

@@ -9,6 +9,7 @@ import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
 import { TaskService } from '../../../../domains/tasks/task-service.js';
 import { CommandTaskExecutor } from '../../../../domains/tasks/executors/command-executor.js';
+import { createTaskAdapter } from '../../../../application/tasks/task-adapter.js';
 import { CommandTaskRuntime, commandExitCode } from '../command-task-runtime.js';
 
 function taskRecord(overrides: Partial<TaskRecord>): TaskRecord {
@@ -98,7 +99,7 @@ describe('CommandTaskRuntime exit-code round-trip', () => {
     const repo = new TaskRepository(db);
     const service = new TaskService(repo);
     const executor = new CommandTaskExecutor(repo);
-    const runtime = new CommandTaskRuntime(repo);
+    const runtime = new CommandTaskRuntime(createTaskAdapter(db));
     const task = service.createTask({
       type: 'command',
       metadata: { command: 'exit 4', cwd: dataDir },

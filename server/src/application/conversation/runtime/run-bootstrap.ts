@@ -8,12 +8,15 @@ import { resolveSkillSelection, skillRefKey } from '@zclaudia/shared/core/skills
 import type { McpToolRef, PluginToolRef, ToolName } from '@zclaudia/shared/core/tools';
 import {
   getEligibleDiscoveredSkills,
+  loadDiscoveredSkillContent,
   loadDiscoveredSkillContentSync,
+  recordSkillUsage,
   type DiscoveredSkill,
 } from '../../../application/plugins/skill-tools.js';
 import {
   createSkillRuntimeState,
   type ExternalToolRuntimeState,
+  type SkillContentPort,
 } from '../../../infra/providers/pi-runtime/index.js';
 import type { SkillRuntimeState } from '../../../infra/providers/pi-runtime/index.js';
 import { sendMessage, broadcastToOtherAuthenticatedClients } from '../transport/broadcast.js';
@@ -132,10 +135,14 @@ function buildExternalToolRuntimeState(profile: AgentProfileConfig): ExternalToo
 export function buildSkillRuntimeState(
   profile: AgentProfileConfig,
   eligibleSkills: DiscoveredSkill[] = getEligibleDiscoveredSkills(),
-  loadContent: typeof loadDiscoveredSkillContentSync = loadDiscoveredSkillContentSync
+  loadContent: typeof loadDiscoveredSkillContentSync = loadDiscoveredSkillContentSync,
+  contentPort: SkillContentPort = {
+    loadContent: loadDiscoveredSkillContent,
+    recordUsage: recordSkillUsage,
+  }
 ): SkillRuntimeState {
   const resolved = resolveSkillSelection(eligibleSkills, profile.skillSelection);
-  const state = createSkillRuntimeState(resolved.discoverable, resolved.pinned);
+  const state = createSkillRuntimeState(resolved.discoverable, resolved.pinned, contentPort);
   state.loadedSkills = [];
   for (const ref of resolved.pinned) {
     const content = loadContent(ref);

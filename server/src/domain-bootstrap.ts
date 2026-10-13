@@ -57,6 +57,7 @@ import type { PermissionWorkflowResolver } from './domains/workflows/index.js';
 import type { MetaWorkflowService } from './domains/meta-workflow/service.js';
 import { ensureSandboxInitialized } from './infra/providers/pi-runtime/sandbox.js';
 import { EvalTaskRuntime } from './infra/providers/pi-runtime/eval-task-runtime.js';
+import { createTaskAdapter } from './application/tasks/task-adapter.js';
 import {
   GoalRepository,
   GoalService,
@@ -140,6 +141,7 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     workflowAiRunPort,
   } = createDomainPorts({
     db,
+    activeRuns,
     handleRunStart,
     broadcastHeartbeat,
   });
@@ -299,7 +301,7 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
   const commandTaskExecutor = new CommandTaskExecutor(backgroundTaskRepo);
   taskExecutorRegistry.register(commandTaskExecutor);
   commandTaskExecutor.reconcile();
-  new EvalTaskRuntime(backgroundTaskRepo).reconcile();
+  new EvalTaskRuntime(createTaskAdapter(db)).reconcile();
   // P1-7: agent runs live only in AgentTaskExecutor's in-memory pendingRuns
   // and monitor tasks have no runtime at all — neither can resume after a
   // restart, so settle leftovers immediately instead of leaving zombies.

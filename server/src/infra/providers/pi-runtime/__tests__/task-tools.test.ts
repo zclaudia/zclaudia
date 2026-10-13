@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
 import { TaskService } from '../../../../domains/tasks/task-service.js';
+import { createTaskAdapter } from '../../../../application/tasks/task-adapter.js';
 import * as taskTools from '../task-tools.js';
 import { createAgentTool, createMonitorTool, createTaskOutputTool } from '../task-tools.js';
 import { createPiToolLookups } from '../../../../application/conversation/runtime/pi-tool-lookups.js';
@@ -77,7 +78,7 @@ describe('task bridge tools', () => {
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
     try {
-      const monitor = createMonitorTool('session-1', 'run-1', db) as any;
+      const monitor = createMonitorTool('session-1', 'run-1', createTaskAdapter(db)) as any;
 
       const res = await monitor.execute('monitor-start-1', {
         action: 'start',
@@ -111,7 +112,7 @@ describe('task bridge tools', () => {
       service.startTask(legacy.id, {
         executorRef: { providerType: 'task-monitor', taskId: legacy.id },
       });
-      const monitor = createMonitorTool(undefined, undefined, db) as any;
+      const monitor = createMonitorTool(undefined, undefined, createTaskAdapter(db)) as any;
 
       const statusRes = await monitor.execute('monitor-status-1', {
         action: 'status',
@@ -155,7 +156,9 @@ describe('task bridge tools', () => {
         'run-1',
         db,
         parentOverride as never,
-        executor as never
+        executor as never,
+        undefined,
+        createTaskAdapter(db)
       ) as any;
 
       const res = await tool.execute('agent-sec-1', {
@@ -193,7 +196,9 @@ describe('task bridge tools', () => {
         'run-1',
         db,
         undefined,
-        executor as never
+        executor as never,
+        undefined,
+        createTaskAdapter(db)
       ) as any;
 
       const res = await tool.execute('agent-sec-2', {
@@ -244,7 +249,8 @@ describe('Agent subagent_type and session linkage', () => {
         db,
         undefined,
         executor as never,
-        createPiToolLookups(db)
+        createPiToolLookups(db),
+        createTaskAdapter(db)
       ) as any;
       expect(tool.description).toContain('Explore: Explore profile');
       expect(tool.description).not.toContain('Legacy');
@@ -277,7 +283,8 @@ describe('Agent subagent_type and session linkage', () => {
         db,
         undefined,
         executor as never,
-        createPiToolLookups(db)
+        createPiToolLookups(db),
+        createTaskAdapter(db)
       ) as any;
       const res = await tool.execute('a1', { prompt: 'x', subagent_type: 'Legacy' });
       expect(res.details).toMatchObject({ ok: false, error: 'unknown_subagent_type' });
@@ -301,7 +308,8 @@ describe('Agent subagent_type and session linkage', () => {
         db,
         undefined,
         executor as never,
-        createPiToolLookups(db)
+        createPiToolLookups(db),
+        createTaskAdapter(db)
       ) as any;
       const res = await tool.execute('a1', { prompt: 'x' });
       const { taskId } = JSON.parse(res.content[0].text);
@@ -318,6 +326,7 @@ describe('SendMessage', () => {
   function setup() {
     const db = new Database(':memory:');
     applyMigrations(db);
+    const taskPort = createTaskAdapter(db);
     const service = new TaskService(new TaskRepository(db));
     const steer = vi.fn(() => ({ delivery: 'steered' as const }));
     const notify = vi.fn(() => ({ delivery: 'steered' as const }));
@@ -339,6 +348,7 @@ describe('SendMessage', () => {
       permissionOverride: { profile: { fileWrite: 'ask' } } as never,
       agentTaskExecutor: executor as never,
       messenger,
+      taskPort,
     }) as any;
     const child = service.createTask({
       type: 'agent',
@@ -460,6 +470,7 @@ describe('RespondToCoordinator', () => {
       const tool = taskTools.createRespondToCoordinatorTool({
         sessionId: 'child-1',
         db,
+        taskPort: createTaskAdapter(db),
         messenger: { steer: vi.fn(), notify } as never,
       }) as any;
       const res = await tool.execute('r1', { summary: 'found the bug', response: 'It is in x.ts' });
@@ -486,6 +497,7 @@ describe('RespondToCoordinator', () => {
       const tool = taskTools.createRespondToCoordinatorTool({
         sessionId: 'lonely',
         db,
+        taskPort: createTaskAdapter(db),
         messenger: { steer: vi.fn(), notify: vi.fn() } as never,
       }) as any;
       const res = await tool.execute('r2', { summary: 's', response: 'r' });

@@ -86,6 +86,8 @@ export function buildPiRunToolBundle(input: {
     subagentMessenger: options.subagentMessenger,
     automationPort: options.automationPort,
     toolLookups: options.toolLookups,
+    planModePort: options.planModePort,
+    taskPort: options.taskPort,
     // The manager is the LSPTool port; an explicit port (tests) wins.
     languageServerPort: options.languageServerPort ?? options.languageServers,
     diagnosticsProvider: options.languageServers
@@ -139,6 +141,8 @@ export function buildPiRunToolBundle(input: {
           cwd: options.cwd,
           db: options.db,
           toolLookups: options.toolLookups,
+          planModePort: options.planModePort,
+          taskPort: options.taskPort,
           enabledTools: effectiveTools,
           llmProfileConfig: options.llmProfileConfig,
           agentProfile: options.agentProfile,
@@ -180,7 +184,7 @@ export function buildPiRunToolBundle(input: {
   const bashConvertible =
     effectiveTools.includes('Bash') &&
     isBashBackgroundConvertible({
-      db: options.db,
+      taskPort: options.taskPort,
       sessionId: options.claudiaSessionId,
       sandboxReadOnly: isPlanMode,
     });

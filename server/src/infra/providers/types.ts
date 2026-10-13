@@ -1,3 +1,5 @@
+import type { TaskPort } from '../../utils/task-port.js';
+import type { PlanModePort } from './pi-runtime/plan-mode-port.js';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
@@ -186,6 +188,8 @@ export interface RunOptions {
   toolLookups?: PiToolLookupPort;
   /** Prompt-cache trace persistence (absent or no trace schema = run not traced). */
   cacheTraceStore?: PiCacheTraceStore;
+  planModePort?: PlanModePort;
+  taskPort?: TaskPort;
   /** Language-server port for LSPTool (absent or no server for cwd = tool not registered). */
   languageServerPort?: LanguageServerPort;
   /** Language-server manager: write diagnostics for the Pi runtime (absent = none). */

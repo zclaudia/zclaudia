@@ -5,12 +5,7 @@ import os from 'os';
 import path from 'path';
 
 import { persistSessionSandboxDomain } from './sandbox-network-memory.js';
-import { TaskRepository } from '../../../domains/tasks/repository.js';
-import { TaskService } from '../../../domains/tasks/task-service.js';
-import {
-  CommandTaskExecutor,
-  commandTaskLogPath,
-} from '../../../domains/tasks/executors/command-executor.js';
+import type { TaskPort } from '../../../utils/task-port.js';
 import type { PermissionCallback } from '../types.js';
 import {
   findBashFileBypass,
@@ -97,6 +92,7 @@ async function persistFullOutputIfTruncated(
 
 export interface BashBridgeToolOptions {
   db?: Database.Database;
+  taskPort?: TaskPort;
   sessionId?: string;
   runId?: string;
   permissionCallback?: PermissionCallback;
@@ -113,7 +109,7 @@ export interface BashBridgeToolOptions {
  * tool cannot perform (no task store, read-only sandbox, no session).
  */
 export function isBashBackgroundConvertible(options?: BashBridgeToolOptions): boolean {
-  return !!options?.db && options?.sandboxReadOnly !== true && !!options?.sessionId;
+  return !!options?.taskPort && options?.sandboxReadOnly !== true && !!options?.sessionId;
 }
 
 export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOptions): AgentTool {
@@ -330,16 +326,13 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
             sandboxed: privilegeGate.result.sandboxed,
           });
         }
-        const db = options?.db;
-        if (!db)
+        const taskPort = options?.taskPort;
+        if (!taskPort)
           return errorResult(
             'missing_db_context',
             'Background execution requires database context'
           );
-        const repo = new TaskRepository(db);
-        const service = new TaskService(repo);
-        const executor = new CommandTaskExecutor(repo);
-        const task = service.createTask({
+        const task = taskPort.createTask({
           type: 'command',
           sessionId: options?.sessionId,
           runId: options?.runId,
@@ -358,9 +351,9 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
           },
         });
         try {
-          const started = await executor.start(task);
-          service.startTask(task.id, { executorRef: started.executorRef });
-          const currentTask = repo.findById(task.id);
+          const started = await taskPort.commandTasks.start(task);
+          taskPort.startTask(task.id, { executorRef: started.executorRef });
+          const currentTask = taskPort.findById(task.id);
           const sandboxed = currentTask?.metadata?.sandboxed === true;
           return textResult(
             `Started background task ${task.id}. Poll with TaskOutput({ task_id: "${task.id}" }); stop with Monitor({ action: "stop", task_id: "${task.id}" }).`,
@@ -369,14 +362,14 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
               background: true,
               taskId: task.id,
               pid: started.executorRef?.pid,
-              logPath: commandTaskLogPath(task.id),
+              logPath: taskPort.commandTasks.logPath(task.id),
               sandboxed,
               ...(privilegeGate?.details ?? {}),
             }
           );
         } catch (err) {
           try {
-            service.failTask(task.id, { error: err instanceof Error ? err.message : String(err) });
+            taskPort.failTask(task.id, { error: err instanceof Error ? err.message : String(err) });
           } catch {
             /* best-effort */
           }
@@ -392,7 +385,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         MAX_TIMEOUT_SEC
       );
       const canAutoBackground =
-        !!options?.db && options?.sandboxReadOnly !== true && args.timeout === undefined;
+        !!options?.taskPort && options?.sandboxReadOnly !== true && args.timeout === undefined;
       const autoBackgroundMs = canAutoBackground
         ? (options?.bashAutoBackgroundMs ?? DEFAULT_AUTO_BACKGROUND_MS) || undefined
         : undefined;
@@ -552,18 +545,15 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
 
       if (result.handoff) {
         const handoff = result.handoff;
-        const db = options?.db;
-        if (!db) {
+        const taskPort = options?.taskPort;
+        if (!taskPort) {
           return errorResult(
             'missing_db_context',
             'Background execution requires database context'
           );
         }
         try {
-          const repo = new TaskRepository(db);
-          const service = new TaskService(repo);
-          const executor = new CommandTaskExecutor(repo);
-          const task = service.createTask({
+          const task = taskPort.createTask({
             type: 'command',
             sessionId: options?.sessionId,
             runId: options?.runId,
@@ -584,7 +574,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
             },
           });
           handoff.detach();
-          const adopted = executor.adopt(
+          const adopted = taskPort.commandTasks.adopt(
             task,
             handoff.child,
             result.fullOutput,
@@ -593,9 +583,9 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
           // adopt() settles synchronously when the child already exited
           // between handoff and adoption; starting an already-terminal task
           // would throw an invalid-transition error.
-          const postAdopt = repo.findById(task.id);
+          const postAdopt = taskPort.findById(task.id);
           if (postAdopt && !TERMINAL_TASK_STATUSES.has(postAdopt.status)) {
-            service.startTask(task.id, { executorRef: adopted.executorRef });
+            taskPort.startTask(task.id, { executorRef: adopted.executorRef });
           }
           const reason = manualBackground?.signal.aborted
             ? "Moved to background at the user's request"
@@ -610,7 +600,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
               autoBackgrounded: true,
               taskId: task.id,
               pid: handoff.child.pid,
-              logPath: commandTaskLogPath(task.id),
+              logPath: taskPort.commandTasks.logPath(task.id),
               durationMs: result.durationMs,
               ...escalated.details,
               sandboxed: wrap.sandboxed,

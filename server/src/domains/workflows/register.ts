@@ -14,7 +14,6 @@ import { WorkflowGeneratorService } from './generator.js';
 import { createWorkflowRoutes } from './routes.js';
 import type { NotificationSender } from '../../infra/push/notification-sender.js';
 import type { WorkflowAiRunPort, WorkflowSchedulingPort } from './ports/runtime.js';
-import { LightweightAgentRunner } from '../../infra/providers/pi-runtime/agent-loop/index.js';
 
 import {
   CompositeStepExecutor,
@@ -24,8 +23,6 @@ import {
   ConditionStepExecutor,
   WaitStepExecutor,
   AIPromptStepExecutor,
-  DefaultWorkflowAgentRuntimeResolver,
-  createWorkflowAgentPermissionCallbackFactory,
   AIReviewStepExecutor,
   GitStepExecutor,
   PluginStepExecutor,
@@ -36,9 +33,12 @@ import {
   ActivityStepExecutorAdapter,
 } from './step-executors/index.js';
 import type { ActivityRegistry } from '../activities/index.js';
-import type { PermissionBridgePort } from './ports/step-executor.js';
+import type {
+  AgentLoopRunnerPort,
+  PermissionBridgePort,
+  WorkflowAgentRuntimePort,
+} from './ports/step-executor.js';
 import type { ProjectLookupPort } from './ports/project-lookup.js';
-import type { PermissionWorkflowResolver } from './permission-workflow-resolver.js';
 import { TaskRepository } from '../tasks/repository.js';
 import { TaskService } from '../tasks/task-service.js';
 import { TaskExecutorRegistry } from '../tasks/executors/registry.js';
@@ -74,10 +74,10 @@ export interface WorkflowDomainDeps {
   systemTaskRegistry: WorkflowSchedulingPort;
   aiRunPort: WorkflowAiRunPort;
   permissionBridge?: PermissionBridgePort;
-  getPermissionWorkflowResolver?: () => PermissionWorkflowResolver | undefined;
+  agentRuntime: WorkflowAgentRuntimePort;
   taskExecutorRegistry?: TaskExecutorRegistry;
   activityRegistry?: ActivityRegistry;
-  agentLoopRunner?: LightweightAgentRunner;
+  agentLoopRunner: AgentLoopRunnerPort;
   /** Project lookup for run root paths; supplied by the composition root. */
   projectLookup?: ProjectLookupPort;
 }
@@ -99,19 +99,12 @@ export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomain
     workflowTriggerRegistry,
     aiRunPort,
     permissionBridge,
-    getPermissionWorkflowResolver,
     activityRegistry,
+    agentRuntime,
+    agentLoopRunner,
   } = deps;
 
   // -- Assemble step executors --
-  const agentLoopRunner = deps.agentLoopRunner ?? new LightweightAgentRunner({ db });
-  const agentRuntime = new DefaultWorkflowAgentRuntimeResolver(db, {
-    permissionCallbackFactory: createWorkflowAgentPermissionCallbackFactory({
-      db,
-      permissionBridge,
-      getPermissionWorkflowResolver,
-    }),
-  });
   const composite = new CompositeStepExecutor();
 
   composite.register(new ShellStepExecutor());

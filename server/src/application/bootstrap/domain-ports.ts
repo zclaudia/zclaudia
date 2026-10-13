@@ -1,6 +1,10 @@
 import { createVirtualClient } from '../conversation/transport/types.js';
 import { bumpProjectsVersion } from '../conversation/transport/broadcast.js';
 import { getGatewayClient } from '../../infra/gateway/gateway-instance.js';
+import { GatewayBackendDataPublisher } from '../../infra/gateway/gateway-backend-data-publisher.js';
+import { publishLocalBackendDataEvent } from '../../infra/gateway/local-backend-data-events.js';
+import type { BackendResourceEventMessage } from '@zclaudia/protocol/sync';
+import type { RunLike } from '../../utils/run-state.js';
 import type { ProjectChangeEvent } from '../../domains/projects/index.js';
 import type { SessionEventPublisherPort } from '../../domains/sessions/index.js';
 import type { LocalPRAiSessionPort } from '../../domains/local-pr/index.js';
@@ -11,6 +15,7 @@ interface CreateDomainPortsDeps {
   db: unknown;
   handleRunStart: (...args: any[]) => Promise<void>;
   broadcastHeartbeat: () => void;
+  activeRuns: Map<string, RunLike>;
 }
 
 export interface DomainPorts {
@@ -23,6 +28,14 @@ export interface DomainPorts {
 
 export function createDomainPorts(deps: CreateDomainPortsDeps): DomainPorts {
   const { db, handleRunStart, broadcastHeartbeat } = deps;
+  const localDataPublisher = new GatewayBackendDataPublisher({
+    activeRuns: deps.activeRuns,
+    publishTopic: (_topic, payload) => {
+      // This publisher only emits mutation events; snapshots are supplied by
+      // LocalBackendHandler when the facade subscribes.
+      publishLocalBackendDataEvent(payload as BackendResourceEventMessage);
+    },
+  });
 
   const handleProjectChanged = (event?: ProjectChangeEvent) => {
     bumpProjectsVersion();
@@ -30,17 +43,19 @@ export function createDomainPorts(deps: CreateDomainPortsDeps): DomainPorts {
 
     if (!event) return;
     const gatewayClient = getGatewayClient();
-    if (!gatewayClient) return;
 
     if (event.type === 'project_upsert') {
-      gatewayClient.commands.backendData.broadcastProjectEvent('updated', event.project);
+      localDataPublisher.broadcastProjectEvent('updated', event.project);
+      gatewayClient?.commands.backendData.broadcastProjectEvent('updated', event.project);
     } else {
-      gatewayClient.commands.backendData.broadcastProjectEvent('deleted', { id: event.projectId });
+      localDataPublisher.broadcastProjectEvent('deleted', { id: event.projectId });
+      gatewayClient?.commands.backendData.broadcastProjectEvent('deleted', { id: event.projectId });
     }
   };
 
   const sessionEvents: SessionEventPublisherPort = {
     publishSessionEvent: (type, session) => {
+      localDataPublisher.broadcastSessionEvent(type, session);
       const gatewayClient = getGatewayClient();
       gatewayClient?.commands.backendData.broadcastSessionEvent(type, session);
     },

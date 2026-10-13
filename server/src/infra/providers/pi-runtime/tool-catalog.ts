@@ -82,12 +82,12 @@ export const BUILTIN_TOOL_FACTORIES: Record<ToolName, ToolFactory> = {
   ListMcpResources: (_cwd, options) => createListMcpResourcesTool(options?.db),
   ReadMcpResource: (_cwd, options) => createReadMcpResourceTool(options?.db),
   TaskOutput: (_cwd, options) =>
-    createTaskOutputTool(options?.db, options?.taskRuntimeRegistryFactory),
+    createTaskOutputTool(options?.taskPort, options?.taskRuntimeRegistryFactory),
   Monitor: (_cwd, options) =>
     createMonitorTool(
       options?.sessionId,
       options?.runId,
-      options?.db,
+      options?.taskPort,
       options?.taskRuntimeRegistryFactory
     ),
   Agent: (cwd, options) =>
@@ -98,7 +98,8 @@ export const BUILTIN_TOOL_FACTORIES: Record<ToolName, ToolFactory> = {
       options?.db,
       options?.permissionOverride,
       options?.agentTaskExecutor,
-      options?.toolLookups
+      options?.toolLookups,
+      options?.taskPort
     ),
   SendMessage: (cwd, options) =>
     createSendMessageTool({
@@ -109,12 +110,14 @@ export const BUILTIN_TOOL_FACTORIES: Record<ToolName, ToolFactory> = {
       permissionOverride: options?.permissionOverride,
       agentTaskExecutor: options?.agentTaskExecutor,
       messenger: options?.subagentMessenger,
+      taskPort: options?.taskPort,
     }),
   RespondToCoordinator: (_cwd, options) =>
     createRespondToCoordinatorTool({
       sessionId: options?.sessionId,
       db: options?.db,
       messenger: options?.subagentMessenger,
+      taskPort: options?.taskPort,
     }),
   ReadSessionContext: (_cwd, options) =>
     createReadSessionContextTool({

@@ -332,24 +332,6 @@ if [ -f "$ANDROID_MANIFEST" ] && grep -q 'android:name=".NotificationRenderServi
   echo ""
 fi
 
-mkdir -p "$ANDROID_RES_DIR/mipmap-anydpi-v26"
-cat > "$ANDROID_RES_DIR/mipmap-anydpi-v26/ic_launcher_dev.xml" <<'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-  <foreground android:drawable="@mipmap/ic_launcher_dev_foreground"/>
-  <background android:drawable="@color/ic_launcher_background"/>
-</adaptive-icon>
-EOF
-cat > "$ANDROID_RES_DIR/mipmap-anydpi-v26/ic_launcher_dev_round.xml" <<'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-  <foreground android:drawable="@mipmap/ic_launcher_dev_foreground"/>
-  <background android:drawable="@color/ic_launcher_background"/>
-</adaptive-icon>
-EOF
-node scripts/assets/generate-dev-icons.js
-echo ""
-
 # --- Patch Android build.gradle.kts (fix duplicate libc++_shared.so) ---
 GRADLE_FILE="$ANDROID_GEN_DIR/app/build.gradle.kts"
 if [ -f "$GRADLE_FILE" ] && ! grep -q "pickFirsts" "$GRADLE_FILE"; then

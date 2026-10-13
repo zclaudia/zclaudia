@@ -2,8 +2,7 @@ import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 
 import { persistSessionSandboxDomain } from './sandbox-network-memory.js';
-import { TaskRepository } from '../../../domains/tasks/repository.js';
-import { TaskService } from '../../../domains/tasks/task-service.js';
+import type { TaskPort } from '../../../utils/task-port.js';
 import type { PermissionCallback } from '../types.js';
 import { getEvalKernel, runOneShotEval, type EvalExecResult } from './eval-kernel.js';
 import { EvalTaskRuntime } from './eval-task-runtime.js';
@@ -22,6 +21,7 @@ export interface EvalBridgeToolOptions {
   sessionId?: string;
   runId?: string;
   db?: Database.Database;
+  taskPort?: TaskPort;
   sandboxReadOnly?: boolean;
   sandboxAllowedDomains?: string[];
   permissionCallback?: PermissionCallback;
@@ -168,14 +168,13 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
             sandboxed: privilegeGate.result.sandboxed,
           });
         }
-        if (!options?.db)
+        const taskPort = options?.taskPort;
+        if (!taskPort)
           return errorResult(
             'missing_db_context',
             'Eval background execution requires database context'
           );
-        const repo = new TaskRepository(options.db);
-        const service = new TaskService(repo);
-        const task = service.createTask({
+        const task = taskPort.createTask({
           type: 'eval',
           title: 'Eval background task',
           sessionId: options.sessionId,
@@ -201,10 +200,10 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
           },
         });
         try {
-          const runtime = new EvalTaskRuntime(repo);
-          const runningTask = service.startTask(task.id);
+          const runtime = new EvalTaskRuntime(taskPort);
+          const runningTask = taskPort.startTask(task.id);
           const started = await runtime.start(runningTask);
-          const running = repo.update(task.id, { executorRef: started.executorRef });
+          const running = taskPort.update(task.id, { executorRef: started.executorRef });
           return textResult(`Started Eval background task ${running.id}`, {
             ok: true,
             taskId: running.id,
@@ -214,7 +213,7 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
           });
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          service.failTask(task.id, { error: message });
+          taskPort.failTask(task.id, { error: message });
           return errorResult('eval_background_start_failed', message, { taskId: task.id });
         }
       }

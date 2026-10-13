@@ -1,6 +1,12 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
-import type { PermissionRequest } from '@zclaudia/shared/interaction/permissions';
 import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
+import type {
+  AgentLoopPermissionCallback,
+  AgentLoopPermissionDecision,
+  AgentLoopPermissionMode,
+} from '../../utils/agent-loop-runtime-types.js';
+
+export type { AgentLoopPermissionCallback, AgentLoopPermissionDecision, AgentLoopPermissionMode };
 
 export type AgentLoopOwnerType =
   | 'workflow_run'
@@ -19,8 +25,6 @@ export type AgentLoopContextPolicy =
   | 'step-local'
   | 'workflow-artifacts'
   | 'workflow-thread';
-
-export type AgentLoopPermissionMode = 'deny-external' | 'allow-declared-tools';
 
 export type AgentLoopRunStatus = 'completed' | 'failed' | 'timeout' | 'contract_failed';
 
@@ -75,16 +79,6 @@ export interface AgentLoopToolsetRequest {
   id: string;
   overrides?: Record<string, AgentTool>;
 }
-
-export interface AgentLoopPermissionDecision {
-  behavior: 'allow' | 'deny';
-  updatedInput?: unknown;
-  message?: string;
-}
-
-export type AgentLoopPermissionCallback = (
-  request: PermissionRequest
-) => Promise<AgentLoopPermissionDecision>;
 
 export interface AgentLoopRuntimePermissions {
   userHooks?: UserHookDefinition[];

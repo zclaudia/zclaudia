@@ -1,15 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 
-vi.mock('../../../../domains/llm-profiles/codex-oauth-service.js', () => ({
-  refreshIfNeeded: vi.fn(),
-}));
 vi.mock('../../../../utils/llm-profile-registry.js', () => ({
-  getLlmProfileWriter: vi.fn(() => ({ updateOAuthCredentials: vi.fn() })),
+  resolveCodexCredentials: vi.fn(),
 }));
 
 import { buildModel } from '../build-model.js';
-import { refreshIfNeeded } from '../../../../domains/llm-profiles/codex-oauth-service.js';
+import { resolveCodexCredentials } from '../../../../utils/llm-profile-registry.js';
 
 function makeCodexProfile(): LlmProfileConfig {
   return {
@@ -53,8 +50,8 @@ describe('buildModel — openai-codex', () => {
     }
   });
 
-  it('getApiKey delegates to refreshIfNeeded', async () => {
-    (refreshIfNeeded as any).mockResolvedValue({
+  it('getApiKey delegates to resolveCodexCredentials', async () => {
+    (resolveCodexCredentials as any).mockResolvedValue({
       access: 'fresh-a',
       refresh: 'r',
       expires: 1,
@@ -65,7 +62,7 @@ describe('buildModel — openai-codex', () => {
     expect(getApiKey).toBeDefined();
     const key = await getApiKey!('openai-codex');
     expect(key).toBe('fresh-a');
-    expect(refreshIfNeeded).toHaveBeenCalled();
+    expect(resolveCodexCredentials).toHaveBeenCalled();
   });
 
   it('stamps ChatGPT-Account-Id and originator headers', () => {

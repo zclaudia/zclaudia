@@ -27,6 +27,8 @@ import { mapPermissionMode } from '../../../infra/providers/pcp-permission.js';
 import type { LanguageServerService } from '../../../infra/lsp/index.js';
 import { createPiCacheTraceStore } from './pi-cache-trace-store.js';
 import { createPiToolLookups } from './pi-tool-lookups.js';
+import { createPlanModePort } from './plan-mode-port.js';
+import { createTaskAdapter } from '../../tasks/task-adapter.js';
 
 interface SessionContext {
   id: string;
@@ -124,6 +126,8 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     languageServers,
     toolLookups: createPiToolLookups(db),
     cacheTraceStore: createPiCacheTraceStore(db),
+    planModePort: createPlanModePort(db),
+    taskPort: createTaskAdapter(db),
     llmProfileConfig: providerConfig,
     agentProfile,
     enabledTools,

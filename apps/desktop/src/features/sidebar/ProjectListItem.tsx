@@ -278,21 +278,16 @@ export function ProjectListItem({
         >
           <MoreVertical className={`${glyphClass} text-muted-foreground`} strokeWidth={1.75} />
         </button>
-        {/* New session — placed last. On touch it leaves the row entirely: a
-            collapsed project carrying chevron + ⋮ + "+" is three affordances on
-            one 44px row, so mobile gets a real "New session" row inside the
-            expanded project instead (below). */}
-        {!isMobile && (
-          <button
-            onClick={() => onStartCreatingSession()}
-            disabled={!isConnected}
-            className={`${menuButtonClass} disabled:cursor-not-allowed`}
-            title="New session"
-            aria-label="New session"
-          >
-            <Plus className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={2} />
-          </button>
-        )}
+        {/* New session — placed last, same "+" affordance as New project. */}
+        <button
+          onClick={() => onStartCreatingSession()}
+          disabled={!isConnected}
+          className={`${menuButtonClass} disabled:cursor-not-allowed`}
+          title="New session"
+          aria-label="New session"
+        >
+          <Plus className={`${glyphClass} text-muted-foreground`} strokeWidth={2} />
+        </button>
 
         {/* Project context menu */}
         {contextMenuProject === project.id &&
@@ -382,17 +377,6 @@ export function ProjectListItem({
             </div>
           )}
           {!hasSupervisor && renderRegularSessions()}
-          {isMobile && (
-            <button
-              onClick={() => onStartCreatingSession()}
-              disabled={!isConnected}
-              aria-label="New session"
-              className="w-full h-11 px-3 rounded-md text-sm text-muted-foreground flex items-center gap-2.5 hover:bg-secondary active:bg-secondary hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Plus className="w-4 h-4 flex-shrink-0" strokeWidth={1.75} />
-              New session
-            </button>
-          )}
         </div>
       )}
     </>

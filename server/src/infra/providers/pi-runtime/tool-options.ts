@@ -1,3 +1,5 @@
+import type { TaskPort } from '../../../utils/task-port.js';
+import type { PlanModePort } from './plan-mode-port.js';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
@@ -54,6 +56,8 @@ export interface ToolBridgeOptions {
   automationPort?: AutomationPort;
   /** Host lookups for TodoRead / ReadSessionContext / the Agent subagent_type roster. */
   toolLookups?: PiToolLookupPort;
+  planModePort?: PlanModePort;
+  taskPort?: TaskPort;
   /** Language-server port for LSPTool; the tool is skipped when it has no server for cwd. */
   languageServerPort?: LanguageServerPort;
   /** Auxiliary model context for summarizing tools (WebFetch prompt, ReadSessionContext). */

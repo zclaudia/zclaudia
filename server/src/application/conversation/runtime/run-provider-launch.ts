@@ -1,3 +1,6 @@
+import { createTaskAdapter } from '../../tasks/task-adapter.js';
+import { createPlanModePort } from './plan-mode-port.js';
+import { createPiToolLookups } from './pi-tool-lookups.js';
 import { resolveAgentForSession } from '../../../domains/sessions/agent-resolver.js';
 import { isPiAgentRuntime } from '@zclaudia/shared/core/agent-profile';
 import { newId } from '../../../utils/uuid.js';
@@ -395,6 +398,9 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
           {
             cwd,
             db: db as Database.Database,
+            taskPort: createTaskAdapter(db as Database.Database),
+            planModePort: createPlanModePort(db as Database.Database),
+            toolLookups: createPiToolLookups(db as Database.Database),
             enabledTools,
             llmProfileConfig: effectiveProviderConfig,
             agentProfile: effectiveAgentProfile,

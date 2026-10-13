@@ -3,11 +3,13 @@ import type { ToolName } from '@zclaudia/shared/core/tools';
 import type {
   AgentLoopPermissionCallback,
   AgentLoopPermissionMode,
-} from '../../../../domains/agent-loop/index.js';
+} from '../../../../utils/agent-loop-runtime-types.js';
 import { SANDBOX_NETWORK_ACCESS_COMPAT_TOOL } from '../sandbox-execution/index.js';
 import { buildTools } from '../tool-bridge.js';
 import { applyToolScheduler } from '../tool-scheduler.js';
 import type { PendingArgOverrides } from '../pending-arg-overrides.js';
+import type { TaskPort } from '../../../../utils/task-port.js';
+import type { PlanModePort } from '../plan-mode-port.js';
 
 const SANDBOX_PERMISSION_TOOLS = [
   'CriticalBashCommand',
@@ -107,6 +109,8 @@ export function buildAgentLoopTools(args: {
   /** Per-run store shared with buildAgentHooks so permission-approved
    *  updatedInput rewrites reach tool execution (pi drops `{ args }`). */
   argOverrides?: PendingArgOverrides;
+  taskPort?: TaskPort;
+  planModePort?: PlanModePort;
 }): AgentTool[] {
   const descriptor = getAgentLoopToolsetDescriptor(args.toolsetId);
   if (!descriptor) {
@@ -127,6 +131,8 @@ export function buildAgentLoopTools(args: {
       runId: args.runId,
       sandboxReadOnly: descriptor.sandboxReadOnly,
       argOverrides: args.argOverrides,
+      taskPort: args.taskPort,
+      planModePort: args.planModePort,
     })
   );
 }

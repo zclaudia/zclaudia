@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { DEFAULT_UNIFIED_POLICY } from '@zclaudia/shared/interaction/permissions';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
-import { createWorkflowAgentPermissionCallbackFactory } from '../step-executors/workflow-agent-permissions.js';
-import type { AgentLoopPermissionDecision } from '../../agent-loop/index.js';
+import { createWorkflowAgentPermissionCallbackFactory } from '../workflow-agent-permissions.js';
+import type { AgentLoopPermissionDecision } from '../../../domains/agent-loop/index.js';
 
 describe('createWorkflowAgentPermissionCallbackFactory', () => {
   let db: Database.Database;

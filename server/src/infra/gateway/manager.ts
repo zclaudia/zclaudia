@@ -9,6 +9,7 @@ import { handleChannelClosed } from './gateway-channel-cleanup.js';
 import { EmbeddedBackendFacadeProvider } from './embedded-provider.js';
 import { StandaloneBackendFacadeProvider } from './standalone-provider.js';
 import type { LocalBackendHandler } from './embedded-adapter.js';
+import { subscribeLocalBackendDataEvents } from './local-backend-data-events.js';
 import type { FacadeWsHub } from './ws-hub.js';
 import type Database from 'better-sqlite3';
 import type { GatewayConfig } from './gateway-types.js';
@@ -445,6 +446,7 @@ export class GatewayManager {
           serverEventListeners.delete(listener);
         };
       },
+      onBackendDataEvent: subscribeLocalBackendDataEvents,
       getSessionItems: () => {
         try {
           const sessions = serverContext.db

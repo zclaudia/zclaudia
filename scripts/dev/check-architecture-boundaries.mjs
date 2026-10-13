@@ -30,34 +30,7 @@ const SERVER_LAYER_ORDER = ['utils', 'infra', 'domains', 'application', 'interfa
 // domains must not import application/interfaces/root, application must not
 // import interfaces/root, utils must not import anything above it.
 const DEFAULT_SERVER_LAYER_VIOLATION_ALLOWLIST = new Set([
-  'server/src/domains/workflows/step-executors/workflow-agent-permissions.ts -> server/src/application/conversation/agent/permission-evaluator.ts',
-  'server/src/domains/workflows/step-executors/workflow-agent-runtime-resolver.ts -> server/src/application/conversation/context/engine.ts',
-  'server/src/domains/workflows/step-executors/workflow-agent-runtime-resolver.ts -> server/src/application/conversation/context/memory-context.ts',
-  'server/src/domains/workflows/step-executors/workflow-agent-runtime-resolver.ts -> server/src/application/conversation/runtime/resolve-user-hooks.ts',
-  'server/src/domains/workflows/step-executors/workflow-agent-runtime-resolver.ts -> server/src/application/plugins/index.ts',
-  'server/src/domains/workflows/step-executors/workflow-agent-runtime-resolver.ts -> server/src/application/services/workspace.ts',
-  'server/src/infra/providers/pi-runtime/agent-loop/lightweight-agent-runner.ts -> server/src/domains/agent-loop/index.ts',
-  'server/src/infra/providers/pi-runtime/agent-loop/lightweight-agent-runner.ts -> server/src/domains/llm-profiles/repository.ts',
-  'server/src/infra/providers/pi-runtime/agent-loop/toolsets.ts -> server/src/domains/agent-loop/index.ts',
-  'server/src/infra/providers/pi-runtime/bash-tool.ts -> server/src/domains/tasks/executors/command-executor.ts',
-  'server/src/infra/providers/pi-runtime/bash-tool.ts -> server/src/domains/tasks/repository.ts',
-  'server/src/infra/providers/pi-runtime/bash-tool.ts -> server/src/domains/tasks/task-service.ts',
-  'server/src/infra/providers/pi-runtime/build-model.ts -> server/src/domains/llm-profiles/codex-oauth-service.ts',
-  'server/src/infra/providers/pi-runtime/command-task-runtime.ts -> server/src/domains/tasks/executors/command-executor.ts',
-  'server/src/infra/providers/pi-runtime/command-task-runtime.ts -> server/src/domains/tasks/repository.ts',
-  'server/src/infra/providers/pi-runtime/command-task-runtime.ts -> server/src/domains/tasks/task-service.ts',
-  'server/src/infra/providers/pi-runtime/eval-task-runtime.ts -> server/src/domains/tasks/executors/command-executor.ts',
-  'server/src/infra/providers/pi-runtime/eval-task-runtime.ts -> server/src/domains/tasks/repository.ts',
-  'server/src/infra/providers/pi-runtime/eval-task-runtime.ts -> server/src/domains/tasks/task-service.ts',
-  'server/src/infra/providers/pi-runtime/eval-tool.ts -> server/src/domains/tasks/repository.ts',
-  'server/src/infra/providers/pi-runtime/eval-tool.ts -> server/src/domains/tasks/task-service.ts',
-  'server/src/infra/providers/pi-runtime/mode-tools.ts -> server/src/application/conversation/interactions/interaction-dispatcher.ts',
-  'server/src/infra/providers/pi-runtime/mode-tools.ts -> server/src/domains/sessions/plan-mode-toggle.ts',
-  'server/src/infra/providers/pi-runtime/mode-tools.ts -> server/src/domains/sessions/repository.ts',
-  'server/src/infra/providers/pi-runtime/models-registry.ts -> server/src/domains/llm-profiles/codex-oauth-pi.ts',
-  'server/src/infra/providers/pi-runtime/skills.ts -> server/src/application/plugins/skill-tools.ts',
-  'server/src/infra/providers/pi-runtime/task-tools.ts -> server/src/domains/tasks/repository.ts',
-  'server/src/infra/providers/pi-runtime/task-tools.ts -> server/src/domains/tasks/task-service.ts',
+  // Cleared: orchestration now lives in application, and infra consumes injected ports.
 ]);
 
 // desktop: a store file may not import another store file (cross-store
