@@ -397,7 +397,7 @@ export class GatewayTransport {
     const msg: PeerHelloMessage = {
       type: 'peer_hello',
       protocolVersion: GATEWAY_PROTOCOL_V4,
-      namespace: ZCLAUDIA_NAMESPACE,
+      namespace: import.meta.env.VITE_GATEWAY_NAMESPACE?.trim() || ZCLAUDIA_NAMESPACE,
       clientProtocolVersion: 1,
       peerType: 'client-only',
       gatewaySecret: this.config.gatewaySecret,

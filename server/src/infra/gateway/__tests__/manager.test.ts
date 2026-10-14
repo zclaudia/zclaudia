@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GatewayManager } from '../manager.js';
 
 const { gatewayClientInstances } = vi.hoisted(() => ({
@@ -109,6 +109,10 @@ describe('GatewayManager', () => {
   beforeEach(() => {
     gatewayClientInstances.length = 0;
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   function createManager() {
@@ -378,5 +382,43 @@ describe('GatewayManager', () => {
       serverContext.getStateHeartbeat()
     );
     expect(serverContext.getStateHeartbeat).toHaveBeenCalled();
+  });
+
+  it('uses the GatewayClient default namespace when none is configured', async () => {
+    vi.stubEnv('GATEWAY_NAMESPACE', '  ');
+    const { manager } = createManager();
+
+    await manager.connect({
+      id: 1,
+      enabled: true,
+      gatewayUrl: 'ws://gateway.example.com',
+      gatewaySecret: 'secret',
+      backendName: 'backend',
+      gatewayBackendId: null,
+      registerAsBackend: true,
+      createdAt: 0,
+      updatedAt: 0,
+    });
+
+    expect(gatewayClientInstances.at(-1)?.config?.namespace).toBeUndefined();
+  });
+
+  it('passes a configured namespace to GatewayClient', async () => {
+    vi.stubEnv('GATEWAY_NAMESPACE', '  mobile-sync-test  ');
+    const { manager } = createManager();
+
+    await manager.connect({
+      id: 1,
+      enabled: true,
+      gatewayUrl: 'ws://gateway.example.com',
+      gatewaySecret: 'secret',
+      backendName: 'backend',
+      gatewayBackendId: null,
+      registerAsBackend: true,
+      createdAt: 0,
+      updatedAt: 0,
+    });
+
+    expect(gatewayClientInstances.at(-1)?.config?.namespace).toBe('mobile-sync-test');
   });
 });

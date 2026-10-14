@@ -73,6 +73,7 @@ describe('GatewayTransport', () => {
 
   afterEach(() => {
     transport.disconnect();
+    vi.unstubAllEnvs();
   });
 
   describe('constructor', () => {
@@ -271,6 +272,7 @@ describe('GatewayTransport', () => {
 
   describe('WebSocket event handlers', () => {
     it('sends peer_hello on open', () => {
+      vi.stubEnv('VITE_GATEWAY_NAMESPACE', '');
       transport.connect();
       const mockWs = (transport as any).ws;
       mockWs.onopen();
@@ -283,6 +285,15 @@ describe('GatewayTransport', () => {
       expect(sentMessage.clientProtocolVersion).toBe(1);
       expect(sentMessage.peerType).toBe('client-only');
       expect(sentMessage.identity).toEqual({ deviceId: 'device-1', instanceId: 'instance-1' });
+    });
+
+    it('uses the configured namespace for peer_hello', () => {
+      vi.stubEnv('VITE_GATEWAY_NAMESPACE', '  mobile-sync-test  ');
+      transport.connect();
+      const mockWs = (transport as any).ws;
+      mockWs.onopen();
+
+      expect(JSON.parse(mockWs.send.mock.calls[0][0]).namespace).toBe('mobile-sync-test');
     });
 
     it('calls onDisconnected on close', () => {

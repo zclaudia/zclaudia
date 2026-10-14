@@ -224,6 +224,7 @@ export class GatewayManager {
     const gatewayClientConfig: GatewayClientConfig = {
       gatewayUrl: config.gatewayUrl,
       gatewaySecret: config.gatewaySecret,
+      namespace: process.env.GATEWAY_NAMESPACE?.trim() || undefined,
       name: config.backendName || `Backend on ${os.hostname()}`,
       channel: process.env.ZCLAUDIA_CHANNEL || 'prod',
       serverPort: this.actualPort,
