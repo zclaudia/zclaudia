@@ -71,11 +71,6 @@ import type { NotificationSender } from './infra/push/notification-sender.js';
 import type { NotificationService } from './domains/notification-feed/index.js';
 import { PermissionBridge } from './application/conversation/agent/permission-bridge.js';
 import {
-  recomputePhase,
-  computeBlockers,
-} from './application/conversation/runtime/active-run-phase.js';
-import type { WorkflowRunEvent } from './domains/workflows/run-events.js';
-import {
   ExecutorRegistry,
   ManualAdapter,
   ExecutorInstanceRepository,
@@ -113,8 +108,14 @@ import {
 } from './domains/activities/index.js';
 import { createPiAgentLoopRunner } from './application/agent-loop/lightweight-agent-runner.js';
 import { DefaultWorkflowAgentRuntimeResolver } from './application/workflows/workflow-agent-runtime-resolver.js';
+import { createMetaWorkflowAiRunPort } from './application/workflows/meta-workflow-ai-port.js';
 import { createTaskAdapter } from './application/tasks/task-adapter.js';
 import { createPlanModePort } from './application/conversation/runtime/plan-mode-port.js';
+import {
+  clearPendingPermissionFromActiveRun as clearPendingPermissionFromActiveRunIn,
+} from './application/permissions/clear-pending-permission.js';
+import { registerPermissionWorkflowProgress } from './application/permissions/permission-workflow-progress.js';
+import { getProjectRoot as lookupProjectRoot } from './application/bootstrap/project-root.js';
 
 interface RegisterFeatureDomainsDeps {
   db: ReturnType<typeof initDatabase>;
@@ -355,20 +356,8 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
   });
 
   // Permission bridge — connects workflow engine to conversation permission system
-  const clearPendingPermissionFromActiveRun = (requestId: string): boolean => {
-    for (const [, run] of activeRuns) {
-      const pending = run.pendingPermissions.get(requestId);
-      if (!pending) continue;
-      if (pending.timeout) clearTimeout(pending.timeout);
-      run.pendingPermissions.delete(requestId);
-      recomputePhase(run, computeBlockers(run));
-      run.db
-        .prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
-        .run('running', Date.now(), run.sessionId);
-      return true;
-    }
-    return false;
-  };
+  const clearPendingPermissionFromActiveRun = (requestId: string): boolean =>
+    clearPendingPermissionFromActiveRunIn(activeRuns, requestId);
 
   const permissionBridge = new PermissionBridge({
     onWorkflowResolved: ({ requestId, decision, reason, context }) => {
@@ -424,82 +413,11 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
 
   // ── Permission workflow progress broadcasting ──
   // Subscribe to workflow engine events and translate to permission-specific messages.
-  workflowEngine.dispatcher.onAny((event: WorkflowRunEvent) => {
-    const payload = workflowEngine.getRunEventPayload(event.runId);
-    if (!payload?.requestId || !payload?.sessionId) return;
-
-    const requestId = payload.requestId as string;
-    const sessionId = payload.sessionId as string;
-
-    if (
-      event.type === 'step_started' ||
-      event.type === 'step_completed' ||
-      event.type === 'step_failed'
-    ) {
-      const runDetail = workflowService.getRun(event.runId);
-      if (!runDetail) return;
-
-      const completedSteps = runDetail.stepRuns
-        .filter(s => s.status === 'completed')
-        .map(s => s.stepId);
-
-      broadcastToAuthenticatedClients(clients, {
-        type: 'permission_workflow_progress',
-        requestId,
-        sessionId,
-        workflowRunId: event.runId,
-        currentStep: {
-          id: event.stepId,
-          type: runDetail.stepRuns.find(s => s.stepId === event.stepId)?.stepType || 'unknown',
-          status:
-            event.type === 'step_started'
-              ? 'running'
-              : event.type === 'step_completed'
-                ? 'completed'
-                : 'failed',
-          label: runDetail.stepRuns.find(s => s.stepId === event.stepId)?.stepId || event.stepId,
-        },
-        completedSteps,
-        totalSteps: runDetail.stepRuns.length,
-      });
-
-      // Send ai_review_completed when ai_risk_analysis step finishes
-      if (event.type === 'step_completed') {
-        const stepRun = runDetail.stepRuns.find(s => s.stepId === event.stepId);
-        if (stepRun?.stepType === 'ai_risk_analysis' && stepRun.output) {
-          broadcastToAuthenticatedClients(clients, {
-            type: 'ai_review_completed',
-            requestId,
-            sessionId,
-            decision: stepRun.output.decision || 'uncertain',
-            reasoning: stepRun.output.reasoning || '',
-            confidence: stepRun.output.confidence ?? 0,
-            metadata: stepRun.output.metadata,
-          });
-        }
-
-        // When permission_decide step resolves the permission, notify the frontend
-        // and clean up pendingPermissions (mirrors what handlePermissionDecision does)
-        if (stepRun?.stepType === 'permission_decide' && stepRun.output?.resolved) {
-          // PermissionBridge normally broadcasts and clears the pending request
-          // before releasing the provider. Keep this fallback for older/custom
-          // bridge implementations that only resolve the promise.
-          if (clearPendingPermissionFromActiveRun(requestId)) {
-            const decision =
-              stepRun.output.decision === 'allow' || stepRun.output.decision === 'approve'
-                ? 'approve'
-                : 'deny';
-            broadcastToAuthenticatedClients(clients, {
-              type: 'permission_auto_resolved',
-              requestId,
-              sessionId,
-              behavior: decision,
-              reason: (stepRun.output.reason as string) || 'Auto-resolved by permission workflow',
-            });
-          }
-        }
-      }
-    }
+  registerPermissionWorkflowProgress({
+    broadcast: msg => broadcastToAuthenticatedClients(clients, msg),
+    workflowEngine,
+    workflowService,
+    clearPendingPermissionFromActiveRun,
   });
 
   // Callback for cancelling a workflow run (used when user manually decides a permission)
@@ -514,42 +432,9 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
   const defaultProjectId = svProjectRepo.findAll()[0]?.id ?? 'default';
   const workflowRunRepository = new WorkflowRunRepository(db);
 
-  // Adapt WorkflowAiRunPort → AiRunPort:
-  // WorkflowAiRunPort.startVirtualRun requires clientId/sessionId and uses
-  // onMessage: (msg: ServerMessage). AiRunPort uses optional args and a simpler
-  // onMessage shape. This adapter bridges the two by generating synthetic IDs
-  // and re-mapping message shapes.
-  const metaWorkflowAiRunPort = {
-    async startVirtualRun(args: {
-      clientId?: string;
-      sessionId?: string;
-      input: string;
-      workingDirectory?: string;
-      llmProfileId?: string;
-      systemContext?: string;
-      onMessage?: (m: { kind: string; content?: string }) => void;
-    }): Promise<void> {
-      const clientId = args.clientId ?? `meta-virtual-${Date.now()}`;
-      const sessionId = args.sessionId ?? `meta-session-${Date.now()}`;
-      const result = workflowAiRunPort.startVirtualRun({
-        clientId,
-        sessionId,
-        input: args.input,
-        workingDirectory: args.workingDirectory,
-        llmProfileId: args.llmProfileId,
-        systemContext: args.systemContext,
-        onMessage: msg => {
-          if (!args.onMessage) return;
-          const m = msg as { type?: string; kind?: string; content?: string; data?: unknown };
-          // Map ServerMessage shape to AiRunPort's simpler {kind, content} shape.
-          const kind = m.kind ?? m.type ?? 'unknown';
-          const content = typeof m.content === 'string' ? m.content : undefined;
-          args.onMessage({ kind, content });
-        },
-      });
-      if (result instanceof Promise) await result;
-    },
-  };
+  // Adapt WorkflowAiRunPort → AiRunPort for meta-workflow virtual runs
+  // (see application/workflows/meta-workflow-ai-port.ts).
+  const metaWorkflowAiRunPort = createMetaWorkflowAiRunPort(workflowAiRunPort);
 
   const metaWorkflow = registerMetaWorkflow({
     db,
@@ -599,21 +484,9 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
   // AnonymousIssueService) and installs the propagator subscriber.
   //
   // G5a: real project root lookup. Returns the projects.root_path string.
-  // Throws if project is missing or has no root_path configured.
-  const getProjectRoot = (projectId: string): string => {
-    const row = db.prepare('SELECT root_path FROM projects WHERE id = ?').get(projectId) as
-      | { root_path: string | null }
-      | undefined;
-    if (!row) {
-      throw new Error(`Project not found: ${projectId}`);
-    }
-    if (!row.root_path) {
-      throw new Error(
-        `Project ${projectId} has no root_path configured (set via PATCH /api/projects/:id { rootPath })`
-      );
-    }
-    return row.root_path;
-  };
+  // (lookup itself lives in application/bootstrap/project-root.ts; throws if
+  // project is missing or has no root_path configured.)
+  const getProjectRoot = (projectId: string): string => lookupProjectRoot(db, projectId);
   const specChangeService = new SpecChangeService({
     db,
     getProjectRoot,
