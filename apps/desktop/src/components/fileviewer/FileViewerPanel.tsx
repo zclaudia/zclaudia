@@ -1,119 +1,37 @@
 import {
-  useCallback,
   useLayoutEffect,
   useRef,
   useState,
   useEffect,
   useMemo,
-  type CSSProperties,
-  type MouseEvent as ReactMouseEvent,
-  type TouchEvent as ReactTouchEvent,
 } from 'react';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useWorkspaceTool } from '../workspace/WorkspaceToolContext';
-import {
-  Highlight,
-  themes as prismThemes,
-  type PrismTheme,
-  type Token,
-} from 'prism-react-renderer';
-import { List, useListRef, type RowComponentProps, type ListImperativeAPI } from 'react-window';
-import {
-  Check,
-  ChevronLeft,
-  Code,
-  Copy,
-  ExternalLink,
-  FileText,
-  Maximize2,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Search,
-  TextSearch,
-} from 'lucide-react';
+import { themes as prismThemes } from 'prism-react-renderer';
+import { useListRef } from 'react-window';
+import { ChevronLeft, FileText } from 'lucide-react';
 import { useTheme, isDarkTheme } from '../../contexts/ThemeContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { IconButton } from '../ui/Button';
-import * as api from '../../services/api';
 import { FileSearchInput } from './FileSearchInput';
 import { FileContentSearchInput } from './FileContentSearchInput';
 import { FileTree } from './FileTree';
 import { MarkdownFileContent } from './MarkdownFileContent';
 import { FileSymbol } from '../filesymbols';
 import { matchesByLine, findContentMatches, type ContentMatch } from './contentSearch';
-import { DiagnosticMarker, FileDiagnosticsSummary } from './FileDiagnostics';
-import {
-  diagnosticLineTint,
-  diagnosticsByLine,
-  type LineDiagnostics,
-} from './fileDiagnosticsModel';
+import { FileDiagnosticsSummary } from './FileDiagnostics';
+import { diagnosticsByLine } from './fileDiagnosticsModel';
 import { useFileDiagnostics } from './useFileDiagnostics';
-import { isDesktopTauri } from '../../utils/platform';
-import {
-  openPopoutWindow,
-  buildWindowTitle,
-  getConnectionParams,
-} from '../../actions/popoutWindow';
-import { useProjectStore } from '../../stores/projectStore';
-import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useWorkspaceVisible } from '../workspace/WorkspaceContext';
+import { detectLanguage } from './detectLanguage';
+import { VirtualizedCodeView } from './VirtualizedCodeView';
+import { useFileContentPolling } from './useFileContentPolling';
+import { usePanelWidth, useResizableTree } from './useResizableTree';
+import { resolveProjectBackendId } from './FileViewerActions';
 
-const EXT_TO_LANG: Record<string, string> = {
-  ts: 'typescript',
-  tsx: 'tsx',
-  js: 'javascript',
-  jsx: 'jsx',
-  json: 'json',
-  md: 'markdown',
-  py: 'python',
-  rs: 'rust',
-  go: 'go',
-  sh: 'bash',
-  bash: 'bash',
-  zsh: 'bash',
-  yml: 'yaml',
-  yaml: 'yaml',
-  toml: 'toml',
-  css: 'css',
-  scss: 'scss',
-  less: 'less',
-  html: 'html',
-  xml: 'xml',
-  svg: 'xml',
-  sql: 'sql',
-  graphql: 'graphql',
-  rb: 'ruby',
-  java: 'java',
-  kt: 'kotlin',
-  c: 'c',
-  cpp: 'cpp',
-  h: 'c',
-  hpp: 'cpp',
-  cs: 'csharp',
-  swift: 'swift',
-  m: 'objectivec',
-  lua: 'lua',
-  r: 'r',
-  pl: 'perl',
-  dockerfile: 'docker',
-  makefile: 'makefile',
-};
-
-function detectLanguage(filePath: string): string {
-  const fileName = filePath.split('/').pop()?.toLowerCase() || '';
-  if (fileName === 'dockerfile') return 'docker';
-  if (fileName === 'makefile') return 'makefile';
-  const ext = fileName.split('.').pop() || '';
-  return EXT_TO_LANG[ext] || 'text';
-}
-
-/**
- * How often to poll the server for external file changes while a file is open.
- * The panel runs a single setInterval; on each tick it stats the file and only
- * re-fetches full content when the mtime advanced. The first check also fires
- * immediately on open/switch so a stale cached view is corrected right away.
- */
-const FILE_POLL_INTERVAL_MS = 5000;
+// FileViewerActions lives in its own file now; keep this path working for
+// existing consumers (builtinPanels renders it in the shared BottomPanel header).
+export { FileViewerActions } from './FileViewerActions';
 
 /** Splits a relative path into directory segments + filename for breadcrumb display. */
 function breadcrumbSegments(relativePath: string): { dirs: string[]; file: string } {
@@ -126,471 +44,10 @@ interface FileViewerPanelProps {
   projectRoot: string;
 }
 
-/** Row height (px) — must match lineHeight below so virtualization aligns rows. */
-const ROW_HEIGHT_PX = 20;
 const TREE_WIDTH_MIN = 160;
 /** The code keeps at least this much width beside the tree. */
 const CODE_WIDTH_MIN = 320;
 const TREE_WIDTH_MAX = 520;
-
-type CodeRowExtraProps = {
-  tokens: Token[][];
-  getLineProps: (input: { line: Token[] }) => { style?: CSSProperties; className?: string };
-  getTokenProps: (input: { token: Token }) => {
-    style?: CSSProperties;
-    className?: string;
-    children?: React.ReactNode;
-  };
-  highlightStart: number | null;
-  highlightEnd: number | null;
-  lineNumberWidth: string;
-  activeMatchLine: number | null;
-  activeMatchColumn: number;
-  matchesByLine: Map<number, { start: number; end: number }[]>;
-  diagnosticLines: Map<number, LineDiagnostics>;
-  /** Reserve the marker column (a language server covers this file). */
-  diagnosticGutter: boolean;
-};
-
-function CodeRow({
-  index,
-  style,
-  tokens,
-  getLineProps,
-  getTokenProps,
-  highlightStart,
-  highlightEnd,
-  lineNumberWidth,
-  activeMatchLine,
-  activeMatchColumn,
-  matchesByLine,
-  diagnosticLines,
-  diagnosticGutter,
-}: RowComponentProps<CodeRowExtraProps>) {
-  const line = tokens[index];
-  if (!line) return null;
-  const lineNumber = index + 1;
-  const inRange =
-    highlightStart != null &&
-    highlightEnd != null &&
-    lineNumber >= highlightStart &&
-    lineNumber <= highlightEnd;
-  const isActiveMatchLine = activeMatchLine != null && activeMatchLine === lineNumber;
-  const lineProps = getLineProps({ line });
-  const themeBg = (lineProps.style?.backgroundColor as string | undefined) ?? undefined;
-  const matchRanges = matchesByLine.get(lineNumber) ?? [];
-  const lineDiagnostics = diagnosticLines.get(lineNumber);
-  return (
-    <div
-      style={{
-        ...style,
-        display: 'flex',
-        whiteSpace: 'pre',
-        backgroundColor: isActiveMatchLine
-          ? 'hsl(var(--primary) / 0.16)'
-          : inRange
-            ? 'hsl(var(--primary) / 0.12)'
-            : lineDiagnostics
-              ? diagnosticLineTint(lineDiagnostics.severity)
-              : themeBg,
-      }}
-    >
-      {diagnosticGutter && (
-        <span style={{ display: 'inline-flex', width: '0.75rem', flexShrink: 0 }}>
-          {lineDiagnostics && <DiagnosticMarker line={lineNumber} entry={lineDiagnostics} />}
-        </span>
-      )}
-      <span
-        style={{
-          display: 'inline-block',
-          width: lineNumberWidth,
-          paddingLeft: '0.5rem',
-          paddingRight: '0.75rem',
-          textAlign: 'right',
-          userSelect: 'none',
-          opacity: 0.5,
-          flexShrink: 0,
-        }}
-      >
-        {lineNumber}
-      </span>
-      <span style={{ flex: 1, minWidth: 0 }}>
-        {
-          line.reduce<{
-            nodes: React.ReactNode[];
-            column: number;
-          }>(
-            (acc, token, key) => {
-              const tokenProps = getTokenProps({ token });
-              const text = String(tokenProps.children ?? '');
-              acc.nodes.push(
-                renderTokenWithMatches(tokenProps, matchRanges, key, activeMatchColumn, acc.column)
-              );
-              acc.column += text.length;
-              return acc;
-            },
-            { nodes: [], column: 0 }
-          ).nodes
-        }
-      </span>
-    </div>
-  );
-}
-
-/** Split a token's text into spans, highlighting matched ranges.
- *  The token starts at `tokenColumn` on the current line. */
-function renderTokenWithMatches(
-  tokenProps: { style?: CSSProperties; className?: string; children?: React.ReactNode },
-  matchRanges: { start: number; end: number }[],
-  tokenKey: number,
-  activeMatchColumn: number,
-  tokenColumn: number
-) {
-  if (matchRanges.length === 0) {
-    return (
-      <span key={tokenKey} style={tokenProps.style} className={tokenProps.className}>
-        {tokenProps.children}
-      </span>
-    );
-  }
-
-  const text = String(tokenProps.children ?? '');
-  const tokenEnd = tokenColumn + text.length;
-  const tokenRanges = matchRanges.filter(r => r.end > tokenColumn && r.start < tokenEnd);
-
-  if (tokenRanges.length === 0) {
-    return (
-      <span key={tokenKey} style={tokenProps.style} className={tokenProps.className}>
-        {tokenProps.children}
-      </span>
-    );
-  }
-
-  const spans: React.ReactNode[] = [];
-  let cursor = 0;
-  let rangeIndex = 0;
-  let spanKey = 0;
-
-  while (cursor < text.length && rangeIndex < tokenRanges.length) {
-    const range = tokenRanges[rangeIndex];
-    const localStart = Math.max(0, range.start - tokenColumn);
-    const localEnd = Math.min(text.length, range.end - tokenColumn);
-
-    if (localEnd <= cursor) {
-      rangeIndex++;
-      continue;
-    }
-    if (localStart > cursor) {
-      spans.push(
-        <span
-          key={`${tokenKey}-${spanKey}`}
-          style={tokenProps.style}
-          className={tokenProps.className}
-        >
-          {text.slice(cursor, localStart)}
-        </span>
-      );
-      spanKey++;
-      cursor = localStart;
-    }
-
-    const start = Math.max(cursor, localStart);
-    const end = Math.min(text.length, localEnd);
-    const isActive = activeMatchColumn >= range.start && activeMatchColumn < range.end;
-    spans.push(
-      <mark
-        key={`${tokenKey}-${spanKey}`}
-        style={{
-          ...tokenProps.style,
-          backgroundColor: isActive ? 'hsl(var(--primary) / 0.45)' : 'hsl(var(--primary) / 0.25)',
-          color: 'inherit',
-        }}
-        className={tokenProps.className}
-      >
-        {text.slice(start, end)}
-      </mark>
-    );
-    spanKey++;
-    cursor = end;
-    if (cursor >= localEnd) rangeIndex++;
-  }
-
-  if (cursor < text.length) {
-    spans.push(
-      <span
-        key={`${tokenKey}-${spanKey}`}
-        style={tokenProps.style}
-        className={tokenProps.className}
-      >
-        {text.slice(cursor)}
-      </span>
-    );
-  }
-
-  return spans;
-}
-
-interface VirtualizedCodeViewProps {
-  content: string;
-  language: string;
-  theme: PrismTheme;
-  highlightStart: number | null;
-  highlightEnd: number | null;
-  listRef: React.RefObject<ListImperativeAPI | null>;
-  matchesByLine: Map<number, { start: number; end: number }[]>;
-  activeMatchLine: number | null;
-  activeMatchColumn: number;
-  diagnosticLines: Map<number, LineDiagnostics>;
-  diagnosticGutter: boolean;
-}
-
-/**
- * Tokenizes once via Prism and renders only the visible rows via react-window.
- * Bounds main-thread work so even 10k-line files don't block the UI on render
- * (Prism tokenization itself is still synchronous but the DOM cost is constant).
- */
-function VirtualizedCodeView({
-  content,
-  language,
-  theme,
-  highlightStart,
-  highlightEnd,
-  listRef,
-  matchesByLine,
-  activeMatchLine,
-  activeMatchColumn,
-  diagnosticLines,
-  diagnosticGutter,
-}: VirtualizedCodeViewProps) {
-  const lineCount = useMemo(() => content.split(/\r?\n/).length, [content]);
-  const lineNumberWidth = `${Math.max(2, String(lineCount).length) + 2}ch`;
-
-  return (
-    <Highlight code={content} language={language} theme={theme}>
-      {({ tokens, getLineProps, getTokenProps, style: themeStyle }) => (
-        <List<CodeRowExtraProps>
-          rowCount={tokens.length}
-          rowHeight={ROW_HEIGHT_PX}
-          rowComponent={CodeRow}
-          rowProps={{
-            tokens,
-            getLineProps,
-            getTokenProps,
-            highlightStart,
-            highlightEnd,
-            lineNumberWidth,
-            activeMatchLine,
-            activeMatchColumn,
-            matchesByLine,
-            diagnosticLines,
-            diagnosticGutter,
-          }}
-          listRef={listRef}
-          style={{
-            ...themeStyle,
-            height: '100%',
-            width: '100%',
-            margin: 0,
-            fontFamily: 'var(--font-mono)',
-            fontSize: '0.75rem',
-            lineHeight: `${ROW_HEIGHT_PX}px`,
-          }}
-          data-testid="code-viewer"
-        />
-      )}
-    </Highlight>
-  );
-}
-
-function resolveProjectBackendId(projectRoot: string): string | null {
-  const projects = useProjectStore.getState().projects;
-  const matchingProject = projects.find(project => project.rootPath === projectRoot);
-  if (!matchingProject) return null;
-  return useOwnershipStore.getState().getProjectBackendId(matchingProject.id);
-}
-
-async function openFileInNewWindow(
-  filePath: string,
-  projectRoot: string,
-  scopedBackendId?: string
-) {
-  const fileName = filePath.split('/').pop() || filePath;
-  const projectName = projectRoot.split('/').pop() || projectRoot;
-  const backendId = scopedBackendId ?? resolveProjectBackendId(projectRoot);
-  const conn = getConnectionParams({ backendId });
-  await openPopoutWindow({
-    type: 'file-viewer',
-    params: { fileViewer: filePath, projectRoot },
-    title: buildWindowTitle(fileName, conn.serverName, projectName),
-    width: 800,
-    height: 600,
-    dragDropEnabled: true,
-    connectionTarget: { backendId },
-  });
-}
-
-/** File viewer toolbar actions (search, copy, open in new window / fullscreen) rendered in the shared BottomPanel header */
-export function FileViewerActions() {
-  const tool = useWorkspaceTool();
-  const isMobile = useIsMobile();
-  const {
-    searchOpen,
-    setSearchOpen,
-    inFileSearchOpen,
-    setInFileSearchOpen,
-    content,
-    filePath,
-    projectRoot,
-    backendId,
-    setFullscreen,
-    showTree,
-    toggleTree,
-    markdownSourceView,
-    toggleMarkdownSourceView,
-    compactLayout,
-  } = useFileViewerStore();
-  // Narrow panels lay out like mobile: the tree is reached with Back, not a toggle.
-  const compact = isMobile || compactLayout;
-  const showFileTree = compact ? !filePath : showTree;
-  const isMarkdown = !!filePath && detectLanguage(filePath) === 'markdown';
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    if (!content) return;
-    await navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleExpand = () => {
-    if (!filePath) return;
-    if (isDesktopTauri() && projectRoot) {
-      openFileInNewWindow(filePath, projectRoot, tool?.backendId ?? backendId ?? undefined);
-    } else {
-      setFullscreen(true);
-    }
-  };
-
-  if (
-    tool &&
-    ((tool.projectRoot && projectRoot && tool.projectRoot !== projectRoot) ||
-      (tool.backendId && backendId && tool.backendId !== backendId))
-  )
-    return null;
-
-  return (
-    <div className="flex items-center gap-1">
-      {filePath && !compact && (
-        <button
-          type="button"
-          onClick={toggleTree}
-          className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
-            showFileTree
-              ? 'bg-secondary text-foreground'
-              : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-          }`}
-          title={showFileTree ? 'Hide file tree' : 'Show file tree'}
-          aria-label={showFileTree ? 'Hide file tree' : 'Show file tree'}
-        >
-          {showFileTree ? (
-            <PanelLeftClose className="w-3.5 h-3.5" aria-hidden="true" />
-          ) : (
-            <PanelLeftOpen className="w-3.5 h-3.5" aria-hidden="true" />
-          )}
-        </button>
-      )}
-      <button
-        onClick={() => setSearchOpen(!searchOpen)}
-        className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
-          searchOpen
-            ? 'bg-secondary text-foreground'
-            : 'text-muted-foreground hover:text-foreground'
-        } hover:bg-secondary`}
-        title="Search files (Cmd+P)"
-        aria-label="Search files"
-      >
-        <Search className="w-3.5 h-3.5" aria-hidden="true" />
-      </button>
-      {content && isMarkdown && (
-        <button
-          onClick={toggleMarkdownSourceView}
-          className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
-            markdownSourceView
-              ? 'bg-secondary text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          } hover:bg-secondary`}
-          title={markdownSourceView ? 'Show rendered preview' : 'Show markdown source'}
-          aria-label={markdownSourceView ? 'Show rendered preview' : 'Show markdown source'}
-          aria-pressed={markdownSourceView}
-        >
-          <Code className="w-3.5 h-3.5" aria-hidden="true" />
-        </button>
-      )}
-      {content && (
-        <button
-          onClick={() => setInFileSearchOpen(!inFileSearchOpen)}
-          className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
-            inFileSearchOpen
-              ? 'bg-secondary text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          } hover:bg-secondary`}
-          title="Find in file (Cmd+F)"
-          aria-label="Find in file"
-        >
-          <TextSearch className="w-3.5 h-3.5" aria-hidden="true" />
-        </button>
-      )}
-      {content && (
-        <button
-          onClick={handleCopy}
-          className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
-            copied
-              ? 'text-green-500'
-              : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-          }`}
-          title={copied ? 'Copied!' : 'Copy file content'}
-          aria-label={copied ? 'Copied file content' : 'Copy file content'}
-        >
-          {copied ? (
-            <Check className="w-3.5 h-3.5" aria-hidden="true" />
-          ) : (
-            <Copy className="w-3.5 h-3.5" aria-hidden="true" />
-          )}
-        </button>
-      )}
-      {filePath && !isMobile && (
-        <button
-          onClick={handleExpand}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground flex-shrink-0"
-          title={isDesktopTauri() ? 'Open in new window' : 'Fullscreen'}
-          aria-label={isDesktopTauri() ? 'Open in new window' : 'Fullscreen'}
-        >
-          {isDesktopTauri() ? (
-            <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-          ) : (
-            <Maximize2 className="w-3.5 h-3.5" aria-hidden="true" />
-          )}
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** File viewer content (renders inside the shared BottomPanel) */
-/** The element's current width, or null before it is measured (or without ResizeObserver). */
-function usePanelWidth(ref: React.RefObject<HTMLElement | null>): number | null {
-  const [width, setWidth] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    const element = ref.current;
-    if (!element || typeof ResizeObserver === 'undefined') return;
-    const measure = () => setWidth(element.getBoundingClientRect().width || null);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [ref]);
-  return width;
-}
 
 export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const visible = useWorkspaceVisible();
@@ -619,7 +76,6 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
     backToTree,
     markdownSourceView,
   } = store;
-  const treeResizeCleanupRef = useRef<(() => void) | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const panelWidth = usePanelWidth(panelRef);
   // Too narrow for the tree (at its minimum) beside usable code: one at a time.
@@ -662,92 +118,14 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
 
   const { resolvedTheme } = useTheme();
 
-  // Freshness poll: on open/switch and every FILE_POLL_INTERVAL_MS, stat the
-  // current file and re-fetch full content only when the mtime advanced past what we
-  // already show. This picks up edits made by the agent *or* by any external
-  // process (editor, git pull, …) while the viewer is open. Cached content is
-  // shown instantly and updated seamlessly in the background once the new
-  // version arrives — no "Loading…" flicker for refreshes.
-  //
-  // Retained workspace panels stop polling when hidden; target changes cancel
-  // in-flight work so a previous root or file cannot overwrite the new viewer.
-  useEffect(() => {
-    if (!filePath || !projectRoot || !visible) return;
-
-    let cancelled = false;
-    // Scope the guard to this target/effect. A cancelled request must not block
-    // the immediate load after a file switch or StrictMode effect restart.
-    let pollInFlight = false;
-    const isCurrentTarget = () => {
-      const current = useFileViewerStore.getState();
-      return (
-        !cancelled &&
-        current.filePath === filePath &&
-        (!current.projectRoot || current.projectRoot === projectRoot) &&
-        (!current.backendId || current.backendId === fileBackendId)
-      );
-    };
-
-    const checkOnce = async () => {
-      if (cancelled || pollInFlight) return;
-      // Skip work while the whole window is hidden (background tab).
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      pollInFlight = true;
-      try {
-        const st = useFileViewerStore.getState();
-        // Bail if the user has since switched to a different file. (A project
-        // switch re-runs this effect via its props with a fresh closure + cleanup,
-        // so only the file path needs guarding here.)
-        if (!isCurrentTarget()) return;
-        const hasContent = st.content != null;
-        const knownMtime = st.knownMtimeMs;
-
-        // Stat first (cheap). If we already have content and the mtime hasn't
-        // advanced, there is nothing to do.
-        let stat;
-        try {
-          stat = await api.getFileStat({
-            projectRoot,
-            relativePath: filePath,
-            backendId: fileBackendId,
-          });
-        } catch (e) {
-          // Stat failed (deleted / network). Only surface an error when there is
-          // no cached content to keep showing.
-          if (!hasContent && isCurrentTarget()) {
-            setError(e instanceof Error ? e.message : 'Failed to load file');
-          }
-          return;
-        }
-        if (!isCurrentTarget()) return;
-        if (hasContent && knownMtime != null && stat.mtimeMs <= knownMtime) return;
-
-        // Stale or first load: fetch the full content.
-        const result = await api.getFileContent({
-          projectRoot,
-          relativePath: filePath,
-          backendId: fileBackendId,
-        });
-        if (!isCurrentTarget()) return;
-        setContent(result.content, stat.mtimeMs);
-      } catch (e) {
-        if (isCurrentTarget() && useFileViewerStore.getState().content == null) {
-          setError(e instanceof Error ? e.message : 'Failed to load file');
-        }
-      } finally {
-        pollInFlight = false;
-      }
-    };
-
-    // Fire once immediately (covers the "open/switch" trigger) then poll.
-    void checkOnce();
-    const intervalId = window.setInterval(() => void checkOnce(), FILE_POLL_INTERVAL_MS);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [fileBackendId, filePath, projectRoot, setContent, setError, visible]);
+  useFileContentPolling({
+    filePath,
+    projectRoot,
+    backendId: fileBackendId,
+    visible,
+    setContent,
+    setError,
+  });
 
   const handleSearchSelect = (relativePath: string) => {
     if (fileBackendId) openFile(projectRoot, relativePath, undefined, undefined, fileBackendId);
@@ -835,42 +213,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
       ? treeWidthPx
       : Math.max(TREE_WIDTH_MIN, Math.min(treeWidthPx, panelWidth - CODE_WIDTH_MIN));
 
-  useEffect(() => () => treeResizeCleanupRef.current?.(), []);
-
-  const beginTreeResize = useCallback(
-    (event: ReactMouseEvent | ReactTouchEvent) => {
-      if (isMobile) return;
-      const startX = 'touches' in event ? event.touches[0]?.clientX : event.clientX;
-      if (typeof startX !== 'number') return;
-      event.preventDefault();
-      treeResizeCleanupRef.current?.();
-
-      // Drag from the width on screen, which may be narrower than the preference.
-      const startWidth = treeWidth;
-      const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
-        const clientX = 'touches' in moveEvent ? moveEvent.touches[0]?.clientX : moveEvent.clientX;
-        if (typeof clientX !== 'number') return;
-        moveEvent.preventDefault();
-        setTreeWidthPx(startWidth + clientX - startX);
-      };
-      const cleanup = () => {
-        window.removeEventListener('mousemove', handleMove);
-        window.removeEventListener('mouseup', cleanup);
-        window.removeEventListener('touchmove', handleMove);
-        window.removeEventListener('touchend', cleanup);
-        window.removeEventListener('touchcancel', cleanup);
-        treeResizeCleanupRef.current = null;
-      };
-
-      window.addEventListener('mousemove', handleMove);
-      window.addEventListener('mouseup', cleanup);
-      window.addEventListener('touchmove', handleMove, { passive: false });
-      window.addEventListener('touchend', cleanup);
-      window.addEventListener('touchcancel', cleanup);
-      treeResizeCleanupRef.current = cleanup;
-    },
-    [isMobile, setTreeWidthPx, treeWidth]
-  );
+  const beginTreeResize = useResizableTree({ isMobile, treeWidth, setTreeWidthPx });
 
   // Scroll the virtualized list to the target line when one is set / changed.
   useEffect(() => {
