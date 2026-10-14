@@ -4,16 +4,25 @@ import type { Attachment } from './types';
 interface AttachmentPreviewListProps {
   attachments: Attachment[];
   onRemove: (id: string) => void;
+  /** Container classes; defaults to the boxed desktop strip. */
+  className?: string;
 }
 
 /** Thumbnails for staged composer attachments — images preview, files iconize. */
-export function AttachmentPreviewList({ attachments, onRemove }: AttachmentPreviewListProps) {
+export function AttachmentPreviewList({
+  attachments,
+  onRemove,
+  className = 'flex flex-wrap gap-2 mb-2 p-2 bg-muted rounded-lg',
+}: AttachmentPreviewListProps) {
   if (attachments.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-2 mb-2 p-2 bg-muted rounded-lg">
+    <div className={className}>
       {attachments.map(attachment => (
-        <div key={attachment.id} className="relative group bg-secondary rounded-lg overflow-hidden">
+        <div
+          key={attachment.id}
+          className="relative group shrink-0 bg-secondary rounded-lg overflow-hidden"
+        >
           {attachment.type === 'image' ? (
             <img
               src={attachment.data}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Lock } from 'lucide-react';
+import { ChevronDown, Lock, Map as MapIcon } from 'lucide-react';
 import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
 import { SelectorTrigger } from './SelectorTrigger';
 
@@ -10,6 +10,16 @@ interface ModeSelectorProps {
   disabled?: boolean;
   locked?: boolean;
   lockReason?: string;
+  /** `chip`: mobile composer card styling; a Default/Plan pair renders as a toggle. */
+  variant?: 'default' | 'chip';
+}
+
+/** The non-plan mode when the runtime offers exactly a {default, plan} pair. */
+function planToggleBaseMode(capabilities: ProviderCapabilities): string | null {
+  const modes = capabilities.modes ?? [];
+  if (modes.length !== 2) return null;
+  const other = modes.find(m => m.id !== 'plan');
+  return modes.some(m => m.id === 'plan') && other ? other.id : null;
 }
 
 /**
@@ -25,6 +35,7 @@ export function ModeSelector({
   disabled,
   locked,
   lockReason,
+  variant = 'default',
 }: ModeSelectorProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -47,9 +58,33 @@ export function ModeSelector({
     ? (lockReason ?? 'Mode locked')
     : (current.description ?? capabilities.modeLabel ?? 'Mode');
 
+  // Two modes, one of them Plan: a dropdown is a wasted tap — the chip
+  // toggles Plan on and off directly.
+  const toggleBase = variant === 'chip' ? planToggleBaseMode(capabilities) : null;
+  if (toggleBase) {
+    const planOn = effective === 'plan';
+    return (
+      <SelectorTrigger
+        variant="chip"
+        active={planOn}
+        onClick={() => onChange(planOn ? toggleBase : 'plan')}
+        disabled={disabled}
+        locked={locked}
+        lockReason={lockReason}
+        title={title}
+        ariaLabel="Plan mode"
+        ariaPressed={planOn}
+      >
+        {locked ? <Lock size={15} strokeWidth={1.75} /> : <MapIcon size={15} strokeWidth={1.75} />}
+        <span>Plan</span>
+      </SelectorTrigger>
+    );
+  }
+
   return (
     <div ref={ref} className="relative inline-block">
       <SelectorTrigger
+        variant={variant}
         onClick={() => setOpen(o => !o)}
         disabled={disabled}
         locked={locked}

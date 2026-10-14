@@ -7,7 +7,7 @@ import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { trapTab } from '../../utils/focusTrap';
 
 type ModalSize = 'md' | 'lg' | '2xl';
-type ModalPlacement = 'top' | 'center';
+type ModalPlacement = 'top' | 'center' | 'bottom';
 
 interface ModalProps {
   open: boolean;
@@ -93,14 +93,23 @@ export function Modal({
   if (!open) return null;
 
   const fullscreen = mobileFullscreen && isMobile;
-  const wrapperAlign = placement === 'center' ? 'items-center pt-0' : 'items-start pt-[12vh]';
+  // 'bottom' is a full-width sheet docked to the screen edge (phone action
+  // sheets); it ignores `size` and pads past the home-indicator inset.
+  const sheet = placement === 'bottom' && !fullscreen;
+  const wrapperAlign = sheet
+    ? 'items-end'
+    : placement === 'center'
+      ? 'items-center pt-0'
+      : 'items-start pt-[12vh]';
   const cardLayout = fullscreen
     ? 'inset-0 rounded-none safe-top-pad safe-bottom-pad'
-    : `relative w-full ${SIZE_CLASS[size]} ${maxHeightClassName} rounded-2xl border border-border`;
+    : sheet
+      ? `relative w-full ${maxHeightClassName} rounded-t-2xl border-t border-border safe-bottom-pad`
+      : `relative w-full ${SIZE_CLASS[size]} ${maxHeightClassName} rounded-2xl border border-border`;
 
   return createPortal(
     <div
-      className={`fixed inset-0 ${zClassName} flex justify-center px-4 ${fullscreen ? 'items-stretch px-0' : wrapperAlign}`}
+      className={`fixed inset-0 ${zClassName} flex justify-center ${fullscreen ? 'items-stretch px-0' : sheet ? wrapperAlign : `px-4 ${wrapperAlign}`}`}
       onKeyDown={handleKeyDown}
     >
       <div

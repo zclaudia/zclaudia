@@ -9,20 +9,23 @@ interface TokenUsageDisplayProps {
   contextUsedTokens?: number;
   /** Context window for the active model, if known. */
   contextWindow?: number;
+  /** Ring only (mobile composer card); the percentage stays in the ring's label. */
+  compact?: boolean;
 }
 
 /**
  * Compact context-window gauge shown at the right edge of the composer: a
  * donut ring plus the used percentage. Detail (token counts, prompt-cache hits,
  * context-window source) lives in the ContextUsagePopover, not here. Mounted
- * in the desktop composer footer and, on mobile, at the right end of the
- * selector-trio row above the textarea.
+ * in the desktop composer footer and, on mobile (compact, ring only), in the
+ * composer card's action row next to send.
  */
 export function TokenUsageDisplay({
   latestInputTokens,
   inputTokens,
   contextUsedTokens,
   contextWindow,
+  compact = false,
 }: TokenUsageDisplayProps) {
   const currentInput = contextUsedTokens ?? latestInputTokens ?? inputTokens;
   if (currentInput === 0) return null;
@@ -45,8 +48,9 @@ export function TokenUsageDisplay({
         ratio={ratio}
         className={colorClass}
         label={`Context window ${percentText} used`}
+        size={compact ? 20 : undefined}
       />
-      <span className="tabular-nums">{percentText}</span>
+      {!compact && <span className="tabular-nums">{percentText}</span>}
     </div>
   );
 }

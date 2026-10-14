@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Lock, Unlock, X, Plus } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Lock, Unlock, X } from 'lucide-react';
 import { useGoalStore } from '../../stores/goalStore';
 import { GoalPinnedBar } from '../../components/GoalPinnedBar';
 import { GoalDialog } from '../../components/GoalDialog';
@@ -14,6 +14,7 @@ import { LanguageServerIndicator } from './LanguageServerIndicator';
 import { ComposerFooter } from './ComposerFooter';
 import { EmptySessionSnapshot, EmptySessionChips } from './EmptySessionOverview';
 import { MessageInput, type Attachment } from './MessageInput';
+import type { ComposerToolItem } from './ComposerAddSheet';
 import { SendQueueBar } from './SendQueueBar';
 import type { QueueItem } from '../../stores/sendQueueStore';
 import { useServerStore } from '../../stores/serverStore';
@@ -172,28 +173,6 @@ export function ChatInputArea({
     };
   }, [activeDraftSessionId, sessionId, onSendMessage, setSendCallback]);
 
-  // Mobile toolbar popover state
-  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
-  const mobileToolsRef = useRef<HTMLDivElement>(null);
-
-  // Close popover on outside tap
-  useEffect(() => {
-    if (!mobileToolsOpen) return;
-    const handler = (e: MouseEvent | TouchEvent) => {
-      if (mobileToolsRef.current && !mobileToolsRef.current.contains(e.target as Node)) {
-        setMobileToolsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    document.addEventListener('touchstart', handler);
-    return () => {
-      document.removeEventListener('mousedown', handler);
-      document.removeEventListener('touchstart', handler);
-    };
-  }, [mobileToolsOpen]);
-
-  const closeMobileTools = useCallback(() => setMobileToolsOpen(false), []);
-
   const emptySessionWorktree = currentSession?.workingDirectory || currentProject?.rootPath;
 
   // One-shot prefill (e.g. from the plan "Execute plan" button). Takes
@@ -202,8 +181,11 @@ export function ChatInputArea({
   // (`prefillConsumed`) keeps the fallback sources out after consumption so
   // the user's in-progress edits stay put (otherwise initialValue would
   // revert to the draft and overwrite them on the next MessageInput effect).
-  const { pendingPrefill, prefillConsumed, pushPrefill: setPendingPrefill } =
-    useComposerPrefill(sessionId);
+  const {
+    pendingPrefill,
+    prefillConsumed,
+    pushPrefill: setPendingPrefill,
+  } = useComposerPrefill(sessionId);
 
   const fallbackInitialValue = prefillConsumed
     ? undefined
@@ -349,39 +331,200 @@ export function ChatInputArea({
   }
 
   // Normal input mode
+  const modeSelector = (variant: 'default' | 'chip') =>
+    capabilities && (
+      <ModeSelector
+        capabilities={capabilities}
+        value={isForcedPlanSession ? 'plan' : mode}
+        onChange={m => {
+          if (isForcedPlanSession) return;
+          onSetMode(sessionId, m);
+        }}
+        disabled={isLoading}
+        locked={isForcedPlanSession}
+        lockReason={isForcedPlanSession ? 'Locked by Supervisor planning mode' : undefined}
+        variant={variant}
+      />
+    );
+  const worktreeSelector = (variant: 'default' | 'row') =>
+    currentProject?.id &&
+    currentProject?.rootPath && (
+      <WorktreeSelector
+        projectId={currentProject.id}
+        projectRootPath={currentProject.rootPath}
+        currentWorktree={currentSession?.workingDirectory || ''}
+        onChange={onWorktreeChange}
+        disabled={isLoading}
+        locked={isForcedPlanSession}
+        lockReason={isForcedPlanSession ? 'Locked by Supervisor planning mode' : undefined}
+        variant={variant}
+      />
+    );
+  // Mobile (option A): mode + model chips sit in the composer card's action
+  // row; the worktree — changed rarely — lives in the "+" sheet.
+  const mobileControls = (
+    <>
+      {modeSelector('chip')}
+      <SessionModelSelector
+        key={sessionId}
+        sessionId={sessionId}
+        disabled={isLoading || !isConnected || currentSession.isReadOnly}
+        variant="chip"
+      />
+    </>
+  );
+  const worktreeRow = worktreeSelector('row') || undefined;
+
   const selectorTrio = (
     <>
-      {capabilities && (
-        <ModeSelector
-          capabilities={capabilities}
-          value={isForcedPlanSession ? 'plan' : mode}
-          onChange={m => {
-            if (isForcedPlanSession) return;
-            onSetMode(sessionId, m);
-          }}
-          disabled={isLoading}
-          locked={isForcedPlanSession}
-          lockReason={isForcedPlanSession ? 'Locked by Supervisor planning mode' : undefined}
-        />
-      )}
+      {modeSelector('default')}
       <SessionModelSelector
         key={sessionId}
         sessionId={sessionId}
         disabled={isLoading || !isConnected || currentSession.isReadOnly}
       />
-      {currentProject?.id && currentProject?.rootPath && (
-        <WorktreeSelector
-          projectId={currentProject.id}
-          projectRootPath={currentProject.rootPath}
-          currentWorktree={currentSession?.workingDirectory || ''}
-          onChange={onWorktreeChange}
-          disabled={isLoading}
-          locked={isForcedPlanSession}
-          lockReason={isForcedPlanSession ? 'Locked by Supervisor planning mode' : undefined}
-        />
-      )}
+      {worktreeSelector('default')}
     </>
   );
+
+  // Mobile "+" sheet tool launchers, derived from the panel registry.
+  const buildMobileToolItems = (): ComposerToolItem[] => {
+    const toolItems: ComposerToolItem[] = [];
+
+    const sortedPanels = [...mobileLauncherPanels].sort(
+      (a, b) => mobileMenuRank(a) - mobileMenuRank(b)
+    );
+
+    for (const panel of sortedPanels) {
+      const Icon = iconForPanel(panel.id);
+      const icon = <Icon size={20} strokeWidth={1.75} />;
+
+      switch (panel.id) {
+        case 'draft': {
+          const isActive = draftPanelActive;
+          toolItems.push({
+            key: 'draft',
+            icon,
+            label: isActive ? 'Close Draft' : 'Draft Editor',
+            isActive,
+            hasBadge: draftExists && !isActive,
+            onClick: () => {
+              if (isActive) {
+                useDraftEditorStore.getState().closeEditor();
+              } else {
+                setSendCallback((content: string) => onSendMessage(content));
+                openDraftEditor(sessionId);
+              }
+            },
+          });
+          break;
+        }
+
+        case 'file-viewer': {
+          if (!currentProject?.rootPath) break;
+          const isActive = fileViewerPanelActive;
+          toolItems.push({
+            key: 'file-viewer',
+            icon,
+            label: isActive ? 'Close Files' : 'File Viewer',
+            isActive,
+            onClick: () => {
+              if (isActive) {
+                useFileViewerStore.getState().close();
+              } else if (fileViewerOpen) {
+                activatePanel('file-viewer');
+              } else {
+                const store = useFileViewerStore.getState();
+                store.togglePanel();
+                store.setSearchOpen(true);
+                activatePanel('file-viewer');
+              }
+            },
+          });
+          break;
+        }
+
+        case 'session-changes': {
+          if (!currentSession) break;
+          const isActive = changesPanelActive;
+          toolItems.push({
+            key: 'session-changes',
+            icon,
+            label: isActive ? 'Hide Changes' : 'Session Changes',
+            isActive,
+            onClick: () => {
+              const store = usePluginStore.getState();
+              if (isActive) {
+                store.updatePanelVisibility('session-changes', false);
+              } else {
+                store.updatePanelVisibility('session-changes', true);
+                activatePanel('session-changes');
+              }
+            },
+          });
+          break;
+        }
+
+        case 'terminal': {
+          // remoteTerminal capability gating is declared on the
+          // panel registration (requiresFeature) and enforced by
+          // useLauncherPanels; only the project scope is local.
+          if (!currentSession?.projectId) break;
+          const pid = currentSession.projectId;
+          const isOpen = isDrawerOpen(pid);
+          const isActive = isOpen && terminalPanelActive;
+          toolItems.push({
+            key: 'terminal',
+            icon,
+            label: isActive ? 'Hide Terminal' : 'Terminal',
+            isActive,
+            onClick: () => {
+              if (isActive) {
+                setDrawerOpen(pid, false);
+              } else if (isOpen) {
+                activatePanel('terminal');
+              } else {
+                const store = useTerminalStore.getState();
+                if (!store.getTerminalId(pid)) {
+                  store.openTerminal(pid);
+                }
+                setDrawerOpen(pid, true);
+                activatePanel('terminal');
+              }
+            },
+          });
+          break;
+        }
+
+        default: {
+          // Generic registry panel (memory, lineage, future
+          // mobile-capable panels): visibility flag + bottom tab.
+          const isActive = panel.visible !== false && bottomActiveTab === panel.id;
+          toolItems.push({
+            key: panel.id,
+            icon,
+            label: isActive ? `Hide ${panel.label}` : panel.label,
+            isActive,
+            onClick: () => {
+              if (isActive) {
+                if (panel.onClose) panel.onClose();
+                else usePluginStore.getState().updatePanelVisibility(panel.id, false);
+              } else {
+                usePluginStore.getState().updatePanelVisibility(panel.id, true);
+                panel.onOpen?.({
+                  sessionId,
+                  projectId: currentSession?.projectId,
+                  backendId: useServerStore.getState().activeServerId,
+                });
+                activatePanel(panel.id);
+              }
+            },
+          });
+        }
+      }
+    }
+    return toolItems;
+  };
 
   return (
     <div
@@ -434,30 +577,6 @@ export function ChatInputArea({
             onSteer={onSteerQueueItem}
           />
         )}
-        {/* Mobile-only toolbar: three selectors + context gauge, JS-gated to mobile only */}
-        {isMobile && (
-          <div className="mb-1.5 flex items-center gap-1">
-            {selectorTrio}
-            <div className="ml-auto shrink-0">
-              <ContextUsagePopover
-                sessionId={sessionId}
-                latestCacheRead={currentUsage.latestCacheReadTokens}
-              >
-                {/* Negative margins keep the row compact while the padded span
-                    provides a ~44px effective touch target for the tap-to-open
-                    popover. */}
-                <span className="-my-2.5 flex min-h-[44px] items-center px-2">
-                  <TokenUsageDisplay
-                    latestInputTokens={currentUsage.latestInputTokens}
-                    inputTokens={currentUsage.inputTokens}
-                    contextUsedTokens={currentUsage.contextUsedTokens}
-                    contextWindow={currentUsage.contextWindow}
-                  />
-                </span>
-              </ContextUsagePopover>
-            </div>
-          </div>
-        )}
         <MessageInput
           key={sessionId}
           sessionId={sessionId}
@@ -475,213 +594,27 @@ export function ChatInputArea({
           isLoading={isLoading}
           initialValue={messageInputInitialValue}
           initialAttachments={restoreMessage?.attachments ?? initialDraft?.attachments}
-          mobileToolbarSlot={
-            isMobile
-              ? (() => {
-                  const toolItems: Array<{
-                    key: string;
-                    icon: React.ReactNode;
-                    label: string;
-                    isActive: boolean;
-                    hasBadge?: boolean;
-                    onClick: () => void;
-                  }> = [];
-
-                  const sortedPanels = [...mobileLauncherPanels].sort(
-                    (a, b) => mobileMenuRank(a) - mobileMenuRank(b)
-                  );
-
-                  for (const panel of sortedPanels) {
-                    const Icon = iconForPanel(panel.id);
-                    const icon = <Icon size={18} strokeWidth={1.75} />;
-
-                    switch (panel.id) {
-                      case 'draft': {
-                        const isActive = draftPanelActive;
-                        toolItems.push({
-                          key: 'draft',
-                          icon,
-                          label: isActive ? 'Close Draft' : 'Draft Editor',
-                          isActive,
-                          hasBadge: draftExists && !isActive,
-                          onClick: () => {
-                            if (isActive) {
-                              useDraftEditorStore.getState().closeEditor();
-                            } else {
-                              setSendCallback((content: string) => onSendMessage(content));
-                              openDraftEditor(sessionId);
-                            }
-                            closeMobileTools();
-                          },
-                        });
-                        break;
-                      }
-
-                      case 'file-viewer': {
-                        if (!currentProject?.rootPath) break;
-                        const isActive = fileViewerPanelActive;
-                        toolItems.push({
-                          key: 'file-viewer',
-                          icon,
-                          label: isActive ? 'Close Files' : 'File Viewer',
-                          isActive,
-                          onClick: () => {
-                            if (isActive) {
-                              useFileViewerStore.getState().close();
-                            } else if (fileViewerOpen) {
-                              activatePanel('file-viewer');
-                            } else {
-                              const store = useFileViewerStore.getState();
-                              store.togglePanel();
-                              store.setSearchOpen(true);
-                              activatePanel('file-viewer');
-                            }
-                            closeMobileTools();
-                          },
-                        });
-                        break;
-                      }
-
-                      case 'session-changes': {
-                        if (!currentSession) break;
-                        const isActive = changesPanelActive;
-                        toolItems.push({
-                          key: 'session-changes',
-                          icon,
-                          label: isActive ? 'Hide Changes' : 'Session Changes',
-                          isActive,
-                          onClick: () => {
-                            const store = usePluginStore.getState();
-                            if (isActive) {
-                              store.updatePanelVisibility('session-changes', false);
-                            } else {
-                              store.updatePanelVisibility('session-changes', true);
-                              activatePanel('session-changes');
-                            }
-                            closeMobileTools();
-                          },
-                        });
-                        break;
-                      }
-
-                      case 'terminal': {
-                        // remoteTerminal capability gating is declared on the
-                        // panel registration (requiresFeature) and enforced by
-                        // useLauncherPanels; only the project scope is local.
-                        if (!currentSession?.projectId) break;
-                        const pid = currentSession.projectId;
-                        const isOpen = isDrawerOpen(pid);
-                        const isActive = isOpen && terminalPanelActive;
-                        toolItems.push({
-                          key: 'terminal',
-                          icon,
-                          label: isActive ? 'Hide Terminal' : 'Terminal',
-                          isActive,
-                          onClick: () => {
-                            if (isActive) {
-                              setDrawerOpen(pid, false);
-                            } else if (isOpen) {
-                              activatePanel('terminal');
-                            } else {
-                              const store = useTerminalStore.getState();
-                              if (!store.getTerminalId(pid)) {
-                                store.openTerminal(pid);
-                              }
-                              setDrawerOpen(pid, true);
-                              activatePanel('terminal');
-                            }
-                            closeMobileTools();
-                          },
-                        });
-                        break;
-                      }
-
-                      default: {
-                        // Generic registry panel (memory, lineage, future
-                        // mobile-capable panels): visibility flag + bottom tab.
-                        const isActive = panel.visible !== false && bottomActiveTab === panel.id;
-                        toolItems.push({
-                          key: panel.id,
-                          icon,
-                          label: isActive ? `Hide ${panel.label}` : panel.label,
-                          isActive,
-                          onClick: () => {
-                            if (isActive) {
-                              if (panel.onClose) panel.onClose();
-                              else usePluginStore.getState().updatePanelVisibility(panel.id, false);
-                            } else {
-                              usePluginStore.getState().updatePanelVisibility(panel.id, true);
-                              panel.onOpen?.({
-                                sessionId,
-                                projectId: currentSession?.projectId,
-                                backendId: useServerStore.getState().activeServerId,
-                              });
-                              activatePanel(panel.id);
-                            }
-                            closeMobileTools();
-                          },
-                        });
-                      }
-                    }
-                  }
-
-                  if (toolItems.length === 0) return undefined;
-
-                  const hasActiveItem = toolItems.some(t => t.isActive);
-                  const hasBadge = toolItems.some(t => t.hasBadge);
-
-                  return (
-                    <div className="flex items-center gap-1.5">
-                      {toolItems.length > 0 && (
-                        <div className="relative" ref={mobileToolsRef}>
-                          <button
-                            onClick={() => setMobileToolsOpen(v => !v)}
-                            className={`h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full transition-colors relative ${hasActiveItem ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-                            title="More tools"
-                            aria-label="More tools"
-                            aria-haspopup="menu"
-                            aria-expanded={mobileToolsOpen}
-                          >
-                            <Plus
-                              size={20}
-                              strokeWidth={1.75}
-                              className={`transition-transform duration-200 ${mobileToolsOpen ? 'rotate-45' : ''}`}
-                            />
-                            {hasBadge && (
-                              <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-                            )}
-                          </button>
-                          {mobileToolsOpen && (
-                            // Wide enough that the longest label ("Session
-                            // Changes") stays on one line at 375px; capped to
-                            // the viewport so it never overflows.
-                            <div className="absolute bottom-full left-0 mb-2 py-1 bg-popover border border-border rounded-xl shadow-lg w-[min(15rem,80vw)] z-50">
-                              {toolItems.map(item => (
-                                <button
-                                  key={item.key}
-                                  onClick={item.onClick}
-                                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${item.isActive ? 'text-primary bg-muted/40' : 'text-foreground hover:bg-muted'}`}
-                                >
-                                  <span className="relative flex-shrink-0">
-                                    {item.icon}
-                                    {item.hasBadge && (
-                                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
-                                    )}
-                                  </span>
-                                  <span className="min-w-0 flex-1 truncate text-left">
-                                    {item.label}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()
-              : undefined
+          mobileControls={isMobile ? mobileControls : undefined}
+          mobileTrailing={
+            isMobile ? (
+              <ContextUsagePopover
+                sessionId={sessionId}
+                latestCacheRead={currentUsage.latestCacheReadTokens}
+              >
+                <span className="flex h-11 w-10 items-center justify-center">
+                  <TokenUsageDisplay
+                    compact
+                    latestInputTokens={currentUsage.latestInputTokens}
+                    inputTokens={currentUsage.inputTokens}
+                    contextUsedTokens={currentUsage.contextUsedTokens}
+                    contextWindow={currentUsage.contextWindow}
+                  />
+                </span>
+              </ContextUsagePopover>
+            ) : undefined
           }
+          mobileTools={isMobile ? buildMobileToolItems() : undefined}
+          mobileSessionRows={isMobile ? worktreeRow : undefined}
           placeholder={
             !isConnected
               ? 'Connecting...'

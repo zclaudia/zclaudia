@@ -30,6 +30,8 @@ interface WorktreeSelectorProps {
   disabled?: boolean;
   locked?: boolean;
   lockReason?: string;
+  /** `row`: full-width list row whose menu expands in place (mobile + sheet). */
+  variant?: 'default' | 'row';
 }
 
 function BranchIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
@@ -76,6 +78,7 @@ export function WorktreeSelector({
   disabled,
   locked,
   lockReason,
+  variant = 'default',
 }: WorktreeSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [worktrees, setWorktrees] = useState<GitWorktree[]>([]);
@@ -107,6 +110,13 @@ export function WorktreeSelector({
   useEffect(() => {
     if (creating) branchInputRef.current?.focus();
   }, [creating]);
+
+  // Row variant: the list expands in place at the foot of a scrolling sheet,
+  // so bring it into view instead of leaving it below the fold.
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (isOpen && variant === 'row') listRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [isOpen, variant, loading]);
 
   const fetchWorktrees = useCallback(async () => {
     setLoading(true);
@@ -183,43 +193,81 @@ export function WorktreeSelector({
     ? lockReason || 'Worktree is locked for this session'
     : currentWorktree || projectRootPath;
 
+  const isRow = variant === 'row';
+
   return (
     <div ref={ref} className="relative">
-      <SelectorTrigger
-        onClick={handleOpen}
-        disabled={disabled}
-        locked={locked}
-        lockReason={lockReason}
-        title={effectiveTitle}
-        className={[
-          'max-w-[170px] sm:max-w-[260px]',
-          !disabled && !locked && hasOverride ? 'text-primary' : '',
-        ].join(' ')}
-      >
-        {locked ? <LockIcon /> : <BranchIcon />}
-        <span
-          className="hidden sm:inline-block min-w-0 max-w-[140px] truncate align-bottom sm:max-w-[220px]"
-          title={triggerLabel}
+      {isRow ? (
+        <button
+          type="button"
+          onClick={handleOpen}
+          disabled={disabled || locked}
+          title={effectiveTitle}
+          aria-expanded={isOpen}
+          className="flex h-12 w-full items-center gap-3.5 rounded-lg px-1 text-left text-[15px] text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {triggerLabel}
-        </span>
-        {locked && (
-          <span className="hidden sm:inline text-[10px] uppercase tracking-wide font-semibold">
-            Locked
+          {locked ? (
+            <LockIcon className="w-5 h-5 text-muted-foreground" />
+          ) : (
+            <BranchIcon className="w-5 h-5 text-muted-foreground" />
+          )}
+          <span className="flex-1">Worktree</span>
+          <span className="min-w-0 max-w-[55%] truncate text-sm text-muted-foreground">
+            {triggerLabel}
           </span>
-        )}
-        <svg
-          className={`w-3 h-3 ${locked ? 'text-amber-500/80' : 'text-muted-foreground'}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+          <svg
+            className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? 'rotate-90' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      ) : (
+        <SelectorTrigger
+          onClick={handleOpen}
+          disabled={disabled}
+          locked={locked}
+          lockReason={lockReason}
+          title={effectiveTitle}
+          className={[
+            'max-w-[170px] sm:max-w-[260px]',
+            !disabled && !locked && hasOverride ? 'text-primary' : '',
+          ].join(' ')}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </SelectorTrigger>
+          {locked ? <LockIcon /> : <BranchIcon />}
+          <span
+            className="hidden sm:inline-block min-w-0 max-w-[140px] truncate align-bottom sm:max-w-[220px]"
+            title={triggerLabel}
+          >
+            {triggerLabel}
+          </span>
+          {locked && (
+            <span className="hidden sm:inline text-[10px] uppercase tracking-wide font-semibold">
+              Locked
+            </span>
+          )}
+          <svg
+            className={`w-3 h-3 ${locked ? 'text-amber-500/80' : 'text-muted-foreground'}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </SelectorTrigger>
+      )}
 
       {isOpen && (
-        <div className="absolute bottom-full left-0 mb-1 z-50 bg-popover border border-border rounded-xl shadow-lg py-1 w-[min(92vw,320px)] max-h-[320px] overflow-y-auto">
+        <div
+          ref={listRef}
+          className={
+            isRow
+              ? 'mt-1 border border-border rounded-xl py-1 max-h-[320px] overflow-y-auto'
+              : 'absolute bottom-full left-0 mb-1 z-50 bg-popover border border-border rounded-xl shadow-lg py-1 w-[min(92vw,320px)] max-h-[320px] overflow-y-auto'
+          }
+        >
           <div className={`px-3 py-1.5 ${SECTION_LABEL} border-b border-border`}>Worktree</div>
 
           {/* Root (default) */}

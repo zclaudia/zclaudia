@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { KeyboardEvent, ClipboardEvent, ChangeEvent } from 'react';
-import { ArrowUp, Paperclip, Square, Plus } from 'lucide-react';
+import { ArrowUp, Square, Plus } from 'lucide-react';
 import type { SkillRef } from '@zclaudia/shared/core/skills';
 import type { SlashCommand } from '@zclaudia/shared/features/commands';
 import type { FileEntry } from '@zclaudia/shared/files';
@@ -16,6 +16,7 @@ import { PinnedSkillChips } from './PinnedSkillChips';
 import { renderSkillTokens, deleteTokenAt, type TokenInteraction } from './SkillTokenRenderer';
 import { MentionMenu } from './MentionMenu';
 import { AttachmentPreviewList } from './AttachmentPreviewList';
+import { ComposerAddSheet, type ComposerToolItem } from './ComposerAddSheet';
 import { useComposerDraft } from './hooks/useComposerDraft';
 import { useMentionState, initialMentionState } from './hooks/useMentionState';
 import { useAttachmentPicker } from './hooks/useAttachmentPicker';
@@ -55,10 +56,18 @@ interface MessageInputProps {
   placeholder?: string;
   initialValue?: string; // Initial value to set (e.g., for restoring after cancel)
   initialAttachments?: Attachment[]; // Initial attachments to restore
-  mobileToolbarSlot?: React.ReactNode; // Extra buttons rendered in mobile action row
+  /** Mobile: session chips (mode, model) in the card's action row, after "+". */
+  mobileControls?: React.ReactNode;
+  /** Mobile: trailing indicator (context ring) just before send. */
+  mobileTrailing?: React.ReactNode;
+  /** Mobile: tool panel launchers listed in the "+" sheet. */
+  mobileTools?: ComposerToolItem[];
+  /** Mobile: low-frequency session controls (worktree) at the bottom of the "+" sheet. */
+  mobileSessionRows?: React.ReactNode;
 }
 
-const COLLAPSED_CONTROL_SIZE_PX = 48;
+// One line at rest; the card's action row supplies the touch height.
+const MOBILE_MIN_INPUT_HEIGHT_PX = 24;
 const EXPANDED_INPUT_DEFAULT_HEIGHT_PX = 160;
 const EXPANDED_INPUT_MIN_HEIGHT_PX = 120;
 
@@ -79,7 +88,10 @@ export function MessageInput({
   placeholder = 'Type a message...',
   initialValue,
   initialAttachments,
-  mobileToolbarSlot,
+  mobileControls,
+  mobileTrailing,
+  mobileTools = [],
+  mobileSessionRows,
 }: MessageInputProps) {
   const isMobile = useIsMobile();
   const clearDraft = useComposerStore(s => s.clearDraft);
@@ -98,6 +110,8 @@ export function MessageInput({
   // Lets us reach the real <textarea> for ResizeObserver: the RichTextarea ref is an imperative handle, not an Element.
   const rootRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
   const commandListRef = useRef<HTMLDivElement>(null);
   const mentionListRef = useRef<HTMLDivElement>(null);
 
@@ -235,7 +249,7 @@ export function MessageInput({
       const max = expandedInputHeight;
       textarea.style.height = 'auto';
       textarea.style.height = `${Math.max(
-        COLLAPSED_CONTROL_SIZE_PX,
+        MOBILE_MIN_INPUT_HEIGHT_PX,
         Math.min(textarea.scrollHeight, max)
       )}px`;
       textarea.style.maxHeight = `${max}px`;
@@ -313,9 +327,12 @@ export function MessageInput({
 
   // Handle input change with @ detection
   const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-    const cursorPos = e.target.selectionStart || 0;
+    applyInput(e.target.value, e.target.selectionStart || 0);
+  };
 
+  // Shared by typing and the mobile sheet's "/" and "@" inserts, so an inserted
+  // trigger opens the same menus a typed one would.
+  const applyInput = (newValue: string, cursorPos: number) => {
     updateValue(newValue);
 
     // Check for @ mention
@@ -340,6 +357,23 @@ export function MessageInput({
         setMentionState(initialMentionState);
       }
     }
+  };
+
+  const insertTrigger = (trigger: '/' | '@') => {
+    const el = textareaRef.current;
+    const start = el?.selectionStart ?? value.length;
+    const end = el?.selectionEnd ?? value.length;
+    const before = value.slice(0, start);
+    // `@` only opens the file menu at a word boundary.
+    const inserted = (trigger === '@' && before && !/\s$/.test(before) ? ' ' : '') + trigger;
+    const caret = before.length + inserted.length;
+    applyInput(before + inserted + value.slice(end), caret);
+    setTimeout(() => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      textarea.setSelectionRange(caret, caret);
+      textarea.focus();
+    }, 0);
   };
 
   // Select a file/directory entry
@@ -757,13 +791,19 @@ export function MessageInput({
         </div>
       )}
 
-      {/* Attachments preview */}
-      <AttachmentPreviewList attachments={attachments} onRemove={removeAttachment} />
+      {/* Attachments preview (mobile renders it inside the card) */}
+      {!isMobile && <AttachmentPreviewList attachments={attachments} onRemove={removeAttachment} />}
 
       {/* Input area */}
       {isMobile ? (
-        /* Mobile: card-style two-row layout — textarea on top, buttons below */
-        <div className="bg-input border border-border rounded-2xl px-3 pt-3 pb-2 mb-1">
+        /* Mobile: one card — staged attachments, the textarea, then an action
+           row holding "+" (sheet), the session chips, the context ring and send. */
+        <div className="mb-1 rounded-3xl border border-border bg-input px-2 pt-3 pb-1.5">
+          <AttachmentPreviewList
+            attachments={attachments}
+            onRemove={removeAttachment}
+            className="mb-2 flex gap-2 overflow-x-auto px-1 pt-1"
+          />
           <RichTextarea
             data-testid="message-input"
             ref={textareaRef}
@@ -796,16 +836,24 @@ export function MessageInput({
           >
             {(v: string) => renderSkillTokens(v, skillIds, commandSet, tokenInteraction)}
           </RichTextarea>
-          <div className="flex items-center gap-2 mt-2">
-            {/* Attachment button */}
+          <div className="mt-1.5 flex items-center gap-0.5">
             <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled}
-              className="h-11 w-11 md:h-10 md:w-10 flex-shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full transition-colors disabled:opacity-50"
-              title="Add attachment"
-              aria-label="Attach file"
+              type="button"
+              onClick={() => setAddSheetOpen(true)}
+              className={`relative h-11 w-11 flex-shrink-0 flex items-center justify-center rounded-full transition-colors ${
+                mobileTools.some(t => t.isActive)
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="Attach, insert, tools"
+              aria-label="Add attachment or open tools"
+              aria-haspopup="dialog"
+              aria-expanded={addSheetOpen}
             >
-              <Paperclip size={20} strokeWidth={1.75} />
+              <Plus size={22} strokeWidth={1.75} />
+              {mobileTools.some(t => t.hasBadge) && (
+                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
+              )}
             </button>
             <input
               ref={fileInputRef}
@@ -815,14 +863,27 @@ export function MessageInput({
               onChange={handleFileSelect}
               className="hidden"
             />
-            {mobileToolbarSlot}
-            <div className="flex-1" />
+            <input
+              ref={photoInputRef}
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={e => {
+                void handleFileSelect(e).then(() => {
+                  if (photoInputRef.current) photoInputRef.current.value = '';
+                });
+              }}
+              className="hidden"
+            />
+            {/* Chips shrink (the model label truncates) before send is pushed off. */}
+            <div className="flex min-w-0 flex-1 items-center gap-0.5">{mobileControls}</div>
+            {mobileTrailing}
             {/* Send/Cancel button */}
             {isLoading && onCancel ? (
               <button
                 data-testid="cancel-button"
                 onClick={onCancel}
-                className="h-11 w-11 md:h-10 md:w-10 flex-shrink-0 flex items-center justify-center bg-foreground text-background hover:bg-foreground/90 rounded-full transition-colors"
+                className="h-11 w-11 flex-shrink-0 flex items-center justify-center bg-foreground text-background hover:bg-foreground/90 rounded-full transition-colors"
                 title="Cancel (Esc)"
                 aria-label="Cancel"
               >
@@ -832,7 +893,7 @@ export function MessageInput({
               <button
                 onClick={handleSend}
                 disabled={disabled || (!value.trim() && attachments.length === 0)}
-                className="h-11 w-11 md:h-10 md:w-10 flex-shrink-0 flex items-center justify-center bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-full transition-colors"
+                className="h-11 w-11 flex-shrink-0 flex items-center justify-center bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-full transition-colors"
                 title="Send message"
                 aria-label="Send message"
                 data-testid="send-button"
@@ -841,6 +902,17 @@ export function MessageInput({
               </button>
             )}
           </div>
+          <ComposerAddSheet
+            open={addSheetOpen}
+            onClose={() => setAddSheetOpen(false)}
+            onPickPhotos={() => photoInputRef.current?.click()}
+            onPickFiles={() => fileInputRef.current?.click()}
+            onInsert={insertTrigger}
+            canMention={!!projectRoot}
+            disabled={disabled}
+            tools={mobileTools}
+            sessionRows={mobileSessionRows}
+          />
         </div>
       ) : (
         /* Desktop: one auto-growing composer. Single row at rest; grows

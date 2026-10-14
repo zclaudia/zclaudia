@@ -479,4 +479,100 @@ describe('MessageInput', () => {
     fireEvent.click(screen.getByTitle('Send message'));
     expect(onSend).toHaveBeenCalledWith('line 1', undefined);
   });
+
+  describe('mobile card (option A)', () => {
+    beforeEach(() => {
+      mockIsMobile = true;
+    });
+
+    it('renders the chips and trailing slot in the card row, with no separate paperclip', () => {
+      render(
+        <MessageInput
+          {...defaultProps}
+          mobileControls={<span data-testid="chips" />}
+          mobileTrailing={<span data-testid="ring" />}
+        />
+      );
+      expect(screen.getByTestId('chips')).toBeInTheDocument();
+      expect(screen.getByTestId('ring')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Attach file' })).toBeNull();
+      expect(
+        screen.getByRole('button', { name: 'Add attachment or open tools' })
+      ).toBeInTheDocument();
+    });
+
+    it('opens the + sheet with attach, insert, tools and session rows', () => {
+      const onTool = vi.fn();
+      render(
+        <MessageInput
+          {...defaultProps}
+          projectRoot="/repo"
+          mobileTools={[
+            { key: 'terminal', icon: null, label: 'Terminal', isActive: false, onClick: onTool },
+          ]}
+          mobileSessionRows={<div data-testid="worktree-row" />}
+        />
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Add attachment or open tools' }));
+
+      const sheet = screen.getByRole('dialog', { name: 'Add to message' });
+      expect(sheet).toHaveTextContent('Photos');
+      expect(sheet).toHaveTextContent('Files');
+      expect(sheet).toHaveTextContent('Command or skill');
+      expect(sheet).toHaveTextContent('Reference a file');
+      expect(screen.getByTestId('worktree-row')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Terminal'));
+      expect(onTool).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('dialog', { name: 'Add to message' })).toBeNull();
+    });
+
+    it('marks the + button when a tool has a badge', () => {
+      render(
+        <MessageInput
+          {...defaultProps}
+          mobileTools={[
+            {
+              key: 'draft',
+              icon: null,
+              label: 'Draft Editor',
+              isActive: false,
+              hasBadge: true,
+              onClick: vi.fn(),
+            },
+          ]}
+        />
+      );
+      const plus = screen.getByRole('button', { name: 'Add attachment or open tools' });
+      expect(plus.querySelector('.bg-primary')).not.toBeNull();
+    });
+
+    it('inserts "/" from the sheet and opens the command menu', () => {
+      render(<MessageInput {...defaultProps} commands={mockCommands} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Add attachment or open tools' }));
+      fireEvent.click(screen.getByText('Command or skill'));
+
+      const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+      expect(textarea.value).toBe('/');
+      expect(screen.getByText('/clear')).toBeInTheDocument();
+    });
+
+    it('inserts "@" at a word boundary from the sheet', () => {
+      render(<MessageInput {...defaultProps} projectRoot="/repo" />);
+      const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+      fireEvent.change(textarea, { target: { value: 'look at' } });
+      textarea.setSelectionRange(7, 7);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add attachment or open tools' }));
+      fireEvent.click(screen.getByText('Reference a file'));
+
+      expect(textarea.value).toBe('look at @');
+    });
+
+    it('hides the @ row without a project root', () => {
+      render(<MessageInput {...defaultProps} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Add attachment or open tools' }));
+      expect(screen.queryByText('Reference a file')).toBeNull();
+    });
+  });
 });

@@ -1,13 +1,34 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatInputArea } from '../ChatInputArea';
 import type { ReactNode } from 'react';
 
 vi.mock('../MessageInput', () => ({
-  MessageInput: ({ mobileToolbarSlot }: { mobileToolbarSlot?: ReactNode }) => (
-    <div data-testid="message-input">{mobileToolbarSlot}</div>
+  MessageInput: ({
+    mobileControls,
+    mobileTrailing,
+    mobileTools,
+    mobileSessionRows,
+  }: {
+    mobileControls?: ReactNode;
+    mobileTrailing?: ReactNode;
+    mobileTools?: Array<{ key: string; label: string; onClick: () => void }>;
+    mobileSessionRows?: ReactNode;
+  }) => (
+    <div data-testid="message-input">
+      <div data-testid="mobile-controls">{mobileControls}</div>
+      <div data-testid="mobile-trailing">{mobileTrailing}</div>
+      <div data-testid="mobile-session-rows">{mobileSessionRows}</div>
+      <ul data-testid="mobile-tools">
+        {mobileTools?.map(t => (
+          <li key={t.key}>
+            <button onClick={t.onClick}>{t.label}</button>
+          </li>
+        ))}
+      </ul>
+    </div>
   ),
 }));
 
@@ -16,21 +37,26 @@ vi.mock('../SessionModelSelector', () => ({
 }));
 
 vi.mock('../ModeSelector', () => ({
-  ModeSelector: (props: { value: string; locked?: boolean }) => (
+  ModeSelector: (props: { value: string; locked?: boolean; variant?: string }) => (
     <div
       data-testid="mode-selector"
       data-value={String(props.value)}
       data-locked={String(Boolean(props.locked))}
+      data-variant={String(props.variant)}
     />
   ),
 }));
 
 vi.mock('../WorktreeSelector', () => ({
-  WorktreeSelector: () => <div data-testid="worktree-selector" />,
+  WorktreeSelector: (props: { variant?: string }) => (
+    <div data-testid="worktree-selector" data-variant={String(props.variant)} />
+  ),
 }));
 
 vi.mock('../TokenUsageDisplay', () => ({
-  TokenUsageDisplay: () => <div data-testid="token-usage" />,
+  TokenUsageDisplay: (props: { compact?: boolean }) => (
+    <div data-testid="token-usage" data-compact={String(Boolean(props.compact))} />
+  ),
 }));
 
 vi.mock('../ContextUsagePopover', () => ({
@@ -373,19 +399,35 @@ describe('ChatInputArea mobile selectors', () => {
     expect(draftEditorState.sendCallback).toBeNull();
   });
 
-  it('shows mode selector + model selector + worktree + terminal tool on mobile', () => {
+  it('puts mode + model chips in the card row and the worktree + terminal in the + sheet', () => {
     serverStoreState.activeServerSupports.mockImplementation(
       (feature: string) => feature === 'remoteTerminal'
     );
 
     render(<ChatInputArea {...baseProps} />);
 
-    expect(screen.getByTestId('mode-selector')).toBeTruthy();
-    expect(screen.getByTestId('model-selector')).toBeTruthy();
-    expect(screen.getByTestId('worktree-selector')).toBeTruthy();
+    const controls = screen.getByTestId('mobile-controls');
+    const mode = within(controls).getByTestId('mode-selector');
+    expect(mode.getAttribute('data-variant')).toBe('chip');
+    expect(within(controls).getByTestId('model-selector')).toBeTruthy();
+    expect(within(controls).queryByTestId('worktree-selector')).toBeNull();
 
-    fireEvent.click(screen.getByTitle('More tools'));
-    expect(screen.getByText('Terminal')).toBeTruthy();
+    const worktree = within(screen.getByTestId('mobile-session-rows')).getByTestId(
+      'worktree-selector'
+    );
+    expect(worktree.getAttribute('data-variant')).toBe('row');
+    expect(within(screen.getByTestId('mobile-tools')).getByText('Terminal')).toBeTruthy();
+  });
+
+  it('drops the old selector row above the composer card', () => {
+    serverStoreState.activeServerSupports.mockReturnValue(false);
+
+    render(<ChatInputArea {...baseProps} />);
+
+    // Every selector instance is handed to MessageInput — none renders beside it.
+    expect(screen.getAllByTestId('mode-selector')).toHaveLength(1);
+    expect(screen.getAllByTestId('worktree-selector')).toHaveLength(1);
+    expect(screen.getAllByTestId('token-usage')).toHaveLength(1);
   });
 
   it('locks mode selector when isForcedPlanSession is true', () => {
@@ -410,14 +452,13 @@ describe('ChatInputArea mobile selectors', () => {
 
     render(<ChatInputArea {...baseProps} />);
 
-    expect(screen.queryByTitle('More tools')).toBeNull();
+    expect(screen.getByTestId('mobile-tools').children).toHaveLength(0);
   });
 
   it('derives the tools menu from the panel registry: memory and lineage are reachable on mobile', () => {
     serverStoreState.activeServerSupports.mockReturnValue(false);
 
     render(<ChatInputArea {...baseProps} />);
-    fireEvent.click(screen.getByTitle('More tools'));
 
     // Legacy four keep their labels and lead the menu…
     expect(screen.getByText('Draft Editor')).toBeTruthy();
@@ -440,7 +481,6 @@ describe('ChatInputArea mobile selectors', () => {
     );
 
     render(<ChatInputArea {...baseProps} />);
-    fireEvent.click(screen.getByTitle('More tools'));
 
     expect(screen.getByText('Terminal')).toBeTruthy();
   });
@@ -449,7 +489,6 @@ describe('ChatInputArea mobile selectors', () => {
     serverStoreState.activeServerSupports.mockReturnValue(false);
 
     render(<ChatInputArea {...baseProps} />);
-    fireEvent.click(screen.getByTitle('More tools'));
     fireEvent.click(screen.getByText('Memory'));
 
     expect(pluginStoreState.updatePanelVisibility).toHaveBeenCalledWith('memory', true);
@@ -464,21 +503,21 @@ describe('ChatInputArea mobile selectors', () => {
     bottomPanelState.activeTab = 'memory';
 
     render(<ChatInputArea {...baseProps} />);
-    fireEvent.click(screen.getByTitle('More tools'));
     fireEvent.click(screen.getByText('Hide Memory'));
 
     expect(pluginStoreState.updatePanelVisibility).toHaveBeenCalledWith('memory', false);
   });
 
-  it('mounts the context gauge (ring + popover) in the mobile selector row', () => {
+  it('mounts the compact context ring (in its popover) next to send', () => {
     serverStoreState.activeServerSupports.mockReturnValue(false);
 
     render(<ChatInputArea {...baseProps} />);
 
-    const wrapper = screen.getByTestId('context-usage-popover-wrapper');
-    expect(wrapper).toBeTruthy();
+    const trailing = screen.getByTestId('mobile-trailing');
+    const wrapper = within(trailing).getByTestId('context-usage-popover-wrapper');
     // The ring lives inside the tap-to-open popover wrapper.
-    expect(wrapper.querySelector('[data-testid="token-usage"]')).toBeTruthy();
+    const ring = wrapper.querySelector('[data-testid="token-usage"]');
+    expect(ring?.getAttribute('data-compact')).toBe('true');
   });
 
   it('hides mode selector entirely when capabilities is null', () => {

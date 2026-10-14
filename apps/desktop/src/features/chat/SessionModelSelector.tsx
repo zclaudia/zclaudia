@@ -20,9 +20,12 @@ const isInListbox = (target: EventTarget | null) =>
 export function SessionModelSelector({
   sessionId,
   disabled = false,
+  variant = 'default',
 }: {
   sessionId: string;
   disabled?: boolean;
+  /** `chip`: mobile composer card styling (no icon, larger label). */
+  variant?: 'default' | 'chip';
 }) {
   const [settings, setSettings] = useState<SessionModelSettings | null>(null);
   const [open, setOpen] = useState(false);
@@ -203,9 +206,13 @@ export function SessionModelSelector({
         ariaHasPopup="dialog"
         ariaExpanded={open}
         title={label}
+        variant={variant}
+        active={variant === 'chip' && open}
       >
-        <Cpu size={14} />
-        <span className="max-w-[140px] truncate">{label}</span>
+        {variant === 'default' && <Cpu size={14} />}
+        <span className={`truncate ${variant === 'chip' ? 'max-w-[120px]' : 'max-w-[140px]'}`}>
+          {label}
+        </span>
         {settings?.selection.thinkingLevel && (
           <span className="text-muted-foreground">· {settings.selection.thinkingLevel}</span>
         )}
