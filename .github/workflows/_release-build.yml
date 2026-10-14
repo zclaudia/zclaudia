@@ -59,21 +59,22 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: 'true'
+          install: 'true'
 
       - name: Install updater signing key
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PUBLIC_KEY: ${{ secrets.TAURI_SIGNING_PUBLIC_KEY }}
         run: |
           set -euo pipefail
+          node scripts/release/validate-updater-signing.mjs
           mkdir -p "$HOME/.tauri"
           printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" > "$HOME/.tauri/zclaudia.key"
           chmod 600 "$HOME/.tauri/zclaudia.key"
-          if [ -n "${TAURI_SIGNING_PUBLIC_KEY:-}" ]; then
-            printf '%s' "$TAURI_SIGNING_PUBLIC_KEY" > "$HOME/.tauri/zclaudia.key.pub"
-            chmod 644 "$HOME/.tauri/zclaudia.key.pub"
-          fi
+          # Keep the build's public key aligned with the validated app config;
+          # a stale optional public-key secret must not override a key rotation.
+          node -p 'JSON.parse(require("node:fs").readFileSync("apps/desktop/src-tauri/tauri.conf.json", "utf8")).plugins.updater.pubkey' > "$HOME/.tauri/zclaudia.key.pub"
+          chmod 644 "$HOME/.tauri/zclaudia.key.pub"
           echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$HOME/.tauri/zclaudia.key" >> "$GITHUB_ENV"
 
       - name: Import macOS signing certificate
@@ -222,6 +223,9 @@ jobs:
         with:
           name: wsl-server-bundle
           path: apps/desktop/src-tauri/wsl-server
+
+      - name: Validate updater signing key
+        run: node scripts/release/validate-updater-signing.mjs
 
       - name: Build Windows installers
         shell: pwsh

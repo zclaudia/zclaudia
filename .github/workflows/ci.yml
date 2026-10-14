@@ -42,4 +42,6 @@ jobs:
       # `pnpm -r` builds plugins/agents/* in topological order before
       # shared/server/desktop, so no separate plugins:build step is needed.
       - run: pnpm -r run build
+      - name: Updater signing preflight tests
+        run: node --test scripts/release/__tests__/validate-updater-signing.test.mjs
       - run: pnpm -r run test
