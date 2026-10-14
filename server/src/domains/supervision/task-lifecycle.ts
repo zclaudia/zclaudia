@@ -18,6 +18,7 @@ import { shouldTransitionAgentToActive } from './model.js';
 import { TaskAggregate } from './task-aggregate.js';
 import type { EventDispatcher } from './event-dispatcher.js';
 import type { SupervisionTaskEvent } from './task-events.js';
+import { SupervisorError } from './supervisor-errors.js';
 
 interface TaskLifecycleDeps {
   taskRepo: SupervisionTaskRepository;
@@ -211,7 +212,7 @@ export class TaskLifecycle {
   } {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
-      throw new Error(`Task not found: ${taskId}`);
+      throw SupervisorError.notFound(`Task not found: ${taskId}`);
     }
     if (!task.sessionId) {
       throw new Error(`Task ${taskId} has no planning session`);
@@ -219,12 +220,16 @@ export class TaskLifecycle {
 
     const session = this.deps.sessionRepo.findById(task.sessionId);
     if (!session) {
-      throw new Error(`Planning session not found for task ${taskId}`);
+      throw SupervisorError.notFound(`Planning session not found for task ${taskId}`);
     }
 
     const planStatus = this.deps.getTaskPlanStatus(taskId);
     if (!planStatus.ready) {
-      throw new Error(`Plan is incomplete: missing ${planStatus.missing.join(', ')}`);
+      throw new SupervisorError(
+        400,
+        'VALIDATION_ERROR',
+        `Plan is incomplete: missing ${planStatus.missing.join(', ')}`
+      );
     }
 
     // Side effect: update session
@@ -260,7 +265,7 @@ export class TaskLifecycle {
   retryTask(taskId: string): SupervisionTask {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
-      throw new Error(`Task not found: ${taskId}`);
+      throw SupervisorError.notFound(`Task not found: ${taskId}`);
     }
 
     const agg = new TaskAggregate(task, this.deps.taskRepo);
@@ -288,7 +293,7 @@ export class TaskLifecycle {
   cancelTask(taskId: string): SupervisionTask {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
-      throw new Error(`Task not found: ${taskId}`);
+      throw SupervisorError.notFound(`Task not found: ${taskId}`);
     }
 
     if (this.deps.virtualClients.has(taskId)) {
@@ -319,7 +324,7 @@ export class TaskLifecycle {
   runTaskNow(taskId: string): SupervisionTask {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
-      throw new Error(`Task not found: ${taskId}`);
+      throw SupervisorError.notFound(`Task not found: ${taskId}`);
     }
 
     const agg = new TaskAggregate(task, this.deps.taskRepo);
@@ -347,6 +352,8 @@ export class TaskLifecycle {
   async approveTaskResult(taskId: string): Promise<SupervisionTask> {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
+      // Deliberately plain: the review/approve route maps every error to 400
+      // INVALID_STATE, so a typed 404 here would change the HTTP contract.
       throw new Error(`Task not found: ${taskId}`);
     }
 
@@ -420,6 +427,8 @@ export class TaskLifecycle {
   rejectTaskResult(taskId: string, reviewNotes: string): SupervisionTask {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
+      // Deliberately plain: the review/reject route maps every error to 400
+      // INVALID_STATE, so a typed 404 here would change the HTTP contract.
       throw new Error(`Task not found: ${taskId}`);
     }
 
@@ -470,6 +479,10 @@ export class TaskLifecycle {
   async resolveConflict(taskId: string): Promise<SupervisionTask> {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
+      // Deliberately plain: the resolve-conflict route only maps "not in
+      // merge_conflict" to 400 and everything else to 500 MERGE_ERROR, so a
+      // typed 404 here would change the HTTP contract. The private requireTask
+      // below stays plain for the same reason.
       throw new Error('Task not found');
     }
 

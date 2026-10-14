@@ -1,6 +1,7 @@
 import type { Database } from 'better-sqlite3';
 import { newId } from '../../../utils/uuid.js';
 import type { ProjectChange, ChangeStatus } from '@zclaudia/shared/features/supervision';
+import { SupervisorError } from '../supervisor-errors.js';
 
 function slugify(title: string): string {
   const normalized = title
@@ -93,7 +94,10 @@ export class ProjectChangeRepository {
     }
     const existing = this.findActiveByProjectId(data.projectId);
     if (data.active !== false && existing) {
-      throw new Error(`Project ${data.projectId} already has an active change`);
+      throw SupervisorError.conflict(
+        'ACTIVE_CHANGE_EXISTS',
+        `Project ${data.projectId} already has an active change`
+      );
     }
 
     const id = newId();
@@ -213,7 +217,7 @@ export class ProjectChangeRepository {
     this.db.prepare(`UPDATE project_changes SET ${updates.join(', ')} WHERE id = ?`).run(...params);
     const updated = this.findById(id);
     if (!updated) {
-      throw new Error(`Change not found: ${id}`);
+      throw SupervisorError.notFound(`Change not found: ${id}`);
     }
     return updated;
   }
@@ -232,7 +236,7 @@ export class ProjectChangeRepository {
 
     const updated = this.findById(id);
     if (!updated) {
-      throw new Error(`Change not found: ${id}`);
+      throw SupervisorError.notFound(`Change not found: ${id}`);
     }
     return updated;
   }

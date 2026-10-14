@@ -5,6 +5,7 @@ export {
   type SupervisionDomainResult,
 } from './register.js';
 export { SupervisorService } from './supervisor-service.js';
+export { SupervisorError } from './supervisor-errors.js';
 export type {
   SupervisionAiRunPort,
   SupervisionSchedulingPort,

@@ -14,6 +14,7 @@ import type { EventDispatcher } from './event-dispatcher.js';
 import { computeNextCronRun } from '../../utils/cron.js';
 import { TaskAggregate } from './task-aggregate.js';
 import { shouldActivateAgentForTaskStatus } from './model.js';
+import { SupervisorError } from './supervisor-errors.js';
 
 interface CreateTaskInput {
   changeId: string;
@@ -65,7 +66,8 @@ export class TaskAdmin {
       const currentCount = this.deps.taskRepo.countByProject(projectId);
       if (currentCount >= project.agent.config.maxTotalTasks) {
         this.deps.pauseAgent(projectId, 'budget');
-        throw new Error(
+        throw SupervisorError.conflict(
+          'BUDGET_EXCEEDED',
           `Budget limit exceeded: maxTotalTasks=${project.agent.config.maxTotalTasks} reached. Agent paused.`
         );
       }
@@ -136,7 +138,7 @@ export class TaskAdmin {
   openTaskSession(taskId: string): { sessionId: string } {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
-      throw new Error(`Task not found: ${taskId}`);
+      throw SupervisorError.notFound(`Task not found: ${taskId}`);
     }
 
     if (task.sessionId) {
@@ -183,6 +185,8 @@ export class TaskAdmin {
   approveTask(taskId: string): SupervisionTask {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
+      // Deliberately plain: the approve route maps every error to 400
+      // INVALID_STATE, so a typed 404 here would change the HTTP contract.
       throw new Error(`Task not found: ${taskId}`);
     }
 
@@ -211,6 +215,8 @@ export class TaskAdmin {
   rejectTask(taskId: string): SupervisionTask {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
+      // Deliberately plain: the reject route maps every error to 400
+      // INVALID_STATE, so a typed 404 here would change the HTTP contract.
       throw new Error(`Task not found: ${taskId}`);
     }
 

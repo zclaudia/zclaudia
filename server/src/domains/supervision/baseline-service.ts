@@ -4,6 +4,7 @@ import { type ProjectChangeRepository } from './repositories/project-change.js';
 import type { SupervisionProjectPort } from './ports.js';
 import type { ContextManager, ContextDocument } from './context-manager.js';
 import { type SupervisorContextService } from './supervisor-context.js';
+import { SupervisorError } from './supervisor-errors.js';
 
 export interface BaselineServiceDeps {
   db: Database;
@@ -48,7 +49,7 @@ export class BaselineService {
     content: string
   ): ProjectChange {
     const change = this.changeRepo.findById(changeId);
-    if (!change) throw new Error(`Change not found: ${changeId}`);
+    if (!change) throw SupervisorError.notFound(`Change not found: ${changeId}`);
     const project = this.projectRepo.findById(change.projectId);
     if (!project?.rootPath) throw new Error(`Project ${change.projectId} has no rootPath`);
 

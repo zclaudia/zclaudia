@@ -42,6 +42,7 @@ import { buildTaskPrompt as buildSupervisedTaskPrompt } from './task-prompt.js';
 import type { SupervisionAiRunPort, SupervisionSchedulingPort } from './ports.js';
 import { ChangeLifecycle, AD_HOC_CHANGE_SLUG } from './change-lifecycle.js';
 import { BaselineService } from './baseline-service.js';
+import { SupervisorError } from './supervisor-errors.js';
 
 export class SupervisorService {
   private static cleanupHooksInstalled = false;
@@ -379,7 +380,7 @@ export class SupervisorService {
 
   getTaskPlanStatus(taskId: string): PlanValidationResult {
     const task = this.taskRepo.findById(taskId);
-    if (!task) throw new Error(`Task not found: ${taskId}`);
+    if (!task) throw SupervisorError.notFound(`Task not found: ${taskId}`);
     const project = this.projectRepo.findById(task.projectId);
     if (!project?.rootPath) throw new Error(`Project ${task.projectId} has no rootPath`);
     return validatePlanFile(project.rootPath, taskId);

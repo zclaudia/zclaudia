@@ -117,6 +117,22 @@ const BUILTIN_STEP_TYPES = [
 
 // ── Service ──────────────────────────────────────────────────
 
+/**
+ * Typed error for generation failures with a direct HTTP outcome, following
+ * the PluginPackageError / SupervisorError convention (status + code on the
+ * error itself, so routes never infer them from the message).
+ */
+export class WorkflowGenerationError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string
+  ) {
+    super(message);
+    this.name = 'WorkflowGenerationError';
+  }
+}
+
 export class WorkflowGeneratorService {
   private sessions = new Map<string, GenerationSession>();
   private sessionRepo: SessionRepository;
@@ -190,7 +206,11 @@ export class WorkflowGeneratorService {
   ): Promise<GenerateResult> {
     const session = this.sessions.get(generationId);
     if (!session) {
-      throw new Error('Generation session not found or expired');
+      throw new WorkflowGenerationError(
+        404,
+        'GENERATION_ERROR',
+        'Generation session not found or expired'
+      );
     }
 
     const systemPrompt = this.buildSystemPrompt();

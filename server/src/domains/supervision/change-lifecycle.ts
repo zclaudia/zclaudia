@@ -7,6 +7,7 @@ import type {
   ProjectChange,
   SupervisionLogEvent,
 } from '@zclaudia/shared/features/supervision';
+import { SupervisorError } from './supervisor-errors.js';
 import { type ProjectChangeRepository } from './repositories/project-change.js';
 import { type ChangeGateReviewRepository } from './repositories/change-gate-review.js';
 import { type ChangeSyncRunRepository } from './repositories/change-sync-run.js';
@@ -135,7 +136,7 @@ export class ChangeLifecycle {
   getExecutionPlan(changeId: string): ChangeExecutionPlan {
     const change = this.changeRepo.findById(changeId);
     if (!change) {
-      throw new Error(`Change not found: ${changeId}`);
+      throw SupervisorError.notFound(`Change not found: ${changeId}`);
     }
     return {
       changeId,
@@ -228,7 +229,9 @@ export class ChangeLifecycle {
   requestAcceptance(changeId: string, notes?: string): ProjectChange {
     const change = this.requireChange(changeId);
     if (change.status !== 'executing') {
-      throw new Error(`Cannot request acceptance when change is in status '${change.status}'`);
+      throw SupervisorError.invalidState(
+        `Cannot request acceptance when change is in status '${change.status}'`
+      );
     }
     const updated = this.changeRepo.updateStatus(changeId, 'accepting');
     this.syncArtifacts(changeId);
@@ -239,7 +242,9 @@ export class ChangeLifecycle {
   resolveAcceptance(changeId: string, decision: AcceptanceDecision, notes?: string): ProjectChange {
     const change = this.requireChange(changeId);
     if (change.status !== 'accepting') {
-      throw new Error(`Cannot resolve acceptance when change is in status '${change.status}'`);
+      throw SupervisorError.invalidState(
+        `Cannot resolve acceptance when change is in status '${change.status}'`
+      );
     }
     let updated: ProjectChange;
     if (decision === 'approve_acceptance') {
@@ -258,7 +263,9 @@ export class ChangeLifecycle {
   requestChangeSync(changeId: string, summary?: string): ProjectChange {
     const change = this.requireChange(changeId);
     if (change.status !== 'accepting') {
-      throw new Error(`Cannot request sync when change is in status '${change.status}'`);
+      throw SupervisorError.invalidState(
+        `Cannot request sync when change is in status '${change.status}'`
+      );
     }
     const updated = this.changeRepo.updateStatus(changeId, 'syncing');
     this.syncRunRepo.create(changeId, summary ?? `Sync requested for ${change.title}`);
@@ -270,7 +277,9 @@ export class ChangeLifecycle {
   completeChange(changeId: string, summary?: string): ProjectChange {
     const change = this.requireChange(changeId);
     if (change.status !== 'syncing') {
-      throw new Error(`Cannot complete change when status is '${change.status}'`);
+      throw SupervisorError.invalidState(
+        `Cannot complete change when status is '${change.status}'`
+      );
     }
     this.syncRunRepo.markApplied(changeId);
     const updated = this.changeRepo.updateFields(changeId, {
@@ -359,7 +368,7 @@ export class ChangeLifecycle {
 
   private requireChange(changeId: string): ProjectChange {
     const change = this.changeRepo.findById(changeId);
-    if (!change) throw new Error(`Change not found: ${changeId}`);
+    if (!change) throw SupervisorError.notFound(`Change not found: ${changeId}`);
     return change;
   }
 }

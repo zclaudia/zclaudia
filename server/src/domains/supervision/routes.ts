@@ -9,10 +9,229 @@ import type {
   ProjectChange,
   SupervisionTask,
 } from '@zclaudia/shared/features/supervision';
+import {
+  sendRouteError,
+  type RouteErrorPolicy,
+  type RouteErrorRule,
+} from '../../utils/route-error-mapping.js';
 import type { SupervisorService } from './supervisor-service.js';
 import type { ContextDocument } from './context-manager.js';
 
 type SupervisionLogRows = ReturnType<SupervisorService['getLogs']>;
+
+/**
+ * Error → HTTP contracts, one policy per route.
+ *
+ * Typed `SupervisorError`s (status + code) thrown by the service win outright.
+ * The rules/fallback pairs exist for plain `Error`s — legacy throw paths and
+ * test doubles — and reproduce byte-for-byte the responses the previous
+ * inline `message.includes(...)` handlers produced.
+ */
+const NOT_FOUND_ON_MESSAGE: RouteErrorRule = { match: 'not found', status: 404, code: 'NOT_FOUND' };
+
+const INIT_ERROR: RouteErrorPolicy = {
+  fallback: { status: 400, code: 'INIT_ERROR' },
+  nonErrorMessage: 'Failed to initialize agent',
+};
+
+const AGENT_ACTION_ERROR: RouteErrorPolicy = {
+  rules: [{ match: 'not in', status: 400, code: 'INVALID_STATE' }],
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  nonErrorMessage: 'Failed to update agent',
+};
+
+const GET_AGENT_ERROR: RouteErrorPolicy = {
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  fixedMessage: 'Failed to get agent',
+};
+
+const LIST_CHANGES_ERROR: RouteErrorPolicy = {
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  fixedMessage: 'Failed to list changes',
+};
+
+const GET_ACTIVE_CHANGE_ERROR: RouteErrorPolicy = {
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  fixedMessage: 'Failed to get active change',
+};
+
+const CREATE_CHANGE_ERROR: RouteErrorPolicy = {
+  rules: [{ match: 'already has an active change', status: 409, code: 'ACTIVE_CHANGE_EXISTS' }],
+  fallback: { status: 400, code: 'CREATE_ERROR' },
+  nonErrorMessage: 'Failed to create change',
+};
+
+const GET_CHANGE_ERROR: RouteErrorPolicy = {
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  fixedMessage: 'Failed to get change',
+};
+
+const EXECUTION_PLAN_ERROR: RouteErrorPolicy = {
+  rules: [{ match: 'Change not found', status: 404, code: 'NOT_FOUND' }],
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  nonErrorMessage: 'Failed to get execution plan',
+};
+
+const REQUEST_DESIGN_GATE_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 400, code: 'REQUEST_ERROR' },
+  nonErrorMessage: 'Failed to request design gate',
+};
+
+const RESOLVE_DESIGN_GATE_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 400, code: 'RESOLVE_ERROR' },
+  nonErrorMessage: 'Failed to resolve design gate',
+};
+
+const REQUEST_EXECUTION_GATE_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 400, code: 'REQUEST_ERROR' },
+  nonErrorMessage: 'Failed to request execution gate',
+};
+
+const RESOLVE_EXECUTION_GATE_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 400, code: 'RESOLVE_ERROR' },
+  nonErrorMessage: 'Failed to resolve execution gate',
+};
+
+const REQUEST_ACCEPTANCE_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 400, code: 'INVALID_STATE' },
+  nonErrorMessage: 'Failed to request acceptance',
+};
+
+const RESOLVE_ACCEPTANCE_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 400, code: 'INVALID_STATE' },
+  nonErrorMessage: 'Failed to resolve acceptance',
+};
+
+const REQUEST_CHANGE_SYNC_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 400, code: 'INVALID_STATE' },
+  nonErrorMessage: 'Failed to request change sync',
+};
+
+const COMPLETE_CHANGE_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 400, code: 'INVALID_STATE' },
+  nonErrorMessage: 'Failed to complete change',
+};
+
+const LIST_TASKS_ERROR: RouteErrorPolicy = {
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  fixedMessage: 'Failed to list tasks',
+};
+
+const CREATE_TASK_ERROR: RouteErrorPolicy = {
+  rules: [
+    { match: 'budget', status: 409, code: 'BUDGET_EXCEEDED' },
+    { match: 'No agent', status: 400, code: 'INTERNAL_ERROR' },
+    { match: 'Change not found', status: 400, code: 'INTERNAL_ERROR' },
+    { match: 'does not belong to project', status: 400, code: 'INTERNAL_ERROR' },
+  ],
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  nonErrorMessage: 'Failed to create task',
+};
+
+const UPDATE_TASK_ERROR: RouteErrorPolicy = {
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  fixedMessage: 'Failed to update task',
+};
+
+const APPROVE_TASK_ERROR: RouteErrorPolicy = {
+  fallback: { status: 400, code: 'INVALID_STATE' },
+  nonErrorMessage: 'Failed to approve task',
+};
+
+const REJECT_TASK_ERROR: RouteErrorPolicy = {
+  fallback: { status: 400, code: 'INVALID_STATE' },
+  nonErrorMessage: 'Failed to reject task',
+};
+
+const APPROVE_TASK_RESULT_ERROR: RouteErrorPolicy = {
+  fallback: { status: 400, code: 'INVALID_STATE' },
+  nonErrorMessage: 'Failed to approve task result',
+};
+
+const REJECT_TASK_RESULT_ERROR: RouteErrorPolicy = {
+  fallback: { status: 400, code: 'INVALID_STATE' },
+  nonErrorMessage: 'Failed to reject task result',
+};
+
+const RESOLVE_CONFLICT_ERROR: RouteErrorPolicy = {
+  rules: [{ match: 'not in merge_conflict', status: 400, code: 'INVALID_STATE' }],
+  fallback: { status: 500, code: 'MERGE_ERROR' },
+  nonErrorMessage: 'Failed to resolve conflict',
+};
+
+const OPEN_TASK_SESSION_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  nonErrorMessage: 'Failed to open task session',
+};
+
+const TASK_PLAN_STATUS_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  nonErrorMessage: 'Failed to get plan status',
+};
+
+const SUBMIT_TASK_PLAN_ERROR: RouteErrorPolicy = {
+  rules: [
+    { match: 'incomplete', status: 400, code: 'VALIDATION_ERROR' },
+    NOT_FOUND_ON_MESSAGE,
+    { match: 'not in planning status', status: 409, code: 'INVALID_STATE' },
+  ],
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  nonErrorMessage: 'Failed to submit plan',
+};
+
+const RELOAD_CONTEXT_ERROR: RouteErrorPolicy = {
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  nonErrorMessage: 'Failed to reload context',
+};
+
+const BUDGET_ERROR: RouteErrorPolicy = {
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  fixedMessage: 'Failed to get budget',
+};
+
+const LOGS_ERROR: RouteErrorPolicy = {
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  fixedMessage: 'Failed to get logs',
+};
+
+const CONTEXT_DOCUMENTS_ERROR: RouteErrorPolicy = {
+  fallback: { status: 500, code: 'INTERNAL_ERROR' },
+  fixedMessage: 'Failed to get context documents',
+};
+
+const UPDATE_CHANGE_DOCUMENT_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 400, code: 'UPDATE_ERROR' },
+  nonErrorMessage: 'Failed to update change document',
+};
+
+const RETRY_TASK_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 400, code: 'INVALID_STATE' },
+  nonErrorMessage: 'Failed to retry task',
+};
+
+const CANCEL_TASK_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 400, code: 'INVALID_STATE' },
+  nonErrorMessage: 'Failed to cancel task',
+};
+
+const RUN_TASK_NOW_ERROR: RouteErrorPolicy = {
+  rules: [NOT_FOUND_ON_MESSAGE],
+  fallback: { status: 400, code: 'INVALID_STATE' },
+  nonErrorMessage: 'Failed to run task',
+};
 
 export function createSupervisionRoutes(service: SupervisorService): Router {
   const router = Router();
@@ -25,11 +244,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const agent = service.initAgent(projectId, config, mode);
       res.json({ success: true, data: agent } as ApiResponse<ProjectAgent>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to initialize agent';
-      res.status(400).json({
-        success: false,
-        error: { code: 'INIT_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, INIT_ERROR);
     }
   });
 
@@ -51,12 +266,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const agent = service.updateAgentPhase(projectId, action);
       res.json({ success: true, data: agent } as ApiResponse<ProjectAgent>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update agent';
-      const status = message.includes('not in') ? 400 : 500;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 400 ? 'INVALID_STATE' : 'INTERNAL_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, AGENT_ACTION_ERROR);
     }
   });
 
@@ -72,11 +282,8 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
         return;
       }
       res.json({ success: true, data: agent } as ApiResponse<ProjectAgent>);
-    } catch (_error) {
-      res.status(500).json({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'Failed to get agent' },
-      } as ApiResponse<never>);
+    } catch (error) {
+      sendRouteError(res, error, GET_AGENT_ERROR);
     }
   });
 
@@ -85,11 +292,8 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
     try {
       const changes = service.getChanges(req.params.projectId);
       res.json({ success: true, data: changes } as ApiResponse<ProjectChange[]>);
-    } catch {
-      res.status(500).json({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'Failed to list changes' },
-      } as ApiResponse<never>);
+    } catch (error) {
+      sendRouteError(res, error, LIST_CHANGES_ERROR);
     }
   });
 
@@ -105,11 +309,8 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
         return;
       }
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
-    } catch {
-      res.status(500).json({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'Failed to get active change' },
-      } as ApiResponse<never>);
+    } catch (error) {
+      sendRouteError(res, error, GET_ACTIVE_CHANGE_ERROR);
     }
   });
 
@@ -134,12 +335,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       });
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create change';
-      const status = message.includes('already has an active change') ? 409 : 400;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 409 ? 'ACTIVE_CHANGE_EXISTS' : 'CREATE_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, CREATE_CHANGE_ERROR);
     }
   });
 
@@ -155,11 +351,8 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
         return;
       }
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
-    } catch {
-      res.status(500).json({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'Failed to get change' },
-      } as ApiResponse<never>);
+    } catch (error) {
+      sendRouteError(res, error, GET_CHANGE_ERROR);
     }
   });
 
@@ -169,12 +362,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const plan = service.getExecutionPlan(req.params.changeId);
       res.json({ success: true, data: plan } as ApiResponse<ChangeExecutionPlan>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to get execution plan';
-      const status = message.includes('Change not found') ? 404 : 500;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 404 ? 'NOT_FOUND' : 'INTERNAL_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, EXECUTION_PLAN_ERROR);
     }
   });
 
@@ -184,12 +372,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const change = service.requestDesignGate(req.params.changeId, req.body?.notes);
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to request design gate';
-      const status = message.includes('not found') ? 404 : 400;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 404 ? 'NOT_FOUND' : 'REQUEST_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, REQUEST_DESIGN_GATE_ERROR);
     }
   });
 
@@ -210,12 +393,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const change = service.resolveDesignGate(req.params.changeId, decision, notes);
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to resolve design gate';
-      const status = message.includes('not found') ? 404 : 400;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 404 ? 'NOT_FOUND' : 'RESOLVE_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, RESOLVE_DESIGN_GATE_ERROR);
     }
   });
 
@@ -225,12 +403,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const change = service.requestExecutionGate(req.params.changeId, req.body?.notes);
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to request execution gate';
-      const status = message.includes('not found') ? 404 : 400;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 404 ? 'NOT_FOUND' : 'REQUEST_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, REQUEST_EXECUTION_GATE_ERROR);
     }
   });
 
@@ -255,12 +428,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const change = service.resolveExecutionGate(req.params.changeId, decision, notes);
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to resolve execution gate';
-      const status = message.includes('not found') ? 404 : 400;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 404 ? 'NOT_FOUND' : 'RESOLVE_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, RESOLVE_EXECUTION_GATE_ERROR);
     }
   });
 
@@ -269,13 +437,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const change = service.requestAcceptance(req.params.changeId, req.body?.notes);
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to request acceptance';
-      const status = message.includes('not found') ? 404 : 400;
-      const code = status === 404 ? 'NOT_FOUND' : 'INVALID_STATE';
-      res.status(status).json({
-        success: false,
-        error: { code, message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, REQUEST_ACCEPTANCE_ERROR);
     }
   });
 
@@ -295,13 +457,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const change = service.resolveAcceptance(req.params.changeId, decision, notes);
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to resolve acceptance';
-      const status = message.includes('not found') ? 404 : 400;
-      const code = status === 404 ? 'NOT_FOUND' : 'INVALID_STATE';
-      res.status(status).json({
-        success: false,
-        error: { code, message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, RESOLVE_ACCEPTANCE_ERROR);
     }
   });
 
@@ -310,13 +466,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const change = service.requestChangeSync(req.params.changeId, req.body?.summary);
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to request change sync';
-      const status = message.includes('not found') ? 404 : 400;
-      const code = status === 404 ? 'NOT_FOUND' : 'INVALID_STATE';
-      res.status(status).json({
-        success: false,
-        error: { code, message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, REQUEST_CHANGE_SYNC_ERROR);
     }
   });
 
@@ -325,13 +475,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const change = service.completeChange(req.params.changeId, req.body?.summary);
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to complete change';
-      const status = message.includes('not found') ? 404 : 400;
-      const code = status === 404 ? 'NOT_FOUND' : 'INVALID_STATE';
-      res.status(status).json({
-        success: false,
-        error: { code, message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, COMPLETE_CHANGE_ERROR);
     }
   });
 
@@ -341,11 +485,8 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const changeId = typeof req.query.changeId === 'string' ? req.query.changeId : undefined;
       const tasks = service.getTasks(req.params.projectId, changeId);
       res.json({ success: true, data: tasks } as ApiResponse<SupervisionTask[]>);
-    } catch (_error) {
-      res.status(500).json({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'Failed to list tasks' },
-      } as ApiResponse<never>);
+    } catch (error) {
+      sendRouteError(res, error, LIST_TASKS_ERROR);
     }
   });
 
@@ -390,18 +531,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       });
       res.json({ success: true, data: task } as ApiResponse<SupervisionTask>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create task';
-      const status = message.includes('budget')
-        ? 409
-        : message.includes('No agent') ||
-            message.includes('Change not found') ||
-            message.includes('does not belong to project')
-          ? 400
-          : 500;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 409 ? 'BUDGET_EXCEEDED' : 'INTERNAL_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, CREATE_TASK_ERROR);
     }
   });
 
@@ -418,11 +548,8 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
         return;
       }
       res.json({ success: true, data: task } as ApiResponse<SupervisionTask>);
-    } catch (_error) {
-      res.status(500).json({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'Failed to update task' },
-      } as ApiResponse<never>);
+    } catch (error) {
+      sendRouteError(res, error, UPDATE_TASK_ERROR);
     }
   });
 
@@ -432,11 +559,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const task = service.approveTask(req.params.taskId);
       res.json({ success: true, data: task } as ApiResponse<SupervisionTask>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to approve task';
-      res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_STATE', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, APPROVE_TASK_ERROR);
     }
   });
 
@@ -446,11 +569,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const task = service.rejectTask(req.params.taskId);
       res.json({ success: true, data: task } as ApiResponse<SupervisionTask>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to reject task';
-      res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_STATE', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, REJECT_TASK_ERROR);
     }
   });
 
@@ -460,11 +579,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const task = await service.approveTaskResult(req.params.taskId);
       res.json({ success: true, data: task } as ApiResponse<SupervisionTask>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to approve task result';
-      res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_STATE', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, APPROVE_TASK_RESULT_ERROR);
     }
   });
 
@@ -482,11 +597,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const task = service.rejectTaskResult(req.params.taskId, notes);
       res.json({ success: true, data: task } as ApiResponse<SupervisionTask>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to reject task result';
-      res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_STATE', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, REJECT_TASK_RESULT_ERROR);
     }
   });
 
@@ -496,12 +607,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const task = await service.resolveConflict(req.params.taskId);
       res.json({ success: true, data: task } as ApiResponse<SupervisionTask>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to resolve conflict';
-      const status = message.includes('not in merge_conflict') ? 400 : 500;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 400 ? 'INVALID_STATE' : 'MERGE_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, RESOLVE_CONFLICT_ERROR);
     }
   });
 
@@ -511,12 +617,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const result = service.openTaskSession(req.params.taskId);
       res.json({ success: true, data: result } as ApiResponse<{ sessionId: string }>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to open task session';
-      const status = message.includes('not found') ? 404 : 500;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 404 ? 'NOT_FOUND' : 'INTERNAL_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, OPEN_TASK_SESSION_ERROR);
     }
   });
 
@@ -526,12 +627,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const status = service.getTaskPlanStatus(req.params.taskId);
       res.json({ success: true, data: status });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to get plan status';
-      const status = message.includes('not found') ? 404 : 500;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 404 ? 'NOT_FOUND' : 'INTERNAL_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, TASK_PLAN_STATUS_ERROR);
     }
   });
 
@@ -541,26 +637,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const result = service.submitTaskPlan(req.params.taskId);
       res.json({ success: true, data: result });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to submit plan';
-      const code = message.includes('incomplete')
-        ? 'VALIDATION_ERROR'
-        : message.includes('not found')
-          ? 'NOT_FOUND'
-          : message.includes('not in planning status')
-            ? 'INVALID_STATE'
-            : 'INTERNAL_ERROR';
-      const status =
-        code === 'VALIDATION_ERROR'
-          ? 400
-          : code === 'NOT_FOUND'
-            ? 404
-            : code === 'INVALID_STATE'
-              ? 409
-              : 500;
-      res.status(status).json({
-        success: false,
-        error: { code, message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, SUBMIT_TASK_PLAN_ERROR);
     }
   });
 
@@ -570,11 +647,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       service.reloadContext(req.params.projectId);
       res.json({ success: true, data: null } as ApiResponse<null>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to reload context';
-      res.status(500).json({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, RELOAD_CONTEXT_ERROR);
     }
   });
 
@@ -593,11 +666,8 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
           remaining: limit !== undefined ? Math.max(0, limit - usage) : undefined,
         },
       } as ApiResponse<{ usage: number; limit?: number; remaining?: number }>);
-    } catch (_error) {
-      res.status(500).json({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'Failed to get budget' },
-      } as ApiResponse<never>);
+    } catch (error) {
+      sendRouteError(res, error, BUDGET_ERROR);
     }
   });
 
@@ -608,11 +678,8 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const limit = parseInt(req.query.limit as string) || 100;
       const logs = service.getLogs(projectId, limit);
       res.json({ success: true, data: logs } as ApiResponse<SupervisionLogRows>);
-    } catch (_error) {
-      res.status(500).json({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'Failed to get logs' },
-      } as ApiResponse<never>);
+    } catch (error) {
+      sendRouteError(res, error, LOGS_ERROR);
     }
   });
 
@@ -621,11 +688,8 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
     try {
       const documents = service.getContextDocuments(req.params.projectId);
       res.json({ success: true, data: documents } as ApiResponse<ContextDocument[]>);
-    } catch (_error) {
-      res.status(500).json({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'Failed to get context documents' },
-      } as ApiResponse<never>);
+    } catch (error) {
+      sendRouteError(res, error, CONTEXT_DOCUMENTS_ERROR);
     }
   });
 
@@ -658,12 +722,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       );
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update change document';
-      const status = message.includes('not found') ? 404 : 400;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 404 ? 'NOT_FOUND' : 'UPDATE_ERROR', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, UPDATE_CHANGE_DOCUMENT_ERROR);
     }
   });
 
@@ -673,12 +732,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const task = service.retryTask(req.params.taskId);
       res.json({ success: true, data: task } as ApiResponse<SupervisionTask>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to retry task';
-      const status = message.includes('not found') ? 404 : 400;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 404 ? 'NOT_FOUND' : 'INVALID_STATE', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, RETRY_TASK_ERROR);
     }
   });
 
@@ -688,12 +742,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const task = service.cancelTask(req.params.taskId);
       res.json({ success: true, data: task } as ApiResponse<SupervisionTask>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to cancel task';
-      const status = message.includes('not found') ? 404 : 400;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 404 ? 'NOT_FOUND' : 'INVALID_STATE', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, CANCEL_TASK_ERROR);
     }
   });
 
@@ -703,12 +752,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const task = service.runTaskNow(req.params.taskId);
       res.json({ success: true, data: task } as ApiResponse<SupervisionTask>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to run task';
-      const status = message.includes('not found') ? 404 : 400;
-      res.status(status).json({
-        success: false,
-        error: { code: status === 404 ? 'NOT_FOUND' : 'INVALID_STATE', message },
-      } as ApiResponse<never>);
+      sendRouteError(res, error, RUN_TASK_NOW_ERROR);
     }
   });
 
