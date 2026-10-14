@@ -161,3 +161,88 @@ describe('session model selector', () => {
     expect(getSessionModelSettings).toHaveBeenCalledWith('s', false, expect.any(AbortSignal));
   });
 });
+
+describe('session model selector chip (mobile menu)', () => {
+  async function openMenu(chipLabel = 'One') {
+    render(<SessionModelSelector sessionId="s" variant="chip" />);
+    await screen.findByText(chipLabel);
+    fireEvent.click(screen.getByRole('button', { name: 'Session model and thinking' }));
+    return screen.findByRole('menu', { name: 'Model' });
+  }
+
+  it('opens a compact menu grouped under the profile, with the active model checked', async () => {
+    settings.profileName = 'Codex profile';
+    settings.inheritedThinkingLevel = 'low';
+    const menu = await openMenu();
+    expect(menu).toHaveTextContent('Codex profile');
+    expect(screen.getByRole('menuitemradio', { name: 'One' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
+    expect(screen.getByRole('menuitemradio', { name: 'Two' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
+    expect(screen.getByRole('menuitem', { name: /Thinking/ })).toHaveTextContent('low');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('saves a picked model in one tap, keeping a thinking level the new model offers', async () => {
+    settings.selection = { model: 'm1', thinkingLevel: 'low', revision: 3 };
+    await openMenu();
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Two' }));
+    await waitFor(() =>
+      expect(saveSessionModelSettings).toHaveBeenCalledWith('s', {
+        model: 'm2',
+        thinkingLevel: 'low',
+        revision: 3,
+      })
+    );
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    expect(await screen.findByText('Two')).toBeInTheDocument();
+  });
+
+  it('drops a thinking level the new model does not offer', async () => {
+    settings.selection = { model: 'm2', thinkingLevel: 'high', revision: 0 };
+    await openMenu('Two');
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'One' }));
+    await waitFor(() =>
+      expect(saveSessionModelSettings).toHaveBeenCalledWith('s', {
+        model: 'm1',
+        thinkingLevel: null,
+        revision: 0,
+      })
+    );
+  });
+
+  it('lists a saved custom model that discovery does not know', async () => {
+    settings.selection = { model: 'custom-x', thinkingLevel: null, revision: 0 };
+    await openMenu('custom-x');
+    expect(screen.getByRole('menuitemradio', { name: 'custom-x' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
+  });
+
+  it('opens the detailed dialog from the Thinking row', async () => {
+    await openMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /Thinking/ }));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Session model settings' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Session thinking level' })).toBeInTheDocument();
+  });
+
+  it('shows a failed save inside the menu', async () => {
+    vi.mocked(saveSessionModelSettings).mockRejectedValue(new Error('Session is busy'));
+    await openMenu();
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Two' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Session is busy');
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
+  it('keeps the dialog for the desktop trigger', async () => {
+    await open();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Session model settings' })).toBeInTheDocument();
+  });
+});

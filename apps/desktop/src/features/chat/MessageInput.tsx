@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { KeyboardEvent, ClipboardEvent, ChangeEvent } from 'react';
-import { ArrowUp, Square, Plus } from 'lucide-react';
+import { ArrowUp, Square, Plus, Maximize2 } from 'lucide-react';
 import type { SkillRef } from '@zclaudia/shared/core/skills';
 import type { SlashCommand } from '@zclaudia/shared/features/commands';
 import type { FileEntry } from '@zclaudia/shared/files';
@@ -17,6 +17,7 @@ import { renderSkillTokens, deleteTokenAt, type TokenInteraction } from './Skill
 import { MentionMenu } from './MentionMenu';
 import { AttachmentPreviewList } from './AttachmentPreviewList';
 import { ComposerAddSheet, type ComposerToolItem } from './ComposerAddSheet';
+import { ComposerFullscreenEditor } from './ComposerFullscreenEditor';
 import { useComposerDraft } from './hooks/useComposerDraft';
 import { useMentionState, initialMentionState } from './hooks/useMentionState';
 import { useAttachmentPicker } from './hooks/useAttachmentPicker';
@@ -68,6 +69,8 @@ interface MessageInputProps {
 
 // One line at rest; the card's action row supplies the touch height.
 const MOBILE_MIN_INPUT_HEIGHT_PX = 24;
+// Past this many lines the mobile card offers the full-screen editor.
+const MOBILE_EXPAND_AFTER_LINES = 3;
 const EXPANDED_INPUT_DEFAULT_HEIGHT_PX = 160;
 const EXPANDED_INPUT_MIN_HEIGHT_PX = 120;
 
@@ -112,6 +115,9 @@ export function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  // Measured in fitTextarea: the draft wraps past MOBILE_EXPAND_AFTER_LINES.
+  const [mobileInputTall, setMobileInputTall] = useState(false);
   const commandListRef = useRef<HTMLDivElement>(null);
   const mentionListRef = useRef<HTMLDivElement>(null);
 
@@ -255,6 +261,11 @@ export function MessageInput({
       textarea.style.maxHeight = `${max}px`;
       textarea.style.overflowY = textarea.scrollHeight > max ? 'auto' : 'hidden';
       textarea.scrollTop = textarea.scrollHeight;
+      const element = rootRef.current?.querySelector('textarea');
+      const style = element ? window.getComputedStyle(element) : null;
+      const lineHeight =
+        parseFloat(style?.lineHeight ?? '') || (parseFloat(style?.fontSize ?? '') || 13) * 1.5;
+      setMobileInputTall(textarea.scrollHeight > lineHeight * MOBILE_EXPAND_AFTER_LINES + 4);
       return;
     }
 
@@ -724,6 +735,11 @@ export function MessageInput({
   const showLiteralEscape =
     !!onSendLiterally && value.startsWith('/') && /^\/[A-Za-z][A-Za-z0-9_-]*:[^\s]*/.test(value);
 
+  const showExpand =
+    isMobile && (mobileInputTall || value.split('\n').length > MOBILE_EXPAND_AFTER_LINES);
+  const canSendMobile =
+    !disabled && (!!value.trim() || attachments.length > 0) && !(isLoading && onCancel);
+
   return (
     <div ref={rootRef} className="relative">
       {/* Cursor-style command/skill dropdown */}
@@ -804,38 +820,53 @@ export function MessageInput({
             onRemove={removeAttachment}
             className="mb-2 flex gap-2 overflow-x-auto px-1 pt-1"
           />
-          <RichTextarea
-            data-testid="message-input"
-            ref={textareaRef}
-            value={value}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            onCompositionStart={handleCompositionStart}
-            onCompositionEnd={handleCompositionEnd}
-            disabled={disabled}
-            placeholder={placeholder}
-            spellCheck={false}
-            autoCorrect="off"
-            autoCapitalize="off"
-            autoComplete="off"
-            rows={1}
-            className="relative w-full resize-none min-h-[1.5rem] overflow-y-auto border-0 bg-transparent p-0 whitespace-pre-wrap break-words placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              fontSize: 'var(--chat-font-input, 0.8125rem)',
-              width: '100%',
-              maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px`,
-              color: 'hsl(var(--foreground))',
-              caretColor: 'hsl(var(--foreground))',
-              // rich-textarea copies this padding to its backdrop and clips
-              // paint at the box edge; 0.6em gives line-start token icons
-              // room to paint. Wins over the p-0 class (inline style).
-              paddingLeft: '0.6em',
-              cursor: deleteZoneHovered ? 'pointer' : undefined,
-            }}
-          >
-            {(v: string) => renderSkillTokens(v, skillIds, commandSet, tokenInteraction)}
-          </RichTextarea>
+          <div className="relative">
+            <RichTextarea
+              data-testid="message-input"
+              ref={textareaRef}
+              value={value}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
+              disabled={disabled}
+              placeholder={placeholder}
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+              autoComplete="off"
+              rows={1}
+              className="relative w-full resize-none min-h-[1.5rem] overflow-y-auto border-0 bg-transparent p-0 whitespace-pre-wrap break-words placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                fontSize: 'var(--chat-font-input, 0.8125rem)',
+                width: '100%',
+                maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px`,
+                color: 'hsl(var(--foreground))',
+                caretColor: 'hsl(var(--foreground))',
+                // rich-textarea copies this padding to its backdrop and clips
+                // paint at the box edge; 0.6em gives line-start token icons
+                // room to paint. Wins over the p-0 class (inline style).
+                paddingLeft: '0.6em',
+                // Keep wrapped text clear of the expand button.
+                paddingRight: showExpand ? '2rem' : undefined,
+                cursor: deleteZoneHovered ? 'pointer' : undefined,
+              }}
+            >
+              {(v: string) => renderSkillTokens(v, skillIds, commandSet, tokenInteraction)}
+            </RichTextarea>
+            {showExpand && (
+              <button
+                type="button"
+                onClick={() => setFullscreenOpen(true)}
+                className="absolute -top-1.5 right-0 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+                title="Expand"
+                aria-label="Expand to full screen"
+              >
+                <Maximize2 size={16} strokeWidth={1.75} />
+              </button>
+            )}
+          </div>
           <div className="mt-1.5 flex items-center gap-0.5">
             <button
               type="button"
@@ -912,6 +943,20 @@ export function MessageInput({
             disabled={disabled}
             tools={mobileTools}
             sessionRows={mobileSessionRows}
+          />
+          <ComposerFullscreenEditor
+            open={fullscreenOpen}
+            onCollapse={() => setFullscreenOpen(false)}
+            value={value}
+            onChange={updateValue}
+            attachments={attachments}
+            onRemoveAttachment={removeAttachment}
+            onSend={() => {
+              void handleSend().then(() => setFullscreenOpen(false));
+            }}
+            canSend={canSendMobile}
+            disabled={disabled}
+            placeholder={placeholder}
           />
         </div>
       ) : (

@@ -111,6 +111,7 @@ export class SessionModelSettingsService {
       runtimeType,
       engineMode,
       inheritedModel: agent.model,
+      profileName: (profileModels ? llm?.name : undefined) || agent.name,
       inheritedThinkingLevel: agent.thinkingLevel,
       models: [],
       allowManualModel: !profileModels && (runtimeType !== 'cursor' || legacyCursor),

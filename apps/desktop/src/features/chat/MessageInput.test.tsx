@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MessageInput } from './MessageInput';
 import type { SlashCommand } from '@zclaudia/shared/features/commands';
 
@@ -573,6 +573,105 @@ describe('MessageInput', () => {
       render(<MessageInput {...defaultProps} />);
       fireEvent.click(screen.getByRole('button', { name: 'Add attachment or open tools' }));
       expect(screen.queryByText('Reference a file')).toBeNull();
+    });
+
+    describe('full-screen editor (A3)', () => {
+      const photo = {
+        id: 'att-1',
+        type: 'image' as const,
+        name: 'photo.png',
+        data: 'data:image/png;base64,abc',
+        mimeType: 'image/png',
+      };
+      const expand = () => screen.queryByRole('button', { name: 'Expand to full screen' });
+
+      it('offers expand only once the draft is past three lines', () => {
+        render(<MessageInput {...defaultProps} />);
+        const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+        fireEvent.change(textarea, { target: { value: 'one\ntwo\nthree' } });
+        expect(expand()).toBeNull();
+        fireEvent.change(textarea, { target: { value: 'one\ntwo\nthree\nfour' } });
+        expect(expand()).toBeInTheDocument();
+      });
+
+      it('offers expand when a single long line wraps past three lines', () => {
+        render(<MessageInput {...defaultProps} />);
+        const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+        Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 120 });
+        fireEvent.change(textarea, { target: { value: 'a long paragraph '.repeat(20) } });
+        expect(expand()).toBeInTheDocument();
+      });
+
+      it('never shows on desktop', () => {
+        mockIsMobile = false;
+        render(<MessageInput {...defaultProps} />);
+        const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+        fireEvent.change(textarea, { target: { value: 'a\nb\nc\nd\ne' } });
+        expect(expand()).toBeNull();
+      });
+
+      it('edits the same draft and attachments, and collapses back in sync', () => {
+        render(<MessageInput {...defaultProps} initialAttachments={[photo]} />);
+        const inline = screen.getByTestId('message-input') as HTMLTextAreaElement;
+        fireEvent.change(inline, { target: { value: '1\n2\n3\n4' } });
+        fireEvent.click(expand()!);
+
+        const editor = screen.getByRole('dialog', { name: 'Edit message' });
+        const full = within(editor).getByRole('textbox', {
+          name: 'Message',
+        }) as HTMLTextAreaElement;
+        expect(full.value).toBe('1\n2\n3\n4');
+        fireEvent.change(full, { target: { value: '1\n2\n3\n4\n5' } });
+        fireEvent.click(within(editor).getByLabelText('Remove attachment photo.png'));
+
+        fireEvent.click(within(editor).getByRole('button', { name: 'Collapse editor' }));
+        expect(screen.queryByRole('dialog', { name: 'Edit message' })).toBeNull();
+        expect(inline.value).toBe('1\n2\n3\n4\n5');
+        expect(screen.queryByLabelText('Remove attachment photo.png')).toBeNull();
+      });
+
+      it('persists edits made in the editor as the draft', () => {
+        vi.useFakeTimers();
+        render(<MessageInput {...defaultProps} />);
+        const inline = screen.getByTestId('message-input') as HTMLTextAreaElement;
+        fireEvent.change(inline, { target: { value: '1\n2\n3\n4' } });
+        fireEvent.click(expand()!);
+        const editor = screen.getByRole('dialog', { name: 'Edit message' });
+        fireEvent.change(within(editor).getByRole('textbox', { name: 'Message' }), {
+          target: { value: 'rewritten\nin\nfull\nscreen' },
+        });
+        vi.runAllTimers();
+        expect(mockSetDraft).toHaveBeenLastCalledWith(
+          'session-1',
+          expect.objectContaining({ content: 'rewritten\nin\nfull\nscreen' })
+        );
+      });
+
+      it('sends from the editor and closes it', async () => {
+        const onSend = vi.fn();
+        render(<MessageInput {...defaultProps} onSend={onSend} initialAttachments={[photo]} />);
+        const inline = screen.getByTestId('message-input') as HTMLTextAreaElement;
+        fireEvent.change(inline, { target: { value: 'a\nb\nc\nd' } });
+        fireEvent.click(expand()!);
+
+        const editor = screen.getByRole('dialog', { name: 'Edit message' });
+        fireEvent.click(within(editor).getByRole('button', { name: 'Send message' }));
+
+        expect(onSend).toHaveBeenCalledWith('a\nb\nc\nd', [photo]);
+        await waitFor(() =>
+          expect(screen.queryByRole('dialog', { name: 'Edit message' })).toBeNull()
+        );
+        expect(inline.value).toBe('');
+      });
+
+      it('disables send in the editor while a run can be cancelled', () => {
+        render(<MessageInput {...defaultProps} isLoading onCancel={vi.fn()} />);
+        const inline = screen.getByTestId('message-input') as HTMLTextAreaElement;
+        fireEvent.change(inline, { target: { value: 'a\nb\nc\nd' } });
+        fireEvent.click(expand()!);
+        const editor = screen.getByRole('dialog', { name: 'Edit message' });
+        expect(within(editor).getByRole('button', { name: 'Send message' })).toBeDisabled();
+      });
     });
   });
 });

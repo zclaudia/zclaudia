@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { trapTab } from '../../utils/focusTrap';
-import { ChevronDown, Cpu, RefreshCw } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Cpu, RefreshCw } from 'lucide-react';
 import type { ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import type { SessionModelSettings } from '@zclaudia/shared/core/runtime-capabilities';
 import { getSessionModelSettings, saveSessionModelSettings } from '../../services/api/sessions';
@@ -9,6 +9,7 @@ import { SelectorTrigger } from './SelectorTrigger';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select, type SelectOption } from '../../components/ui/Select';
+import { SECTION_LABEL } from '../../components/ui/typography';
 
 /** The Select dropdown is portaled to <body>, so it sits outside this
  *  popover's DOM subtree. Outside-click / Escape handlers must treat an open
@@ -24,11 +25,13 @@ export function SessionModelSelector({
 }: {
   sessionId: string;
   disabled?: boolean;
-  /** `chip`: mobile composer card styling (no icon, larger label). */
+  /** `chip`: mobile composer card styling (no icon, larger label); tapping it
+   *  opens a compact model menu whose Thinking row leads to the full dialog. */
   variant?: 'default' | 'chip';
 }) {
   const [settings, setSettings] = useState<SessionModelSettings | null>(null);
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState<'menu' | 'dialog'>('dialog');
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -131,11 +134,11 @@ export function SessionModelSelector({
       window.removeEventListener('resize', position);
       window.removeEventListener('scroll', position, true);
     };
-  }, [open, settings, model, error, loading]);
+  }, [open, view, settings, model, error, loading]);
 
   useEffect(() => {
     if (open) panelRef.current?.focus();
-  }, [open]);
+  }, [open, view]);
 
   const savedModel = settings?.selection.model ?? settings?.inheritedModel ?? '';
   const label = settings?.models.find(m => m.id === savedModel)?.label || savedModel || 'Model';
@@ -175,15 +178,14 @@ export function SessionModelSelector({
           ? [{ value: thinking as string, label: `${thinking} (saved)` }]
           : []),
       ];
-  const save = async () => {
+  const save = async (next = { model, thinkingLevel: thinking }) => {
     if (!settings) return;
     const id = epoch.current;
     setSaving(true);
     setError('');
     try {
       const value = await saveSessionModelSettings(sessionId, {
-        model,
-        thinkingLevel: thinking,
+        ...next,
         revision: settings.selection.revision,
       });
       if (epoch.current === id) {
@@ -197,13 +199,50 @@ export function SessionModelSelector({
       setSaving(false);
     }
   };
+  // Compact menu (chip): one tap picks a model and saves; the saved thinking
+  // level carries over only when the new model offers it.
+  const activeModel = settings?.selection.model ?? (savedModel || settings?.defaultModel || '');
+  const menuModels =
+    settings && activeModel && !settings.models.some(m => m.id === activeModel)
+      ? [{ id: activeModel, label: activeModel }, ...settings.models]
+      : (settings?.models ?? []);
+  const thinkingLabel =
+    settings?.selection.thinkingLevel ??
+    (settings?.selection.model === null ? settings?.inheritedThinkingLevel : undefined) ??
+    'Default';
+  const pickModel = (id: string) => {
+    if (!settings || saving) return;
+    if (id === settings.selection.model) {
+      setOpen(false);
+      return;
+    }
+    const kept = settings.selection.thinkingLevel;
+    const supported = settings.models.find(m => m.id === id)?.thinkingLevels ?? [];
+    void save({ model: id, thinkingLevel: kept && supported.includes(kept) ? kept : null });
+  };
+  const moveMenuFocus = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const items = Array.from(
+      panelRef.current?.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]:not(:disabled)') ??
+        []
+    );
+    if (items.length === 0) return;
+    e.preventDefault();
+    const at = items.indexOf(document.activeElement as HTMLButtonElement);
+    const step = e.key === 'ArrowDown' ? 1 : -1;
+    items[(at + step + items.length) % items.length]?.focus();
+  };
+  const menu = variant === 'chip' && view === 'menu';
   return (
     <div className="relative min-w-0" ref={ref}>
       <SelectorTrigger
         disabled={disabled || saving}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          if (!open) setView(variant === 'chip' ? 'menu' : 'dialog');
+          setOpen(!open);
+        }}
         ariaLabel="Session model and thinking"
-        ariaHasPopup="dialog"
+        ariaHasPopup={variant === 'chip' ? 'menu' : 'dialog'}
         ariaExpanded={open}
         title={label}
         variant={variant}
@@ -219,6 +258,75 @@ export function SessionModelSelector({
         <ChevronDown size={12} />
       </SelectorTrigger>
       {open &&
+        menu &&
+        createPortal(
+          <div
+            ref={panelRef}
+            tabIndex={-1}
+            style={panelStyle}
+            onKeyDown={e => {
+              moveMenuFocus(e);
+              trapTab(e, panelRef.current);
+            }}
+            role="menu"
+            aria-label="Model"
+            aria-busy={loading || saving}
+            className="fixed z-[110] flex w-[270px] max-w-[calc(100vw-32px)] max-h-[60vh] flex-col overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 shadow-xl outline-none"
+          >
+            <div className={`${SECTION_LABEL} truncate px-2.5 pt-2 pb-1`}>
+              {settings?.profileName || 'Models'}
+            </div>
+            {!settings && loading && (
+              <p role="status" className="px-2.5 py-2 text-xs text-muted-foreground">
+                Loading available models…
+              </p>
+            )}
+            {menuModels.map(m => {
+              const checked = m.id === activeModel;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={checked}
+                  disabled={saving || disabled}
+                  onClick={() => pickModel(m.id)}
+                  className={`flex h-11 w-full flex-shrink-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-[15px] text-foreground transition-colors hover:bg-muted focus-visible:bg-muted focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
+                    checked ? 'bg-muted' : ''
+                  }`}
+                >
+                  <span className="min-w-0 flex-1 truncate">{m.label}</span>
+                  {checked && <Check size={16} strokeWidth={2} />}
+                </button>
+              );
+            })}
+            {settings && menuModels.length === 0 && !loading && (
+              <p className="px-2.5 py-2 text-xs text-muted-foreground">
+                {settings.discoveryError || 'No models available.'}
+              </p>
+            )}
+            {error && (
+              <p role="alert" className="px-2.5 py-1.5 text-xs text-destructive">
+                {error}
+              </p>
+            )}
+            <div className="mx-1.5 my-1 h-px flex-shrink-0 bg-border" aria-hidden />
+            <button
+              type="button"
+              role="menuitem"
+              disabled={!settings || saving}
+              onClick={() => setView('dialog')}
+              className="flex h-11 w-full flex-shrink-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted focus-visible:bg-muted focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span className="flex-1">Thinking</span>
+              <span>{thinkingLabel}</span>
+              <ChevronRight size={14} strokeWidth={1.75} />
+            </button>
+          </div>,
+          document.body
+        )}
+      {open &&
+        !menu &&
         createPortal(
           <div
             ref={panelRef}

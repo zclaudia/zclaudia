@@ -49,6 +49,9 @@ describe('session model selection', () => {
     await service.read('s', true, true);
     expect(discoverModels).toHaveBeenCalledTimes(2);
   });
+  it('names the agent profile the discovered models belong to', async () => {
+    expect((await service.read('s', true)).profileName).toBe('A');
+  });
   it('persists across resolver calls without changing the agent or bound connection', async () => {
     const repo = new SessionRuntimeBindingRepository(db);
     repo.upsert({

@@ -61,6 +61,9 @@ export interface SessionModelSettings {
   runtimeType: string;
   engineMode: string;
   inheritedModel: string;
+  /** Name of the profile the model list comes from (LLM profile for
+   *  profile-backed runtimes, else the agent profile); a menu group heading. */
+  profileName?: string;
   inheritedThinkingLevel?: import('./agent-profile.js').ThinkingLevel;
   defaultModel?: string;
   models: RuntimeModelOption[];
