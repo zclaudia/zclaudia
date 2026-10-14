@@ -132,8 +132,11 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: 'true'
+          install: 'true'
 
-      # linux.sh runs its own `pnpm install`; CI=true makes pnpm frozen by default.
+      - name: Prepare Linux bundler with RPM short-write fix
+        run: node scripts/release/prepare-linux-bundler.mjs
+
       - name: Build Linux packages
         shell: bash
         run: ./scripts/build/linux.sh

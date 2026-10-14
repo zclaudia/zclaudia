@@ -75,7 +75,15 @@ cat > "$TAURI_CONFIG_FILE" <<EOF
 }
 EOF
 
-pnpm --filter @zclaudia/desktop exec tauri build --bundles deb,rpm --config src-tauri/tauri.linux.release.generated.json || {
+run_tauri() {
+  if [[ -n "${ZCLAUDIA_TAURI_BIN:-}" ]]; then
+    (cd apps/desktop && "$ZCLAUDIA_TAURI_BIN" tauri "$@")
+  else
+    pnpm --filter @zclaudia/desktop exec tauri "$@"
+  fi
+}
+
+run_tauri build --bundles deb,rpm --config src-tauri/tauri.linux.release.generated.json || {
   rm -f "$TAURI_CONFIG_FILE"
   echo "ERROR: Tauri build failed"
   exit 1
