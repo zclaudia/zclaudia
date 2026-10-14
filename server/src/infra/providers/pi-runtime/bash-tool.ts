@@ -1,4 +1,5 @@
 import type { AgentTool, AgentToolUpdateCallback } from '@earendil-works/pi-agent-core';
+import type { TaskRecord } from '@zclaudia/shared/core/task';
 import type Database from 'better-sqlite3';
 import { existsSync, statSync } from 'fs';
 import os from 'os';
@@ -88,6 +89,67 @@ async function persistFullOutputIfTruncated(
   } catch {
     return undefined;
   }
+}
+
+interface BackgroundBashTaskParams {
+  taskPort: TaskPort;
+  command: string;
+  toolCallId: string;
+  workspaceRoot: string;
+  runCwd: string;
+  sessionId?: string;
+  runId?: string;
+  sandboxAllowedDomains: ReadonlySet<string>;
+  privilegeMode?: SandboxPrivilegeMode | 'capability-granted';
+  privilegeGrants?: SandboxGrant[];
+  sandboxRequired: boolean;
+  autoBackgrounded?: boolean;
+  sandboxed?: boolean;
+}
+
+/**
+ * Create the background command task record shared by the explicit
+ * `run_in_background` path and the auto-background handoff path. Task
+ * creation and its metadata assembly are identical between the two; only the
+ * subsequent launch differs (fresh start vs. adoption of a still-running
+ * child), so it stays at the call sites.
+ */
+function createBackgroundBashTask(params: BackgroundBashTaskParams): TaskRecord {
+  const {
+    taskPort,
+    command,
+    toolCallId,
+    workspaceRoot,
+    runCwd,
+    sessionId,
+    runId,
+    sandboxAllowedDomains,
+    privilegeMode,
+    privilegeGrants,
+    sandboxRequired,
+    autoBackgrounded,
+    sandboxed,
+  } = params;
+  return taskPort.createTask({
+    type: 'command',
+    sessionId,
+    runId,
+    parentToolUseId: toolCallId,
+    title: truncateText(command, 80),
+    metadata: {
+      command,
+      cwd: runCwd,
+      workspaceRoot,
+      ...(autoBackgrounded ? { autoBackgrounded: true } : {}),
+      sandboxAllowedDomains: [...sandboxAllowedDomains],
+      ...(sandboxed !== undefined ? { sandboxed } : {}),
+      privilegePlan: {
+        mode: privilegeMode === 'unsandboxed' ? 'unsandboxed' : 'sandbox',
+        grants: privilegeGrants ?? [],
+      },
+      ...(sandboxRequired ? { sandboxRequired: true } : {}),
+    },
+  });
 }
 
 export interface BashBridgeToolOptions {
@@ -332,23 +394,17 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
             'missing_db_context',
             'Background execution requires database context'
           );
-        const task = taskPort.createTask({
-          type: 'command',
+        const task = createBackgroundBashTask({
+          taskPort,
+          command,
+          toolCallId,
+          workspaceRoot: cwd,
+          runCwd,
           sessionId: options?.sessionId,
           runId: options?.runId,
-          parentToolUseId: toolCallId,
-          title: truncateText(command, 80),
-          metadata: {
-            command,
-            cwd: runCwd,
-            workspaceRoot: cwd,
-            sandboxAllowedDomains: [...grantedDomains],
-            privilegePlan: {
-              mode: sandboxMode === 'unsandboxed' ? 'unsandboxed' : 'sandbox',
-              grants: [],
-            },
-            ...(sandboxRequired ? { sandboxRequired: true } : {}),
-          },
+          sandboxAllowedDomains: grantedDomains,
+          privilegeMode: sandboxMode,
+          sandboxRequired,
         });
         try {
           const started = await taskPort.commandTasks.start(task);
@@ -553,25 +609,20 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
           );
         }
         try {
-          const task = taskPort.createTask({
-            type: 'command',
+          const task = createBackgroundBashTask({
+            taskPort,
+            command,
+            toolCallId,
+            workspaceRoot: cwd,
+            runCwd,
             sessionId: options?.sessionId,
             runId: options?.runId,
-            parentToolUseId: toolCallId,
-            title: truncateText(command, 80),
-            metadata: {
-              command,
-              cwd: runCwd,
-              workspaceRoot: cwd,
-              autoBackgrounded: true,
-              sandboxAllowedDomains: [...grantedDomains],
-              sandboxed: wrap.sandboxed,
-              privilegePlan: {
-                mode: escalated.details.privilegeMode === 'unsandboxed' ? 'unsandboxed' : 'sandbox',
-                grants: escalated.details.grantsUsed ?? [],
-              },
-              ...(sandboxRequired ? { sandboxRequired: true } : {}),
-            },
+            sandboxAllowedDomains: grantedDomains,
+            privilegeMode: escalated.details.privilegeMode,
+            privilegeGrants: escalated.details.grantsUsed,
+            sandboxRequired,
+            autoBackgrounded: true,
+            sandboxed: wrap.sandboxed,
           });
           handoff.detach();
           const adopted = taskPort.commandTasks.adopt(

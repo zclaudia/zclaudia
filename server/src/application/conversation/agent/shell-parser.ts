@@ -1,7 +1,9 @@
 /**
  * Shell command parsing engine for the permission evaluator.
  *
- * Pure functions — no external dependencies except `path`.
+ * Pure functions — the only external dependencies are `path` and `fs`, and
+ * the single `fs` use (`statSync` in `normalizeExternalRoot`) is injectable
+ * via that function's optional `stat` parameter.
  * Handles tokenization, compound command splitting, command substitution
  * extraction, normalization, and wrapper command extraction.
  */
@@ -168,11 +170,13 @@ export function isPathWithinRoot(filePath: string, rootPath: string): boolean {
   return resolved.startsWith(resolvedRoot + path.sep) || resolved === resolvedRoot;
 }
 
-export function normalizeExternalRoot(filePath: string): string {
+export function normalizeExternalRoot(
+  filePath: string,
+  stat: (path: string) => fs.Stats = fs.statSync
+): string {
   const resolved = path.resolve(filePath);
   try {
-    const stat = fs.statSync(resolved);
-    return stat.isDirectory() ? resolved : path.dirname(resolved);
+    return stat(resolved).isDirectory() ? resolved : path.dirname(resolved);
   } catch {
     if (filePath.endsWith(path.sep)) return resolved.replace(new RegExp(`${path.sep}+$`), '');
     return path.dirname(resolved);
