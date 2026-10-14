@@ -69,8 +69,7 @@ describe('ModelsChart', () => {
   it('shows the empty state when nothing is tagged yet', async () => {
     getModelStats.mockResolvedValue({ days: [], models: [], trackedSince: null, capturedAt: 1 });
     render(<ModelsChart range="all" />);
-    await waitFor(() => expect(getModelStats).toHaveBeenCalled());
-    expect(screen.getByText(/No model data yet/)).toBeTruthy();
+    expect(await screen.findByText(/No model data yet/)).toBeTruthy();
   });
 
   it('refetches when the range changes', async () => {

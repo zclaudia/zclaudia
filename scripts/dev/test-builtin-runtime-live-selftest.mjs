@@ -76,12 +76,7 @@ try {
           report.concurrency.primarySdkSessionId,
           report.concurrency.peerSdkSessionId
         );
-        assert.equal(
-          report.concurrency.approvalIsolation,
-          report.concurrency.peerRuntime === 'cursor'
-            ? 'not-supported-by-peer'
-            : 'pending-survived-other-session-cancel'
-        );
+        assert.equal(report.concurrency.approvalIsolation, 'pending-survived-other-session-cancel');
       } else if (scenario === 'capabilities') {
         assert.deepEqual(report.coveredCases, ['L05']);
         assert.equal(report.capabilities.length, 3);

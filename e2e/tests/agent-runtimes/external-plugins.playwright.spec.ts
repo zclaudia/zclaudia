@@ -53,7 +53,16 @@ test('E12/E13: external IDs cannot replace built-ins and ordinary development pl
   const plugins = await app.api('/api/plugins');
   for (const runtime of ['claude', 'codex', 'cursor']) {
     const builtin = plugins.find((plugin: any) => plugin.id === `com.zclaudia.${runtime}`);
-    expect(builtin).toMatchObject({ source: 'builtin', status: 'active', version: '0.1.0' });
+    expect(builtin).toMatchObject({
+      source: 'builtin',
+      status: 'active',
+      version: JSON.parse(
+        await readFile(
+          new URL(`../../../plugins/agents/${runtime}/plugin.json`, import.meta.url),
+          'utf8'
+        )
+      ).version,
+    });
     expect(builtin.shadowedPaths).toEqual(
       expect.arrayContaining(
         ['same-id', 'same-runtime'].map(kind => path.join(development, `${runtime}-${kind}`))

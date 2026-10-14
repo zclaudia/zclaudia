@@ -14,9 +14,14 @@ for (const runtime of ['claude', 'codex', 'cursor']) {
     // override or diagnostic endpoint; its default remains one hour.
     const entry = path.join(bundle, 'server.mjs');
     const original = await readFile(entry, 'utf8');
-    const timeoutDeclaration = /\bDEFAULT_IDLE_TIMEOUT_MS = [^;]+;/g;
+    // esbuild suffixes colliding identifiers. Match the bridge's one-hour
+    // default, not the language server's similarly named ten-minute default.
+    const timeoutDeclaration = /(\bDEFAULT_IDLE_TIMEOUT_MS\d* = )60 \* 60 \* (?:1e3|1000);/g;
     expect(original.match(timeoutDeclaration)).toHaveLength(1);
-    await writeFile(entry, original.replace(timeoutDeclaration, 'DEFAULT_IDLE_TIMEOUT_MS = 250;'));
+    await writeFile(
+      entry,
+      original.replace(timeoutDeclaration, (_match, declaration) => `${declaration}250;`)
+    );
     await writeFile(path.join(app.directory, 'cli-audit.jsonl'), '', { flag: 'wx' });
     await app.start();
     const probe = await installLiveMcpProbe(app);

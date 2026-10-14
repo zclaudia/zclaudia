@@ -12,7 +12,7 @@ test('E01: all shipped adapters register and appear in the Built-in UI', async (
   const profiles = await app.api('/api/agent-profiles');
   for (const runtime of ['claude', 'codex', 'cursor']) {
     expect(profiles.find((p: any) => p.runtimeType === runtime)).toMatchObject({
-      llmProfileId: '',
+      llmProfileId: null,
       model: '',
     });
   }

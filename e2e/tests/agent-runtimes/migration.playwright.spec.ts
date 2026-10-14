@@ -44,7 +44,12 @@ test('E12/E14: upgrade preserves profiles, defaults, sessions and pins while sha
     expect(plugin).toMatchObject({
       source: 'builtin',
       status: 'active',
-      version: '0.1.0',
+      version: JSON.parse(
+        await readFile(
+          new URL(`../../../plugins/agents/${runtime}/plugin.json`, import.meta.url),
+          'utf8'
+        )
+      ).version,
       shadowedPaths: expect.arrayContaining([external, managed]),
       canRollback: false,
     });

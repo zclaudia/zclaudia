@@ -88,7 +88,7 @@ test('E22: ZClaudia runtime still executes coding tools and retains its UI histo
       .toMatchObject({
         name: 'Edited native agent',
         description: 'Native profile UI edit',
-        runtimeType: 'zclaudia',
+        runtimeType: 'pi',
         llmProfileId: llm.id,
         model: 'e2e-native',
         enabledTools: ['Read', 'Write', 'Bash'],

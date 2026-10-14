@@ -286,7 +286,7 @@ test('LSP: Python works out of the box with the bundled Pyright', async ({ app, 
 test('LSP: the model renames a symbol across files in one RenameSymbol call', async ({
   app,
   page,
-}) => {
+}, testInfo) => {
   const { project, cwd } = await app.configureCodingProject('codex', undefined, '-lsp-rename');
   await mkdir(path.join(cwd, 'src'), { recursive: true });
   await mkdir(path.join(cwd, 'node_modules'), { recursive: true });
@@ -376,14 +376,17 @@ test('LSP: the model renames a symbol across files in one RenameSymbol call', as
     await expect(messages.getByText('src/lib.ts', { exact: true })).toBeVisible();
     await expect(messages.getByText('src/main.ts', { exact: true })).toBeVisible();
     await page.screenshot({
-      path: '/private/tmp/claude-501/-Users-zhvala-SourceCode-zclaudia/80655315-71e9-4cc4-b5c1-aa9ab2f3b067/scratchpad/rename-card.png',
+      path: testInfo.outputPath('rename-card.png'),
     });
   } finally {
     await upstream.stop();
   }
 });
 
-test('LSP: the file viewer marks type errors once the user checks types', async ({ app, page }) => {
+test('LSP: the file viewer marks type errors once the user checks types', async ({
+  app,
+  page,
+}, testInfo) => {
   const { project, cwd } = await app.configureCodingProject('codex', undefined, '-lsp-viewer');
   await mkdir(path.join(cwd, 'src'), { recursive: true });
   await mkdir(path.join(cwd, 'node_modules'), { recursive: true });
@@ -450,9 +453,8 @@ test('LSP: the file viewer marks type errors once the user checks types', async 
     });
 
     await reference.click();
-    // The side panel is narrow, so the viewer shows the code without the tree.
+    // Assert the diagnostics controls independently of the pane's responsive layout.
     await expect(page.getByTestId('code-viewer')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Back to file tree' })).toBeVisible();
     const checkTypes = page.getByTestId('check-types');
     await expect(checkTypes).toBeVisible({ timeout: 15_000 });
     await checkTypes.click();
@@ -465,7 +467,7 @@ test('LSP: the file viewer marks type errors once the user checks types', async 
       "Type 'number' is not assignable to type 'string'."
     );
     await page.screenshot({
-      path: '/private/tmp/claude-501/-Users-zhvala-SourceCode-zclaudia/80655315-71e9-4cc4-b5c1-aa9ab2f3b067/scratchpad/viewer-diagnostics.png',
+      path: testInfo.outputPath('viewer-diagnostics.png'),
     });
     // The viewer's lease keeps the server running.
     const overview = await app.api('/api/language-servers');

@@ -23,11 +23,14 @@ for (const runtime of ['claude', 'codex', 'cursor']) {
     await app.stop();
     const manifestPath = path.join(bundle, 'builtin-plugins', runtime, 'plugin.json');
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-    manifest.version = '0.1.1';
+    const versionParts = manifest.version.split('.').map(Number);
+    versionParts[2] += 1;
+    const upgradedVersion = versionParts.join('.');
+    manifest.version = upgradedVersion;
     await writeFile(manifestPath, JSON.stringify(manifest));
     await app.start();
     expect((await app.api('/api/plugins')).find((p: any) => p.id === manifest.id)).toMatchObject({
-      version: '0.1.1',
+      version: upgradedVersion,
       status: 'inactive',
       enabled: false,
       source: 'builtin',
@@ -43,13 +46,13 @@ for (const runtime of ['claude', 'codex', 'cursor']) {
         runtimeType: runtime,
         systemPrompt: 'Retain on upgrade',
         model: 'custom-model',
-        llmProfileId: '',
+        llmProfileId: null,
       });
     };
     await assertRetained();
     await app.api(`/api/plugins/com.zclaudia.${runtime}/activate`, { method: 'POST' });
     expect((await app.api('/api/plugins')).find((p: any) => p.id === manifest.id)).toMatchObject({
-      version: '0.1.1',
+      version: upgradedVersion,
       status: 'active',
       enabled: true,
     });

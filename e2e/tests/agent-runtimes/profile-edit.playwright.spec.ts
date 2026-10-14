@@ -67,7 +67,7 @@ for (const runtime of ['claude', 'codex', 'cursor']) {
       description,
       runtimeType: runtime,
       cliPath,
-      llmProfileId: '',
+      llmProfileId: null,
       model: '',
     });
     expect(

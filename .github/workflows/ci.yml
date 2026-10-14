@@ -38,6 +38,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           install: 'true'
+          ripgrep: 'true'
       # `pnpm -r` builds plugins/agents/* in topological order before
       # shared/server/desktop, so no separate plugins:build step is needed.
       - run: pnpm -r run build

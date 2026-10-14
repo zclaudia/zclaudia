@@ -27,14 +27,12 @@ export async function runLiveConcurrencyProbe(
   const probe = await installLiveMcpProbe(app);
   const markerA = `E2E_MCP_${primary.session.id}`;
   const markerB = `E2E_MCP_${peer.session.id}`;
-  const requiresApproval = options.peerRuntime !== 'cursor';
-  if (requiresApproval)
-    await app.api(`/api/projects/${peer.project.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        agentPermissionOverride: { escalateAlways: ['Bash'], aiReview: { enabled: false } },
-      }),
-    });
+  await app.api(`/api/projects/${peer.project.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      agentPermissionOverride: { escalateAlways: ['Bash'], aiReview: { enabled: false } },
+    }),
+  });
   const scriptPath = path.join(peer.cwd, 'concurrency-probe.mjs');
   const script = `import {existsSync,writeFileSync} from 'node:fs';
 let tick=0;
@@ -105,14 +103,13 @@ const deadline=setTimeout(()=>process.exit(2),${options.turnTimeoutMs + 30000});
             peerError = error;
           }
         );
-        if (requiresApproval) {
-          await expect.poll(() => observedApproval).toBe(true);
-          expect(await readTick()).toBe('');
-        } else {
-          await expect.poll(readTick).not.toBe('');
-          const before = await readTick();
-          await expect.poll(readTick).not.toBe(before);
-        }
+        await expect
+          .poll(() => {
+            if (peerError) throw peerError;
+            return observedApproval;
+          })
+          .toBe(true);
+        expect(await readTick()).toBe('');
         expect((await app.api(`/api/sessions/${primary.session.id}/run-state`)).isRunning).toBe(
           true
         );
@@ -125,14 +122,12 @@ const deadline=setTimeout(()=>process.exit(2),${options.turnTimeoutMs + 30000});
       peerRuntime: options.peerRuntime,
       overlapped: true,
       cancellation,
-      approvalIsolation: requiresApproval ? 'pending' : 'not-supported-by-peer',
+      approvalIsolation: 'pending',
     };
-    if (requiresApproval) {
-      await expect(peerPage.getByRole('button', { name: 'Allow', exact: true })).toBeVisible();
-      expect(await readTick()).toBe('');
-      expect((await app.api(`/api/sessions/${peer.session.id}/run-state`)).isRunning).toBe(true);
-      evidence.concurrency.approvalIsolation = 'pending-survived-other-session-cancel';
-    }
+    await expect(peerPage.getByRole('button', { name: 'Allow', exact: true })).toBeVisible();
+    expect(await readTick()).toBe('');
+    expect((await app.api(`/api/sessions/${peer.session.id}/run-state`)).isRunning).toBe(true);
+    evidence.concurrency.approvalIsolation = 'pending-survived-other-session-cancel';
     releaseApproval(true);
     await expect.poll(readTick).not.toBe('');
     const previousTick = await readTick();

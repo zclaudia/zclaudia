@@ -7,13 +7,18 @@ import {
   sendCodingMessage,
 } from '../../helpers/agent-runtime-harness';
 
-test('E06: Cursor exposes supported modes without host per-tool approval controls', async ({
+test('E06: Cursor ACP modes preserve read-only turns and gate tool effects through host approval', async ({
   app,
   page,
 }) => {
   const { project, session, cwd } = await app.configureCodingProject('cursor');
+  await app.api(`/api/projects/${project.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      agentPermissionOverride: { escalateAlways: ['Bash'], aiReview: { enabled: false } },
+    }),
+  });
   await openCodingSession(page, app, project, session);
-  await expect(page.getByText('CLI permissions', { exact: true })).toBeVisible();
   const original = await readFile(path.join(cwd, 'add.mjs'), 'utf8');
   for (const mode of ['plan', 'ask']) {
     await page.getByRole('button', { name: 'Agent mode', exact: true }).click();
@@ -31,36 +36,53 @@ test('E06: Cursor exposes supported modes without host per-tool approval control
     expect((await app.audit()).filter(event => event.cwd).at(-1)).toMatchObject({
       runtime: 'cursor',
       mode,
-      yolo: false,
-      autoReview: false,
     });
     await expect(page.getByRole('button', { name: 'Allow', exact: true })).toHaveCount(0);
   }
   await page.getByRole('button', { name: 'Agent mode', exact: true }).click();
   await page.getByRole('option', { name: /^Default/ }).click();
-  await sendCodingMessage(page, 'Fix addition in default mode.');
+  await sendCodingMessage(page, 'E2E_PERMISSION Fix addition in default mode.');
+  const allow = page.getByRole('button', { name: 'Allow', exact: true });
+  await expect(allow).toBeVisible();
+  expect(await readFile(path.join(cwd, 'add.mjs'), 'utf8')).toBe(original);
+  await allow.click();
   await expect(page.getByText('E2E_CURSOR_CODING_COMPLETE', { exact: true })).toBeVisible();
-  // Default is supervised: Cursor's classifier gates tool calls, nothing is force-allowed.
+  // ACP default mode uses the host's per-tool approval callback.
   expect((await app.audit()).filter(event => event.cwd).at(-1)).toMatchObject({
     runtime: 'cursor',
-    mode: 'default',
-    yolo: false,
-    autoReview: true,
+    mode: 'agent',
   });
+
+  expect((await app.audit()).find(event => event.permissionOutcome)?.permissionOutcome).toEqual({
+    outcome: 'selected',
+    optionId: 'allow-once',
+  });
+  await expect
+    .poll(async () => (await app.api(`/api/sessions/${session.id}/run-state`)).isRunning)
+    .toBe(false);
 
   const runsBeforeBypass = (await app.audit()).filter(event => event.cwd).length;
   await page.getByRole('button', { name: 'Agent mode', exact: true }).click();
   await page.getByRole('option', { name: /^Bypass/ }).click();
-  await sendCodingMessage(page, 'Fix addition in bypass mode.');
+  await sendCodingMessage(page, 'E2E_PERMISSION Fix addition in bypass mode.');
   // The default-mode turn already printed E2E_CURSOR_CODING_COMPLETE, so that
   // marker is on screen before this turn even starts — wait on the audit.
   await expect
     .poll(async () => (await app.audit()).filter(event => event.cwd).length)
     .toBe(runsBeforeBypass + 1);
-  // Force-allow is reachable only through the explicit bypass mode.
+  await expect
+    .poll(async () => (await app.audit()).filter(event => event.permissionOutcome).length)
+    .toBe(2);
+  await expect(page.getByRole('button', { name: 'Allow', exact: true })).toHaveCount(0);
+  // ACP bypass auto-selects a one-shot approval, without a host prompt.
   expect((await app.audit()).filter(event => event.cwd).at(-1)).toMatchObject({
     runtime: 'cursor',
-    yolo: true,
-    autoReview: false,
+    mode: 'agent',
+  });
+  expect(
+    (await app.audit()).filter(event => event.permissionOutcome).at(-1)?.permissionOutcome
+  ).toEqual({
+    outcome: 'selected',
+    optionId: 'allow-once',
   });
 });

@@ -32,6 +32,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           install: 'true'
+          ripgrep: 'true'
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm plugins:check && pnpm plugins:test
       - name: Portable production dependency packaging

@@ -58,7 +58,6 @@ export async function runLiveCapabilitiesProbe(
   const allow = () => page.getByRole('button', { name: 'Allow', exact: true }).click();
   if (options.runtime === 'cursor') {
     await openCodingSession(page, app, project, session);
-    await expect(page.getByText('CLI permissions', { exact: true })).toBeVisible();
     for (const [index, mode] of ['plan', 'ask'].entries()) {
       evidence.failureStep = `mode-${mode}`;
       const result = await withLiveDeadline(

@@ -1,5 +1,5 @@
 name: Setup toolchain
-description: pnpm + Node from .node-version, with optional Rust toolchain/cache and a frozen dependency install.
+description: pnpm + Node from .node-version, with optional ripgrep, Rust toolchain/cache, and a frozen dependency install.
 
 inputs:
   rust:
@@ -7,6 +7,9 @@ inputs:
     default: 'false'
   install:
     description: Run `pnpm install --frozen-lockfile`.
+    default: 'false'
+  ripgrep:
+    description: Install ripgrep for Linux search tests and runtime fixtures.
     default: 'false'
 
 runs:
@@ -20,6 +23,14 @@ runs:
       with:
         node-version-file: .node-version
         cache: pnpm
+
+    - name: Install ripgrep
+      if: inputs.ripgrep == 'true'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ripgrep
+        rg --version
 
     - if: inputs.rust == 'true'
       uses: dtolnay/rust-toolchain@stable

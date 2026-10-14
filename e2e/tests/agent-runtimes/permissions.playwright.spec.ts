@@ -7,7 +7,7 @@ import {
   sendCodingMessage,
 } from '../../helpers/agent-runtime-harness';
 
-for (const runtime of ['claude', 'codex']) {
+for (const runtime of ['claude', 'codex', 'cursor']) {
   for (const decision of ['allow', 'deny']) {
     test(`E06: ${runtime} ${decision} approval controls the actual CLI side effect`, async ({
       app,

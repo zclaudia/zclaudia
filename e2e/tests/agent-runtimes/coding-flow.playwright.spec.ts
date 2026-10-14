@@ -27,7 +27,11 @@ for (const runtime of ['cursor', 'codex', 'claude']) {
       .split('\n')
       .map(line => JSON.parse(line));
     expect(audit[0]).toMatchObject({ runtime, cwd });
-    expect(audit.every(event => event.model === undefined)).toBe(true);
+    // The CLI can echo its discovered default model on later turns. Assert
+    // that it receives no unrelated model from the host's LLM profiles.
+    expect(audit.every(event => event.model === undefined || event.model === 'fixture-model')).toBe(
+      true
+    );
     expect(audit.some(event => event.testExitCode === 0)).toBe(true);
     await page.reload();
     await page.getByText(project.name, { exact: true }).click();
