@@ -30,6 +30,28 @@ type SetupPath = 'choose' | 'wsl' | 'gateway' | 'manual';
 
 const DEFAULT_PORT = 3100;
 
+/** Interval/timeout handle — DOM timers share one id pool. */
+type TimerId = ReturnType<typeof setTimeout>;
+
+/**
+ * Cancel a tracked connection timer (interval or timeout) and drop it from its
+ * registry.
+ */
+function clearTrackedTimer(registry: Set<TimerId>, id: TimerId) {
+  clearTimeout(id);
+  clearInterval(id);
+  registry.delete(id);
+}
+
+/** Cancel every timer tracked in the registry (used on retry and unmount). */
+function clearTimerRegistry(registry: Set<TimerId>) {
+  registry.forEach(id => {
+    clearTimeout(id);
+    clearInterval(id);
+  });
+  registry.clear();
+}
+
 /** Spinner SVG used in buttons */
 function Spinner({ className = 'w-4 h-4' }: { className?: string }) {
   return (
@@ -75,10 +97,24 @@ export function WindowsSetup() {
   const [gatewayConnecting, setGatewayConnecting] = useState(false);
   const [gatewayError, setGatewayError] = useState<string | null>(null);
 
+  // Pending connection timers (polling intervals + timeouts), tracked so they
+  // can be cancelled when a new attempt supersedes them or on unmount.
+  const connectTimersRef = useRef<Set<TimerId>>(new Set());
+  const gatewayTimersRef = useRef<Set<TimerId>>(new Set());
+
   // Run WSL discovery on mount
   useEffect(() => {
     runDiscovery();
   }, [runDiscovery]);
+
+  // Stop connection polling when the setup screen unmounts so pending timers
+  // no longer fire or update stores behind a gone component.
+  useEffect(() => {
+    return () => {
+      clearTimerRegistry(connectTimersRef.current);
+      clearTimerRegistry(gatewayTimersRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (directGatewayUrl && directGatewaySecret) {
@@ -128,6 +164,9 @@ export function WindowsSetup() {
         setActiveServer(initialLocalBackendId);
         connectServer(initialLocalBackendId);
 
+        // A new attempt supersedes any pending polling from a previous one.
+        clearTimerRegistry(connectTimersRef.current);
+
         // Poll for connection
         let attempts = 0;
         await new Promise<void>((resolve, reject) => {
@@ -140,14 +179,15 @@ export function WindowsSetup() {
               ) || LEGACY_LOCAL_SERVER_ID;
             const backendState = useRecoveryStore.getState().backends[localBackendId];
             if (backendState?.status === 'ready') {
+              clearTrackedTimer(connectTimersRef.current, interval);
               useServerStore.getState().setActiveServer(localBackendId);
-              clearInterval(interval);
               resolve();
             } else if (attempts >= 20) {
-              clearInterval(interval);
+              clearTrackedTimer(connectTimersRef.current, interval);
               reject(new Error('Connection timed out'));
             }
           }, 500);
+          connectTimersRef.current.add(interval);
         });
       } catch (err) {
         setConnectError(err instanceof Error ? err.message : 'Connection failed');
@@ -169,20 +209,27 @@ export function WindowsSetup() {
     setGatewayConnecting(true);
     setDirectGatewayConfig(url, secret);
 
+    // A new attempt supersedes any pending polling from a previous one.
+    clearTimerRegistry(gatewayTimersRef.current);
+
     const checkInterval = setInterval(() => {
       if (useRecoveryStore.getState().transport.status === 'connected') {
         setGatewayConnecting(false);
-        clearInterval(checkInterval);
+        // Connected: stop polling and cancel the pending 15s timeout.
+        clearTimerRegistry(gatewayTimersRef.current);
       }
     }, 500);
+    gatewayTimersRef.current.add(checkInterval);
 
-    setTimeout(() => {
-      clearInterval(checkInterval);
+    const timeout = setTimeout(() => {
+      // Timed out: stop polling (the timeout itself has already fired).
+      clearTimerRegistry(gatewayTimersRef.current);
       if (useRecoveryStore.getState().transport.status !== 'connected') {
         setGatewayConnecting(false);
         setGatewayError('Connection timed out. Please check the URL and secret.');
       }
     }, 15000);
+    gatewayTimersRef.current.add(timeout);
   }, [gatewayUrl, gatewaySecret, setDirectGatewayConfig]);
 
   const handleBackendSelect = useCallback(
