@@ -37,7 +37,11 @@ import {
 } from '../../services/api';
 import type { McpOAuthStartResult } from '../../services/api';
 import { McpOAuthLoginModal } from './McpOAuthLoginModal';
+import { McpOAuthSection } from './mcp-server-editor/McpOAuthSection';
+import { McpTrustPolicySection } from './mcp-server-editor/McpTrustPolicySection';
 import { EditorSection, FieldLabel } from './ui/EditorSection';
+import { KeyValuePairsEditor } from './ui/KeyValuePairsEditor';
+import type { KeyValuePair } from './ui/KeyValuePairsEditor';
 import { ProfileHeader } from './ui/ProfileHeader';
 import type { DetailBadge } from './ui/DetailHeader';
 import type { ActionsMenuAction } from './ui/ActionsMenu';
@@ -55,13 +59,6 @@ import type {
 } from '@zclaudia/shared/core/mcp';
 
 const PROVIDER_OPTIONS = [{ value: PI_AGENT_RUNTIME, label: 'Pi' }];
-
-const RISK_ACTION_OPTIONS: Array<{ value: McpRiskAction | ''; label: string }> = [
-  { value: '', label: 'Use default' },
-  { value: 'auto-approve', label: 'Auto approve' },
-  { value: 'ask', label: 'Ask' },
-  { value: 'deny', label: 'Deny' },
-];
 
 export interface McpServerEditorProps {
   backendId: string;
@@ -106,10 +103,10 @@ export function McpServerEditor({
   const [formCommand, setFormCommand] = useState(server?.command ?? '');
   const [formUrl, setFormUrl] = useState(server?.url || '');
   const [formArgs, setFormArgs] = useState(server?.args?.join(' ') || '');
-  const [formEnvPairs, setFormEnvPairs] = useState<{ key: string; value: string }[]>(
+  const [formEnvPairs, setFormEnvPairs] = useState<KeyValuePair[]>(
     server?.env ? Object.entries(server.env).map(([key, value]) => ({ key, value })) : []
   );
-  const [formHeaderPairs, setFormHeaderPairs] = useState<{ key: string; value: string }[]>(
+  const [formHeaderPairs, setFormHeaderPairs] = useState<KeyValuePair[]>(
     server?.headers ? Object.entries(server.headers).map(([key, value]) => ({ key, value })) : []
   );
   const [formHeadersHelper, setFormHeadersHelper] = useState(server?.headersHelper || '');
@@ -640,131 +637,25 @@ export function McpServerEditor({
               </FormField>
             )}
 
-            {/* Env vars / headers */}
+            {/* Env vars / headers — same pair-list markup, one per transport. */}
             {formTransport === 'stdio' ? (
-              <div>
-                <div className="mb-1 flex items-center justify-between">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Environment Variables
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setFormEnvPairs([...formEnvPairs, { key: '', value: '' }])}
-                    className="-m-1.5 p-1.5 text-xs text-primary transition-colors hover:text-primary/80 md:m-0 md:p-0"
-                  >
-                    + Add
-                  </button>
-                </div>
-                {formEnvPairs.map((pair, i) => (
-                  <div key={i} className="mb-1 flex gap-2">
-                    <input
-                      type="text"
-                      value={pair.key}
-                      onChange={e => {
-                        const updated = [...formEnvPairs];
-                        updated[i] = { ...pair, key: e.target.value };
-                        setFormEnvPairs(updated);
-                      }}
-                      onBlur={autosave.flush}
-                      placeholder="KEY"
-                      className={`${FIELD_CLASS} flex-1 font-mono text-xs`}
-                    />
-                    <input
-                      type="text"
-                      value={pair.value}
-                      onChange={e => {
-                        const updated = [...formEnvPairs];
-                        updated[i] = { ...pair, value: e.target.value };
-                        setFormEnvPairs(updated);
-                      }}
-                      onBlur={autosave.flush}
-                      placeholder="value"
-                      className={`${FIELD_CLASS} flex-1 font-mono text-xs`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setFormEnvPairs(formEnvPairs.filter((_, j) => j !== i))}
-                      className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive max-md:p-2"
-                      aria-label="Remove environment variable"
-                    >
-                      <svg
-                        className="h-3.5 w-3.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
+              <KeyValuePairsEditor
+                label="Environment Variables"
+                pairs={formEnvPairs}
+                onChange={setFormEnvPairs}
+                keyPlaceholder="KEY"
+                removeLabel="Remove environment variable"
+                onFlush={autosave.flush}
+              />
             ) : (
-              <div>
-                <div className="mb-1 flex items-center justify-between">
-                  <label className="text-xs font-medium text-muted-foreground">HTTP Headers</label>
-                  <button
-                    type="button"
-                    onClick={() => setFormHeaderPairs([...formHeaderPairs, { key: '', value: '' }])}
-                    className="-m-1.5 p-1.5 text-xs text-primary transition-colors hover:text-primary/80 md:m-0 md:p-0"
-                  >
-                    + Add
-                  </button>
-                </div>
-                {formHeaderPairs.map((pair, i) => (
-                  <div key={i} className="mb-1 flex gap-2">
-                    <input
-                      type="text"
-                      value={pair.key}
-                      onChange={e => {
-                        const updated = [...formHeaderPairs];
-                        updated[i] = { ...pair, key: e.target.value };
-                        setFormHeaderPairs(updated);
-                      }}
-                      onBlur={autosave.flush}
-                      placeholder="Header"
-                      className={`${FIELD_CLASS} flex-1 font-mono text-xs`}
-                    />
-                    <input
-                      type="text"
-                      value={pair.value}
-                      onChange={e => {
-                        const updated = [...formHeaderPairs];
-                        updated[i] = { ...pair, value: e.target.value };
-                        setFormHeaderPairs(updated);
-                      }}
-                      onBlur={autosave.flush}
-                      placeholder="value"
-                      className={`${FIELD_CLASS} flex-1 font-mono text-xs`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setFormHeaderPairs(formHeaderPairs.filter((_, j) => j !== i))}
-                      className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive max-md:p-2"
-                      aria-label="Remove header"
-                    >
-                      <svg
-                        className="h-3.5 w-3.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
+              <KeyValuePairsEditor
+                label="HTTP Headers"
+                pairs={formHeaderPairs}
+                onChange={setFormHeaderPairs}
+                keyPlaceholder="Header"
+                removeLabel="Remove header"
+                onFlush={autosave.flush}
+              />
             )}
 
             {formTransport !== 'stdio' && (
@@ -788,185 +679,37 @@ export function McpServerEditor({
           </EditorSection>
 
           {formTransport !== 'stdio' && (
-            <EditorSection title="Authentication">
-              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground max-md:py-2">
-                <input
-                  type="checkbox"
-                  aria-label="Enable OAuth"
-                  checked={formOAuthEnabled}
-                  onChange={e => setFormOAuthEnabled(e.target.checked)}
-                  className="rounded border-border bg-secondary/50"
-                />
-                Enable OAuth
-              </label>
-              {formOAuthEnabled && (
-                <div className="grid gap-2 md:grid-cols-2">
-                  <div className="md:col-span-2">
-                    <FormField label="Metadata URL">
-                      {f => (
-                        <Input
-                          {...f}
-                          type="text"
-                          value={formOAuthMetadataUrl}
-                          onChange={e => setFormOAuthMetadataUrl(e.target.value)}
-                          onBlur={autosave.flush}
-                          placeholder="https://auth.example.com/.well-known/…"
-                          className="text-xs font-mono"
-                        />
-                      )}
-                    </FormField>
-                  </div>
-                  <FormField label="Authorization Endpoint">
-                    {f => (
-                      <Input
-                        {...f}
-                        type="text"
-                        value={formOAuthAuthorizationEndpoint}
-                        onChange={e => setFormOAuthAuthorizationEndpoint(e.target.value)}
-                        onBlur={autosave.flush}
-                        placeholder="https://auth.example.com/oauth/authorize"
-                        className="text-xs font-mono"
-                      />
-                    )}
-                  </FormField>
-                  <FormField label="Token Endpoint">
-                    {f => (
-                      <Input
-                        {...f}
-                        type="text"
-                        value={formOAuthTokenEndpoint}
-                        onChange={e => setFormOAuthTokenEndpoint(e.target.value)}
-                        onBlur={autosave.flush}
-                        placeholder="https://auth.example.com/oauth/token"
-                        className="text-xs font-mono"
-                      />
-                    )}
-                  </FormField>
-                  <FormField label="Device Authorization Endpoint">
-                    {f => (
-                      <Input
-                        {...f}
-                        type="text"
-                        value={formOAuthDeviceEndpoint}
-                        onChange={e => setFormOAuthDeviceEndpoint(e.target.value)}
-                        onBlur={autosave.flush}
-                        placeholder="https://auth.example.com/oauth/device"
-                        className="text-xs font-mono"
-                      />
-                    )}
-                  </FormField>
-                  <FormField label="Client ID">
-                    {f => (
-                      <Input
-                        {...f}
-                        type="text"
-                        value={formOAuthClientId}
-                        onChange={e => setFormOAuthClientId(e.target.value)}
-                        onBlur={autosave.flush}
-                        placeholder="zclaudia-client-id"
-                        className="text-xs font-mono"
-                      />
-                    )}
-                  </FormField>
-                  <FormField label="Client Secret">
-                    {f => (
-                      <Input
-                        {...f}
-                        type="password"
-                        value={formOAuthClientSecret}
-                        onChange={e => setFormOAuthClientSecret(e.target.value)}
-                        onBlur={autosave.flush}
-                        placeholder="client secret (optional)"
-                        className="text-xs font-mono"
-                      />
-                    )}
-                  </FormField>
-                  <FormField label="Scopes">
-                    {f => (
-                      <Input
-                        {...f}
-                        type="text"
-                        value={formOAuthScopes}
-                        onChange={e => setFormOAuthScopes(e.target.value)}
-                        onBlur={autosave.flush}
-                        placeholder="repo read:user"
-                        className="text-xs font-mono"
-                      />
-                    )}
-                  </FormField>
-                </div>
-              )}
-            </EditorSection>
+            <McpOAuthSection
+              enabled={formOAuthEnabled}
+              onEnabledChange={setFormOAuthEnabled}
+              metadataUrl={formOAuthMetadataUrl}
+              onMetadataUrlChange={setFormOAuthMetadataUrl}
+              authorizationEndpoint={formOAuthAuthorizationEndpoint}
+              onAuthorizationEndpointChange={setFormOAuthAuthorizationEndpoint}
+              tokenEndpoint={formOAuthTokenEndpoint}
+              onTokenEndpointChange={setFormOAuthTokenEndpoint}
+              deviceAuthorizationEndpoint={formOAuthDeviceEndpoint}
+              onDeviceAuthorizationEndpointChange={setFormOAuthDeviceEndpoint}
+              clientId={formOAuthClientId}
+              onClientIdChange={setFormOAuthClientId}
+              clientSecret={formOAuthClientSecret}
+              onClientSecretChange={setFormOAuthClientSecret}
+              scopes={formOAuthScopes}
+              onScopesChange={setFormOAuthScopes}
+              onFlush={autosave.flush}
+            />
           )}
 
-          <EditorSection
-            title="Trust Policy"
-            description="Controls how self-declared MCP read-only hints and risk levels affect permission prompts."
-          >
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="mcp-trust-level">Trust Level</FieldLabel>
-                <select
-                  id="mcp-trust-level"
-                  aria-label="Trust Level"
-                  value={formTrustLevel}
-                  onChange={e => setFormTrustLevel(e.target.value as McpServerTrustLevel)}
-                  className={FIELD_CLASS}
-                >
-                  <option value="untrusted">Untrusted</option>
-                  <option value="trusted-readonly">Trusted read-only</option>
-                  <option value="trusted">Trusted</option>
-                </select>
-              </div>
-              <div>
-                <FieldLabel htmlFor="mcp-default-risk-action">Default risk action</FieldLabel>
-                <select
-                  id="mcp-default-risk-action"
-                  aria-label="Default risk action"
-                  value={formDefaultRiskAction}
-                  onChange={e => setFormDefaultRiskAction(e.target.value as McpRiskAction)}
-                  className={FIELD_CLASS}
-                >
-                  {RISK_ACTION_OPTIONS.filter(opt => opt.value).map(opt => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground max-md:py-2">
-              <input
-                type="checkbox"
-                checked={formTrustReadOnlyHint}
-                onChange={e => setFormTrustReadOnlyHint(e.target.checked)}
-                className="rounded border-border bg-secondary/50"
-              />
-              Trust read-only hints
-            </label>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-              {(['low', 'medium', 'high'] as const).map(level => (
-                <div key={level}>
-                  <FieldLabel htmlFor={`mcp-${level}-risk-action`}>
-                    {`${level[0].toUpperCase()}${level.slice(1)}`} risk action
-                  </FieldLabel>
-                  <select
-                    id={`mcp-${level}-risk-action`}
-                    aria-label={`${level[0].toUpperCase()}${level.slice(1)} risk action`}
-                    value={formRiskActions[level] ?? ''}
-                    onChange={e => setRiskAction(level, e.target.value as McpRiskAction | '')}
-                    className={`${FIELD_CLASS} text-xs`}
-                  >
-                    {RISK_ACTION_OPTIONS.map(opt => (
-                      <option key={opt.value || 'default'} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-            </div>
-          </EditorSection>
+          <McpTrustPolicySection
+            trustLevel={formTrustLevel}
+            onTrustLevelChange={setFormTrustLevel}
+            trustReadOnlyHint={formTrustReadOnlyHint}
+            onTrustReadOnlyHintChange={setFormTrustReadOnlyHint}
+            defaultRiskAction={formDefaultRiskAction}
+            onDefaultRiskActionChange={setFormDefaultRiskAction}
+            riskActions={formRiskActions}
+            onRiskActionChange={setRiskAction}
+          />
 
           <EditorSection title="Provider Scope" description="Empty = all providers.">
             <div className="flex flex-wrap gap-2">
