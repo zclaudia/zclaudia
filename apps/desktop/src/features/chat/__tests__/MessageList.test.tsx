@@ -264,7 +264,7 @@ describe('extractThinking', () => {
 
 // ── MessageList component tests ────────────────────────────────────────────────
 
-let MessageList: typeof import('../MessageList').MessageList;
+let MessageList: typeof import('../message-list/MessageList').MessageList;
 let formatMessageTimestamp: typeof import('../messageTimestamp').formatMessageTimestamp;
 
 beforeEach(async () => {
@@ -284,7 +284,7 @@ beforeEach(async () => {
     return terminalId;
   });
   mockWaitForReady.mockResolvedValue(true);
-  const mod = await import('../MessageList');
+  const mod = await import('../message-list/MessageList');
   const timestampMod = await import('../messageTimestamp');
   MessageList = mod.MessageList;
   formatMessageTimestamp = timestampMod.formatMessageTimestamp;

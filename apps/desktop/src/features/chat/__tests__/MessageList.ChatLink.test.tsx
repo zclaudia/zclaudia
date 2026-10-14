@@ -105,7 +105,7 @@ vi.mock('../FileReference', () => ({
 
 // ── Import after mocks ────────────────────────────────────────────────────────
 
-import { MessageList } from '../MessageList';
+import { MessageList } from '../message-list/MessageList';
 
 function makeMessage(
   overrides: Partial<MessageWithToolCalls> & { id: string; role: 'user' | 'assistant' | 'system' }

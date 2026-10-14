@@ -3,7 +3,11 @@ import { useConnection } from '../../contexts/ConnectionContext';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { openToolInWorkspace } from '../../actions/workspaceActions';
 import { isPanelAvailable } from '../../actions/openPanel';
-import { useChatActionsOptional } from '../chat';
+// Import the chat actions hook from the chat feature's narrow api.ts entry,
+// not the chat barrel: the barrel re-exports SessionChatLayout whose module
+// graph reaches back into the chat render tree (MessageList -> ../browser),
+// which would close a chat⇄browser runtime import cycle.
+import { useChatActionsOptional } from '../chat/api';
 
 const HTTP_RE = /^https?:\/\//i;
 
