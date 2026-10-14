@@ -1,14 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import type { SkillRef } from '@zclaudia/shared/core/skills';
+import { buildSkillCatalog, resolveSkillExecutionPolicy } from '../skill-policy.js';
+import { buildSkillMetaTools } from '../skill-meta-tools.js';
 import {
   buildActiveSkillContext,
-  buildSkillCatalog,
-  buildSkillMetaTools,
   createSkillRuntimeState as createSkillRuntimeStateWithPort,
   executePreparedDirectSkillInvocation,
   prepareDirectSkillInvocation,
-  resolveSkillExecutionPolicy,
   type RuntimeDiscoveredSkill,
-  type SkillRef,
 } from '../skills.js';
 
 const { loadDiscoveredSkillContentMock, recordSkillUsageMock } = vi.hoisted(() => ({
@@ -16,10 +15,7 @@ const { loadDiscoveredSkillContentMock, recordSkillUsageMock } = vi.hoisted(() =
   recordSkillUsageMock: vi.fn(),
 }));
 
-function createSkillRuntimeState(
-  skills: RuntimeDiscoveredSkill[],
-  pinned: SkillRef[] = []
-) {
+function createSkillRuntimeState(skills: RuntimeDiscoveredSkill[], pinned: SkillRef[] = []) {
   return createSkillRuntimeStateWithPort(skills, pinned, {
     loadContent: loadDiscoveredSkillContentMock,
     recordUsage: recordSkillUsageMock,

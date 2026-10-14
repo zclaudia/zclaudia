@@ -57,18 +57,20 @@ export {
 } from './external-tools.js';
 export {
   buildActiveSkillContext,
-  buildSkillCatalog,
-  buildSkillMetaTools,
   createSkillRuntimeState,
-  resolveSkillExecutionPolicy,
-  skillRefKey,
   type SkillExecutionDependencies,
   type SkillExecutionMode,
-  type SkillExecutionPolicy,
   type RuntimeDiscoveredSkill,
   type SkillContentPort,
   type SkillRuntimeState,
 } from './skills.js';
+export {
+  buildSkillCatalog,
+  resolveSkillExecutionPolicy,
+  skillRefKey,
+  type SkillExecutionPolicy,
+} from './skill-policy.js';
+export { buildSkillMetaTools } from './skill-meta-tools.js';
 // Enumerated explicitly (no `export *`) so a growing agent-loop surface can
 // never silently collide with the named exports above.
 export {

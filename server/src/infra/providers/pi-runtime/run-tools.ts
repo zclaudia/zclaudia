@@ -11,7 +11,9 @@ import {
   createConcreteMcpTool,
   externalToolKey,
 } from './external-tools.js';
-import { buildActiveSkillContext, buildSkillCatalog, buildSkillMetaTools } from './skills.js';
+import { buildSkillCatalog } from './skill-policy.js';
+import { buildSkillMetaTools } from './skill-meta-tools.js';
+import { buildActiveSkillContext } from './skills.js';
 import { isBashBackgroundConvertible } from './bash-tool.js';
 import { buildTools } from './tool-bridge.js';
 import { applyToolScheduler } from './tool-scheduler.js';

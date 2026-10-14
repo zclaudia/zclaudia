@@ -1,32 +1,27 @@
 import { randomUUID } from 'node:crypto';
-import { streamSimple } from '@earendil-works/pi-ai/compat';
-import {
-  Agent,
-  type AgentOptions,
-  type AgentTool,
-  type StreamFn,
-} from '@earendil-works/pi-agent-core';
+import type { AgentOptions, StreamFn } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
-import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
 import type {
   SkillSource,
   SkillRef,
   SkillExecutionMode as SharedSkillExecutionMode,
-  SkillExecutionOverride,
   SkillForkToolPolicy,
 } from '@zclaudia/shared/core/skills';
-import { ALL_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools';
+import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
 import type { TaskPort } from '../../../utils/task-port.js';
 import type { PermissionCallback } from '../message-types.js';
 import type { PiToolLookupPort } from '../types.js';
 import type { PlanModePort } from './plan-mode-port.js';
-import { buildModel } from './build-model.js';
-import { buildTools } from './tool-bridge.js';
-import { applyToolScheduler } from './tool-scheduler.js';
-import { agentToolParameters, textResult, type ToolContent } from './tool-common.js';
-import { wrapStreamFnWithToolSchemaCompat } from './tool-schema-compat.js';
+import { textResult, type ToolContent } from './tool-common.js';
+import {
+  isLoaded,
+  resolveSkillExecutionPolicy,
+  skillRefKey,
+  type SkillExecutionPolicy,
+} from './skill-policy.js';
+import { executeForkedSkill, resolveForkSkillToolNames } from './skill-fork.js';
 
 export type SkillExecutionMode = 'inline' | 'fork';
 
@@ -64,15 +59,6 @@ const EMPTY_SKILL_CONTENT_PORT: SkillContentPort = {
   loadContent: async () => null,
   recordUsage: () => undefined,
 };
-
-export interface SkillExecutionPolicy {
-  modes: SkillExecutionMode[];
-  defaultMode: SkillExecutionMode;
-  source: 'profile-override' | 'skill-metadata' | 'source-default' | 'heuristic' | 'override';
-  reason: string;
-  forkToolPolicy?: SkillForkToolPolicy;
-  diagnostics?: string[];
-}
 
 export interface SkillRuntimeState {
   discoverableSkills: RuntimeDiscoveredSkill[];
@@ -157,22 +143,10 @@ export interface SkillExecutionDependencies {
   abortSignal?: AbortSignal;
 }
 
-// Local variant of tool-common's jsonResult that also passes details through
-// (tool-common's returns empty details); textResult itself is shared.
-function jsonResult(value: Record<string, unknown>, details: Record<string, unknown> = {}) {
-  return textResult(JSON.stringify(value, null, 2), details);
-}
-
-export function skillRefKey(ref: SkillRef): string {
-  return `${ref.source}:${ref.id}`;
-}
-
-function isLoaded(state: SkillRuntimeState, ref: SkillRef): boolean {
-  const key = skillRefKey(ref);
-  return state.loadedSkills.some(loaded => skillRefKey(loaded) === key);
-}
-
-function findSkill(state: SkillRuntimeState, ref: SkillRef): RuntimeDiscoveredSkill | undefined {
+export function findSkill(
+  state: SkillRuntimeState,
+  ref: SkillRef
+): RuntimeDiscoveredSkill | undefined {
   return state.discoverableSkills.find(skill => skill.source === ref.source && skill.id === ref.id);
 }
 
@@ -180,7 +154,7 @@ function findSkillById(state: SkillRuntimeState, id: string): RuntimeDiscoveredS
   return state.discoverableSkills.find(skill => skill.id === id || skill.name === id);
 }
 
-function normalizeSkillRef(input: unknown): SkillRef | undefined {
+export function normalizeSkillRef(input: unknown): SkillRef | undefined {
   if (!input || typeof input !== 'object') return undefined;
   const row = input as Record<string, unknown>;
   if (
@@ -248,195 +222,6 @@ function substituteSkillArguments(
   return out;
 }
 
-const FORK_KEYWORDS = [
-  'review',
-  'audit',
-  'analyze',
-  'analyse',
-  'generate',
-  'investigate',
-  'search',
-  'summarize',
-  'summarise',
-  'report',
-];
-
-const INLINE_KEYWORDS = [
-  'guideline',
-  'convention',
-  'workflow',
-  'follow',
-  'use when',
-  'rule',
-  'standard',
-];
-
-function keywordMatch(skill: RuntimeDiscoveredSkill, keywords: string[]): string | undefined {
-  const haystack =
-    `${skill.id} ${skill.name} ${skill.description} ${skill.metadata?.whenToUse ?? ''}`.toLowerCase();
-  return keywords.find(keyword => haystack.includes(keyword));
-}
-
-export function resolveSkillExecutionPolicy(
-  skill: RuntimeDiscoveredSkill,
-  contentStats?: { estimatedTokens?: number; contentLength?: number },
-  agentProfile?: AgentProfileConfig
-): SkillExecutionPolicy {
-  const basePolicy = resolveBaseSkillExecutionPolicy(skill, contentStats);
-  const metadataPolicy = applySkillPolicyLayer(
-    basePolicy,
-    skill.execution,
-    'skill-metadata',
-    'Skill execution metadata from SKILL.md frontmatter.'
-  );
-  const override = findSkillExecutionOverride(agentProfile, skill);
-  return applySkillPolicyLayer(
-    metadataPolicy,
-    override,
-    'profile-override',
-    'Agent profile skillExecution override.'
-  );
-}
-
-function resolveBaseSkillExecutionPolicy(
-  skill: RuntimeDiscoveredSkill,
-  contentStats?: { estimatedTokens?: number; contentLength?: number }
-): SkillExecutionPolicy {
-  if (skill.source === 'plugin') {
-    return {
-      modes: ['fork'],
-      defaultMode: 'fork',
-      source: 'source-default',
-      reason: 'Plugin skills default to isolated fork execution in Phase 2A.',
-    };
-  }
-
-  const forkKeyword = keywordMatch(skill, FORK_KEYWORDS);
-  if (forkKeyword) {
-    return {
-      modes: ['inline', 'fork'],
-      defaultMode: 'fork',
-      source: 'heuristic',
-      reason: `Matched task-output keyword "${forkKeyword}".`,
-    };
-  }
-
-  const estimatedSize = contentStats?.estimatedTokens ?? contentStats?.contentLength;
-  if (estimatedSize !== undefined && estimatedSize > 4_000) {
-    return {
-      modes: ['inline', 'fork'],
-      defaultMode: 'fork',
-      source: 'heuristic',
-      reason: 'Skill content appears large enough to prefer isolated execution.',
-    };
-  }
-
-  const inlineKeyword = keywordMatch(skill, INLINE_KEYWORDS);
-  if (inlineKeyword) {
-    return {
-      modes: ['inline', 'fork'],
-      defaultMode: 'inline',
-      source: 'heuristic',
-      reason: `Matched behavior-guidance keyword "${inlineKeyword}".`,
-    };
-  }
-
-  if (skill.source === 'workspace') {
-    return {
-      modes: ['inline', 'fork'],
-      defaultMode: 'inline',
-      source: 'source-default',
-      reason:
-        'Workspace skills default to inline context unless they look like task/report workflows.',
-    };
-  }
-
-  return {
-    modes: ['inline', 'fork'],
-    defaultMode: 'fork',
-    source: 'heuristic',
-    reason: 'No strong guidance signal found; defaulting external skill to isolated execution.',
-  };
-}
-
-function findSkillExecutionOverride(
-  agentProfile: AgentProfileConfig | undefined,
-  skill: RuntimeDiscoveredSkill
-): SkillExecutionOverride | undefined {
-  return agentProfile?.skillExecution?.overrides?.find(
-    override => override.ref.source === skill.source && override.ref.id === skill.id
-  );
-}
-
-function applySkillPolicyLayer(
-  base: SkillExecutionPolicy,
-  layer:
-    | {
-        allowedModes?: readonly SharedSkillExecutionMode[];
-        defaultMode?: SharedSkillExecutionMode;
-        forkToolPolicy?: SkillForkToolPolicy;
-      }
-    | undefined,
-  source: SkillExecutionPolicy['source'],
-  reason: string
-): SkillExecutionPolicy {
-  if (!layer) return base;
-  const diagnostics = [...(base.diagnostics ?? [])];
-  const requestedModes =
-    layer.allowedModes && layer.allowedModes.length > 0 ? layer.allowedModes : base.modes;
-  let modes = requestedModes.filter(
-    (mode): mode is SkillExecutionMode =>
-      (mode === 'inline' || mode === 'fork') && base.modes.includes(mode)
-  );
-
-  if (modes.length !== requestedModes.length) {
-    diagnostics.push(`${source.replaceAll('-', '_')}_cannot_expand_modes`);
-  }
-  if (modes.length === 0) {
-    modes = [...base.modes];
-  }
-
-  let defaultMode = (
-    layer.defaultMode === 'inline' || layer.defaultMode === 'fork'
-      ? layer.defaultMode
-      : base.defaultMode
-  ) as SkillExecutionMode;
-  if (!modes.includes(defaultMode)) {
-    diagnostics.push('default_mode_not_allowed');
-    defaultMode = modes[0] ?? base.defaultMode;
-  }
-
-  return {
-    ...base,
-    modes,
-    defaultMode,
-    source,
-    reason,
-    ...(layer.forkToolPolicy ? { forkToolPolicy: layer.forkToolPolicy } : {}),
-    ...(diagnostics.length > 0 ? { diagnostics: [...new Set(diagnostics)] } : {}),
-  };
-}
-
-export function buildSkillCatalog(
-  state: SkillRuntimeState,
-  agentProfile?: AgentProfileConfig
-): string {
-  if (state.discoverableSkills.length === 0) return '';
-  const rows = state.discoverableSkills.map(skill => {
-    const loaded = isLoaded(state, { source: skill.source, id: skill.id }) ? ', loaded=true' : '';
-    const policy = resolveSkillExecutionPolicy(skill, undefined, agentProfile);
-    const whenToUse = skill.metadata?.whenToUse ? `; whenToUse=${skill.metadata.whenToUse}` : '';
-    const paths = skill.metadata?.paths?.length ? `; paths=${skill.metadata.paths.join('|')}` : '';
-    const args = skill.metadata?.argumentHint
-      ? `; args=${skill.metadata.argumentHint}`
-      : skill.metadata?.arguments?.length
-        ? `; args=${skill.metadata.arguments.join(' ')}`
-        : '';
-    return `- ${skill.source}/${skill.id}: ${skill.name} — ${skill.description || 'No description'}${whenToUse}${paths}${args}; defaultMode=${policy.defaultMode}, modes=${policy.modes.join('|')}, policySource=${policy.source}${loaded}`;
-  });
-  return `Discoverable skills:\n${rows.join('\n')}\nUse SearchSkills and InspectSkill before choosing a skill. Use LoadSkill for inline behavioral context and RunSkill for isolated task execution.`;
-}
-
 export function buildActiveSkillContext(state: SkillRuntimeState): string {
   const loaded = state.loadedSkills
     .map(ref => {
@@ -455,26 +240,6 @@ export function buildActiveSkillContext(state: SkillRuntimeState): string {
       [`<skill source="${ref.source}" id="${ref.id}">`, content.trim(), '</skill>'].join('\n')
     ),
   ].join('\n\n');
-}
-
-function skillSummary(
-  state: SkillRuntimeState,
-  skill: RuntimeDiscoveredSkill,
-  agentProfile?: AgentProfileConfig
-): Record<string, unknown> {
-  const ref: SkillRef = { source: skill.source, id: skill.id };
-  return {
-    ref,
-    id: skill.id,
-    name: skill.name,
-    description: skill.description,
-    source: skill.source,
-    eligible: skill.eligible,
-    ...(skill.requirements ? { requirements: skill.requirements } : {}),
-    ...(skill.metadata ? { metadata: skill.metadata } : {}),
-    loaded: isLoaded(state, ref),
-    executionPolicy: resolveSkillExecutionPolicy(skill, undefined, agentProfile),
-  };
 }
 
 type LoadSkillOutcome =
@@ -549,7 +314,7 @@ async function loadSkillStructured(
 }
 
 /** Model-facing LoadSkill result; the text contract is part of the tool API. */
-async function loadSkill(
+export async function loadSkill(
   state: SkillRuntimeState,
   ref: SkillRef,
   agentProfile?: AgentProfileConfig,
@@ -558,14 +323,18 @@ async function loadSkill(
   const outcome = await loadSkillStructured(state, ref, agentProfile, args);
   if (!outcome.ok) {
     if (outcome.error === 'policy_denied_inline') {
-      return jsonResult(
-        {
-          ok: false,
-          error: outcome.error,
-          ref: outcome.ref,
-          executionPolicy: outcome.executionPolicy,
-          message: outcome.message,
-        },
+      return textResult(
+        JSON.stringify(
+          {
+            ok: false,
+            error: outcome.error,
+            ref: outcome.ref,
+            executionPolicy: outcome.executionPolicy,
+            message: outcome.message,
+          },
+          null,
+          2
+        ),
         { ok: false, error: outcome.error, ref: outcome.ref }
       );
     }
@@ -593,221 +362,7 @@ async function loadSkill(
   );
 }
 
-const READ_ONLY_SKILL_TOOLS: ToolName[] = ['Read', 'Grep', 'Glob', 'LS'];
-const WEB_SKILL_TOOLS: ToolName[] = ['WebFetch', 'WebSearch'];
-const WORKSPACE_EDIT_SKILL_TOOLS: ToolName[] = ['Write', 'Edit'];
-const AGENT_DEFAULT_EXCLUDED_TOOLS = new Set<ToolName>([
-  'Agent',
-  'MCPTool',
-  'Monitor',
-  'TaskOutput',
-  'ToolSearch',
-  'AskUserQuestion',
-]);
-const ALL_TOOL_NAME_SET = new Set<string>(ALL_TOOL_NAMES);
-
-function isToolName(value: string): value is ToolName {
-  return ALL_TOOL_NAME_SET.has(value);
-}
-
-function extractAssistantText(messages: unknown): string {
-  if (!Array.isArray(messages)) return '';
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const message = messages[i] as Record<string, unknown>;
-    const role = message.role ?? message.type;
-    if (role !== 'assistant') continue;
-    const content = message.content;
-    if (typeof content === 'string') return content.trim();
-    if (!Array.isArray(content)) continue;
-    const text = content
-      .map(block => {
-        if (!block || typeof block !== 'object') return '';
-        const row = block as Record<string, unknown>;
-        return typeof row.text === 'string' ? row.text : '';
-      })
-      .filter(Boolean)
-      .join('\n')
-      .trim();
-    if (text) return text;
-  }
-  return '';
-}
-
-function buildForkSystemPrompt(
-  ref: SkillRef,
-  content: string,
-  policy: SkillExecutionPolicy
-): string {
-  const lines = [
-    'You are executing the following skill as an isolated worker for a parent agent.',
-    '',
-    `<skill source="${ref.source}" id="${ref.id}">`,
-    content.trim(),
-    '</skill>',
-    '',
-    'Complete the user task using this skill.',
-    'Return a concise result for the parent agent.',
-    'Do not assume your intermediate messages are visible to the parent.',
-  ];
-  // Only forbid writes when the resolved fork policy actually withholds write
-  // tools — a 'workspace-edit' fork grants Write/Edit in the same run, so the
-  // blanket no-modify line would contradict the tool set.
-  if ((policy.forkToolPolicy ?? 'read-only') !== 'workspace-edit') {
-    lines.push('Do not modify files unless a future policy explicitly grants write access.');
-  }
-  return lines.join('\n');
-}
-
-function resolveForkSkillToolNames(
-  execution: SkillExecutionDependencies,
-  policy: SkillExecutionPolicy
-): ToolName[] {
-  const parentEnabled = new Set((execution.enabledTools ?? READ_ONLY_SKILL_TOOLS).map(String));
-  const forkToolPolicy = policy.forkToolPolicy ?? 'read-only';
-  const candidates = (() => {
-    if (forkToolPolicy === 'web') return [...READ_ONLY_SKILL_TOOLS, ...WEB_SKILL_TOOLS];
-    if (forkToolPolicy === 'workspace-edit')
-      return [...READ_ONLY_SKILL_TOOLS, ...WORKSPACE_EDIT_SKILL_TOOLS];
-    if (forkToolPolicy === 'agent-default') {
-      return (execution.enabledTools ?? READ_ONLY_SKILL_TOOLS)
-        .filter(isToolName)
-        .filter(tool => !AGENT_DEFAULT_EXCLUDED_TOOLS.has(tool));
-    }
-    return READ_ONLY_SKILL_TOOLS;
-  })();
-  return [...new Set(candidates)].filter(tool => parentEnabled.has(tool));
-}
-
-function buildForkSkillTools(
-  execution: SkillExecutionDependencies,
-  policy: SkillExecutionPolicy
-): AgentTool[] {
-  const enabled = resolveForkSkillToolNames(execution, policy);
-  return applyToolScheduler(
-    buildTools(execution.cwd, {
-      enabled,
-      db: execution.db,
-      toolLookups: execution.toolLookups,
-      planModePort: execution.planModePort,
-      taskPort: execution.taskPort,
-      permissionOverride: execution.permissionOverride,
-      permissionCallback: execution.permissionCallback,
-    })
-  );
-}
-
-/**
- * Safety net for forked skill execution: a hung nested agent must not block
- * the parent run's tool call forever. Shorter than the 30-minute sub-agent
- * safety timeout (agent-task-runner) since skills are scoped tasks.
- */
-const DEFAULT_SKILL_FORK_TIMEOUT_MS = 10 * 60 * 1000;
-
-function skillForkTimeoutMs(): number {
-  const parsed = Number(process.env.ZCLAUDIA_SKILL_FORK_TIMEOUT_MS);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : DEFAULT_SKILL_FORK_TIMEOUT_MS;
-}
-
-type ForkPromptOutcome =
-  | { kind: 'completed' }
-  | { kind: 'failed'; error: unknown }
-  | { kind: 'timeout' }
-  | { kind: 'aborted' };
-
-async function executeForkedSkill(
-  ref: SkillRef,
-  skillContent: string,
-  task: string,
-  execution: SkillExecutionDependencies,
-  policy: SkillExecutionPolicy
-): Promise<{ ok: true; result: string } | { ok: false; error: string; message: string }> {
-  const builtModel = buildModel(execution.llmProfileConfig, execution.agentProfile?.model);
-  const agentFactory = execution.agentFactory ?? ((opts: AgentOptions) => new Agent(opts));
-  const finalMessages: unknown[] = [];
-  const agent = agentFactory({
-    initialState: {
-      systemPrompt: buildForkSystemPrompt(ref, skillContent, policy),
-      model: builtModel.model,
-      messages: [],
-      tools: buildForkSkillTools(execution, policy),
-    },
-    streamFn: wrapStreamFnWithToolSchemaCompat(execution.streamFn ?? streamSimple),
-    ...(builtModel.getApiKey ? { getApiKey: builtModel.getApiKey } : {}),
-  });
-  const unsubscribe = agent.subscribe((event: unknown) => {
-    const row = event as Record<string, unknown>;
-    if (row.type === 'agent_end') {
-      finalMessages.splice(
-        0,
-        finalMessages.length,
-        ...((Array.isArray(row.messages) ? row.messages : []) as unknown[])
-      );
-    }
-  });
-
-  const timeoutMs = skillForkTimeoutMs();
-  const abortSignal = execution.abortSignal;
-  let timer: NodeJS.Timeout | undefined;
-  let onAbort: (() => void) | undefined;
-  // Both race branches settle through handlers, so a late rejection from the
-  // losing side can never surface as an unhandled rejection.
-  const promptOutcome: Promise<ForkPromptOutcome> = agent.prompt(`Task:\n${task}`).then(
-    () => ({ kind: 'completed' }) as ForkPromptOutcome,
-    error => ({ kind: 'failed', error }) as ForkPromptOutcome
-  );
-  const interruption = new Promise<ForkPromptOutcome>(resolve => {
-    timer = setTimeout(() => resolve({ kind: 'timeout' }), timeoutMs);
-    timer.unref?.();
-    if (abortSignal) {
-      if (abortSignal.aborted) {
-        resolve({ kind: 'aborted' });
-      } else {
-        onAbort = () => resolve({ kind: 'aborted' });
-        abortSignal.addEventListener('abort', onAbort, { once: true });
-      }
-    }
-  });
-  try {
-    const outcome = await Promise.race([promptOutcome, interruption]);
-    if (outcome.kind === 'timeout') {
-      return {
-        ok: false,
-        error: 'skill_execution_timeout',
-        message: `Forked skill execution exceeded the ${Math.round(timeoutMs / 60_000)}-minute safety timeout and was abandoned. Retry with a narrower task or raise ZCLAUDIA_SKILL_FORK_TIMEOUT_MS.`,
-      };
-    }
-    if (outcome.kind === 'aborted') {
-      return {
-        ok: false,
-        error: 'skill_execution_aborted',
-        message: 'Forked skill execution was aborted together with the parent run.',
-      };
-    }
-    if (outcome.kind === 'failed') {
-      return {
-        ok: false,
-        error: 'skill_execution_failed',
-        message: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
-      };
-    }
-  } finally {
-    if (timer) clearTimeout(timer);
-    if (onAbort && abortSignal) abortSignal.removeEventListener('abort', onAbort);
-    unsubscribe();
-  }
-
-  const result = extractAssistantText(finalMessages);
-  if (!result) {
-    return {
-      ok: false,
-      error: 'empty_skill_result',
-      message: 'Forked skill execution completed without an assistant text result.',
-    };
-  }
-  return { ok: true, result };
-}
-
-async function runSkill(
+export async function runSkill(
   state: SkillRuntimeState,
   params: unknown,
   execution?: SkillExecutionDependencies
@@ -815,64 +370,84 @@ async function runSkill(
   const args = (params && typeof params === 'object' ? params : {}) as Record<string, unknown>;
   const ref = normalizeSkillRef(args.ref);
   if (!ref) {
-    return jsonResult(
-      {
-        ok: false,
-        error: 'invalid_ref',
-        message: 'RunSkill requires a valid skill ref.',
-      },
+    return textResult(
+      JSON.stringify(
+        {
+          ok: false,
+          error: 'invalid_ref',
+          message: 'RunSkill requires a valid skill ref.',
+        },
+        null,
+        2
+      ),
       { ok: false, error: 'invalid_ref' }
     );
   }
 
   const task = typeof args.task === 'string' ? args.task.trim() : '';
   if (!task) {
-    return jsonResult(
-      {
-        ok: false,
-        error: 'missing_task',
-        ref,
-        message: 'RunSkill requires a non-empty task.',
-      },
+    return textResult(
+      JSON.stringify(
+        {
+          ok: false,
+          error: 'missing_task',
+          ref,
+          message: 'RunSkill requires a non-empty task.',
+        },
+        null,
+        2
+      ),
       { ok: false, error: 'missing_task', ref }
     );
   }
 
   const requestedMode = typeof args.mode === 'string' ? args.mode : undefined;
   if (requestedMode === 'inline') {
-    return jsonResult(
-      {
-        ok: false,
-        error: 'inline_mode_not_supported',
-        ref,
-        message:
-          'RunSkill is fork-only in Phase 2A. Use LoadSkill to add a skill as inline active context.',
-      },
+    return textResult(
+      JSON.stringify(
+        {
+          ok: false,
+          error: 'inline_mode_not_supported',
+          ref,
+          message:
+            'RunSkill is fork-only in Phase 2A. Use LoadSkill to add a skill as inline active context.',
+        },
+        null,
+        2
+      ),
       { ok: false, error: 'inline_mode_not_supported', ref }
     );
   }
   if (requestedMode !== undefined && requestedMode !== 'fork') {
-    return jsonResult(
-      {
-        ok: false,
-        error: 'invalid_mode',
-        ref,
-        mode: requestedMode,
-        message: 'RunSkill mode must be "fork" when provided.',
-      },
+    return textResult(
+      JSON.stringify(
+        {
+          ok: false,
+          error: 'invalid_mode',
+          ref,
+          mode: requestedMode,
+          message: 'RunSkill mode must be "fork" when provided.',
+        },
+        null,
+        2
+      ),
       { ok: false, error: 'invalid_mode', ref }
     );
   }
 
   const skill = findSkill(state, ref);
   if (!skill) {
-    return jsonResult(
-      {
-        ok: false,
-        error: 'skill_not_found',
-        ref,
-        message: `Skill not found or not eligible: ${ref.source}/${ref.id}`,
-      },
+    return textResult(
+      JSON.stringify(
+        {
+          ok: false,
+          error: 'skill_not_found',
+          ref,
+          message: `Skill not found or not eligible: ${ref.source}/${ref.id}`,
+        },
+        null,
+        2
+      ),
       { ok: false, error: 'skill_not_found', ref }
     );
   }
@@ -889,46 +464,58 @@ async function runSkill(
     enabledForkTools,
   });
   if (!policy.modes.includes('fork')) {
-    return jsonResult(
-      {
-        ok: false,
-        error: 'policy_denied_fork',
-        ref,
-        mode: 'fork',
-        executionPolicy: policy,
-        ...diagnostics(),
-        message: 'This skill does not allow fork execution.',
-      },
+    return textResult(
+      JSON.stringify(
+        {
+          ok: false,
+          error: 'policy_denied_fork',
+          ref,
+          mode: 'fork',
+          executionPolicy: policy,
+          ...diagnostics(),
+          message: 'This skill does not allow fork execution.',
+        },
+        null,
+        2
+      ),
       { ok: false, error: 'policy_denied_fork', ref }
     );
   }
 
   if (requestedMode === undefined && policy.defaultMode === 'inline') {
-    return jsonResult(
-      {
-        ok: false,
-        error: 'use_load_skill',
-        ref,
-        executionPolicy: policy,
-        ...diagnostics(),
-        message:
-          'This skill defaults to inline active context. Use LoadSkill, or call RunSkill with mode: "fork" if fork execution is intentional.',
-      },
+    return textResult(
+      JSON.stringify(
+        {
+          ok: false,
+          error: 'use_load_skill',
+          ref,
+          executionPolicy: policy,
+          ...diagnostics(),
+          message:
+            'This skill defaults to inline active context. Use LoadSkill, or call RunSkill with mode: "fork" if fork execution is intentional.',
+        },
+        null,
+        2
+      ),
       { ok: false, error: 'use_load_skill', ref }
     );
   }
 
   const content = await state.contentPort.loadContent(ref);
   if (!content) {
-    return jsonResult(
-      {
-        ok: false,
-        error: 'skill_content_unavailable',
-        ref,
-        executionPolicy: policy,
-        ...diagnostics(),
-        message: `Skill content unavailable: ${ref.source}/${ref.id}`,
-      },
+    return textResult(
+      JSON.stringify(
+        {
+          ok: false,
+          error: 'skill_content_unavailable',
+          ref,
+          executionPolicy: policy,
+          ...diagnostics(),
+          message: `Skill content unavailable: ${ref.source}/${ref.id}`,
+        },
+        null,
+        2
+      ),
       { ok: false, error: 'skill_content_unavailable', ref }
     );
   }
@@ -946,42 +533,54 @@ async function runSkill(
       policy
     );
     if (result.ok) {
-      return jsonResult(
-        {
-          ok: true,
-          ref,
-          mode: 'fork',
-          result: result.result,
-          executionPolicy: policy,
-          ...diagnostics(),
-        },
+      return textResult(
+        JSON.stringify(
+          {
+            ok: true,
+            ref,
+            mode: 'fork',
+            result: result.result,
+            executionPolicy: policy,
+            ...diagnostics(),
+          },
+          null,
+          2
+        ),
         { ok: true, ref, mode: 'fork' }
       );
     }
-    return jsonResult(
-      {
-        ok: false,
-        error: result.error,
-        ref,
-        mode: 'fork',
-        message: result.message,
-        executionPolicy: policy,
-        ...diagnostics(),
-      },
+    return textResult(
+      JSON.stringify(
+        {
+          ok: false,
+          error: result.error,
+          ref,
+          mode: 'fork',
+          message: result.message,
+          executionPolicy: policy,
+          ...diagnostics(),
+        },
+        null,
+        2
+      ),
       { ok: false, error: result.error, ref }
     );
   }
 
-  return jsonResult(
-    {
-      ok: false,
-      error: 'skill_execution_unavailable',
-      ref,
-      mode: 'fork',
-      executionPolicy: policy,
-      ...diagnostics(),
-      message: 'RunSkill fork execution dependencies are not configured.',
-    },
+  return textResult(
+    JSON.stringify(
+      {
+        ok: false,
+        error: 'skill_execution_unavailable',
+        ref,
+        mode: 'fork',
+        executionPolicy: policy,
+        ...diagnostics(),
+        message: 'RunSkill fork execution dependencies are not configured.',
+      },
+      null,
+      2
+    ),
     { ok: false, error: 'skill_execution_unavailable', ref }
   );
 }
@@ -995,7 +594,7 @@ function parseDirectSkillInput(input: string): { id: string; args: string } | un
   return { id, args: match[2]?.trim() ?? '' };
 }
 
-async function invokeSkill(
+export async function invokeSkill(
   state: SkillRuntimeState,
   params: unknown,
   execution?: SkillExecutionDependencies
@@ -1004,36 +603,48 @@ async function invokeSkill(
   const input = typeof args.input === 'string' ? args.input : '';
   const parsed = parseDirectSkillInput(input);
   if (!parsed) {
-    return jsonResult(
-      {
-        ok: false,
-        error: 'invalid_skill_invocation',
-        message: 'InvokeSkill input must look like "/skill-id optional args".',
-      },
+    return textResult(
+      JSON.stringify(
+        {
+          ok: false,
+          error: 'invalid_skill_invocation',
+          message: 'InvokeSkill input must look like "/skill-id optional args".',
+        },
+        null,
+        2
+      ),
       { ok: false, error: 'invalid_skill_invocation' }
     );
   }
   const skill = findSkillById(state, parsed.id);
   if (!skill) {
-    return jsonResult(
-      {
-        ok: false,
-        error: 'skill_not_found',
-        id: parsed.id,
-        message: `Skill not found or not eligible: ${parsed.id}`,
-      },
+    return textResult(
+      JSON.stringify(
+        {
+          ok: false,
+          error: 'skill_not_found',
+          id: parsed.id,
+          message: `Skill not found or not eligible: ${parsed.id}`,
+        },
+        null,
+        2
+      ),
       { ok: false, error: 'skill_not_found', id: parsed.id }
     );
   }
   const ref: SkillRef = { source: skill.source, id: skill.id };
   if (skill.metadata?.userInvocable === false) {
-    return jsonResult(
-      {
-        ok: false,
-        error: 'skill_not_user_invocable',
-        ref,
-        message: `Skill ${skill.id} can only be invoked by the model.`,
-      },
+    return textResult(
+      JSON.stringify(
+        {
+          ok: false,
+          error: 'skill_not_user_invocable',
+          ref,
+          message: `Skill ${skill.id} can only be invoked by the model.`,
+        },
+        null,
+        2
+      ),
       { ok: false, error: 'skill_not_user_invocable', ref }
     );
   }
@@ -1052,30 +663,38 @@ async function invokeSkill(
   }
   const outcome = await loadSkillStructured(state, ref, execution?.agentProfile, parsed.args);
   if (!outcome.ok) {
-    return jsonResult(
-      {
-        ok: false,
-        error: outcome.error,
-        ref,
-        mode: 'inline',
-        args: parsed.args,
-        ...(outcome.executionPolicy ? { executionPolicy: outcome.executionPolicy } : {}),
-        message: outcome.message,
-      },
+    return textResult(
+      JSON.stringify(
+        {
+          ok: false,
+          error: outcome.error,
+          ref,
+          mode: 'inline',
+          args: parsed.args,
+          ...(outcome.executionPolicy ? { executionPolicy: outcome.executionPolicy } : {}),
+          message: outcome.message,
+        },
+        null,
+        2
+      ),
       { ok: false, error: outcome.error, ref }
     );
   }
-  return jsonResult(
-    {
-      loaded: true,
-      ref,
-      name: outcome.name,
-      ok: true,
-      mode: 'inline',
-      args: parsed.args,
-      availability: 'next_model_request',
-      message: SKILL_LOADED_MESSAGE,
-    },
+  return textResult(
+    JSON.stringify(
+      {
+        loaded: true,
+        ref,
+        name: outcome.name,
+        ok: true,
+        mode: 'inline',
+        args: parsed.args,
+        availability: 'next_model_request',
+        message: SKILL_LOADED_MESSAGE,
+      },
+      null,
+      2
+    ),
     { ok: true, ref, mode: 'inline' }
   );
 }
@@ -1186,174 +805,4 @@ export async function executePreparedDirectSkillInvocation(
 function textResultText(result: { content: ToolContent }): string {
   const first = result.content[0];
   return first && first.type === 'text' ? first.text : '{}';
-}
-
-export function buildSkillMetaTools(options: SkillRuntimeOptions): AgentTool[] {
-  const { state, execution } = options;
-  return [
-    {
-      name: 'ListSkills',
-      label: 'ListSkills',
-      description: 'List skills that are discoverable and can be loaded as active session context.',
-      parameters: agentToolParameters({ type: 'object', properties: {} }),
-      execute: async () =>
-        textResult(
-          JSON.stringify(
-            {
-              skills: state.discoverableSkills.map(skill =>
-                skillSummary(state, skill, execution?.agentProfile)
-              ),
-            },
-            null,
-            2
-          ),
-          { ok: true, count: state.discoverableSkills.length }
-        ),
-    },
-    {
-      name: 'SearchSkills',
-      label: 'SearchSkills',
-      description:
-        'Search discoverable skills by id, name, source, or description before loading full skill context.',
-      parameters: agentToolParameters({
-        type: 'object',
-        properties: {
-          query: { type: 'string' },
-          limit: { type: 'number', default: 10 },
-        },
-      }),
-      execute: async (_id: string, params: unknown) => {
-        const args = (params && typeof params === 'object' ? params : {}) as Record<
-          string,
-          unknown
-        >;
-        const query = String(args.query ?? '')
-          .trim()
-          .toLowerCase();
-        const limit = Math.max(1, Math.min(Number(args.limit ?? 10) || 10, 50));
-        const results = state.discoverableSkills
-          .filter(skill => {
-            if (!query) return true;
-            const haystack = [
-              skill.id,
-              skill.name,
-              skill.description,
-              skill.source,
-              skill.metadata?.whenToUse,
-              skill.metadata?.argumentHint,
-              ...(skill.metadata?.allowedTools ?? []),
-              ...(skill.metadata?.paths ?? []),
-              ...(skill.metadata?.arguments ?? []),
-            ]
-              .filter(Boolean)
-              .join(' ')
-              .toLowerCase();
-            return haystack.includes(query);
-          })
-          .slice(0, limit)
-          .map(skill => skillSummary(state, skill, execution?.agentProfile));
-        return textResult(JSON.stringify({ results }, null, 2), {
-          ok: true,
-          total: results.length,
-        });
-      },
-    },
-    {
-      name: 'InspectSkill',
-      label: 'InspectSkill',
-      description: 'Inspect one skill metadata entry without loading its full SKILL.md body.',
-      parameters: agentToolParameters({
-        type: 'object',
-        properties: { ref: { type: 'object' } },
-        required: ['ref'],
-      }),
-      execute: async (_id: string, params: unknown) => {
-        const ref = normalizeSkillRef((params as { ref?: unknown })?.ref);
-        if (!ref)
-          return textResult('InspectSkill requires a valid skill ref', {
-            ok: false,
-            error: 'invalid_ref',
-          });
-        const skill = findSkill(state, ref);
-        if (!skill)
-          return textResult(`Skill not found or not eligible: ${ref.source}/${ref.id}`, {
-            ok: false,
-            error: 'skill_not_found',
-            ref,
-          });
-        return textResult(
-          JSON.stringify(
-            {
-              ...skillSummary(state, skill, execution?.agentProfile),
-              filePath: skill.filePath,
-              dirPath: skill.dirPath,
-              contentLoaded: Boolean(state.loadedSkillContents[skillRefKey(ref)]),
-            },
-            null,
-            2
-          ),
-          { ok: true, ref }
-        );
-      },
-    },
-    {
-      name: 'LoadSkill',
-      label: 'LoadSkill',
-      description:
-        'Load one skill for this session so its full SKILL.md becomes inline active context on the next assistant step.',
-      parameters: agentToolParameters({
-        type: 'object',
-        properties: { ref: { type: 'object' } },
-        required: ['ref'],
-      }),
-      execute: async (_id: string, params: unknown) => {
-        const row = (params && typeof params === 'object' ? params : {}) as {
-          ref?: unknown;
-          args?: unknown;
-        };
-        const ref = normalizeSkillRef(row.ref);
-        if (!ref)
-          return textResult('LoadSkill requires a valid skill ref', {
-            ok: false,
-            error: 'invalid_ref',
-          });
-        return loadSkill(
-          state,
-          ref,
-          execution?.agentProfile,
-          typeof row.args === 'string' ? row.args : undefined
-        );
-      },
-    },
-    {
-      name: 'InvokeSkill',
-      label: 'InvokeSkill',
-      description:
-        'Invoke a user-facing skill from slash-style input such as "/skill-id optional args".',
-      parameters: agentToolParameters({
-        type: 'object',
-        properties: {
-          input: { type: 'string' },
-        },
-        required: ['input'],
-      }),
-      execute: async (_id: string, params: unknown) => invokeSkill(state, params, execution),
-    },
-    {
-      name: 'RunSkill',
-      label: 'RunSkill',
-      description:
-        'Execute a fork-capable skill once as an isolated worker and return its result without changing active skill context.',
-      parameters: agentToolParameters({
-        type: 'object',
-        properties: {
-          ref: { type: 'object' },
-          task: { type: 'string' },
-          mode: { type: 'string', enum: ['fork', 'inline'] },
-        },
-        required: ['ref', 'task'],
-      }),
-      execute: async (_id: string, params: unknown) => runSkill(state, params, execution),
-    },
-  ];
 }
