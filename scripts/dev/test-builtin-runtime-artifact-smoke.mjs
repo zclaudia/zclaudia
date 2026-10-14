@@ -221,7 +221,7 @@ try {
   const sessions = [];
   for (const runtime of ['claude', 'codex', 'cursor']) {
     const profile = profiles.find(item => item.runtimeType === runtime);
-    assert.equal(profile.llmProfileId, '');
+    assert.equal(profile.llmProfileId, null);
     const cwd = path.join(output, 'workspace', runtime);
     await mkdir(cwd, { recursive: true });
     await writeFile(path.join(cwd, 'add.mjs'), 'export const add = (a, b) => a - b;\n');

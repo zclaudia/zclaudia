@@ -51,7 +51,8 @@ cp -R "$repo_dir/e2e/fixtures/agent-runtimes" "$input_dir/fixtures"
 cp "$repo_dir/scripts/dev/test-builtin-runtime-artifact-smoke.mjs" "$input_dir/scripts/dev/"
 cp "$repo_dir/scripts/plugins/artifact-integrity.mjs" "$input_dir/scripts/plugins/"
 
-docker create --name "$container_name" --init --network none \
+# Match the invoking user so private reports remain readable by the host runner.
+docker create --name "$container_name" --init --network none --user "$(id -u):$(id -g)" \
   --mount "type=bind,src=$input_dir,dst=/input,readonly" \
   --mount "type=bind,src=$output_dir,dst=/output" \
   node@sha256:915acd9e9b885ead0c620e27e37c81b74c226e0e1c8177f37a60217b6eabb0d7 \
@@ -59,5 +60,8 @@ docker create --name "$container_name" --init --network none \
   --artifact-dir /input/bundle --node-path /input/node \
   --fixtures-dir /input/fixtures --output-dir /output/run > "$output_dir/container-id.txt"
 container_created=true
-docker start -a "$container_name" > "$output_dir/container.log" 2>&1
+if ! docker start -a "$container_name" > "$output_dir/container.log" 2>&1; then
+  cat "$output_dir/container.log" >&2
+  exit 1
+fi
 echo "Artifact API acceptance report: $output_dir/run/summary.json"
