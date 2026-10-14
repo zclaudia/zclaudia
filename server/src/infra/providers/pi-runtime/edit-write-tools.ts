@@ -8,7 +8,10 @@
  *   - mutation-details.ts diff budgets/truncation, mutation details and
  *                         model-visible result text
  *   - write-tool.ts       createWriteBridgeTool
- *   - edit-tool.ts        createEditBridgeTool (incl. the apply_patch path)
+ *   - edit-tool.ts        createEditBridgeTool (schema, parsing, dispatch)
+ *   - patch-executor.ts   the apply_patch-style multi-file patch path
+ *   - edit-core.ts        pure read-guard/match/apply logic for single files
+ *   - persist-mutation.ts shared backup→write→record→lifecycle tail
  *   - multi-edit-tool.ts  createMultiEditBridgeTool
  *
  * Public surface is re-exported unchanged so external callers (tool-catalog,

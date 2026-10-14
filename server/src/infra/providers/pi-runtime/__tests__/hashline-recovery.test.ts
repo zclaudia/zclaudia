@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
@@ -139,6 +139,86 @@ describe('hashline edit drift tolerance (integration)', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.ok).toBe(false);
     expect(res.details.error).toBe('hashline_mismatch');
+  });
+});
+
+describe('hashline write lifecycle (regression)', () => {
+  // The hashline path used to skip the shared write tail: no lifecycle hooks,
+  // no diagnostics provider — unlike the batch and exact paths. It must stay
+  // aligned with them.
+  it('runs the write lifecycle and diagnostics after a hashline edit', async () => {
+    const dir = makeWorkspace();
+    const filePath = path.join(dir, 'f.ts');
+    const before = 'const a = 1;\nconst target = "old";\nconst b = 2;\n';
+    const afterExpected = 'const a = 1;\nconst target = "new";\nconst b = 2;\n';
+    writeFileSync(filePath, before);
+    const afterWrite = vi.fn().mockResolvedValue({
+      diagnostics: [
+        {
+          path: 'f.ts',
+          line: 2,
+          column: 7,
+          severity: 'error',
+          message: 'fake lifecycle diagnostic',
+          source: 'fake-lsp',
+        },
+      ],
+    });
+    const diagnosticsProvider = vi.fn().mockResolvedValue({
+      checker: 'Fake',
+      state: 'checked',
+      baseline: 'known',
+      errors: [],
+    });
+    const tools = Object.fromEntries(
+      buildTools(dir, {
+        enabled: ['Read', 'Edit'],
+        writeLifecycle: { afterWrite },
+        diagnosticsProvider,
+      }).map(t => [t.name, t])
+    );
+    const read = await tools.Read.execute('r1', { path: 'f.ts', hashline: true });
+    const anchor = read.details.hashline.lines.find((l: { text: string }) =>
+      l.text.includes('target')
+    );
+
+    const res = await tools.Edit.execute('e1', {
+      file_path: 'f.ts',
+      hashline_operation: `replace:${anchor.hash}`,
+      hashline_tag: read.details.hashline.tag,
+      new_string: 'const target = "new";',
+    });
+    const after = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+    rmSync(dir, { recursive: true, force: true });
+
+    expect(res.details.ok).toBe(true);
+    expect(after).toBe(afterExpected);
+    expect(afterWrite).toHaveBeenCalledTimes(1);
+    expect(afterWrite).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'edit',
+        type: 'update',
+        path: 'f.ts',
+        absolutePath: filePath,
+        originalContent: before,
+        updatedContent: afterExpected,
+        firstChangedLine: 2,
+      })
+    );
+    expect(diagnosticsProvider).toHaveBeenCalledTimes(1);
+    expect(diagnosticsProvider.mock.calls[0][0]).toMatchObject({
+      operation: 'edit',
+      type: 'update',
+      path: 'f.ts',
+    });
+    expect(res.details.lifecycle).toMatchObject({
+      diagnostics: [
+        { message: 'fake lifecycle diagnostic', source: 'fake-lsp', severity: 'error' },
+      ],
+      diagnosticsReport: { checker: 'Fake', state: 'checked' },
+    });
+    // The model-visible text reports the check state like the other paths.
+    expect(res.content[0].text).toContain('Diagnostics (Fake)');
   });
 });
 
