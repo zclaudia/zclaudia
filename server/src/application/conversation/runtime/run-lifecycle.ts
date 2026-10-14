@@ -226,16 +226,19 @@ export function cancelRun(
         : undefined;
 
     // Broadcast run_failed to ALL connected clients so every device updates its UI.
-    run.eventSeq += 1;
-    broadcastRunMessage(run, {
+    const runFailedEvent = {
       type: 'run_failed',
       runId,
       sessionId: run.sessionId,
       error: options.clientError ?? 'Run cancelled by user',
-      seq: run.eventSeq,
       ...terminalSnapshot,
       ...(restoreDraft ? { restoreDraft } : {}),
-    });
+    } as const;
+    if (run.sendRunEvent) run.sendRunEvent(runFailedEvent);
+    else {
+      run.eventSeq += 1;
+      broadcastRunMessage(run, { ...runFailedEvent, seq: run.eventSeq });
+    }
 
     // Clear steer state — handle.steer on an aborted agent is no longer safe,
     // and pendingSteers is now the client's responsibility (via restoreDraft).

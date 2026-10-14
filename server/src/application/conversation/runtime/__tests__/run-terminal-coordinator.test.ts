@@ -66,10 +66,17 @@ describe('run terminal coordinator', () => {
   });
 
   it('persists, completes, emits plugin event, heartbeat, notification, and background update', async () => {
-    const activeRun = buildRun({ sessionType: 'background' });
+    const sendOrder: string[] = [];
+    const activeRun = buildRun({
+      sessionType: 'background',
+      flushPendingRunDeltas: vi.fn(() => sendOrder.push('flush')),
+    });
     const terminalSendPhases: string[] = [];
     const sendRunEvent = vi.fn(event => {
-      if (event.type === 'run_completed') terminalSendPhases.push(activeRun.phase);
+      if (event.type === 'run_completed') {
+        terminalSendPhases.push(activeRun.phase);
+        sendOrder.push('terminal');
+      }
     });
     const broadcastHeartbeat = vi.fn();
     const notificationsService = { postItem: vi.fn() };
@@ -118,6 +125,7 @@ describe('run terminal coordinator', () => {
         usage,
       })
     );
+    expect(sendOrder.slice(0, 2)).toEqual(['flush', 'terminal']);
     expect(activeRun.phase).toBe('completed');
     expect(terminalSendPhases).toEqual(['finalizing']);
     expect(runCompletedListener).toHaveBeenCalledWith(
@@ -381,9 +389,14 @@ describe('run terminal coordinator', () => {
   });
 
   it('fails provider turns with persistence, wire event, plugin event, cleanup, and notification', async () => {
-    const activeRun = buildRun();
+    const sendOrder: string[] = [];
+    const activeRun = buildRun({
+      flushPendingRunDeltas: vi.fn(() => sendOrder.push('flush')),
+    });
     const activeRuns = new Map([['run-1', activeRun]]);
-    const sendRunEvent = vi.fn();
+    const sendRunEvent = vi.fn(event => {
+      if (event.type === 'run_failed') sendOrder.push('failed');
+    });
     const broadcastHeartbeat = vi.fn();
     const notificationsService = { postItem: vi.fn() };
     const listeners = new RunDomainEventListenerRegistry();
@@ -418,6 +431,7 @@ describe('run terminal coordinator', () => {
       assistantMessageId: 'assistant-1',
       messageVersion: 7,
     });
+    expect(sendOrder.slice(0, 2)).toEqual(['flush', 'failed']);
     expect(activeRun.phase).toBe('failed');
     expect(runFailedListener).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -32,6 +32,7 @@ import {
   type RunDomainEventListenerRegistry,
 } from './run-domain-event-listeners.js';
 import { attachRunPhaseDomainEventEmitter } from './run-phase-domain-events.js';
+import { createRunDeltaBatcher } from './run-delta-batcher.js';
 
 export interface BackgroundFollowUpContext {
   activeRuns: Map<string, ActiveRun>;
@@ -252,20 +253,28 @@ function createFollowUpRun(ctx: BackgroundFollowUpContext): {
   };
 
   // Wire broadcast
-  activeRun.broadcast = (msg: ServerMessage) => {
+  const broadcastRaw = (msg: ServerMessage) => {
     sendMessage(ctx.client.ws, msg);
     if (ctx.connectedClients.size > 0) {
       broadcastToOtherAuthenticatedClients(ctx.connectedClients, ctx.client.id, msg);
     }
   };
 
-  const sendRunEvent = (event: ServerMessage) => {
+  const sendSequencedRunEvent = (event: ServerMessage) => {
     if ('runId' in event) {
       activeRun.eventSeq += 1;
       (event as ServerMessage & { seq?: number }).seq = activeRun.eventSeq;
     }
-    activeRun.broadcast!(event);
+    broadcastRaw(event);
   };
+  const deltaBatcher = createRunDeltaBatcher(sendSequencedRunEvent);
+  const sendRunEvent = deltaBatcher.send;
+  activeRun.broadcast = (msg: ServerMessage) => {
+    deltaBatcher.flush();
+    broadcastRaw(msg);
+  };
+  activeRun.sendRunEvent = sendRunEvent;
+  activeRun.flushPendingRunDeltas = deltaBatcher.flush;
 
   ctx.activeRuns.set(runId, activeRun);
   attachRunPhaseDomainEventEmitter(activeRun, ctx.listeners);
@@ -292,12 +301,14 @@ function finalizeFollowUpRun(run: ActiveRun, ctx: BackgroundFollowUpContext): vo
   }
 
   if (!isTerminalPhase(run.phase)) {
-    run.broadcast!({
+    const completed = {
       type: 'run_completed',
       runId: run.runId,
       sessionId: run.sessionId,
       ...terminalSnapshot,
-    });
+    } as const;
+    if (run.sendRunEvent) run.sendRunEvent(completed);
+    else run.broadcast?.(completed);
     setPhase(run, 'completed');
   }
 

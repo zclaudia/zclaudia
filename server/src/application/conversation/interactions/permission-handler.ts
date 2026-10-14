@@ -289,6 +289,7 @@ function emitInteractionDomainEvent<TType extends RunDomainEventType>(input: {
   run: ActiveRun;
   type: TType;
 }): void {
+  input.run.flushPendingRunDeltas?.();
   const event = createRunDomainEvent({
     type: input.type,
     runId: input.run.runId,

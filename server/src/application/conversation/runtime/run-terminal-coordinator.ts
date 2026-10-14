@@ -90,6 +90,7 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
     sessionType,
     listeners,
   } = input;
+  activeRun.flushPendingRunDeltas?.();
 
   applyTerminalContentFallbacks(input);
 
@@ -272,6 +273,7 @@ export function failProviderTurn(input: FailProviderTurnInput): void {
     sessionId,
     listeners,
   } = input;
+  activeRun.flushPendingRunDeltas?.();
 
   if (!isTerminalPhase(activeRun.phase)) {
     if (activeRun.phase !== 'cancelling' && activeRun.phase !== 'finalizing') {

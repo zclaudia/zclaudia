@@ -105,6 +105,10 @@ export interface RunMessagingState {
   thinkingBlocks: ThinkingBlock[];
   saveInterval?: NodeJS.Timeout;
   eventSeq: number; // Monotonically increasing event sequence number (starts at 0, first event gets seq=1)
+  /** Central sender used by lifecycle paths that outlive the provider callback. */
+  sendRunEvent?: (event: ServerMessage) => void;
+  /** Flush queued text before constructing a sequenced non-text domain event. */
+  flushPendingRunDeltas?: () => void;
   /** Route C: set once the turn has been appended to the session tree (final save).
    *  Guards against the multiple final-save call sites duplicating tree entries. */
   treeTurnAppended?: boolean;

@@ -35,6 +35,7 @@ import type { TraceRecorder } from '../../../utils/provider-trace.js';
 import { resolveAgentForSession } from '../../../domains/sessions/agent-resolver.js';
 import { PhaseEmitter, isTerminalPhase } from './active-run-phase.js';
 import { attachRunPhaseDomainEventEmitter } from './run-phase-domain-events.js';
+import { createRunDeltaBatcher } from './run-delta-batcher.js';
 import {
   appendMessagesToTree,
   buildUserMessage,
@@ -394,21 +395,29 @@ export function initializeRunBootstrap(
   }
 
   // Wire broadcast: sends to ALL connected clients (originating + others).
-  // Used by run-lifecycle, run-permissions, etc. via activeRun.broadcast.
-  activeRun.broadcast = (msg: ServerMessage) => {
+  const broadcastRaw = (msg: ServerMessage) => {
     sendMessage(client.ws, msg);
     if (connectedClients.size > 0)
       broadcastToOtherAuthenticatedClients(connectedClients, client.id, msg);
   };
 
-  const sendRunEvent = (event: ServerMessage) => {
+  const sendSequencedRunEvent = (event: ServerMessage) => {
     if ('runId' in event) {
       activeRun.eventSeq += 1;
       (event as ServerMessage & { seq?: number }).seq = activeRun.eventSeq;
     }
     trace.log('server_norm', event.type, event);
-    activeRun.broadcast!(event);
+    broadcastRaw(event);
   };
+
+  const deltaBatcher = createRunDeltaBatcher(sendSequencedRunEvent);
+  const sendRunEvent = deltaBatcher.send;
+  activeRun.broadcast = (msg: ServerMessage) => {
+    deltaBatcher.flush();
+    broadcastRaw(msg);
+  };
+  activeRun.sendRunEvent = sendRunEvent;
+  activeRun.flushPendingRunDeltas = deltaBatcher.flush;
 
   const providerEventState: RunProviderEventState = {
     sdkSessionId: effectiveSdkSessionId,

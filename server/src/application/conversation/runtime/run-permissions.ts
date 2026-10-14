@@ -765,6 +765,7 @@ function emitPermissionDomainEvent<TType extends RunDomainEventType>(input: {
   sessionId: string;
   type: TType;
 }): void {
+  input.activeRun.flushPendingRunDeltas?.();
   const event = createRunDomainEvent({
     type: input.type,
     runId: input.runId,

@@ -21,7 +21,8 @@ function buildRun(overrides: Record<string, unknown> = {}): any {
 
 describe('run domain dispatcher', () => {
   it('translates provider events, applies reducer state, and emits wire projections', () => {
-    const activeRun = buildRun();
+    const flushPendingRunDeltas = vi.fn();
+    const activeRun = buildRun({ flushPendingRunDeltas });
     const sendRunEvent = vi.fn();
 
     const events = dispatchProviderRuntimeEventToDomain({
@@ -35,6 +36,7 @@ describe('run domain dispatcher', () => {
     expect(events.map(event => event.type)).toEqual(['assistant.textDelta']);
     expect(activeRun.fullContent).toBe('hello');
     expect(activeRun.contentBlocks).toEqual([{ type: 'text', content: 'hello' }]);
+    expect(flushPendingRunDeltas).not.toHaveBeenCalled();
     expect(sendRunEvent).toHaveBeenCalledWith({
       type: 'delta',
       runId: 'run-1',
@@ -61,6 +63,10 @@ describe('run domain dispatcher', () => {
 
   it('emits public domain events to the listener registry', () => {
     const activeRun = buildRun();
+    const flushPendingRunDeltas = vi.fn(() => {
+      activeRun.eventSeq += 1;
+    });
+    activeRun.flushPendingRunDeltas = flushPendingRunDeltas;
     const sendRunEvent = vi.fn();
     const listeners = new RunDomainEventListenerRegistry();
     const listener = vi.fn();
@@ -81,6 +87,8 @@ describe('run domain dispatcher', () => {
     } as any);
 
     expect(events.map(event => event.type)).toEqual(['tool.started']);
+    expect(flushPendingRunDeltas).toHaveBeenCalledOnce();
+    expect(events[0].seq).toBe(43);
     expect(listener).toHaveBeenCalledWith(events[0]);
   });
 });

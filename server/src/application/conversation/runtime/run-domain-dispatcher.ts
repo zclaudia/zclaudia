@@ -25,6 +25,12 @@ export interface DispatchProviderRuntimeEventInput {
 export function dispatchProviderRuntimeEventToDomain(
   input: DispatchProviderRuntimeEventInput
 ): RunDomainEvent[] {
+  if (input.providerEvent.type !== 'assistant' && input.providerEvent.type !== 'assistant_delta') {
+    input.activeRun.flushPendingRunDeltas?.();
+  }
+  // Text-delta domain envelopes are private reducer inputs; their candidate
+  // seq is not a public wire contract. The central sender assigns the actual
+  // monotonic wire seq only when the buffered delta is flushed.
   const domainEvents = translateProviderRuntimeEvent({
     event: input.providerEvent,
     runId: input.runId,

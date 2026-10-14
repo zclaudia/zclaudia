@@ -132,6 +132,34 @@ describe('cancelRun — restoreDraft', () => {
     expect(run.steerHandle).toBeUndefined();
   });
 
+  it('routes cancellation through the central sender so pending deltas flush before failure', async () => {
+    const { cancelRun } = await import('../run-lifecycle.js');
+    const ctx = makeCtx();
+    const sendRunEvent = vi.fn();
+    const run = makeActiveRun({
+      runId: 'r1',
+      sessionId: 's1',
+      pendingSteers: [],
+      sendRunEvent,
+    });
+    ctx.activeRuns.set('r1', run);
+
+    cancelRun('r1', ctx);
+
+    expect(sendRunEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_failed',
+        runId: 'r1',
+        sessionId: 's1',
+      })
+    );
+    expect(sendRunEvent.mock.calls[0][0]).not.toHaveProperty('seq');
+    expect(broadcastRunMessageMock).not.toHaveBeenCalledWith(
+      run,
+      expect.objectContaining({ type: 'run_failed' })
+    );
+  });
+
   it('handles string content in pendingSteers (defensive)', async () => {
     const { cancelRun } = await import('../run-lifecycle.js');
     const ctx = makeCtx();

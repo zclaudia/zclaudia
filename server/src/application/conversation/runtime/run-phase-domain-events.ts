@@ -7,6 +7,7 @@ import {
 
 export interface PhaseDomainEventRun {
   eventSeq?: number;
+  flushPendingRunDeltas?: () => void;
   phaseEmitter: PhaseEmitter;
   providerType?: string;
   runId: string;
@@ -18,6 +19,7 @@ export function attachRunPhaseDomainEventEmitter(
   listeners: RunDomainEventListenerRegistry = runDomainEventListeners
 ): () => void {
   return run.phaseEmitter.onChange((next: RunPhase, prev: RunPhase) => {
+    run.flushPendingRunDeltas?.();
     const event = createRunDomainEvent({
       type: 'run.phaseChanged',
       runId: run.runId,

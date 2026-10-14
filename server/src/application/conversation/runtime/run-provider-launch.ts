@@ -561,6 +561,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
           sessionId: message.sessionId,
           content: '⚠️ Context limit reached — compacted the conversation before starting…',
         });
+        activeRun.flushPendingRunDeltas?.();
         const event = compactionDomainEventFor({
           outcome: preflight,
           providerType: activeRun.providerType,
