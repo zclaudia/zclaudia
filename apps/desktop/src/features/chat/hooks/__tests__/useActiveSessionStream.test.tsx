@@ -32,7 +32,22 @@ describe('useActiveSessionStream', () => {
       facade: facade as any,
       mode: 'embedded',
       connectionState: 'connected',
-      backends: [],
+      // The catch-up effect only fires once the backend reports runtimeState 'ready'.
+      backends: [
+        {
+          backendId: 'backend-1',
+          name: 'backend-1',
+          online: true,
+          runtimeState: 'ready',
+          openState: 'unsubscribed',
+          instanceId: 'instance-1',
+          deviceId: 'device-1',
+          channel: 'gateway',
+          isThisInstance: true,
+          isThisDevice: true,
+          capabilities: [],
+        },
+      ],
       sessionStreams: {},
       localBackendId: null,
       currentInstanceId: null,
