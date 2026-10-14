@@ -8,6 +8,10 @@ let facadeServerRuns = new Map<string, Set<string>>();
 const pendingAutoOpenBackends = new Set<string>();
 let autoOpenTimer: ReturnType<typeof setTimeout> | null = null;
 const autoOpenFailures = new Map<string, number>();
+// Last non-null local backend id seen in a facade snapshot. Survives facade
+// re-creation on purpose: the session/project stores it guards outlive the
+// facade too.
+let lastLocalBackendId: string | null = null;
 
 export function getFacadeServerRuns(): Map<string, Set<string>> {
   return facadeServerRuns;
@@ -16,6 +20,19 @@ export function getFacadeServerRuns(): Map<string, Set<string>> {
 export function resetFacadeSyncState(): void {
   facadeServerRuns = new Map();
   clearPendingAutoOpen();
+}
+
+/**
+ * Record the current local backend id and return the previous one when it
+ * changed. The server starts on a standalone facade (`local-standalone`) and
+ * swaps to the gateway facade once a gateway is configured, so the same
+ * machine shows up under a new id while the old one silently drops out.
+ */
+export function noteLocalBackendId(backendId: string | null): string | null {
+  if (!backendId || backendId === lastLocalBackendId) return null;
+  const previous = lastLocalBackendId;
+  lastLocalBackendId = backendId;
+  return previous;
 }
 
 export function clearPendingAutoOpen(): void {

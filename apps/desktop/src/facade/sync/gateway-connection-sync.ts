@@ -6,7 +6,8 @@ import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useServerStore } from '../../stores/serverStore';
 import { cleanupServerSyncState } from '../../services/messageHandler';
 import { isLegacyLocalBackendId } from '../../actions/controlPlane';
-import { clearAutoOpenFailures, scheduleAutoOpenBackends } from './state';
+import { syncBackendsRemoved } from './backend-data-sync';
+import { clearAutoOpenFailures, noteLocalBackendId, scheduleAutoOpenBackends } from './state';
 
 export function syncSnapshotToGatewayStore(
   event: Extract<BackendFacadeEvent, { type: 'snapshot_updated' }>
@@ -18,6 +19,16 @@ export function syncSnapshotToGatewayStore(
   gwStore.setConnected(snapshot.connectionState === 'connected');
   const resolvedLocalBackendId =
     snapshot.localBackendId || snapshot.backends.find(b => b.isThisInstance)?.backendId || null;
+  // The local backend moved to a new id (standalone → gateway facade or back).
+  // Nothing emits backends_removed for the old id, so its session/project
+  // buckets would linger as a phantom second backend mirroring this one.
+  const previousLocalBackendId = noteLocalBackendId(resolvedLocalBackendId);
+  if (
+    previousLocalBackendId &&
+    !snapshot.backends.some(b => b.backendId === previousLocalBackendId)
+  ) {
+    syncBackendsRemoved({ type: 'backends_removed', backendIds: [previousLocalBackendId] });
+  }
   for (const b of snapshot.backends) {
     serverState.setServerFeatures(b.backendId, b.capabilities as ServerFeature[]);
   }

@@ -474,6 +474,66 @@ describe('useBackendFacade run_event forwarding', () => {
     expect(useServerStore.getState().activeServerId).toBe('local-embedded');
   });
 
+  it('drops the old local backend buckets when the local backend id changes', () => {
+    const localSnapshot = (backendId: string) =>
+      ({
+        type: 'snapshot_updated',
+        snapshot: {
+          snapshotVersion: 5,
+          capturedAt: Date.now(),
+          mode: 'embedded',
+          connectionState: 'connected',
+          localBackendId: backendId,
+          currentInstanceId: 'instance-local',
+          currentDeviceId: 'device-local',
+          sessionStreams: {},
+          backends: [
+            {
+              backendId,
+              name: 'Local',
+              online: true,
+              runtimeState: 'ready',
+              openState: 'open',
+              instanceId: 'instance-local',
+              deviceId: 'device-local',
+              channel: 'local',
+              isThisInstance: true,
+              isThisDevice: true,
+              capabilities: [],
+            },
+          ],
+        },
+      }) as any;
+    const session = {
+      id: 'session-1',
+      projectId: 'project-1',
+      name: 'Mobile',
+      createdAt: 1,
+      updatedAt: 1,
+      isActive: false,
+      type: 'regular' as const,
+    };
+
+    // Server boots on the standalone facade first...
+    syncToGatewayStore(localSnapshot('local-standalone'));
+    useSessionsStore.getState().setRemoteSessions('local-standalone', [session]);
+    useProjectStore.getState().replaceProjectsForBackend('local-standalone', [
+      { id: 'project-1', name: 'zclaudia', type: 'code', createdAt: 1, updatedAt: 1 },
+    ]);
+
+    // ...then swaps to the gateway facade, where this machine has a new id.
+    syncToGatewayStore(localSnapshot('gw-local'));
+
+    expect(useSessionsStore.getState().remoteSessions.has('local-standalone')).toBe(false);
+    expect(useOwnershipStore.getState().getProjectBackendId('project-1')).toBeNull();
+
+    // The same project is now accepted under the new id instead of colliding.
+    useProjectStore.getState().replaceProjectsForBackend('gw-local', [
+      { id: 'project-1', name: 'zclaudia', type: 'code', createdAt: 1, updatedAt: 1 },
+    ]);
+    expect(useOwnershipStore.getState().getProjectBackendId('project-1')).toBe('gw-local');
+  });
+
   it('deduplicates deferred auto-open across repeated snapshots', () => {
     const openBackend = vi.fn();
     useFacadeStore.setState({
