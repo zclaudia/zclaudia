@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { randomUUID } from 'crypto';
 import { closeSync, existsSync, mkdirSync, openSync, writeFileSync, writeSync } from 'fs';
 import * as path from 'path';
+import { StringDecoder } from 'string_decoder';
 
 import { resolveDataDir, sweepStaleLogs } from '../../../utils/data-dir.js';
 import { scrubEnv } from './env-scrub.js';
@@ -378,7 +379,7 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
 
     let full = '';
     let fullOutputPath: string | undefined;
-    const stderrChunks: string[] = [];
+    const stderrChunks: Buffer[] = [];
     let stderrBytes = 0;
     let timedOut = false;
     let aborted = false;
@@ -440,8 +441,9 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
     const onStderrData = (chunk: Buffer) => {
       const text = chunk.toString('utf8');
       if (stderrBytes < STDERR_CAPTURE_LIMIT) {
-        stderrChunks.push(text);
-        stderrBytes += Buffer.byteLength(text, 'utf8');
+        const captured = Buffer.from(chunk.subarray(0, STDERR_CAPTURE_LIMIT - stderrBytes));
+        stderrChunks.push(captured);
+        stderrBytes += captured.length;
       }
       appendOutput(text);
     };
@@ -490,7 +492,8 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
         timedOut: false,
         aborted: false,
         durationMs: Date.now() - startedAt,
-        stderrOutput: stderrChunks.join(''),
+        // Do not flush a partial UTF-8 character at the capture boundary.
+        stderrOutput: new StringDecoder('utf8').write(Buffer.concat(stderrChunks)),
         ...(fullOutputPath ? { fullOutputPath } : {}),
         ...(spillCapped ? { fullOutputCapped: true } : {}),
         handoff: {
@@ -530,7 +533,7 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
         timedOut,
         aborted,
         durationMs: Date.now() - startedAt,
-        stderrOutput: stderrChunks.join(''),
+        stderrOutput: new StringDecoder('utf8').write(Buffer.concat(stderrChunks)),
         ...(fullOutputPath ? { fullOutputPath } : {}),
         ...(spillCapped ? { fullOutputCapped: true } : {}),
       });

@@ -151,7 +151,7 @@ describe('runBash', () => {
         timeoutSec: 10,
       });
       expect(result.exitCode).toBe(0);
-      expect(result.stderrOutput.length).toBeLessThanOrEqual(66 * 1024); // ~64KB capture cap (+ at most one chunk)
+      expect(result.stderrOutput).toBe('e'.repeat(64 * 1024));
       // Output exceeds the in-memory cap: fullOutput is the tail, complete content on disk.
       expect(result.truncated).toBe(true);
       expect(result.fullOutputPath).toBeDefined();
@@ -161,6 +161,23 @@ describe('runBash', () => {
       if (prev === undefined) delete process.env.ZCLAUDIA_DATA_DIR;
       else process.env.ZCLAUDIA_DATA_DIR = prev;
       rmSync(dataDir, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('caps stderr by bytes without returning a partial UTF-8 character', async () => {
+    const dir = TMP();
+    try {
+      const result = await runBash({
+        command: 'python3 -c "import sys; sys.stderr.write(chr(0x4e2d) * 30000)"',
+        cwd: dir,
+        timeoutSec: 10,
+        maxBytes: 100000,
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.stderrOutput).toBe('中'.repeat(Math.floor((64 * 1024) / 3)));
+      expect(Buffer.byteLength(result.stderrOutput, 'utf8')).toBeLessThanOrEqual(64 * 1024);
+    } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
