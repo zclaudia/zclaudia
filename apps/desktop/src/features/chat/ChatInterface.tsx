@@ -17,7 +17,6 @@ import { DraftLockPrompt } from '../../components/draft/DraftLockPrompt';
 import { TaskCardStrip } from '../supervision';
 import { forkSession, branchSession } from '../../services/api';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
-import { useComposerStore, type SessionDraft } from '../../stores/composerStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -42,6 +41,7 @@ import { usePlanStatus } from './hooks/usePlanStatus';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useMobileViewport } from './hooks/useMobileViewport';
 import { useSessionRoute } from './hooks/useSessionRoute';
+import { useSessionInitialDraft } from './hooks/useComposerPrefill';
 import type { MessageAttachment } from '@zclaudia/shared/core/message';
 import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
 import { useProjectStore } from '../../stores/projectStore';
@@ -222,12 +222,12 @@ export function ChatInterface({
   const [showSessionMenu, setShowSessionMenu] = useState(false);
   const [isRenamingSession, setIsRenamingSession] = useState(false);
   const [renameValue, setRenameValue] = useState('');
-  const [initialDraft, setInitialDraft] = useState<SessionDraft | undefined>(undefined);
+  // Latched snapshot of the persisted draft, recaptured once per session switch.
+  const initialDraft = useSessionInitialDraft(sessionId);
 
   // Reset per-session ephemeral state when switching sessions
   useEffect(() => {
     resetSendState();
-    setInitialDraft(useComposerStore.getState().drafts[sessionId]);
     resetPaginationRefs();
     setIsRenamingSession(false);
     setRenameValue('');

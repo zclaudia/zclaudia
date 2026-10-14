@@ -23,7 +23,7 @@ import { usePluginStore, type UIExtension } from '../../stores/pluginStore';
 import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useDraftEditorStore } from '../../stores/draftEditorStore';
-import { useComposerStore } from '../../stores/composerStore';
+import { useComposerPrefill } from './hooks/useComposerPrefill';
 import { activatePanel, usePanelIsActive, useLauncherPanels } from '../../actions/openPanel';
 import { iconForPanel } from '../../components/rightSidebarToolIcons';
 import * as api from '../../services/api';
@@ -198,28 +198,12 @@ export function ChatInputArea({
 
   // One-shot prefill (e.g. from the plan "Execute plan" button). Takes
   // precedence over restoreMessage/initialDraft on its tick, then clears
-  // itself so subsequent user edits aren't clobbered. `prefillConsumed`
-  // gates the fallback sources after consumption so the user's in-progress
-  // edits stay put (otherwise initialValue would revert to the draft and
-  // overwrite them on the next MessageInput effect).
-  const pendingPrefill = useComposerStore(s => s.pendingPrefills[sessionId]);
-  const clearPendingPrefill = useComposerStore(s => s.clearPendingPrefill);
-  const setPendingPrefill = useComposerStore(s => s.setPendingPrefill);
-  const [prefillConsumed, setPrefillConsumed] = useState(false);
-
-  useEffect(() => {
-    setPrefillConsumed(false);
-  }, [sessionId]);
-
-  useEffect(() => {
-    if (!pendingPrefill) return;
-    setPrefillConsumed(false);
-    const timer = setTimeout(() => {
-      clearPendingPrefill(sessionId);
-      setPrefillConsumed(true);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [pendingPrefill, sessionId, clearPendingPrefill]);
+  // itself so subsequent user edits aren't clobbered. Consumption gating
+  // (`prefillConsumed`) keeps the fallback sources out after consumption so
+  // the user's in-progress edits stay put (otherwise initialValue would
+  // revert to the draft and overwrite them on the next MessageInput effect).
+  const { pendingPrefill, prefillConsumed, pushPrefill: setPendingPrefill } =
+    useComposerPrefill(sessionId);
 
   const fallbackInitialValue = prefillConsumed
     ? undefined
@@ -738,7 +722,7 @@ export function ChatInputArea({
             projectId={currentProject?.id}
             worktreePath={emptySessionWorktree}
             commands={commands}
-            onSuggestion={text => setPendingPrefill(sessionId, text)}
+            onSuggestion={setPendingPrefill}
           />
         )}
       </div>

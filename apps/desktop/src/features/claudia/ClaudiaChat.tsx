@@ -1,54 +1,28 @@
-import { useRef, useEffect, useCallback, useMemo, useState, type ComponentProps } from 'react';
+import { useRef, useEffect, useCallback, useState, type ComponentProps } from 'react';
 import { MessageInput, InlinePermissionRequest, type Attachment } from '../chat';
 import { useClaudiaStore } from '../../stores/claudiaStore';
-import type {
-  ClaudiaFeedMessage,
-  ClaudiaRunInstance,
-  ClaudiaThreadSummary,
-} from '../../stores/claudiaStore';
+import type { ClaudiaRunInstance } from '../../stores/claudiaStore';
 import { Button } from '../../components/ui/Button';
 import { usePromptRequestStore } from '../../stores/promptRequestStore';
 import { usePermissionStore } from '../../stores/permissionStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { useSelectionStore } from '../../stores/selectionStore';
-import { useServerStore } from '../../stores/serverStore';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
 import { useConnection } from '../../contexts/ConnectionContext';
-import { fetchApiForBackend } from '../../services/api/base';
 import { listAgentProfilesForBackend } from '../../services/api/agent-profiles';
 import { parseBackendId } from '../../stores/gatewayStore';
-import { useFacadeStore } from '../../stores/facadeStore';
 import { useComposerStore } from '../../stores/composerStore';
 import { resolveCanonicalBackendId } from '../../actions/controlPlane';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
-import type { Message } from '@zclaudia/shared/core/message';
-import type { ClaudiaMessageMessage } from '@zclaudia/shared/wire/messages/claudia';
 import type { ClientMessage } from '@zclaudia/shared/wire/messages/index';
-import type { AgentCancelMessage } from '@zclaudia/shared/wire/messages/run';
-
-type ProfileSourceLabel =
-  | 'Explicit selection'
-  | 'Project default'
-  | 'Global default'
-  | 'Session bound';
+import { buildAgentCancelMessage, buildClaudiaMessage } from './claudiaProtocol';
+import { useClaudiaThreads } from './useClaudiaThreads';
+import { useClaudiaRuns } from './useClaudiaRuns';
+import { useClaudiaTranscriptSync } from './useClaudiaTranscriptSync';
+import { useClaudiaProfileBinding } from './useClaudiaProfileBinding';
+import { useComposerMountDraft } from '../chat/api';
 
 interface ClaudiaChatProps {
   isMobile?: boolean;
-}
-
-function sourceLabel(source: string | undefined, explicit: boolean): ProfileSourceLabel {
-  if (explicit) return 'Explicit selection';
-  switch (source) {
-    case 'project-default':
-      return 'Project default';
-    case 'session-bound':
-      return 'Session bound';
-    case 'explicit':
-      return 'Explicit selection';
-    default:
-      return 'Global default';
-  }
 }
 
 // MessageInput expects its parent to restore persisted drafts. Capture a prefill
@@ -57,11 +31,7 @@ function ClaudiaComposer({
   rejected,
   ...props
 }: ComponentProps<typeof MessageInput> & { rejected?: ClaudiaRunInstance }) {
-  const [initialDraft] = useState(() =>
-    rejected && !rejected.draftRestored
-      ? { content: rejected.input, attachments: rejected.draftAttachments ?? [] }
-      : useComposerStore.getState().drafts[props.sessionId]
-  );
+  const initialDraft = useComposerMountDraft(props.sessionId, rejected);
   return (
     <MessageInput
       {...props}
@@ -73,92 +43,31 @@ function ClaudiaComposer({
 
 export function ClaudiaChat({ isMobile = false }: ClaudiaChatProps) {
   const { sendToServer, isConnected, handlePermissionDecision } = useConnection();
-  const activeServerId = useServerStore(s => s.activeServerId);
-  const localBackendId = useFacadeStore(s => s.localBackendId);
-  const activeBackendId = resolveCanonicalBackendId(
-    activeServerId ? parseBackendId(activeServerId) : null,
-    localBackendId
-  );
+  const returnToApp = useTopLevelViewStore(s => s.returnToApp);
+  const { selectSession } = useSelectionCoordinator();
+
+  const {
+    activeBackendId,
+    selectedProjectId,
+    project,
+    slice,
+    store,
+    threads,
+    activeThreadId,
+    currentThread,
+    threadsLoaded,
+    threadSessionId,
+  } = useClaudiaThreads({ isConnected });
+
   const wsSendMessage = useCallback(
     (message: ClientMessage) => {
       if (activeBackendId) sendToServer(activeBackendId, message);
     },
     [activeBackendId, sendToServer]
   );
-  const selectedProjectId = useSelectionStore(s => s.selectedProjectId);
-  const projects = useProjectStore(s => s.projects);
-  const dataServerId = useProjectStore(s => s.dataServerId);
-  const projectBackendId = resolveCanonicalBackendId(
-    dataServerId ? parseBackendId(dataServerId) : null,
-    localBackendId
-  );
-  const returnToApp = useTopLevelViewStore(s => s.returnToApp);
-  const { selectSession } = useSelectionCoordinator();
-
-  const slice = useClaudiaStore(s => (activeBackendId ? s.slices[activeBackendId] : undefined));
-  const store = useClaudiaStore;
   const [newTopicArmed, setNewTopicArmed] = useState(false);
   const [newTopicRequestId, setNewTopicRequestId] = useState<string | null>(null);
-
-  const project = useMemo(
-    () =>
-      projectBackendId === activeBackendId
-        ? (projects.find(p => p.id === selectedProjectId) ?? null)
-        : null,
-    [projects, selectedProjectId, projectBackendId, activeBackendId]
-  );
-
-  const threads = useMemo(
-    () =>
-      selectedProjectId
-        ? (slice?.threadsByProject[selectedProjectId] ?? [])
-        : ([] as ClaudiaThreadSummary[]),
-    [slice?.threadsByProject, selectedProjectId]
-  );
-  const activeThreadId = selectedProjectId
-    ? (slice?.activeThreadIdByProject[selectedProjectId] ?? null)
-    : null;
-  // No explicit thread open → most recently updated thread (project-state pointer
-  // semantics, kept client-side so it can never override an explicit open).
-  const currentThread: ClaudiaThreadSummary | null = useMemo(() => {
-    if (activeThreadId) return threads.find(t => t.id === activeThreadId) ?? null;
-    return threads[0] ?? null;
-  }, [activeThreadId, threads]);
-  const threadsLoaded = Boolean(selectedProjectId && slice?.threadsByProject[selectedProjectId]);
-  const threadSessionId = currentThread?.session?.id ?? null;
-
-  const runs = useMemo(() => slice?.runs ?? [], [slice?.runs]);
-  const projectRuns = useMemo(
-    () => runs.filter(run => !selectedProjectId || run.projectId === selectedProjectId),
-    [runs, selectedProjectId]
-  );
-  const threadRuns = useMemo(
-    () =>
-      projectRuns
-        .filter(run => {
-          const target = currentThread?.id ?? activeThreadId;
-          return target
-            ? run.threadId === target ||
-                (run.status === 'submitting' && run.originThreadId === target)
-            : !run.threadId;
-        })
-        .sort((a, b) => a.createdAt - b.createdAt),
-    [projectRuns, currentThread, activeThreadId]
-  );
-  const activeRun: ClaudiaRunInstance | null =
-    threadRuns.find(run => run.status === 'running' || run.status === 'submitting') ??
-    threadRuns.filter(run => run.status !== 'rejected').slice(-1)[0] ??
-    null;
-  const rejectedRuns = threadRuns.filter(run => run.status === 'rejected');
-
-  useEffect(() => {
-    if (!isConnected || !activeBackendId) return;
-    // A lost accepted receipt must replay the same request, never allocate a
-    // fresh request ID. The server ledger reconciles accepted/rejected/uncertain.
-    for (const pending of store.getState().slices[activeBackendId]?.runs ?? []) {
-      if (pending.status === 'submitting' && pending.request) wsSendMessage(pending.request);
-    }
-  }, [isConnected, activeBackendId, wsSendMessage, store]);
+  const composerKey = `claudia-${activeBackendId ?? 'none'}-${selectedProjectId ?? 'none'}-${newTopicArmed ? 'new' : (currentThread?.id ?? 'new')}`;
 
   useEffect(() => {
     store.getState().markViewed();
@@ -187,198 +96,6 @@ export function ClaudiaChat({ isMobile = false }: ClaudiaChatProps) {
     };
   }, [isConnected, activeBackendId, selectedProjectId]);
 
-  const boundProfile = useMemo(() => {
-    const fromReceipt = [...threadRuns]
-      .reverse()
-      .find(run => run.status === 'running' && run.agentProfileId);
-    if (!newTopicArmed && fromReceipt?.agentProfileId) {
-      return {
-        id: fromReceipt.agentProfileId,
-        sourceLabel: sourceLabel(fromReceipt.agentProfileSource, false),
-      };
-    }
-    if (!newTopicArmed && threadSessionId && currentThread?.session?.agentProfileId) {
-      return {
-        id: currentThread.session.agentProfileId,
-        sourceLabel: 'Session bound' as ProfileSourceLabel,
-      };
-    }
-    const explicit = explicitProfileId ? profiles.find(p => p.id === explicitProfileId) : null;
-    if (explicit)
-      return { id: explicit.id, sourceLabel: 'Explicit selection' as ProfileSourceLabel };
-    if (project?.defaultAgentProfileId) {
-      return {
-        id: project.defaultAgentProfileId,
-        sourceLabel: 'Project default' as ProfileSourceLabel,
-      };
-    }
-    const globalDefault = profiles.find(p => p.isDefault);
-    if (globalDefault)
-      return { id: globalDefault.id, sourceLabel: 'Global default' as ProfileSourceLabel };
-    return null;
-  }, [
-    threadRuns,
-    currentThread,
-    threadSessionId,
-    explicitProfileId,
-    profiles,
-    project,
-    newTopicArmed,
-  ]);
-  const boundProfileName =
-    profiles.find(p => p.id === boundProfile?.id)?.name ?? boundProfile?.id ?? null;
-
-  // --- Reads: threads + transcript (standard session/message path) ---
-  const hydratedThreadsRef = useRef<string>('');
-  useEffect(() => {
-    if (!isConnected) {
-      hydratedThreadsRef.current = '';
-      return;
-    }
-    if (!activeBackendId || !selectedProjectId) return;
-    const key = `${activeBackendId}:${selectedProjectId}`;
-    if (hydratedThreadsRef.current === key) return;
-    hydratedThreadsRef.current = key;
-    const requestedAt = Date.now();
-    fetchApiForBackend<{ threads: ClaudiaThreadSummary[] }>(
-      `/api/claudia/threads?projectId=${encodeURIComponent(selectedProjectId)}`,
-      activeBackendId
-    )
-      .then(res => {
-        if (res.success && res.data?.threads) {
-          store
-            .getState()
-            .setThreads(activeBackendId, selectedProjectId, res.data.threads, requestedAt);
-        }
-      })
-      .catch(() => {
-        hydratedThreadsRef.current = '';
-      });
-  }, [isConnected, activeBackendId, selectedProjectId, store]);
-
-  const messages = threadSessionId ? (slice?.messagesBySession[threadSessionId] ?? null) : null;
-  const readVersions = useRef(new Map<string, number>());
-  const refetchThreadMessages = useCallback(
-    async (sessionId: string, backendId: string) => {
-      const key = `${backendId}:${sessionId}`;
-      const version = (readVersions.current.get(key) ?? 0) + 1;
-      readVersions.current.set(key, version);
-      const requestedAt = Date.now();
-      try {
-        const res = await fetchApiForBackend<{
-          messages: Array<Message>;
-          lastRunStatus?: string | null;
-          activeRun?: {
-            runId: string;
-            content?: string;
-            assistantMessageId?: string;
-            startedAt?: number;
-            seq?: number;
-          } | null;
-        }>(`/api/sessions/${encodeURIComponent(sessionId)}/messages?limit=100`, backendId);
-        if (readVersions.current.get(key) !== version || !res.success || !res.data) return;
-        const projected: ClaudiaFeedMessage[] = res.data.messages.map(m => ({
-          id: m.id,
-          role: m.role === 'user' || m.role === 'assistant' ? m.role : 'other',
-          text: typeof m.content === 'string' ? m.content : '',
-          createdAt: m.createdAt,
-        }));
-        // Keep loaded older history; stable IDs replace snapshots rather than duplicate text.
-        const previous = store.getState().slices[backendId]?.messagesBySession[sessionId] ?? [];
-        const merged = new Map(previous.map(m => [m.id, m]));
-        for (const message of projected) merged.set(message.id, message);
-        store.getState().setSessionMessages(
-          backendId,
-          sessionId,
-          [...merged.values()].sort((a, b) => a.createdAt - b.createdAt)
-        );
-        const live = res.data.activeRun;
-        const current = store.getState().slices[backendId];
-        if (live) {
-          const known = current?.runs.find(run => run.runId === live.runId);
-          if (!known) {
-            const thread = Object.values(current?.threadsByProject ?? {})
-              .flat()
-              .find(t => t.session?.id === sessionId);
-            if (thread)
-              store.getState().startRun(backendId, {
-                clientRequestId: `recovered:${live.runId}`,
-                input: '',
-                projectId: thread.projectId,
-                threadId: thread.id,
-                sessionId,
-                runId: live.runId,
-                status: 'running',
-                assistantMessageId: live.assistantMessageId,
-                agentProfileId: thread.session?.agentProfileId ?? undefined,
-                responseText: live.content,
-                createdAt: live.startedAt ?? requestedAt,
-                updatedAt: requestedAt,
-              });
-          }
-          if (live.content !== undefined)
-            store.getState().applyRunSnapshot(backendId, live.runId, live.content, live.seq);
-        }
-        // A terminal event may have been lost while the socket was disconnected.
-        // Refresh the authoritative thread/session state before settling the local projection.
-        const stale =
-          current?.runs.filter(
-            run =>
-              run.sessionId === sessionId &&
-              run.status === 'running' &&
-              run.runId !== live?.runId &&
-              run.updatedAt <= requestedAt
-          ) ?? [];
-        for (const run of stale) {
-          if (!run.threadId) continue;
-          const latest = store
-            .getState()
-            .slices[backendId]?.runs.find(r => r.clientRequestId === run.clientRequestId);
-          if (!latest || latest.status !== 'running' || latest.updatedAt > requestedAt) continue;
-          const status = res.data.lastRunStatus;
-          const finalStatus =
-            status === 'failed' || status === 'cancelled' || status === 'interrupted'
-              ? status
-              : 'completed';
-          store
-            .getState()
-            .startRun(backendId, { ...latest, status: finalStatus, updatedAt: Date.now() });
-        }
-      } catch {
-        store.getState().setSessionMessagesLoading(backendId, sessionId, false);
-      }
-    },
-    [store]
-  );
-
-  useEffect(() => {
-    if (!isConnected || !activeBackendId || !threadSessionId) return;
-    let stopped = false;
-    const versions = readVersions.current;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const refresh = async () => {
-      await refetchThreadMessages(threadSessionId, activeBackendId);
-      if (!stopped) timer = setTimeout(refresh, 4000);
-    };
-    void refresh();
-    return () => {
-      stopped = true;
-      if (timer) clearTimeout(timer);
-      const key = `${activeBackendId}:${threadSessionId}`;
-      versions.set(key, (versions.get(key) ?? 0) + 1);
-    };
-  }, [isConnected, activeBackendId, threadSessionId, refetchThreadMessages]);
-
-  const settledRunKey = threadRuns
-    .filter(run => !['running', 'submitting', 'rejected'].includes(run.status))
-    .map(run => `${run.clientRequestId}:${run.status}`)
-    .join('|');
-  useEffect(() => {
-    if (isConnected && activeBackendId && threadSessionId && settledRunKey) {
-      void refetchThreadMessages(threadSessionId, activeBackendId);
-    }
-  }, [settledRunKey, isConnected, activeBackendId, threadSessionId, refetchThreadMessages]);
-
   // --- Pending permission / input requests: associated by session, not by task ---
   const permissionRequests = usePermissionStore(state =>
     state.pendingRequests.filter(request => {
@@ -398,25 +115,6 @@ export function ClaudiaChat({ isMobile = false }: ClaudiaChatProps) {
     )
   );
 
-  const composerKey = `claudia-${activeBackendId ?? 'none'}-${selectedProjectId ?? 'none'}-${newTopicArmed ? 'new' : (currentThread?.id ?? 'new')}`;
-  const rejectedDraft = [...rejectedRuns].reverse().find(run => run.draftKey === composerKey);
-  useEffect(() => {
-    if (!rejectedDraft || rejectedDraft.draftRestored || !activeBackendId) return;
-    useComposerStore.getState().setDraft(composerKey, {
-      content: rejectedDraft.input,
-      attachments: rejectedDraft.draftAttachments ?? [],
-    });
-    store.getState().startRun(activeBackendId, { ...rejectedDraft, draftRestored: true });
-  }, [rejectedDraft, composerKey, activeBackendId, store]);
-
-  // --- Interrupted recovery, keyed by the thread's session ---
-  const [dismissedInterruption, setDismissedInterruption] = useState('');
-  const interruptionKey = `${activeBackendId}:${threadSessionId}:${activeRun?.clientRequestId ?? currentThread?.session?.updatedAt}`;
-  const threadInterrupted =
-    dismissedInterruption !== interruptionKey &&
-    (activeRun
-      ? activeRun.status === 'interrupted'
-      : currentThread?.session?.lastRunStatus === 'interrupted');
   // --- Send ---
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -447,15 +145,16 @@ export function ClaudiaChat({ isMobile = false }: ClaudiaChatProps) {
       const forceNew = !resumeCurrent && newTopicArmed;
       const targetThreadId = activeThreadId ?? currentThread?.id;
       if (forceNew) setNewTopicRequestId(clientRequestId);
-      const message: ClaudiaMessageMessage = {
-        type: 'claudia_message',
+      const message = buildClaudiaMessage({
         clientRequestId,
-        input: attachments?.length ? JSON.stringify({ text: content, attachments }) : content,
+        content,
+        attachments,
         projectId: selectedProjectId,
-        ...(!resumeCurrent && explicitProfileId ? { agentProfileId: explicitProfileId } : {}),
-        ...(targetThreadId && !forceNew ? { activeBranchId: targetThreadId } : {}),
-        ...(forceNew ? { forceNewBranch: true } : {}),
-      };
+        explicitProfileId,
+        resumeCurrent,
+        targetThreadId,
+        forceNew,
+      });
       store.getState().startRun(activeBackendId, {
         clientRequestId,
         input: content,
@@ -487,6 +186,34 @@ export function ClaudiaChat({ isMobile = false }: ClaudiaChatProps) {
     ]
   );
 
+  // Interrupted resume re-sends inside the current thread and disarms the
+  // new-topic interlock in the original order (send, then disarm).
+  const resumeSend = useCallback(() => {
+    handleSend('continue', undefined, true);
+    setNewTopicArmed(false);
+  }, [handleSend]);
+
+  const {
+    runs,
+    threadRuns,
+    activeRun,
+    rejectedRuns,
+    threadInterrupted,
+    handleResumeInterrupted,
+    handleDismissInterrupted,
+  } = useClaudiaRuns({
+    isConnected,
+    activeBackendId,
+    selectedProjectId,
+    slice,
+    store,
+    currentThread,
+    activeThreadId,
+    threadSessionId,
+    wsSendMessage,
+    resumeSend,
+  });
+
   useEffect(() => {
     const submitted = runs.find(run => run.clientRequestId === newTopicRequestId);
     if (
@@ -499,77 +226,41 @@ export function ClaudiaChat({ isMobile = false }: ClaudiaChatProps) {
     }
   }, [runs, newTopicRequestId]);
 
-  const handleResumeInterrupted = useCallback(async () => {
-    if (!threadSessionId || !activeBackendId) return;
-    try {
-      const response = await fetchApiForBackend(
-        `/api/sessions/${encodeURIComponent(threadSessionId)}/dismiss-interrupted`,
-        activeBackendId,
-        { method: 'PATCH' }
-      );
-      if (!response.success) return;
-    } catch (error) {
-      console.warn('[ClaudiaChat] Failed to clear interrupted status before resume:', error);
-      return;
-    }
-    handleSend('continue', undefined, true);
-    setNewTopicArmed(false);
-    setDismissedInterruption(interruptionKey);
-    // Refresh thread run status
-    if (selectedProjectId) {
-      fetchApiForBackend<{ threads: ClaudiaThreadSummary[] }>(
-        `/api/claudia/threads?projectId=${encodeURIComponent(selectedProjectId)}`,
-        activeBackendId
-      )
-        .then(res => {
-          if (res.success && res.data?.threads) {
-            store.getState().setThreads(activeBackendId, selectedProjectId, res.data.threads);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [threadSessionId, activeBackendId, selectedProjectId, handleSend, store, interruptionKey]);
+  const rejectedDraft = [...rejectedRuns].reverse().find(run => run.draftKey === composerKey);
+  useEffect(() => {
+    if (!rejectedDraft || rejectedDraft.draftRestored || !activeBackendId) return;
+    useComposerStore.getState().setDraft(composerKey, {
+      content: rejectedDraft.input,
+      attachments: rejectedDraft.draftAttachments ?? [],
+    });
+    store.getState().startRun(activeBackendId, { ...rejectedDraft, draftRestored: true });
+  }, [rejectedDraft, composerKey, activeBackendId, store]);
 
-  const handleDismissInterrupted = useCallback(async () => {
-    if (!threadSessionId) return;
-    try {
-      const response = await fetchApiForBackend(
-        `/api/sessions/${encodeURIComponent(threadSessionId)}/dismiss-interrupted`,
-        activeBackendId,
-        { method: 'PATCH' }
-      );
-      if (!response.success) return;
-    } catch (error) {
-      console.warn('[ClaudiaChat] Failed to dismiss interrupted status:', error);
-      return;
-    }
-    setDismissedInterruption(interruptionKey);
-    if (activeBackendId && selectedProjectId) {
-      const next = (slice?.threadsByProject[selectedProjectId] ?? []).map(thread =>
-        thread.session?.id === threadSessionId && thread.session
-          ? { ...thread, session: { ...thread.session, lastRunStatus: null } }
-          : thread
-      );
-      store.getState().setThreads(activeBackendId, selectedProjectId, next);
-    }
-  }, [
+  const { boundProfile, boundProfileName } = useClaudiaProfileBinding({
+    threadRuns,
+    currentThread,
     threadSessionId,
+    explicitProfileId,
+    profiles,
+    project,
+    newTopicArmed,
+  });
+
+  // --- Reads: transcript (4s polling + version-guarded refetch) ---
+  const { messages } = useClaudiaTranscriptSync({
+    isConnected,
     activeBackendId,
-    selectedProjectId,
-    slice?.threadsByProject,
+    threadSessionId,
+    slice,
     store,
-    interruptionKey,
-  ]);
+    threadRuns,
+  });
 
   // --- Actions on the active run ---
   const handleCancelActive = useCallback(() => {
     const run = threadRuns.find(r => r.status === 'running' || r.status === 'submitting');
     if (!run || !run.sessionId) return;
-    wsSendMessage({
-      type: 'agent_cancel',
-      sessionId: run.sessionId,
-      ...(run.runId ? { runId: run.runId } : {}),
-    } as AgentCancelMessage);
+    wsSendMessage(buildAgentCancelMessage(run.sessionId, run.runId));
   }, [threadRuns, wsSendMessage]);
 
   const handleOpenSession = useCallback(() => {

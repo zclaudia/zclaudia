@@ -4,3 +4,4 @@
 // keeps the browser feature's ChatLink off the chat⇄browser runtime cycle.
 export { useChatActionsOptional } from './ChatActionsContext';
 export type { ChatActionsContextValue } from './ChatActionsContext';
+export { useComposerMountDraft } from './hooks/useComposerPrefill';
