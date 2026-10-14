@@ -12,23 +12,13 @@ import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { eagerSyncCurrentSession, recoverCurrentSessionTail } from '../sessionSync';
 import { finalizeRunLifecycle } from './run-finalization';
 import { getProjectsForBackend } from '../api/projects';
-import {
-  isLegacyLocalBackendId,
-  resolveCanonicalBackendId,
-  resolveLocalBackendId,
-} from '../../actions/controlPlane';
+import { isLegacyLocalBackendId } from '../../actions/controlPlane';
 import { parseBackendId } from '../../stores/gatewayStore';
 import { useBackgroundTaskStore } from '../../stores/backgroundTaskStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import type { MessageHandlerContext } from './types';
 import type { InteractionPromptMessage } from '@zclaudia/shared/interaction/forms';
-
-function resolveOwnerBackendId(backendId: string | null, serverId: string): string {
-  const rawBackendId = backendId || parseBackendId(serverId) || serverId;
-  return (
-    resolveCanonicalBackendId(rawBackendId, resolveLocalBackendId() ?? rawBackendId) ?? rawBackendId
-  );
-}
+import { resolveOwnerBackendId } from './interaction-owner';
 
 function buildProviderPromptInteraction(prompt: {
   requestId: string;
@@ -258,7 +248,10 @@ export function handleHeartbeat(
         if (sessionId) {
           usePermissionStore.getState().clearRequestsForSession(sessionId);
           usePromptRequestStore.getState().clearRequestsForSession(sessionId);
-          useInteractionStore.getState().clearSession(sessionId);
+          useInteractionStore.getState().clearSession(sessionId, {
+            serverId: resolveOwnerBackendId(backendId, serverId),
+            runId,
+          });
           useProjectStore.getState().setSessionActive(sessionId, false);
           useSessionsStore
             .getState()
@@ -315,6 +308,12 @@ export function handleHeartbeat(
   }
 
   // Reconcile questions
+  useInteractionStore.getState().reconcilePendingApprovals(
+    resolveOwnerBackendId(backendId, serverId),
+    heartbeat.activeRuns.map(run => ({ runId: run.runId, sessionId: run.sessionId })),
+    heartbeat.pendingApprovals
+  );
+
   const validQIds = new Set<string>(heartbeat.pendingQuestions.map(q => q.requestId));
   usePromptRequestStore.getState().clearStaleRequests(serverId, validQIds);
   for (const q of heartbeat.pendingQuestions) {

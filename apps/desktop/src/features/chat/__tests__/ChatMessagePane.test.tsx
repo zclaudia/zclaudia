@@ -6,6 +6,7 @@ import type { ToolCallState } from '../../../stores/runStore';
 
 const mockInteractionsState = {
   interactions: {} as Record<string, any>,
+  owners: {} as Record<string, { serverId: string; runId?: string }>,
 };
 
 vi.mock('../../../stores/interactionStore', () => ({
@@ -28,7 +29,7 @@ vi.mock('../MessageList', () => ({
 
 vi.mock('../InteractionItem', () => ({
   InteractionItem: ({ interaction }: { interaction: any }) => (
-    <div data-testid="global-prompt">{interaction.interactionId}</div>
+    <div data-testid="global-interaction">{interaction.interactionId}</div>
   ),
 }));
 
@@ -60,6 +61,16 @@ function makeCreatePlanToolCall(id: string): ToolCallState {
     status: 'completed',
     isError: false,
     semantic: 'plan_proposal',
+  };
+}
+
+function makeRequestApprovalToolCall(id: string): ToolCallState {
+  return {
+    id,
+    toolName: 'mcp:claudia-plugins:request_approval',
+    toolInput: { title: 'Approve action', message: 'Review this action' },
+    status: 'running',
+    isError: false,
   };
 }
 
@@ -124,6 +135,7 @@ function defineScrollableMetrics(
 describe('ChatMessagePane', () => {
   beforeEach(() => {
     mockInteractionsState.interactions = {};
+    mockInteractionsState.owners = {};
   });
 
   it('does not render a provider prompt globally when an AskUserQuestion tool call already owns it', () => {
@@ -144,7 +156,7 @@ describe('ChatMessagePane', () => {
     });
 
     expect(screen.getByTestId('inline-tool-call')).toHaveTextContent('ask-1');
-    expect(screen.queryByTestId('global-prompt')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('global-interaction')).not.toBeInTheDocument();
   });
 
   it('keeps the global provider prompt as a fallback when no AskUserQuestion tool call owns it', () => {
@@ -162,7 +174,7 @@ describe('ChatMessagePane', () => {
 
     renderPane();
 
-    expect(screen.getByTestId('global-prompt')).toHaveTextContent('ask-1');
+    expect(screen.getByTestId('global-interaction')).toHaveTextContent('ask-1');
   });
 
   it('renders an orphan plan review so pending sessions have visible action buttons', () => {
@@ -177,7 +189,7 @@ describe('ChatMessagePane', () => {
 
     renderPane();
 
-    expect(screen.getByTestId('global-prompt')).toHaveTextContent('plan-1');
+    expect(screen.getByTestId('global-interaction')).toHaveTextContent('plan-1');
   });
 
   it('does not render a plan review globally when a tool call owns it', () => {
@@ -194,7 +206,74 @@ describe('ChatMessagePane', () => {
       sessionToolCallHistory: [makeCreatePlanToolCall('plan-1')],
     });
 
-    expect(screen.queryByTestId('global-prompt')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('global-interaction')).not.toBeInTheDocument();
+  });
+
+  it('renders a live approval globally when its interaction ID differs from the tool-call ID', () => {
+    mockInteractionsState.interactions['approval-id'] = {
+      type: 'interaction_approval',
+      interactionId: 'approval-id',
+      sessionId: 's1',
+      source: 'tool_call',
+      createdAt: 1,
+      title: 'Approve action',
+      message: 'Review this action',
+    };
+
+    renderPane({ sessionToolCallHistory: [makeRequestApprovalToolCall('tool-call-id')] });
+
+    expect(screen.getByTestId('inline-tool-call')).toHaveTextContent('tool-call-id');
+    expect(screen.getByTestId('global-interaction')).toHaveTextContent('approval-id');
+  });
+
+  it('does not duplicate an approval once the owning tool result is available', () => {
+    mockInteractionsState.interactions['approval-id'] = {
+      type: 'interaction_approval',
+      interactionId: 'approval-id',
+      sessionId: 's1',
+      source: 'tool_call',
+      createdAt: 1,
+      title: 'Approve action',
+      message: 'Review this action',
+    };
+
+    renderPane({
+      sessionToolCallHistory: [
+        { ...makeRequestApprovalToolCall('tool-call-id'), result: JSON.stringify({ interactionId: 'approval-id' }) },
+      ],
+    });
+
+    expect(screen.queryByTestId('global-interaction')).not.toBeInTheDocument();
+  });
+
+  it('does not show an approval owned by another backend with the same session ID', () => {
+    mockInteractionsState.interactions['approval-a'] = {
+      type: 'interaction_approval',
+      interactionId: 'approval-a',
+      sessionId: 's1',
+      source: 'tool_call',
+      createdAt: 1,
+      title: 'Approve A',
+      message: 'Backend A action',
+    };
+    mockInteractionsState.interactions['approval-b'] = {
+      type: 'interaction_approval',
+      interactionId: 'approval-b',
+      sessionId: 's1',
+      source: 'tool_call',
+      createdAt: 2,
+      title: 'Approve B',
+      message: 'Backend B action',
+    };
+    mockInteractionsState.owners = {
+      'approval-a': { serverId: 'backend-a', runId: 'run-a' },
+      'approval-b': { serverId: 'backend-b', runId: 'run-b' },
+    };
+
+    renderPane({ interactionServerId: 'backend-a' });
+
+    expect(screen.getByTestId('global-interaction')).toHaveTextContent('approval-a');
+    expect(screen.queryByText('approval-b')).not.toBeInTheDocument();
   });
 
   it('does not auto-scroll on initial mount for a static loaded session', () => {

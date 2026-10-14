@@ -5,7 +5,7 @@
 import type { ServerFeature } from '../../core/server.js';
 import type { SessionType } from '../../core/session.js';
 import type { NotificationUnreadCountsByTab } from '../../features/notification-feed.js';
-import type { AskUserQuestionItem } from '../../interaction/forms.js';
+import type { ApprovalInteractionMessage, AskUserQuestionItem } from '../../interaction/forms.js';
 
 // Authentication message (sent after WebSocket connection)
 export interface AuthMessage {
@@ -146,6 +146,8 @@ export interface StateHeartbeatMessage {
     sessionId: string;
     questions: AskUserQuestionItem[];
   }>;
+  /** Active request_approval interactions that a reconnecting client must restore. */
+  pendingApprovals?: Array<{ runId: string; interaction: ApprovalInteractionMessage }>;
   /** Unread Agent Feed item count — for badge display on reconnect */
   unreadFeedCount?: number;
   /** Unread Agent Feed item count by tab — for inbox badges on reconnect */

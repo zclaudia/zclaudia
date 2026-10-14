@@ -158,6 +158,7 @@ const mockInteractionStore = {
   resolveInteraction: vi.fn(),
   markExpired: vi.fn(),
   clearSession: vi.fn(),
+  reconcilePendingApprovals: vi.fn(),
   has: vi.fn(() => false),
 };
 const mockEagerSyncCurrentSession = vi.fn(() => Promise.resolve());
@@ -451,7 +452,10 @@ describe('handleServerMessage', () => {
 
       expect(mockPromptRequestStore.clearRequestsForSession).toHaveBeenCalledWith('s1');
       expect(mockPermissionStore.clearRequestsForSession).toHaveBeenCalledWith('s1');
-      expect(mockInteractionStore.clearSession).toHaveBeenCalledWith('s1');
+      expect(mockInteractionStore.clearSession).toHaveBeenCalledWith('s1', {
+        serverId: 'server-1',
+        runId: 'r1',
+      });
       expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1', {
         sessionId: 's1',
         assistantMessageId: undefined,
@@ -498,7 +502,10 @@ describe('handleServerMessage', () => {
       handleServerMessage({ type: 'run_completed', runId: 'r1', sessionId: 's2' }, makeCtx());
       expect(mockPromptRequestStore.clearRequestsForSession).toHaveBeenCalledWith('s2');
       expect(mockPermissionStore.clearRequestsForSession).toHaveBeenCalledWith('s2');
-      expect(mockInteractionStore.clearSession).toHaveBeenCalledWith('s2');
+      expect(mockInteractionStore.clearSession).toHaveBeenCalledWith('s2', {
+        serverId: 'server-1',
+        runId: 'r1',
+      });
     });
 
     it('gateway: calls setSessionActiveById', () => {
@@ -571,7 +578,10 @@ describe('handleServerMessage', () => {
       handleServerMessage({ type: 'run_failed', runId: 'r1', error: 'boom' }, makeCtx());
 
       expect(mockPermissionStore.clearRequestsForSession).toHaveBeenCalledWith('s1');
-      expect(mockInteractionStore.clearSession).toHaveBeenCalledWith('s1');
+      expect(mockInteractionStore.clearSession).toHaveBeenCalledWith('s1', {
+        serverId: 'server-1',
+        runId: 'r1',
+      });
       expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1', {
         sessionId: 's1',
         assistantMessageId: undefined,
@@ -1000,6 +1010,57 @@ describe('handleServerMessage', () => {
     } as const;
     handleServerMessage(event, makeCtx());
     expect(mockInteractionStore.upsertInteraction).toHaveBeenCalledWith(event);
+  });
+
+  it('records the owning backend and active run for a live approval event', () => {
+    const event = {
+      type: 'interaction_approval',
+      interactionId: 'approval-id',
+      sessionId: 'session-b',
+      source: 'tool_call',
+      createdAt: 1,
+      title: 'Approve action',
+      message: 'Review action',
+    } as const;
+    mockChatStore.activeRuns = { 'run-b': 'session-b' };
+    handleServerMessage(
+      event,
+      makeCtx({
+        serverId: 'backend-b',
+        serverRunsRef: new Map([['backend-b', new Set(['run-b'])]]),
+      })
+    );
+
+    expect(mockInteractionStore.upsertInteraction).toHaveBeenCalledWith(event, {
+      serverId: 'backend-b',
+      runId: 'run-b',
+    });
+  });
+
+  it('stores gateway approval ownership under the routed backend ID', () => {
+    const event = {
+      type: 'interaction_approval',
+      interactionId: 'approval-gateway',
+      sessionId: 'session-b',
+      source: 'tool_call',
+      createdAt: 1,
+      title: 'Approve action',
+      message: 'Review action',
+    } as const;
+    mockChatStore.activeRuns = { 'run-b': 'session-b' };
+    handleServerMessage(
+      event,
+      makeCtx({
+        serverId: 'gw:remote-1',
+        backendId: 'remote-1',
+        serverRunsRef: new Map([['gw:remote-1', new Set(['run-b'])]]),
+      })
+    );
+
+    expect(mockInteractionStore.upsertInteraction).toHaveBeenCalledWith(event, {
+      serverId: 'remote-1',
+      runId: 'run-b',
+    });
   });
 
   it('does not create prompt route for non-provider interaction_prompt', () => {
@@ -1639,6 +1700,36 @@ describe('handleServerMessage', () => {
         })
       );
       expect(mockInteractionStore.upsertInteraction).not.toHaveBeenCalled();
+    });
+
+    it('reconciles pending approvals from a backend/session/run-scoped heartbeat snapshot', () => {
+      const pendingApprovals = [
+        {
+          runId: 'run-b',
+          interaction: {
+            type: 'interaction_approval',
+            interactionId: 'approval-id',
+            sessionId: 'session-b',
+            source: 'tool_call',
+            createdAt: 1,
+            title: 'Approve action',
+            message: 'Review action',
+          },
+        },
+      ];
+      handleServerMessage(
+        makeHeartbeat({
+          activeRuns: [{ runId: 'run-b', sessionId: 'session-b' }],
+          pendingApprovals,
+        }),
+        makeCtx({ serverId: 'backend-b' })
+      );
+
+      expect(mockInteractionStore.reconcilePendingApprovals).toHaveBeenCalledWith(
+        'backend-b',
+        [{ runId: 'run-b', sessionId: 'session-b' }],
+        pendingApprovals
+      );
     });
 
     it('gateway: reconciles active sessions', () => {

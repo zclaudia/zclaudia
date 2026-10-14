@@ -393,20 +393,25 @@ function PromptRenderer({ interaction }: { interaction: InteractionPromptMessage
 // ============================================
 
 function ApprovalRenderer({ interaction }: { interaction: ApprovalInteractionMessage }) {
-  const { sendMessage } = useConnection();
+  const { sendMessage, sendToServer } = useConnection();
+  const ownerServerId = useInteractionStore(
+    state => state.owners[interaction.interactionId]?.serverId
+  );
   const [decision, setDecision] = useState<'approved' | 'rejected' | null>(null);
 
   const handleDecision = useCallback(
     (approved: boolean) => {
-      sendMessage({
+      const message = {
         type: 'interaction_response',
         interactionId: interaction.interactionId,
         sessionId: interaction.sessionId,
         response: { approved },
-      });
+      } as const;
+      if (ownerServerId) sendToServer(ownerServerId, message);
+      else sendMessage(message);
       setDecision(approved ? 'approved' : 'rejected');
     },
-    [sendMessage, interaction.interactionId, interaction.sessionId]
+    [ownerServerId, sendMessage, sendToServer, interaction.interactionId, interaction.sessionId]
   );
 
   if (decision) {

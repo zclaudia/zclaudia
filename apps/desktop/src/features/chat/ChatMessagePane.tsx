@@ -12,12 +12,15 @@ import type { PermissionRequest } from '../../stores/permissionStore';
 import type { ContentBlock } from '@zclaudia/shared/core/message';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { isPlanProposalTool } from './tool-call/toolClassifiers';
+import { extractInteractionId } from './tool-call/toolFormatters';
 import { TodoFloatingPanel } from './todo/TodoFloatingPanel';
 
 const AUTO_STICK_BOTTOM_THRESHOLD_PX = 200;
 
 interface ChatMessagePaneProps {
   sessionId: string;
+  /** Server/backend currently routed to this session, used to isolate live controls. */
+  interactionServerId?: string | null;
   // Pagination / scroll refs & state
   messagesEndRef: RefObject<HTMLDivElement | null>;
   messagesContainerRef: RefObject<HTMLDivElement | null>;
@@ -78,6 +81,7 @@ interface ChatMessagePaneProps {
 
 export const ChatMessagePane = memo(function ChatMessagePane({
   sessionId,
+  interactionServerId,
   messagesEndRef,
   messagesContainerRef,
   initialLoadDone,
@@ -116,6 +120,7 @@ export const ChatMessagePane = memo(function ChatMessagePane({
   collapsed,
 }: ChatMessagePaneProps) {
   const interactionsMap = useInteractionStore(state => state.interactions);
+  const interactionOwners = useInteractionStore(state => state.owners);
   const promptInteractions = useMemo(() => {
     const inlinePromptInteractionIds = new Set(
       [...sessionToolCallHistory, ...sessionToolCalls]
@@ -133,6 +138,28 @@ export const ChatMessagePane = memo(function ChatMessagePane({
       )
       .sort((a, b) => a.createdAt - b.createdAt);
   }, [interactionsMap, sessionId, sessionToolCallHistory, sessionToolCalls]);
+  const approvalInteractions = useMemo(
+    () => {
+      const inlineInteractionIds = new Set(
+        [...sessionToolCallHistory, ...sessionToolCalls].flatMap(toolCall =>
+          [toolCall.id, extractInteractionId(toolCall.result)].filter(
+            (id): id is string => Boolean(id)
+          )
+        )
+      );
+      return Object.values(interactionsMap)
+        .filter(
+          interaction =>
+            interaction.sessionId === sessionId &&
+            interaction.type === 'interaction_approval' &&
+            (!interactionOwners[interaction.interactionId] ||
+              interactionOwners[interaction.interactionId].serverId === interactionServerId) &&
+            !inlineInteractionIds.has(interaction.interactionId)
+        )
+        .sort((a, b) => a.createdAt - b.createdAt);
+    },
+    [interactionsMap, interactionOwners, interactionServerId, sessionId, sessionToolCallHistory, sessionToolCalls]
+  );
   const planReviewInteractions = useMemo(() => {
     const toolCalls = [...sessionToolCallHistory, ...sessionToolCalls];
     const hasPlanProposalTool = toolCalls.some(toolCall =>
@@ -425,6 +452,14 @@ export const ChatMessagePane = memo(function ChatMessagePane({
                   request={req}
                   onDecision={onPermissionDecision}
                 />
+              ))}
+            </div>
+          )}
+
+          {approvalInteractions.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {approvalInteractions.map(interaction => (
+                <InteractionItem key={interaction.interactionId} interaction={interaction} />
               ))}
             </div>
           )}

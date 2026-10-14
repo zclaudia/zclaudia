@@ -620,6 +620,7 @@ export function ChatInterface({
             {/* Messages — memo'd to isolate from input re-renders */}
             <ChatMessagePane
               sessionId={sessionId}
+              interactionServerId={routedBackendId ?? activeServerId}
               messagesEndRef={pagination.messagesEndRef}
               messagesContainerRef={pagination.messagesContainerRef}
               initialLoadDone={pagination.initialLoadDone}

@@ -14,6 +14,7 @@ import {
 import { commandRegistry as pluginCommandRegistry } from '../../commands/registry.js';
 import type { ConnectedClient, ActiveRun } from './types.js';
 import { isTerminalPhase } from '../runtime/active-run-phase.js';
+import { interactionDispatcher } from '../interactions/interaction-dispatcher.js';
 
 // ---------------------------------------------------------------------------
 // Application-layer entity version counters (monotonic, in-memory).
@@ -76,6 +77,7 @@ export function buildStateHeartbeat(activeRuns: Map<string, ActiveRun>): StateHe
   const runs: StateHeartbeatMessage['activeRuns'] = [];
   const permissions: StateHeartbeatMessage['pendingPermissions'] = [];
   const questions: StateHeartbeatMessage['pendingQuestions'] = [];
+  const pendingApprovals: NonNullable<StateHeartbeatMessage['pendingApprovals']> = [];
 
   for (const [runId, run] of activeRuns) {
     if (isTerminalPhase(run.phase)) continue;
@@ -125,11 +127,25 @@ export function buildStateHeartbeat(activeRuns: Map<string, ActiveRun>): StateHe
     }
   }
 
+  // The dispatcher owns live request_approval promises in memory. Include
+  // their cards in each heartbeat so a client that backgrounds or reconnects
+  // while the approval is pending can rebuild its UI from authoritative state.
+  // request_approval events currently carry sessionId, not runId. Sessions
+  // are admitted with at most one active run; fail closed if that invariant is
+  // ever violated rather than binding a card to an arbitrary Map winner.
+  for (const interaction of interactionDispatcher.getPendingApprovals()) {
+    const matchingRuns = runs.filter(run => run.sessionId === interaction.sessionId);
+    if (matchingRuns.length === 1) {
+      pendingApprovals.push({ runId: matchingRuns[0].runId, interaction });
+    }
+  }
+
   return {
     type: 'state_heartbeat',
     activeRuns: runs,
     pendingPermissions: permissions,
     pendingQuestions: questions,
+    pendingApprovals,
     versions: getEntityVersions(),
   };
 }

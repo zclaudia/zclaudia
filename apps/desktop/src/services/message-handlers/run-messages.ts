@@ -14,6 +14,7 @@ import { eagerSyncCurrentSession, recoverCurrentSessionTail } from '../sessionSy
 import { getSessionCompaction } from '../api/sessions';
 import { scheduleDelta, scheduleToolUse } from './delta-buffer';
 import { finalizeRunLifecycle } from './run-finalization';
+import { resolveOwnerBackendId } from './interaction-owner';
 
 /**
  * Translate a Codex OAuth error code into a user-facing message.
@@ -131,7 +132,10 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       if (completedSession) {
         usePromptRequestStore.getState().clearRequestsForSession(completedSession);
         usePermissionStore.getState().clearRequestsForSession(completedSession);
-        useInteractionStore.getState().clearSession(completedSession);
+        useInteractionStore.getState().clearSession(completedSession, {
+          serverId: resolveOwnerBackendId(backendId, serverId),
+          runId: msg.runId,
+        });
         if (msg.usage) {
           useSessionConfigStore.getState().addSessionUsage(completedSession, msg.usage);
         }
@@ -170,7 +174,10 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       if (failedSession) {
         usePromptRequestStore.getState().clearRequestsForSession(failedSession);
         usePermissionStore.getState().clearRequestsForSession(failedSession);
-        useInteractionStore.getState().clearSession(failedSession);
+        useInteractionStore.getState().clearSession(failedSession, {
+          serverId: resolveOwnerBackendId(backendId, serverId),
+          runId: msg.runId,
+        });
         if (msg.error) {
           const codexToast = describeCodexOAuthError(msg.errorCode);
           if (codexToast) {
