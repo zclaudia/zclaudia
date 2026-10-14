@@ -48,9 +48,7 @@ export const useInteractionStore = create<InteractionState>((set, get) => ({
   upsertInteraction: (event, owner) =>
     set(state => ({
       interactions: { ...state.interactions, [event.interactionId]: event },
-      owners: owner
-        ? { ...state.owners, [event.interactionId]: owner }
-        : state.owners,
+      owners: owner ? { ...state.owners, [event.interactionId]: owner } : state.owners,
     })),
 
   resolveInteraction: interactionId =>

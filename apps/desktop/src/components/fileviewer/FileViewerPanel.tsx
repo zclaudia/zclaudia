@@ -1,10 +1,4 @@
-import {
-  useLayoutEffect,
-  useRef,
-  useState,
-  useEffect,
-  useMemo,
-} from 'react';
+import { useLayoutEffect, useRef, useState, useEffect, useMemo } from 'react';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useWorkspaceTool } from '../workspace/WorkspaceToolContext';
 import { themes as prismThemes } from 'prism-react-renderer';

@@ -40,10 +40,14 @@ describe('buildClaudiaMessage', () => {
   });
 
   it('carries the explicit profile only when not resuming the current thread', () => {
-    expect(
-      buildClaudiaMessage({ ...base, explicitProfileId: 'agent-1' }).agentProfileId
-    ).toBe('agent-1');
-    const resumed = buildClaudiaMessage({ ...base, explicitProfileId: 'agent-1', resumeCurrent: true });
+    expect(buildClaudiaMessage({ ...base, explicitProfileId: 'agent-1' }).agentProfileId).toBe(
+      'agent-1'
+    );
+    const resumed = buildClaudiaMessage({
+      ...base,
+      explicitProfileId: 'agent-1',
+      resumeCurrent: true,
+    });
     expect(resumed.agentProfileId).toBeUndefined();
     expect(resumed.activeBranchId).toBe('thread-1');
   });

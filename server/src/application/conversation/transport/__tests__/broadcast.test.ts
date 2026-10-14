@@ -47,7 +47,11 @@ describe('state heartbeat pending approvals', () => {
     expect(buildStateHeartbeat(new Map([['run-b', run]])).pendingApprovals).toEqual([
       { runId: 'run-b', interaction: event },
     ]);
-    expect(buildStateHeartbeat(new Map([['run-a', { ...run, runId: 'run-a', sessionId: 'session-a' } as ActiveRun]])).pendingApprovals).toEqual([]);
+    expect(
+      buildStateHeartbeat(
+        new Map([['run-a', { ...run, runId: 'run-a', sessionId: 'session-a' } as ActiveRun]])
+      ).pendingApprovals
+    ).toEqual([]);
 
     expect(interactionDispatcher.resolve(event.interactionId, { approved: true })).toBe(true);
     await expect(pending).resolves.toEqual({ approved: true });

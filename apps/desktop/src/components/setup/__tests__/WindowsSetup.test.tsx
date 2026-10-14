@@ -148,7 +148,8 @@ describe('WindowsSetup connection timer cleanup', () => {
 
         expect(setActiveServerSpy).toHaveBeenCalledTimes(1);
         expect(setActiveServerSpy).toHaveBeenCalledWith(LEGACY_LOCAL_SERVER_ID);
-        expect(vi.getTimerCount()).toBe(0);} finally {
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
         vi.useRealTimers();
       }
     });

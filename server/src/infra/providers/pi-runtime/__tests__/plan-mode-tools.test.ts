@@ -24,7 +24,12 @@ describe('EnterPlanMode / ExitPlanMode builtins', () => {
   });
 
   function tools(): Record<string, any> {
-    const built = buildTools('/tmp', { enabled: ['EnterPlanMode', 'ExitPlanMode'], db, sessionId, planModePort: createPlanModePort(db) });
+    const built = buildTools('/tmp', {
+      enabled: ['EnterPlanMode', 'ExitPlanMode'],
+      db,
+      sessionId,
+      planModePort: createPlanModePort(db),
+    });
     return Object.fromEntries(built.map(t => [t.name, t]));
   }
 

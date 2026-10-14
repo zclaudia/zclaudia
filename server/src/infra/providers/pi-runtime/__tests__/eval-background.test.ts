@@ -51,7 +51,12 @@ describe('Eval background runtime', () => {
   it('runs isolated one-shot code as a task readable through TaskOutput', async () => {
     expect(db).toBeDefined();
     expect(dir).toBeDefined();
-    const evalTool = createEvalBridgeTool(dir!, { sessionId: 's1', runId: 'r1', db: db!, taskPort: tasks! }) as any;
+    const evalTool = createEvalBridgeTool(dir!, {
+      sessionId: 's1',
+      runId: 'r1',
+      db: db!,
+      taskPort: tasks!,
+    }) as any;
     const start = await evalTool.execute('eval-bg-1', {
       code: "console.log('hello from eval'); 21 * 2",
       run_in_background: true,
@@ -125,7 +130,12 @@ describe('Eval background runtime', () => {
     expect(db).toBeDefined();
     expect(dir).toBeDefined();
     expect(dataDir).toBeDefined();
-    const evalTool = createEvalBridgeTool(dir!, { sessionId: 's1', runId: 'r1', db: db!, taskPort: tasks! }) as any;
+    const evalTool = createEvalBridgeTool(dir!, {
+      sessionId: 's1',
+      runId: 'r1',
+      db: db!,
+      taskPort: tasks!,
+    }) as any;
     const start = await evalTool.execute('eval-bg-cleanup', {
       code: "'cleanup probe'",
       run_in_background: true,

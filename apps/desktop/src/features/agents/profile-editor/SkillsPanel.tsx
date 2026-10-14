@@ -121,7 +121,10 @@ export function SkillsPanel({
                       aria-label={`skill visibility ${key}`}
                       value={skillVisibility(skill)}
                       onChange={event =>
-                        setSkillVisibility(skill, event.target.value as 'default' | 'include' | 'exclude')
+                        setSkillVisibility(
+                          skill,
+                          event.target.value as 'default' | 'include' | 'exclude'
+                        )
                       }
                       className="rounded-md border border-border bg-secondary px-1 py-0.5 text-[10px] max-md:flex-1 max-md:py-1.5 max-md:text-xs"
                     >

@@ -60,7 +60,9 @@ export function createAssistantMarkdownComponents(fileRef: FileRefContextValue):
     table({ children }) {
       return (
         <div className="w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
-          <table className="w-max min-w-full border-collapse border border-border">{children}</table>
+          <table className="w-max min-w-full border-collapse border border-border">
+            {children}
+          </table>
         </div>
       );
     },

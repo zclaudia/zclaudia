@@ -9,7 +9,10 @@
  */
 
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
-import type { ApprovalInteractionMessage, InteractionResolvedReason } from '@zclaudia/shared/interaction/forms';
+import type {
+  ApprovalInteractionMessage,
+  InteractionResolvedReason,
+} from '@zclaudia/shared/interaction/forms';
 
 interface PendingInteraction {
   resolve: (response: Record<string, unknown>) => void;
@@ -64,7 +67,13 @@ class InteractionDispatcher {
               resolve({ error: 'User did not respond within timeout' });
             }, timeoutMs);
 
-      this.pending.set(interactionId, { resolve, timeout, sessionId, eventType: event.type, event });
+      this.pending.set(interactionId, {
+        resolve,
+        timeout,
+        sessionId,
+        eventType: event.type,
+        event,
+      });
 
       try {
         sendFn(sessionId, event);
@@ -169,7 +178,9 @@ class InteractionDispatcher {
   getPendingApprovals(): ApprovalInteractionMessage[] {
     return Array.from(this.pending.values())
       .map(entry => entry.event)
-      .filter((event): event is ApprovalInteractionMessage => event.type === 'interaction_approval');
+      .filter(
+        (event): event is ApprovalInteractionMessage => event.type === 'interaction_approval'
+      );
   }
 
   /**

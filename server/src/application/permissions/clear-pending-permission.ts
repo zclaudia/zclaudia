@@ -1,8 +1,5 @@
 import type { ActiveRun } from '../conversation/transport/types.js';
-import {
-  computeBlockers,
-  recomputePhase,
-} from '../conversation/runtime/active-run-phase.js';
+import { computeBlockers, recomputePhase } from '../conversation/runtime/active-run-phase.js';
 
 /**
  * Clear a pending permission request from whichever active run holds it.

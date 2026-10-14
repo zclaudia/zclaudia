@@ -328,11 +328,14 @@ describe('LightweightAgentRunner', () => {
   });
 
   it('returns contract_failed when repair still fails', async () => {
-    const runner = createRunner(db, vi.fn(async () => ({
+    const runner = createRunner(
+      db,
+      vi.fn(async () => ({
         text: 'still bad',
         messages: [],
         usage: { totalTokens: 7 },
-      })));
+      }))
+    );
 
     const result = await runner.run({
       owner: { type: 'workflow_run', id: 'run-1' },

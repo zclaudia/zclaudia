@@ -16,18 +16,12 @@ import {
 import { buildFileStateErrorDescriptor } from '../file-state.js';
 import { hashlineTag, replaceHashlineLine } from '../hashline.js';
 import type { ReadFileStateEntry } from '../read-file-state.js';
-import {
-  errorResult,
-  readGuardFailureDetails,
-  type BatchEditInput,
-} from './shared.js';
+import { errorResult, readGuardFailureDetails, type BatchEditInput } from './shared.js';
 
 /** The tool-result shape shared by all mutation outcomes. */
 export type MutationOutcome = ReturnType<typeof errorResult>;
 
-export type ReadGuardCheck =
-  | { ok: true }
-  | { ok: false; code: string; message: string };
+export type ReadGuardCheck = { ok: true } | { ok: false; code: string; message: string };
 
 export type ReadGuardDecision =
   | { proceed: true; rebased: boolean }

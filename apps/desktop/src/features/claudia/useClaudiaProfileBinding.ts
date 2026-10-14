@@ -1,9 +1,6 @@
 import { useMemo } from 'react';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
-import type {
-  ClaudiaRunInstance,
-  ClaudiaThreadSummary,
-} from '../../stores/claudiaStore';
+import type { ClaudiaRunInstance, ClaudiaThreadSummary } from '../../stores/claudiaStore';
 
 export type ProfileSourceLabel =
   | 'Explicit selection'

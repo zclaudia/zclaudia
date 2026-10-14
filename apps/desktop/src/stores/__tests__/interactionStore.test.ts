@@ -134,11 +134,13 @@ describe('interactionStore', () => {
       message: 'Review action',
     };
 
-    useInteractionStore.getState().reconcilePendingApprovals(
-      'backend-b',
-      [{ runId: 'run-b', sessionId: 'session-b' }],
-      [{ runId: 'run-b', interaction: approval }]
-    );
+    useInteractionStore
+      .getState()
+      .reconcilePendingApprovals(
+        'backend-b',
+        [{ runId: 'run-b', sessionId: 'session-b' }],
+        [{ runId: 'run-b', interaction: approval }]
+      );
 
     expect(useInteractionStore.getState().interactions['approval-1']).toEqual(approval);
     expect(useInteractionStore.getState().owners['approval-1']).toEqual({
@@ -160,23 +162,23 @@ describe('interactionStore', () => {
     const store = useInteractionStore.getState();
     store.upsertInteraction(approval, { serverId: 'backend-b', runId: 'run-b' });
 
-    store.reconcilePendingApprovals('backend-b', [{ runId: 'run-b', sessionId: 'session-b' }], undefined);
+    store.reconcilePendingApprovals(
+      'backend-b',
+      [{ runId: 'run-b', sessionId: 'session-b' }],
+      undefined
+    );
     expect(useInteractionStore.getState().interactions).toHaveProperty('approval-b');
 
     // A's empty snapshot must not clear B's pending approval.
-    useInteractionStore.getState().reconcilePendingApprovals(
-      'backend-a',
-      [{ runId: 'run-a', sessionId: 'session-a' }],
-      []
-    );
+    useInteractionStore
+      .getState()
+      .reconcilePendingApprovals('backend-a', [{ runId: 'run-a', sessionId: 'session-a' }], []);
     expect(useInteractionStore.getState().interactions).toHaveProperty('approval-b');
 
     // B's explicit empty snapshot for the exact active run clears it.
-    useInteractionStore.getState().reconcilePendingApprovals(
-      'backend-b',
-      [{ runId: 'run-b', sessionId: 'session-b' }],
-      []
-    );
+    useInteractionStore
+      .getState()
+      .reconcilePendingApprovals('backend-b', [{ runId: 'run-b', sessionId: 'session-b' }], []);
     expect(useInteractionStore.getState().interactions).not.toHaveProperty('approval-b');
   });
 
@@ -223,11 +225,13 @@ describe('interactionStore', () => {
       runId: 'run-old',
     });
 
-    useInteractionStore.getState().reconcilePendingApprovals(
-      'backend-a',
-      [{ runId: 'run-new', sessionId: 'shared-session' }],
-      [{ runId: 'run-new', interaction: approval('new-run') }]
-    );
+    useInteractionStore
+      .getState()
+      .reconcilePendingApprovals(
+        'backend-a',
+        [{ runId: 'run-new', sessionId: 'shared-session' }],
+        [{ runId: 'run-new', interaction: approval('new-run') }]
+      );
 
     expect(useInteractionStore.getState().interactions).not.toHaveProperty('old-run');
     expect(useInteractionStore.getState().interactions).toHaveProperty('new-run');

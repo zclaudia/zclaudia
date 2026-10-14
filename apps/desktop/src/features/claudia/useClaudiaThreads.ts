@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import {
-  useClaudiaStore,
-  type ClaudiaThreadSummary,
-} from '../../stores/claudiaStore';
+import { useClaudiaStore, type ClaudiaThreadSummary } from '../../stores/claudiaStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useServerStore } from '../../stores/serverStore';

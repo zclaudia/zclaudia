@@ -95,7 +95,11 @@ async function main() {
     content +
     '</svg>\n';
   const scaled = (scale, shapes = inner) =>
-    '<g transform="translate(256 256) scale(' + scale + ') translate(-256 -256)">' + shapes + '</g>';
+    '<g transform="translate(256 256) scale(' +
+    scale +
+    ') translate(-256 -256)">' +
+    shapes +
+    '</g>';
   const devInner = inner
     .replace(head, head.replace(/fill="[^"]+"/, 'fill="' + DEV_HEAD + '"'))
     .replace(faceMask, faceMask.replace(/fill="[^"]+"/, 'fill="' + DEV_FACE + '"'));
@@ -115,8 +119,7 @@ async function main() {
     '<rect width="512" height="512" rx="104" fill="' + BACKGROUND + '" />' + scaled(0.88)
   );
   const mobileSvg = svg(
-    '<rect width="512" height="512" fill="' + BACKGROUND + '" />' +
-      scaled(0.88 * MOBILE_HEAD_SCALE)
+    '<rect width="512" height="512" fill="' + BACKGROUND + '" />' + scaled(0.88 * MOBILE_HEAD_SCALE)
   );
   // macOS 26 applies its own rounded mask. Transparent, pre-rounded corners
   // make legacy ICNS icons receive a second system background around the art.
@@ -126,15 +129,21 @@ async function main() {
   // Keep the adaptive foreground inside Android's central safe area.
   const adaptiveSvg = svg(scaled(0.72 * MOBILE_HEAD_SCALE));
   const devMobileSvg = svg(
-    '<rect width="512" height="512" fill="' + DEV_BACKGROUND + '" />' +
+    '<rect width="512" height="512" fill="' +
+      DEV_BACKGROUND +
+      '" />' +
       scaled(0.88 * MOBILE_HEAD_SCALE, devInner)
   );
   const devAdaptiveSvg = svg(scaled(0.72 * MOBILE_HEAD_SCALE, devInner));
   // Pre-adaptive launchers need circular fallbacks with transparent corners.
-  const roundSvg = (background, shapes = inner) => svg(
-    '<defs><clipPath id="round"><circle cx="256" cy="256" r="256" /></clipPath></defs><g clip-path="url(#round)"><rect width="512" height="512" fill="' +
-      background + '" />' + scaled(0.8 * MOBILE_HEAD_SCALE, shapes) + '</g>'
-  );
+  const roundSvg = (background, shapes = inner) =>
+    svg(
+      '<defs><clipPath id="round"><circle cx="256" cy="256" r="256" /></clipPath></defs><g clip-path="url(#round)"><rect width="512" height="512" fill="' +
+        background +
+        '" />' +
+        scaled(0.8 * MOBILE_HEAD_SCALE, shapes) +
+        '</g>'
+    );
   const outputs = new Map();
   const put = (relative, content) =>
     outputs.set(relative, Buffer.isBuffer(content) ? content : Buffer.from(content));
@@ -237,7 +246,8 @@ async function main() {
     ICONS + '/android/values/ic_launcher_background.xml',
     '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n  <color name="ic_launcher_background">' +
       BACKGROUND +
-      '</color>\n  <color name="ic_launcher_dev_background">' + DEV_BACKGROUND +
+      '</color>\n  <color name="ic_launcher_dev_background">' +
+      DEV_BACKGROUND +
       '</color>\n</resources>\n'
   );
 

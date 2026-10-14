@@ -517,9 +517,11 @@ describe('useBackendFacade run_event forwarding', () => {
     // Server boots on the standalone facade first...
     syncToGatewayStore(localSnapshot('local-standalone'));
     useSessionsStore.getState().setRemoteSessions('local-standalone', [session]);
-    useProjectStore.getState().replaceProjectsForBackend('local-standalone', [
-      { id: 'project-1', name: 'zclaudia', type: 'code', createdAt: 1, updatedAt: 1 },
-    ]);
+    useProjectStore
+      .getState()
+      .replaceProjectsForBackend('local-standalone', [
+        { id: 'project-1', name: 'zclaudia', type: 'code', createdAt: 1, updatedAt: 1 },
+      ]);
 
     // ...then swaps to the gateway facade, where this machine has a new id.
     syncToGatewayStore(localSnapshot('gw-local'));
@@ -528,9 +530,11 @@ describe('useBackendFacade run_event forwarding', () => {
     expect(useOwnershipStore.getState().getProjectBackendId('project-1')).toBeNull();
 
     // The same project is now accepted under the new id instead of colliding.
-    useProjectStore.getState().replaceProjectsForBackend('gw-local', [
-      { id: 'project-1', name: 'zclaudia', type: 'code', createdAt: 1, updatedAt: 1 },
-    ]);
+    useProjectStore
+      .getState()
+      .replaceProjectsForBackend('gw-local', [
+        { id: 'project-1', name: 'zclaudia', type: 'code', createdAt: 1, updatedAt: 1 },
+      ]);
     expect(useOwnershipStore.getState().getProjectBackendId('project-1')).toBe('gw-local');
   });
 

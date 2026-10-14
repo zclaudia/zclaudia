@@ -138,28 +138,32 @@ export const ChatMessagePane = memo(function ChatMessagePane({
       )
       .sort((a, b) => a.createdAt - b.createdAt);
   }, [interactionsMap, sessionId, sessionToolCallHistory, sessionToolCalls]);
-  const approvalInteractions = useMemo(
-    () => {
-      const inlineInteractionIds = new Set(
-        [...sessionToolCallHistory, ...sessionToolCalls].flatMap(toolCall =>
-          [toolCall.id, extractInteractionId(toolCall.result)].filter(
-            (id): id is string => Boolean(id)
-          )
+  const approvalInteractions = useMemo(() => {
+    const inlineInteractionIds = new Set(
+      [...sessionToolCallHistory, ...sessionToolCalls].flatMap(toolCall =>
+        [toolCall.id, extractInteractionId(toolCall.result)].filter((id): id is string =>
+          Boolean(id)
         )
-      );
-      return Object.values(interactionsMap)
-        .filter(
-          interaction =>
-            interaction.sessionId === sessionId &&
-            interaction.type === 'interaction_approval' &&
-            (!interactionOwners[interaction.interactionId] ||
-              interactionOwners[interaction.interactionId].serverId === interactionServerId) &&
-            !inlineInteractionIds.has(interaction.interactionId)
-        )
-        .sort((a, b) => a.createdAt - b.createdAt);
-    },
-    [interactionsMap, interactionOwners, interactionServerId, sessionId, sessionToolCallHistory, sessionToolCalls]
-  );
+      )
+    );
+    return Object.values(interactionsMap)
+      .filter(
+        interaction =>
+          interaction.sessionId === sessionId &&
+          interaction.type === 'interaction_approval' &&
+          (!interactionOwners[interaction.interactionId] ||
+            interactionOwners[interaction.interactionId].serverId === interactionServerId) &&
+          !inlineInteractionIds.has(interaction.interactionId)
+      )
+      .sort((a, b) => a.createdAt - b.createdAt);
+  }, [
+    interactionsMap,
+    interactionOwners,
+    interactionServerId,
+    sessionId,
+    sessionToolCallHistory,
+    sessionToolCalls,
+  ]);
   const planReviewInteractions = useMemo(() => {
     const toolCalls = [...sessionToolCallHistory, ...sessionToolCalls];
     const hasPlanProposalTool = toolCalls.some(toolCall =>

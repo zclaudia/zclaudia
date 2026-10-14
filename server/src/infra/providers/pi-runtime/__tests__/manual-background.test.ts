@@ -148,9 +148,12 @@ describe('manual backgrounding (tool integration)', () => {
 
   it('converts a waiting foreground command via the registry', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-manualbg-ws-'));
-    const bash = buildTools(dir, { enabled: ['Bash'], db, taskPort: createTaskAdapter(db), sessionId: 's1' }).find(
-      (t: any) => t.name === 'Bash'
-    ) as any;
+    const bash = buildTools(dir, {
+      enabled: ['Bash'],
+      db,
+      taskPort: createTaskAdapter(db),
+      sessionId: 's1',
+    }).find((t: any) => t.name === 'Bash') as any;
 
     const pending = bash.execute('mb1', { command: 'echo early; sleep 2; echo late' });
     const registered = await waitUntil(() => listInflightForegroundCommands('s1').length === 1);
@@ -179,9 +182,12 @@ describe('manual backgrounding (tool integration)', () => {
 
   it('manual conversion works even with an explicit timeout', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-manualbg-ws-'));
-    const bash = buildTools(dir, { enabled: ['Bash'], db, taskPort: createTaskAdapter(db), sessionId: 's1' }).find(
-      (t: any) => t.name === 'Bash'
-    ) as any;
+    const bash = buildTools(dir, {
+      enabled: ['Bash'],
+      db,
+      taskPort: createTaskAdapter(db),
+      sessionId: 's1',
+    }).find((t: any) => t.name === 'Bash') as any;
 
     const pending = bash.execute('mb2', { command: 'sleep 1; echo fin', timeout: 30 });
     await waitUntil(() => listInflightForegroundCommands('s1').length === 1);
@@ -196,9 +202,12 @@ describe('manual backgrounding (tool integration)', () => {
 
   it('a normally-completing command leaves no registry residue', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-manualbg-ws-'));
-    const bash = buildTools(dir, { enabled: ['Bash'], db, taskPort: createTaskAdapter(db), sessionId: 's1' }).find(
-      (t: any) => t.name === 'Bash'
-    ) as any;
+    const bash = buildTools(dir, {
+      enabled: ['Bash'],
+      db,
+      taskPort: createTaskAdapter(db),
+      sessionId: 's1',
+    }).find((t: any) => t.name === 'Bash') as any;
     const res = await bash.execute('mb3', { command: 'echo quick' });
     expect(res.details.ok).toBe(true);
     expect(res.details.background).toBeUndefined();

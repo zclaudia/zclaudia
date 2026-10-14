@@ -1,17 +1,18 @@
 import { ChevronRight } from 'lucide-react';
 import type { ProfileConfigDescriptor } from '@zclaudia/shared/core/profile-config-descriptor';
 import type { ToolName, ToolSelection } from '@zclaudia/shared/core/tools';
-import { BUILTIN_TOOL_METADATA, BUILTIN_TOOL_SETS, resolveToolSelection } from '@zclaudia/shared/core/tools';
+import {
+  BUILTIN_TOOL_METADATA,
+  BUILTIN_TOOL_SETS,
+  resolveToolSelection,
+} from '@zclaudia/shared/core/tools';
 import { Checkbox } from '../../../components/ui/Checkbox';
 import { CapabilityNote } from './CapabilityNote';
 import type { BuiltinToolSetId } from './derive';
 import { toolSetPreview } from './derive';
 
 /** One entry of the built-in tool-set catalog shown in the Tools sub-panel. */
-export type BuiltinToolSetEntry = Omit<
-  (typeof BUILTIN_TOOL_SETS)[BuiltinToolSetId],
-  'id'
-> & {
+export type BuiltinToolSetEntry = Omit<(typeof BUILTIN_TOOL_SETS)[BuiltinToolSetId], 'id'> & {
   id: BuiltinToolSetId;
 };
 

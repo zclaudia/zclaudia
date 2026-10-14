@@ -12,7 +12,10 @@ import { useClaudiaStore } from '../../stores/claudiaStore';
 import { useNotificationFeedStore } from '../../stores/notificationFeedStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useClaudiaStatus } from '../../hooks/useClaudiaStatus';
-import { isMobileBackendReachable, isMobileBackendUsable } from '../../services/mobileConnectionState';
+import {
+  isMobileBackendReachable,
+  isMobileBackendUsable,
+} from '../../services/mobileConnectionState';
 import { selectProjectIdsForBackend } from './projectGrouping';
 
 /**

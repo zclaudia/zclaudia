@@ -111,9 +111,7 @@ import { DefaultWorkflowAgentRuntimeResolver } from './application/workflows/wor
 import { createMetaWorkflowAiRunPort } from './application/workflows/meta-workflow-ai-port.js';
 import { createTaskAdapter } from './application/tasks/task-adapter.js';
 import { createPlanModePort } from './application/conversation/runtime/plan-mode-port.js';
-import {
-  clearPendingPermissionFromActiveRun as clearPendingPermissionFromActiveRunIn,
-} from './application/permissions/clear-pending-permission.js';
+import { clearPendingPermissionFromActiveRun as clearPendingPermissionFromActiveRunIn } from './application/permissions/clear-pending-permission.js';
 import { registerPermissionWorkflowProgress } from './application/permissions/permission-workflow-progress.js';
 import { getProjectRoot as lookupProjectRoot } from './application/bootstrap/project-root.js';
 

@@ -3292,9 +3292,7 @@ describe('Bash background execution', () => {
       sandboxReadOnly: true,
       db,
       taskPort: createTaskAdapter(db),
-    }).find(
-      (t: any) => t.name === 'Bash'
-    ) as any;
+    }).find((t: any) => t.name === 'Bash') as any;
     const res = await bash.execute('bgp1', {
       command: `echo PWNED > "${target}"`,
       run_in_background: true,
@@ -3370,7 +3368,11 @@ describe('TaskOutput for command tasks', () => {
 
   it('reads the log incrementally with output_offset/nextOffset', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-tobg-'));
-    const tools = buildTools(dir, { enabled: ['Bash', 'TaskOutput'], db, taskPort: createTaskAdapter(db) });
+    const tools = buildTools(dir, {
+      enabled: ['Bash', 'TaskOutput'],
+      db,
+      taskPort: createTaskAdapter(db),
+    });
     const bash = tools.find((t: any) => t.name === 'Bash') as any;
     const taskOutput = tools.find((t: any) => t.name === 'TaskOutput') as any;
     const started = await bash.execute('to1', {
@@ -3403,7 +3405,11 @@ describe('TaskOutput for command tasks', () => {
 
   it('wait_ms blocks until new output arrives instead of returning empty', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-tobg-'));
-    const tools = buildTools(dir, { enabled: ['Bash', 'TaskOutput'], db, taskPort: createTaskAdapter(db) });
+    const tools = buildTools(dir, {
+      enabled: ['Bash', 'TaskOutput'],
+      db,
+      taskPort: createTaskAdapter(db),
+    });
     const bash = tools.find((t: any) => t.name === 'Bash') as any;
     const taskOutput = tools.find((t: any) => t.name === 'TaskOutput') as any;
     const started = await bash.execute('tw1', {
@@ -3427,7 +3433,11 @@ describe('TaskOutput for command tasks', () => {
 
   it('wait_ms returns when the task completes without new output', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-tobg-'));
-    const tools = buildTools(dir, { enabled: ['Bash', 'TaskOutput'], db, taskPort: createTaskAdapter(db) });
+    const tools = buildTools(dir, {
+      enabled: ['Bash', 'TaskOutput'],
+      db,
+      taskPort: createTaskAdapter(db),
+    });
     const bash = tools.find((t: any) => t.name === 'Bash') as any;
     const taskOutput = tools.find((t: any) => t.name === 'TaskOutput') as any;
     const started = await bash.execute('tw3', {
@@ -3449,7 +3459,11 @@ describe('TaskOutput for command tasks', () => {
 
   it('tail_lines returns the last N lines', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-tobg-'));
-    const tools = buildTools(dir, { enabled: ['Bash', 'TaskOutput'], db, taskPort: createTaskAdapter(db) });
+    const tools = buildTools(dir, {
+      enabled: ['Bash', 'TaskOutput'],
+      db,
+      taskPort: createTaskAdapter(db),
+    });
     const bash = tools.find((t: any) => t.name === 'Bash') as any;
     const taskOutput = tools.find((t: any) => t.name === 'TaskOutput') as any;
     const started = await bash.execute('to4', {
@@ -3468,7 +3482,11 @@ describe('TaskOutput for command tasks', () => {
 
   it('returns structured diagnostics for failed command task output', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-tobg-'));
-    const tools = buildTools(dir, { enabled: ['Bash', 'TaskOutput'], db, taskPort: createTaskAdapter(db) });
+    const tools = buildTools(dir, {
+      enabled: ['Bash', 'TaskOutput'],
+      db,
+      taskPort: createTaskAdapter(db),
+    });
     const bash = tools.find((t: any) => t.name === 'Bash') as any;
     const taskOutput = tools.find((t: any) => t.name === 'TaskOutput') as any;
     const started = await bash.execute('to-diagnostics-start', {
@@ -3534,7 +3552,11 @@ describe('Monitor stops command tasks', () => {
 
   it('kills the process tree, not just the DB record', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-monbg-'));
-    const tools = buildTools(dir, { enabled: ['Bash', 'Monitor'], db, taskPort: createTaskAdapter(db) });
+    const tools = buildTools(dir, {
+      enabled: ['Bash', 'Monitor'],
+      db,
+      taskPort: createTaskAdapter(db),
+    });
     const bash = tools.find((t: any) => t.name === 'Bash') as any;
     const monitor = tools.find((t: any) => t.name === 'Monitor') as any;
     const started = await bash.execute('mb1', { command: 'sleep 30', run_in_background: true });

@@ -47,8 +47,12 @@ export function useFileContentPolling({
     let pollInFlight = false;
     const isCurrentTarget = () => {
       const current = useFileViewerStore.getState();
-      return !cancelled && current.filePath === filePath && (!current.projectRoot || current.projectRoot === projectRoot) &&
-        (!current.backendId || current.backendId === backendId);
+      return (
+        !cancelled &&
+        current.filePath === filePath &&
+        (!current.projectRoot || current.projectRoot === projectRoot) &&
+        (!current.backendId || current.backendId === backendId)
+      );
     };
 
     const checkOnce = async () => {

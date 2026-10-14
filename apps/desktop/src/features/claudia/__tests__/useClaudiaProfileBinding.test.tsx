@@ -55,7 +55,10 @@ describe('useClaudiaProfileBinding priority chain', () => {
     const { result } = renderHook(() =>
       useClaudiaProfileBinding({ ...base, threadRuns: [], newTopicArmed: false })
     );
-    expect(result.current.boundProfile).toEqual({ id: 'session-agent', sourceLabel: 'Session bound' });
+    expect(result.current.boundProfile).toEqual({
+      id: 'session-agent',
+      sourceLabel: 'Session bound',
+    });
   });
 
   it('prefers the explicit selection once armed state allows it', () => {

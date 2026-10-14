@@ -30,7 +30,11 @@ export function resolveProjectBackendId(projectRoot: string): string | null {
   return useOwnershipStore.getState().getProjectBackendId(matchingProject.id);
 }
 
-async function openFileInNewWindow(filePath: string, projectRoot: string, scopedBackendId?: string) {
+async function openFileInNewWindow(
+  filePath: string,
+  projectRoot: string,
+  scopedBackendId?: string
+) {
   const fileName = filePath.split('/').pop() || filePath;
   const projectName = projectRoot.split('/').pop() || projectRoot;
   const backendId = scopedBackendId ?? resolveProjectBackendId(projectRoot);
@@ -88,8 +92,12 @@ export function FileViewerActions() {
     }
   };
 
-  if (tool && ((tool.projectRoot && projectRoot && tool.projectRoot !== projectRoot) ||
-    (tool.backendId && backendId && tool.backendId !== backendId))) return null;
+  if (
+    tool &&
+    ((tool.projectRoot && projectRoot && tool.projectRoot !== projectRoot) ||
+      (tool.backendId && backendId && tool.backendId !== backendId))
+  )
+    return null;
 
   return (
     <div className="flex items-center gap-1">

@@ -239,7 +239,10 @@ describe('ChatMessagePane', () => {
 
     renderPane({
       sessionToolCallHistory: [
-        { ...makeRequestApprovalToolCall('tool-call-id'), result: JSON.stringify({ interactionId: 'approval-id' }) },
+        {
+          ...makeRequestApprovalToolCall('tool-call-id'),
+          result: JSON.stringify({ interactionId: 'approval-id' }),
+        },
       ],
     });
 
