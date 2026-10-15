@@ -48,6 +48,9 @@ interface GestureState {
   touchId: number | null;
   startX: number;
   startY: number;
+  /** Where distance is measured from once claimed (startX moved past the activation slop). */
+  originX: number;
+  target: EventTarget | null;
   samples: PositionSample[];
 }
 
@@ -56,6 +59,8 @@ const INITIAL_STATE: GestureState = {
   touchId: null,
   startX: 0,
   startY: 0,
+  originX: 0,
+  target: null,
   samples: [],
 };
 
@@ -66,13 +71,75 @@ const VELOCITY_STOP_MS = 80;
 /** Floor for the measured span so two coalesced events can't spike the result. */
 const VELOCITY_MIN_SPAN_MS = 8;
 
-const INTERACTIVE_START_SELECTOR =
-  'input, textarea, button, a, select, option, [contenteditable]:not([contenteditable="false"]), [role="button"], [data-horizontal-drag-ignore]';
+/** A click this soon after a claimed drag is the drag's own lift, not a tap. */
+const CLICK_SUPPRESS_MS = 400;
 
-/** True when an opening drag began on a control that should keep the gesture. */
-export function isInteractiveHorizontalDragStart(target: EventTarget | null): boolean {
+/**
+ * Controls that use horizontal motion themselves (caret moves, text selection,
+ * sliders) or opt out explicitly. Buttons, links and list rows are not here: a
+ * drawer swipe should work wherever the finger lands, the way native drawers
+ * do, and a claimed drag swallows the click it would otherwise end in.
+ */
+const EXCLUDED_START_SELECTOR =
+  'input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [data-horizontal-drag-ignore]';
+
+/** True when a drag began on a control that should keep horizontal motion for itself. */
+export function isExcludedHorizontalDragStart(target: EventTarget | null): boolean {
   const closest = (target as Element | null)?.closest;
-  return typeof closest === 'function' && closest.call(target, INTERACTIVE_START_SELECTOR) !== null;
+  return typeof closest === 'function' && closest.call(target, EXCLUDED_START_SELECTOR) !== null;
+}
+
+/**
+ * True when something between the touch target and the gesture surface can
+ * itself scroll the way the finger is moving (a wide code block or table), so
+ * the content scrolls instead of the surface's drag claiming the motion.
+ */
+function nestedScrollerCanPan(
+  target: EventTarget | null,
+  boundary: Element,
+  fingerDeltaX: number
+): boolean {
+  let node = target instanceof Element ? target : null;
+  while (node && node !== boundary) {
+    if (node.scrollWidth > node.clientWidth + 1) {
+      const overflowX = getComputedStyle(node).overflowX;
+      if (overflowX === 'auto' || overflowX === 'scroll') {
+        // Finger moving right reveals content to the left, and vice versa.
+        const canPan =
+          fingerDeltaX > 0
+            ? node.scrollLeft > 0
+            : node.scrollLeft < node.scrollWidth - node.clientWidth - 1;
+        if (canPan) return true;
+      }
+    }
+    node = node.parentElement;
+  }
+  return false;
+}
+
+/**
+ * Swallow the click a lifted drag can still produce on the control it began
+ * on. Only that control's click, and only until the next touch begins, so a
+ * deliberate tap right after the swipe always goes through.
+ */
+function suppressLiftClick(startTarget: EventTarget | null) {
+  if (!(startTarget instanceof Node)) return;
+  const disarm = () => {
+    window.removeEventListener('click', swallow, true);
+    window.removeEventListener('touchstart', disarm, true);
+    window.clearTimeout(timer);
+  };
+  const swallow = (event: Event) => {
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+    if (!target.contains(startTarget) && !startTarget.contains(target)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    disarm();
+  };
+  const timer = window.setTimeout(disarm, CLICK_SUPPRESS_MS);
+  window.addEventListener('click', swallow, true);
+  window.addEventListener('touchstart', disarm, true);
 }
 
 function touchAt(touches: TouchList, index: number): Touch | null {
@@ -189,6 +256,8 @@ export function useHorizontalDrag<E extends HTMLElement = HTMLDivElement>(
           touchId: touch.identifier,
           startX: touch.clientX,
           startY: touch.clientY,
+          originX: touch.clientX,
+          target: event.target,
           samples: [{ x: touch.clientX, time: eventTime(event) }],
         };
       };
@@ -231,6 +300,14 @@ export function useHorizontalDrag<E extends HTMLElement = HTMLDivElement>(
             reset(false);
             return;
           }
+          if (nestedScrollerCanPan(state.target, element, rawX)) {
+            reset(false);
+            return;
+          }
+          // Measure from the slop boundary rather than the touch-down point so
+          // the surface doesn't leap by the activation travel the moment it is
+          // claimed; a fast first event still carries whatever ran past it.
+          state.originX = state.startX + Math.sign(rawX) * activationDistance;
           state.phase = 'dragging';
           current.onDragStart?.();
         }
@@ -238,7 +315,7 @@ export function useHorizontalDrag<E extends HTMLElement = HTMLDivElement>(
         const maxDistance = Math.max(1, current.maxDistance);
         const distance = clampDelta(
           current.direction,
-          directionalDelta(current.direction, state.startX, touch.clientX),
+          directionalDelta(current.direction, state.originX, touch.clientX),
           maxDistance
         );
         event.preventDefault();
@@ -260,7 +337,7 @@ export function useHorizontalDrag<E extends HTMLElement = HTMLDivElement>(
         const maxDistance = Math.max(1, current.maxDistance);
         const distance = clampDelta(
           current.direction,
-          directionalDelta(current.direction, state.startX, touch.clientX),
+          directionalDelta(current.direction, state.originX, touch.clientX),
           maxDistance
         );
         const rawVelocity = releaseVelocity(state.samples, touch.clientX, eventTime(event));
@@ -277,6 +354,7 @@ export function useHorizontalDrag<E extends HTMLElement = HTMLDivElement>(
             : distance / maxDistance >= completionThreshold || velocity >= velocityThreshold;
 
         stateRef.current = { ...INITIAL_STATE };
+        suppressLiftClick(state.target);
         current.onEnd({
           distance,
           progress: distance / maxDistance,

@@ -4,6 +4,7 @@ import {
   DRAWER_PEEK_WIDTH_PX,
   drawerExpandedWidth,
   drawerHasExpandedStage,
+  drawerReleaseSettle,
   drawerStageBelow,
   drawerStagePosition,
   resolveDrawerStage,
@@ -109,5 +110,47 @@ describe('drawerStageBelow', () => {
     expect(drawerStageBelow('full')).toBe('peek');
     expect(drawerStageBelow('peek')).toBe('closed');
     expect(drawerStageBelow('closed')).toBe('closed');
+  });
+});
+
+/** Starting speed of a cubic-bezier(x1, y1, …) settle, in px/ms. */
+function startSpeed(timing: { durationMs: number; easing: string }, distance: number) {
+  const [x1, y1] = timing.easing.match(/[\d.]+/g)!.map(Number);
+  return ((y1 / x1) * distance) / timing.durationMs;
+}
+
+describe('drawerReleaseSettle', () => {
+  it('leaves the finger at the speed it was moving', () => {
+    const timing = drawerReleaseSettle(150, 0.5);
+    expect(startSpeed(timing, 150)).toBeCloseTo(0.5, 2);
+  });
+
+  it('eases out of rest after a still release', () => {
+    const timing = drawerReleaseSettle(150, 0);
+    expect(startSpeed(timing, 150)).toBe(0);
+    expect(timing.durationMs).toBeGreaterThan(0);
+  });
+
+  it('treats a release moving away from the target as still', () => {
+    expect(drawerReleaseSettle(-120, -1)).toEqual(drawerReleaseSettle(-120, 0));
+  });
+
+  it('shortens the settle rather than overshoot for a fast fling', () => {
+    const slow = drawerReleaseSettle(200, 0.4);
+    const fast = drawerReleaseSettle(200, 3);
+    expect(fast.durationMs).toBeLessThan(slow.durationMs);
+    const [, y1] = fast.easing.match(/[\d.]+/g)!.map(Number);
+    expect(y1).toBeLessThanOrEqual(1);
+    expect(startSpeed(fast, 200)).toBeCloseTo(3, 1);
+  });
+
+  it('takes longer for more remaining travel', () => {
+    expect(drawerReleaseSettle(280, 0).durationMs).toBeGreaterThan(
+      drawerReleaseSettle(40, 0).durationMs
+    );
+  });
+
+  it('does not animate when already at the detent', () => {
+    expect(drawerReleaseSettle(0.4, 2).durationMs).toBe(0);
   });
 });

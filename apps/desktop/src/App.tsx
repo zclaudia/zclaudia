@@ -365,10 +365,25 @@ function AppContent() {
   );
 
   // --- Mobile swipe gestures ---
+  // These recognizers report on every touchmove, including the zero progress of
+  // a swipe going the other way (a drawer drag over <main>). Keep the previous
+  // state object for those so the shell doesn't re-render mid-drag.
+  const updateAgentSwipePreview = useCallback((mode: 'open' | 'close', progress: number) => {
+    setAgentSwipePreview(current => {
+      if (progress > 0) {
+        return current.mode === mode && current.progress === progress
+          ? current
+          : { mode, progress };
+      }
+      return current.mode === null && current.progress === 0
+        ? current
+        : { mode: null, progress: 0 };
+    });
+  }, []);
+
   const swipeOpenClaudiaRef = useSwipeBack<HTMLElement>({
     onSwipe: () => setAgentExpanded(true),
-    onProgress: progress =>
-      setAgentSwipePreview(progress > 0 ? { mode: 'open', progress } : { mode: null, progress: 0 }),
+    onProgress: progress => updateAgentSwipePreview('open', progress),
     enabled:
       isAppTopLevelView && isMobile && !isAgentExpanded && !sidebarOpen && !fileViewerFullscreen,
     direction: 'left',
@@ -378,10 +393,7 @@ function AppContent() {
 
   const swipeCloseClaudiaRef = useSwipeBack({
     onSwipe: () => setAgentExpanded(false),
-    onProgress: progress =>
-      setAgentSwipePreview(
-        progress > 0 ? { mode: 'close', progress } : { mode: null, progress: 0 }
-      ),
+    onProgress: progress => updateAgentSwipePreview('close', progress),
     enabled: isAppTopLevelView && isMobile && isAgentExpanded,
     direction: 'right',
     fullWidth: true,

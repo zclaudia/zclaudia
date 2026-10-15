@@ -1613,7 +1613,9 @@ describe('Sidebar', () => {
     expect(dialog).toBeTruthy();
     expect(dialog?.getAttribute('aria-hidden')).toBe('true');
     expect(dialog?.hasAttribute('inert')).toBe(true);
-    expect((dialog as HTMLElement).style.getPropertyValue('--drawer-panel-x')).toBe('-100%');
+    // Offscreen comes from the class; the drawer hook owns inline positioning.
+    expect(dialog?.classList.contains('mobile-drawer-panel')).toBe(true);
+    expect((dialog as HTMLElement).style.transform).toBe('');
   });
 
   it('closes mobile drawer when backdrop is clicked', () => {

@@ -1,11 +1,4 @@
-import {
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  type CSSProperties,
-  type RefObject,
-} from 'react';
+import { useState, useCallback, useEffect, useRef, type RefObject } from 'react';
 import { SidebarTopBar } from './SidebarTopBar';
 import { SidebarNav } from './SidebarNav';
 import type { AutomationTab } from '../automation/automation-types';
@@ -482,12 +475,6 @@ export function Sidebar({
         <div
           ref={drawerBackdropRef}
           className={`mobile-drawer-backdrop fixed inset-0 bg-black z-40 ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
-          style={
-            {
-              '--drawer-backdrop-opacity': isOpen ? '0.5' : '0',
-              '--drawer-transition-duration': '350ms',
-            } as CSSProperties
-          }
           onClick={isOpen ? onClose : undefined}
           aria-hidden="true"
         />
@@ -501,12 +488,6 @@ export function Sidebar({
           tabIndex={-1}
           onKeyDown={handleDrawerKeyDown}
           className={`mobile-drawer-panel fixed inset-y-0 left-0 bg-[hsl(var(--sidebar))] border-r border-border/60 z-50 shadow-apple-xl flex flex-col safe-top-pad safe-bottom-pad outline-none ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
-          style={
-            {
-              '--drawer-panel-x': isOpen ? '0px' : '-100%',
-              '--drawer-transition-duration': '350ms',
-            } as CSSProperties
-          }
         >
           <MobileSidebarHeader
             onClose={onClose}

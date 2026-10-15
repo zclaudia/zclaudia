@@ -988,21 +988,24 @@ button {
   touch-action: pan-y;
 }
 
-/* Width is a variable so the expanded detent can grow the panel in place while
-   the same drag keeps driving the slide-in transform. */
+/* Closed by default; useMobileDrawer then owns transform, width, opacity and
+   transition timing as inline styles (compositor-only, no inherited custom
+   properties to restyle the sidebar's subtree on every touchmove). */
 .mobile-drawer-panel {
-  width: var(--drawer-width, 300px);
-  transform: translate3d(var(--drawer-panel-x, -100%), 0, 0);
-  transition-property: transform, width;
-  transition-duration: var(--drawer-transition-duration, 350ms);
+  width: 300px;
+  transform: translate3d(-100%, 0, 0);
+  /* Hidden while closed so its shadow doesn't bleed onto the screen edge. */
+  visibility: hidden;
+  transition-property: transform, width, visibility;
+  transition-duration: 350ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
 
 .mobile-drawer-backdrop {
-  opacity: var(--drawer-backdrop-opacity, 0);
+  opacity: 0;
   transition-property: opacity;
-  transition-duration: var(--drawer-transition-duration, 350ms);
+  transition-duration: 350ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   will-change: opacity;
 }
@@ -1098,7 +1101,6 @@ button {
   [data-chat-surface='card'] .zc-composer-usage {
     margin-left: auto;
   }
-
 }
 
 /* Title and pane controls have priority over optional header metadata. */
@@ -1117,5 +1119,4 @@ button {
   [data-chat-surface='card'] .zc-session-engine-badge {
     display: none;
   }
-
 }

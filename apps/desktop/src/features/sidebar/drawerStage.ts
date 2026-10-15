@@ -116,3 +116,55 @@ export function resolveDrawerStage(
 export function drawerStageBelow(stage: DrawerStage): DrawerStage {
   return stage === 'full' ? 'peek' : 'closed';
 }
+
+export interface DrawerSettleTiming {
+  durationMs: number;
+  easing: string;
+}
+
+/** Settle used when nothing is moving: buttons, back, Escape, a still release. */
+export const DRAWER_SETTLE_DURATION_MS = 350;
+export const DRAWER_SETTLE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+
+/** Released settles scale with the distance left: this plus `PER_PX` each pixel. */
+const RELEASE_BASE_MS = 180;
+const RELEASE_PER_PX_MS = 0.55;
+const RELEASE_MIN_MS = 120;
+const RELEASE_MAX_MS = 340;
+/** First control point x of the release curve; its y sets the starting speed. */
+const RELEASE_CURVE_X1 = 0.3;
+
+/**
+ * Timing for the settle that follows a release, shaped so the drawer leaves
+ * the finger at the speed the finger was moving instead of jumping to a fixed
+ * curve's speed. A cubic-bezier's starting slope is y1/x1 (in units of
+ * distance/duration), so y1 is picked to match the release velocity; a slow
+ * release eases out of rest, a quick one carries straight on. When even the
+ * steepest curve without overshoot is slower than the finger, the duration
+ * shortens instead.
+ *
+ * @param distance Pixels between the release point and the target detent.
+ * @param velocityTowardTarget Release speed in px/ms; negative or zero when the
+ *   finger was moving away from the target or had stopped.
+ */
+export function drawerReleaseSettle(
+  distance: number,
+  velocityTowardTarget: number
+): DrawerSettleTiming {
+  const remaining = Math.abs(distance);
+  if (remaining < 1) return { durationMs: 0, easing: DRAWER_SETTLE_EASING };
+
+  const speed = Math.max(0, velocityTowardTarget);
+  let durationMs = Math.min(RELEASE_MAX_MS, RELEASE_BASE_MS + remaining * RELEASE_PER_PX_MS);
+  const maxSlope = 1 / RELEASE_CURVE_X1;
+  let slope = (speed * durationMs) / remaining;
+  if (slope > maxSlope) {
+    durationMs = Math.max(RELEASE_MIN_MS, (maxSlope * remaining) / speed);
+    slope = Math.min(maxSlope, (speed * durationMs) / remaining);
+  }
+  const y1 = Math.max(0, RELEASE_CURVE_X1 * slope);
+  return {
+    durationMs: Math.round(durationMs),
+    easing: `cubic-bezier(${RELEASE_CURVE_X1}, ${y1.toFixed(3)}, 0.25, 1)`,
+  };
+}

@@ -2,7 +2,7 @@
 import { act, render } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
-  isInteractiveHorizontalDragStart,
+  isExcludedHorizontalDragStart,
   useHorizontalDrag,
   type UseHorizontalDragOptions,
 } from '../useHorizontalDrag';
@@ -46,7 +46,11 @@ function Harness({ options }: { options: UseHorizontalDragOptions }) {
   return (
     <div ref={ref} data-testid="surface">
       <button data-testid="button">Control</button>
+      <input data-testid="input" />
       <div data-testid="content">Content</div>
+      <div data-testid="scroller" style={{ overflowX: 'auto' }}>
+        <div data-testid="scroller-content">Wide</div>
+      </div>
     </div>
   );
 }
@@ -100,9 +104,9 @@ describe('useHorizontalDrag', () => {
   it('completes a right drag to open after crossing the distance threshold', () => {
     const { content, onEnd } = setup();
     dispatchTouch(content, 'touchstart', 40, 100);
-    dispatchTouch(content, 'touchmove', 75, 102);
-    dispatchTouch(content, 'touchend', 75, 102);
-    dispatchTouch(content, 'touchend', 75, 102);
+    dispatchTouch(content, 'touchmove', 83, 102);
+    dispatchTouch(content, 'touchend', 83, 102);
+    dispatchTouch(content, 'touchend', 83, 102);
 
     expect(onEnd).toHaveBeenCalledTimes(1);
     expect(onEnd.mock.calls[0][0]).toMatchObject({ distance: 35, shouldComplete: true });
@@ -111,21 +115,22 @@ describe('useHorizontalDrag', () => {
   it('completes a left drag to close', () => {
     const { content, onEnd } = setup({ direction: 'left' });
     dispatchTouch(content, 'touchstart', 90, 100);
-    dispatchTouch(content, 'touchmove', 50, 101);
-    dispatchTouch(content, 'touchend', 50, 101);
+    dispatchTouch(content, 'touchmove', 42, 101);
+    dispatchTouch(content, 'touchend', 42, 101);
 
     expect(onEnd.mock.calls[0][0]).toMatchObject({ distance: 40, shouldComplete: true });
   });
 
-  it('reports every drag position continuously', () => {
+  it('reports every drag position continuously, measured from the end of the slop', () => {
     const { content, onDrag } = setup();
     dispatchTouch(content, 'touchstart', 20, 50);
     dispatchTouch(content, 'touchmove', 32, 50);
     dispatchTouch(content, 'touchmove', 50, 51);
     dispatchTouch(content, 'touchmove', 80, 52);
 
-    expect(onDrag.mock.calls.map(([update]) => update.distance)).toEqual([12, 30, 60]);
-    expect(onDrag.mock.calls.map(([update]) => update.progress)).toEqual([0.12, 0.3, 0.6]);
+    // The 8px activation travel isn't replayed as a jump when the drag claims.
+    expect(onDrag.mock.calls.map(([update]) => update.distance)).toEqual([4, 22, 52]);
+    expect(onDrag.mock.calls.map(([update]) => update.progress)).toEqual([0.04, 0.22, 0.52]);
   });
 
   it('leaves a vertical scroll unclaimed', () => {
@@ -181,7 +186,7 @@ describe('useHorizontalDrag', () => {
     dispatchTouch(fast.content, 'touchmove', 22, 50);
     vi.setSystemTime(20);
     dispatchTouch(fast.content, 'touchend', 30, 50);
-    expect(fast.onEnd.mock.calls[0][0].distance).toBe(20);
+    expect(fast.onEnd.mock.calls[0][0].distance).toBe(12);
     expect(fast.onEnd.mock.calls[0][0].velocity).toBeGreaterThanOrEqual(0.45);
     expect(fast.onEnd.mock.calls[0][0].shouldComplete).toBe(true);
   });
@@ -230,8 +235,9 @@ describe('useHorizontalDrag', () => {
     dispatchTouch(content, 'touchmove', 20, 50);
     dispatchTouch(content, 'touchend', 20, 50);
 
-    expect(onDrag.mock.calls.map(([update]) => update.distance)).toEqual([30, -30]);
-    expect(onEnd.mock.calls[0][0]).toMatchObject({ distance: -30, progress: -0.3 });
+    // Claimed rightward, so the origin sits 8px right of the touch-down point.
+    expect(onDrag.mock.calls.map(([update]) => update.distance)).toEqual([22, -38]);
+    expect(onEnd.mock.calls[0][0]).toMatchObject({ distance: -38, progress: -0.38 });
   });
 
   it('claims a leftward start in "both" that a right-only drag would ignore', () => {
@@ -241,7 +247,7 @@ describe('useHorizontalDrag', () => {
     dispatchTouch(content, 'touchend', 10, 50);
 
     expect(onDragStart).toHaveBeenCalledTimes(1);
-    expect(onEnd.mock.calls[0][0]).toMatchObject({ distance: -40, shouldComplete: true });
+    expect(onEnd.mock.calls[0][0]).toMatchObject({ distance: -32, shouldComplete: true });
   });
 
   it('clamps both directions to maxDistance', () => {
@@ -267,15 +273,56 @@ describe('useHorizontalDrag', () => {
     expect(onEnd.mock.calls[0][0].shouldComplete).toBe(false);
   });
 
-  it('can exclude interactive controls from opening drags', () => {
+  it('can exclude text entry from drags', () => {
     const { getByTestId, onDrag } = setup({
-      shouldStart: target => !isInteractiveHorizontalDragStart(target),
+      shouldStart: target => !isExcludedHorizontalDragStart(target),
+    });
+    const input = getByTestId('input');
+    dispatchTouch(input, 'touchstart', 10, 50);
+    dispatchTouch(input, 'touchmove', 60, 50);
+    dispatchTouch(input, 'touchend', 60, 50);
+
+    expect(onDrag).not.toHaveBeenCalled();
+    expect(isExcludedHorizontalDragStart(getByTestId('button'))).toBe(false);
+  });
+
+  it('claims a drag that starts on a button and swallows the click it ends in', () => {
+    const { getByTestId, onEnd } = setup({
+      shouldStart: target => !isExcludedHorizontalDragStart(target),
     });
     const button = getByTestId('button');
+    const onClick = vi.fn();
+    button.addEventListener('click', onClick);
     dispatchTouch(button, 'touchstart', 10, 50);
     dispatchTouch(button, 'touchmove', 60, 50);
     dispatchTouch(button, 'touchend', 60, 50);
+    act(() => button.click());
 
-    expect(onDrag).not.toHaveBeenCalled();
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(onClick).not.toHaveBeenCalled();
+
+    // Only the lift's own click; a later tap goes through.
+    act(() => button.click());
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the motion to a nested scroller that can pan that way', () => {
+    const { getByTestId, onDragStart } = setup();
+    const scroller = getByTestId('scroller');
+    Object.defineProperty(scroller, 'scrollWidth', { value: 400 });
+    Object.defineProperty(scroller, 'clientWidth', { value: 100 });
+    scroller.scrollLeft = 50;
+    const cell = getByTestId('scroller-content');
+    dispatchTouch(cell, 'touchstart', 10, 50);
+    dispatchTouch(cell, 'touchmove', 60, 50);
+    dispatchTouch(cell, 'touchend', 60, 50);
+    expect(onDragStart).not.toHaveBeenCalled();
+
+    // Scrolled to its start, the same rightward drag belongs to the surface.
+    scroller.scrollLeft = 0;
+    dispatchTouch(cell, 'touchstart', 10, 50);
+    dispatchTouch(cell, 'touchmove', 60, 50);
+    dispatchTouch(cell, 'touchend', 60, 50);
+    expect(onDragStart).toHaveBeenCalledTimes(1);
   });
 });

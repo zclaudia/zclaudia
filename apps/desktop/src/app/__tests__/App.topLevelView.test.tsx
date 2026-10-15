@@ -378,7 +378,7 @@ describe('Mobile drawer detents', () => {
     return {
       ...view,
       surface,
-      drawerWidth: () => view.getByTestId('drawer-panel').style.getPropertyValue('--drawer-width'),
+      drawerWidth: () => view.getByTestId('drawer-panel').style.width,
       isOpen: () => view.getByTestId('app-sidebar').getAttribute('data-open') === 'true',
     };
   }
@@ -453,7 +453,8 @@ describe('Mobile drawer detents', () => {
   });
 
   it('walks Android back down one detent at a time', async () => {
-    const { surface, drawerWidth, isOpen } = await renderOpenDrawer();
+    const view = await renderOpenDrawer();
+    const { surface, drawerWidth, isOpen } = view;
     slowDrag(surface, 140);
     expect(drawerWidth()).toBe(`${EXPANDED_WIDTH_PX}px`);
 
@@ -471,6 +472,14 @@ describe('Mobile drawer detents', () => {
 
     stepBack();
     expect(isOpen()).toBe(false);
+    // Closed, the panel is hidden so its shadow doesn't bleed onto the edge.
+    expect(view.getByTestId('drawer-panel').style.visibility).toBe('hidden');
+  });
+
+  it('shows the panel once the drawer opens', async () => {
+    const view = await renderOpenDrawer();
+    const panel = view.getByTestId('drawer-panel');
+    expect(panel.style.visibility).toBe('visible');
   });
 });
 
