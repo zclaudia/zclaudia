@@ -436,6 +436,22 @@ export function Sidebar({
     </>
   );
 
+  // Portaled, so it mounts the same way from the mobile drawer branch (whose
+  // header search button closes the drawer and opens this full screen) and
+  // from the desktop sidebar.
+  const renderSearchModal = () => (
+    <SearchModal
+      open={searchOpen}
+      onClose={() => setSearchOpen(false)}
+      search={search}
+      sessions={sessions}
+      onResultSelect={(sessionId, messageId, ownerBackendId) => {
+        actions.handleSearchResultSelect(sessionId, messageId, ownerBackendId);
+        setSearchOpen(false);
+      }}
+    />
+  );
+
   const renderPortaledModals = () => (
     <SidebarPortaledModals
       settingsProjectId={settingsProjectId}
@@ -597,6 +613,7 @@ export function Sidebar({
           <SidebarFooter onShowSettings={() => onOpenSettings?.()} isMobile />
         </div>
 
+        {renderSearchModal()}
         {renderPortaledModals()}
       </>
     );
@@ -637,16 +654,7 @@ export function Sidebar({
           aria-valuemax={Math.round(maxSidebarWidthPx)}
         />
 
-        <SearchModal
-          open={searchOpen}
-          onClose={() => setSearchOpen(false)}
-          search={search}
-          sessions={sessions}
-          onResultSelect={(sessionId, messageId, ownerBackendId) => {
-            actions.handleSearchResultSelect(sessionId, messageId, ownerBackendId);
-            setSearchOpen(false);
-          }}
-        />
+        {renderSearchModal()}
 
         <div
           data-testid="sidebar-card"

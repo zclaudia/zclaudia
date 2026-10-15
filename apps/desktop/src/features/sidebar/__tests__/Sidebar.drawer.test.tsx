@@ -287,6 +287,16 @@ describe('Sidebar mobile drawer — modal dialog semantics', () => {
     renderSidebarMobileOpen();
     expect(screen.getByRole('button', { name: /close menu/i })).toBeTruthy();
   });
+
+  it('header search button closes the drawer and opens the search modal', () => {
+    const { onClose } = renderSidebarMobileOpen();
+    expect(screen.queryByPlaceholderText('Search messages and sessions…')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Search messages' }));
+    expect(onClose).toHaveBeenCalled();
+    expect(screen.getByPlaceholderText('Search messages and sessions…')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Close search' }));
+    expect(screen.queryByPlaceholderText('Search messages and sessions…')).toBeNull();
+  });
 });
 
 describe('Sidebar mobile drawer — top-level mode entries', () => {
