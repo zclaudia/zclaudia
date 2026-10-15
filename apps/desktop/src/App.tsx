@@ -343,6 +343,10 @@ function AppContent() {
     (isAppTopLevelView || isShellTopLevelView) && isMobile && isAgentExpanded,
     20
   );
+  // The mobile notifications feed covers the content area; back closes it
+  // before the shell-mode escape (same priority tier would tie on order).
+  // The drawer sits above it, so the drawer closes first.
+  useAndroidBack(() => setFeedOpen(false), isMobile && isFeedOpen && !sidebarOpen, 22);
   // Back steps down one detent (expanded → drawer → closed) so it undoes the
   // same amount a leftward swipe would.
   useAndroidBack(
@@ -610,7 +614,6 @@ function AppContent() {
                 agentSwipePreview={agentSwipePreview}
                 claudiaSwipePreviewProgress={claudiaSwipePreviewProgress}
                 claudiaOverlayOpacity={claudiaOverlayOpacity}
-                onCloseAgent={() => setAgentExpanded(false)}
                 onCloseFeed={() => setFeedOpen(false)}
               />
             )}

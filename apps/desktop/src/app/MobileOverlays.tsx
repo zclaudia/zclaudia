@@ -1,5 +1,4 @@
 import type { RefObject } from 'react';
-import { ChevronRight } from 'lucide-react';
 import { ClaudiaChat } from '../features/claudia/ClaudiaChat';
 import { NotificationsPanel } from '../components/notifications/NotificationsPanel';
 
@@ -10,7 +9,6 @@ interface MobileOverlaysProps {
   agentSwipePreview: { mode: 'open' | 'close' | null; progress: number };
   claudiaSwipePreviewProgress: number;
   claudiaOverlayOpacity: number;
-  onCloseAgent: () => void;
   onCloseFeed: () => void;
 }
 
@@ -21,7 +19,6 @@ export function MobileOverlays({
   agentSwipePreview,
   claudiaSwipePreviewProgress,
   claudiaOverlayOpacity,
-  onCloseAgent,
   onCloseFeed,
 }: MobileOverlaysProps) {
   return (
@@ -64,40 +61,13 @@ export function MobileOverlays({
               : 'none',
         }}
       >
-        <button
-          onClick={onCloseAgent}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10
-                     flex items-center px-1 py-2
-                     bg-zinc-400/60 text-zinc-600 rounded-r-md shadow-sm
-                     border border-l-0 border-zinc-300
-                     active:bg-zinc-400/80
-                     dark:bg-zinc-600/60 dark:text-zinc-400
-                     dark:border-zinc-600 dark:active:bg-zinc-600/80"
-          title="Close Claudia"
-          aria-label="Close Claudia"
-        >
-          <ChevronRight className="w-3 h-3" strokeWidth={1.75} />
-        </button>
         <ClaudiaChat isMobile={true} />
       </div>
 
       {/* Feed panel */}
       {isFeedOpen && (
         <div className="absolute inset-0 z-20 bg-background">
-          <button
-            onClick={onCloseFeed}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10
-                       flex items-center px-1 py-2
-                       bg-zinc-400/60 text-zinc-600 rounded-r-md shadow-sm
-                       border border-l-0 border-zinc-300
-                       active:bg-zinc-400/80
-                       dark:bg-zinc-600/60 dark:text-zinc-400
-                       dark:border-zinc-600 dark:active:bg-zinc-600/80"
-            title="Close Feed"
-          >
-            <ChevronRight className="w-3 h-3" strokeWidth={1.75} />
-          </button>
-          <NotificationsPanel />
+          <NotificationsPanel onClose={onCloseFeed} />
         </div>
       )}
     </>
