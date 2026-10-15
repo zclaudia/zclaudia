@@ -136,11 +136,17 @@ class MainActivity : TauriActivity() {
 
   private fun extractSelectionTarget(intent: Intent?): String? {
     if (intent == null) return null
-    val openPayload = intent.getStringExtra("open_payload")?.trim().orEmpty()
-    if (openPayload.isNotEmpty()) return openPayload
+    // click_url (ntfy-bridge v2) is a real selection URL; dataString covers
+    // external VIEW deep links; open_payload is JSON the web layer cannot
+    // parse into a target, so it stays the last resort.
+    val clickUrl = intent.getStringExtra("click_url")?.trim().orEmpty()
+    if (clickUrl.isNotEmpty()) return clickUrl
 
     val dataString = intent.dataString?.trim().orEmpty()
     if (dataString.isNotEmpty()) return dataString
+
+    val openPayload = intent.getStringExtra("open_payload")?.trim().orEmpty()
+    if (openPayload.isNotEmpty()) return openPayload
 
     return null
   }

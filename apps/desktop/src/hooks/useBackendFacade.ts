@@ -52,6 +52,31 @@ export function useBackendFacade(): void {
   const directGatewayUrl = useGatewayStore(s => s.directGatewayUrl);
   const directGatewaySecret = useGatewayStore(s => s.directGatewaySecret);
 
+  // Per-backend ntfy topics: re-sync bridge subscriptions whenever the set of
+  // subscribed backends changes (including becoming empty).
+  const subscribedBackendIds = useFacadeStore(s =>
+    s.backends
+      .filter(b => b.openState === 'subscribed')
+      .map(b => b.backendId)
+      .join(',')
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        await refreshNotificationConfig();
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('[Notifications] Failed to sync bridge subscriptions:', err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [subscribedBackendIds]);
+
   // Determine mode by control-plane source, not platform.
   const mode = directGatewayUrl && directGatewaySecret ? 'direct' : 'embedded';
 

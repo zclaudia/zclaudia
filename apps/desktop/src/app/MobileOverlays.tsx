@@ -5,6 +5,8 @@ import { NotificationsPanel } from '../components/notifications/NotificationsPan
 interface MobileOverlaysProps {
   isAgentExpanded: boolean;
   isFeedOpen: boolean;
+  /** No shell header sits above the feed, so it must clear the status bar itself. */
+  padFeedTopInset: boolean;
   swipeCloseRef: RefObject<HTMLDivElement | null>;
   agentSwipePreview: { mode: 'open' | 'close' | null; progress: number };
   claudiaSwipePreviewProgress: number;
@@ -15,6 +17,7 @@ interface MobileOverlaysProps {
 export function MobileOverlays({
   isAgentExpanded,
   isFeedOpen,
+  padFeedTopInset,
   swipeCloseRef,
   agentSwipePreview,
   claudiaSwipePreviewProgress,
@@ -66,7 +69,9 @@ export function MobileOverlays({
 
       {/* Feed panel */}
       {isFeedOpen && (
-        <div className="absolute inset-0 z-20 bg-background">
+        <div
+          className={`absolute inset-0 z-20 bg-background ${padFeedTopInset ? 'safe-top-pad' : ''}`}
+        >
           <NotificationsPanel onClose={onCloseFeed} />
         </div>
       )}

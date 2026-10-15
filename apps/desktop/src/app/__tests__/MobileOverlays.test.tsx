@@ -19,12 +19,15 @@ vi.mock('../../components/notifications/NotificationsPanel', () => ({
   ),
 }));
 
-function renderOverlays(props: { isAgentExpanded?: boolean; isFeedOpen?: boolean } = {}) {
+function renderOverlays(
+  props: { isAgentExpanded?: boolean; isFeedOpen?: boolean; padFeedTopInset?: boolean } = {}
+) {
   const onCloseFeed = vi.fn();
   render(
     <MobileOverlays
       isAgentExpanded={props.isAgentExpanded ?? false}
       isFeedOpen={props.isFeedOpen ?? false}
+      padFeedTopInset={props.padFeedTopInset ?? false}
       swipeCloseRef={createRef<HTMLDivElement>()}
       agentSwipePreview={{ mode: null, progress: 0 }}
       claudiaSwipePreviewProgress={0}
@@ -47,5 +50,19 @@ describe('MobileOverlays', () => {
     expect(screen.queryByTitle('Close Feed')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Close notifications' }));
     expect(onCloseFeed).toHaveBeenCalledTimes(1);
+  });
+
+  it('pads the feed below the status bar only when no shell header sits above it', () => {
+    renderOverlays({ isFeedOpen: true, padFeedTopInset: true });
+    expect(screen.getByTestId('notifications-panel').parentElement?.className).toContain(
+      'safe-top-pad'
+    );
+  });
+
+  it('leaves the feed unpadded under a shell header', () => {
+    renderOverlays({ isFeedOpen: true });
+    expect(screen.getByTestId('notifications-panel').parentElement?.className).not.toContain(
+      'safe-top-pad'
+    );
   });
 });

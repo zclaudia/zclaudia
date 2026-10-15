@@ -5,11 +5,30 @@ import { isAndroid } from '../utils/platform';
 const BRIDGE_URL = 'http://127.0.0.1:9595';
 const RECEIVER = 'com.zclaudia.mobile.NotificationRenderService';
 
+export interface NtfyBridgeSubscriptionStatus {
+  ntfy_url?: string;
+  topic?: string;
+  package?: string;
+  auth_mode?: string;
+  auth_configured?: boolean;
+  status?: string;
+  connected?: boolean;
+}
+
 export interface NtfyBridgeStatusResponse {
   ok: boolean;
   uptime?: string;
   version?: string;
-  subscriptions: Record<string, unknown>;
+  subscriptions: Record<string, NtfyBridgeSubscriptionStatus>;
+}
+
+/** Per-backend subscription id / topic scheme, shared with the gateway. */
+export function subscriptionId(packageId: string, backendId: string): string {
+  return `${packageId}:${backendId}`;
+}
+
+export function backendTopic(baseTopic: string, backendId: string): string {
+  return `${baseTopic}-${backendId}`;
 }
 
 async function bridgeFetch(path: string, options?: RequestInit): Promise<Response> {
@@ -25,110 +44,96 @@ export function isNtfyBridgeSupported(): boolean {
   return isAndroid();
 }
 
-export async function registerNtfySubscription(
-  config: Pick<
-    NotificationConfig,
-    | 'ntfyUrl'
-    | 'ntfyTopic'
-    | 'ntfyAuthMode'
-    | 'ntfySubscribeToken'
-    | 'ntfyUsername'
-    | 'ntfyPassword'
-  >
+/**
+ * Sync local ntfy-bridge subscriptions to the desired set: one subscription
+ * per subscribed backend (per-backend topics), replacing anything stale that
+ * belongs to this package. With no enabled config or no backends, all of this
+ * package's subscriptions are removed.
+ */
+export async function syncNtfyBridgeSubscriptions(
+  config: NotificationConfig,
+  backendIds: string[]
 ): Promise<void> {
   if (!isNtfyBridgeSupported()) return;
 
   const packageId = await getCurrentPackageId();
+  const ntfyUrl = config.ntfyUrl.trim();
+  const baseTopic = config.ntfyTopic.trim();
+  const enabled = Boolean(config.enabled && ntfyUrl && baseTopic && backendIds.length > 0);
   const authMode = config.ntfyAuthMode ?? 'none';
-  const subscribeToken = config.ntfySubscribeToken?.trim() ?? '';
+  const authToken = config.ntfySubscribeToken?.trim() ?? '';
   const username = config.ntfyUsername?.trim() ?? '';
   const password = config.ntfyPassword ?? '';
 
   if (isAndroid()) {
     await invoke('android_sync_ntfy_bridge', {
       config: {
-        enabled: true,
-        ntfy_url: config.ntfyUrl,
-        ntfy_topic: config.ntfyTopic,
+        enabled,
+        ntfy_url: ntfyUrl,
+        ntfy_topic: baseTopic,
         ntfy_auth_mode: authMode,
-        ntfy_auth_token: subscribeToken,
+        ntfy_auth_token: authToken,
         ntfy_username: username,
         ntfy_password: password,
       },
       packageId,
+      backendIds,
     });
     return;
   }
 
-  const response = await bridgeFetch('/subscribe', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      id: packageId,
-      ntfy_url: config.ntfyUrl.trim(),
-      topic: config.ntfyTopic.trim(),
-      auth_mode: authMode,
-      auth_token: subscribeToken,
-      username,
-      password,
-      package: packageId,
-      receiver: RECEIVER,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`ntfy-bridge register failed: ${response.status}`);
+  const desired = new Map<string, string>();
+  if (enabled) {
+    for (const backendId of backendIds) {
+      desired.set(subscriptionId(packageId, backendId), backendTopic(baseTopic, backendId));
+    }
   }
-}
 
-export async function unregisterNtfySubscription(): Promise<void> {
-  if (!isNtfyBridgeSupported()) return;
+  const status = await getNtfyBridgeStatus();
+  const currentIds = Object.entries(status.subscriptions ?? {})
+    .filter(([, sub]) => sub?.package === packageId)
+    .map(([id]) => id);
 
-  const packageId = await getCurrentPackageId();
-
-  if (isAndroid()) {
-    await invoke('android_sync_ntfy_bridge', {
-      config: {
-        enabled: false,
-        ntfy_url: '',
-        ntfy_topic: '',
-        ntfy_auth_mode: 'none',
-        ntfy_auth_token: '',
-        ntfy_username: '',
-        ntfy_password: '',
-      },
-      packageId,
+  for (const [id, topic] of desired) {
+    // Upserts restart the daemon's SSE connection; only register new or changed topics.
+    if (
+      currentIds.includes(id) &&
+      status.subscriptions[id]?.topic === topic &&
+      status.subscriptions[id]?.ntfy_url === ntfyUrl
+    ) {
+      continue;
+    }
+    const response = await bridgeFetch('/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        ntfy_url: ntfyUrl,
+        topic,
+        auth_mode: authMode,
+        auth_token: authToken,
+        username,
+        password,
+        package: packageId,
+        receiver: RECEIVER,
+      }),
     });
-    return;
+    if (!response.ok) {
+      throw new Error(`ntfy-bridge register failed: ${response.status}`);
+    }
   }
 
-  const response = await bridgeFetch('/subscribe', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: packageId }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`ntfy-bridge unregister failed: ${response.status}`);
-  }
-}
-
-export async function syncNtfyBridgeRegistration(config: NotificationConfig): Promise<void> {
-  if (!isNtfyBridgeSupported()) return;
-
-  if (config.enabled && config.ntfyUrl.trim() && config.ntfyTopic.trim()) {
-    await registerNtfySubscription({
-      ntfyUrl: config.ntfyUrl,
-      ntfyTopic: config.ntfyTopic,
-      ntfyAuthMode: config.ntfyAuthMode,
-      ntfySubscribeToken: config.ntfySubscribeToken,
-      ntfyUsername: config.ntfyUsername,
-      ntfyPassword: config.ntfyPassword,
+  for (const id of currentIds) {
+    if (desired.has(id)) continue;
+    const response = await bridgeFetch('/subscribe', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
     });
-    return;
+    if (!response.ok) {
+      throw new Error(`ntfy-bridge unregister failed: ${response.status}`);
+    }
   }
-
-  await unregisterNtfySubscription();
 }
 
 export async function getNtfyBridgeStatus(): Promise<NtfyBridgeStatusResponse> {

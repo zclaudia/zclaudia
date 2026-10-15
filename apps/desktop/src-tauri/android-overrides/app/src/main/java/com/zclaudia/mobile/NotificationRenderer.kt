@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -25,6 +26,7 @@ object NotificationRenderer {
     val messageId = intent.getStringExtra("message_id") ?: ""
     val topic = intent.getStringExtra("topic") ?: ""
     val openPayload = intent.getStringExtra("open_payload") ?: ""
+    val clickUrl = intent.getStringExtra("click_url")?.take(2048)?.trim() ?: ""
 
     val launchIntent = context.packageManager
       .getLaunchIntentForPackage(context.packageName)
@@ -35,6 +37,10 @@ object NotificationRenderer {
         putExtra("message_id", messageId)
         putExtra("topic", topic)
         putExtra("open_payload", openPayload)
+        if (clickUrl.startsWith("http://") || clickUrl.startsWith("https://")) {
+          putExtra("click_url", clickUrl)
+          data = Uri.parse(clickUrl)
+        }
       }
 
     val pendingIntent = launchIntent?.let {

@@ -192,6 +192,10 @@ function AppContent() {
             ? 'Claudia'
             : null;
   const isShellTopLevelView = shellModeTitle !== null;
+  // An open session's header pads its own status-bar inset, so the shell's
+  // safe-top strip steps aside. Overlays that cover that header must then pad
+  // themselves.
+  const sessionOwnsTopInset = !!selectedSessionId && !isAgentExpanded && !isShellTopLevelView;
 
   const {
     drawerStage,
@@ -495,7 +499,7 @@ function AppContent() {
           otherwise paint over the sidebar header. */}
       {isMobile && (
         <div
-          className={`safe-top-spacer bg-card flex-shrink-0 ${selectedSessionId && !isAgentExpanded && !isShellTopLevelView ? 'hidden' : ''}`}
+          className={`safe-top-spacer bg-card flex-shrink-0 ${sessionOwnsTopInset ? 'hidden' : ''}`}
           data-tauri-drag-region
         />
       )}
@@ -610,6 +614,7 @@ function AppContent() {
               <MobileOverlays
                 isAgentExpanded={isAgentExpanded}
                 isFeedOpen={isFeedOpen}
+                padFeedTopInset={sessionOwnsTopInset}
                 swipeCloseRef={swipeCloseClaudiaRef}
                 agentSwipePreview={agentSwipePreview}
                 claudiaSwipePreviewProgress={claudiaSwipePreviewProgress}

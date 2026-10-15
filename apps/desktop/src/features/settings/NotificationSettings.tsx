@@ -3,6 +3,7 @@ import * as api from '../../services/api';
 import type { NotificationConfig } from '@zclaudia/protocol/notifications';
 import { DEFAULT_NOTIFICATION_CONFIG } from '@zclaudia/protocol/notifications';
 import { isNotificationConfigAvailable } from '../../services/api/notifications';
+import { useFacadeStore } from '../../stores/facadeStore';
 import { isAndroid } from '../../utils/platform';
 
 type BridgeStatus = Awaited<ReturnType<typeof api.getLocalNotificationBridgeStatus>>;
@@ -136,7 +137,12 @@ export function NotificationSettingsInline({ readOnly = false }: { readOnly?: bo
       setConfigLoaded(true);
       setConfigError(null);
       setBridgeStatus(await api.getLocalNotificationBridgeStatus());
-      await api.sendTestNotification();
+      // Notifications live on per-backend topics now; test through a
+      // subscribed backend so this device actually receives the ping.
+      const backendId = useFacadeStore
+        .getState()
+        .backends.find(b => b.openState === 'subscribed')?.backendId;
+      await api.sendTestNotification(backendId);
       setTestResult({
         ok: true,
         message: 'Test notification sent. Check this device for delivery.',
