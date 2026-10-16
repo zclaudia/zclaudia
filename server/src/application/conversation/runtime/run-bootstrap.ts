@@ -22,6 +22,7 @@ import type { SkillRuntimeState } from '../../../infra/providers/pi-runtime/inde
 import { sendMessage, broadcastToOtherAuthenticatedClients } from '../transport/broadcast.js';
 import type { ActiveRun, ConnectedClient } from '../transport/types.js';
 import { getNextOffset } from './run-lifecycle.js';
+import { loadProjectAdditionalRoots } from '../../../domains/projects/additional-paths.js';
 import {
   loadProjectAllowedOutsideWorkspaceRoots,
   loadSessionRememberedDecisions,
@@ -325,6 +326,7 @@ export function initializeRunBootstrap(
     pendingBackgroundTasks: 0,
     sessionType,
     workspaceRoot: cwd,
+    additionalRoots: loadProjectAdditionalRoots(db, projectId),
     rememberedDecisions: loadSessionRememberedDecisions(db, message.sessionId),
     allowedOutsideWorkspaceRoots: loadProjectAllowedOutsideWorkspaceRoots(db, projectId),
     aiInitiatedPlanMode: false,

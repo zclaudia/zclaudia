@@ -26,6 +26,7 @@ import {
   loadProjectAllowedOutsideWorkspaceRoots,
 } from '../agent/permission-evaluator.js';
 import { PhaseEmitter, isTerminalPhase, setPhase } from './active-run-phase.js';
+import { loadProjectAdditionalRoots } from '../../../domains/projects/additional-paths.js';
 import { createRunDomainEvent, type RunDomainEvent } from './run-domain-events.js';
 import {
   runDomainEventListeners,
@@ -240,6 +241,7 @@ function createFollowUpRun(ctx: BackgroundFollowUpContext): {
     pendingBackgroundTasks: 0,
     sessionType: 'regular',
     workspaceRoot: ctx.workspaceRoot,
+    additionalRoots: loadProjectAdditionalRoots(ctx.db, ctx.projectId),
     rememberedDecisions: loadSessionRememberedDecisions(ctx.db, ctx.sessionId),
     allowedOutsideWorkspaceRoots: loadProjectAllowedOutsideWorkspaceRoots(ctx.db, ctx.projectId),
     eventSeq: 0,
