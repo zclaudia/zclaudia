@@ -119,12 +119,17 @@ export function SidebarPortaledModals({
             newProject.setShow(false);
             newProject.setName('');
             newProject.setRootPath('');
+            newProject.setAdditionalPaths([]);
+            newProject.setError(null);
             newProject.setBackendId(null);
           }}
           name={newProject.name}
           onNameChange={newProject.setName}
           rootPath={newProject.rootPath}
           onRootPathChange={newProject.setRootPath}
+          additionalPaths={newProject.additionalPaths}
+          onAdditionalPathsChange={newProject.setAdditionalPaths}
+          error={newProject.error}
           onCreate={agentProfileId => onCreateProject(agentProfileId)}
           creatingProject={newProject.creating}
           isConnected={isConnected}

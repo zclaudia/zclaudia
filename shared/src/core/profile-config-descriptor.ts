@@ -5,6 +5,7 @@ import {
   type AgentRuntimeType,
 } from './agent-profile.js';
 import { builtinAgentPluginForRuntime } from '../plugins/builtin-agents.js';
+import type { AdditionalDirectoriesSupport } from '../providers/agent-runtime.js';
 
 export type ModelConfigKind = 'llm-profile' | 'native' | 'none';
 
@@ -38,6 +39,11 @@ export interface ProfileConfigDescriptor {
   };
   /** Whether the profile editor surfaces a CLI Path field for this runtime. */
   hasCliPath: boolean;
+  /**
+   * How the runtime honors a project's additional directories. Absent when the
+   * serving backend predates the field — treat that as unknown, not 'none'.
+   */
+  additionalDirectories?: AdditionalDirectoriesSupport;
   capabilities: {
     tools: CapabilityMode;
     providers: CapabilityMode;

@@ -2,6 +2,7 @@ import type { Permission } from './permissions.js';
 import type { PluginContributes } from './contributions.js';
 import type { PluginRequirements } from './capabilities.js';
 import { validateEngineModeDeclarations } from '@zclaudia/plugin-sdk/providers';
+import { ADDITIONAL_DIRECTORIES_SUPPORT } from '../providers/agent-runtime.js';
 import { validateLanguageServerConfigs } from '../core/language-servers.js';
 
 export interface PluginAuthor {
@@ -78,10 +79,24 @@ export function validateAgentRuntimeContributions(contributes: unknown): string[
     if (!isRecord(runtime) || typeof runtime.type !== 'string' || !runtime.type.trim()) {
       return [`contributes.agentRuntimes[${index}] must have a non-empty string type`];
     }
+    const errors: string[] = [];
+    if (
+      'additionalDirectories' in runtime &&
+      !(ADDITIONAL_DIRECTORIES_SUPPORT as readonly unknown[]).includes(
+        runtime.additionalDirectories
+      )
+    ) {
+      errors.push(
+        `contributes.agentRuntimes[${index}]: additionalDirectories must be one of ${ADDITIONAL_DIRECTORIES_SUPPORT.join(', ')}`
+      );
+    }
     // Dual-mode declarations: same structural contract the plugin SDK enforces.
-    return validateEngineModeDeclarations(runtime).map(
-      error => `contributes.agentRuntimes[${index}]: ${error}`
-    );
+    return [
+      ...errors,
+      ...validateEngineModeDeclarations(runtime).map(
+        error => `contributes.agentRuntimes[${index}]: ${error}`
+      ),
+    ];
   });
 }
 

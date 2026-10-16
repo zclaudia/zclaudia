@@ -20,6 +20,7 @@ import {
   buildInteractionToolPrompt,
 } from '../../../utils/server-utils.js';
 import { createContextEngine } from '../context/engine.js';
+import { buildAdditionalDirectoriesPrompt } from '../context/additional-directories.js';
 import { buildMemoryContext } from '../context/memory-context.js';
 import { resolveProjectMemoryDir } from '../../../utils/memory-paths.js';
 import { workspaceService } from '../../services/workspace.js';
@@ -49,6 +50,8 @@ interface AdapterContext {
 
 export interface BuildRunContextInput {
   adapter: AdapterContext;
+  /** Project additional directories (absolute, verified to exist at run start). */
+  additionalRoots?: string[];
   agentProfile: AgentProfileConfig;
   cwd: string;
   db: Database.Database;
@@ -84,6 +87,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
 }> {
   const {
     adapter,
+    additionalRoots,
     agentProfile,
     cwd,
     db,
@@ -132,7 +136,9 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     agentProfile,
     enabledTools,
     thinkingLevel: agentProfile.thinkingLevel,
+    additionalDirectories: additionalRoots?.length ? [...additionalRoots] : undefined,
   };
+  const additionalDirectoriesPrompt = buildAdditionalDirectoriesPrompt(additionalRoots);
 
   if (usesNativeContext) {
     // Claude/Codex/Cursor own persona, project discovery, memory, skills and
@@ -142,7 +148,13 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
       nativeMode,
       runOptions: {
         ...baseRunOptions,
-        systemPrompt: agentProfile.systemPrompt?.trim() ? agentProfile.systemPrompt : undefined,
+        systemPrompt:
+          [
+            agentProfile.systemPrompt?.trim() ? agentProfile.systemPrompt : undefined,
+            additionalDirectoriesPrompt,
+          ]
+            .filter(Boolean)
+            .join('\n\n') || undefined,
       },
       taskContext:
         [
@@ -209,6 +221,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     cwd,
     baseSystemPrompt: agentProfile.systemPrompt,
     workspacePrompt,
+    additionalDirectoriesPrompt,
     skillDirectoryHint,
     memoryContext,
     systemContext: message.systemContext,

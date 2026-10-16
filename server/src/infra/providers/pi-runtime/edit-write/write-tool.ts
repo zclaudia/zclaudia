@@ -26,7 +26,11 @@ import {
   runWriteLifecycle,
   scheduleDeferredDiagnostics,
 } from '../write-lifecycle.js';
-import { resolveInsideWorkspace, toWorkspaceRelative } from '../workspace-paths.js';
+import {
+  resolveInsideWorkspaces,
+  toWorkspaceRelative,
+  workspaceRootsOf,
+} from '../workspace-paths.js';
 import { buildBudgetedDiffDetails, buildMutationResultText } from './mutation-details.js';
 import {
   errorResult,
@@ -64,7 +68,7 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
       const content = args.content;
       let filePath: string;
       try {
-        filePath = resolveInsideWorkspace(cwd, requested);
+        filePath = resolveInsideWorkspaces(workspaceRootsOf(cwd, options), requested);
       } catch (err) {
         return errorResult(
           'path_outside_workspace',
@@ -93,7 +97,12 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
       try {
         return await runWithFileWriteLock(filePath, async () => {
           const relPathForSymlink = toWorkspaceRelative(cwd, filePath);
-          const targetResult = await resolveWritePath(cwd, filePath, relPathForSymlink);
+          const targetResult = await resolveWritePath(
+            cwd,
+            filePath,
+            relPathForSymlink,
+            options?.additionalRoots
+          );
           if (!targetResult.ok) return targetResult.result;
           const writePath = targetResult.writePath;
           let existed = false;

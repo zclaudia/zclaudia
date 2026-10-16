@@ -23,10 +23,12 @@ import {
   type LspQueryResult,
 } from '../language-server-port.js';
 import { agentToolParameters, errorResult, textResult, toolParams } from './tool-common.js';
-import { resolveInsideWorkspace } from './workspace-paths.js';
+import { resolveInsidePrimaryWorkspace } from './workspace-paths.js';
 
 export interface LspToolDeps {
   cwd: string;
+  /** Project additional directories; only used to explain why their files are refused. */
+  additionalRoots?: readonly string[];
   port?: LanguageServerPort;
 }
 
@@ -121,7 +123,7 @@ export async function resolveColumn(
 }
 
 export function createLspTool(deps: LspToolDeps): AgentTool {
-  const { cwd, port } = deps;
+  const { cwd, port, additionalRoots } = deps;
   const servers = listServers(port, cwd);
   return {
     name: 'LSPTool',
@@ -198,7 +200,11 @@ export function createLspTool(deps: LspToolDeps): AgentTool {
       let file: string | undefined;
       if (fileArg) {
         try {
-          file = resolveInsideWorkspace(cwd, fileArg);
+          file = resolveInsidePrimaryWorkspace(
+            { primary: cwd, additional: additionalRoots },
+            fileArg,
+            'LSPTool'
+          );
         } catch (err) {
           return errorResult(
             'path_outside_workspace',

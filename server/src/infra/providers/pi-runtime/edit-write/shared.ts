@@ -22,7 +22,7 @@ import type {
   WriteDiagnosticsProvider,
   WriteLifecycleHooks,
 } from '../write-lifecycle.js';
-import { isOutsideWorkspace } from '../workspace-paths.js';
+import { isOutsideWorkspace, type WorkspaceRootOptions } from '../workspace-paths.js';
 
 export type TextBlock = { type: 'text'; text: string };
 export type ToolContent = TextBlock[];
@@ -32,7 +32,7 @@ export type FileMutationToolResult = Awaited<ReturnType<FileMutationTool['execut
 export type FileMutationToolUpdate = Parameters<FileMutationTool['execute']>[3];
 export type MutationDetails = Record<string, unknown>;
 
-export interface FileMutationToolOptions {
+export interface FileMutationToolOptions extends WorkspaceRootOptions {
   readFileState?: ReadFileStateStore;
   writeLifecycle?: WriteLifecycleHooks;
   diagnosticsProvider?: WriteDiagnosticsProvider;
@@ -184,7 +184,8 @@ export function toolParams(first: unknown, second: unknown): Record<string, unkn
 export async function resolveWritePath(
   cwd: string,
   filePath: string,
-  relPath: string
+  relPath: string,
+  additionalRoots: readonly string[] = []
 ): Promise<
   | { ok: true; writePath: string; wasSymlink: boolean }
   | { ok: false; result: ReturnType<typeof errorResult> }
@@ -215,9 +216,14 @@ export async function resolveWritePath(
   // canonicalised, so symlinked workspace roots (macOS /tmp -> /private/tmp)
   // don't read as escapes. resolveInsideWorkspace can't be reused here: its fast
   // path compares an absolute argument against the raw, non-canonical cwd.
-  const realWorkspace = await realpath(cwd).catch(() => path.resolve(cwd));
-  const relToWorkspace = path.relative(realWorkspace, target);
-  const insideWorkspace = relToWorkspace === '' || !isOutsideWorkspace(relToWorkspace);
+  // A symlink may also resolve inside a configured additional directory.
+  const insideWorkspace = await Promise.all(
+    [cwd, ...additionalRoots].map(async root => {
+      const realRoot = await realpath(root).catch(() => path.resolve(root));
+      const relToRoot = path.relative(realRoot, target);
+      return relToRoot === '' || !isOutsideWorkspace(relToRoot);
+    })
+  ).then(results => results.some(Boolean));
   if (!insideWorkspace) {
     return {
       ok: false,

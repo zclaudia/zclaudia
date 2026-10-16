@@ -469,6 +469,7 @@ function mergeProjectPreservingFields(existing: Project | undefined, incoming: P
     ...existing,
     ...incoming,
     rootPath: incoming.rootPath ?? existing.rootPath,
+    additionalPaths: incoming.additionalPaths ?? existing.additionalPaths,
     defaultAgentProfileId: incoming.defaultAgentProfileId ?? existing.defaultAgentProfileId,
     systemPrompt: incoming.systemPrompt ?? existing.systemPrompt,
     permissionPolicy: incoming.permissionPolicy ?? existing.permissionPolicy,

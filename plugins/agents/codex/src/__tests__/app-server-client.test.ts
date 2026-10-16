@@ -229,6 +229,71 @@ describe('CodexAppServerClient', () => {
     client.destroy();
   });
 
+  describe('thread sandbox roots', () => {
+    async function threadRequests(
+      act: (client: CodexAppServerClient) => Promise<unknown>
+    ): Promise<Array<{ method: string; params: Record<string, unknown> }>> {
+      const { proc, stdinWrites } = fakeProc({
+        lines: [JSON.stringify({ id: 1, result: { capabilities: {} } })],
+        onStdin(data, stdout) {
+          for (const line of data.split('\n').filter(Boolean)) {
+            const msg = JSON.parse(line);
+            if (msg.method === 'thread/start' || msg.method === 'thread/resume') {
+              stdout.push(JSON.stringify({ id: msg.id, result: { thread: { id: 't1' } } }) + '\n');
+            }
+          }
+        },
+      });
+      spawnMock.mockReturnValueOnce(proc as never);
+      const client = new CodexAppServerClient('/bin/codex', {}, []);
+      await act(client);
+      client.destroy();
+      return stdinWrites
+        .flatMap(chunk => chunk.split('\n').filter(Boolean))
+        .map(line => JSON.parse(line))
+        .filter(msg => msg.method === 'thread/start' || msg.method === 'thread/resume');
+    }
+
+    it('sends no sandbox params without additional directories', async () => {
+      const [start] = await threadRequests(c => c.startThread('/p'));
+      expect(start.params).toEqual({ cwd: '/p' });
+      const [resume] = await threadRequests(c => c.resumeThread('t1'));
+      expect(resume.params).toEqual({ threadId: 't1' });
+      const [empty] = await threadRequests(c => c.startThread('/p', { additionalDirectories: [] }));
+      expect(empty.params).toEqual({ cwd: '/p' });
+    });
+
+    it('sends workspace-write with writable_roots on thread/start', async () => {
+      const [start] = await threadRequests(c =>
+        c.startThread('/p', { additionalDirectories: ['/extra/a', '/extra/b'] })
+      );
+      expect(start.params).toEqual({
+        cwd: '/p',
+        sandbox: 'workspace-write',
+        config: {
+          sandbox_workspace_write: {
+            writable_roots: ['/extra/a', '/extra/b'],
+            network_access: true,
+          },
+        },
+      });
+    });
+
+    it('sends the same sandbox params on thread/resume', async () => {
+      const [resume] = await threadRequests(c =>
+        c.resumeThread('t1', { additionalDirectories: ['/extra/a'], cwd: '/p' })
+      );
+      expect(resume.params).toEqual({
+        threadId: 't1',
+        cwd: '/p',
+        sandbox: 'workspace-write',
+        config: {
+          sandbox_workspace_write: { writable_roots: ['/extra/a'], network_access: true },
+        },
+      });
+    });
+  });
+
   it('runTurn yields init, assistant_delta, and provider_turn_finished', async () => {
     const { proc } = fakeProc({
       lines: [JSON.stringify({ id: 1, result: { capabilities: {} } })],

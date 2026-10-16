@@ -138,6 +138,7 @@ export interface EvalExecResult {
 
 export interface EvalKernelOptions {
   workspaceRoot: string;
+  additionalRoots?: readonly string[];
   readOnly?: boolean;
   extraAllowedDomains?: string[];
   unsandboxed?: boolean;
@@ -241,6 +242,7 @@ export class EvalKernel {
       ? { sandboxed: false }
       : await sandbox.wrapCommand(`node "${this.scriptPath}"`, {
           workspaceRoot: this.options.workspaceRoot,
+          additionalRoots: this.options.additionalRoots,
           readOnly: this.options.readOnly === true,
           extraAllowedDomains: this.options.extraAllowedDomains,
         });

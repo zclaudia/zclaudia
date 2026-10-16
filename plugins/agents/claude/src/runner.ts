@@ -32,6 +32,8 @@ import { createClaudeProcessOwner } from './cli-process.js';
 
 export interface ClaudeAgentRunOptions {
   cwd: string;
+  /** Project additional directories the agent may read/write besides cwd. */
+  additionalDirectories?: string[];
   sessionId?: string;
   env?: Record<string, string>;
   cliPath?: string;
@@ -147,6 +149,9 @@ export async function* runClaudeAgent(
   sdkOptions.pathToClaudeCodeExecutable = cliPath;
   if (options.env) sdkOptions.env = effectiveEnv;
   if (options.canUseTool) sdkOptions.canUseTool = options.canUseTool;
+  if (options.additionalDirectories?.length) {
+    sdkOptions.additionalDirectories = options.additionalDirectories;
+  }
   if (options.mcpServers && Object.keys(options.mcpServers).length > 0) {
     sdkOptions.mcpServers = options.mcpServers;
   }
@@ -250,6 +255,9 @@ async function* runClaudeSdkAgent(
     };
   }
   if (options.canUseTool) sdkOptions.canUseTool = options.canUseTool;
+  if (options.additionalDirectories?.length) {
+    sdkOptions.additionalDirectories = options.additionalDirectories;
+  }
   if (options.mcpServers && Object.keys(options.mcpServers).length > 0) {
     sdkOptions.mcpServers = options.mcpServers;
   }

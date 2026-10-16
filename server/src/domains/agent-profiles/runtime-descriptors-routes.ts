@@ -7,7 +7,11 @@ import {
   type EngineModeSummary,
   type ProfileConfigDescriptor,
 } from '@zclaudia/shared/core/profile-config-descriptor';
-import type { AgentRuntimeContribution } from '@zclaudia/shared/providers';
+import {
+  additionalDirectoriesSupportOf,
+  type AdditionalDirectoriesSupport,
+  type AgentRuntimeContribution,
+} from '@zclaudia/shared/providers';
 import { runtimeDescriptorRegistry } from '../../infra/providers/runtime-descriptor-registry.js';
 import { providerRegistry } from '../../infra/providers/registry.js';
 
@@ -21,6 +25,8 @@ export interface AgentRuntimeSummary {
     thinkingLevel: string;
   };
   hasCliPath: boolean;
+  /** How the runtime honors a project's additional directories. */
+  additionalDirectories: AdditionalDirectoriesSupport;
   capabilities: {
     tools: string;
     providers: string;
@@ -57,6 +63,7 @@ export function createRuntimeDescriptorRoutes(deps: RuntimeDescriptorRoutesDeps 
           enabled: providerRegistry.hasType(d.type),
           model: d.model,
           hasCliPath: d.hasCliPath,
+          additionalDirectories: additionalDirectoriesSupportOf(d),
           capabilities: d.capabilities,
           authNote: d.authNote,
         };

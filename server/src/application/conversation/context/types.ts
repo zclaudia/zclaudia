@@ -25,6 +25,8 @@ export interface AssemblyInput {
 
   // Prompt fragments from run-handler (coding mode)
   workspacePrompt?: string;
+  /** Project additional directories fragment; absent when the project has none. */
+  additionalDirectoriesPrompt?: string;
   skillDirectoryHint?: string;
   systemContext?: string;
   nonNativePlanPrompt?: string;

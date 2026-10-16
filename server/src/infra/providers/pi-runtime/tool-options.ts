@@ -38,6 +38,11 @@ import type {
 } from './write-lifecycle.js';
 
 export interface ToolBridgeOptions {
+  /**
+   * The project's additional directories (absolute): file tools, search and Bash
+   * may touch them alongside `cwd`, and the Bash sandbox allows writes there.
+   */
+  additionalRoots?: readonly string[];
   /** Subset of tools to enable. Default: all built-ins. */
   enabled?: string[];
   /** Replace specific pi tool implementations. Key is the tool name. */

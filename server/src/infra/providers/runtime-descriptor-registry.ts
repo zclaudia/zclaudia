@@ -1,16 +1,21 @@
 import { PI_AGENT_RUNTIME, normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
-import type { AgentRuntimeDescriptor } from '@zclaudia/shared/providers';
+import type {
+  AgentRuntimeDescriptor,
+  HostAgentRuntimeDescriptor,
+} from '@zclaudia/shared/providers';
 
 // NOTE: `manifest.runtime` is typed as `ProviderRuntimeKind` in
 // shared/src/core/pcp.ts, which only allows 'cli' | 'sdk' | 'http' | 'bridge'
 // ('native' is not a member). The built-in Pi adapter
 // (server/src/infra/providers/pi-agent/adapter.ts) uses 'sdk' for its PCP
 // manifest, so we mirror that here.
-const PI_DESCRIPTOR: AgentRuntimeDescriptor = {
+const PI_DESCRIPTOR: HostAgentRuntimeDescriptor = {
   type: PI_AGENT_RUNTIME,
   label: 'Pi',
   model: { kind: 'llm-profile', multimodalFallback: true, thinkingLevel: 'selectable' },
   hasCliPath: false,
+  // Pi's tools and sandbox enforce a project's additional directories host-side.
+  additionalDirectories: 'host',
   capabilities: { tools: 'profile', providers: 'profile', skills: 'profile' },
   manifest: {
     id: PI_AGENT_RUNTIME,

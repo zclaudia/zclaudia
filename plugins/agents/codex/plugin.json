@@ -21,6 +21,7 @@
           "thinkingLevel": "auto"
         },
         "hasCliPath": true,
+        "additionalDirectories": "native",
         "capabilities": {
           "tools": "native-readonly",
           "providers": "external",

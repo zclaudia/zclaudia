@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Select } from '../../components/ui/Select';
 import { DirectoryPickerModal } from './DirectoryPickerModal';
+import { AdditionalDirectoriesField } from './AdditionalDirectoriesField';
 import { listAgentProfilesForBackend } from '../../services/api/agent-profiles';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 
@@ -15,6 +16,10 @@ interface NewProjectModalProps {
   onNameChange: (name: string) => void;
   rootPath: string;
   onRootPathChange: (path: string) => void;
+  additionalPaths: string[];
+  onAdditionalPathsChange: (paths: string[]) => void;
+  /** Server-side creation error to show under the form. */
+  error?: string | null;
   onCreate: (agentProfileId?: string) => void;
   creatingProject: boolean;
   isConnected: boolean;
@@ -37,6 +42,9 @@ export function NewProjectModal({
   onNameChange,
   rootPath,
   onRootPathChange,
+  additionalPaths,
+  onAdditionalPathsChange,
+  error = null,
   onCreate,
   creatingProject,
   isConnected,
@@ -59,6 +67,10 @@ export function NewProjectModal({
   const selectedAvailable = profiles.some(
     profile => profile.id === agentProfileId && available(profile)
   );
+  // The profile the project will use: the explicit pick, else the usable global default.
+  const selectedProfile = agentProfileId
+    ? profiles.find(profile => profile.id === agentProfileId)
+    : profiles.find(profile => profile.isDefault && available(profile));
   const canCreate =
     !!name.trim() &&
     isConnected &&
@@ -230,6 +242,20 @@ export function NewProjectModal({
               Leave empty to use the default location.
             </span>
           </div>
+
+          <AdditionalDirectoriesField
+            value={additionalPaths}
+            onChange={onAdditionalPathsChange}
+            backendId={backendId}
+            rootPath={rootPath}
+            agentRuntimeType={selectedProfile?.runtimeType}
+          />
+
+          {error && (
+            <p role="alert" className="text-xs text-destructive">
+              {error}
+            </p>
+          )}
         </div>
       </Modal>
 

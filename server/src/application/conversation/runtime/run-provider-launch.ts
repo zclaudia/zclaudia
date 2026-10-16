@@ -430,6 +430,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
 
   const { runOptions, taskContext } = await buildRunContext({
     adapter,
+    additionalRoots: activeRun.additionalRoots,
     agentProfile: effectiveAgentProfile,
     cwd,
     db,

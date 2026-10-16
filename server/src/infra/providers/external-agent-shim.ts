@@ -7,7 +7,16 @@ import type {
 import { InvocationError } from '@zclaudia/shared/providers';
 import type { ProviderAdapter, RunOptions } from './types.js';
 
-export function toExternalAgentRunContext(options: RunOptions): ExternalAgentRunContext {
+/**
+ * Run context as handed to in-process plugin adapters. `additionalDirectories`
+ * is a host-side extension: the pinned plugin-sdk contract has no field for it,
+ * so plugins that support it read it from this widened shape.
+ */
+export type HostExternalAgentRunContext = ExternalAgentRunContext & {
+  additionalDirectories?: string[];
+};
+
+export function toExternalAgentRunContext(options: RunOptions): HostExternalAgentRunContext {
   return {
     cwd: options.cwd,
     sessionId: options.sessionId,
@@ -27,6 +36,7 @@ export function toExternalAgentRunContext(options: RunOptions): ExternalAgentRun
     engineExecution: options.engineExecution,
     modelConnection: options.modelConnection,
     usageBaseline: options.usageBaseline,
+    additionalDirectories: options.additionalDirectories,
   };
 }
 

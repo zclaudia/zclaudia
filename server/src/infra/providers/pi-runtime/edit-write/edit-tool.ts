@@ -18,7 +18,11 @@ import { hashlineForLine, hashlineTag, parseHashlineOperation } from '../hashlin
 import { NOOP_EDIT_HARD_LIMIT } from '../noop-edit-guard.js';
 import { readTextFileWithMetadata } from '../text-io.js';
 import { MAX_EDIT_FILE_BYTES, validateMutationContent } from '../write-guards.js';
-import { resolveInsideWorkspace, toWorkspaceRelative } from '../workspace-paths.js';
+import {
+  resolveInsideWorkspaces,
+  toWorkspaceRelative,
+  workspaceRootsOf,
+} from '../workspace-paths.js';
 import {
   applyBatchEdits,
   applyExactEdit,
@@ -183,7 +187,7 @@ async function executeSingleFileEdit(
   const replaceAll = args.replace_all === true;
   let filePath: string;
   try {
-    filePath = resolveInsideWorkspace(cwd, requested);
+    filePath = resolveInsideWorkspaces(workspaceRootsOf(cwd, options), requested);
   } catch (err) {
     return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err));
   }
@@ -208,7 +212,12 @@ async function executeSingleFileEdit(
   try {
     return await runWithFileWriteLock(filePath, async () => {
       const relPathForChecks = toWorkspaceRelative(cwd, filePath);
-      const targetResult = await resolveWritePath(cwd, filePath, relPathForChecks);
+      const targetResult = await resolveWritePath(
+        cwd,
+        filePath,
+        relPathForChecks,
+        options?.additionalRoots
+      );
       if (!targetResult.ok) return targetResult.result;
       const writePath = targetResult.writePath;
       const fileStat = await stat(filePath); // follows the symlink to its target

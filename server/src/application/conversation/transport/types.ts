@@ -137,6 +137,12 @@ export interface RunLifecycleState {
 
 export interface RunWorkspaceState {
   workspaceRoot: string;
+  /**
+   * The project's configured additional directories (absolute, existing at run
+   * start). The agent may read/write them without an outside-workspace prompt.
+   * Relative paths still resolve against `workspaceRoot`.
+   */
+  additionalRoots: string[];
 }
 
 export interface RunHealthState {

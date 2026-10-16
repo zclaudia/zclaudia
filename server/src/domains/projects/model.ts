@@ -6,6 +6,7 @@ type ProjectStateFields = Pick<
   | 'type'
   | 'defaultAgentProfileId'
   | 'rootPath'
+  | 'additionalPaths'
   | 'systemPrompt'
   | 'reviewLlmProfileId'
   | 'permissionWorkflowOverrideId'
@@ -48,11 +49,20 @@ function assertRequiredProjectFields(project: Pick<Project, 'name' | 'type'>): v
   }
 }
 
+function parseAdditionalPaths(value: unknown): string[] {
+  if (!Array.isArray(value) || value.some(item => typeof item !== 'string')) {
+    throw new Error('additionalPaths must be an array of strings');
+  }
+  return value as string[];
+}
+
 export function assertValidProjectState(
   project: Pick<
     Project,
     | 'name'
     | 'type'
+    | 'rootPath'
+    | 'additionalPaths'
     | 'reviewLlmProfileId'
     | 'permissionWorkflowOverrideId'
     | 'agent'
@@ -64,6 +74,10 @@ export function assertValidProjectState(
   assertJsonObject(project.permissionPolicy, 'permissionPolicy');
   assertJsonObject(project.agentPermissionOverride, 'agentPermissionOverride');
   assertPermissionPolicy(project.permissionPolicy);
+
+  if (project.additionalPaths?.length && (project.type !== 'code' || !project.rootPath)) {
+    throw new Error('Additional directories can only be set for code projects with a root path');
+  }
 
   if (project.reviewLlmProfileId && project.type !== 'code') {
     throw new Error('reviewLlmProfileId can only be set for code projects');
@@ -104,6 +118,7 @@ export function buildProjectCreateState(
     defaultAgentProfileId:
       typeof body.defaultAgentProfileId === 'string' ? body.defaultAgentProfileId : undefined,
     rootPath: typeof body.rootPath === 'string' ? body.rootPath : undefined,
+    additionalPaths: body.additionalPaths == null ? [] : parseAdditionalPaths(body.additionalPaths),
     systemPrompt: typeof body.systemPrompt === 'string' ? body.systemPrompt : undefined,
     permissionPolicy: (body.permissionPolicy as PermissionPolicy | undefined) ?? undefined,
     agentPermissionOverride:
@@ -132,6 +147,9 @@ export function buildProjectPatch(body: Record<string, unknown>): ProjectPatch {
       body.defaultAgentProfileId == null ? null : String(body.defaultAgentProfileId);
   if (hasOwn(body, 'rootPath'))
     patch.rootPath = body.rootPath == null ? null : String(body.rootPath);
+  if (hasOwn(body, 'additionalPaths'))
+    patch.additionalPaths =
+      body.additionalPaths == null ? null : parseAdditionalPaths(body.additionalPaths);
   if (hasOwn(body, 'systemPrompt'))
     patch.systemPrompt = body.systemPrompt == null ? null : String(body.systemPrompt);
   if (hasOwn(body, 'permissionPolicy'))
@@ -162,6 +180,10 @@ export function applyProjectPatch(existing: Project, patch: ProjectPatch): Proje
         ? existing.defaultAgentProfileId
         : (patch.defaultAgentProfileId ?? undefined),
     rootPath: patch.rootPath === undefined ? existing.rootPath : (patch.rootPath ?? undefined),
+    additionalPaths:
+      patch.additionalPaths === undefined
+        ? existing.additionalPaths
+        : (patch.additionalPaths ?? []),
     systemPrompt:
       patch.systemPrompt === undefined ? existing.systemPrompt : (patch.systemPrompt ?? undefined),
     permissionPolicy:

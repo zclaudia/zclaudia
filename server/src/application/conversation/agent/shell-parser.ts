@@ -170,6 +170,40 @@ export function isPathWithinRoot(filePath: string, rootPath: string): boolean {
   return resolved.startsWith(resolvedRoot + path.sep) || resolved === resolvedRoot;
 }
 
+/** Lexical containment in any of `roots` (same rules as `isPathWithinRoot`). */
+export function isPathWithinAnyRoot(filePath: string, roots: readonly string[]): boolean {
+  return roots.some(root => isPathWithinRoot(filePath, root));
+}
+
+/** Resolve symlinks through the deepest existing ancestor, keeping missing tail segments. */
+function resolveRealPathWithMissingTail(target: string): string {
+  const missing: string[] = [];
+  let current = path.resolve(target);
+  for (;;) {
+    try {
+      return path.join(fs.realpathSync.native(current), ...missing.reverse());
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) return path.resolve(target);
+      missing.push(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
+/**
+ * Containment for a configured additional directory: lexically inside `root`
+ * AND still inside it after following symlinks, so a link planted in the
+ * directory cannot lead the agent out of it.
+ */
+export function isPathWithinRealRoot(filePath: string, root: string): boolean {
+  if (!isPathWithinRoot(filePath, root)) return false;
+  return isPathWithinRoot(
+    resolveRealPathWithMissingTail(filePath),
+    resolveRealPathWithMissingTail(root)
+  );
+}
+
 export function normalizeExternalRoot(
   filePath: string,
   stat: (path: string) => fs.Stats = fs.statSync

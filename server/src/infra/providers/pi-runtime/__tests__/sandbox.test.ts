@@ -88,6 +88,43 @@ describe('wrapCommand', () => {
     expect(cfg.network.allowedDomains).toEqual(DEFAULT_ALLOWED_DOMAINS);
   });
 
+  it('read-write: additional roots are writable alongside the workspace and tmp', async () => {
+    mockAvailable();
+    const wrapSpy = vi
+      .spyOn(sandboxRuntime.SandboxManager, 'wrapWithSandboxArgv')
+      .mockResolvedValue({ argv: ['/bin/bash', '-c', 'x'], env: {} } as any);
+    await wrapCommand('echo hi', {
+      workspaceRoot: '/ws',
+      additionalRoots: ['/extra-a', '/extra-b'],
+    });
+    const cfg = wrapSpy.mock.calls[0][2] as any;
+    expect(cfg.filesystem.allowWrite).toEqual(['/ws', '/extra-a', '/extra-b', os.tmpdir()]);
+  });
+
+  it('read-only: additional roots are not writable either (tmp only)', async () => {
+    mockAvailable();
+    const wrapSpy = vi
+      .spyOn(sandboxRuntime.SandboxManager, 'wrapWithSandboxArgv')
+      .mockResolvedValue({ argv: ['/bin/bash', '-c', 'x'], env: {} } as any);
+    await wrapCommand('ls', {
+      workspaceRoot: '/ws',
+      additionalRoots: ['/extra-a'],
+      readOnly: true,
+    });
+    const cfg = wrapSpy.mock.calls[0][2] as any;
+    expect(cfg.filesystem.allowWrite).toEqual([os.tmpdir()]);
+  });
+
+  it('without additional roots allowWrite is unchanged', async () => {
+    mockAvailable();
+    const wrapSpy = vi
+      .spyOn(sandboxRuntime.SandboxManager, 'wrapWithSandboxArgv')
+      .mockResolvedValue({ argv: ['/bin/bash', '-c', 'x'], env: {} } as any);
+    await wrapCommand('echo hi', { workspaceRoot: '/ws' });
+    const cfg = wrapSpy.mock.calls[0][2] as any;
+    expect(cfg.filesystem.allowWrite).toEqual(['/ws', os.tmpdir()]);
+  });
+
   it('scrubs secret-looking vars from the wrapped sandbox env (P0-3)', async () => {
     mockAvailable();
     vi.spyOn(sandboxRuntime.SandboxManager, 'wrapWithSandboxArgv').mockResolvedValue({
