@@ -67,6 +67,10 @@ export function NewProjectModal({
   const selectedAvailable = profiles.some(
     profile => profile.id === agentProfileId && available(profile)
   );
+  // The profile the project will use: the explicit pick, else the usable global default.
+  const selectedProfile = agentProfileId
+    ? profiles.find(profile => profile.id === agentProfileId)
+    : profiles.find(profile => profile.isDefault && available(profile));
   const canCreate =
     !!name.trim() &&
     isConnected &&
@@ -244,6 +248,7 @@ export function NewProjectModal({
             onChange={onAdditionalPathsChange}
             backendId={backendId}
             rootPath={rootPath}
+            agentRuntimeType={selectedProfile?.runtimeType}
           />
 
           {error && (

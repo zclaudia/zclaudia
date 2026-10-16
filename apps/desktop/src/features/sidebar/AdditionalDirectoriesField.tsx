@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { FolderOpen, Plus, X } from 'lucide-react';
 import { Button, IconButton } from '../../components/ui/Button';
 import { SECTION_LABEL } from '../../components/ui/typography';
+import { normalizeAgentRuntimeType } from '@zclaudia/shared/core/agent-profile';
+import { useRuntimeDescriptorStore } from '../../stores/runtimeDescriptorStore';
 import { DirectoryPickerModal } from './DirectoryPickerModal';
 
 interface AdditionalDirectoriesFieldProps {
@@ -11,6 +13,11 @@ interface AdditionalDirectoriesFieldProps {
   backendId: string | null;
   /** The primary working directory; extra directories need one to exist. */
   rootPath: string;
+  /**
+   * Runtime of the agent that will run in this project (undefined = unknown).
+   * Used only to warn when that runtime can't honor additional directories.
+   */
+  agentRuntimeType?: string;
 }
 
 /**
@@ -24,7 +31,14 @@ export function AdditionalDirectoriesField({
   onChange,
   backendId,
   rootPath,
+  agentRuntimeType,
 }: AdditionalDirectoriesFieldProps) {
+  const descriptors = useRuntimeDescriptorStore(s => s.getDescriptors(backendId));
+  const descriptor = agentRuntimeType
+    ? descriptors.find(d => d.runtime === normalizeAgentRuntimeType(agentRuntimeType))
+    : undefined;
+  // Only an explicit 'none' warns; a missing field (older backend) is unknown.
+  const unsupported = descriptor?.additionalDirectories === 'none';
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerIndex, setPickerIndex] = useState<number | null>(null);
   const hasRoot = rootPath.trim().length > 0;
@@ -88,6 +102,12 @@ export function AdditionalDirectoriesField({
           ? 'The agent can read and write these in addition to the working directory. Git status, worktrees and pull requests only cover the working directory.'
           : 'Set a working directory first to add more directories.'}
       </span>
+      {hasRoot && unsupported && descriptor && (
+        <span role="status" className="px-0.5 text-[11px] text-muted-foreground">
+          {descriptor.label} can't use additional directories directly; writes there will ask for
+          approval.
+        </span>
+      )}
 
       <DirectoryPickerModal
         open={pickerOpen}

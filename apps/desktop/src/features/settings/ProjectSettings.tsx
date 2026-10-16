@@ -388,6 +388,12 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
             onChange={setAdditionalPaths}
             backendId={useOwnershipStore.getState().getProjectBackendId(project.id)}
             rootPath={rootPath}
+            agentRuntimeType={
+              (selectedAgentId
+                ? agents.find(agent => agent.id === selectedAgentId)
+                : agents.find(agent => agent.isDefault)
+              )?.runtimeType
+            }
           />
 
           {/* Default Agent */}

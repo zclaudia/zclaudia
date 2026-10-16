@@ -1,5 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import type { ProfileConfigDescriptor } from '@zclaudia/shared/core/profile-config-descriptor';
+import { useRuntimeDescriptorStore } from '../../../stores/runtimeDescriptorStore';
 import { AdditionalDirectoriesField, cleanAdditionalPaths } from '../AdditionalDirectoriesField';
 
 // The real picker browses a backend filesystem; here it just exposes onSelect.
@@ -68,5 +70,71 @@ describe('AdditionalDirectoriesField', () => {
 
   it('cleanAdditionalPaths trims and drops blanks', () => {
     expect(cleanAdditionalPaths([' /a ', '', '   ', '/b'])).toEqual(['/a', '/b']);
+  });
+});
+
+function descriptor(
+  runtime: string,
+  additionalDirectories?: 'native' | 'host' | 'none'
+): ProfileConfigDescriptor {
+  return {
+    runtime,
+    label: runtime === 'legacy' ? 'Legacy Agent' : 'Other Agent',
+    enabled: true,
+    model: { kind: 'native', multimodalFallback: false, thinkingLevel: 'off' },
+    hasCliPath: false,
+    capabilities: { tools: 'profile', providers: 'profile', skills: 'profile' },
+    ...(additionalDirectories ? { additionalDirectories } : {}),
+  };
+}
+
+describe('AdditionalDirectoriesField runtime hint', () => {
+  beforeEach(() => {
+    useRuntimeDescriptorStore.setState({
+      byBackend: {
+        local: [
+          descriptor('other', 'none'),
+          descriptor('native-rt', 'native'),
+          descriptor('host-rt', 'host'),
+          descriptor('legacy'),
+        ],
+      },
+    });
+  });
+
+  const renderField = (agentRuntimeType: string | undefined, rootPath = '/root') =>
+    render(
+      <AdditionalDirectoriesField
+        value={[]}
+        onChange={() => {}}
+        backendId="local"
+        rootPath={rootPath}
+        agentRuntimeType={agentRuntimeType}
+      />
+    );
+
+  it('warns when the agent runtime does not support additional directories', () => {
+    renderField('other');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      "Other Agent can't use additional directories directly"
+    );
+  });
+
+  it.each(['native-rt', 'host-rt'])('stays quiet for %s', runtime => {
+    renderField(runtime);
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('treats a missing field (older backend), an unknown runtime and no runtime as unknown', () => {
+    for (const runtime of ['legacy', 'never-registered', undefined]) {
+      const { unmount } = renderField(runtime);
+      expect(screen.queryByRole('status')).toBeNull();
+      unmount();
+    }
+  });
+
+  it('does not warn before a working directory is set', () => {
+    renderField('other', '');
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });

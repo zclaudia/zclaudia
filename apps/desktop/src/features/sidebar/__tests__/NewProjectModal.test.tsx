@@ -1,6 +1,7 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NewProjectModal } from '../NewProjectModal';
+import { useRuntimeDescriptorStore } from '../../../stores/runtimeDescriptorStore';
 import { listAgentProfilesForBackend } from '../../../services/api/agent-profiles';
 
 vi.mock('../../../services/api/agent-profiles', () => ({ listAgentProfilesForBackend: vi.fn() }));
@@ -181,5 +182,37 @@ describe('NewProjectModal', () => {
       />
     );
     expect(screen.getByRole('alert')).toHaveTextContent('must exist');
+  });
+
+  it("warns when the default agent's runtime lacks additional-directory support", async () => {
+    vi.mocked(listAgentProfilesForBackend).mockResolvedValue([
+      { id: 'default-agent', name: 'My agent', isDefault: true, runtimeType: 'other' },
+    ] as never);
+    useRuntimeDescriptorStore.setState({
+      byBackend: {
+        local: [
+          {
+            runtime: 'other',
+            label: 'Other Agent',
+            enabled: true,
+            model: { kind: 'native', multimodalFallback: false, thinkingLevel: 'off' },
+            hasCliPath: false,
+            additionalDirectories: 'none',
+            capabilities: { tools: 'profile', providers: 'profile', skills: 'profile' },
+          },
+        ],
+      },
+    });
+    render(
+      <NewProjectModal
+        {...baseProps}
+        rootPath="/work/app"
+        backends={[backends[0]]}
+        selectedBackendId="local"
+      />
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      "Other Agent can't use additional directories directly"
+    );
   });
 });
