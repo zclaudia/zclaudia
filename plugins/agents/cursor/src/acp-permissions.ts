@@ -10,6 +10,7 @@ import type {
 } from '@agentclientprotocol/sdk';
 import { boundedJsonText, boundedToolInput, truncateUtf8 } from '@zclaudia/agent-common';
 import { isDeepStrictEqual } from 'node:util';
+import { isInsideAnyRoot } from './additional-roots.js';
 
 /**
  * Bridge between ACP `session/request_permission` and ZClaudia's
@@ -30,6 +31,12 @@ import { isDeepStrictEqual } from 'node:util';
  *   commonly echoes the unchanged input for policy auto-approvals; that is
  *   accepted because it does not change what Cursor will execute.
  *
+ * Project additional directories (host tier): an `edit` request whose every diff
+ * path lies inside a configured additional directory is approved once without
+ * asking, because Cursor itself prompts for any write outside its cwd. Shell
+ * requests are never auto-approved (Cursor's command allowlist is
+ * directory-independent) and plan/ask runs pass no directories.
+ *
  * The bridge also records the local decision per `toolCallId` so the event
  * mapper can override the agent's terminal tool status (§9.2): a denied call
  * is reported `completed` by the agent, but must render as an error in
@@ -48,6 +55,8 @@ export interface AcpPermissionBridgeOptions {
   onAutoDeny?: (toolCallId: string, reason: string) => void;
   /** Test/embedding override; production uses the host-visible 300s timeout. */
   timeoutMs?: number;
+  /** Absolute project additional directories whose file edits are auto-approved. */
+  additionalDirectories?: readonly string[];
 }
 
 interface SelectedOutcome {
@@ -77,6 +86,15 @@ export class AcpPermissionBridge {
 
     // Bypass mode auto-approves once per call, without touching the callback.
     if (!this.options.supervised) {
+      const selected = this.selectOutcome(request, 'allow_once');
+      this.decisions.set(toolCallId, selected.allowed ? 'allowed' : 'denied');
+      if (!selected.allowed) {
+        this.options.onAutoDeny?.(toolCallId, 'permission request offered no allow_once option');
+      }
+      return selected.response;
+    }
+
+    if (this.isEditInsideAdditionalDirectory(request)) {
       const selected = this.selectOutcome(request, 'allow_once');
       this.decisions.set(toolCallId, selected.allowed ? 'allowed' : 'denied');
       if (!selected.allowed) {
@@ -148,6 +166,19 @@ export class AcpPermissionBridge {
     // Decisions already recorded stay; unrecorded calls cannot be distinguished
     // reliably post-cancel, and the terminal-status override below treats
     // "unknown after cancel" conservatively via the run-level abort flag.
+  }
+
+  private isEditInsideAdditionalDirectory(request: RequestPermissionRequest): boolean {
+    const roots = this.options.additionalDirectories;
+    if (!roots || roots.length === 0) return false;
+    const toolCall = request.toolCall;
+    if (toolCall?.kind !== 'edit' || !Array.isArray(toolCall.content)) return false;
+    const diffPaths = toolCall.content.flatMap(entry =>
+      entry?.type === 'diff' && typeof (entry as { path?: unknown }).path === 'string'
+        ? [(entry as { path: string }).path]
+        : []
+    );
+    return diffPaths.length > 0 && diffPaths.every(target => isInsideAnyRoot(target, roots));
   }
 
   private buildPermissionRequest(request: RequestPermissionRequest): PermissionRequest {
