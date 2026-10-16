@@ -122,6 +122,7 @@ export class CommandTaskExecutor implements TaskExecutor {
       command?: unknown;
       cwd?: unknown;
       workspaceRoot?: unknown;
+      additionalRoots?: unknown;
       sandboxAllowedDomains?: unknown;
       sandboxReadOnly?: unknown;
       sandboxRequired?: unknown;
@@ -157,6 +158,11 @@ export class CommandTaskExecutor implements TaskExecutor {
       ? ({ sandboxed: false } as sandbox.WrapResult)
       : await sandbox.wrapCommand(command, {
           workspaceRoot,
+          additionalRoots: Array.isArray(meta.additionalRoots)
+            ? meta.additionalRoots.filter(
+                (root): root is string => typeof root === 'string' && root.length > 0
+              )
+            : undefined,
           readOnly: meta.sandboxReadOnly === true,
           extraAllowedDomains,
         });

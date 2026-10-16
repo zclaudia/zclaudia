@@ -146,7 +146,12 @@ export async function applyFileEditsAtomically(
         // path the model knows (the link).
         let writePath = file.absolutePath;
         if (cwd) {
-          const resolved = await resolveWritePath(cwd, file.absolutePath, file.path);
+          const resolved = await resolveWritePath(
+            cwd,
+            file.absolutePath,
+            file.path,
+            options?.additionalRoots
+          );
           if (!resolved.ok) {
             const message = resolved.result.details.message;
             return {

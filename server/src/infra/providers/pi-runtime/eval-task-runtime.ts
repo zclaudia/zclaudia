@@ -124,6 +124,11 @@ export class EvalTaskRuntime implements TaskRuntime {
     if (!code.trim()) throw new Error('eval task requires metadata.code');
     const workspaceRoot =
       typeof metadata.workspaceRoot === 'string' ? metadata.workspaceRoot : process.cwd();
+    const additionalRoots = Array.isArray(metadata.additionalRoots)
+      ? metadata.additionalRoots.filter(
+          (root): root is string => typeof root === 'string' && root.length > 0
+        )
+      : undefined;
     const readOnly = metadata.readOnly === true;
     const timeoutMs =
       typeof metadata.timeoutMs === 'number' && Number.isFinite(metadata.timeoutMs)
@@ -157,6 +162,7 @@ export class EvalTaskRuntime implements TaskRuntime {
           `${shellQuote(process.execPath)} ${shellQuote(scriptPath)} ${shellQuote(payloadPath)}`,
           {
             workspaceRoot,
+            additionalRoots,
             readOnly,
             extraAllowedDomains,
           }

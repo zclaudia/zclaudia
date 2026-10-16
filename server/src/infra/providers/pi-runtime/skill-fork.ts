@@ -107,6 +107,7 @@ function buildForkSkillTools(
   return applyToolScheduler(
     buildTools(execution.cwd, {
       enabled,
+      additionalRoots: execution.additionalRoots,
       db: execution.db,
       toolLookups: execution.toolLookups,
       planModePort: execution.planModePort,

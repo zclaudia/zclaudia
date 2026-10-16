@@ -9,7 +9,12 @@ import type { ReadFileStateStore } from './read-file-state.js';
 import { readTextFileWithMetadata } from './text-io.js';
 import { agentToolParameters, errorResult, textResult, toolParams } from './tool-common.js';
 import { MAX_EDIT_FILE_BYTES } from './write-guards.js';
-import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
+import {
+  resolveInsideWorkspaces,
+  toWorkspaceRelative,
+  workspaceRootsOf,
+  type WorkspaceRootOptions,
+} from './workspace-paths.js';
 
 type SymbolKind = 'class' | 'function' | 'method' | 'variable';
 
@@ -34,7 +39,7 @@ interface SymbolMatch {
   indent: number;
 }
 
-interface ReadSymbolOptions {
+interface ReadSymbolOptions extends WorkspaceRootOptions {
   readFileState?: ReadFileStateStore;
 }
 
@@ -581,7 +586,7 @@ export function createReadSymbolTool(cwd: string, options?: ReadSymbolOptions): 
         return errorResult('missing_symbol', 'ReadSymbol requires symbol');
       let filePath: string;
       try {
-        filePath = resolveInsideWorkspace(cwd, requested);
+        filePath = resolveInsideWorkspaces(workspaceRootsOf(cwd, options), requested);
       } catch (err) {
         return errorResult(
           'path_outside_workspace',
@@ -687,7 +692,7 @@ export function createEditSymbolTool(cwd: string, options?: FileMutationToolOpti
         return errorResult('missing_body', 'EditSymbol requires new_body');
       let filePath: string;
       try {
-        filePath = resolveInsideWorkspace(cwd, requested);
+        filePath = resolveInsideWorkspaces(workspaceRootsOf(cwd, options), requested);
       } catch (err) {
         return errorResult(
           'path_outside_workspace',

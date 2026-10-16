@@ -4,7 +4,12 @@ import * as path from 'path';
 
 import { runRipgrep } from './ripgrep-runner.js';
 import { agentToolParameters, errorResult, textResult, toolParams } from './tool-common.js';
-import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
+import {
+  resolveInsideWorkspaces,
+  toWorkspaceRelative,
+  workspaceRootsOf,
+  type WorkspaceRootOptions,
+} from './workspace-paths.js';
 
 function parseRipgrepLines(
   cwd: string,
@@ -103,7 +108,7 @@ function parseRipgrepContextLines(
   return results;
 }
 
-export function createGrepBridgeTool(cwd: string): AgentTool {
+export function createGrepBridgeTool(cwd: string, options?: WorkspaceRootOptions): AgentTool {
   return {
     name: 'Grep',
     label: 'Grep',
@@ -135,7 +140,7 @@ export function createGrepBridgeTool(cwd: string): AgentTool {
       if (!pattern.trim()) return errorResult('missing_pattern', 'grep requires a pattern');
       let searchRoot: string;
       try {
-        searchRoot = resolveInsideWorkspace(cwd, args.path);
+        searchRoot = resolveInsideWorkspaces(workspaceRootsOf(cwd, options), args.path);
       } catch (err) {
         return errorResult(
           'path_outside_workspace',
@@ -277,7 +282,7 @@ export function createGrepBridgeTool(cwd: string): AgentTool {
   };
 }
 
-export function createLsBridgeTool(cwd: string): AgentTool {
+export function createLsBridgeTool(cwd: string, options?: WorkspaceRootOptions): AgentTool {
   const LS_DEFAULT_LIMIT = 500;
   const LS_STAT_BATCH_SIZE = 32;
   return {
@@ -299,7 +304,7 @@ export function createLsBridgeTool(cwd: string): AgentTool {
       const args = toolParams(toolCallId, params);
       let dirPath: string;
       try {
-        dirPath = resolveInsideWorkspace(cwd, args.path);
+        dirPath = resolveInsideWorkspaces(workspaceRootsOf(cwd, options), args.path);
       } catch (err) {
         return errorResult(
           'path_outside_workspace',
@@ -371,7 +376,7 @@ export function createLsBridgeTool(cwd: string): AgentTool {
   };
 }
 
-export function createGlobTool(cwd: string): AgentTool {
+export function createGlobTool(cwd: string, options?: WorkspaceRootOptions): AgentTool {
   return {
     name: 'Glob',
     label: 'Glob',
@@ -394,7 +399,7 @@ export function createGlobTool(cwd: string): AgentTool {
       const maxResults = Math.max(1, Math.min(Number(args.max_results ?? 100) || 100, 500));
       let searchRoot: string;
       try {
-        searchRoot = resolveInsideWorkspace(cwd, args.path);
+        searchRoot = resolveInsideWorkspaces(workspaceRootsOf(cwd, options), args.path);
       } catch (err) {
         return errorResult(
           'path_outside_workspace',

@@ -18,6 +18,8 @@ import {
 import { errorResult, textResult, toolParams } from './tool-common.js';
 
 export interface EvalBridgeToolOptions {
+  /** Project additional directories: writable in the eval sandbox like the workspace. */
+  additionalRoots?: readonly string[];
   sessionId?: string;
   runId?: string;
   db?: Database.Database;
@@ -185,6 +187,9 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
           metadata: {
             code,
             workspaceRoot: cwd,
+            ...(options.additionalRoots?.length
+              ? { additionalRoots: [...options.additionalRoots] }
+              : {}),
             readOnly: options.sandboxReadOnly === true,
             ...(timeout.timeoutMs !== undefined ? { timeoutMs: timeout.timeoutMs } : {}),
             privilegePlan: {
@@ -246,6 +251,7 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
           previousPrivilegeKey !== undefined && previousPrivilegeKey !== privilegeKey;
         const evalOptions = {
           workspaceRoot: cwd,
+          additionalRoots: options?.additionalRoots,
           readOnly,
           extraAllowedDomains,
           unsandboxed: forceUnsandboxed,

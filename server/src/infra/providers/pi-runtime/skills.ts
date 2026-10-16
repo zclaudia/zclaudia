@@ -127,6 +127,8 @@ type NestedAgentLike = {
 
 export interface SkillExecutionDependencies {
   cwd: string;
+  /** Project additional directories, forwarded to the forked skill's tools. */
+  additionalRoots?: readonly string[];
   db?: Database.Database;
   planModePort?: PlanModePort;
   taskPort?: TaskPort;

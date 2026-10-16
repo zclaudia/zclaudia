@@ -78,6 +78,7 @@ export function buildPiRunToolBundle(input: {
   });
   const tools = buildTools(options.cwd, {
     enabled: enabledForSession,
+    additionalRoots: options.additionalDirectories,
     supportsVision,
     serverPort: options.serverPort,
     sessionId: options.claudiaSessionId,
@@ -141,6 +142,7 @@ export function buildPiRunToolBundle(input: {
         state: options.skillState,
         execution: {
           cwd: options.cwd,
+          additionalRoots: options.additionalDirectories,
           db: options.db,
           toolLookups: options.toolLookups,
           planModePort: options.planModePort,

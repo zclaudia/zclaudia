@@ -27,10 +27,16 @@ import {
 import type { FileMutationToolOptions } from './edit-write/shared.js';
 import { resolveColumn } from './lsp-tool.js';
 import { agentToolParameters, errorResult, textResult, toolParams } from './tool-common.js';
-import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
+import {
+  resolveInsidePrimaryWorkspace,
+  resolveInsideWorkspace,
+  toWorkspaceRelative,
+} from './workspace-paths.js';
 
 export interface RenameSymbolToolDeps {
   cwd: string;
+  /** Project additional directories; only used to explain why their files are refused. */
+  additionalRoots?: readonly string[];
   port?: LanguageServerPort;
   mutation?: FileMutationToolOptions;
 }
@@ -66,7 +72,7 @@ async function refusalReason(
 }
 
 export function createRenameSymbolTool(deps: RenameSymbolToolDeps): AgentTool {
-  const { cwd, port, mutation } = deps;
+  const { cwd, port, mutation, additionalRoots } = deps;
   return {
     name: 'RenameSymbol',
     label: 'RenameSymbol',
@@ -123,7 +129,11 @@ export function createRenameSymbolTool(deps: RenameSymbolToolDeps): AgentTool {
 
       let file: string;
       try {
-        file = resolveInsideWorkspace(cwd, fileArg);
+        file = resolveInsidePrimaryWorkspace(
+          { primary: cwd, additional: additionalRoots },
+          fileArg,
+          'RenameSymbol'
+        );
       } catch (err) {
         return errorResult(
           'path_outside_workspace',

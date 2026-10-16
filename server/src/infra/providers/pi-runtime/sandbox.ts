@@ -99,6 +99,8 @@ export async function ensureSandboxInitialized(): Promise<void> {
 
 export interface WrapOptions {
   workspaceRoot: string; // session project root (NOT the per-call cwd subdir)
+  /** Project additional directories: writable like the workspace (never in readOnly mode). */
+  additionalRoots?: readonly string[];
   readOnly?: boolean;
   /** Session-granted domains (Phase B1) appended to the network allow-list for this call. */
   extraAllowedDomains?: string[];
@@ -118,7 +120,9 @@ export async function wrapCommand(command: string, opts: WrapOptions): Promise<W
     const tmpDir = os.tmpdir();
     const customConfig: Partial<SandboxRuntimeConfig> = {
       filesystem: {
-        allowWrite: opts.readOnly ? [tmpDir] : [opts.workspaceRoot, tmpDir],
+        allowWrite: opts.readOnly
+          ? [tmpDir]
+          : [opts.workspaceRoot, ...(opts.additionalRoots ?? []), tmpDir],
         denyRead: SENSITIVE_DENY_READ,
         denyWrite: [],
         allowRead: SENSITIVE_ALLOW_BACK,
