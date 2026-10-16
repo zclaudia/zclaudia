@@ -351,7 +351,8 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           request.toolInput,
           request.detail,
           activeRun.workspaceRoot,
-          activeRun.allowedOutsideWorkspaceRoots
+          activeRun.allowedOutsideWorkspaceRoots,
+          activeRun.additionalRoots
         )
       ) {
         broadcastRunMessage(activeRun, {
@@ -474,7 +475,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           request.toolInput,
           request.detail,
           effectivePolicy,
-          { rootPath: cwd, sessionType }
+          { rootPath: cwd, additionalRoots: activeRun.additionalRoots, sessionType }
         );
         if (decision === 'approve') {
           broadcastRunMessage(activeRun, {
@@ -515,7 +516,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
               request.toolInput,
               request.detail,
               effectivePolicy,
-              { rootPath: cwd, sessionType }
+              { rootPath: cwd, additionalRoots: activeRun.additionalRoots, sessionType }
             ) || undefined
           : undefined;
 
@@ -524,7 +525,8 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           request.toolName,
           request.toolInput,
           request.detail,
-          cwd
+          cwd,
+          activeRun.additionalRoots
         );
         const bashCommand = isBashLikeTool(request.toolName)
           ? ((request.toolInput as { command?: unknown } | undefined)?.command ?? request.detail)
