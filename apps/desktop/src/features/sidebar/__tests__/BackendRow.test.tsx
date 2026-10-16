@@ -43,6 +43,38 @@ describe('BackendRow', () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the project count only while collapsed', () => {
+    const { rerender } = render(
+      <BackendRow name="Local Server" online expanded={false} onToggle={() => {}} projectCount={3}>
+        <div />
+      </BackendRow>
+    );
+    expect(screen.getByLabelText('3 projects')).toHaveTextContent('3');
+
+    rerender(
+      <BackendRow name="Local Server" online expanded onToggle={() => {}} projectCount={3}>
+        <div />
+      </BackendRow>
+    );
+    expect(screen.queryByLabelText('3 projects')).toBeNull();
+  });
+
+  it('omits the count when unknown or zero', () => {
+    const { rerender } = render(
+      <BackendRow name="Local Server" online expanded={false} onToggle={() => {}}>
+        <div />
+      </BackendRow>
+    );
+    expect(screen.queryByLabelText(/projects?$/)).toBeNull();
+
+    rerender(
+      <BackendRow name="Local Server" online expanded={false} onToggle={() => {}} projectCount={0}>
+        <div />
+      </BackendRow>
+    );
+    expect(screen.queryByLabelText(/projects?$/)).toBeNull();
+  });
+
   it('has no trailing chevron beside the + button', () => {
     const { container } = render(
       <BackendRow name="Local Server" online expanded onToggle={() => {}} onNewProject={() => {}}>

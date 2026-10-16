@@ -411,6 +411,7 @@ export function Sidebar({
                     facadeBackends
                   )}
                   latencyMs={serverConnections[backend.backendId]?.latencyMs}
+                  projectCount={isActive ? backendProjects.length : undefined}
                   isActive={isActive}
                   onActivate={() => selectionCoordinator.selectBackend(backend.backendId)}
                   isMobile={isMobile}

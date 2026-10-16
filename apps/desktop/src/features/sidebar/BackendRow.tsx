@@ -14,6 +14,12 @@ interface BackendRowProps {
   viewState?: BackendViewState;
   latencyMs?: number | null;
   /**
+   * Number of projects under this backend. Shown only while collapsed — it is
+   * the row's expand/collapse cue now that there is no chevron. Leave undefined
+   * when the count is unknown (a non-active backend's projects aren't loaded).
+   */
+  projectCount?: number;
+  /**
    * Whether this backend is the active one. Only the active backend's projects
    * and sessions are loaded, so a non-active row offers to switch instead of
    * showing an empty (and misleading) project list.
@@ -39,6 +45,7 @@ export function BackendRow({
   newProjectDisabled,
   viewState,
   latencyMs,
+  projectCount,
   isActive = true,
   onActivate,
   isMobile,
@@ -88,6 +95,14 @@ export function BackendRow({
               className={`flex-shrink-0 text-muted-foreground/60 ${isMobile ? 'text-2xs' : 'text-3xs'}`}
             >
               {latencyMs}ms
+            </span>
+          )}
+          {!expanded && typeof projectCount === 'number' && projectCount > 0 && (
+            <span
+              className={`flex-shrink-0 text-muted-foreground ${isMobile ? 'text-xs' : 'text-2xs'}`}
+              aria-label={`${projectCount} ${projectCount === 1 ? 'project' : 'projects'}`}
+            >
+              {projectCount}
             </span>
           )}
         </button>
