@@ -2,6 +2,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildClaudeCanUseTool } from '../permissions.js';
 
 describe('buildClaudeCanUseTool plan mode', () => {
+  it('delivers the host question answer back to Claude instead of dropping it', async () => {
+    const answer = 'Q: Which route?\nA: Embedded web';
+    const onPermission = vi.fn().mockResolvedValue({ behavior: 'allow', message: answer });
+    await expect(
+      buildClaudeCanUseTool(onPermission)!(
+        'AskUserQuestion',
+        { questions: [] },
+        {
+          signal: new AbortController().signal,
+          toolUseID: 'question',
+        }
+      )
+    ).resolves.toEqual({ behavior: 'deny', message: answer });
+  });
+
   it('exposes the exact shell command and SDK explanation for the approval view', async () => {
     const onPermission = vi.fn().mockResolvedValue({ behavior: 'deny' });
     const command = "printf 'approved' > 'a file.txt'";

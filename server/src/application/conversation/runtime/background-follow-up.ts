@@ -35,6 +35,8 @@ import { attachRunPhaseDomainEventEmitter } from './run-phase-domain-events.js';
 import { createRunDeltaBatcher } from './run-delta-batcher.js';
 
 export interface BackgroundFollowUpContext {
+  /** Owns the original provider permission callback for this native invocation. */
+  sourceRun?: ActiveRun;
   activeRuns: Map<string, ActiveRun>;
   broadcastHeartbeat: () => void;
   client: ConnectedClient;
@@ -72,10 +74,34 @@ async function consumeBackgroundStream(
 ): Promise<void> {
   let pendingTasks = ctx.initialPendingTasks;
   let executionState: 'completed' | 'failed' = 'failed';
-  let followUpRun: ActiveRun | null = null;
-  let followUpSendRunEvent: ((event: ServerMessage) => void) | null = null;
+  const followUp: {
+    run: ActiveRun | null;
+    sendRunEvent: ((event: ServerMessage) => void) | null;
+  } = { run: null, sendRunEvent: null };
   const toolUseIdToName = new Map<string, string>();
   const providerEventState: ProviderEventState = {};
+
+  const ensureFollowUpRun = (): ActiveRun => {
+    if (!followUp.run) {
+      const created = createFollowUpRun(ctx);
+      followUp.run = created.activeRun;
+      if (ctx.usageInvocationId) {
+        followUp.run.usageAccounting = {
+          invocationId: ctx.usageInvocationId,
+          runningMarked: true,
+          deferSettlement: true,
+        };
+      }
+      followUp.sendRunEvent = created.sendRunEvent;
+      console.log(
+        `[BackgroundFollowUp] Follow-up run ${followUp.run.runId} started for session ${ctx.sessionId}`
+      );
+    }
+    return followUp.run;
+  };
+  // A can_use_tool control request may precede its assistant/tool_use event.
+  // Create the answerable run lazily in either order, scoped to this stream.
+  if (ctx.sourceRun) ctx.sourceRun.resolvePermissionRun = ensureFollowUpRun;
 
   try {
     while (true) {
@@ -108,9 +134,9 @@ async function consumeBackgroundStream(
         }
 
         // Broadcast task_notification to clients even without an active follow-up run
-        if (followUpRun && followUpSendRunEvent) {
+        if (followUp.run && followUp.sendRunEvent) {
           handleProviderEvent({
-            activeRun: followUpRun,
+            activeRun: followUp.run,
             activeRuns: ctx.activeRuns,
             broadcastHeartbeat: ctx.broadcastHeartbeat,
             client: ctx.client,
@@ -123,8 +149,8 @@ async function consumeBackgroundStream(
             persistSessionWorkingDirectory: () => {},
             providerRegistry: ctx.providerRegistry,
             providerType: ctx.providerType,
-            runId: followUpRun.runId,
-            sendRunEvent: followUpSendRunEvent,
+            runId: followUp.run.runId,
+            sendRunEvent: followUp.sendRunEvent,
             sessionId: ctx.sessionId,
             sessionType: 'regular',
             state: providerEventState,
@@ -135,27 +161,15 @@ async function consumeBackgroundStream(
       }
 
       // New assistant/tool_use message → create a follow-up run
-      if (!followUpRun && (msg.type === 'assistant' || msg.type === 'tool_use')) {
-        const created = createFollowUpRun(ctx);
-        followUpRun = created.activeRun;
-        if (ctx.usageInvocationId) {
-          followUpRun.usageAccounting = {
-            invocationId: ctx.usageInvocationId,
-            runningMarked: true,
-            deferSettlement: true,
-          };
-        }
-        followUpSendRunEvent = created.sendRunEvent;
-        console.log(
-          `[BackgroundFollowUp] Follow-up run ${followUpRun.runId} started for session ${ctx.sessionId}`
-        );
+      if (!followUp.run && (msg.type === 'assistant' || msg.type === 'tool_use')) {
+        ensureFollowUpRun();
       }
 
-      if (followUpRun && followUpSendRunEvent) {
-        followUpRun.lastActivityAt = Date.now();
+      if (followUp.run && followUp.sendRunEvent) {
+        followUp.run.lastActivityAt = Date.now();
 
         handleProviderEvent({
-          activeRun: followUpRun,
+          activeRun: followUp.run,
           activeRuns: ctx.activeRuns,
           broadcastHeartbeat: ctx.broadcastHeartbeat,
           client: ctx.client,
@@ -168,19 +182,19 @@ async function consumeBackgroundStream(
           persistSessionWorkingDirectory: () => {},
           providerRegistry: ctx.providerRegistry,
           providerType: ctx.providerType,
-          runId: followUpRun.runId,
-          sendRunEvent: followUpSendRunEvent,
+          runId: followUp.run.runId,
+          sendRunEvent: followUp.sendRunEvent,
           sessionId: ctx.sessionId,
           sessionType: 'regular',
           state: providerEventState,
           toolUseIdToName,
         });
 
-        if (isTerminalPhase(followUpRun.phase)) {
-          executionState = followUpRun.phase === 'failed' ? 'failed' : 'completed';
-          finalizeFollowUpRun(followUpRun, ctx);
-          followUpRun = null;
-          followUpSendRunEvent = null;
+        if (isTerminalPhase(followUp.run.phase)) {
+          executionState = followUp.run.phase === 'failed' ? 'failed' : 'completed';
+          finalizeFollowUpRun(followUp.run, ctx);
+          followUp.run = null;
+          followUp.sendRunEvent = null;
 
           if (pendingTasks <= 0) {
             await iterator.return?.();
@@ -194,6 +208,7 @@ async function consumeBackgroundStream(
     executionState = 'failed';
     throw error;
   } finally {
+    if (ctx.sourceRun) delete ctx.sourceRun.resolvePermissionRun;
     if (ctx.usageInvocationId) {
       getUsageRecorder(ctx.db).settleInvocation({
         invocationId: ctx.usageInvocationId,
@@ -201,8 +216,8 @@ async function consumeBackgroundStream(
       });
     }
     await iterator.return?.();
-    if (followUpRun) {
-      finalizeFollowUpRun(followUpRun, ctx);
+    if (followUp.run) {
+      finalizeFollowUpRun(followUp.run, ctx);
     }
   }
 }
@@ -244,6 +259,11 @@ function createFollowUpRun(ctx: BackgroundFollowUpContext): {
     allowedOutsideWorkspaceRoots: loadProjectAllowedOutsideWorkspaceRoots(ctx.db, ctx.projectId),
     eventSeq: 0,
     providerType: ctx.providerType,
+    providerSessionId: ctx.sourceRun?.providerSessionId,
+    providerCwd: ctx.sourceRun?.providerCwd,
+    abortController: ctx.sourceRun?.abortController,
+    aiInitiatedPlanMode: ctx.sourceRun?.aiInitiatedPlanMode,
+    originalMode: ctx.sourceRun?.originalMode,
     pendingSteers: [],
     // agentProfile / llmProfile intentionally omitted: background follow-up runs
     // do not eagerly load these (they're not always available here), and as a

@@ -66,6 +66,41 @@ const SDK_ALTERNATE_AUTH_ENV = {
   CLAUDE_CODE_USE_FOUNDRY: '0',
 };
 
+/** Keep stdin available for permissions throughout background continuations.
+ * Both string prompts and exhausted iterables let the SDK close stdin on the
+ * first result, even though the host still owns and consumes the native run.
+ */
+function createClaudePrompt(input: string, sessionId?: string) {
+  let start!: () => void;
+  let finish!: () => void;
+  let closed = false;
+  const ready = new Promise<void>(resolve => {
+    start = resolve;
+  });
+  const done = new Promise<void>(resolve => {
+    finish = resolve;
+  });
+  return {
+    start,
+    close() {
+      closed = true;
+      start();
+      finish();
+    },
+    async *messages(): AsyncGenerator<SDKUserMessage> {
+      await ready;
+      if (closed) return;
+      yield {
+        type: 'user',
+        message: { role: 'user', content: input },
+        parent_tool_use_id: null,
+        session_id: sessionId ?? '',
+      };
+      await done;
+    },
+  };
+}
+
 export async function* runClaudeAgent(
   input: string,
   options: ClaudeAgentRunOptions
@@ -119,12 +154,15 @@ export async function* runClaudeAgent(
     sdkOptions.plugins = options.plugins;
   }
 
-  const stream = query({ prompt: input, options: sdkOptions });
+  const prompt = createClaudePrompt(input, options.sessionId);
+  const stream = query({ prompt: prompt.messages(), options: sdkOptions });
   const detachCancellation = bindClaudeCancellation(stream, abortController, processOwner);
   try {
-    yield* pumpClaudeStream(stream, options);
+    prompt.start();
+    yield* pumpClaudeStream(stream, options, prompt.close);
   } finally {
     detachCancellation();
+    prompt.close();
     try {
       stream.close();
     } catch {
@@ -222,22 +260,8 @@ async function* runClaudeSdkAgent(
   // Do not put credentials in --settings argv or a settings file. Gate the
   // first user message until the native control channel has locked the SDK
   // connection above project settings. This also applies when resuming.
-  let releaseInput!: () => void;
-  let inputAllowed = false;
-  const ready = new Promise<void>(resolve => {
-    releaseInput = resolve;
-  });
-  async function* prompt(): AsyncGenerator<SDKUserMessage> {
-    await ready;
-    if (!inputAllowed || abortController.signal.aborted) return;
-    yield {
-      type: 'user',
-      message: { role: 'user', content: input },
-      parent_tool_use_id: null,
-      session_id: options.sessionId ?? '',
-    };
-  }
-  const stream = query({ prompt: prompt(), options: sdkOptions });
+  const prompt = createClaudePrompt(input, options.sessionId);
+  const stream = query({ prompt: prompt.messages(), options: sdkOptions });
   const detachCancellation = bindClaudeCancellation(stream, abortController, processOwner);
   try {
     await stream.applyFlagSettings({
@@ -248,13 +272,12 @@ async function* runClaudeSdkAgent(
       },
       apiKeyHelper: '',
     });
-    inputAllowed = true;
-    releaseInput();
-    yield* pumpClaudeStream(stream, options);
+    if (abortController.signal.aborted) prompt.close();
+    else prompt.start();
+    yield* pumpClaudeStream(stream, options, prompt.close);
   } finally {
     detachCancellation();
-    inputAllowed = false;
-    releaseInput();
+    prompt.close();
     stream.close();
   }
 }
@@ -343,9 +366,11 @@ export function extractClaudeContextWindow(message: unknown): number | undefined
 /** Shared SDK message pump: maps events, reports the provider session id, emits plan transitions. Exported for tests. */
 export async function* pumpClaudeStream(
   stream: AsyncIterable<unknown> & { close(): void },
-  options: ClaudeAgentRunOptions
+  options: ClaudeAgentRunOptions,
+  closeInput?: () => void
 ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
   const planModeTools = new Map<string, 'EnterPlanMode' | 'ExitPlanMode'>();
+  const pendingTasks = new Set<string>();
   let initSystemInfo: SystemInfo | undefined;
   let lastCallContextTokens: number | undefined;
   // With includePartialMessages the text/thinking of a main-loop API call
@@ -427,6 +452,12 @@ export async function* pumpClaudeStream(
         streamedCurrentMessage = false;
       }
       for (const event of events) {
+        if (event.type === 'task_notification' && event.taskId) {
+          if (event.taskStatus === 'started') pendingTasks.add(event.taskId);
+          else if (['completed', 'failed', 'stopped'].includes(event.taskStatus ?? '')) {
+            pendingTasks.delete(event.taskId);
+          }
+        }
         if (event.type === 'init' && event.sessionId) {
           options.onSessionId?.(event.sessionId);
         }
@@ -477,6 +508,9 @@ export async function* pumpClaudeStream(
           }
         }
       }
+      // Release stdin only once no background continuation remains. Drain the
+      // engine's output afterward so it can flush transcripts and exit cleanly.
+      if (resultMsg.type === 'result' && pendingTasks.size === 0) closeInput?.();
     }
   } finally {
     stream.close();
@@ -578,6 +612,7 @@ export function transformClaudeSdkMessage(
         taskId,
         taskStatus:
           (patch?.status as string | undefined) ??
+          (msg.status as string | undefined) ??
           (subtype === 'task_started' ? 'started' : subtype.replace(/^task_/, '')),
         taskMessage:
           (msg.description as string | undefined) ??

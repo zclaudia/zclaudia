@@ -42,6 +42,7 @@ async function flushPromises(): Promise<void> {
 describe('background follow-up consumer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    upsertAssistantMessageMock.mockReturnValue(0);
   });
 
   it('persists late cumulative usage even without a follow-up UI message', async () => {
@@ -125,6 +126,56 @@ describe('background follow-up consumer', () => {
         payload: { followupRunId: startedEvent.runId },
       })
     );
+    expect(activeRuns.size).toBe(0);
+  });
+
+  it('makes permissions answerable before content and across successive follow-up turns', async () => {
+    const sourceRun = {
+      providerSessionId: 'native-session',
+      providerCwd: '/repo',
+      abortController: new AbortController(),
+      aiInitiatedPlanMode: true,
+      originalMode: 'default',
+      resolvePermissionRun: undefined as undefined | (() => any),
+    };
+    const activeRuns = new Map();
+    const ownedRuns: any[] = [];
+    const iterator = (async function* () {
+      // A control request can arrive before any assistant content.
+      for (let i = 0; i < 2; i++) {
+        const run = sourceRun.resolvePermissionRun!();
+        expect(activeRuns.get(run.runId)).toBe(run);
+        expect(run).toMatchObject({
+          providerSessionId: 'native-session',
+          providerCwd: '/repo',
+          abortController: sourceRun.abortController,
+          aiInitiatedPlanMode: true,
+        });
+        ownedRuns.push(run);
+        yield { type: 'assistant', content: 'continue' } as any;
+        if (i === 1) yield { type: 'task_notification', taskStatus: 'completed' } as any;
+        yield { type: 'result', content: 'done' } as any;
+      }
+    })();
+    const { spawnBackgroundFollowUpConsumer } = await import('../background-follow-up.js');
+    spawnBackgroundFollowUpConsumer(iterator, {
+      sourceRun: sourceRun as any,
+      activeRuns,
+      broadcastHeartbeat: vi.fn(),
+      client: { id: 'client-1', ws: {} } as any,
+      connectedClients: new Map(),
+      db: stubDb(),
+      sessionId: 'session-1',
+      projectId: 'project-1',
+      providerType: 'claude',
+      providerRegistry: { getPolicy: vi.fn(() => undefined) } as any,
+      notificationService: { notify: vi.fn() } as any,
+      initialPendingTasks: 1,
+      workspaceRoot: '/repo',
+    });
+    await vi.waitFor(() => expect(sourceRun.resolvePermissionRun).toBeUndefined());
+    expect(ownedRuns).toHaveLength(2);
+    expect(ownedRuns[0].runId).not.toBe(ownedRuns[1].runId);
     expect(activeRuns.size).toBe(0);
   });
 });

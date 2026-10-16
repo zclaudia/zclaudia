@@ -65,6 +65,8 @@ export interface RunProviderState {
 }
 
 export interface RunPermissionState {
+  /** The continuing native invocation can acquire a new UI run after a result. */
+  resolvePermissionRun?: () => ActiveRun;
   pendingPermissions: Map<string, PendingPermission>;
   /** Session-scoped remembered permission decisions, hydrated into each run from DB.
    *  Key: toolName for non-bash, `Bash:<normalized-command>` for bash commands/subcommands. */

@@ -61,6 +61,12 @@ export function buildClaudeCanUseTool(onPermission?: PermissionCallback): CanUse
     }
 
     if (decision.behavior === 'allow') {
+      // The host returns a formatted answer, while Claude's native question
+      // tool expects structured `answers` in updatedInput. Return the text as
+      // the tool result through its denial channel, as the UI already expects.
+      if (toolName === 'AskUserQuestion' && decision.message) {
+        return { behavior: 'deny', message: decision.message };
+      }
       return decision.updatedInput === undefined
         ? { behavior: 'allow' }
         : {

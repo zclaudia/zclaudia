@@ -130,6 +130,7 @@ export async function consumeProviderStream(input: ConsumeProviderStreamInput): 
               `handing off stream to background consumer`
           );
           spawnBackgroundFollowUpConsumer(iterator, {
+            sourceRun: activeRun,
             activeRuns,
             broadcastHeartbeat,
             client,

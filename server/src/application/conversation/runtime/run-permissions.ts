@@ -227,7 +227,6 @@ export interface CreatePermissionCallbackInput {
 
 export function createPermissionCallback(input: CreatePermissionCallbackInput) {
   const {
-    activeRun,
     cwd,
     db,
     forcedPlanBySession,
@@ -239,8 +238,6 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
     permissionBridge,
     permissionWorkflowResolver,
     providerType,
-    runId,
-    sendRunEvent,
     session,
     sessionType,
   } = input;
@@ -248,6 +245,11 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
   const sessionPermissionOverride = message.permissionOverride;
 
   return async (request: PermissionRequest) => {
+    // The SDK callback outlives the foreground UI run when native background
+    // tasks continue. Register decisions on the run the user can still answer.
+    const activeRun = input.activeRun.resolvePermissionRun?.() ?? input.activeRun;
+    const runId = activeRun.runId;
+    const sendRunEvent = activeRun.sendRunEvent ?? input.sendRunEvent;
     return new Promise<PermissionDecision>(resolve => {
       const autoResolve = (decision: PermissionDecision, reason?: string) => {
         emitPermissionDomainEvent({

@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPermissionCallback } from '../run-permissions.js';
 import { PhaseEmitter } from '../active-run-phase.js';
 import { RunDomainEventListenerRegistry } from '../run-domain-event-listeners.js';
+import {
+  handlePermissionDecision,
+  handlePromptAnswer,
+} from '../../interactions/permission-handler.js';
 
 async function shortRace<T>(promise: Promise<T>): Promise<T | 'pending'> {
   return Promise.race([
@@ -206,6 +210,69 @@ describe('createPermissionCallback workflow routing', () => {
       ],
     });
   });
+
+  it.each(['AskUserQuestion', 'ExitPlanMode'])(
+    'routes a continued %s request and user response through the current run',
+    async toolName => {
+      const input = createInput();
+      const callback = createPermissionCallback(input as any);
+      const current = {
+        ...createInput().activeRun,
+        runId: 'followup-run',
+        sessionId: input.message.sessionId,
+        db: input.db,
+        sendRunEvent: vi.fn(),
+      };
+      Object.assign(input.activeRun, {
+        phase: 'completed',
+        resolvePermissionRun: () => current,
+      });
+      normalizeFromAskUserMock.mockReturnValue({ type: 'interaction_prompt', title: 'Question' });
+      const decision = callback({
+        requestId: 'continued-request',
+        toolName,
+        toolInput: toolName === 'AskUserQuestion' ? { questions: [] } : { plan: '# Plan' },
+        detail: 'continued',
+        timeoutSeconds: 0,
+      });
+      expect(input.activeRun.pendingPermissions.size).toBe(0);
+      expect(current.pendingPermissions.has('continued-request')).toBe(true);
+      const runs = new Map([['followup-run', current]]) as any;
+      if (toolName === 'AskUserQuestion') {
+        expect(current.sendRunEvent).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'interaction_prompt' })
+        );
+        expect(input.sendRunEvent).not.toHaveBeenCalled();
+        handlePromptAnswer(
+          {
+            type: 'prompt_answer',
+            requestId: 'continued-request',
+            formattedAnswer: 'Embedded web',
+          },
+          runs,
+          new Map()
+        );
+        await expect(decision).resolves.toEqual({ behavior: 'allow', message: 'Embedded web' });
+      } else {
+        expect(input.permissionBridge.register).toHaveBeenCalledWith(
+          'continued-request',
+          expect.any(Function),
+          expect.objectContaining({ runId: 'followup-run' })
+        );
+        handlePermissionDecision(
+          {
+            type: 'permission_decision',
+            requestId: 'continued-request',
+            allow: true,
+          },
+          runs,
+          new Map()
+        );
+        await expect(decision).resolves.toMatchObject({ behavior: 'allow' });
+      }
+      expect(current.pendingPermissions.size).toBe(0);
+    }
+  );
 
   it('auto-approves readonly MCP tools when trusted by server policy', async () => {
     evaluateMcpToolTrustPolicyMock.mockReturnValue('approve');
