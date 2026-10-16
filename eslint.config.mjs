@@ -29,6 +29,8 @@ export default [
       '.github/hooks/**',
       '**/.claire/**',
       '**/.zclaudia/**',
+      // ZCode 工作流基础设施写进仓库的机器生成脚本（workflow-runs/workflow-drafts）。
+      '.zcode/**',
       // Tauri 生成的文件
       '**/src-tauri/target/**',
       '**/src-tauri/gen/**',
