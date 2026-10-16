@@ -87,3 +87,48 @@ describe('projects model', () => {
     );
   });
 });
+
+describe('projects model: additional paths', () => {
+  it('defaults additionalPaths to an empty list on create', () => {
+    expect(buildProjectCreateState({ name: 'Demo' }, 0).additionalPaths).toEqual([]);
+  });
+
+  it('rejects malformed additionalPaths as a validation error', () => {
+    for (const bad of ['/a', [1], { a: 1 }]) {
+      try {
+        buildProjectPatch({ additionalPaths: bad });
+        throw new Error('expected throw');
+      } catch (error) {
+        expect(isProjectValidationError(error)).toBe(true);
+      }
+    }
+  });
+
+  it('patches additionalPaths and treats null as clearing', () => {
+    expect(buildProjectPatch({ additionalPaths: ['/a'] }).additionalPaths).toEqual(['/a']);
+    expect(buildProjectPatch({ additionalPaths: null }).additionalPaths).toBeNull();
+    const existing = {
+      id: 'p',
+      name: 'n',
+      type: 'code',
+      rootPath: '/r',
+      additionalPaths: ['/a'],
+      createdAt: 1,
+      updatedAt: 1,
+    } as Project;
+    expect(applyProjectPatch(existing, { additionalPaths: null }).additionalPaths).toEqual([]);
+    expect(applyProjectPatch(existing, {}).additionalPaths).toEqual(['/a']);
+  });
+
+  it('refuses additional directories on chat-only or rootless projects', () => {
+    expect(() =>
+      buildProjectCreateState(
+        { name: 'x', type: 'chat_only', rootPath: '/r', additionalPaths: ['/a'] },
+        0
+      )
+    ).toThrow(/only/);
+    expect(() => buildProjectCreateState({ name: 'x', additionalPaths: ['/a'] }, 0)).toThrow(
+      /only/
+    );
+  });
+});

@@ -12,6 +12,11 @@ export interface Project {
   type: ProjectType;
   defaultAgentProfileId?: string | null;
   rootPath?: string;
+  /**
+   * Extra absolute directories the agent may read/write beside `rootPath`.
+   * Not part of git/worktree/PR flows. Always an array on server responses.
+   */
+  additionalPaths?: string[];
   systemPrompt?: string;
   permissionPolicy?: PermissionPolicy;
   agentPermissionOverride?: Partial<UnifiedPermissionPolicy>; // Project-level override of global agent policy

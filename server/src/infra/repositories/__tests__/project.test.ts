@@ -43,6 +43,7 @@ describe('ProjectRepository', () => {
         type: 'code',
         defaultAgentProfileId: 'prov-456',
         rootPath: '/path/to/project',
+        additionalPaths: [],
         systemPrompt: 'Test prompt',
         permissionPolicy: { mode: 'autoApprove' },
         isInternal: true,
@@ -147,8 +148,9 @@ describe('ProjectRepository', () => {
       expect(params[2]).toBe('code');
       expect(params[3]).toBe('prov-789');
       expect(params[4]).toBe('/new/path');
-      expect(params[5]).toBe('New prompt');
-      expect(params[6]).toBe('{"mode":"askUser"}');
+      expect(params[5]).toBeNull(); // additional_paths
+      expect(params[6]).toBe('New prompt');
+      expect(params[7]).toBe('{"mode":"askUser"}');
     });
 
     it('uses default type when not specified', () => {
@@ -177,11 +179,11 @@ describe('ProjectRepository', () => {
       const { params } = repository.createQuery(data);
       const after = Date.now();
 
-      // params: [id, name, type, defaultAgentProfileId, rootPath, systemPrompt, permissionPolicy,
+      // params: [id, name, type, defaultAgentProfileId, rootPath, additionalPaths, systemPrompt, permissionPolicy,
       // agentPermissionOverride, agent, contextSyncStatus, reviewLlmProfileId, permissionWorkflowOverrideId, sortOrder, createdAt, updatedAt]
-      expect(params[13]).toBeGreaterThanOrEqual(before);
-      expect(params[13]).toBeLessThanOrEqual(after);
-      expect(params[14]).toBe(params[13]); // createdAt === updatedAt
+      expect(params[14]).toBeGreaterThanOrEqual(before);
+      expect(params[14]).toBeLessThanOrEqual(after);
+      expect(params[15]).toBe(params[14]); // createdAt === updatedAt
     });
   });
 

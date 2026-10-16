@@ -10,6 +10,7 @@ import {
   ProjectNotFoundError,
   ProjectRootPathMissingError,
 } from './worktree-service.js';
+import { normalizeAdditionalPaths } from './additional-paths.js';
 import { createGitRoutes } from './git-routes.js';
 import type { GitRoutesDeps } from './git-routes.js';
 import { resolveProjectMemoryDir } from '../../utils/memory-paths.js';
@@ -129,6 +130,10 @@ export function createProjectRoutes(
       }
       const sortOrder = repo.findNextSortOrder();
       const createState = buildProjectCreateState(req.body ?? {}, sortOrder);
+      createState.additionalPaths = normalizeAdditionalPaths(
+        createState.rootPath,
+        createState.additionalPaths ?? []
+      );
       const overrideError = validatePermissionWorkflowOverride(
         createState.permissionWorkflowOverrideId
       );
@@ -169,6 +174,19 @@ export function createProjectRoutes(
       }
 
       const nextState = applyProjectPatch(existing, patch);
+      // Re-validate whenever the list or the primary root changes. Saved paths
+      // that have since vanished are dropped rather than blocking an unrelated
+      // edit; a freshly submitted list must be fully valid.
+      const additionalPathsTouched =
+        patch.additionalPaths !== undefined || patch.rootPath !== undefined;
+      if (additionalPathsTouched) {
+        nextState.additionalPaths = nextState.rootPath
+          ? normalizeAdditionalPaths(nextState.rootPath, nextState.additionalPaths ?? [], {
+              dropMissing: patch.additionalPaths === undefined,
+            })
+          : [];
+        patch.additionalPaths = nextState.additionalPaths;
+      }
       const overrideError = validatePermissionWorkflowOverride(
         nextState.permissionWorkflowOverrideId
       );

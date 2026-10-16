@@ -9,6 +9,16 @@ export interface ProjectContextSummary {
   rootPath: string | null;
 }
 
+function parseAdditionalPathsColumn(raw: unknown): string[] {
+  if (typeof raw !== 'string' || !raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 export class ProjectRepository extends BaseRepository<
   Project,
   Omit<Project, 'id' | 'createdAt' | 'updatedAt'>,
@@ -25,6 +35,7 @@ export class ProjectRepository extends BaseRepository<
       type: row.type,
       defaultAgentProfileId: row.default_agent_profile_id || undefined,
       rootPath: row.root_path || undefined,
+      additionalPaths: parseAdditionalPathsColumn(row.additional_paths),
       systemPrompt: row.system_prompt || undefined,
       permissionPolicy: row.permission_policy ? JSON.parse(row.permission_policy) : undefined,
       agentPermissionOverride: row.agent_permission_override
@@ -52,11 +63,11 @@ export class ProjectRepository extends BaseRepository<
     return {
       sql: `
         INSERT INTO projects (
-          id, name, type, default_agent_profile_id, root_path, system_prompt,
+          id, name, type, default_agent_profile_id, root_path, additional_paths, system_prompt,
           permission_policy, agent_permission_override, agent, context_sync_status,
           review_llm_profile_id, permission_workflow_override_id, sort_order, created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
@@ -64,6 +75,7 @@ export class ProjectRepository extends BaseRepository<
         data.type || 'code',
         data.defaultAgentProfileId || null,
         data.rootPath || null,
+        data.additionalPaths?.length ? JSON.stringify(data.additionalPaths) : null,
         data.systemPrompt || null,
         data.permissionPolicy ? JSON.stringify(data.permissionPolicy) : null,
         data.agentPermissionOverride ? JSON.stringify(data.agentPermissionOverride) : null,
@@ -100,6 +112,10 @@ export class ProjectRepository extends BaseRepository<
     if (data.rootPath !== undefined) {
       updates.push('root_path = ?');
       params.push(data.rootPath);
+    }
+    if (data.additionalPaths !== undefined) {
+      updates.push('additional_paths = ?');
+      params.push(data.additionalPaths?.length ? JSON.stringify(data.additionalPaths) : null);
     }
     if (data.systemPrompt !== undefined) {
       updates.push('system_prompt = ?');

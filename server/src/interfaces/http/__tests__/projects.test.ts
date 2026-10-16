@@ -2,6 +2,9 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } 
 import express from 'express';
 import request from 'supertest';
 import Database from 'better-sqlite3';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { createProjectRoutes } from '../../../domains/projects/routes.js';
 
 // Mock git-worktrees to avoid actual git operations
@@ -21,6 +24,7 @@ function createTestDb(): Database.Database {
       type TEXT CHECK(type IN ('chat_only', 'code')) DEFAULT 'code',
       default_agent_profile_id TEXT,
       root_path TEXT,
+      additional_paths TEXT,
       system_prompt TEXT,
       permission_policy TEXT,
       agent_permission_override TEXT,
@@ -1311,5 +1315,108 @@ describe('projects routes', () => {
         { id: 'p2', sort_order: 0, updated_at: before[1].updated_at },
       ]);
     });
+  });
+});
+
+describe('projects routes: additional directories', () => {
+  let db: Database.Database;
+  let app: ReturnType<typeof express>;
+  let tmp: string;
+  let root: string;
+  let extraA: string;
+  let extraB: string;
+
+  beforeEach(() => {
+    db = createTestDb();
+    app = createTestApp(db);
+    tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'proj-addl-')));
+    root = path.join(tmp, 'root');
+    extraA = path.join(tmp, 'extra-a');
+    extraB = path.join(tmp, 'extra-b');
+    for (const dir of [root, extraA, extraB]) fs.mkdirSync(dir);
+  });
+
+  afterEach(() => {
+    db.close();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('round-trips additional directories through create and get', async () => {
+    const created = await request(app)
+      .post('/api/projects')
+      .send({ name: 'P', rootPath: root, additionalPaths: [extraA, extraB, extraA] });
+    expect(created.status).toBe(201);
+    expect(created.body.data.additionalPaths).toEqual([extraA, extraB]);
+
+    const fetched = await request(app).get(`/api/projects/${created.body.data.id}`);
+    expect(fetched.body.data.additionalPaths).toEqual([extraA, extraB]);
+  });
+
+  it('returns an empty array when none are set', async () => {
+    const created = await request(app).post('/api/projects').send({ name: 'P', rootPath: root });
+    expect(created.body.data.additionalPaths).toEqual([]);
+  });
+
+  it('rejects a missing directory with a 400', async () => {
+    const res = await request(app)
+      .post('/api/projects')
+      .send({ name: 'P', rootPath: root, additionalPaths: [path.join(tmp, 'nope')] });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects additional directories without a root path', async () => {
+    const res = await request(app)
+      .post('/api/projects')
+      .send({ name: 'P', additionalPaths: [extraA] });
+    expect(res.status).toBe(400);
+  });
+
+  it('updates and clears the list via PUT', async () => {
+    const { body } = await request(app).post('/api/projects').send({ name: 'P', rootPath: root });
+    const id = body.data.id;
+
+    expect(
+      (
+        await request(app)
+          .put(`/api/projects/${id}`)
+          .send({ additionalPaths: [extraA] })
+      ).status
+    ).toBe(200);
+    expect((await request(app).get(`/api/projects/${id}`)).body.data.additionalPaths).toEqual([
+      extraA,
+    ]);
+
+    await request(app).put(`/api/projects/${id}`).send({ additionalPaths: [] });
+    expect((await request(app).get(`/api/projects/${id}`)).body.data.additionalPaths).toEqual([]);
+  });
+
+  it('drops entries that the new root swallows, and clears all when the root is removed', async () => {
+    const { body } = await request(app)
+      .post('/api/projects')
+      .send({ name: 'P', rootPath: root, additionalPaths: [extraA, extraB] });
+    const id = body.data.id;
+
+    await request(app).put(`/api/projects/${id}`).send({ rootPath: extraA });
+    expect((await request(app).get(`/api/projects/${id}`)).body.data.additionalPaths).toEqual([
+      extraB,
+    ]);
+
+    await request(app).put(`/api/projects/${id}`).send({ rootPath: null });
+    expect((await request(app).get(`/api/projects/${id}`)).body.data.additionalPaths).toEqual([]);
+  });
+
+  it('does not block an unrelated edit when a saved directory has vanished', async () => {
+    const { body } = await request(app)
+      .post('/api/projects')
+      .send({ name: 'P', rootPath: root, additionalPaths: [extraA, extraB] });
+    const id = body.data.id;
+    fs.rmSync(extraA, { recursive: true });
+
+    const res = await request(app).put(`/api/projects/${id}`).send({ rootPath: root });
+    expect(res.status).toBe(200);
+    expect((await request(app).get(`/api/projects/${id}`)).body.data.additionalPaths).toEqual([
+      extraB,
+    ]);
   });
 });

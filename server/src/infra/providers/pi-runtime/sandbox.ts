@@ -1,38 +1,11 @@
 import * as os from 'os';
-import * as path from 'path';
 import { SandboxManager } from '@anthropic-ai/sandbox-runtime';
 import type { SandboxRuntimeConfig } from '@anthropic-ai/sandbox-runtime';
 
 import { scrubEnv } from './env-scrub.js';
+import { expandHome, SENSITIVE_DENY_READ } from '../../../utils/sensitive-paths.js';
 
-/** Expand a leading `~/` to an absolute home path (silent non-match = no protection; we don't rely on the lib's ~ handling). */
-function expandHome(p: string): string {
-  return p.startsWith('~/') ? path.join(os.homedir(), p.slice(2)) : p;
-}
-
-/** Credential paths to deny-read (operator-overridable default; spec §4). Pre-expanded to absolute. */
-export const SENSITIVE_DENY_READ: string[] = [
-  '~/.ssh',
-  '~/.gnupg',
-  '~/.aws/credentials',
-  '~/.config/gcloud',
-  '~/.azure',
-  '~/.docker/config.json',
-  '~/.kube/config',
-  '~/.config/gh/hosts.yml',
-  '~/.npmrc',
-  '~/.pypirc',
-  '~/.cargo/credentials.toml',
-  '~/.netrc',
-  '~/.vault-token',
-  '~/.terraformrc',
-  '~/.bash_history',
-  '~/.zsh_history',
-  '~/.zhistory',
-  '~/Library/Safari',
-  '~/Library/Application Support/Google/Chrome',
-  '~/Library/Application Support/Firefox/Profiles',
-].map(expandHome);
+export { SENSITIVE_DENY_READ };
 
 /** Non-secret files inside denied subtrees that tools still need (allow-within-deny). */
 export const SENSITIVE_ALLOW_BACK: string[] = [
