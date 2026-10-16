@@ -66,6 +66,18 @@ describe('plugin manifest validation', () => {
     expect(validatePluginManifest({ ...baseManifest, contributes }).valid).toBe(false);
   });
 
+  it.each(['native', 'host', 'none'])('accepts additionalDirectories: %s', value => {
+    const contributes = { agentRuntimes: [{ type: 'custom-agent', additionalDirectories: value }] };
+    expect(validatePluginManifest({ ...baseManifest, contributes }).valid).toBe(true);
+  });
+
+  it.each(['yes', 1, true, null])('rejects invalid additionalDirectories: %j', value => {
+    const contributes = { agentRuntimes: [{ type: 'custom-agent', additionalDirectories: value }] };
+    const result = validatePluginManifest({ ...baseManifest, contributes });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toMatch(/additionalDirectories/);
+  });
+
   it('accepts omitted, empty and named custom runtime declarations', () => {
     for (const contributes of [
       undefined,

@@ -36,4 +36,36 @@ describe('GET /api/agent-runtimes', () => {
 
     expect(byRuntime.claude).toBeUndefined();
   });
+
+  it('reports how each runtime honors additional directories (Pi is host-enforced)', async () => {
+    const res = await request(app).get('/api/agent-runtimes');
+    expect(res.body.data[0].additionalDirectories).toBe('host');
+  });
+
+  it('defaults a contributed runtime without the field to none', async () => {
+    const base = {
+      label: 'X',
+      model: { kind: 'native', multimodalFallback: false, thinkingLevel: 'auto' },
+      hasCliPath: false,
+      capabilities: { tools: 'native', providers: 'external', skills: 'external' },
+      manifest: { id: 'x', name: 'X', version: '1', apiVersion: 'pcp/v1', capabilities: [] },
+    };
+    const contributions = [
+      { ...base, type: 'plain' },
+      { ...base, type: 'nativeish', additionalDirectories: 'native' },
+    ];
+    const withContrib = express();
+    withContrib.use(
+      '/api/agent-runtimes',
+      createRuntimeDescriptorRoutes({ builtinRuntimeContributions: () => contributions as never })
+    );
+    const res = await request(withContrib).get('/api/agent-runtimes');
+    const byRuntime = Object.fromEntries(
+      (res.body.data as Array<{ runtime: string; additionalDirectories: string }>).map(d => [
+        d.runtime,
+        d.additionalDirectories,
+      ])
+    );
+    expect(byRuntime).toMatchObject({ pi: 'host', plain: 'none', nativeish: 'native' });
+  });
 });
