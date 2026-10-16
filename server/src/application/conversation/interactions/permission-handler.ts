@@ -135,7 +135,8 @@ export function handlePermissionDecision(
             toolName,
             pending.originalToolInput,
             detail,
-            run.workspaceRoot
+            run.workspaceRoot,
+            run.additionalRoots
           );
           persistProjectAllowedOutsideWorkspaceRoots(run.db, run.projectId, outsideRoots);
           for (const root of outsideRoots) {

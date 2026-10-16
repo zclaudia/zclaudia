@@ -112,10 +112,14 @@ export function deriveCodexModeTransition(
 
 // ── Mode → sandbox/approval config args ──────────────────────
 //
-// NOTE: `sandbox_permissions` via `-c` has no effect in app-server mode
-// (sandbox is always workspaceWrite). Keep approval requests enabled for every
-// mode and make the decision in handleServerRequest so dynamic mode switches
-// (for example EnterPlanMode during a bypass run) take effect immediately.
+// NOTE: `sandbox_permissions` via `-c` has no effect in app-server mode (the
+// sandbox is workspace-write by default), but `sandbox_workspace_write.*` keys
+// do: `network_access` below is honoured, and `writable_roots` can be set per
+// thread (thread/start and thread/resume `config`, see
+// CodexAppServerClient.startThread) to expose a project's additional
+// directories. Keep approval requests enabled for every mode and make the
+// decision in handleServerRequest so dynamic mode switches (for example
+// EnterPlanMode during a bypass run) take effect immediately.
 
 export function mapModeToConfigArgs(mode?: string): string[] {
   const args: string[] = [];

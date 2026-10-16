@@ -43,6 +43,23 @@ describe('file history', () => {
     await rm(root, { recursive: true, force: true });
   });
 
+  it('records and restores a file in an additional directory (workspace-relative path with ..)', async () => {
+    const base = await tempRoot('zc-fh-additional-');
+    const extra = path.join(base, 'extra');
+    await mkdir(extra);
+    const target = path.join(extra, 'f.ts');
+    await writeFile(target, 'const a = 1;\n');
+    // Tools key additional-directory files as `../extra/f.ts` relative to the primary root.
+    const backup = await fileHistory.recordFileBackup('../extra/f.ts', 'const a = 1;\n', target);
+    await writeFile(target, 'const a = 2;\n');
+
+    const restored = await fileHistory.restoreFileBackup(backup.id);
+
+    expect(restored.restored).toBe(true);
+    expect(await readFile(target, 'utf8')).toBe('const a = 1;\n');
+    await rm(base, { recursive: true, force: true });
+  });
+
   it('writes backup files owner-only (0600)', async () => {
     const root = await tempRoot('zc-fh-perms-');
     const target = path.join(root, 'secret.ts');

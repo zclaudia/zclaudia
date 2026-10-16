@@ -90,6 +90,18 @@ export interface ModelInfo {
   [key: string]: unknown;
 }
 
+/** Thread-level sandbox modes accepted by `thread/start` and `thread/resume` (no experimentalApi needed). */
+export type CodexSandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access';
+
+/** Per-thread config override object (merged over the process config for this thread). */
+export interface CodexThreadConfig {
+  sandbox_workspace_write?: {
+    writable_roots?: string[];
+    network_access?: boolean;
+  };
+  [key: string]: unknown;
+}
+
 export interface CodexClientRequestMap {
   'config/read': {
     params: { cwd?: string; includeLayers?: boolean };
@@ -107,6 +119,10 @@ export interface CodexClientRequestMap {
       modelProvider?: string | null;
       /** SDK mode: host-injected project instructions (replaces the [System Context] text prefix). */
       developerInstructions?: string | null;
+      /** Sandbox mode for the thread; only set together with `config` writable roots. */
+      sandbox?: CodexSandboxMode | null;
+      /** Per-thread config overrides, e.g. `sandbox_workspace_write.writable_roots`. */
+      config?: CodexThreadConfig | null;
     };
     result: { thread: { id: string; [key: string]: unknown } };
   };
@@ -117,6 +133,9 @@ export interface CodexClientRequestMap {
       model?: string | null;
       modelProvider?: string | null;
       developerInstructions?: string | null;
+      /** Resume does not persist writable roots and replaces them: re-send the full list. */
+      sandbox?: CodexSandboxMode | null;
+      config?: CodexThreadConfig | null;
     };
     result: { thread: { id: string; cwd?: string; [key: string]: unknown }; cwd?: string };
   };

@@ -12,6 +12,7 @@ import * as path from 'path';
 import {
   extractPathsFromCommand,
   isPathWithinRoot,
+  isPathWithinRealRoot,
   normalizeExternalRoot,
   extractRememberableShellCommands,
   splitCompoundCommand,
@@ -33,6 +34,7 @@ export {
   shouldIgnoreOutsideWorkspaceExecutable,
   extractPathsFromCommand,
   isPathWithinRoot,
+  isPathWithinAnyRoot,
   normalizeExternalRoot,
   splitCompoundCommand,
   extractCommandSubstitutions,
@@ -187,17 +189,42 @@ function isBlockingInteractionTool(toolName: string): boolean {
 // Outside Workspace Path Analysis
 // ============================================
 
+/**
+ * True when `absPath` is inside the primary workspace root (lexical, as ever) or
+ * inside a configured additional directory (lexical and symlink-safe).
+ */
+function isInsideWorkspaceRoots(
+  absPath: string,
+  rootPath: string,
+  additionalRoots: readonly string[]
+): boolean {
+  if (isPathWithinRoot(absPath, rootPath)) return true;
+  return additionalRoots.some(root => isPathWithinRealRoot(absPath, root));
+}
+
+/** `filePath` as a tool would resolve it: relative paths are based on the primary root. */
+function isFilePathInsideWorkspaceRoots(
+  filePath: string,
+  rootPath: string,
+  additionalRoots: readonly string[]
+): boolean {
+  if (isPathWithinRoot(filePath, rootPath)) return true;
+  if (additionalRoots.length === 0) return false;
+  return additionalRoots.some(root => isPathWithinRealRoot(path.resolve(rootPath, filePath), root));
+}
+
 export function getOutsideWorkspacePaths(
   toolName: string,
   toolInput: unknown,
   detail: string,
-  rootPath: string
+  rootPath: string,
+  additionalRoots: readonly string[] = []
 ): string[] {
   if (!rootPath) return [];
 
   const paths: string[] = [];
   const filePath = extractFilePath(toolInput);
-  if (filePath && !isPathWithinRoot(filePath, rootPath)) {
+  if (filePath && !isFilePathInsideWorkspaceRoots(filePath, rootPath, additionalRoots)) {
     paths.push(path.resolve(filePath));
   }
 
@@ -208,7 +235,7 @@ export function getOutsideWorkspacePaths(
         // Bash commands run cwd'd to the workspace root, so resolve relative
         // paths against rootPath (not process.cwd()) before the within-root test.
         const abs = path.isAbsolute(p) ? p : path.resolve(rootPath, p);
-        if (!isPathWithinRoot(abs, rootPath)) {
+        if (!isInsideWorkspaceRoots(abs, rootPath, additionalRoots)) {
           paths.push(abs);
         }
       }
@@ -222,9 +249,10 @@ export function getOutsideWorkspaceRootsToRemember(
   toolName: string,
   toolInput: unknown,
   detail: string,
-  rootPath: string
+  rootPath: string,
+  additionalRoots: readonly string[] = []
 ): string[] {
-  return getOutsideWorkspacePaths(toolName, toolInput, detail, rootPath)
+  return getOutsideWorkspacePaths(toolName, toolInput, detail, rootPath, additionalRoots)
     .map(filePath => normalizeExternalRoot(filePath))
     .filter((dir, index, arr) => arr.indexOf(dir) === index);
 }
@@ -234,9 +262,16 @@ export function isOutsideWorkspacePathAllowed(
   toolInput: unknown,
   detail: string,
   rootPath: string,
-  allowedRoots: Iterable<string>
+  allowedRoots: Iterable<string>,
+  additionalRoots: readonly string[] = []
 ): boolean {
-  const outsidePaths = getOutsideWorkspacePaths(toolName, toolInput, detail, rootPath);
+  const outsidePaths = getOutsideWorkspacePaths(
+    toolName,
+    toolInput,
+    detail,
+    rootPath,
+    additionalRoots
+  );
   if (outsidePaths.length === 0) return false;
   const roots = [...allowedRoots].map(root => path.resolve(root));
   return outsidePaths.every(outsidePath => roots.some(root => isPathWithinRoot(outsidePath, root)));
@@ -322,12 +357,13 @@ function targetsOutsideWorkspace(
   toolName: string,
   toolInput: unknown,
   detail: string,
-  rootPath: string
+  rootPath: string,
+  additionalRoots: readonly string[] = []
 ): boolean {
   if (!rootPath) return false;
 
   const filePath = extractFilePath(toolInput);
-  if (filePath && !isPathWithinRoot(filePath, rootPath)) return true;
+  if (filePath && !isFilePathInsideWorkspaceRoots(filePath, rootPath, additionalRoots)) return true;
 
   if (isBashLikeTool(toolName)) {
     const command = extractBashCommand(toolInput, detail);
@@ -336,7 +372,7 @@ function targetsOutsideWorkspace(
         // Bash commands run cwd'd to the workspace root, so resolve relative
         // paths against rootPath (not process.cwd()) before the within-root test.
         const abs = path.isAbsolute(p) ? p : path.resolve(rootPath, p);
-        return !isPathWithinRoot(abs, rootPath);
+        return !isInsideWorkspaceRoots(abs, rootPath, additionalRoots);
       });
     }
   }
@@ -497,6 +533,7 @@ export function getMatchedPermissionRule(
   if (!policy.enabled) return null;
 
   const rootPath = context?.rootPath || process.cwd();
+  const additionalRoots = context?.additionalRoots ?? [];
   const customRules = policy.customRules || [];
 
   if (policy.escalateAlways?.includes(toolName)) {
@@ -522,7 +559,7 @@ export function getMatchedPermissionRule(
 
   if (
     policy.globalGuards.blockOutsideWorkspace &&
-    targetsOutsideWorkspace(toolName, toolInput, detail, rootPath)
+    targetsOutsideWorkspace(toolName, toolInput, detail, rootPath, additionalRoots)
   ) {
     return 'Outside workspace access';
   }
@@ -601,6 +638,7 @@ export class PermissionEvaluator {
     if (!policy.enabled) return 'escalate';
 
     const rootPath = context?.rootPath || process.cwd();
+    const additionalRoots = context?.additionalRoots ?? [];
     const customRules = policy.customRules || [];
 
     // 1. escalateAlways
@@ -627,7 +665,7 @@ export class PermissionEvaluator {
     }
     if (
       policy.globalGuards.blockOutsideWorkspace &&
-      targetsOutsideWorkspace(toolName, toolInput, detail, rootPath)
+      targetsOutsideWorkspace(toolName, toolInput, detail, rootPath, additionalRoots)
     ) {
       return 'escalate';
     }

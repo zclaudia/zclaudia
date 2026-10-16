@@ -157,6 +157,12 @@ export type {
 /** Options for starting an agent runtime run. */
 export interface RunOptions {
   cwd: string;
+  /**
+   * The project's additional directories (absolute): read/write allowed in
+   * addition to `cwd`. Pi enforces them host-side; native plugins receive them
+   * on the run context (see `toExternalAgentRunContext`). Absent = none.
+   */
+  additionalDirectories?: string[];
   sessionId?: string;
   /**
    * Persisted transport of the provider session being resumed

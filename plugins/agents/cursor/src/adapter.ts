@@ -202,6 +202,10 @@ export class CursorAgentAdapter implements ExternalAgentAdapter {
             env: context.env,
             model: context.model,
             mode: effectiveMode,
+            // Host extension: not declared by the pinned plugin-sdk run context.
+            additionalDirectories: (
+              context as ExternalAgentRunContext & { additionalDirectories?: string[] }
+            ).additionalDirectories,
             systemPrompt: context.systemPrompt,
             abortController: session.abortController,
             bridge,

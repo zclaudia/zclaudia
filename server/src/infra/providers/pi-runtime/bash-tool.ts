@@ -39,7 +39,12 @@ import {
   toolParams,
   truncateText,
 } from './tool-common.js';
-import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
+import {
+  resolveInsideWorkspaces,
+  toWorkspaceRelative,
+  workspaceRootsOf,
+  type WorkspaceRootOptions,
+} from './workspace-paths.js';
 
 export type SandboxFsDenial = 'read_only' | 'write_outside_workspace';
 type SandboxInvocation = { argv: string[]; env: NodeJS.ProcessEnv };
@@ -96,6 +101,7 @@ interface BackgroundBashTaskParams {
   command: string;
   toolCallId: string;
   workspaceRoot: string;
+  additionalRoots?: readonly string[];
   runCwd: string;
   sessionId?: string;
   runId?: string;
@@ -120,6 +126,7 @@ function createBackgroundBashTask(params: BackgroundBashTaskParams): TaskRecord 
     command,
     toolCallId,
     workspaceRoot,
+    additionalRoots,
     runCwd,
     sessionId,
     runId,
@@ -140,6 +147,7 @@ function createBackgroundBashTask(params: BackgroundBashTaskParams): TaskRecord 
       command,
       cwd: runCwd,
       workspaceRoot,
+      ...(additionalRoots?.length ? { additionalRoots: [...additionalRoots] } : {}),
       ...(autoBackgrounded ? { autoBackgrounded: true } : {}),
       sandboxAllowedDomains: [...sandboxAllowedDomains],
       ...(sandboxed !== undefined ? { sandboxed } : {}),
@@ -152,7 +160,7 @@ function createBackgroundBashTask(params: BackgroundBashTaskParams): TaskRecord 
   });
 }
 
-export interface BashBridgeToolOptions {
+export interface BashBridgeToolOptions extends WorkspaceRootOptions {
   db?: Database.Database;
   taskPort?: TaskPort;
   sessionId?: string;
@@ -260,7 +268,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
 
       let runCwd: string;
       try {
-        runCwd = resolveInsideWorkspace(cwd, args.cwd);
+        runCwd = resolveInsideWorkspaces(workspaceRootsOf(cwd, options), args.cwd);
       } catch (err) {
         return errorResult(
           'path_outside_workspace',
@@ -399,6 +407,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
           command,
           toolCallId,
           workspaceRoot: cwd,
+          additionalRoots: options?.additionalRoots,
           runCwd,
           sessionId: options?.sessionId,
           runId: options?.runId,
@@ -500,6 +509,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
           ? ({ sandboxed: false } as sandbox.WrapResult)
           : await sandbox.wrapCommand(command, {
               workspaceRoot: cwd,
+              additionalRoots: options?.additionalRoots,
               readOnly: options?.sandboxReadOnly === true,
               extraAllowedDomains,
               signal,
@@ -614,6 +624,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
             command,
             toolCallId,
             workspaceRoot: cwd,
+            additionalRoots: options?.additionalRoots,
             runCwd,
             sessionId: options?.sessionId,
             runId: options?.runId,

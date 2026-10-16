@@ -44,6 +44,8 @@ export interface CursorAcpRunOptions {
   env?: Record<string, string>;
   model?: string;
   mode?: string;
+  /** Project additional directories (absolute); file edits there are auto-approved. */
+  additionalDirectories?: string[];
   systemPrompt?: string;
   abortController?: AbortController;
   bridge: ProviderToolBridgeEntry | null | undefined;
@@ -71,6 +73,9 @@ export async function* runCursorAcp(
   const permissionBridge = new AcpPermissionBridge({
     supervised,
     onPermission: options.onPermission,
+    // Plan/ask runs must not write anywhere, additional directories included.
+    additionalDirectories:
+      options.mode === 'plan' || options.mode === 'ask' ? undefined : options.additionalDirectories,
   });
 
   const client = new AcpClient();

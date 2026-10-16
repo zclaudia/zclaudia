@@ -19,9 +19,14 @@ import {
   buildRangeDescriptor,
   buildReadStateDescriptor,
 } from './file-state.js';
-import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
+import {
+  resolveInsideWorkspaces,
+  toWorkspaceRelative,
+  workspaceRootsOf,
+  type WorkspaceRootOptions,
+} from './workspace-paths.js';
 
-export interface ReadToolOptions {
+export interface ReadToolOptions extends WorkspaceRootOptions {
   supportsVision?: boolean;
   readFileState?: ReadFileStateStore;
 }
@@ -573,7 +578,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
         }
         let filePath: string;
         try {
-          filePath = resolveInsideWorkspace(cwd, requestedPath);
+          filePath = resolveInsideWorkspaces(workspaceRootsOf(cwd, options), requestedPath);
         } catch (err) {
           return errorResult(
             'path_outside_workspace',

@@ -98,3 +98,41 @@ export function normalizeAdditionalPaths(
   }
   return kept;
 }
+
+interface AdditionalPathsDb {
+  prepare(sql: string): { get(...params: unknown[]): unknown };
+}
+
+/**
+ * Load a project's additional directories for a run. Entries that no longer
+ * exist (or are not absolute directories) are skipped with a warning so a stale
+ * directory never fails the whole run.
+ */
+export function loadProjectAdditionalRoots(db: AdditionalPathsDb, projectId: string): string[] {
+  const row = db.prepare('SELECT additional_paths FROM projects WHERE id = ?').get(projectId) as
+    | { additional_paths?: string | null }
+    | undefined;
+  if (!row?.additional_paths) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(row.additional_paths);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const roots: string[] = [];
+  for (const entry of parsed) {
+    if (typeof entry !== 'string' || !path.isAbsolute(entry)) {
+      console.warn(`[additional-dirs] Skipping invalid additional directory: ${String(entry)}`);
+      continue;
+    }
+    try {
+      if (!fs.statSync(entry).isDirectory()) throw new Error('not a directory');
+    } catch {
+      console.warn(`[additional-dirs] Skipping unavailable additional directory: ${entry}`);
+      continue;
+    }
+    roots.push(entry);
+  }
+  return roots;
+}

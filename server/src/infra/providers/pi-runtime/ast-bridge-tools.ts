@@ -23,9 +23,14 @@ import {
   truncateText,
 } from './tool-common.js';
 import { validateMutationContent } from './write-guards.js';
-import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
+import {
+  resolveInsideWorkspaces,
+  toWorkspaceRelative,
+  workspaceRootsOf,
+  type WorkspaceRootOptions,
+} from './workspace-paths.js';
 
-export interface AstBridgeToolOptions {
+export interface AstBridgeToolOptions extends WorkspaceRootOptions {
   readFileState?: ReadFileStateStore;
   noopGuard?: NoopEditGuard;
 }
@@ -33,7 +38,7 @@ export interface AstBridgeToolOptions {
 /** Output budget for the concatenated AstEdit diff (matches tool-common's default). */
 const MAX_AST_EDIT_DIFF_CHARS = 80_000;
 
-export function createAstGrepTool(cwd: string): AgentTool {
+export function createAstGrepTool(cwd: string, options?: WorkspaceRootOptions): AgentTool {
   return {
     name: 'AstGrep',
     label: 'AstGrep',
@@ -58,7 +63,7 @@ export function createAstGrepTool(cwd: string): AgentTool {
       }
       let searchRoot: string;
       try {
-        searchRoot = resolveInsideWorkspace(cwd, args.path);
+        searchRoot = resolveInsideWorkspaces(workspaceRootsOf(cwd, options), args.path);
       } catch (err) {
         return errorResult(
           'path_outside_workspace',
@@ -142,7 +147,7 @@ export function createAstEditTool(cwd: string, options?: AstBridgeToolOptions): 
       }
       let searchRoot: string;
       try {
-        searchRoot = resolveInsideWorkspace(cwd, args.path);
+        searchRoot = resolveInsideWorkspaces(workspaceRootsOf(cwd, options), args.path);
       } catch (err) {
         return errorResult(
           'path_outside_workspace',

@@ -182,6 +182,8 @@ export function normalizeToUnifiedPolicy(raw: unknown): UnifiedPermissionPolicy 
 /** Context passed to the permission evaluator for path-aware evaluation */
 export interface EvaluationContext {
   rootPath: string; // Session's workspace root directory
+  /** Project additional directories: inside the workspace boundary alongside rootPath. */
+  additionalRoots?: string[];
   sessionType?: SessionType; // Optional, no longer used for profile lookup
 }
 

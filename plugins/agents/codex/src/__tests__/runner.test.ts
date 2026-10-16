@@ -160,6 +160,60 @@ describe('runner', () => {
     expect(mockClient.startThread).not.toHaveBeenCalled();
   });
 
+  it('passes additional directories to startThread for a new thread', async () => {
+    for await (const _event of runCodexAppServer(
+      'hello',
+      { cwd: '/tmp/project', bridge: null, additionalDirectories: ['/extra/a', '/extra/b'] },
+      denyAll
+    )) {
+      // drain generator
+    }
+    expect(mockClient.startThread).toHaveBeenCalledWith('/tmp/project', {
+      additionalDirectories: ['/extra/a', '/extra/b'],
+    });
+  });
+
+  it('re-passes the full list (and cwd) on every resume', async () => {
+    for await (const _event of runCodexAppServer(
+      'hello',
+      {
+        cwd: '/tmp/project',
+        sessionId: 'existing-thread',
+        bridge: null,
+        additionalDirectories: ['/extra/a'],
+      },
+      denyAll
+    )) {
+      // drain generator
+    }
+    expect(mockClient.resumeThread).toHaveBeenCalledWith('existing-thread', {
+      additionalDirectories: ['/extra/a'],
+      cwd: '/tmp/project',
+    });
+  });
+
+  it('does not add writable roots in plan mode', async () => {
+    for await (const _event of runCodexAppServer(
+      'hello',
+      { cwd: '/tmp/project', mode: 'plan', bridge: null, additionalDirectories: ['/extra/a'] },
+      denyAll
+    )) {
+      // drain generator
+    }
+    expect(mockClient.startThread).toHaveBeenCalledWith('/tmp/project');
+  });
+
+  it('treats an empty list like no list', async () => {
+    for await (const _event of runCodexAppServer(
+      'hello',
+      { cwd: '/tmp/project', bridge: null, additionalDirectories: [] },
+      denyAll
+    )) {
+      // drain generator
+    }
+    expect(mockClient.startThread).toHaveBeenCalledWith('/tmp/project');
+  });
+
   it('abortCodexSession calls interruptTurn', async () => {
     const gen = runCodexAppServer(
       'hello',
