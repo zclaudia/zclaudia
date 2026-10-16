@@ -100,7 +100,8 @@ export function resolveInsidePrimaryWorkspace(
       if (inAdditional) {
         throw new Error(
           `${feature} only supports files under the primary workspace root (${path.resolve(roots.primary)}); ` +
-            `${String(requestedPath)} is in an additional directory, which has no language server.`
+            `${String(requestedPath)} is in an additional directory, which has no language server.`,
+          { cause: err }
         );
       }
     }
