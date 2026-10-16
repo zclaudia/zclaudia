@@ -11,7 +11,13 @@ import {
   isRetryable,
   MAX_ATTEMPTS,
   MAX_DELAY_MS,
+  MAX_REASONABLE_RETRY_AFTER_MS,
 } from '../retry-stream.js';
+import {
+  classifyErrorText,
+  extractBusinessCode,
+  lookupBusinessCode,
+} from '../provider-business-codes.js';
 
 const am = (over: Partial<AssistantMessage> = {}): AssistantMessage =>
   ({ role: 'assistant', content: [], stopReason: 'stop', ...over }) as unknown as AssistantMessage;
@@ -21,6 +27,12 @@ const TEXT: AssistantMessageEvent = { type: 'text_start', contentIndex: 0, parti
 const DONE: AssistantMessageEvent = { type: 'done', reason: 'stop', message: am() } as never;
 const ERR = (reason: 'error' | 'aborted' = 'error'): AssistantMessageEvent =>
   ({ type: 'error', reason, error: am({ stopReason: reason }) }) as never;
+const BIZ_ERR = (errorMessage: string): AssistantMessageEvent =>
+  ({
+    type: 'error',
+    reason: 'error',
+    error: am({ stopReason: 'error', errorMessage }),
+  }) as never;
 
 interface AttemptScript {
   response?: { status: number; headers?: Record<string, string> };
@@ -185,6 +197,128 @@ describe('withStreamRetry', () => {
     expect(events.map(e => e.type)).toEqual(['start', 'text_start', 'done']);
   });
 
+  it('adopts a 120s retry-after verbatim instead of capping it at 60s', async () => {
+    const onRetry = vi.fn();
+    const { fn } = scriptedStream([
+      { response: { status: 429, headers: { 'retry-after': '120' } }, events: [START, ERR()] },
+      { response: { status: 200 }, events: [START, TEXT, DONE] },
+    ]);
+
+    const wrapped = withStreamRetry(fn, { onRetry });
+    const resultStream = wrapped({} as never, { messages: [] }, undefined);
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(onRetry).toHaveBeenCalledWith({
+      attempt: 2,
+      maxAttempts: MAX_ATTEMPTS,
+      delayMs: 120_000,
+      status: 429,
+    });
+
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    const events = await collect(resultStream);
+    expect(events.map(e => e.type)).toEqual(['start', 'text_start', 'done']);
+  });
+
+  it('prefers the retry-after-ms header over retry-after', async () => {
+    const onRetry = vi.fn();
+    const { fn } = scriptedStream([
+      {
+        response: {
+          status: 429,
+          headers: { 'retry-after': '30', 'retry-after-ms': '250' },
+        },
+        events: [START, ERR()],
+      },
+      { response: { status: 200 }, events: [START, TEXT, DONE] },
+    ]);
+
+    const wrapped = withStreamRetry(fn, { onRetry });
+    const resultStream = wrapped({} as never, { messages: [] }, undefined);
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(onRetry).toHaveBeenCalledWith(expect.objectContaining({ delayMs: 250 }));
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    const events = await collect(resultStream);
+    expect(events.map(e => e.type)).toEqual(['start', 'text_start', 'done']);
+  });
+
+  it('retries a retryable business code delivered on status 200', async () => {
+    const onRetry = vi.fn();
+    const { fn, calls } = scriptedStream([
+      {
+        response: { status: 200 },
+        events: [START, BIZ_ERR('[1302][aa][req-1] concurrency too high')],
+      },
+      { response: { status: 200 }, events: [START, TEXT, DONE] },
+    ]);
+
+    const wrapped = withStreamRetry(fn, { onRetry });
+    const resultStream = wrapped({} as never, { messages: [] }, undefined);
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const events = await collect(resultStream);
+
+    expect(events.map(e => e.type)).toEqual(['start', 'text_start', 'done']);
+    expect(calls.length).toBe(2);
+    expect(onRetry).toHaveBeenCalledWith({
+      attempt: 2,
+      maxAttempts: MAX_ATTEMPTS,
+      delayMs: 1000,
+      status: 200,
+      businessCode: '1302',
+    });
+  });
+
+  it('does not retry a terminal business code even on a retryable 5xx', async () => {
+    const onRetry = vi.fn();
+    const { fn, calls } = scriptedStream([
+      {
+        response: { status: 503 },
+        events: [START, BIZ_ERR('[1304][aa][req-1] daily limit reached')],
+      },
+    ]);
+
+    const wrapped = withStreamRetry(fn, { onRetry });
+    const resultStream = wrapped({} as never, { messages: [] }, undefined);
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    const events = await collect(resultStream);
+
+    expect(events.map(e => e.type)).toEqual(['error']);
+    expect(calls.length).toBe(1);
+    expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it('does not retry when the x-should-retry header vetoes it', async () => {
+    const onRetry = vi.fn();
+    const { fn, calls } = scriptedStream([
+      {
+        response: { status: 503, headers: { 'x-should-retry': 'false' } },
+        events: [START, ERR()],
+      },
+    ]);
+
+    const wrapped = withStreamRetry(fn, { onRetry });
+    const resultStream = wrapped({} as never, { messages: [] }, undefined);
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    const events = await collect(resultStream);
+
+    expect(events.map(e => e.type)).toEqual(['error']);
+    expect(calls.length).toBe(1);
+    expect(onRetry).not.toHaveBeenCalled();
+  });
+
   it('does not retry non-retryable statuses (401)', async () => {
     const onRetry = vi.fn();
     const { fn, calls } = scriptedStream([{ response: { status: 401 }, events: [START, ERR()] }]);
@@ -295,16 +429,31 @@ describe('computeDelay', () => {
     expect(computeDelay(20)).toBe(MAX_DELAY_MS);
   });
 
-  it('caps retry-after header value at MAX_DELAY_MS', () => {
-    expect(computeDelay(1, '120')).toBe(MAX_DELAY_MS);
+  it('adopts a reasonable retry-after header verbatim (up to 5 minutes)', () => {
+    // 120s used to be capped at MAX_DELAY_MS; reasonable waits are now kept whole.
+    expect(computeDelay(1, '120')).toBe(120_000);
+    expect(computeDelay(1, '30')).toBe(30_000);
+  });
+
+  it('falls back to capped exponential backoff when retry-after exceeds 5 minutes', () => {
+    expect(computeDelay(1, '3600')).toBe(1000); // 1h is unreasonable → exponential
+    expect(computeDelay(1, String(MAX_REASONABLE_RETRY_AFTER_MS / 1000 + 1))).toBe(1000);
+    expect(computeDelay(20, '3600')).toBe(MAX_DELAY_MS); // exponential still capped
   });
 
   it('parses an HTTP-date retry-after relative to now', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-10T00:00:00Z'));
     expect(computeDelay(1, new Date('2026-06-10T00:00:10Z').toUTCString())).toBe(10_000);
-    expect(computeDelay(1, new Date('2026-06-09T00:00:00Z').toUTCString())).toBe(0); // past date clamps to 0
+    // A past date is not a reasonable wait — fall back to the exponential schedule.
+    expect(computeDelay(1, new Date('2026-06-09T00:00:00Z').toUTCString())).toBe(1000);
     vi.useRealTimers();
+  });
+
+  it('prefers retry-after-ms over retry-after and applies the same reasonableness rule', () => {
+    expect(computeDelay(1, undefined, '1500')).toBe(1500);
+    expect(computeDelay(1, '60', '1500')).toBe(1500); // ms header wins
+    expect(computeDelay(1, undefined, '700000')).toBe(1000); // 700s > 5min → exponential
   });
 });
 
@@ -317,5 +466,73 @@ describe('isRetryable', () => {
       expect(isRetryable(s)).toBe(false);
     }
     expect(isRetryable(undefined)).toBe(true);
+  });
+
+  it('lets retryable business codes win even on status 200', () => {
+    expect(isRetryable(200, { errorMessage: '[1302][aa][req-1] concurrency too high' })).toBe(true);
+    expect(isRetryable(200, { errorMessage: '{"error":{"code":"rate_limit_error"}}' })).toBe(true);
+  });
+
+  it('lets terminal business codes veto retry even on retryable 5xx', () => {
+    expect(isRetryable(503, { errorMessage: '[1304][aa][req-1] daily limit reached' })).toBe(false);
+    expect(
+      isRetryable(429, {
+        errorMessage: '{"error":{"message":"_quota","code":"insufficient_quota"}}',
+      })
+    ).toBe(false);
+  });
+
+  it('falls through to the status verdict for unknown business codes', () => {
+    expect(isRetryable(503, { errorMessage: '[9999][aa][req-1] mystery' })).toBe(true);
+    expect(isRetryable(200, { errorMessage: '[9999][aa][req-1] mystery' })).toBe(false);
+    expect(isRetryable(503, { errorMessage: 'no code here' })).toBe(true);
+  });
+
+  it('blocks retry on an explicit x-should-retry false/0 header', () => {
+    expect(isRetryable(503, { headers: { 'x-should-retry': 'false' } })).toBe(false);
+    expect(isRetryable(429, { headers: { 'X-Should-Retry': '0' } })).toBe(false);
+    expect(isRetryable(503, { headers: { 'x-should-retry': 'true' } })).toBe(true);
+    // The veto is absolute — it also wins over a retryable business code.
+    expect(
+      isRetryable(200, {
+        errorMessage: '[1302][aa][req-1]',
+        headers: { 'x-should-retry': 'false' },
+      })
+    ).toBe(false);
+  });
+});
+
+describe('provider-business-codes', () => {
+  it('extracts BigModel bracket prefixes and OpenAI-style code fields', () => {
+    expect(extractBusinessCode('[1302][aa][req-1] concurrency too high')).toBe('1302');
+    expect(extractBusinessCode('  [20097][aa][req-1] quota')).toBe('20097');
+    expect(extractBusinessCode('{"error":{"message":"boom","code":"insufficient_quota"}}')).toBe(
+      'insufficient_quota'
+    );
+    expect(extractBusinessCode('upstream says {"error":{"code":1302}} inline')).toBe('1302');
+    expect(extractBusinessCode('plain failure, nothing to see')).toBeUndefined();
+    expect(extractBusinessCode(undefined)).toBeUndefined();
+  });
+
+  it('classifies table codes with ZCode semantics', () => {
+    for (const code of ['1120', '1230', '1234', '1302', '1303', '1305', '1312']) {
+      expect(lookupBusinessCode(code)?.retryable).toBe(true);
+    }
+    for (const code of ['1113', '1304', '1308', '1309', '1310', '1311', '1313']) {
+      expect(lookupBusinessCode(code)?.retryable).toBe(false);
+    }
+    for (const code of ['insufficient_quota', 'credit_balance_exhausted', '2056']) {
+      expect(lookupBusinessCode(code)?.retryable).toBe(false);
+    }
+    expect(lookupBusinessCode('INSUFFICIENT_QUOTA')?.retryable).toBe(false);
+    expect(lookupBusinessCode('9999')).toBeUndefined();
+  });
+
+  it('returns undefined from classifyErrorText for codes outside the table', () => {
+    expect(classifyErrorText('[1305][aa][req-1]')).toEqual({
+      code: '1305',
+      info: { retryable: true, reason: 'rate_limited' },
+    });
+    expect(classifyErrorText('[9999][aa][req-1]')).toBeUndefined();
   });
 });
