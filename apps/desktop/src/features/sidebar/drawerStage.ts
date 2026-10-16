@@ -5,15 +5,18 @@
  * revealed width: 0 is fully closed, `peek` is the standard 300px drawer, and
  * `expandedWidth` is the widened "reading" stage. Positions below `peek` slide
  * the 300px panel in from the left; positions above it grow the panel's width
- * in place. One scalar keeps drag math, snapping, and the CSS variables that
- * paint the panel in agreement.
+ * in place. One scalar keeps drag math, snapping, and the styles that paint
+ * the panel in agreement.
  *
- * Release carries momentum: the drawer coasts on from where the finger let go
- * (release velocity × `DRAWER_PROJECTION_MS`) and snaps to the detent nearest
- * that projected point, so a short quick swipe still opens. Momentum reaches at
- * most the neighbouring detent, a slow drag that physically crosses two detents
- * lands where the finger left it, and a clear flick always moves one detent in
- * its direction. A hard leftward fling is the one shortcut: it closes the
+ * Release follows intent rather than distance. A drag that has clearly moved
+ * one way (`DRAWER_COMMIT_DISTANCE_PX`) commits to the next detent that way
+ * however slowly it ends, so a short swipe opens or closes instead of falling
+ * back; a slow drag that physically crosses a detent lands on whichever detent
+ * the finger is nearer. Release velocity overrides travel: a clear flick moves
+ * one detent in its direction, and pulling back against the drag at release
+ * goes the way the finger is now heading. Only a drag too small to read
+ * coasts on its momentum (release velocity × `DRAWER_PROJECTION_MS`) to the
+ * nearest detent. A hard leftward fling is the one shortcut: it closes the
  * drawer outright instead of parking at `peek`.
  */
 
@@ -36,6 +39,12 @@ export const DRAWER_MAX_EXPANDED_WIDTH_PX = 420;
 
 /** Directional intent: at or above this a release always moves one detent. */
 export const DRAWER_FLICK_VELOCITY = 0.3;
+
+/** Travel past the activation slop that commits a release to the next detent. */
+export const DRAWER_COMMIT_DISTANCE_PX = 24;
+
+/** Pulling back against the drag at least this fast at release reverses it. */
+export const DRAWER_REVERSE_VELOCITY = 0.1;
 
 /** How far release momentum carries the drawer, as ms of travel at release speed. */
 export const DRAWER_PROJECTION_MS = 200;
@@ -80,15 +89,18 @@ function detents(expandedWidth: number): Array<{ stage: DrawerStage; position: n
  * @param position Revealed width at the moment of release.
  * @param velocity Release velocity in px/ms; positive opens, negative closes.
  * @param expandedWidth Position of the `full` detent for this viewport.
+ * @param origin Revealed width when the drag began.
  */
 export function resolveDrawerStage(
   position: number,
   velocity: number,
-  expandedWidth: number
+  expandedWidth: number,
+  origin: number
 ): DrawerStage {
   const stops = detents(expandedWidth);
   const max = stops[stops.length - 1].position;
   const clamped = Math.min(max, Math.max(0, position));
+  const travel = clamped - Math.min(max, Math.max(0, origin));
 
   if (velocity <= -DRAWER_DISMISS_VELOCITY) return 'closed';
 
@@ -102,7 +114,29 @@ export function resolveDrawerStage(
   if (velocity <= -DRAWER_FLICK_VELOCITY) return below.stage;
   if (velocity >= DRAWER_FLICK_VELOCITY) return above.stage;
 
-  // Slower releases coast toward a neighbour and settle on the nearest detent.
+  // Pulling back against the drag at release means the user changed their mind.
+  if (travel !== 0 && Math.abs(velocity) >= DRAWER_REVERSE_VELOCITY) {
+    if (Math.sign(velocity) !== Math.sign(travel)) {
+      return velocity < 0 ? below.stage : above.stage;
+    }
+  }
+
+  // A clear drag commits to the next detent its way, or to a farther one the
+  // finger has already carried it nearer to.
+  if (Math.abs(travel) >= DRAWER_COMMIT_DISTANCE_PX) {
+    const start = clamped - travel;
+    const ahead = stops
+      .filter(stop => (travel > 0 ? stop.position > start : stop.position < start))
+      .sort((a, b) => Math.abs(a.position - start) - Math.abs(b.position - start));
+    if (ahead.length) {
+      return ahead.reduce((target, stop) =>
+        Math.abs(stop.position - clamped) < Math.abs(target.position - clamped) ? stop : target
+      ).stage;
+    }
+  }
+
+  // Too small to read as intent: coast toward a neighbour and settle on the
+  // nearest detent.
   const projected = Math.min(
     above.position,
     Math.max(below.position, clamped + velocity * DRAWER_PROJECTION_MS)

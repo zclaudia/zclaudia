@@ -168,7 +168,12 @@ export function useMobileDrawer({
         expandedWidth,
         Math.max(0, dragStartPositionRef.current + distance)
       );
-      const nextStage = resolveDrawerStage(releasePosition, velocity, expandedWidth);
+      const nextStage = resolveDrawerStage(
+        releasePosition,
+        velocity,
+        expandedWidth,
+        dragStartPositionRef.current
+      );
       const target = drawerStagePosition(nextStage, expandedWidth);
       const towardTarget = target >= releasePosition ? velocity : -velocity;
       // Start the settle before React hears about it: the stage change

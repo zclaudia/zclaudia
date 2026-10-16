@@ -58,11 +58,13 @@ export async function reorderSessions(projectId: string, orderedIds: string[]): 
 }
 
 export async function getSessionRunState(
-  sessionId: string
+  sessionId: string,
+  options?: RequestInit
 ): Promise<{ sessionId: string; isRunning: boolean; activeRunId?: string }> {
   return apiCallForBackend<{ sessionId: string; isRunning: boolean; activeRunId?: string }>(
     getBackendIdForSession(sessionId),
-    `/api/sessions/${sessionId}/run-state`
+    `/api/sessions/${sessionId}/run-state`,
+    options
   );
 }
 

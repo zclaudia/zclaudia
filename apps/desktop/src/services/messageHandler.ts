@@ -36,6 +36,11 @@ import { handleFilePushMessage } from './message-handlers/file-push-messages';
 import { handleInvocationMessage } from './message-handlers/invocation-messages';
 import { handleErrorMessage } from './message-handlers/error-messages';
 import { handleRunMessage } from './message-handlers/run-messages';
+import {
+  recordTerminalRun,
+  terminalRunSeqByRun,
+  TERMINAL_RUN_TOMBSTONE_MS,
+} from './message-handlers/run-finalization';
 import { handleGoalMessage } from './message-handlers/goal-messages';
 import { createMessageDispatcher } from './message-handlers/dispatcher';
 import type { HeartbeatState } from './message-handlers/heartbeat-reconciliation';
@@ -73,8 +78,6 @@ function unwrapMessage(rawMessage: ServerMessage | any): ServerMessage {
 
 // Run event dedup: track max seq per runId.
 const maxSeqByRun = new Map<string, number>();
-const terminalRunSeqByRun = new Map<string, { seq?: number; endedAt: number }>();
-const TERMINAL_RUN_TOMBSTONE_MS = 60_000;
 
 // Heartbeat state — shared with heartbeat-reconciliation handler
 const entityVersions = new Map<string, { projects: number; plugins: number }>();
@@ -96,15 +99,14 @@ const heartbeatState: HeartbeatState = {
 };
 
 function isStaleRunEvent(runId: string, seq?: number): boolean {
+  const terminal = terminalRunSeqByRun.get(runId);
+  if (terminal?.recovered && Date.now() - terminal.endedAt <= TERMINAL_RUN_TOMBSTONE_MS)
+    return true;
   if (seq == null || seq < 1) return false;
   const maxSeq = maxSeqByRun.get(runId) ?? 0;
   if (seq <= maxSeq) return true;
   maxSeqByRun.set(runId, seq);
   return false;
-}
-
-function recordTerminalRun(runId: string, seq?: number): void {
-  terminalRunSeqByRun.set(runId, { seq, endedAt: Date.now() });
 }
 
 function isRunEventGap(runId: string, seq?: number): boolean {

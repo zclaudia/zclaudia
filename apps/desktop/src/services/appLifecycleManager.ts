@@ -31,10 +31,24 @@ class AppLifecycleManager {
   private lastHealthProbeTickAt = 0;
   /** Prevent duplicate reconnects when wake emits focus + visibility + online together. */
   private lastResumeReconnectAt = 0;
+  /** Android Activity state outranks WebView visibility, which can remain stale. */
+  private nativeForeground: boolean | null = null;
+
+  private isForeground(): boolean {
+    return this.nativeForeground ?? document.visibilityState === 'visible';
+  }
+
+  private handleNativeLifecycle = (event: Event): void => {
+    const active = (event as CustomEvent<{ active?: unknown }>).detail?.active;
+    if (typeof active !== 'boolean') return;
+    this.nativeForeground = active;
+    if (active) this.onForeground();
+    else this.onBackground();
+  };
 
   // Bound handlers for cleanup
   private handleVisibilityChange = (): void => {
-    if (document.visibilityState === 'visible') {
+    if (this.isForeground()) {
       this.onForeground();
     } else {
       this.onBackground();
@@ -42,17 +56,17 @@ class AppLifecycleManager {
   };
 
   private handleOnline = (): void => {
-    if (document.visibilityState !== 'visible') return;
+    if (!this.isForeground()) return;
     this.triggerResumeReconnect('network online');
   };
 
   private handleWindowFocus = (): void => {
-    if (document.visibilityState !== 'visible') return;
+    if (!this.isForeground()) return;
     this.triggerResumeReconnect('window focus');
   };
 
   private handlePageShow = (): void => {
-    if (document.visibilityState !== 'visible') return;
+    if (!this.isForeground()) return;
     this.triggerResumeReconnect('pageshow');
   };
 
@@ -61,13 +75,17 @@ class AppLifecycleManager {
     this.facade = facade;
     this.onResume = options?.onResume ?? null;
     this.started = true;
+    const nativeActive = (window as Window & { __ZCLAUDIA_NATIVE_APP_ACTIVE__?: boolean })
+      .__ZCLAUDIA_NATIVE_APP_ACTIVE__;
+    this.nativeForeground = typeof nativeActive === 'boolean' ? nativeActive : null;
 
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
     window.addEventListener('online', this.handleOnline);
     window.addEventListener('focus', this.handleWindowFocus);
     window.addEventListener('pageshow', this.handlePageShow);
+    window.addEventListener('zclaudia:app-lifecycle', this.handleNativeLifecycle);
 
-    this.startHealthProbe();
+    if (this.isForeground()) this.startHealthProbe();
   }
 
   stop(): void {
@@ -76,16 +94,20 @@ class AppLifecycleManager {
     window.removeEventListener('online', this.handleOnline);
     window.removeEventListener('focus', this.handleWindowFocus);
     window.removeEventListener('pageshow', this.handlePageShow);
+    window.removeEventListener('zclaudia:app-lifecycle', this.handleNativeLifecycle);
 
     this.stopHealthProbe();
     this.facade = null;
     this.onResume = null;
     this.backgroundSince = null;
     this.lastResumeReconnectAt = 0;
+    this.nativeForeground = null;
   }
 
   private onBackground(): void {
+    if (this.backgroundSince !== null) return;
     this.backgroundSince = Date.now();
+    this.lastResumeReconnectAt = 0;
     this.stopHealthProbe();
     console.log('[AppLifecycleManager] App went to background');
   }
@@ -111,6 +133,10 @@ class AppLifecycleManager {
       return;
     }
     this.lastResumeReconnectAt = now;
+    // focus/pageshow/native resume can be the only wake signal. A previous
+    // hidden event stopped the probe, so all resume paths must restart it.
+    this.backgroundSince = null;
+    this.startHealthProbe();
     console.log(`[AppLifecycleManager] ${reason} — triggering reconnect`);
     this.facade?.forceReconnect?.();
     this.runResumeHooks();

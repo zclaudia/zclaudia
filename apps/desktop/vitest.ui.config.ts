@@ -29,6 +29,7 @@ export default defineConfig({
       'src/hooks/**/*.test.ts',
       'src/features/**/*.test.tsx',
       'src/features/**/*.test.ts',
+      'src/services/__tests__/appLifecycleManager.test.ts',
     ],
     exclude: [
       '**/node_modules/**',

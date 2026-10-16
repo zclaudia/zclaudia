@@ -20,6 +20,10 @@ import * as api from './api';
 import { getControlPlaneMode, isLocalBackendId } from '../actions/controlPlane';
 import { getBrowserShellBaseUrl } from '../utils/browserShellRuntime';
 import { findDeletedSessionIds, planDeltaSessionEvents } from './sessionSyncReconciliation';
+import { syncBackendSessionCatalog } from './backend-session-catalog';
+import { useRunStore } from '../stores/runStore';
+import { finalizeRunLifecycle, recordTerminalRun } from './message-handlers/run-finalization';
+import { clearSessionBlockingState } from './session-run-coordination';
 
 interface BackendSyncState {
   lastSyncTime: number;
@@ -232,6 +236,10 @@ async function incrementalSync(backendId: string): Promise<RemoteSession[] | nul
     }
 
     // Update sync timestamp
+    syncBackendSessionCatalog(
+      backendId,
+      existing.map(session => session.id)
+    );
     state.lastSyncTime = timestamp;
 
     if (sessions.length > 0) {
@@ -309,6 +317,10 @@ async function fullSync(backendId: string): Promise<RemoteSession[] | null> {
 
     // Replace sessionsStore with server's complete list (no need for individual delete events)
     store.setRemoteSessions(backendId, sessions);
+    syncBackendSessionCatalog(
+      backendId,
+      localSessions.map(session => session.id)
+    );
     useSessionRunStateStore.getState().reconcileBackendSessionStatuses({
       backendId,
       sessions: sessions.map((session: RemoteSession) => ({
@@ -411,6 +423,23 @@ export async function recoverCurrentSessionTail(
   targetServerId: string,
   sessionId?: string
 ): Promise<boolean> {
+  return recoverSessionSnapshot(targetServerId, sessionId, false);
+}
+
+/** Resume must repair both content and a missed terminal run event. Catalog
+ * idle flags deliberately cannot finalize chat runs; use the live run API. */
+export async function recoverCurrentSession(
+  targetServerId: string,
+  sessionId?: string
+): Promise<boolean> {
+  return recoverSessionSnapshot(targetServerId, sessionId, true);
+}
+
+async function recoverSessionSnapshot(
+  targetServerId: string,
+  sessionId: string | undefined,
+  reconcileRun: boolean
+): Promise<boolean> {
   const currentSessionId = useSelectionStore.getState().selectedSessionId;
   const activeServerId = useServerStore.getState().activeServerId;
   const targetSessionId = sessionId ?? currentSessionId;
@@ -420,10 +449,11 @@ export async function recoverCurrentSessionTail(
 
   const recoveryFacade = useFacadeStore.getState().facade;
   const reconnectGeneration = useFacadeStore.getState().reconnectGeneration;
+  const recoveryConnectionState = useFacadeStore.getState().connectionState;
   const recoveryFacadeId = getRecoveryFacadeId(recoveryFacade);
   // A newer connection generation must start its own request immediately; it
   // cannot be coalesced behind an older generation's potentially stuck fetch.
-  const key = `${targetServerId}:${targetSessionId}:${reconnectGeneration ?? 'initial'}:${recoveryFacadeId}`;
+  const key = `${targetServerId}:${targetSessionId}:${reconnectGeneration ?? 'initial'}:${recoveryFacadeId}:${reconcileRun ? 'full' : 'tail'}`;
 
   const isStillCurrent = () => {
     const currentFacade = useFacadeStore.getState();
@@ -431,6 +461,7 @@ export async function recoverCurrentSessionTail(
       useSelectionStore.getState().selectedSessionId === targetSessionId &&
       useServerStore.getState().activeServerId === targetServerId &&
       currentFacade.facade === recoveryFacade &&
+      (recoveryConnectionState !== 'connected' || currentFacade.connectionState === 'connected') &&
       (reconnectGeneration == null || currentFacade.reconnectGeneration === reconnectGeneration)
     );
   };
@@ -445,10 +476,23 @@ export async function recoverCurrentSessionTail(
 
   const run = async (): Promise<boolean> => {
     const controller = new AbortController();
+    const foregroundRunIds = () => {
+      const state = useRunStore.getState();
+      return Object.entries(state.activeRuns)
+        .filter(([id, sid]) => sid === targetSessionId && !state.backgroundRunIds.has(id))
+        .map(([id]) => id)
+        .sort();
+    };
+    const capturedRuns = reconcileRun ? foregroundRunIds() : [];
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      const result = await Promise.race([
-        api.getSessionMessages(targetSessionId, { limit: 100, signal: controller.signal }),
+      const [result, runState] = await Promise.race([
+        Promise.all([
+          api.getSessionMessages(targetSessionId, { limit: 100, signal: controller.signal }),
+          reconcileRun
+            ? api.getSessionRunState(targetSessionId, { signal: controller.signal })
+            : null,
+        ]),
         new Promise<never>((_, reject) => {
           timeout = setTimeout(() => {
             controller.abort();
@@ -457,6 +501,33 @@ export async function recoverCurrentSessionTail(
         }),
       ]);
       if (!isStillCurrent()) return false;
+      if (reconcileRun) {
+        if (
+          !runState ||
+          runState.sessionId !== targetSessionId ||
+          typeof runState.isRunning !== 'boolean'
+        ) {
+          throw new Error('Invalid session run-state snapshot');
+        }
+        // A user or live event may have started another run while HTTP was in
+        // flight. An older idle response must never clear that newer run.
+        if (JSON.stringify(capturedRuns) !== JSON.stringify(foregroundRunIds())) return false;
+        if (!runState.isRunning) {
+          // Flush buffered deltas BEFORE merging the persisted message window,
+          // otherwise an old partial delta could overwrite the recovered tail.
+          for (const runId of capturedRuns) {
+            recordTerminalRun(runId, undefined, true);
+            finalizeRunLifecycle(runId);
+            clearSessionBlockingState(targetSessionId, { serverId: targetServerId, runId });
+          }
+          useSessionRunStateStore.getState().markSessionInactive({
+            backendId: targetServerId,
+            sessionId: targetSessionId,
+            source: 'session_sync',
+            cleanupChatRuns: false,
+          });
+        }
+      }
       // Hydrate top-level contentBlocks/toolCalls from metadata: the segmented
       // message view renders from them, so merging raw wire messages would
       // repair `content` invisibly while the rendered blocks stay truncated.
@@ -468,6 +539,7 @@ export async function recoverCurrentSessionTail(
       );
       return true;
     } catch (error) {
+      controller.abort();
       console.error('[SessionSync] Failed to recover current session tail:', error);
       return false;
     } finally {

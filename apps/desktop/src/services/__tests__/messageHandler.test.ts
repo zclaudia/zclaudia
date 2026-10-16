@@ -239,6 +239,7 @@ vi.mock('../api/sessions', () => ({
 }));
 
 import { cleanupServerSyncState, handleServerMessage } from '../messageHandler';
+import { terminalRunSeqByRun } from '../message-handlers/run-finalization';
 import { downloadPushedFile } from '../fileDownload';
 import { useNotificationFeedStore } from '../../stores/notificationFeedStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
@@ -260,6 +261,7 @@ function makeCtx(overrides?: Partial<MessageHandlerContext>): MessageHandlerCont
 describe('handleServerMessage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    terminalRunSeqByRun.clear();
     useSessionRunStateStore.setState({ records: {} });
     mockGetProjectsForBackend.mockReset();
     mockChatStore.activeRuns = {};

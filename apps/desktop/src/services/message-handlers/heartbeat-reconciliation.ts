@@ -182,23 +182,23 @@ export function handleHeartbeat(
   const backendName = ctx.resolveBackendName();
   const chatState = useRunStore.getState();
   clearExpiredTerminalRuns(state);
+  // A heartbeat queued before terminal HTTP recovery can arrive afterwards.
+  // Filter it for ALL reconciliation, not only the run resurrection loop;
+  // otherwise the later activity-index update turns the session running again.
+  const activeRuns = heartbeat.activeRuns.filter(
+    run => !shouldIgnoreHeartbeatRun(state, run.runId, run.lastSeq)
+  );
 
   useServerStore.getState().recordHeartbeat(serverId);
 
-  const serverActiveRunIds = new Set(heartbeat.activeRuns.map(r => r.runId));
+  const serverActiveRunIds = new Set(activeRuns.map(r => r.runId));
   const activeBackgroundSessionIds = new Set(
-    heartbeat.activeRuns.filter(r => r.sessionType === 'background').map(r => r.sessionId)
+    activeRuns.filter(r => r.sessionType === 'background').map(r => r.sessionId)
   );
 
   // Add missing runs
-  for (const run of heartbeat.activeRuns) {
+  for (const run of activeRuns) {
     if (!chatState.activeRuns[run.runId]) {
-      if (shouldIgnoreHeartbeatRun(state, run.runId, run.lastSeq)) {
-        console.log(
-          `[${logTag}] Ignoring stale heartbeat resurrection for run ${run.runId} lastSeq=${run.lastSeq ?? 'none'}`
-        );
-        continue;
-      }
       const isBackground = run.sessionType === 'background';
       console.log(
         `[${logTag}] Heartbeat resurrecting run ${run.runId} sessionId=${run.sessionId} lastSeq=${run.lastSeq ?? 'none'}`
@@ -267,7 +267,7 @@ export function handleHeartbeat(
   }
 
   // Update run health
-  for (const run of heartbeat.activeRuns) {
+  for (const run of activeRuns) {
     if (run.systemInfo) {
       useSessionConfigStore.getState().setSystemInfo(run.sessionId, run.systemInfo);
     }
@@ -283,7 +283,7 @@ export function handleHeartbeat(
   reconcileStaleBackgroundRunTasks(
     serverId,
     activeBackgroundSessionIds,
-    new Set(heartbeat.activeRuns.map(r => r.sessionId))
+    new Set(activeRuns.map(r => r.sessionId))
   );
   reconcileTasksFromRemovedBackends(serverId);
 
@@ -310,7 +310,7 @@ export function handleHeartbeat(
   // Reconcile questions
   useInteractionStore.getState().reconcilePendingApprovals(
     resolveOwnerBackendId(backendId, serverId),
-    heartbeat.activeRuns.map(run => ({ runId: run.runId, sessionId: run.sessionId })),
+    activeRuns.map(run => ({ runId: run.runId, sessionId: run.sessionId })),
     heartbeat.pendingApprovals
   );
 
@@ -339,7 +339,7 @@ export function handleHeartbeat(
   // are still reported as active so the store-level foreground cleanup does
   // not tear them down before their terminal run event arrives.
   const activeSessionIds = new Set<string>(
-    heartbeat.activeRuns.filter(r => r.sessionType !== 'background').map(r => r.sessionId)
+    activeRuns.filter(r => r.sessionType !== 'background').map(r => r.sessionId)
   );
   for (const grace of graceRuns) {
     if (grace.sessionId) activeSessionIds.add(grace.sessionId);
@@ -347,7 +347,7 @@ export function handleHeartbeat(
   useSessionRunStateStore.getState().reconcileBackendActiveRuns({
     backendId,
     activeRuns: [
-      ...heartbeat.activeRuns.map(run => ({
+      ...activeRuns.map(run => ({
         runId: run.runId,
         sessionId: run.sessionId,
         sessionType: run.sessionType,

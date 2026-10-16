@@ -43,6 +43,7 @@
     "test:e2e:playwright:debug": "bash scripts/with-project-node.sh playwright test --debug",
     "test:e2e:playwright:codegen": "bash scripts/with-project-node.sh playwright codegen http://localhost:1420",
     "test:e2e:playwright:report": "bash scripts/with-project-node.sh playwright show-report",
+    "test:e2e:resource-sync": "bash scripts/with-project-node.sh playwright test --config e2e/playwright.resource-sync.config.ts",
     "test:desktop": "bash scripts/with-project-node.sh pnpm --filter @zclaudia/desktop run test",
     "test:server": "bash scripts/with-project-node.sh pnpm --filter @zclaudia/server run test",
     "test:file": "bash scripts/with-project-node.sh node scripts/dev/test-file-by-file.mjs",

@@ -16,6 +16,33 @@ import androidx.activity.enableEdgeToEdge
 
 class MainActivity : TauriActivity() {
   private val notificationPermissionRequestCode = 1001
+  private var activityResumed = false
+
+  override fun onResume() {
+    super.onResume()
+    activityResumed = true
+    dispatchLifecycleState()
+  }
+
+  override fun onPause() {
+    activityResumed = false
+    dispatchLifecycleState()
+    super.onPause()
+  }
+
+  private fun dispatchLifecycleState() {
+    findWebView()?.evaluateJavascript(
+      """
+        (() => {
+          window.__ZCLAUDIA_NATIVE_APP_ACTIVE__ = $activityResumed;
+          window.dispatchEvent(new CustomEvent('zclaudia:app-lifecycle', {
+            detail: { active: $activityResumed },
+          }));
+        })()
+      """.trimIndent(),
+      null
+    )
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
@@ -111,6 +138,9 @@ class MainActivity : TauriActivity() {
         webView.addJavascriptInterface(NotificationBridge(), "AndroidNotifications")
         webView.addJavascriptInterface(SystemBarsBridge(this@MainActivity), "AndroidSystemBars")
         dispatchPendingSelectionTarget(webView)
+        // Cold start may resume before the WebView exists. Publish the current
+        // Activity state again once native bridges are ready.
+        dispatchLifecycleState()
         // ThemeContext applies the saved theme before this bridge exists; tell
         // it to re-sync the system bars now that the bridge is reachable.
         webView.evaluateJavascript(

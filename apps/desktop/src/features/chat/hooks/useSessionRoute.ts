@@ -13,7 +13,7 @@ import {
   getMobileBackendViewState,
   isMobileBackendUsable,
 } from '../../../services/mobileConnectionState';
-import { recoverCurrentSessionTail } from '../../../services/sessionSync';
+import { recoverCurrentSession } from '../../../services/sessionSync';
 
 function getStreamKey(backendId: string, sessionId: string): string {
   return `${backendId}:${sessionId}`;
@@ -161,19 +161,26 @@ export function useSessionRoute(
       lastTailRecoveryRef.current?.signature === signature &&
       lastTailRecoveryRef.current.facade === facade
         ? lastTailRecoveryRef.current.promise
-        : recoverCurrentSessionTail(backendId, sessionId);
+        : recoverCurrentSession(backendId, sessionId);
     lastTailRecoveryRef.current = { signature, facade, promise };
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    void promise.then(recovered => {
-      // Allow one bounded retry for a transient HTTP failure within the same
-      // connection generation. A later reconnect gets its own attempt.
+    let retryDelay = 1_500;
+    const onRecovered = (recovered: boolean) => {
+      // Mobile HTTP can remain unavailable for more than two attempts after
+      // wake. Keep retrying with capped backoff until recovery succeeds or
+      // this route/connection is superseded.
       if (!recovered && !cancelled) {
         retryTimer = setTimeout(() => {
-          if (!cancelled) void recoverCurrentSessionTail(backendId, sessionId);
-        }, 1_500);
+          if (cancelled) return;
+          const next = recoverCurrentSession(backendId, sessionId);
+          lastTailRecoveryRef.current = { signature, facade, promise: next };
+          void next.then(onRecovered);
+        }, retryDelay);
+        retryDelay = Math.min(retryDelay * 2, 10_000);
       }
-    });
+    };
+    void promise.then(onRecovered);
     return () => {
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);

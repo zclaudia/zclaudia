@@ -42,7 +42,10 @@ function setLegacySessionActive(backendId: string, sessionId: string, isActive: 
   }
 }
 
-function clearSessionBlockingState(sessionId: string): void {
+function clearSessionBlockingState(
+  sessionId: string,
+  owner?: { serverId: string; runId: string }
+): void {
   const permissionStore = usePermissionStore.getState() as ReturnType<
     typeof usePermissionStore.getState
   > & {
@@ -60,9 +63,10 @@ function clearSessionBlockingState(sessionId: string): void {
   const interactionStore = useInteractionStore.getState() as ReturnType<
     typeof useInteractionStore.getState
   > & {
-    clearSession?: (sessionId: string) => void;
+    clearSession?: (sessionId: string, owner?: { serverId: string; runId: string }) => void;
   };
-  interactionStore.clearSession?.(sessionId);
+  if (owner) interactionStore.clearSession?.(sessionId, owner);
+  else interactionStore.clearSession?.(sessionId);
 }
 
 export function cleanupForegroundChatRunsForSession(

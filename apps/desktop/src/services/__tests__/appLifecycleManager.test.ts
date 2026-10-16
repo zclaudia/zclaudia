@@ -12,6 +12,8 @@ describe('AppLifecycleManager', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    delete (window as any).__ZCLAUDIA_NATIVE_APP_ACTIVE__;
     facade = {
       forceReconnect: vi.fn(),
       probeHealth: vi.fn(),
@@ -166,5 +168,39 @@ describe('AppLifecycleManager', () => {
 
     expect(facade.forceReconnect).not.toHaveBeenCalled();
     expect(facade2.forceReconnect).toHaveBeenCalledOnce();
+  });
+
+  it('recovers on native Android resume even when WebView visibility is stuck hidden', () => {
+    appLifecycleManager.start(facade as any);
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    vi.advanceTimersByTime(120_000);
+    window.dispatchEvent(new CustomEvent('zclaudia:app-lifecycle', { detail: { active: true } }));
+    expect(facade.forceReconnect).toHaveBeenCalledOnce();
+    facade.probeHealth.mockClear();
+    vi.advanceTimersByTime(25_000);
+    expect(facade.probeHealth).toHaveBeenCalledOnce();
+  });
+
+  it('uses native pause to stop probes when WebView visibility remains visible', () => {
+    appLifecycleManager.start(facade as any);
+    window.dispatchEvent(new CustomEvent('zclaudia:app-lifecycle', { detail: { active: false } }));
+    vi.advanceTimersByTime(50_000);
+    window.dispatchEvent(new Event('focus'));
+    window.dispatchEvent(new Event('online'));
+    expect(facade.probeHealth).not.toHaveBeenCalled();
+    expect(facade.forceReconnect).not.toHaveBeenCalled();
+  });
+
+  it('resumes probes on focus after a hidden event without a matching visible event', () => {
+    appLifecycleManager.start(facade as any);
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    vi.advanceTimersByTime(120_000);
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    window.dispatchEvent(new Event('focus'));
+    facade.probeHealth.mockClear();
+    vi.advanceTimersByTime(25_000);
+    expect(facade.probeHealth).toHaveBeenCalledOnce();
   });
 });

@@ -325,6 +325,13 @@ export const useProjectStore = create<ProjectState>(set => ({
     set(state => {
       assignSessionOwners([session]);
       admitCreatedSession(session);
+      // Cross-client resource push can arrive before the REST create response.
+      const existingIndex = state.sessions.findIndex(item => item.id === session.id);
+      if (existingIndex >= 0) {
+        const sessions = state.sessions.slice();
+        sessions[existingIndex] = { ...sessions[existingIndex], ...session };
+        return { sessions };
+      }
       return { sessions: [...state.sessions, session] };
     }),
 

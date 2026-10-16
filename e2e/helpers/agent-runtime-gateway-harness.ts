@@ -11,12 +11,14 @@ export class AgentRuntimeGatewayHarness {
   url = '';
   logs = '';
   readonly secret = randomUUID();
+  backendSecret = this.secret;
+  clientSecret = this.secret;
   private child?: ChildProcess;
 
-  async start() {
+  async start(options: { issuedCredentials?: boolean } = {}) {
     const configured = process.env.ZCLAUDIA_E2E_GATEWAY_ENTRY;
     if (!configured)
-      throw new Error('ZCLAUDIA_E2E_GATEWAY_ENTRY must identify a built Gateway v3 server module');
+      throw new Error('ZCLAUDIA_E2E_GATEWAY_ENTRY must identify a built Gateway server module');
     const entry = path.resolve(configured);
     const bytes = await readFile(entry);
     this.directory = await mkdtemp(path.join(tmpdir(), 'zclaudia-gateway-e2e-'));
@@ -26,7 +28,7 @@ export class AgentRuntimeGatewayHarness {
         {
           entry,
           sha256: createHash('sha256').update(bytes).digest('hex'),
-          protocol: 3,
+          protocol: options.issuedCredentials ? 4 : 3,
         },
         null,
         2
@@ -37,7 +39,7 @@ export class AgentRuntimeGatewayHarness {
       launcher,
       `
       import { createGatewayServer } from ${JSON.stringify(pathToFileURL(entry).href)};
-      const server = createGatewayServer({ gatewaySecret: process.env.E2E_GATEWAY_SECRET,
+      const server = createGatewayServer({ ${options.issuedCredentials ? 'adminToken' : 'gatewaySecret'}: process.env.E2E_GATEWAY_SECRET,
         notificationConfig: { enabled: false } });
       server.listen(0, '127.0.0.1', () => console.log('E2E_GATEWAY_READY:' + server.address().port));
       process.once('SIGTERM', () => server.close(error => process.exit(error ? 1 : 0)));
@@ -78,6 +80,21 @@ export class AgentRuntimeGatewayHarness {
       child.once('error', finish);
       child.once('exit', exited);
     });
+    if (options.issuedCredentials) {
+      const issue = async (type: 'backend' | 'device'): Promise<string> => {
+        const response = await fetch(`${this.url.replace('ws:', 'http:')}/api/admin/credentials`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.secret}` },
+          body: JSON.stringify({ type, namespace: 'zclaudia', name: `E2E ${type}` }),
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.success)
+          throw new Error(`Credential issue failed (${response.status})`);
+        return payload.data.token;
+      };
+      this.backendSecret = await issue('backend');
+      this.clientSecret = await issue('device');
+    }
   }
 
   async stop() {

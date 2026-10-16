@@ -12,7 +12,7 @@ const { mockRecoverCurrentSessionTail } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../../services/sessionSync', () => ({
-  recoverCurrentSessionTail: (...args: unknown[]) => mockRecoverCurrentSessionTail(...args),
+  recoverCurrentSession: (...args: unknown[]) => mockRecoverCurrentSessionTail(...args),
 }));
 
 describe('useSessionRoute', () => {
@@ -224,6 +224,20 @@ describe('useSessionRoute', () => {
       await vi.advanceTimersByTimeAsync(1_500);
     });
 
+    expect(mockRecoverCurrentSessionTail).toHaveBeenCalledTimes(3);
+  });
+
+  it('continues recovery after two failed attempts without another reconnect or user action', async () => {
+    vi.useFakeTimers();
+    mockRecoverCurrentSessionTail
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValue(true);
+    useFacadeStore.setState({ reconnectGeneration: 2 });
+    renderHook(() => useSessionRoute('session-1', { maintainDesiredState: true }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
     expect(mockRecoverCurrentSessionTail).toHaveBeenCalledTimes(3);
   });
 });

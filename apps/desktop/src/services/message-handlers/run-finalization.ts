@@ -2,6 +2,20 @@ import type { ContentBlock } from '@zclaudia/shared/core/message';
 import { useRunStore } from '../../stores/runStore';
 import { flushDeltaForRun } from './delta-buffer';
 
+export const TERMINAL_RUN_TOMBSTONE_MS = 60_000;
+export const terminalRunSeqByRun = new Map<
+  string,
+  {
+    seq?: number;
+    endedAt: number;
+    recovered?: boolean;
+  }
+>();
+
+export function recordTerminalRun(runId: string, seq?: number, recovered = false): void {
+  terminalRunSeqByRun.set(runId, { seq, endedAt: Date.now(), recovered });
+}
+
 export interface AuthoritativeRunSnapshot {
   sessionId?: string;
   assistantMessageId?: string;

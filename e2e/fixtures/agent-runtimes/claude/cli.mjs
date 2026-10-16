@@ -93,6 +93,10 @@ createInterface({ input: process.stdin }).on('line', async line => {
     timer = setInterval(() => writeFileSync('cancel-tick.txt', String(Date.now())), 100);
     return;
   }
+  if (prompt.includes('E2E_RESUME_FINISH')) {
+    assistant([{ type: 'text', text: 'E2E_RESUME_PARTIAL' }]);
+    await waitForConcurrentRelease(process.cwd());
+  }
   if (prompt.includes('E2E_CRASH') || prompt.includes('E2E_MALFORMED')) {
     appendFileSync(
       process.env.E2E_RUNTIME_AUDIT,

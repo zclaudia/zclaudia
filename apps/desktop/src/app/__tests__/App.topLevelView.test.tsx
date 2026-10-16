@@ -443,10 +443,23 @@ describe('Mobile drawer detents', () => {
     expect(isOpen()).toBe(false);
   });
 
-  it('keeps the drawer put when a drag never reaches the next detent', async () => {
+  it('commits a short, slow drag to the next detent instead of falling back', async () => {
     const { surface, drawerWidth, isOpen } = await renderOpenDrawer();
 
     slowDrag(surface, 40);
+    expect(drawerWidth()).toBe(`${EXPANDED_WIDTH_PX}px`);
+
+    slowDrag(surface, -40);
+    expect(drawerWidth()).toBe(`${PEEK_WIDTH_PX}px`);
+
+    slowDrag(surface, -40);
+    expect(isOpen()).toBe(false);
+  });
+
+  it('keeps the drawer put when a drag is too small to read as intent', async () => {
+    const { surface, drawerWidth, isOpen } = await renderOpenDrawer();
+
+    slowDrag(surface, 20);
 
     expect(drawerWidth()).toBe(`${PEEK_WIDTH_PX}px`);
     expect(isOpen()).toBe(true);

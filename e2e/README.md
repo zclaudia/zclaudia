@@ -206,6 +206,21 @@ describe('My Feature', () => {
 
 ---
 
+## 跨客户端资源同步回归
+
+测试位于 `tests/resource-sync/`：移动尺寸浏览器通过真实 Gateway 连接后端，桌面浏览器通过嵌入式 facade 连接同一后端。两端使用独立浏览器上下文，业务创建操作通过 UI 完成；断言接收端侧边栏实际显示 project/session，禁止用刷新或切换后端促成同步。测试使用临时后端和 Gateway 数据目录。
+
+恢复用例会冻结浏览器，让真实后端任务在后台完成，并丢弃客户端收到的结束事件和心跳；恢复时只模拟原生 shell 的生命周期信号，验证原会话正文与 running 状态自动收敛。另覆盖前两次消息 HTTP 请求返回 503 的情况，确认无需再次切后台或切会话就会持续重试。每例记录 `recovery.json` 中的恢复耗时、HTTP 尝试次数及丢帧数量；本机浏览器耗时不代表实体手机的性能保证。
+
+```bash
+pnpm browser:build
+E2E_BROWSER_CHANNEL=chrome \
+ZCLAUDIA_E2E_GATEWAY_ENTRY=/absolute/path/to/zclaudia-gateway/dist/server.js \
+pnpm test:e2e:resource-sync
+```
+
+Gateway 产物须支持 `adminToken` 和 `/api/admin/credentials`；测试会签发独立 backend/device 凭据。未设置 `E2E_BROWSER_CHANNEL` 时使用 Playwright 自带 Chromium。失败 trace、服务日志及双端截图写入 `artifacts/resource-sync/`。浏览器验证不能替代 Android APK 和实体手机的设备验收。
+
 ## 🔍 故障排查
 
 ### 常见问题

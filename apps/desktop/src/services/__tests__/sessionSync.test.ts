@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../backend-session-catalog', () => ({ syncBackendSessionCatalog: vi.fn() }));
+
 const {
   mockGetSessionMessages,
   mockResolveGatewayBackendUrl,

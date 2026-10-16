@@ -4,6 +4,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useSessionsStore } from '../../stores/sessionsStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
+import { syncBackendSessionCatalog } from '../../services/backend-session-catalog';
 
 export function syncBackendDataSnapshot(
   event: Extract<BackendFacadeEvent, { type: 'backend_data_snapshot' }>
@@ -49,6 +50,10 @@ export function syncBackendDataSnapshot(
   if (sessionsChanged) {
     useSessionsStore.getState().setRemoteSessions(backendId, mappedSessions);
   }
+  syncBackendSessionCatalog(
+    backendId,
+    currentSessions?.map(session => session.id)
+  );
 
   const activeSessionIds = new Set(
     activeItems
@@ -87,6 +92,11 @@ export function syncBackendsRemoved(
   event: Extract<BackendFacadeEvent, { type: 'backends_removed' }>
 ): void {
   for (const backendId of event.backendIds) {
+    const previousIds = useSessionsStore
+      .getState()
+      .remoteSessions.get(backendId)
+      ?.map(s => s.id);
+    syncBackendSessionCatalog(backendId, previousIds, true);
     useSessionsStore.getState().clearBackendSessions(backendId);
     useProjectStore.getState().replaceProjectsForBackend(backendId, []);
     useOwnershipStore.getState().removeProjectOwnersByBackend(backendId);
@@ -97,6 +107,10 @@ export function syncBackendDataEvent(
   event: Extract<BackendFacadeEvent, { type: 'backend_data_event' }>
 ): void {
   const { backendId, event: dataEvent } = event;
+  const previousIds = useSessionsStore
+    .getState()
+    .remoteSessions.get(backendId)
+    ?.map(s => s.id);
   if (dataEvent.resourceType === 'session' && dataEvent.op === 'upsert') {
     const item = dataEvent.resource as NonNullable<typeof dataEvent.resource> & {
       sessionId: string;
@@ -116,6 +130,7 @@ export function syncBackendDataEvent(
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
       });
+      syncBackendSessionCatalog(backendId, previousIds);
       useSessionRunStateStore.getState().markSessionInactive({
         backendId,
         sessionId: item.sessionId,
@@ -133,8 +148,13 @@ export function syncBackendDataEvent(
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
       isActive: item.runStatus === 'running' || item.runStatus === 'waiting',
+      lastRunStatus:
+        item.runStatus === 'running' || item.runStatus === 'waiting' || item.runStatus === 'failed'
+          ? item.runStatus
+          : null,
       type: 'regular' as const,
     });
+    syncBackendSessionCatalog(backendId, previousIds);
     useSessionRunStateStore.getState().applySessionRunStatus({
       backendId,
       sessionId: item.sessionId,
@@ -150,6 +170,7 @@ export function syncBackendDataEvent(
       createdAt: 0,
       updatedAt: 0,
     });
+    syncBackendSessionCatalog(backendId, previousIds);
     useSessionRunStateStore.getState().markSessionInactive({
       backendId,
       sessionId: dataEvent.resourceId,
