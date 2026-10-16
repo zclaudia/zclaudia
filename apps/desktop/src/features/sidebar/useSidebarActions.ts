@@ -12,6 +12,7 @@ import { confirm } from '../../stores/confirmDialogStore';
 import { reorderProjects } from '../../services/api/projects';
 import { reorderSessions } from '../../services/api/sessions';
 import { useProjectStore } from '../../stores/projectStore';
+import { cleanAdditionalPaths } from './AdditionalDirectoriesField';
 import { selectProjectChat, resolveProjectWorkspace } from '../../actions/projectWorkspaceActions';
 
 interface UseSidebarActionsOptions {
@@ -29,6 +30,8 @@ interface UseSidebarActionsOptions {
   setExpandedProjects: React.Dispatch<React.SetStateAction<Set<string>>>;
   setNewProjectName: (v: string) => void;
   setNewProjectRootPath: (v: string) => void;
+  setNewProjectAdditionalPaths?: (v: string[]) => void;
+  setNewProjectError?: (v: string | null) => void;
   setShowNewProjectForm: (v: boolean) => void;
   setNewSessionName: (v: string) => void;
   setNewSessionAgentProfileId: (v: string) => void;
@@ -37,6 +40,7 @@ interface UseSidebarActionsOptions {
   setContextMenuProject: (v: string | null) => void;
   newProjectName: string;
   newProjectRootPath: string;
+  newProjectAdditionalPaths?: string[];
   newSessionName: string;
   newSessionAgentProfileId: string;
   onAgentNotReady?: (details?: unknown) => void;
@@ -59,6 +63,8 @@ export function useSidebarActions({
   setExpandedProjects,
   setNewProjectName,
   setNewProjectRootPath,
+  setNewProjectAdditionalPaths,
+  setNewProjectError,
   setShowNewProjectForm,
   setNewSessionName,
   setNewSessionAgentProfileId,
@@ -67,6 +73,7 @@ export function useSidebarActions({
   setContextMenuProject,
   newProjectName,
   newProjectRootPath,
+  newProjectAdditionalPaths,
   newSessionName,
   newSessionAgentProfileId,
   onAgentNotReady,
@@ -83,12 +90,15 @@ export function useSidebarActions({
     async (backendId?: string | null, defaultAgentProfileId?: string) => {
       if (!newProjectName.trim() || !canReach(backendId)) return;
       setCreatingProject(true);
+      setNewProjectError?.(null);
       try {
+        const additionalPaths = cleanAdditionalPaths(newProjectAdditionalPaths ?? []);
         const project = await api.createProject(
           {
             name: newProjectName.trim(),
             type: 'code',
             rootPath: newProjectRootPath.trim() || undefined,
+            ...(additionalPaths.length > 0 ? { additionalPaths } : {}),
             ...(defaultAgentProfileId ? { defaultAgentProfileId } : {}),
           },
           backendId ?? null
@@ -96,6 +106,7 @@ export function useSidebarActions({
         addProject(project);
         setNewProjectName('');
         setNewProjectRootPath('');
+        setNewProjectAdditionalPaths?.([]);
         setShowNewProjectForm(false);
         setExpandedProjects(prev => new Set(prev).add(project.id));
         selectProject(project.id);
@@ -105,6 +116,7 @@ export function useSidebarActions({
           return;
         }
         console.error('Failed to create project:', error);
+        setNewProjectError?.(error instanceof Error ? error.message : 'Failed to create project');
       } finally {
         setCreatingProject(false);
       }
@@ -112,6 +124,7 @@ export function useSidebarActions({
     [
       newProjectName,
       newProjectRootPath,
+      newProjectAdditionalPaths,
       canReach,
       addProject,
       selectProject,
@@ -119,6 +132,8 @@ export function useSidebarActions({
       setExpandedProjects,
       setNewProjectName,
       setNewProjectRootPath,
+      setNewProjectAdditionalPaths,
+      setNewProjectError,
       setShowNewProjectForm,
       onAgentNotReady,
     ]

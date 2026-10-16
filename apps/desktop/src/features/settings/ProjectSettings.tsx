@@ -12,6 +12,11 @@ import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useOwnershipStore } from '../../stores/ownershipStore';
+import {
+  AdditionalDirectoriesField,
+  cleanAdditionalPaths,
+} from '../sidebar/AdditionalDirectoriesField';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';
@@ -61,6 +66,8 @@ interface ProjectSettingsProps {
 
 export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsProps) {
   const titleId = useId();
+  // Stable dependency for the form-reset effect: array identity changes on every store merge.
+  const additionalPathsKey = JSON.stringify(project?.additionalPaths ?? []);
   const activeServerId = useServerStore(s => s.activeServerId);
   const facadeConnectionState = useFacadeStore(s => s.connectionState);
   const facadeBackends = useFacadeStore(s => s.backends);
@@ -99,6 +106,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
   // Form state
   const [name, setName] = useState('');
   const [rootPath, setRootPath] = useState('');
+  const [additionalPaths, setAdditionalPaths] = useState<string[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [reviewLlmProfileId, setReviewProviderId] = useState<string>('');
   const [permissionWorkflowOverrideId, setPermissionWorkflowOverrideId] = useState<string>('');
@@ -155,6 +163,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
 
     setName(project.name);
     setRootPath(project.rootPath || '');
+    setAdditionalPaths(project.additionalPaths ?? []);
     setSelectedAgentId(project.defaultAgentProfileId || '');
     setReviewProviderId(project.reviewLlmProfileId || '');
     setPermissionWorkflowOverrideId(project.permissionWorkflowOverrideId || '');
@@ -172,6 +181,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
     project?.id,
     project?.name,
     project?.rootPath,
+    additionalPathsKey,
     project?.defaultAgentProfileId,
     project?.reviewLlmProfileId,
     project?.permissionWorkflowOverrideId,
@@ -254,6 +264,8 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
       const updates: Partial<Project> = {
         name: name.trim(),
         rootPath: rootPath.trim() || undefined,
+        // An empty list clears the saved directories on the server.
+        additionalPaths: rootPath.trim() ? cleanAdditionalPaths(additionalPaths) : [],
         // Empty selection sends `null` so the backend clears any existing
         // default (FK becomes NULL → falls back to global default).
         defaultAgentProfileId: selectedAgentId || null,
@@ -369,6 +381,14 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
               The directory where Claude will execute commands
             </p>
           </div>
+
+          {/* Additional Directories */}
+          <AdditionalDirectoriesField
+            value={additionalPaths}
+            onChange={setAdditionalPaths}
+            backendId={useOwnershipStore.getState().getProjectBackendId(project.id)}
+            rootPath={rootPath}
+          />
 
           {/* Default Agent */}
           <div>

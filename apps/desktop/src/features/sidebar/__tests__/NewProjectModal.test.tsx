@@ -18,6 +18,8 @@ const baseProps = {
   onNameChange: () => {},
   rootPath: '',
   onRootPathChange: () => {},
+  additionalPaths: [] as string[],
+  onAdditionalPathsChange: () => {},
   onCreate: () => {},
   creatingProject: false,
   isConnected: true,
@@ -129,5 +131,55 @@ describe('NewProjectModal', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables Add directory until a working directory is set', () => {
+    const { rerender } = render(
+      <NewProjectModal {...baseProps} backends={[backends[0]]} selectedBackendId="local" />
+    );
+    expect(screen.getByRole('button', { name: /Add directory/ })).toBeDisabled();
+    expect(screen.getByText(/Set a working directory first/)).toBeInTheDocument();
+    rerender(
+      <NewProjectModal
+        {...baseProps}
+        rootPath="/work/app"
+        backends={[backends[0]]}
+        selectedBackendId="local"
+      />
+    );
+    expect(screen.getByRole('button', { name: /Add directory/ })).toBeEnabled();
+  });
+
+  it('lists additional directories and reports edits and removals', () => {
+    const onAdditionalPathsChange = vi.fn();
+    render(
+      <NewProjectModal
+        {...baseProps}
+        rootPath="/work/app"
+        additionalPaths={['/work/lib', '/work/docs']}
+        onAdditionalPathsChange={onAdditionalPathsChange}
+        backends={[backends[0]]}
+        selectedBackendId="local"
+      />
+    );
+    expect(screen.getByLabelText('Additional directory 1')).toHaveValue('/work/lib');
+    fireEvent.change(screen.getByLabelText('Additional directory 2'), {
+      target: { value: '/work/other' },
+    });
+    expect(onAdditionalPathsChange).toHaveBeenLastCalledWith(['/work/lib', '/work/other']);
+    fireEvent.click(screen.getByLabelText('Remove additional directory 1'));
+    expect(onAdditionalPathsChange).toHaveBeenLastCalledWith(['/work/docs']);
+  });
+
+  it('shows a creation error', () => {
+    render(
+      <NewProjectModal
+        {...baseProps}
+        error="Additional directory must exist: /nope"
+        backends={[backends[0]]}
+        selectedBackendId="local"
+      />
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('must exist');
   });
 });

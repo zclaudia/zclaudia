@@ -21,6 +21,7 @@ export async function createProject(
     type?: 'chat_only' | 'code';
     llmProfileId?: string;
     rootPath?: string;
+    additionalPaths?: string[];
     defaultAgentProfileId?: string | null;
   },
   backendId?: string | null

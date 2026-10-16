@@ -10,6 +10,8 @@ export function useNewProjectForm(onlineBackends: BackendSnapshot[]) {
   const [showNewProjectForm, setShowNewProjectForm] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectRootPath, setNewProjectRootPath] = useState('');
+  const [newProjectAdditionalPaths, setNewProjectAdditionalPaths] = useState<string[]>([]);
+  const [newProjectError, setNewProjectError] = useState<string | null>(null);
   const [newProjectBackendId, setNewProjectBackendId] = useState<string | null>(null);
   const [creatingProject, setCreatingProject] = useState(false);
 
@@ -27,6 +29,10 @@ export function useNewProjectForm(onlineBackends: BackendSnapshot[]) {
     setName: setNewProjectName,
     rootPath: newProjectRootPath,
     setRootPath: setNewProjectRootPath,
+    additionalPaths: newProjectAdditionalPaths,
+    setAdditionalPaths: setNewProjectAdditionalPaths,
+    error: newProjectError,
+    setError: setNewProjectError,
     backendId: newProjectBackendId,
     setBackendId: setNewProjectBackendId,
     creating: creatingProject,
