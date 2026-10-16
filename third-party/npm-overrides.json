@@ -1,0 +1,126 @@
+[
+  {
+    "package": "@ast-grep/napi-darwin-arm64@0.43.0",
+    "file": "third-party/upstream/ast-grep-napi-0.43.0-LICENSE.txt",
+    "sha256": "81471889c77b2161a3e4dcdb1b2e6ca382e485766132d92d5fe1d7497e7dd2d9",
+    "source": "MIT LICENSE, https://raw.githubusercontent.com/ast-grep/ast-grep/master/LICENSE (default branch; fetched 2026-10-16; platform-binary tarball ships no license file)"
+  },
+  {
+    "package": "@aws-sdk/credential-provider-http@3.972.48",
+    "file": "third-party/upstream/aws-sdk-js-v3-LICENSE.txt",
+    "sha256": "edea91454b811f127fbdea3d86f378f6719bd372ed440abf82b232f6fca06c3d",
+    "source": "Apache-2.0 LICENSE, https://raw.githubusercontent.com/aws/aws-sdk-js-v3/main/LICENSE (monorepo root, default branch; fetched 2026-10-16; SDK tarballs ship no license file and upstream carries no NOTICE file)"
+  },
+  {
+    "package": "@aws-sdk/credential-provider-login@3.972.52",
+    "file": "third-party/upstream/aws-sdk-js-v3-LICENSE.txt",
+    "sha256": "edea91454b811f127fbdea3d86f378f6719bd372ed440abf82b232f6fca06c3d",
+    "source": "Apache-2.0 LICENSE, https://raw.githubusercontent.com/aws/aws-sdk-js-v3/main/LICENSE (monorepo root, default branch; fetched 2026-10-16; SDK tarballs ship no license file and upstream carries no NOTICE file)"
+  },
+  {
+    "package": "@aws-sdk/nested-clients@3.997.20",
+    "file": "third-party/upstream/aws-sdk-js-v3-LICENSE.txt",
+    "sha256": "edea91454b811f127fbdea3d86f378f6719bd372ed440abf82b232f6fca06c3d",
+    "source": "Apache-2.0 LICENSE, https://raw.githubusercontent.com/aws/aws-sdk-js-v3/main/LICENSE (monorepo root, default branch; fetched 2026-10-16; SDK tarballs ship no license file and upstream carries no NOTICE file)"
+  },
+  {
+    "package": "@cfworker/json-schema@4.1.1",
+    "file": "third-party/upstream/cfworker-json-schema-4.1.1-LICENSE.txt",
+    "sha256": "376944252ab78ca6b41aee44ddea8894927ee67891e77e61eb9d59af63e35094",
+    "source": "MIT LICENSE.md, https://raw.githubusercontent.com/cfworker/cfworker/master/LICENSE.md (monorepo root, default branch; fetched 2026-10-16; tarball ships no license file)"
+  },
+  {
+    "package": "boolbase@1.0.0",
+    "file": "third-party/upstream/boolbase-1.0.0-LICENSE.txt",
+    "sha256": "cdf4d87ae0a6c160227263bf4e39a0a10e30e89ae7256e0f7ac7bde0836552c6",
+    "source": "ISC LICENSE, https://raw.githubusercontent.com/fb55/boolbase/master/LICENSE (default branch; fetched 2026-10-16; tarball ships no license file)"
+  },
+  {
+    "package": "@earendil-works/pi-agent-core@0.84.1",
+    "file": "third-party/upstream/pi-0.84.1-LICENSE.txt",
+    "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48",
+    "source": "MIT LICENSE, https://raw.githubusercontent.com/earendil-works/pi/v0.84.1/LICENSE (monorepo root at tag v0.84.1; tarball ships no license file)"
+  },
+  {
+    "package": "@earendil-works/pi-ai@0.84.1",
+    "file": "third-party/upstream/pi-0.84.1-LICENSE.txt",
+    "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48",
+    "source": "MIT LICENSE, https://raw.githubusercontent.com/earendil-works/pi/v0.84.1/LICENSE (monorepo root at tag v0.84.1; tarball ships no license file)"
+  },
+  {
+    "package": "@earendil-works/pi-telemetry@0.84.1",
+    "file": "third-party/upstream/pi-0.84.1-LICENSE.txt",
+    "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48",
+    "source": "MIT LICENSE, https://raw.githubusercontent.com/earendil-works/pi/v0.84.1/LICENSE (monorepo root at tag v0.84.1; tarball ships no license file)"
+  },
+  {
+    "package": "@nodable/entities@2.2.0",
+    "file": "third-party/upstream/nodable-val-parsers-2.2.0-LICENSE.txt",
+    "sha256": "750cb3fb6362804957ef52caaf9b5c824015be44d494637330d7cd8834d31d40",
+    "source": "MIT LICENSE, https://raw.githubusercontent.com/nodable/val-parsers/main/LICENSE (default branch; fetched 2026-10-16; tarball ships no license file)"
+  },
+  {
+    "package": "@puppeteer/browsers@3.0.6",
+    "file": "third-party/upstream/puppeteer-25.3.0-LICENSE.txt",
+    "sha256": "a27ca07269b3518550b2e83aed13eadd7d14d924b5864e14889b40cf227530ca",
+    "source": "Apache-2.0 LICENSE, https://raw.githubusercontent.com/puppeteer/puppeteer/puppeteer-v25.3.0/LICENSE (release tag puppeteer-v25.3.0; tarball ships no license file)"
+  },
+  {
+    "package": "puppeteer-core@25.3.0",
+    "file": "third-party/upstream/puppeteer-25.3.0-LICENSE.txt",
+    "sha256": "a27ca07269b3518550b2e83aed13eadd7d14d924b5864e14889b40cf227530ca",
+    "source": "Apache-2.0 LICENSE, https://raw.githubusercontent.com/puppeteer/puppeteer/puppeteer-v25.3.0/LICENSE (release tag puppeteer-v25.3.0; tarball ships no license file)"
+  },
+  {
+    "package": "@tokenizer/token@0.3.0",
+    "file": "third-party/upstream/tokenizer-token-0.3.0-LICENSE.txt",
+    "sha256": "73af3f57f2b7aa24fa9523eebe12bd4bb8d3627a2a2d15ec4f5bff5f6f028ef6",
+    "source": "MIT licence section, https://raw.githubusercontent.com/Borewit/tokenizer-token/master/README.md (verbatim extract of the version's README; repo carries no standalone LICENSE file; fetched 2026-10-16)",
+    "evidenceKind": "publisher-metadata"
+  },
+  {
+    "package": "cookie-signature@1.0.7",
+    "file": "third-party/upstream/cookie-signature-1.0.7-LICENSE.txt",
+    "sha256": "0dd4e47333485760cf8c265db5a5e24ae8d7401064c6f2e19793ee81a5bef42f",
+    "source": "MIT LICENSE, https://raw.githubusercontent.com/visionmedia/node-cookie-signature/master/LICENSE (default branch; fetched 2026-10-16; tarball ships no license file)"
+  },
+  {
+    "package": "data-uri-to-buffer@4.0.1",
+    "license": "MIT",
+    "source": "npm package.json license field (MIT) and README licence section (Copyright (c) 2014 Nathan Rajlich) are the only version-pinned material; the upstream repository no longer carries a LICENSE file at any branch/tag (checked 2026-10-16)",
+    "acceptedMissingNotice": "original version-specific LICENSE file unavailable upstream; README licence section is shipped in the notices",
+    "evidenceKind": "publisher-metadata"
+  },
+  {
+    "package": "format@0.2.2",
+    "file": "third-party/upstream/format-0.2.2-LICENSE.txt",
+    "sha256": "0b2c94863590ca2aed327e89642b7e74b1608ec423bfec1d8f1beba2945fc4ba",
+    "source": "MIT License.md, https://raw.githubusercontent.com/samsonjs/format/main/License.md (default branch; fetched 2026-10-16; tarball ships no license file, package.json declares no license field)"
+  },
+  {
+    "package": "highlightjs-vue@1.0.0",
+    "file": "third-party/upstream/highlightjs-vue-1.0.0-LICENSE.txt",
+    "sha256": "e02de3f1cb136ad72488c7661392e88c5e8c3b7150297cf6fe8eb7851db54fc8",
+    "source": "LICENSE, https://raw.githubusercontent.com/highlightjs/highlightjs-vue/master/LICENSE (default branch; fetched 2026-10-16). Identifier discrepancy: npm metadata states CC0-1.0, the upstream LICENSE file is BSD-3-Clause; the actual text is attached and both are permissive",
+    "evidenceKind": "publisher-metadata"
+  },
+  {
+    "package": "omggif@1.0.10",
+    "file": "third-party/upstream/omggif-1.0.10-LICENSE.txt",
+    "sha256": "afb8fb0e1ca627e529175c2ac0f11bb6712e8f81d5f5962a56a55124f80aba5c",
+    "source": "MIT notice, verbatim extract of the README shipped in the omggif@1.0.10 tarball (repo carries no standalone LICENSE file)",
+    "evidenceKind": "publisher-metadata"
+  },
+  {
+    "package": "parse-bmfont-ascii@1.0.6",
+    "file": "third-party/upstream/parse-bmfont-ascii-1.0.6-LICENSE.txt",
+    "sha256": "59c38e93a395817bc9d674d868af7c062fcea8b37468af8b3f6f075133eb1756",
+    "source": "MIT LICENSE.md, https://raw.githubusercontent.com/mattdesl/parse-bmfont-ascii/master/LICENSE.md (default branch; fetched 2026-10-16; tarball ships no license file)"
+  },
+  {
+    "package": "xml-naming@0.1.0",
+    "file": "third-party/upstream/xml-naming-0.1.0-LICENSE.txt",
+    "sha256": "8e75fc0e776c62ccadb8178ece8d3daa9ba7601fb0a49b2dfb0ea9a7a5c0aa07",
+    "source": "MIT LICENSE, https://raw.githubusercontent.com/NaturalIntelligence/xml-naming/master/LICENSE (default branch; fetched 2026-10-16; tarball ships no license file)"
+  }
+]

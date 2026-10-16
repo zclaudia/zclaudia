@@ -1,0 +1,155 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // knip 配置（第一梯队任务 D）。原则：发现只记录不删除——存量问题全部登记在
+  // docs/reviews/2026-10-16-first-tier-implementation/knip-findings.md（按严重度分组），
+  // 并在下方 ignore 段挂账；人工清理后应同步删除对应 ignore 条目，让 knip 重新守卫该文件。
+  //
+  // 入口补充说明：
+  // - 根 workspace 的 scripts/** 与 e2e 配置均由 package.json scripts 经
+  //   bash scripts/with-project-node.sh / --config 传入非标准命名文件调用，
+  //   knip 的 script 解析器识别不到，故显式列为入口。
+  // - apps/desktop：vitest.*.config.ts 非标准命名；src/test/** 是 vitest setupFiles；
+  //   src/agent-playground/** 由 scripts/dev/agent-playground.mjs 按路径动态加载。
+  // - plugins/agents/*：probes/ 为手工调试探针；__tests__/fixtures/ 为按路径 spawn 的假进程。
+  //   各 agent 显式列出（claude 无 probes；cursor 才有 fixtures 假进程），新增 agent 时需补条目。
+  // - ignoreExportsUsedInFile：仅在定义文件内使用的导出不算死代码（ts noUnusedLocals 已覆盖），
+  //   开启后消掉约 580 项存量噪音。
+  // - "**/index.{ts,tsx}"：barrel 文件的未消费 re-export 是存量架构模式（300+ 项），
+  //   挂账见 knip-findings.md；清理 barrel 后删除此条可恢复逐项守卫。
+  // - ignoreDependencies/ignoreBinaries：运行期按字符串名 spawn 的二进制（LSP server、
+  //   平台专属 opener、测试用 CLI）与 native 构建工具链，静态分析不可见，非依赖可删的依据。
+  "tags": ["-lintignore"],
+  "ignoreExportsUsedInFile": true,
+  "ignoreBinaries": ["codex", "wsl.exe", "xdg-open"],
+  "ignoreUnresolved": ["../types.js"],
+  "ignoreDependencies": [
+    "node-gyp",
+    "node-pty",
+    "ws",
+    "pyright",
+    "typescript-language-server",
+    "memfs",
+    "@earendil-works/pi-ai"
+  ],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/**/*.{js,mjs,cjs}",
+        "e2e/**/*config*.{ts,mts}",
+        "e2e/tests/**/*.{spec,test}.{ts,tsx}",
+        "e2e/setup/**/*.ts"
+      ],
+      "ignore": ["e2e/fixtures/**"]
+    },
+    "apps/*": {
+      "entry": [
+        "vitest.*.config.ts",
+        "src/agent-playground/**/*.{ts,tsx}",
+        "src/test/**/*.{ts,tsx}"
+      ]
+    },
+    "server": {
+      "entry": ["scripts/**/*.{ts,mjs,js}", "test-*.mjs"]
+    },
+    "shared": {},
+    "packages/*": {},
+    "plugins/agents/claude": {},
+    "plugins/agents/codex": {
+      "entry": ["probes/**/*.{mjs,js}"]
+    },
+    "plugins/agents/cursor": {
+      "entry": ["probes/**/*.{mjs,js}", "src/__tests__/fixtures/**/*.{mjs,ts}"]
+    }
+  },
+  // ===== 以下为存量发现挂账（清理后逐条移除），明细见 knip-findings.md =====
+  "ignore": [
+    // barrel 文件的未消费 re-export（exports 311 项；含 3 个整体未被引用的 index.ts）
+    "**/index.{ts,tsx}",
+    // —— 整文件未被引用（dead file 候选，server 5 + desktop 2 + e2e 1）
+    "e2e/helpers/performance.ts",
+    "apps/desktop/src/features/chat/InvocableAutocomplete.tsx",
+    "apps/desktop/src/features/settings/ServerPickerDropdown.tsx",
+    "server/src/application/plugins/mcp-bridge.ts",
+    "server/src/application/plugins/worker-runner.ts",
+    "server/src/application/conversation/agent/delegation/review-parser.ts",
+    "e2e/helpers/ai-test-utils.ts", // 实际是 e2e/vitest.config.e2e.ts 的 setupFiles，knip 未关联，非死代码
+    // —— 未使用导出/类型：e2e
+    "e2e/helpers/setup.ts",
+    "e2e/helpers/connection-helper.ts",
+    "e2e/helpers/connection.ts",
+    "e2e/page-objects/PermissionPage.ts",
+    // —— 未使用导出/类型：desktop
+    "apps/desktop/src/stores/rightSidebarStore.ts",
+    "apps/desktop/src/stores/gatewayStore.ts",
+    "apps/desktop/src/stores/sessionsStore.ts",
+    "apps/desktop/src/stores/sendQueueStore.ts",
+    "apps/desktop/src/stores/invocableCatalogStore.ts",
+    "apps/desktop/src/stores/projectStore.ts",
+    "apps/desktop/src/stores/permissionStore.ts",
+    "apps/desktop/src/stores/runStore.ts",
+    "apps/desktop/src/stores/composerStore.ts",
+    "apps/desktop/src/services/api.ts",
+    "apps/desktop/src/services/api/agent-profiles.ts",
+    "apps/desktop/src/services/messageHandler.ts",
+    "apps/desktop/src/services/terminal/useTerminalController.ts",
+    "apps/desktop/src/features/workflows/api.ts",
+    "apps/desktop/src/features/meta-workflow/api.ts",
+    "apps/desktop/src/features/openspec/api.ts",
+    "apps/desktop/src/features/chat/api.ts",
+    "apps/desktop/src/features/chat/TranscriptCapabilities.tsx",
+    "apps/desktop/src/features/chat/clientActions.ts",
+    "apps/desktop/src/features/chat/tool-call/toolClassifiers.ts",
+    "apps/desktop/src/features/claudia/useClaudiaThreads.ts",
+    "apps/desktop/src/features/sidebar/types.ts",
+    "apps/desktop/src/features/automation/automation-types.tsx",
+    "apps/desktop/src/features/automation/useAutomationApi.ts",
+    "apps/desktop/src/hooks/useWslDiscovery.ts",
+    "apps/desktop/src/components/workspace/dragSplit.ts",
+    "apps/desktop/src/actions/projectWorkspaceActions.ts",
+    "apps/desktop/src/components/ui/typography.ts",
+    "apps/desktop/src/components/plugins/PluginPanelRenderer.tsx",
+    "apps/desktop/src/components/permission/PluginPermissionDialog.tsx",
+    // —— 未使用导出/类型：plugins
+    "plugins/agents/codex/src/tool-effects.ts",
+    "plugins/agents/codex/src/app-server-protocol.ts",
+    "plugins/agents/cursor/src/tool-effects.ts",
+    "plugins/agents/cursor/src/acp-runner.ts",
+    // —— 未使用导出/类型：server
+    "server/src/server.ts",
+    "server/src/utils/process-tree.ts",
+    "server/src/utils/provider-trace.ts",
+    "server/src/utils/agent-loop-runtime-types.ts",
+    "server/src/domains/llm-profiles/repository-registry.ts",
+    "server/src/domains/openspec/markdown/types.ts",
+    "server/src/domains/openspec/bootstrap-service.ts",
+    "server/src/domains/agent-loop/types.ts",
+    "server/src/domains/local-pr/types.ts",
+    "server/src/domains/agent-profiles/agent-profile-deletion-service.ts",
+    "server/src/domains/sessions/agent-readiness.ts",
+    "server/src/domains/executor/executor-port.ts",
+    "server/src/application/conversation/runtime/active-run-phase.ts",
+    "server/src/application/conversation/agent/ai-risk-analysis-adapter.ts",
+    "server/src/application/conversation/agent/permission-evaluator.ts",
+    "server/src/application/conversation/agent/permission-memory.ts",
+    "server/src/application/conversation/agent/delegation-evaluator.ts",
+    "server/src/application/invocations/router.ts",
+    "server/src/application/orchestration/agent-task-runner.ts",
+    "server/src/application/managed-runtimes/service.ts",
+    "server/src/interfaces/http/session-invocables.ts",
+    "server/src/interfaces/http/provider-capabilities.ts",
+    "server/src/infra/providers/types.ts",
+    "server/src/infra/providers/message-types.ts",
+    "server/src/infra/providers/codex-oauth.ts",
+    "server/src/infra/providers/pi-runtime/run-tools.ts",
+    "server/src/infra/providers/pi-runtime/models-registry.ts",
+    "server/src/infra/providers/pi-runtime/task-tools.ts",
+    "server/src/infra/providers/pi-runtime/invocations.ts",
+    "server/src/infra/providers/pi-runtime/tool-bridge.ts",
+    "server/src/infra/providers/pi-runtime/bash-guards.ts",
+    "server/src/infra/providers/pi-runtime/sandbox-network-memory.ts",
+    "server/src/infra/providers/pi-runtime/sandbox-execution/classifier.ts",
+    "server/src/infra/providers/pi-runtime/sandbox-execution/types.ts",
+    // —— 重复导出（同一符号两个导出名）
+    "shared/src/core/agent-profile.ts"
+  ]
+}

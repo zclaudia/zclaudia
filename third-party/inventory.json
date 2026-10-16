@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "reviewRequired": [
+    {
+      "id": "@anthropic-ai/claude-agent-sdk*",
+      "bucket": "review-proprietary",
+      "date": "2026-10-16",
+      "reason": "Anthropic 专有 Agent 运行时 SDK（含各平台二进制）：包内 LICENSE.md 声明 © Anthropic PBC 保留所有权利，使用受其 Legal Agreements（https://code.claude.com/docs/en/legal-and-compliance）约束。作为可选的 Claude Code 运行时适配层引入；不修改、不内嵌其源码，许可标识由 scripts/licenses.mjs MANUAL_LICENSE 人工核实。若未来随应用分发包体，需在发布前单独复核再分发条款。"
+    },
+    {
+      "id": "@img/sharp-libvips-*",
+      "bucket": "yellow-lgpl",
+      "date": "2026-10-16",
+      "reason": "sharp 的 libvips 平台二进制（LGPL-3.0-or-later）：sharp 仅是根 devDependency，用于构建期图标生成（scripts/assets/regenerate-icons.mjs），不在运行时生产图中；libvips 以独立、可替换的共享库随 sharp 分发，本仓库未静态链接或修改。"
+    },
+    {
+      "id": "lightningcss*",
+      "bucket": "yellow-weak",
+      "date": "2026-10-16",
+      "reason": "lightningcss 及平台二进制（MPL-2.0）：仅构建/测试工具链（vite、vitest）使用，不进入运行时生产图；MPL-2.0 的源码提供义务以文件级 copyleft 满足，不传染仓库其余代码。"
+    }
+  ],
+  "copiedComponents": []
+}
