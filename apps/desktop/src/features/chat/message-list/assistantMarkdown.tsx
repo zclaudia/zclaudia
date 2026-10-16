@@ -9,6 +9,20 @@ import {
 } from '../../../components/markdown/InlineMarkdownIcons';
 import type { FileRefContextValue } from './fileRefContext';
 
+// Heading typography rides the generated UI type scale (--font-ui-*, see
+// scripts/tokens/config.mjs): h1/h2 step up the scale, h3–h6 hold the base
+// size and separate by weight. `not-prose` opts each heading out of the
+// .prose.prose-sm :where(h*) fallbacks in styles/index.css so these classes
+// are the source of truth; the em margins keep the prose spacing rhythm.
+const headingClasses = {
+  h1: 'not-prose mt-[1.15em] mb-[0.45em] text-[length:var(--font-ui-xl)] font-semibold leading-snug',
+  h2: 'not-prose mt-[1.15em] mb-[0.45em] text-[length:var(--font-ui-lg)] font-semibold leading-snug',
+  h3: 'not-prose mt-[1.15em] mb-[0.45em] text-[length:var(--font-ui-base)] font-semibold leading-snug',
+  h4: 'not-prose mt-[1.15em] mb-[0.45em] text-[length:var(--font-ui-base)] font-semibold leading-snug',
+  h5: 'not-prose mt-[1.15em] mb-[0.45em] text-[length:var(--font-ui-base)] font-medium leading-snug',
+  h6: 'not-prose mt-[1.15em] mb-[0.45em] text-[length:var(--font-ui-base)] font-normal leading-snug',
+} as const;
+
 /**
  * ReactMarkdown `components` mapping for assistant messages. `fileRef` is the
  * FileRefContext value read by AssistantContent — it closes over the mapping's
@@ -82,49 +96,49 @@ export function createAssistantMarkdownComponents(fileRef: FileRefContextValue):
     },
     h1({ children }) {
       return (
-        <h1>
+        <h1 className={headingClasses.h1}>
           <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
         </h1>
       );
     },
     h2({ children }) {
       return (
-        <h2>
+        <h2 className={headingClasses.h2}>
           <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
         </h2>
       );
     },
     h3({ children }) {
       return (
-        <h3>
+        <h3 className={headingClasses.h3}>
           <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
         </h3>
       );
     },
     h4({ children }) {
       return (
-        <h4>
+        <h4 className={headingClasses.h4}>
           <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
         </h4>
       );
     },
     h5({ children }) {
       return (
-        <h5>
+        <h5 className={headingClasses.h5}>
           <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
         </h5>
       );
     },
     h6({ children }) {
       return (
-        <h6>
+        <h6 className={headingClasses.h6}>
           <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
         </h6>
       );
     },
     p({ children }) {
       return (
-        <p>
+        <p className="leading-relaxed">
           <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
         </p>
       );

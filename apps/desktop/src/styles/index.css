@@ -3,6 +3,16 @@
 @tailwind utilities;
 
 @layer base {
+  /* @generated:tokens font-scale — edit apps/desktop/scripts/tokens/config.mjs, run pnpm gen:tokens */
+  :root {
+    --font-ui-base: var(--chat-font-prose, 0.8125rem);
+    --font-ui-xl: calc(var(--font-ui-base) + 4px);
+    --font-ui-lg: calc(var(--font-ui-base) + 2px);
+    --font-ui-sm: calc(var(--font-ui-base) - 2px);
+    --font-ui-xs: calc(var(--font-ui-base) - 4px);
+  }
+  /* @generated:tokens font-scale end */
+
   /* Light theme (default) — warm paper */
   :root {
     /* @generated:tokens light — edit apps/desktop/scripts/tokens/config.mjs, run pnpm gen:tokens */

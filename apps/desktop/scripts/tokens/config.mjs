@@ -2,6 +2,17 @@
 // the surface ladder is sidebar < background < card (= popover) in all modes.
 // Regenerate CSS with: pnpm --filter @zclaudia/desktop run gen:tokens
 // Design rationale: docs/superpowers/specs/2026-07-02-warm-palette-retune-design.md
+//
+// UI type scale (--font-ui-*, theme-independent, emitted once into :root):
+// every tier derives from the single root variable --font-ui-base, which is
+// anchored to --chat-font-prose (the user's small/medium/large chat font
+// preset), so the whole scale follows the preset. Global scaling may only
+// ever change that root variable — never html font-size — and UI text must
+// not use bare px sizes. Markdown headings map h1 → xl, h2 → lg, h3–h6 →
+// base with weight steps (semibold/semibold/medium/normal); the mapping
+// lives in src/features/chat/message-list/assistantMarkdown.tsx. Scale
+// concept references ZCode's DESIGN.md typography rules (semantic text-ui-*
+// tiers driven by one root variable).
 
 // Symbols file-glyph palette — decorative file-type colors for
 // src/components/filesymbols/ only; deliberately separate from the status
@@ -186,6 +197,16 @@ function darkNeutrals(hue, sat, satText) {
     'terminal-fg': [hue, satText, 91],
   };
 }
+
+// Static UI type scale — values are raw CSS, not [h, s, l] triples, so
+// gen-tokens emits them verbatim into a dedicated :root block.
+export const fontScale = {
+  'font-ui-base': 'var(--chat-font-prose, 0.8125rem)', // 13px at the medium preset
+  'font-ui-xl': 'calc(var(--font-ui-base) + 4px)',
+  'font-ui-lg': 'calc(var(--font-ui-base) + 2px)',
+  'font-ui-sm': 'calc(var(--font-ui-base) - 2px)',
+  'font-ui-xs': 'calc(var(--font-ui-base) - 4px)',
+};
 
 export const themes = [
   {

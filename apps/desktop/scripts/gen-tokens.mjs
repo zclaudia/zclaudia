@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { themes } from './tokens/config.mjs';
+import { themes, fontScale } from './tokens/config.mjs';
 import { validateTheme, renderTokens } from './tokens/lib.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -19,6 +19,20 @@ if (errors.length > 0) {
 
 const current = readFileSync(cssPath, 'utf8');
 let next = current;
+
+// Static UI type scale — theme-independent, so it renders once into its own
+// :root block instead of into each theme block.
+const fontScaleRe =
+  /(\/\* @generated:tokens font-scale [^*]*\*\/)[\s\S]*?(\n\s*\/\* @generated:tokens font-scale end \*\/)/;
+if (!fontScaleRe.test(next)) {
+  console.error(`Marker block "font-scale" not found in ${cssPath}`);
+  process.exit(1);
+}
+const fontScaleCss = `  :root {\n${Object.entries(fontScale)
+  .map(([token, value]) => `    --${token}: ${value};`)
+  .join('\n')}\n  }`;
+next = next.replace(fontScaleRe, `$1\n${fontScaleCss}$2`);
+
 for (const theme of themes) {
   const re = new RegExp(
     `(/\\* @generated:tokens ${theme.name} [^*]*\\*/)[\\s\\S]*?(\\n\\s*/\\* @generated:tokens end \\*/)`
