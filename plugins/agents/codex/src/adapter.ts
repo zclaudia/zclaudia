@@ -240,6 +240,10 @@ export class CodexAgentAdapter implements ExternalAgentAdapter {
       model: context.model,
       thinkingLevel: context.thinkingLevel,
       mode: effectiveMode,
+      // Host extension: not declared by the pinned plugin-sdk run context.
+      additionalDirectories: (
+        context as ExternalAgentRunContext & { additionalDirectories?: string[] }
+      ).additionalDirectories,
       systemPrompt: context.systemPrompt,
       claudiaSessionId: context.claudiaSessionId,
       bridge: null,

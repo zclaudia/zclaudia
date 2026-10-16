@@ -247,4 +247,27 @@ describe('Claude model controls', () => {
       effort: 'high',
     });
   });
+  it('forwards the project additional directories to the SDK', async () => {
+    queryMock.mockReturnValueOnce(emptyStream());
+    const adapter = new ClaudeAgentAdapter(async () => null);
+    for await (const _event of adapter.run('hello', {
+      cwd: '/tmp',
+      additionalDirectories: ['/extra/a', '/extra/b'],
+    } as never)) {
+      /* drain */
+    }
+    expect(queryMock.mock.calls.at(-1)![0].options.additionalDirectories).toEqual([
+      '/extra/a',
+      '/extra/b',
+    ]);
+  });
+
+  it('leaves additionalDirectories unset when the project has none', async () => {
+    queryMock.mockReturnValueOnce(emptyStream());
+    const adapter = new ClaudeAgentAdapter(async () => null);
+    for await (const _event of adapter.run('hello', { cwd: '/tmp' })) {
+      /* drain */
+    }
+    expect(queryMock.mock.calls.at(-1)![0].options).not.toHaveProperty('additionalDirectories');
+  });
 });

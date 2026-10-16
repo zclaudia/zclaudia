@@ -19,6 +19,12 @@ import { buildClaudeCanUseTool } from './permissions.js';
 import type { ClaudeAgentRunOptions } from './runner.js';
 import { runClaudeAgent } from './runner.js';
 
+/**
+ * The host puts `additionalDirectories` on the run context object; the pinned
+ * plugin-sdk contract does not declare it yet.
+ */
+type ClaudeRunContext = ExternalAgentRunContext & { additionalDirectories?: string[] };
+
 type ClaudeMcpServers = NonNullable<ClaudeAgentRunOptions['mcpServers']>;
 type ClaudeThinkingOptions = Pick<ClaudeAgentRunOptions, 'thinking' | 'effort'>;
 
@@ -175,6 +181,7 @@ export class ClaudeAgentAdapter implements ExternalAgentAdapter {
       const thinkingOptions = toClaudeThinkingOptions(context.thinkingLevel);
       yield* runClaudeAgent(input, {
         cwd: context.cwd,
+        additionalDirectories: (context as ClaudeRunContext).additionalDirectories,
         sessionId: context.sessionId,
         env: context.env,
         cliPath: context.cliPath,

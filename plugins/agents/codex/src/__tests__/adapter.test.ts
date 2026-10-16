@@ -64,6 +64,22 @@ describe('CodexAgentAdapter', () => {
     );
   });
 
+  it('forwards the host additionalDirectories to the runner options', async () => {
+    const adapter = new CodexAgentAdapter(async () => null);
+    for await (const _ of adapter.run(
+      'hi',
+      { cwd: '/p', claudiaSessionId: 'sess', additionalDirectories: ['/extra/a'] } as never,
+      vi.fn()
+    )) {
+      /* drain */
+    }
+    expect(runCodexAppServerMock).toHaveBeenCalledWith(
+      'hi',
+      expect.objectContaining({ additionalDirectories: ['/extra/a'] }),
+      expect.any(Function)
+    );
+  });
+
   it('uses setSessionMode over context.mode for the next turn', async () => {
     const adapter = new CodexAgentAdapter(async () => null);
     adapter.setSessionMode('sess', 'plan');

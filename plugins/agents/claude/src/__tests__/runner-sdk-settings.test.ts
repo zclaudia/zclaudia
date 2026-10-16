@@ -81,4 +81,32 @@ describe('Claude SDK project settings and connection binding', () => {
     expect(close).toHaveBeenCalled();
     expect(abortController.signal.aborted).toBe(false);
   });
+
+  it('passes additionalDirectories to the SDK in SDK engine mode', async () => {
+    queryMock.mockImplementationOnce(() => ({
+      applyFlagSettings: vi.fn(async () => {}),
+      close: vi.fn(),
+      async *[Symbol.asyncIterator]() {
+        yield { type: 'result', subtype: 'success', result: 'done' };
+      },
+    }));
+    for await (const _ of runClaudeAgent('hi', {
+      cwd: '/project',
+      cliPath: '/bundled/claude',
+      additionalDirectories: ['/extra/a'],
+      engineExecution: {
+        engineMode: 'sdk',
+        executableSource: 'bundled-sdk',
+        configDirectory: '/isolated',
+      },
+      modelConnection: {
+        protocol: 'anthropic-messages',
+        baseUrl: 'https://bound.example',
+        apiKey: 'test-bound-key',
+      },
+    })) {
+      /* drain */
+    }
+    expect(queryMock.mock.calls.at(-1)![0].options.additionalDirectories).toEqual(['/extra/a']);
+  });
 });

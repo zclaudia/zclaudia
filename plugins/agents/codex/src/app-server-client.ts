@@ -126,6 +126,26 @@ export function enabledMcpServers(
     .map(([name]) => ({ name, status: 'enabled' }));
 }
 
+/**
+ * Thread params that make the project's additional directories writable.
+ * Codex (>= 0.154.0) accepts `sandbox` + `config.sandbox_workspace_write` on
+ * thread/start and thread/resume without experimentalApi. `network_access`
+ * must be restated: the per-thread config replaces the process-level
+ * `-c sandbox_workspace_write.network_access=true`, and loopback is needed for
+ * the push_file flow. Empty/absent list => no override (default sandbox).
+ */
+function writableRootsParams(
+  directories: readonly string[] | undefined
+): Pick<ClientRequestParams<'thread/start'>, 'sandbox' | 'config'> {
+  if (!directories || directories.length === 0) return {};
+  return {
+    sandbox: 'workspace-write',
+    config: {
+      sandbox_workspace_write: { writable_roots: [...directories], network_access: true },
+    },
+  };
+}
+
 export class CodexAppServerClient {
   private process: ChildProcess | null = null;
   private readonly children = new Set<ChildProcess>();
@@ -701,7 +721,13 @@ export class CodexAppServerClient {
 
   async startThread(
     cwd: string,
-    options?: { model?: string; modelProvider?: string; developerInstructions?: string }
+    options?: {
+      model?: string;
+      modelProvider?: string;
+      developerInstructions?: string;
+      /** Project additional directories made writable for this thread. */
+      additionalDirectories?: string[];
+    }
   ): Promise<string> {
     await this.ensureRunning();
     const params: ClientRequestParams<'thread/start'> = { cwd };
@@ -709,6 +735,7 @@ export class CodexAppServerClient {
     if (options?.modelProvider) params.modelProvider = options.modelProvider;
     if (options?.developerInstructions)
       params.developerInstructions = options.developerInstructions;
+    Object.assign(params, writableRootsParams(options?.additionalDirectories));
     const result = await this.sendRequest('thread/start', params);
     const threadId = result.thread?.id;
     if (!threadId) {
@@ -720,14 +747,23 @@ export class CodexAppServerClient {
 
   async resumeThread(
     threadId: string,
-    options?: { model?: string; modelProvider?: string; developerInstructions?: string }
+    options?: {
+      model?: string;
+      modelProvider?: string;
+      developerInstructions?: string;
+      /** Re-sent on every resume: Codex neither persists nor merges writable roots. */
+      additionalDirectories?: string[];
+      cwd?: string;
+    }
   ): Promise<void> {
     await this.ensureRunning();
     const params: ClientRequestParams<'thread/resume'> = { threadId };
+    if (options?.cwd) params.cwd = options.cwd;
     if (options?.model) params.model = options.model;
     if (options?.modelProvider) params.modelProvider = options.modelProvider;
     if (options?.developerInstructions)
       params.developerInstructions = options.developerInstructions;
+    Object.assign(params, writableRootsParams(options?.additionalDirectories));
     await this.sendRequest('thread/resume', params);
     debugLog(`[Codex AppServer] Thread resumed: ${threadId}`);
   }

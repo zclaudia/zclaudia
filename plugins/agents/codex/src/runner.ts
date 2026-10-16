@@ -40,6 +40,8 @@ export interface CodexRunOptions {
   model?: string;
   thinkingLevel?: import('@zclaudia/plugin-sdk/providers').ExternalAgentRunContext['thinkingLevel'];
   mode?: string;
+  /** Project additional directories: writable roots for the thread (never in plan mode). */
+  additionalDirectories?: string[];
   systemPrompt?: string;
   claudiaSessionId?: string;
   bridge?: ProviderToolBridgeEntry | null;
@@ -53,6 +55,20 @@ export interface CodexRunOptions {
    * runs with an UNKNOWN baseline, never a zero one.
    */
   usageBaseline?: { cumulative: TokenUsageBreakdown; nativeThreadId?: string } | null;
+}
+
+/**
+ * Thread sandbox arguments for the project's additional directories, as a
+ * spread-able tuple so a run without them keeps calling `startThread(cwd)` /
+ * `resumeThread(id)` exactly as before. Plan mode must stay non-writing, so it
+ * never gets extra roots.
+ */
+function threadRootsArgs(
+  options: CodexRunOptions,
+  extra: { cwd?: string } = {}
+): [] | [{ additionalDirectories: string[]; cwd?: string }] {
+  const dirs = options.mode === 'plan' ? [] : (options.additionalDirectories ?? []);
+  return dirs.length > 0 ? [{ additionalDirectories: [...dirs], ...extra }] : [];
 }
 
 function zeroTokenUsage(): TokenUsageBreakdown {
@@ -314,6 +330,7 @@ export async function* runCodexSdkTurn(
     // Host instructions map onto the engine's developer instructions instead
     // of being concatenated into the first user message.
     developerInstructions: options.systemPrompt,
+    ...(threadRootsArgs(options)[0] ?? {}),
   };
 
   let threadId: string;
@@ -321,7 +338,10 @@ export async function* runCodexSdkTurn(
   if (options.sessionId) {
     try {
       debugLog(`[Codex AppServer] SDK strict resume: ${options.sessionId}`);
-      await client.resumeThread(options.sessionId, threadOptions);
+      await client.resumeThread(options.sessionId, {
+        ...threadOptions,
+        ...(threadRootsArgs(options)[0] ? { cwd: options.cwd } : {}),
+      });
       threadId = options.sessionId;
       isResumed = true;
     } catch (err) {
@@ -438,24 +458,27 @@ export async function* runCodexAppServer(
     if (canResumeThreadInCwd(options.sessionId, options.cwd)) {
       try {
         debugLog(`[Codex AppServer] Resuming thread: ${options.sessionId}`);
-        await client.resumeThread(options.sessionId);
+        await client.resumeThread(
+          options.sessionId,
+          ...threadRootsArgs(options, { cwd: options.cwd })
+        );
         rememberThreadCwd(options.sessionId, options.cwd);
         threadId = options.sessionId;
         isResumed = true;
       } catch (err) {
         debugLog(`[Codex AppServer] WARN: Resume failed, starting fresh: ${err}`);
-        threadId = await client.startThread(options.cwd);
+        threadId = await client.startThread(options.cwd, ...threadRootsArgs(options));
         rememberThreadCwd(threadId, options.cwd);
       }
     } else {
       debugLog(
         `[Codex AppServer] Skipping resume for cwd-bound thread ${options.sessionId}; starting fresh in ${options.cwd}`
       );
-      threadId = await client.startThread(options.cwd);
+      threadId = await client.startThread(options.cwd, ...threadRootsArgs(options));
       rememberThreadCwd(threadId, options.cwd);
     }
   } else {
-    threadId = await client.startThread(options.cwd);
+    threadId = await client.startThread(options.cwd, ...threadRootsArgs(options));
     rememberThreadCwd(threadId, options.cwd);
   }
   debugLog(`[Codex AppServer] Using threadId: ${threadId}`);
@@ -523,7 +546,7 @@ export async function* runCodexAppServer(
         content: `[Session recovery: previous thread failed (${encounteredError}), starting fresh]`,
       };
 
-      const freshThreadId = await client.startThread(options.cwd);
+      const freshThreadId = await client.startThread(options.cwd, ...threadRootsArgs(options));
       rememberThreadCwd(freshThreadId, options.cwd);
       debugLog(`[Codex AppServer] Recovery: new threadId=${freshThreadId}`);
       activeThreadIds.delete(threadId);
