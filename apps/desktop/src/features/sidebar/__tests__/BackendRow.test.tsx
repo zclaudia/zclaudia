@@ -43,6 +43,16 @@ describe('BackendRow', () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
+  it('has no trailing chevron beside the + button', () => {
+    const { container } = render(
+      <BackendRow name="Local Server" online expanded onToggle={() => {}} onNewProject={() => {}}>
+        <div />
+      </BackendRow>
+    );
+    expect(screen.getByRole('button', { name: /Local Server/ }).querySelector('svg')).toBeNull();
+    expect(container.querySelectorAll('svg')).toHaveLength(1);
+  });
+
   it('calls onNewProject when the + button is clicked', () => {
     const onNewProject = vi.fn();
     render(

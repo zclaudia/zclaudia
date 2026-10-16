@@ -1,4 +1,4 @@
-import { ChevronRight, Plus, ArrowLeftRight } from 'lucide-react';
+import { Plus, ArrowLeftRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { backendStatusColor, backendStatusLabel, type BackendViewState } from './backendStatus';
 
@@ -54,19 +54,17 @@ export function BackendRow({
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
-          // The name span takes flex-1 so the trailing chevron parks against the
-          // action button at a fixed x rather than trailing the text — that is
-          // what keeps this chevron on the same column as the project row's.
-          // Mobile uses the 44px touch tier and pl-3, which lands the status dot
-          // on the drawer's x=20 rail (tree p-2 + 12).
+          // The whole row is the toggle target; there is deliberately no
+          // trailing chevron, which used to sit right beside "New project" and
+          // got mis-hit. Mobile uses the 44px touch tier and pl-3, which lands
+          // the status dot on the drawer's x=20 rail (tree p-2 + 12).
           className={
             isMobile
               ? 'flex min-w-0 flex-1 items-center gap-2.5 h-11 pl-3 pr-1 text-left'
               : 'flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-2 pr-1 text-left'
           }
         >
-          {/* Status dot leads (like the project row's folder icon); the expand
-              chevron trails at the right end, matching ProjectListItem. */}
+          {/* Status dot leads, like the project row's folder icon. */}
           <span
             className={`h-2 w-2 flex-shrink-0 rounded-full ${backendStatusColor(effectiveState)}`}
             title={statusLabel ?? 'Ready'}
@@ -92,11 +90,6 @@ export function BackendRow({
               {latencyMs}ms
             </span>
           )}
-          <ChevronRight
-            size={isMobile ? 16 : 14}
-            strokeWidth={1.75}
-            className={`flex-shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-90' : ''}`}
-          />
         </button>
         {onNewProject && (
           // Visible on touch; hover-revealed only from md: up.

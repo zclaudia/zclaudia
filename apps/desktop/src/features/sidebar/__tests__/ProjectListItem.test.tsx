@@ -85,6 +85,17 @@ describe('ProjectListItem', () => {
     expect(container.querySelector('svg')?.getAttribute('class')).toContain('w-3.5 h-3.5');
   });
 
+  it('puts New session before the project menu and has no trailing chevron on the toggle', () => {
+    const { container } = render(<ProjectListItem {...makeProps({ isExpanded: false })} />);
+    const buttons = Array.from(container.querySelectorAll('button')).map(b =>
+      b.getAttribute('aria-label')
+    );
+    expect(buttons.indexOf('New session')).toBeLessThan(buttons.indexOf('Project menu'));
+    // Only the folder glyph remains inside the toggle button.
+    expect(container.querySelector('button svg:nth-of-type(2)')).toBeNull();
+    expect(container.querySelectorAll('button')[0].querySelectorAll('svg')).toHaveLength(1);
+  });
+
   describe('worktree flattening', () => {
     const rootSession = {
       ...mockSession,

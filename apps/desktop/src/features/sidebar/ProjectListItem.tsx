@@ -2,7 +2,6 @@ import { createPortal } from 'react-dom';
 import {
   Folder,
   FolderOpen,
-  ChevronDown,
   ChevronRight,
   MoreVertical,
   Plus,
@@ -237,16 +236,17 @@ export function ProjectListItem({
 
   return (
     <>
-      <div className="flex items-center group relative">
+      <div className="flex items-center gap-0.5 group relative">
         <button onClick={onToggle} className={projectButtonClass}>
           {isExpanded ? (
             <FolderOpen className={`${glyphClass} text-muted-foreground`} strokeWidth={1.75} />
           ) : (
             <Folder className={`${glyphClass} text-muted-foreground`} strokeWidth={1.75} />
           )}
-          {/* flex-1 (not just min-w-0) so the chevron parks against the menu
-              button at a fixed x instead of trailing the truncated name — that
-              is what puts it on the same column as BackendRow's chevron. */}
+          {/* The open/closed folder glyph is the only expand cue — a trailing
+              chevron put the toggle's edge right next to the action buttons,
+              and expanding mis-hit "New session". flex-1 lets the whole row
+              (name included) stay one big toggle target. */}
           <span
             className={`min-w-0 flex-1 truncate text-foreground ${
               isMobile ? 'text-sm font-medium' : 'text-xs font-medium'
@@ -254,11 +254,6 @@ export function ProjectListItem({
           >
             {project.name}
           </span>
-          {isExpanded ? (
-            <ChevronDown className={`${glyphClass} text-muted-foreground`} strokeWidth={1.75} />
-          ) : (
-            <ChevronRight className={`${glyphClass} text-muted-foreground`} strokeWidth={1.75} />
-          )}
         </button>
         {/* Supervisor phase — shown at rest, yields to the hover actions */}
         {phaseDot && (
@@ -270,15 +265,9 @@ export function ProjectListItem({
             <span className="text-[10px] text-muted-foreground/60">{phaseDot.label}</span>
           </span>
         )}
-        {/* Project menu button */}
-        <button
-          onClick={e => onOpenContextMenu(e, 'project', project.id)}
-          className={menuButtonClass}
-          aria-label="Project menu"
-        >
-          <MoreVertical className={`${glyphClass} text-muted-foreground`} strokeWidth={1.75} />
-        </button>
-        {/* New session — placed last, same "+" affordance as New project. */}
+        {/* New session first, then the overflow menu at the outer edge: the
+            frequent action sits next to the row's toggle target, and the menu
+            keeps the conventional last slot. */}
         <button
           onClick={() => onStartCreatingSession()}
           disabled={!isConnected}
@@ -287,6 +276,13 @@ export function ProjectListItem({
           aria-label="New session"
         >
           <Plus className={`${glyphClass} text-muted-foreground`} strokeWidth={2} />
+        </button>
+        <button
+          onClick={e => onOpenContextMenu(e, 'project', project.id)}
+          className={menuButtonClass}
+          aria-label="Project menu"
+        >
+          <MoreVertical className={`${glyphClass} text-muted-foreground`} strokeWidth={1.75} />
         </button>
 
         {/* Project context menu */}
