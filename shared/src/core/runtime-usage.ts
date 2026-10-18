@@ -1,4 +1,4 @@
-// Runtime token usage accounting contract (design: docs/specs/2026-09-16-runtime-token-usage-design.md).
+// Runtime token usage accounting contract (design: docs/archive/specs/2026-09-16-runtime-token-usage-design.md).
 //
 // The contract types are canonical in @zclaudia/plugin-sdk/usage so runtime
 // plugins and the host share one declaration; this module re-exports them and

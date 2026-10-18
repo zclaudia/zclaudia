@@ -1,7 +1,7 @@
 # Cursor ACP P0 probe assets
 
 Audit assets for the Cursor runtime ACP migration
-(`docs/plans/2026-09-12-cursor-acp-migration.md`). These files are **not** part
+(`docs/archive/plans/2026-09-12-cursor-acp-migration.md`). These files are **not** part
 of the production plugin package — the directory is excluded from the build and
 from builtin staging.
 

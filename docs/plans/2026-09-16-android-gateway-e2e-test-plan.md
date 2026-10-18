@@ -55,7 +55,7 @@ Backend 可以运行在本机或远程主机，但 APK 的业务请求必须经�
 - `push_file` 经 session 绑定的 MCP 工具桥注入；默认额外系统提示词已移除。需要新建会话，避免旧历史影响。见 [native-agent-context](../native-agent-context.md)。
 - 当前 [文件服务](../../server/src/infra/services/file-transfer-service.ts) 对图片自动下载，对非图片仅在 **小于 500 × 1024 字节**时自动下载；Android 保存涉及 MediaStore 和 FileProvider。打开方法立即返回的成功值不等于外部查看器已打开。
 - 系统通知涉及远程 ntfy、设备接收桥、Android 权限和会话跳转，不能用 ADB 人工广播替代真实送达。
-- 既有 [移动 UI 问题记录](../mobile-ui-findings.md) 和 [Profile 编辑器记录](../mobile-profile-editor-findings.md) 来自浏览器移动视口，适合选取回归点，不能证明 APK 已通过。
+- 既有 [移动 UI 问题记录](../reviews/2026-08-06-mobile-ui-findings.md) 和 [Profile 编辑器记录](../reviews/2026-08-07-mobile-profile-editor-findings.md) 来自浏览器移动视口，适合选取回归点，不能证明 APK 已通过。
 
 ## 3. 执行方式
 

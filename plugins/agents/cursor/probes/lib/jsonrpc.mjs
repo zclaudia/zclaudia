@@ -4,7 +4,7 @@
 // to pin down what `cursor-agent acp` actually does on the wire, independent of
 // any SDK framing or reconnection behavior. Re-run these whenever the Cursor CLI
 // is upgraded and write the observed results back to
-// docs/plans/2026-09-12-cursor-acp-migration.md §2.
+// docs/archive/plans/2026-09-12-cursor-acp-migration.md §2.
 import { spawn } from 'node:child_process';
 
 /** Probe-internal timeout error. */

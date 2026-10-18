@@ -1,5 +1,5 @@
 // P0 probe 1/7 — initialize handshake and capability surface.
-// Reproduces docs/plans/2026-09-12-cursor-acp-migration.md §2.1.
+// Reproduces docs/archive/plans/2026-09-12-cursor-acp-migration.md §2.1.
 //
 // Usage: node probes/probe-initialize.mjs [--out probes/fixtures/initialize.json]
 // Safe to run logged out: initialize does not touch the network session.

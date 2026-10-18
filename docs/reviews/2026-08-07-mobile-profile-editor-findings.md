@@ -45,7 +45,7 @@ The agent profile editor hits the same wall once the `Saved` chip appears
 The `⋯` menu opens and lists "Set as default provider" / "Delete provider".
 Desktop still fits on one line (`scrollWidth === clientWidth`, height unchanged).
 
-> Note: this is the same defect logged as Q3 in `docs/mobile-ui-findings.md` and
+> Note: this is the same defect logged as Q3 in `docs/reviews/2026-08-06-mobile-ui-findings.md` and
 > marked fixed in `ff22ada2`. Adding `flex-wrap` there moved the overflow from the
 > first line to the second; it did not remove it. Q3 should be reopened.
 

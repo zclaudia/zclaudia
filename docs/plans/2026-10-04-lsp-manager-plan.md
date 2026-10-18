@@ -1,6 +1,6 @@
 # LanguageServerManager 实施计划
 
-> 取代 [2026-09-23-tool-set-alignment-plan.md](2026-09-23-tool-set-alignment-plan.md) Task 9 的「后续」项。步骤用 `- [ ]` 跟踪。
+> 取代 [2026-09-23-tool-set-alignment-plan.md](../archive/plans/2026-09-23-tool-set-alignment-plan.md) Task 9 的「后续」项。步骤用 `- [ ]` 跟踪。
 
 **Goal:** 给 Pi runtime 接上真实语言服务器：先让 agent 改完代码立刻看到自己引入的编译错误（P0），再打开 LSPTool 做语义查询（P1），最后扩到更多语言并提供状态可见性（P2）。
 

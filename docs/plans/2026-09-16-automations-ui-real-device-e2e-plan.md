@@ -246,4 +246,4 @@ API / fixture 仅用于准备数据、制造隔离故障和读取独立证据。
 - [Automation service：范围与系统项限制](../../server/src/domains/automations/service.ts)
 - [Automation HTTP：请求校验与运行记录](../../server/src/interfaces/http/automations.ts)
 - [已有组件测试](../../apps/desktop/src/features/automation/__tests__/AutomationsTab.test.tsx)、[现有 Playwright 配置](../../playwright.config.ts)
-- [历史移动 UI 问题](../mobile-ui-findings.md)：作为回归线索，不代表当前实际应用状态。
+- [历史移动 UI 问题](../reviews/2026-08-06-mobile-ui-findings.md)：作为回归线索，不代表当前实际应用状态。

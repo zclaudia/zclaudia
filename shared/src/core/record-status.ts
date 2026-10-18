@@ -4,7 +4,7 @@
  * intrinsic completeness and extrinsic availability — plus an optional user
  * disable toggle, collapsed to a single priority-ordered display chip.
  *
- * See docs/specs/2026-07-15-unified-record-status-design.md.
+ * See docs/archive/specs/2026-07-15-unified-record-status-design.md.
  */
 
 /** Why a complete record is not currently usable (a dependency/precondition failed). */

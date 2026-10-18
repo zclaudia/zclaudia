@@ -17,5 +17,5 @@
     "probe-plan-mode.mjs (§2.7)",
     "probe-cancel.mjs (§2.8)"
   ],
-  "policy": "Re-run every probe after each Cursor CLI upgrade and write the results back to docs/plans/2026-09-12-cursor-acp-migration.md §2 before changing ACP behavior."
+  "policy": "Re-run every probe after each Cursor CLI upgrade and write the results back to docs/archive/plans/2026-09-12-cursor-acp-migration.md §2 before changing ACP behavior."
 }

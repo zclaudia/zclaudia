@@ -21,7 +21,7 @@ import { buildClaudeSdkEnvironment } from '../sdk-environment.js';
 import type { ProviderRuntimeEvent } from '@zclaudia/plugin-sdk/providers';
 
 /**
- * P0 local-engine probe (design: docs/plans/2026-09-11-claude-dual-mode-runtime-design.md §12).
+ * P0 local-engine probe (design: docs/archive/plans/2026-09-11-claude-dual-mode-runtime-design.md §12).
  *
  * Drives the APP-BUNDLED Claude Code engine binary through the real plugin
  * runner (SDK mode) against a local Anthropic Messages HTTP fixture — no

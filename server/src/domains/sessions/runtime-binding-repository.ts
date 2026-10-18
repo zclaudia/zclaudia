@@ -3,8 +3,8 @@ import type Database from 'better-sqlite3';
 
 /**
  * Per-session runtime binding (design:
- * docs/plans/2026-09-11-claude-dual-mode-runtime-design.md §7,
- * docs/plans/2026-09-11-codex-dual-mode-runtime-design.md §7.2).
+ * docs/archive/plans/2026-09-11-claude-dual-mode-runtime-design.md §7,
+ * docs/archive/plans/2026-09-11-codex-dual-mode-runtime-design.md §7.2).
  *
  * The binding is the immutable run identity a session was started with: engine
  * mode, model, the bound LLM profile (canonical FK column — never duplicated

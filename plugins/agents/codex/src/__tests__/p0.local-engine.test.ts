@@ -16,7 +16,7 @@ import type { PermissionCallback, ProviderRuntimeEvent } from '@zclaudia/plugin-
 
 /**
  * P0 local-engine probe for the Codex runtime (design:
- * docs/plans/2026-09-11-codex-dual-mode-runtime-design.md §11).
+ * docs/archive/plans/2026-09-11-codex-dual-mode-runtime-design.md §11).
  *
  * Drives the REAL `codex app-server` binary through the plugin's real client,
  * config writers and environment builder against a local OpenAI Responses

@@ -1,8 +1,8 @@
 import type { Migration } from './types.js';
 
 /**
- * Dual-mode runtimes (design: docs/plans/2026-09-11-claude-dual-mode-runtime-design.md,
- * docs/plans/2026-09-11-codex-dual-mode-runtime-design.md).
+ * Dual-mode runtimes (design: docs/archive/plans/2026-09-11-claude-dual-mode-runtime-design.md,
+ * docs/archive/plans/2026-09-11-codex-dual-mode-runtime-design.md).
  *
  * One transactional migration introduces:
  * 1. `agent_profiles.engine_mode` — nullable; NULL means "unset" and is

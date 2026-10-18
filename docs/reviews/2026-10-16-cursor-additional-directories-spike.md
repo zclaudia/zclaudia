@@ -21,7 +21,7 @@ cannot be auto-approved per root (see caveats).
 | ACP `session/new` with `additionalDirectories: [B]` | Accepted without error (response keys `sessionId, modes, models, configOptions`), **silently ignored**: behaviour is identical to the run without the field (§2). Do not rely on it. |
 | Legacy `-p --output-format stream-json` + `--add-dir B` (the rollback transport in `runner.ts`) | Probed once per variant, `--trust --auto-review` (auto-review reported "unavailable… Falling back to Allowlist"): the edit tool to `B/written.txt` was `rejected` both with and without `--add-dir`; no file written either way. Headless has no approval path, so the flag did not unlock writes in this probe. Legacy is a gated rollback transport (`ZCLAUDIA_CURSOR_TRANSPORT=stream-json`); treat as `none`. |
 
-Existing probe assets (`plugins/agents/cursor/probes/`, `docs/plans/2026-09-12-cursor-acp-migration.md` §2)
+Existing probe assets (`plugins/agents/cursor/probes/`, `docs/archive/plans/2026-09-12-cursor-acp-migration.md` §2)
 never covered extra roots; this spike is new ground. The plugin sends `newSession({ cwd, mcpServers })` /
 `loadSession({ sessionId, cwd, mcpServers })` only (`acp-runner.ts:182-215`).
 

@@ -47,7 +47,7 @@ SDK 模式仍使用 Claude Code 引擎。它提供应用控制的模型连接和
 | `scripts/plugins/portable-dependencies.mjs`                          | 明确排除 SDK optional 平台执行文件                                 | 必须增加目标平台资源交付，不能只删除 runner 的路径检查     |
 | `sessions.sdk_session_id`                                            | 只存供应商会话 ID                                                  | 增加会话运行绑定，避免 Profile 修改后错误 resume           |
 
-现有 Managed Agent CLI 服务已经能安装/选择执行文件，但继承外部身份。它属于 CLI 模式。SDK 模式可以复用其文件校验、资源信息和引用管理思想，不复用其“已登录外部 CLI 才可用”的认证判断。现有机制详见 [Managed Agent CLI 文档](../managed-runtimes.md)。
+现有 Managed Agent CLI 服务已经能安装/选择执行文件，但继承外部身份。它属于 CLI 模式。SDK 模式可以复用其文件校验、资源信息和引用管理思想，不复用其“已登录外部 CLI 才可用”的认证判断。现有机制详见 [Managed Agent CLI 文档](../../managed-runtimes.md)。
 
 ## 3. 用户体验
 

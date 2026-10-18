@@ -3,7 +3,7 @@
  * (no domain config types) so the module stays dependency-free and reusable by
  * both server (from rows) and desktop (from DTOs).
  *
- * See docs/specs/2026-07-15-unified-record-status-design.md.
+ * See docs/archive/specs/2026-07-15-unified-record-status-design.md.
  */
 import type { RecordStatus, RecordCompleteness, RecordAvailability } from './record-status.js';
 import type { McpServerStatusState } from './mcp.js';

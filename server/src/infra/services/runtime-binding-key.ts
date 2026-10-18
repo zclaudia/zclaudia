@@ -5,7 +5,7 @@ import { resolveDataDir } from '../../utils/data-dir.js';
 
 /**
  * Independent HMAC key for session runtime-binding integrity (design:
- * docs/plans/2026-09-11-claude-dual-mode-runtime-design.md §7.1).
+ * docs/archive/plans/2026-09-11-claude-dual-mode-runtime-design.md §7.1).
  *
  * This deliberately does NOT reuse `mcp-oauth-credential-protector.ts`: not its
  * key material, not its env variable, and critically not its read-failure

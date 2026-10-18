@@ -111,6 +111,7 @@ through **Development directories** instead.
 
 Additional architecture notes:
 
+- [Documentation index](docs/README.md)
 - [Runtime Event Model](docs/runtime-events.md)
 - [Plugin Package Installation](docs/plugin-packages.md)
 - [Managed Agent CLI Runtimes](docs/managed-runtimes.md)

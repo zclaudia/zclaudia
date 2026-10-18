@@ -2,7 +2,7 @@ import type { Migration } from './types.js';
 
 /**
  * Runtime token usage ledger (design:
- * docs/specs/2026-09-16-runtime-token-usage-design.md §6).
+ * docs/archive/specs/2026-09-16-runtime-token-usage-design.md §6).
  *
  * One updatable row per invocation — the accounting unit for a single actual
  * runtime call (host dispatch → terminal settlement). Message

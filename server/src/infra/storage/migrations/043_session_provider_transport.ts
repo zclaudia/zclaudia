@@ -1,7 +1,7 @@
 import type { Migration } from './types.js';
 
 /**
- * Cursor transport binding (design: docs/plans/2026-09-12-cursor-acp-migration.md §14).
+ * Cursor transport binding (design: docs/archive/plans/2026-09-12-cursor-acp-migration.md §14).
  *
  * `sessions.provider_transport` records how a provider session is resumed:
  * `cursor-stream-json-v1` for legacy CLI sessions, `cursor-acp-v1` for ACP
