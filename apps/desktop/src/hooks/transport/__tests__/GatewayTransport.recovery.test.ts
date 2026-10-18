@@ -99,6 +99,55 @@ afterEach(() => {
 });
 
 describe('GatewayTransport recovery', () => {
+  it('sends a subscribe requested mid-reconnect once the new control socket is ready', () => {
+    const oldControl = MockWebSocket.instances[0];
+    transport.forceReconnect();
+    oldControl.finishClose();
+    const newControl = MockWebSocket.instances[1];
+    newControl.readyState = MockWebSocket.CONNECTING;
+
+    // The facade re-opens the backend while the new socket is still dialing.
+    transport.subscribe('a');
+    expect(frames(newControl)).toHaveLength(0);
+
+    newControl.readyState = MockWebSocket.OPEN;
+    ready(newControl);
+
+    expect(frames(newControl).filter(frame => frame.type === 'topic_subscribe')).toEqual([
+      { type: 'topic_subscribe', backendId: 'a', topic: 'resources' },
+    ]);
+  });
+
+  it('does not send a queued subscribe twice when the backend is re-opened on ready', () => {
+    const oldControl = MockWebSocket.instances[0];
+    transport.forceReconnect();
+    oldControl.finishClose();
+    const newControl = MockWebSocket.instances[1];
+    newControl.readyState = MockWebSocket.CONNECTING;
+    transport.subscribe('a');
+
+    newControl.readyState = MockWebSocket.OPEN;
+    config.onRegistryChanged.mockImplementationOnce(() => transport.subscribe('a'));
+    ready(newControl);
+
+    expect(frames(newControl).filter(frame => frame.type === 'topic_subscribe')).toHaveLength(1);
+  });
+
+  it('drops a queued subscribe when the backend is unsubscribed before the socket is ready', () => {
+    const oldControl = MockWebSocket.instances[0];
+    transport.forceReconnect();
+    oldControl.finishClose();
+    const newControl = MockWebSocket.instances[1];
+    newControl.readyState = MockWebSocket.CONNECTING;
+    transport.subscribe('a');
+    transport.unsubscribe('a');
+
+    newControl.readyState = MockWebSocket.OPEN;
+    ready(newControl);
+
+    expect(frames(newControl).filter(frame => frame.type === 'topic_subscribe')).toHaveLength(0);
+  });
+
   it('clears active channels before an asynchronously closing control socket can interfere', () => {
     const oldControl = MockWebSocket.instances[0];
     subscribed(oldControl, 'a');

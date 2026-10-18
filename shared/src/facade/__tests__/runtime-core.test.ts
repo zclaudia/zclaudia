@@ -204,6 +204,37 @@ describe('BackendFacadeRuntimeCore', () => {
       expect(events.some(e => e.type === 'backend_data_snapshot')).toBe(true);
     });
 
+    it('re-subscribes a backend whose subscribe was in flight when the connection dropped', () => {
+      emit({ type: 'connection_state_changed', state: 'connected' });
+      core.openBackend('b1');
+      // topic_subscribed never arrives: the transport drops before the ack, so it
+      // has nothing in subscribedBackends and emits no backend_unsubscribed.
+      emit({ type: 'connection_state_changed', state: 'reconnecting' });
+      emit({ type: 'connection_state_changed', state: 'connected' });
+
+      commandLog.length = 0;
+      emit({
+        type: 'registry_snapshot_received',
+        items: [makePresence({ backendId: 'b1', epoch: 1 })],
+      });
+
+      expect(commandLog.map(c => c.method)).toEqual(['backend.subscribe']);
+      expect(commandLog[0].args).toEqual(['b1']);
+    });
+
+    it('leaves a subscribing backend alone while the connection stays up', () => {
+      emit({ type: 'connection_state_changed', state: 'connected' });
+      core.openBackend('b1');
+
+      commandLog.length = 0;
+      emit({
+        type: 'registry_snapshot_received',
+        items: [makePresence({ backendId: 'b1', epoch: 1 })],
+      });
+
+      expect(commandLog).toHaveLength(0);
+    });
+
     it('closeBackend sends unsubscribe command and resets state', () => {
       core.openBackend('b1');
       emit({

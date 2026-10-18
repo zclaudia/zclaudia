@@ -109,6 +109,13 @@ export class GatewayTransport {
   /** Set of backendIds we are currently subscribed to. */
   subscribedBackends = new Set<string>();
 
+  /**
+   * Backends asked for while the control socket wasn't ready (mid-reconnect).
+   * The facade marks a backend 'subscribing' as soon as it asks, so a request
+   * dropped here would leave it stuck there; flushed on peer_ready instead.
+   */
+  private pendingSubscribes = new Set<string>();
+
   // --- Protocol v4 message channels (per-backend dedicated pipe) ---
   /** backendId → open data socket. Targeted messages prefer this pipe. */
   private messageChannels = new Map<string, { channelId: string; ws: WebSocket }>();
@@ -177,6 +184,7 @@ export class GatewayTransport {
 
   disconnect(): void {
     this.intentionalClose = true;
+    this.pendingSubscribes.clear();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -198,6 +206,11 @@ export class GatewayTransport {
   // --- Backend Subscription (v4: resources topic + message channel) ---
   subscribe(backendId: string): void {
     if (this.subscribedBackends.has(backendId)) return;
+    if (!this.isConnected()) {
+      this.pendingSubscribes.add(backendId);
+      return;
+    }
+    this.pendingSubscribes.delete(backendId);
     if (!this.isV4Backend(backendId)) {
       console.warn(
         '[GatewayTransport] Backend does not speak protocol v4, cannot subscribe:',
@@ -209,6 +222,7 @@ export class GatewayTransport {
   }
 
   unsubscribe(backendId: string): void {
+    this.pendingSubscribes.delete(backendId);
     this.send({ type: 'topic_unsubscribe', backendId, topic: RESOURCES_TOPIC });
     this.closeMessageChannel(backendId);
   }
@@ -458,6 +472,7 @@ export class GatewayTransport {
     this.peerSessionId = msg.peerSessionId;
     this.recoveryToken = msg.recoveryToken;
     this.applyRegistrySync(msg.registrySync);
+    for (const backendId of [...this.pendingSubscribes]) this.subscribe(backendId);
     this.config.onConnected(msg.peerSessionId, msg.recoveryToken);
   }
 

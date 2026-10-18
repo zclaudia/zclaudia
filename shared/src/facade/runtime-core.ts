@@ -334,11 +334,27 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
     const newState = event.state as BackendConnectionState;
     if (this.connectionState === newState) return; // Skip if unchanged
     this.connectionState = newState;
+    if (newState !== 'connected') this.resetInFlightSubscriptions();
     this.emitFacadeEvent({
       type: 'connection_state_changed',
       state: this.connectionState,
       error: event.error,
     });
+  }
+
+  /**
+   * A subscribe sent on a connection that then dropped is never acknowledged, and
+   * the transport only reports `backend_unsubscribed` for backends it had already
+   * seen acknowledged. Without this reset the backend stays 'subscribing' forever
+   * and `reopenDesiredBackends` skips it, so nothing can be sent to it.
+   */
+  private resetInFlightSubscriptions(): void {
+    for (const backend of this.registryStore.getAllBackends()) {
+      if (backend.openState !== 'subscribing') continue;
+      this.emitBackendDiffs(
+        this.registryStore.markUnsubscribed(backend.backendId, 'transport_disconnected')
+      );
+    }
   }
 
   // --------------------------------------------------------------------------
