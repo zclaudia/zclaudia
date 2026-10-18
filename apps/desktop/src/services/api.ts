@@ -38,5 +38,6 @@ export * from './api/provider-diagnostics';
 export * from './api/context-usage';
 export * from './api/language-servers';
 export * from './api/web-search';
+export * from './api/auto-title';
 export * from './api/context-graph';
 export * from './api/usage-stats';

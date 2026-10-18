@@ -23,6 +23,14 @@ export interface Session {
   autoTitle?: string;
   /** User-message count at the moment `autoTitle` was last generated. */
   autoTitleMsgCount?: number;
+  /** Transient wire-only flag: a title generation is currently in flight.
+   *  Broadcast via `sessions_updated`, never persisted — a fresh DB read or
+   *  full sync yields sessions without it. */
+  autoTitlePending?: boolean;
+  /** Transient wire-only reason why the last title generation failed, set on
+   *  the closing `sessions_updated` broadcast. Cleared by any later broadcast
+   *  built from a persisted row. */
+  autoTitleError?: string;
   /** FK to agent_profiles.id (NOT NULL on the server schema). Optional in the
    *  shared type to accommodate sync payloads that omit it; populated by the
    *  server before any session can be persisted. */

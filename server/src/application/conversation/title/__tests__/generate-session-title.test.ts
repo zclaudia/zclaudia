@@ -71,6 +71,22 @@ describe('generateSessionTitle', () => {
     expect(vi.mocked(completeSimple)).toHaveBeenCalledTimes(1);
   });
 
+  it('returns null when the completion resolves with a provider error', async () => {
+    // completeSimple resolves (does not throw) provider failures with
+    // stopReason 'error'; the failure text must not become a title.
+    vi.mocked(completeSimple).mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'upstream error: rate limited' }],
+      stopReason: 'error',
+    } as never);
+    const title = await generateSessionTitle({
+      db: {} as never,
+      sessionId: 's1',
+      agentProfile,
+      llmProfile,
+    });
+    expect(title).toBeNull();
+  });
+
   it('passes the per-model entry to buildModel so overrides and dialect apply', async () => {
     const entry = { modelId: agentProfile.model, maxTokens: 1024, dialect: 'deepseek' as const };
     const lp: LlmProfileConfig = { ...llmProfile, models: [entry] };
@@ -85,5 +101,16 @@ describe('generateSessionTitle', () => {
     };
     await generateSessionTitle({ db: {} as never, sessionId: 's1', agentProfile, llmProfile: lp });
     expect(vi.mocked(buildModel)).toHaveBeenCalledWith(lp, agentProfile.model, undefined);
+  });
+
+  it('prefers the configured model override over the session model', async () => {
+    await generateSessionTitle({
+      db: {} as never,
+      sessionId: 's1',
+      agentProfile,
+      llmProfile,
+      modelOverride: 'cheap-title-model',
+    });
+    expect(vi.mocked(buildModel)).toHaveBeenCalledWith(llmProfile, 'cheap-title-model', undefined);
   });
 });

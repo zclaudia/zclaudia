@@ -1,12 +1,17 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SessionItem } from '../SessionItem';
 import { useDragSplitStore } from '../../../components/workspace/dragSplit';
 import { useRightWorkspaceStore } from '../../../stores/rightWorkspaceStore';
 import { useProjectWorkspaceStore } from '../../../stores/projectWorkspaceStore';
+import { useProjectStore } from '../../../stores/projectStore';
 
-const { selectProjectChat } = vi.hoisted(() => ({ selectProjectChat: vi.fn() }));
+const { selectProjectChat, updateSession } = vi.hoisted(() => ({
+  selectProjectChat: vi.fn(),
+  updateSession: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('../../../actions/projectWorkspaceActions', () => ({ selectProjectChat }));
+vi.mock('../../../services/api', () => ({ updateSession }));
 
 const mockSession = {
   id: 's1',
@@ -25,6 +30,7 @@ describe('SessionItem', () => {
     useDragSplitStore.getState().endDrag();
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
     useProjectWorkspaceStore.setState({ byProject: {} });
+    useProjectStore.setState({ sessions: [] });
   });
 
   it('opens a distinct pane on modifier click only on unified desktop', () => {
@@ -277,5 +283,42 @@ describe('SessionItem', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Open in new window' }));
     expect(onPopOut).toHaveBeenCalledTimes(1);
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('renames inline from the row menu', async () => {
+    useProjectStore.setState({ sessions: [{ id: 's1', name: 'Test Session' }] });
+    render(
+      <SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    const input = screen.getByLabelText('Session name') as HTMLInputElement;
+    expect(input.value).toBe('Test Session');
+    fireEvent.change(input, { target: { value: 'Renamed' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(updateSession).toHaveBeenCalledWith('s1', { name: 'Renamed' }));
+    expect(useProjectStore.getState().sessions[0].name).toBe('Renamed');
+  });
+
+  it('Escape cancels the rename without a request', () => {
+    render(
+      <SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    const input = screen.getByLabelText('Session name');
+    fireEvent.change(input, { target: { value: 'Discarded' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(updateSession).not.toHaveBeenCalled();
+    expect(screen.getByText('Test Session')).toBeTruthy();
+  });
+
+  it('does not offer rename for task rows', () => {
+    const taskSession = { ...mockSession, projectRole: 'task' };
+    render(
+      <SessionItem session={taskSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
+    expect(screen.queryByRole('menuitem', { name: 'Rename' })).toBeNull();
   });
 });

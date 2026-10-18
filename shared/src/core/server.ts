@@ -122,3 +122,20 @@ export interface UpdateWebSearchConfigRequest {
   /** Undefined keeps the existing stored value; null or empty string clears it. */
   searxngBaseUrl?: string | null;
 }
+
+export interface AutoTitleConfig {
+  /** Master switch for AI session-title generation. */
+  enabled: boolean;
+  /** Optional model id used for title generation instead of the session's own
+   *  model (e.g. a cheaper small model). Null = use the session's model. */
+  model: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface UpdateAutoTitleConfigRequest {
+  /** Undefined keeps the existing stored value. */
+  enabled?: boolean;
+  /** Undefined keeps the existing stored value; null or empty string clears it. */
+  model?: string | null;
+}

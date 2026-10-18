@@ -11,17 +11,17 @@ import {
 } from './session-title-helpers.js';
 
 /**
- * Generate a short title using the session's own model. Mirrors how compaction
- * builds the model (buildModel + llmProfile.apiKey). Returns null on any failure
- * so the caller silently keeps the previous title.
+ * Generate a short title using the session's model, or the configured
+ * override model when one is set. Mirrors how compaction builds the model
+ * (buildModel + llmProfile.apiKey). Returns null on any failure so the caller
+ * silently keeps the previous title.
  */
 export async function generateSessionTitle(input: TitleGenerateInput): Promise<string | null> {
-  const { db, sessionId, agentProfile, llmProfile } = input;
-  const built = buildModel(
-    llmProfile,
-    agentProfile.model,
-    modelEntryFor(llmProfile, agentProfile.model)
-  );
+  const { db, sessionId, agentProfile, llmProfile, modelOverride } = input;
+  // A configured override (auto_title_config.model) wins — e.g. a cheaper
+  // small model — otherwise the title uses the session's own model.
+  const modelId = modelOverride || agentProfile.model;
+  const built = buildModel(llmProfile, modelId, modelEntryFor(llmProfile, modelId));
 
   // Title only needs a handful of messages (pickTitleWindow keeps ~9). Read a
   // bounded recent window from the session tree (Route C) so long sessions don't
@@ -52,6 +52,10 @@ export async function generateSessionTitle(input: TitleGenerateInput): Promise<s
     { systemPrompt: TITLE_SYSTEM_PROMPT, messages: contextMessages },
     { apiKey, maxTokens: 32 }
   );
+
+  // completeSimple resolves provider/network failures instead of throwing:
+  // stopReason 'error' carries the failure in content, so treat it as no title.
+  if (result.stopReason === 'error') return null;
 
   const title = extractTitle(result.content);
   return title.length > 0 ? title : null;

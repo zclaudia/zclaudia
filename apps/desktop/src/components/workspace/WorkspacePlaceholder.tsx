@@ -7,6 +7,7 @@ import { fillChatSlot, fillToolSlot } from '../../actions/layoutPresetActions';
 import { useLauncherPanels } from '../../actions/openPanel';
 import { Button } from '../ui/Button';
 import { WorkspaceNavigationContext } from './WorkspaceContext';
+import { resolveSessionDisplayName } from '../../utils/sessionDisplayName';
 
 export function WorkspacePlaceholder({
   node,
@@ -41,7 +42,7 @@ export function WorkspacePlaceholder({
                 else if (!result.ok) setError('Unable to fill this slot');
               }}
             >
-              {session.name || session.autoTitle || 'Untitled Session'}
+              {resolveSessionDisplayName(session).text}
             </Button>
           ))
         : panels

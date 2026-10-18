@@ -4,6 +4,7 @@ import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { SessionRepository } from '../../../domains/sessions/repository.js';
 import { SessionMessageRepository } from '../../../domains/sessions/message-repository.js';
+import { getAutoTitleConfig } from '../../../utils/auto-title-config.js';
 import { shouldRegenerateTitle } from './session-title-helpers.js';
 import { generateSessionTitle } from './generate-session-title.js';
 
@@ -12,6 +13,8 @@ export interface TitleGenerateInput {
   sessionId: string;
   agentProfile: AgentProfileConfig;
   llmProfile: LlmProfileConfig;
+  /** Model id from auto_title_config; null/undefined = the session's own model. */
+  modelOverride?: string | null;
 }
 
 export interface MaybeGenerateSessionTitleDeps extends TitleGenerateInput {
@@ -34,6 +37,9 @@ async function runTitleGeneration(deps: MaybeGenerateSessionTitleDeps): Promise<
   const { db, sessionId } = deps;
   if (inFlight.has(sessionId)) return;
 
+  const { enabled, model: modelOverride } = getAutoTitleConfig(db);
+  if (!enabled) return;
+
   const repo = new SessionRepository(db);
   const session = repo.findById(sessionId);
   if (!session || session.type === 'background') return;
@@ -48,7 +54,24 @@ async function runTitleGeneration(deps: MaybeGenerateSessionTitleDeps): Promise<
   )
     return;
 
+  // Broadcast the latest persisted row (never the pre-generation snapshot) so
+  // concurrent metadata changes such as a rename aren't clobbered.
+  // autoTitlePending/autoTitleError are transient wire state, not persisted.
+  const broadcastTitleState = (autoTitlePending: boolean, autoTitleError?: string): void => {
+    const current = repo.findById(sessionId);
+    if (!current) return;
+    const msg: SessionsUpdatedMessage = {
+      type: 'sessions_updated',
+      session: autoTitleError
+        ? { ...current, autoTitlePending, autoTitleError }
+        : { ...current, autoTitlePending },
+    };
+    deps.broadcast(msg);
+  };
+
   inFlight.add(sessionId);
+  broadcastTitleState(true);
+  let failureReason: string | undefined;
   try {
     const generate = deps.generate ?? generateSessionTitle;
     const title = await generate({
@@ -56,15 +79,17 @@ async function runTitleGeneration(deps: MaybeGenerateSessionTitleDeps): Promise<
       sessionId,
       agentProfile: deps.agentProfile,
       llmProfile: deps.llmProfile,
+      modelOverride,
     });
-    if (!title) return;
-    repo.updateAutoTitle(sessionId, title, userMsgCount);
-    const msg: SessionsUpdatedMessage = {
-      type: 'sessions_updated',
-      session: { ...session, autoTitle: title, autoTitleMsgCount: userMsgCount },
-    };
-    deps.broadcast(msg);
+    if (title) {
+      repo.updateAutoTitle(sessionId, title, userMsgCount);
+    } else {
+      failureReason = 'title generation returned no result';
+    }
+  } catch (error) {
+    failureReason = error instanceof Error ? error.message : 'title generation failed';
   } finally {
     inFlight.delete(sessionId);
+    broadcastTitleState(false, failureReason);
   }
 }

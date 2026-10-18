@@ -1,5 +1,13 @@
-import { useEffect } from 'react';
-import { ExternalLink, Trash2, GitBranch, Lock, MoreHorizontal, Columns2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  ExternalLink,
+  Trash2,
+  GitBranch,
+  Lock,
+  MoreHorizontal,
+  Columns2,
+  Pencil,
+} from 'lucide-react';
 import type { Session } from '@zclaudia/shared/core/session';
 import { TONE_BADGE, TONE_TEXT, type Tone } from '../../components/ui/tone';
 import { DropdownMenu, type DropdownMenuEntry } from '../../components/ui/DropdownMenu';
@@ -7,6 +15,10 @@ import { selectProjectChat } from '../../actions/projectWorkspaceActions';
 import { useDragSplitStore } from '../../components/workspace/dragSplit';
 import { flattenPanes, useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
 import { useProjectWorkspaceStore } from '../../stores/projectWorkspaceStore';
+import { useProjectStore } from '../../stores/projectStore';
+import { useToastStore } from '../../stores/toastStore';
+import { updateSession } from '../../services/api';
+import { resolveSessionDisplayName } from '../../utils/sessionDisplayName';
 
 interface SessionItemProps {
   session: Session;
@@ -63,6 +75,30 @@ export function SessionItem({
   const isTask = session.projectRole === 'task';
   const roleBadge = session.projectRole ? ROLE_BADGES[session.projectRole] : undefined;
   const statusLabel = getStatusLabel(session, isActive, hasPending);
+  const [renaming, setRenaming] = useState(false);
+  const [renameDraft, setRenameDraft] = useState('');
+
+  // Inline rename mirrors the chat-header rename: empty or unchanged names are
+  // dropped without a request. Background/readonly/task rows are excluded, and
+  // mobile rows use the header's rename instead (no room for an inline input).
+  const canRename = !isMobile && !isTask && session.type !== 'background' && !session.isReadOnly;
+  const commitRename = async () => {
+    const name = renameDraft.trim();
+    setRenaming(false);
+    if (!name || name === session.name) return;
+    try {
+      await updateSession(session.id, { name });
+      useProjectStore.getState().updateSession(session.id, { name });
+    } catch (error) {
+      console.error('Failed to rename session:', error);
+      useToastStore.getState().add({
+        title: 'Rename failed',
+        message: error instanceof Error ? error.message : undefined,
+        type: 'error',
+        icon: 'error',
+      });
+    }
+  };
 
   // Right-side hover actions (desktop only) collapse into a "⋯" dropdown so the
   // row stays clean — matching the project/session-header menu convention.
@@ -101,7 +137,7 @@ export function SessionItem({
     selectProjectChat(session.projectId, session.id, { beside: true });
     onSelect(session.id);
   };
-  const hasRowMenu = !isMobile && Boolean(onDeleteWorktree || onPopOut || canArrange);
+  const hasRowMenu = !isMobile && Boolean(onDeleteWorktree || onPopOut || canArrange || canRename);
   const actionPadding = hasRowMenu ? 'pr-6' : 'pr-2';
   const microClass = isMobile ? 'text-2xs' : 'text-3xs';
   const entries: DropdownMenuEntry[] = [];
@@ -115,6 +151,17 @@ export function SessionItem({
         onSelect: openBeside,
       }
     );
+  }
+  if (canRename) {
+    entries.push({
+      key: 'rename',
+      label: 'Rename',
+      icon: <Pencil size={13} />,
+      onSelect: () => {
+        setRenameDraft(session.name ?? '');
+        setRenaming(true);
+      },
+    });
   }
   if (onPopOut)
     entries.push({
@@ -141,107 +188,134 @@ export function SessionItem({
   // Strip "Task: " prefix for task items (redundant under Tasks section).
   // Regular sessions fall back to the auto-generated title so an unnamed session
   // reads the same here as in the home view instead of a bare "Untitled Session".
+  const { text: regularName, titlePending } = resolveSessionDisplayName(session);
   const displayName = isTask
     ? (session.name || 'Untitled Task').replace(/^Task:\s*/i, '')
-    : session.name || session.autoTitle || 'Untitled Session';
+    : regularName;
 
   return (
     <div className="relative group" data-testid="session-item">
-      <button
-        onClick={event => {
-          cancelOwnDrag();
-          if (canArrange && (event.metaKey || event.ctrlKey)) openBeside();
-          else onSelect(session.id);
-        }}
-        onPointerDown={event => {
-          if (
-            !canArrange ||
-            !session.projectId ||
-            event.button !== 0 ||
-            (event.pointerType !== 'mouse' && event.pointerType !== 'pen')
-          )
-            return;
-          const workspaceId =
-            useProjectWorkspaceStore.getState().byProject[session.projectId]?.workspaceId ??
-            session.id;
-          const root = useRightWorkspaceStore.getState().bySession[workspaceId]?.root ?? null;
-          const source = flattenPanes(root).find(pane =>
-            pane.tools.some(ref => ref.toolId === 'chat' && ref.instanceKey === session.id)
-          );
-          useDragSplitStore.getState().startDrag(
-            {
-              toolId: 'chat',
-              instanceKey: session.id,
-              projectId: session.projectId,
-              multiInstance: true,
-              sourcePaneId: source?.id,
-              sourceIndex: source?.tools.findIndex(
-                ref => ref.toolId === 'chat' && ref.instanceKey === session.id
-              ),
-            },
-            { x: event.clientX, y: event.clientY }
-          );
-        }}
-        data-selected={isSelected || undefined}
-        // Mobile sits inside the always-on rail at the 44px tier; desktop keeps
-        // the negative-margin pull so its hover fill spans the rail padding.
-        className={`text-left rounded-md truncate flex items-center transition-colors ${
-          isMobile
-            ? 'w-full h-11 px-3 gap-2.5 text-sm'
-            : `-ml-5 w-[calc(100%+1.25rem)] pl-7 h-7 gap-1 text-xs ${actionPadding}`
-        } ${isSelected ? selectedClass : unselectedClass}`}
-      >
-        {!isTask && (
-          <span
-            className={`h-1.5 w-1.5 shrink-0 rounded-full ${isMobile ? '' : 'mr-1.5'} ${isActive ? 'bg-success' : 'bg-muted-foreground/60'}`}
-            aria-hidden
-          />
-        )}
-        <span className="truncate">{displayName}</span>
-        {/* Project role badge */}
-        {roleBadge && (
-          <span
-            className={`${microClass} px-1 rounded-md font-medium shrink-0 ${TONE_BADGE[roleBadge.tone]}`}
-          >
-            {roleBadge.label}
-          </span>
-        )}
-        {/* Provider name tag (for regular sessions, only when idle) */}
-        {!session.projectRole && providerName && !statusLabel && (
-          <span
-            className={`${microClass} px-1 rounded-md shrink-0 text-muted-foreground ${
-              isSelected ? 'bg-foreground/10' : 'bg-muted-foreground/10'
-            }`}
-          >
-            {providerName}
-          </span>
-        )}
-        {/* Read-only lock icon */}
-        {session.isReadOnly && (
-          <Lock size={12} strokeWidth={1.75} className="shrink-0 text-muted-foreground" />
-        )}
-        {/* Worktree branch indicator — right-aligned with a branch glyph */}
-        {!session.projectRole && worktreeBranch && !hideWorktreeBranch && (
-          <span
-            className={`ml-auto flex items-center gap-0.5 ${microClass} truncate max-w-[90px] shrink-0 text-muted-foreground`}
-            title={worktreeBranch}
-          >
-            <GitBranch size={isMobile ? 11 : 10} strokeWidth={1.75} className="shrink-0" />
-            <span className="truncate">{worktreeBranch}</span>
-          </span>
-        )}
-        {/* Status label (right side) */}
-        {statusLabel && (
-          <span
-            className={`ml-auto flex items-center gap-1 shrink-0 ${microClass} font-medium ${TONE_TEXT[statusLabel.tone]}`}
-          >
-            {statusLabel.pulse && (
-              <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-            )}
-            {statusLabel.text}
-          </span>
-        )}
-      </button>
+      {renaming ? (
+        <input
+          autoFocus
+          type="text"
+          value={renameDraft}
+          aria-label="Session name"
+          onChange={e => setRenameDraft(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') void commitRename();
+            if (e.key === 'Escape') {
+              // Reset before unmount so a blur fired during removal commits a
+              // no-op instead of the abandoned draft.
+              setRenameDraft(session.name ?? '');
+              setRenaming(false);
+            }
+          }}
+          onBlur={() => void commitRename()}
+          onPointerDown={e => e.stopPropagation()}
+          className={`text-left rounded-md flex items-center text-foreground bg-muted/60 focus:ring-1 focus:ring-primary/50 focus:outline-none ${
+            isMobile
+              ? 'w-full h-11 px-3 text-sm'
+              : `-ml-5 w-[calc(100%+1.25rem)] pl-7 h-7 text-xs ${actionPadding}`
+          }`}
+        />
+      ) : (
+        <button
+          onClick={event => {
+            cancelOwnDrag();
+            if (canArrange && (event.metaKey || event.ctrlKey)) openBeside();
+            else onSelect(session.id);
+          }}
+          onPointerDown={event => {
+            if (
+              !canArrange ||
+              !session.projectId ||
+              event.button !== 0 ||
+              (event.pointerType !== 'mouse' && event.pointerType !== 'pen')
+            )
+              return;
+            const workspaceId =
+              useProjectWorkspaceStore.getState().byProject[session.projectId]?.workspaceId ??
+              session.id;
+            const root = useRightWorkspaceStore.getState().bySession[workspaceId]?.root ?? null;
+            const source = flattenPanes(root).find(pane =>
+              pane.tools.some(ref => ref.toolId === 'chat' && ref.instanceKey === session.id)
+            );
+            useDragSplitStore.getState().startDrag(
+              {
+                toolId: 'chat',
+                instanceKey: session.id,
+                projectId: session.projectId,
+                multiInstance: true,
+                sourcePaneId: source?.id,
+                sourceIndex: source?.tools.findIndex(
+                  ref => ref.toolId === 'chat' && ref.instanceKey === session.id
+                ),
+              },
+              { x: event.clientX, y: event.clientY }
+            );
+          }}
+          data-selected={isSelected || undefined}
+          // Mobile sits inside the always-on rail at the 44px tier; desktop keeps
+          // the negative-margin pull so its hover fill spans the rail padding.
+          className={`text-left rounded-md truncate flex items-center transition-colors ${
+            isMobile
+              ? 'w-full h-11 px-3 gap-2.5 text-sm'
+              : `-ml-5 w-[calc(100%+1.25rem)] pl-7 h-7 gap-1 text-xs ${actionPadding}`
+          } ${isSelected ? selectedClass : unselectedClass}`}
+        >
+          {!isTask && (
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${isMobile ? '' : 'mr-1.5'} ${isActive ? 'bg-success' : 'bg-muted-foreground/60'}`}
+              aria-hidden
+            />
+          )}
+          <span className={`truncate${titlePending ? ' animate-pulse' : ''}`}>{displayName}</span>
+          {/* Project role badge */}
+          {roleBadge && (
+            <span
+              className={`${microClass} px-1 rounded-md font-medium shrink-0 ${TONE_BADGE[roleBadge.tone]}`}
+            >
+              {roleBadge.label}
+            </span>
+          )}
+          {/* Provider name tag (for regular sessions, only when idle) */}
+          {!session.projectRole && providerName && !statusLabel && (
+            <span
+              className={`${microClass} px-1 rounded-md shrink-0 text-muted-foreground ${
+                isSelected ? 'bg-foreground/10' : 'bg-muted-foreground/10'
+              }`}
+            >
+              {providerName}
+            </span>
+          )}
+          {/* Read-only lock icon */}
+          {session.isReadOnly && (
+            <Lock size={12} strokeWidth={1.75} className="shrink-0 text-muted-foreground" />
+          )}
+          {/* Worktree branch indicator — right-aligned with a branch glyph */}
+          {!session.projectRole && worktreeBranch && !hideWorktreeBranch && (
+            <span
+              className={`ml-auto flex items-center gap-0.5 ${microClass} truncate max-w-[90px] shrink-0 text-muted-foreground`}
+              title={worktreeBranch}
+            >
+              <GitBranch size={isMobile ? 11 : 10} strokeWidth={1.75} className="shrink-0" />
+              <span className="truncate">{worktreeBranch}</span>
+            </span>
+          )}
+          {/* Status label (right side) */}
+          {statusLabel && (
+            <span
+              className={`ml-auto flex items-center gap-1 shrink-0 ${microClass} font-medium ${TONE_TEXT[statusLabel.tone]}`}
+            >
+              {statusLabel.pulse && (
+                <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+              )}
+              {statusLabel.text}
+            </span>
+          )}
+        </button>
+      )}
       {hasRowMenu && (
         <DropdownMenu
           entries={entries}

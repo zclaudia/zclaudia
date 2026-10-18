@@ -213,9 +213,11 @@ function AppContent() {
     isFileViewerFullscreen: fileViewerFullscreen,
   });
 
-  const mobileToastContainer = isMobile ? (
-    <ToastContainer className={MOBILE_TOAST_CONTAINER_CLASS} />
-  ) : null;
+  // Toasts render on every viewport; only placement differs (mobile stacks
+  // top-center, desktop uses ToastContainer's bottom-right default).
+  const toastContainer = (
+    <ToastContainer className={isMobile ? MOBILE_TOAST_CONTAINER_CLASS : undefined} />
+  );
 
   const claudiaSwipePreviewProgress = useMemo(() => {
     const progress = Math.max(0, Math.min(1, agentSwipePreview.progress));
@@ -483,7 +485,7 @@ function AppContent() {
           initialTab={topLevelView.initialTab}
           onClose={closeTopLevelView}
         />
-        {mobileToastContainer}
+        {toastContainer}
       </div>
     );
   }
@@ -692,7 +694,7 @@ function AppContent() {
         </main>
       </div>
 
-      {mobileToastContainer}
+      {toastContainer}
 
       {fileViewerFullscreen && fileViewerFilePath && fileViewerProjectRoot && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col">

@@ -10,6 +10,7 @@ import { LayoutMenu } from './LayoutMenu';
 import { IconButton } from '../ui/Button';
 import { useWorkspacePane, WorkspaceNavigationContext } from './WorkspaceContext';
 import { useDragSplitStore } from './dragSplit';
+import { resolveSessionDisplayName } from '../../utils/sessionDisplayName';
 
 export function WorkspaceChatControls() {
   const { syncSelection = true } = useContext(WorkspaceNavigationContext);
@@ -63,7 +64,7 @@ export function WorkspaceChatControls() {
               )
               .map(s => ({
                 key: s.id,
-                label: s.name || s.autoTitle || 'Untitled Session',
+                label: resolveSessionDisplayName(s).text,
                 onSelect: () => {
                   if (
                     selectProjectChat(projectId, s.id, { beside: true, targetPaneId: pane.paneId })

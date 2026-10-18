@@ -252,7 +252,11 @@ function SessionGroup({
                   // Settled, so no pulse — it is a result to review, not activity.
                   <span className="w-1.5 h-1.5 rounded-full bg-destructive shrink-0" />
                 ) : null}
-                <span className="truncate text-sm text-foreground">{row.title}</span>
+                <span
+                  className={`truncate text-sm text-foreground${row.titlePending ? ' animate-pulse' : ''}`}
+                >
+                  {row.title}
+                </span>
                 <span className="ml-auto shrink-0 pl-4 text-[11px] text-muted-foreground">
                   {timeAgo(row.updatedAt)}
                 </span>

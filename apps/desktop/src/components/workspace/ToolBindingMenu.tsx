@@ -8,6 +8,7 @@ import {
 import { useProjectStore } from '../../stores/projectStore';
 import { DropdownMenu } from '../ui/DropdownMenu';
 import { Button } from '../ui/Button';
+import { resolveSessionDisplayName } from '../../utils/sessionDisplayName';
 
 export function ToolBindingMenu({ projectId, tool }: { projectId: string; tool: ToolRef }) {
   const project = useProjectWorkspaceStore(s => s.byProject[projectId]);
@@ -18,7 +19,7 @@ export function ToolBindingMenu({ projectId, tool }: { projectId: string; tool: 
   const binding = project?.toolBindings[workspaceRefKey(tool)];
   const boundId = binding?.mode === 'fixed' ? binding.sessionId : project?.focusedChatSessionId;
   const bound = sessions.find(s => s.id === boundId);
-  const label = bound?.name || bound?.autoTitle || 'chat';
+  const label = resolveSessionDisplayName(bound, 'chat').text;
   const chatIds = [
     ...new Set(
       flattenPanes(root)
@@ -39,7 +40,7 @@ export function ToolBindingMenu({ projectId, tool }: { projectId: string; tool: 
         },
         ...chatIds.map(id => ({
           key: id,
-          label: `Pin to ${sessions.find(s => s.id === id)?.name || sessions.find(s => s.id === id)?.autoTitle || 'Untitled Session'}`,
+          label: `Pin to ${resolveSessionDisplayName(sessions.find(s => s.id === id)).text}`,
           onSelect: () =>
             useProjectWorkspaceStore
               .getState()

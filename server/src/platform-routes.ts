@@ -16,6 +16,7 @@ import { createSystemTaskRoutes } from './interfaces/http/system-tasks.js';
 import { createWorkspaceRoutes } from './interfaces/http/workspace.js';
 import { createGatewayRouter } from './interfaces/http/gateway.js';
 import { createWebSearchConfigRoutes } from './interfaces/http/web-search.js';
+import { createAutoTitleConfigRoutes } from './interfaces/http/auto-title.js';
 import { createUsageStatsRoutes } from './interfaces/http/usage-stats.js';
 import { createLanguageServerRoutes } from './interfaces/http/language-servers.js';
 import type { LanguageServerManager } from './infra/lsp/index.js';
@@ -87,6 +88,7 @@ export function registerPlatformRoutes(deps: RegisterPlatformRoutesDeps): void {
   app.use('/api', authMiddleware, createSystemTaskRoutes());
   app.use('/api/workspace', authMiddleware, createWorkspaceRoutes());
   app.use('/api/web-search', authMiddleware, createWebSearchConfigRoutes(db));
+  app.use('/api/auto-title', authMiddleware, createAutoTitleConfigRoutes(db));
 
   app.use(
     '/api/server/gateway',

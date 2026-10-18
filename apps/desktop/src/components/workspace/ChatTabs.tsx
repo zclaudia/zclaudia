@@ -17,6 +17,7 @@ import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
 import { DropdownMenu } from '../ui/DropdownMenu';
 import { useDragSplitStore } from './dragSplit';
 import { WorkspaceNavigationContext } from './WorkspaceContext';
+import { resolveSessionDisplayName } from '../../utils/sessionDisplayName';
 
 /** Session tabs only change visibility; their content hosts keep stable ref keys. */
 export function ChatTabs({
@@ -51,7 +52,7 @@ export function ChatTabs({
           const sessionId = ref.instanceKey;
           if (!sessionId) return null;
           const session = sessions.find(item => item.id === sessionId);
-          const title = session?.name || session?.autoTitle || 'Untitled Session';
+          const { text: title, titlePending } = resolveSessionDisplayName(session);
           const active = pane.activeToolId === CHAT_TOOL_ID && pane.activeInstanceKey === sessionId;
           return (
             <div
@@ -81,7 +82,7 @@ export function ChatTabs({
                 className={`flex min-w-0 items-center gap-1.5 px-2 text-xs ${active ? 'text-foreground shadow-[inset_0_-2px_0_hsl(var(--muted-foreground))]' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 <MessageSquare size={13} className="shrink-0" />
-                <span className="truncate">{title}</span>
+                <span className={`truncate${titlePending ? ' animate-pulse' : ''}`}>{title}</span>
               </button>
               <button
                 aria-label={`Close ${title}`}
@@ -107,7 +108,7 @@ export function ChatTabs({
           .filter(session => session.projectId === projectId && !session.archivedAt)
           .map(session => ({
             key: session.id,
-            label: session.name || session.autoTitle || 'Untitled Session',
+            label: resolveSessionDisplayName(session).text,
             onSelect: () => {
               if (openSessionTab(projectId, session.id, pane.id).ok && syncSelection)
                 selectSession(session.id);

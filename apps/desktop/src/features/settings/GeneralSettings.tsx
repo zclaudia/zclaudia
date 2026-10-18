@@ -1,6 +1,7 @@
 import { Moon, Type } from 'lucide-react';
 import { useUIStore, type FontSizePreset } from '../../stores/uiStore';
 import { ThemeToggle } from './ThemeToggle';
+import { AutoTitleSettings } from './AutoTitleSettings';
 import { SettingsGroup, SettingsRow } from './ui/SettingsGroup';
 
 export function GeneralSettings() {
@@ -18,6 +19,7 @@ export function GeneralSettings() {
           control={<FontSizeToggle />}
         />
       </SettingsGroup>
+      <AutoTitleSettings />
     </div>
   );
 }

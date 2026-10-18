@@ -1,10 +1,13 @@
 import type { Project } from '@zclaudia/shared/core/project';
 import type { Session } from '@zclaudia/shared/core/session';
 import { LOCAL_BACKEND_KEY, type RemoteSession } from '../../stores/sessionsStore';
+import { resolveSessionDisplayName } from '../../utils/sessionDisplayName';
 
 export interface HomeSessionRow {
   id: string;
   title: string;
+  /** True while the backend is generating this session's AI title. */
+  titlePending: boolean;
   projectId: string;
   projectName: string;
   /** LOCAL_BACKEND_KEY for the local backend, gateway backendId otherwise. */
@@ -62,11 +65,11 @@ function toRow(
 ): HomeSessionRow {
   const needsAttention = session.lastRunStatus === 'waiting';
   const hasFailed = session.lastRunStatus === 'failed' || session.lastRunStatus === 'interrupted';
+  const { text, titlePending } = resolveSessionDisplayName(session, 'Untitled');
   return {
     id: session.id,
-    // Explicit user name wins over the AI auto-title so a rename is never
-    // overridden; auto-title only fills in for unnamed sessions.
-    title: session.name || session.autoTitle || 'Untitled',
+    title: text,
+    titlePending,
     projectId: session.projectId,
     projectName: projectNames.get(session.projectId) ?? '',
     backendKey,
