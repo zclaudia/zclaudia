@@ -35,6 +35,7 @@ import { useToastStore } from '../../stores/toastStore';
 import { ProfileEditor } from './ProfileEditor';
 import { SkillEditor } from './SkillEditor';
 import { SkillDirsEditor } from './SkillDirsEditor';
+import { SkillImportModal } from './SkillImportModal';
 import { McpServerEditor } from './McpServerEditor';
 import { LlmProfileEditor } from './LlmProfileEditor';
 import { useSavedBridge } from './useSavedBridge';
@@ -149,6 +150,8 @@ export function AgentsContent({
     kind: 'skill' | 'mcp-server' | 'llm-profile';
     backendId: string;
   } | null>(null);
+  // External-agent skills import dialog: opened from the Skills browse toolbar.
+  const [importSkillsBackendId, setImportSkillsBackendId] = useState<string | null>(null);
 
   const activeTab = view.kind === 'agents' ? view.tab : 'profiles';
   const backendFilter = useTopLevelViewStore(s => s.agentsBackendFilter);
@@ -491,6 +494,9 @@ export function AgentsContent({
           onOpen={openItem}
           onSelectBackendFilter={setBackendFilter}
           onNew={startNew}
+          onImportSkills={
+            activeTab === 'skills' ? () => setImportSkillsBackendId(backendForNew()) : undefined
+          }
           onSetProfileDefault={handleSetProfileDefault}
           onDeleteProfile={handleDeleteProfile}
           onSetLlmProfileDefault={handleSetLlmProfileDefault}
@@ -515,6 +521,14 @@ export function AgentsContent({
               setNewDraft(null);
             }}
             onClose={() => setNewDraft(null)}
+          />
+        )}
+        {importSkillsBackendId !== null && (
+          <SkillImportModal
+            open
+            backendId={importSkillsBackendId}
+            onClose={() => setImportSkillsBackendId(null)}
+            onImported={bumpAgentsRefresh}
           />
         )}
       </div>

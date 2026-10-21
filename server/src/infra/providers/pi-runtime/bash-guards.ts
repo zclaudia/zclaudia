@@ -42,4 +42,4 @@ export {
   type BashFileBypassKind,
 } from './bash-guards/routing.js';
 
-export { normalizeBashCommandForMatch } from './bash-guards/normalize.js';
+export { normalizeBashCommandForMatch, expandAssignedVariables } from './bash-guards/normalize.js';

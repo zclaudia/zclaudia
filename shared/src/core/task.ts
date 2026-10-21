@@ -29,6 +29,24 @@ export interface TaskResult {
   text?: string;
   error?: string;
   artifacts?: TaskArtifact[];
+  /**
+   * Token/cost summary of a finished agent task's run (sub-agent usage).
+   * Populated by the agent executor from the run's terminal usage snapshot so
+   * the Agent tool's synchronous return can render a `<usage>` block; optional
+   * and absent for command/eval/monitor tasks.
+   */
+  usage?: TaskUsageSummary;
+}
+
+/** Terminal usage summary of an agent task's run, aligned with the wire UsageInfo vocabulary. */
+export interface TaskUsageSummary {
+  input?: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  totalTokens?: number;
+  toolUses?: number;
+  durationMs?: number;
 }
 
 export interface TaskRecord {

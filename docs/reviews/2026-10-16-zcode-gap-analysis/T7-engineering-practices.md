@@ -1,7 +1,7 @@
 # T7 工程实践与质量基建 对比报告
 
 > 竞品差距分析 · 维度 T7（架构治理 / 死代码检测 / 形式化验证 / 遥测 / 国际化 / 三方合规 / 发布工程）
-> 探索方式：只读。ZCode 仓库：`/Users/zhvala/SourceCode/ZCode`；本仓库：`/Users/zhvala/SourceCode/zclaudia`。
+> 探索方式：只读。ZCode 仓库：`/Users/zhvala/SourceCode/zcoder`；本仓库：`/Users/zhvala/SourceCode/zclaudia`。
 > 所有 ZCode 侧结论均来自本次实际读到的文件；行号为探索当日快照。
 
 ## 1. 两侧结构对照（简表）
@@ -30,8 +30,8 @@
 **解决的问题**：架构规则不靠口头约定，而是声明式 YAML + 独立检查器。受管模块（managed: true）必须自带五件套产物——`module.ts`（manifest，可内联声明 requires）、`contract.ts`、`contract.example.ts`、`contract.test.ts`、`CONTRACT.md`，缺一件即违规；每个模块声明 owner、requires、publicEntrypoints、分层（domain/app/adapters/ui）。
 
 - **证据（ZCode）**：
-  - `/Users/zhvala/SourceCode/ZCode/architecture-policy.yaml:26-33`（storage 模块：requires/publicEntrypoints/layers/owner 全声明）、`architecture-policy.yaml:179-186`（全局：maxFileLines 400、maxContractLines 300、maxPublicMethods 12、forbidCycles、forbidDeepImports、managedOnly）
-  - `/Users/zhvala/SourceCode/ZCode/scripts/architecture/index.mjs:113-134`（missing-module-artifact 检查）、`:260-274`（deep-import：跨模块只能走公开入口）、`:193-209,276-286`（domain-io：domain 层禁 IO/定时器/fetch）、`:36-71`（DFS 环检测）、`:91-99`（公开入口匹配）
+  - `/Users/zhvala/SourceCode/zcoder/architecture-policy.yaml:26-33`（storage 模块：requires/publicEntrypoints/layers/owner 全声明）、`architecture-policy.yaml:179-186`（全局：maxFileLines 400、maxContractLines 300、maxPublicMethods 12、forbidCycles、forbidDeepImports、managedOnly）
+  - `/Users/zhvala/SourceCode/zcoder/scripts/architecture/index.mjs:113-134`（missing-module-artifact 检查）、`:260-274`（deep-import：跨模块只能走公开入口）、`:193-209,276-286`（domain-io：domain 层禁 IO/定时器/fetch）、`:36-71`（DFS 环检测）、`:91-99`（公开入口匹配）
 - **zclaudia 现状**：`scripts/dev/check-architecture-boundaries.mjs:1-42` 有 server 六层方向规则与 desktop store/feature/services 规则（ratchet allowlist 已清零），但**没有**模块契约产物要求、公开入口白名单、domain 纯度、公开方法数上限；规则不可配置（硬编码），也无策略文件。
 - **可搬运性**：重写借鉴。ZCode 检查器约 800 行、零第三方依赖（仅 typescript + yaml），核心思想（契约五件套、deep-import、domain-io、fingerprint 基线）可直接映射到 zclaudia 的 shared/server/apps/desktop/plugins 布局；但模块拓扑需按本仓重写，不能照抄 policy 文件。
 - **体量估计**：策略 schema + 检查器移植 2–4 天；为首批模块补 contract.example/contract.test 产物另计（每模块 0.5–1 天）。
@@ -41,9 +41,9 @@
 **解决的问题**：存量违规不阻塞增量开发——每条违规按 sha256 指纹登记进 `.architecture-baseline.json`（ZCode 当前基线为空，说明全绿），`architecture:check --changed` 只对「改动文件 + 反向依赖闭包」内的违规判失败；例外可带 `expires` 过期日，过期自动变违规。
 
 - **证据（ZCode）**：
-  - `/Users/zhvala/SourceCode/ZCode/scripts/architecture/index.mjs:20-34`（fingerprint 生成）、`:90-103`（expired-exception）、`:292-315`（--changed 反向闭包 + baseline 对比）、`:318-323`（baseline:update）
-  - `/Users/zhvala/SourceCode/ZCode/.architecture-baseline.json`（空基线）
-  - `/Users/zhvala/SourceCode/ZCode/package.json:38`（`verify:pre-push = lint + architecture:check -- --changed + test:unit:affected`）
+  - `/Users/zhvala/SourceCode/zcoder/scripts/architecture/index.mjs:20-34`（fingerprint 生成）、`:90-103`（expired-exception）、`:292-315`（--changed 反向闭包 + baseline 对比）、`:318-323`（baseline:update）
+  - `/Users/zhvala/SourceCode/zcoder/.architecture-baseline.json`（空基线）
+  - `/Users/zhvala/SourceCode/zcoder/package.json:38`（`verify:pre-push = lint + architecture:check -- --changed + test:unit:affected`）
 - **zclaudia 现状**：`scripts/dev/check-architecture-boundaries.mjs:10-39` 用「allowlist Set 注释已清零」达到同样效果（ratchet），但基线是源码内常量而非数据文件，无指纹、无过期机制、无 --changed 增量模式（CI 每次全量）。
 - **可搬运性**：重写借鉴。指纹基线 + 过期例外是对现有 ratchet 的自然升级；`--changed` 闭包还能把架构检查塞进 pre-push（zclaudia pre-commit-guard 目前不含架构检查）。
 - **体量估计**：1–2 天。
@@ -53,9 +53,9 @@
 **解决的问题**：(a) 架构检查器本身有 281 行 node:test 自测，在临时 git 仓库夹具里验证 policy 解析、基线、增量路径；(b) `architecture:context <module-id>` 一条命令生成该模块的受控阅读包（manifest、contract 文件清单、公开入口、直接依赖的 contract），配合 `.agents/skills/architecture-governance/SKILL.md` 让 AI/新人改代码前先跑检查、再读最小上下文。
 
 - **证据（ZCode）**：
-  - `/Users/zhvala/SourceCode/ZCode/scripts/test/architecture-governance.test.mjs:1-50`（git 夹具 + POLICY fixture；共 281 行）
-  - `/Users/zhvala/SourceCode/ZCode/scripts/architecture/index.mjs:333-367`（generateContext）
-  - `/Users/zhvala/SourceCode/ZCode/.agents/skills/architecture-governance/SKILL.md:1-30`（「先跑检查、再读上下文、先定 owner/path/boundary/time 再写码」）
+  - `/Users/zhvala/SourceCode/zcoder/scripts/test/architecture-governance.test.mjs:1-50`（git 夹具 + POLICY fixture；共 281 行）
+  - `/Users/zhvala/SourceCode/zcoder/scripts/architecture/index.mjs:333-367`（generateContext）
+  - `/Users/zhvala/SourceCode/zcoder/.agents/skills/architecture-governance/SKILL.md:1-30`（「先跑检查、再读上下文、先定 owner/path/boundary/time 再写码」）
 - **zclaudia 现状**：检查器无自测；无 context 生成器；`CLAUDE.md` 有结构说明但无「改码前生成阅读包」的流程化技能（缺失）。
 - **可搬运性**：直接移植（generateContext 函数自包含，换成本仓模块清单即可）；SKILL.md 做重写借鉴。
 - **体量估计**：context 生成 0.5–1 天；治理 skill 半天。
@@ -65,8 +65,8 @@
 **解决的问题**：`scripts/licenses.mjs` 递归扫描 workspace 实装包（含嵌套版本），按 SPDX 表达式分为 green（MIT/ISC/BSD/Apache-2.0 等）/yellow（LGPL/MPL/EPL，需登记复核理由）/red（GPL/AGPL/SSPL/CC-NC 直接失败）；`check --strict` 还要求 third-party/inventory.json 中 reviewRequired 材料清零。`notices` 命令从锁文件生产图收集真实 license 原文，生成 2MB 的 `THIRD-PARTY-NOTICES.md`（记录精确版本、来源与哈希）。许可证文本变更后可复核（PROD_REVIEWED 绑定许可类别）。
 
 - **证据（ZCode）**：
-  - `/Users/zhvala/SourceCode/ZCode/scripts/licenses.mjs:60-90`（GREEN 正则 + classify：AGPL/LGPL/MPL/BSL/CC-NC 分桶）、`:91-99`（PROD_REVIEWED 登记 libvips LGPL、elkjs EPL 复核结论）、`:113-136`（check/--strict 门禁与提示语）
-  - `/Users/zhvala/SourceCode/ZCode/THIRD-PARTY-NOTICES.md:1-5`（生成方式声明）、`/Users/zhvala/SourceCode/ZCode/third-party/inventory.json`、`/Users/zhvala/SourceCode/ZCode/NOTICE.md`（29KB 功能风险与数据流披露）
+  - `/Users/zhvala/SourceCode/zcoder/scripts/licenses.mjs:60-90`（GREEN 正则 + classify：AGPL/LGPL/MPL/BSL/CC-NC 分桶）、`:91-99`（PROD_REVIEWED 登记 libvips LGPL、elkjs EPL 复核结论）、`:113-136`（check/--strict 门禁与提示语）
+  - `/Users/zhvala/SourceCode/zcoder/THIRD-PARTY-NOTICES.md:1-5`（生成方式声明）、`/Users/zhvala/SourceCode/zcoder/third-party/inventory.json`、`/Users/zhvala/SourceCode/zcoder/NOTICE.md`（29KB 功能风险与数据流披露）
 - **zclaudia 现状**：缺失。仅根目录 `LICENSE`（MIT），无 NOTICES、无盘点、无门禁；桌面/服务端分发时（尤其捆绑 ripgrep、better-sqlite3、sharp、Chromium 等原生/外部组件）存在合规缺口。
 - **可搬运性**：直接移植。脚本自包含（node + 锁文件解析），Apache-2.0 允许复制，**移植时须保留原文件头版权与许可声明、并在 NOTICES/NOTICE 中保留 ZCode 归属**；分类正则与 PROD_REVIEWED 需按 zclaudia 实际依赖树调整。
 - **体量估计**：脚本移植 1 天 + 首次盘点/复核 1–2 天；NOTICE.md 类风险披露文档另需产品侧写作（2–3 天）。
@@ -75,7 +75,7 @@
 
 **解决的问题**：monorepo 里未使用导出/依赖/文件随时间累积。ZCode 用 knip 6（`tags: ["-lintignore"]`，忽略 docs 与 UI 组件目录）作为日常命令，另有 `dep:refs --list-exports <file>` 回答「这个文件的导出被谁引用」，`dep:graph` 生成 544 边的 mermaid 全仓依赖图（19KB，入库可 diff）。
 
-- **证据（ZCode）**：`/Users/zhvala/SourceCode/ZCode/knip.json:1-10`、`/Users/zhvala/SourceCode/ZCode/package.json:22-23`（dep:graph/dep:refs）、`:61`（knip）、`/Users/zhvala/SourceCode/ZCode/scripts/dep-refs.mjs`（387 行）、`/Users/zhvala/SourceCode/ZCode/dependency-graph.mmd`（544 条边）、`/Users/zhvala/SourceCode/ZCode/AGENTS.md:24`（把 knip 列为标准命令）
+- **证据（ZCode）**：`/Users/zhvala/SourceCode/zcoder/knip.json:1-10`、`/Users/zhvala/SourceCode/zcoder/package.json:22-23`（dep:graph/dep:refs）、`:61`（knip）、`/Users/zhvala/SourceCode/zcoder/scripts/dep-refs.mjs`（387 行）、`/Users/zhvala/SourceCode/zcoder/dependency-graph.mmd`（544 条边）、`/Users/zhvala/SourceCode/zcoder/AGENTS.md:24`（把 knip 列为标准命令）
 - **zclaudia 现状**：缺失（`ls node_modules/.bin | grep knip|madge|depcheck` 无命中；package.json 无相关 script）。
 - **可搬运性**：直接移植。knip 是现成 npm 工具，加配置即可；dep:refs 脚本（ts-morph）可照搬；ZCode 侧 Apache-2.0，保留声明。
 - **体量估计**：0.5–1 天（含首次清理误报 ignore 列表）。
@@ -85,9 +85,9 @@
 **解决的问题**：把 agent 运行时（CLI/桌面共享）的 trace、metrics、模型 API 调用记录标准化：`@zcode/telemetry` 封装 OTLP exporter（trace + metrics 双协议）、agent-trace-runtime（span 生命周期）、model-api-recorder、provider-endpoint 归类，且内置 error-sanitizer（上报前脱敏）与 otlp-cost-controls（采样/批量上限），10 个测试文件覆盖集成与成本路径。桌面端另有 ARMS RUM 前端监控（经 patches 修正）。vitest 配置注入 `__ZCODE_TELEMETRY_REPORT_ENDPOINT__` 使上报链路在单测可验证；CI 还有 `scripts/ci/ci-telemetry-keyword-guard.test.mjs` 防止敏感关键字进入遥测。
 
 - **证据（ZCode）**：
-  - `/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/telemetry/package.json`（@opentelemetry/sdk-trace-base/sdk-metrics/otlp-exporter 依赖）与 `src/index.ts:1-6`（导出面：agent-trace-runtime、bootstrap、error-sanitizer、model-api-recorder、provider-endpoint）
-  - `/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/telemetry/src/error-sanitizer.ts`、`src/agent-metrics.ts`、`tests/otlp-cost-controls.test.ts`
-  - `/Users/zhvala/SourceCode/ZCode/vitest.config.ts:46-49`（define 注入上报端点）
+  - `/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/telemetry/package.json`（@opentelemetry/sdk-trace-base/sdk-metrics/otlp-exporter 依赖）与 `src/index.ts:1-6`（导出面：agent-trace-runtime、bootstrap、error-sanitizer、model-api-recorder、provider-endpoint）
+  - `/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/telemetry/src/error-sanitizer.ts`、`src/agent-metrics.ts`、`tests/otlp-cost-controls.test.ts`
+  - `/Users/zhvala/SourceCode/zcoder/vitest.config.ts:46-49`（define 注入上报端点）
 - **zclaudia 现状**：缺失（workspace 各 package.json 无 @opentelemetry 依赖；`grep -rl opentelemetry apps server shared plugins packages` 无命中）。服务端问题排查目前靠日志。
 - **可搬运性**：重写借鉴。包结构与技术选型（OTLP + sanitizer + cost controls）可整体参考，但它依赖 `@zcode/contracts` 类型，直接复制需先解耦接口；自托管产品还要先决定上报端点与开关策略。
 - **体量估计**：核心包移植/改写 3–5 天（含测试），接入 server/desktop 另计。
@@ -96,7 +96,7 @@
 
 **解决的问题**：CLI/TUI/UI 共享一套 `getZCodeCopy(locale)` 文案目录，en-US 与 zh-CN 各约 360 行、类型受 `ZCodeCopy` 契约约束（缺 key 即编译错误）；`locale.ts` 按 LC_ALL→LC_MESSAGES→LANG→LANGUAGE 顺序解析环境并处理 `@modifier`/编码后缀，DEFAULT_LOCALE=en-US。配套 `tests/i18n.test.ts`。
 
-- **证据（ZCode）**：`/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/i18n/src/index.ts:20-27`（CATALOGS + getZCodeCopy）、`src/locale.ts:1-14`（env 探测）、`src/locales/zh-CN.ts`（361 行）、`src/locales/en-US.ts`（364 行）
+- **证据（ZCode）**：`/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/i18n/src/index.ts:20-27`（CATALOGS + getZCodeCopy）、`src/locale.ts:1-14`（env 探测）、`src/locales/zh-CN.ts`（361 行）、`src/locales/en-US.ts`（364 行）
 - **zclaudia 现状**：缺失（desktop/src 无 i18n/locale 模块；grep 'i18n' 于 services/stores/utils 无命中），UI 文案硬编码中文。
 - **可搬运性**：直接移植。包几乎自包含（唯一依赖 @zcode/contracts 的两个字符串字面量类型，可内联）；ZCode Apache-2.0，保留版权声明。若 zclaudia 面向国内用户为主，可只借架构、暂缓 en-US 补全。
 - **体量估计**：包移植 0.5 天；把现有 UI 文案迁入目录体系按页面计（初步 2–5 天）。
@@ -106,9 +106,9 @@
 **解决的问题**：对话产品（compact/fork/goal/队列/编辑组合）行为组合爆炸，靠人写用例覆盖不全。ZCode 的做法是：`packages/formal-proof` 用 ~900 行 model.ts 把产品上下文（runPhase/queue/compactMemory/goal/…）× 用户动作枚举成状态空间，guard/effect 剪枝后输出可人工 review、可转 e2e 的 trace case（模型里每个 case 带 `e2e` 字段）；配套 `scripts/audit-conversation-session-case-coverage.mjs --check/--require-complete` 维护 case catalog、e2e 覆盖率矩阵、环境故障目录三者一致性，并由 4 个 `scripts/test/conversation-session-formal-admission*.test.mjs` 审计转正流程。审计明确注释「必须显式命令触发，不挂默认单测」避免阻塞提交。
 
 - **证据（ZCode）**：
-  - `/Users/zhvala/SourceCode/ZCode/packages/formal-proof/src/model.ts:1-60`（ProductContext/Decision/TraceNode 类型与 case 统计）、`README.md`
-  - `/Users/zhvala/SourceCode/ZCode/docs/conversation-product-state-space.md:1-50`（状态维度表、笛卡尔积+guard 剪枝方法论）
-  - `/Users/zhvala/SourceCode/ZCode/scripts/audit-conversation-session-case-coverage.mjs:1-46`（catalog/matrix/fault 目录一致性口径）、`scripts/lib/conversation-session-formal-admission*.mjs`（5 个审计模块）
+  - `/Users/zhvala/SourceCode/zcoder/packages/formal-proof/src/model.ts:1-60`（ProductContext/Decision/TraceNode 类型与 case 统计）、`README.md`
+  - `/Users/zhvala/SourceCode/zcoder/docs/conversation-product-state-space.md:1-50`（状态维度表、笛卡尔积+guard 剪枝方法论）
+  - `/Users/zhvala/SourceCode/zcoder/scripts/audit-conversation-session-case-coverage.mjs:1-46`（catalog/matrix/fault 目录一致性口径）、`scripts/lib/conversation-session-formal-admission*.mjs`（5 个审计模块）
 - **zclaudia 现状**：缺失。zclaudia 有 `docs/quality-audit/06-e2e-scripts.md` 之类的人工审计，但无状态空间模型、无 case 转正门禁。
 - **可搬运性**：仅思路（当前对话状态机与 ZCode 产品强耦合）。可借鉴的方法论：高阶组合行为先建模枚举、再产出带 e2e 映射的 case 清单、用一致性审计脚本守住 catalog 与实现的同步。
 - **体量估计**：方法论落地（针对 zclaudia 的 automations/runtime 生命周期）约 1–2 周；直接移植不可行。
@@ -118,9 +118,9 @@
 **解决的问题**：e2e 不止 pass/fail：`packages/e2e-report` 把 wdio/覆盖率运行器的 summary JSON 渲染成 chart.js 看板（趋势、覆盖面板、样本统计），`pretest:e2e` 先构建其 node 侧库；`test:e2e:all:coverage` 用 `run-all-e2e-coverage.mjs` 按 env/故障注入选择 spec 全量跑并产出汇总；另有 `harness/remote`（SSH e2e 的 Docker 化 ssh-server）与 `test:e2e:container` 脚本族、`e2eSummarySpecCoverage.test.ts` 防止 spec 脱离汇总口径。desktop e2e 共 417 个 spec 文件（zclaudia 74 个）。
 
 - **证据（ZCode）**：
-  - `/Users/zhvala/SourceCode/ZCode/packages/e2e-report/src/node/index.ts:1-30`（readE2EReportSummary/createE2EReportViewerUrl）、`src/viewer/App.tsx`、`package.json`（chart.js）
-  - `/Users/zhvala/SourceCode/ZCode/packages/desktop/package.json:31-36`（pretest:e2e / test:e2e:all:coverage / windows sharded）、`packages/desktop/scripts/run-all-e2e-coverage.mjs:1-40`（env 选 spec、provider key 校验）
-  - `/Users/zhvala/SourceCode/ZCode/harness/remote/`（Dockerfile/build.sh/README）
+  - `/Users/zhvala/SourceCode/zcoder/packages/e2e-report/src/node/index.ts:1-30`（readE2EReportSummary/createE2EReportViewerUrl）、`src/viewer/App.tsx`、`package.json`（chart.js）
+  - `/Users/zhvala/SourceCode/zcoder/packages/desktop/package.json:31-36`（pretest:e2e / test:e2e:all:coverage / windows sharded）、`packages/desktop/scripts/run-all-e2e-coverage.mjs:1-40`（env 选 spec、provider key 校验）
+  - `/Users/zhvala/SourceCode/zcoder/harness/remote/`（Dockerfile/build.sh/README）
 - **zclaudia 现状**：e2e/ 有 vitest+playwright 双栈与多模式（local/remote/gateway，`e2e/README.md`），但报告用 playwright 内建 HTML report，无趋势/覆盖率看板，无容器化 harness；`playwright.resource-sync.config.ts` 是最接近的自定义运行器。
 - **可搬运性**：仅思路（ZCode 看板绑定 wdio summary 格式）。借鉴点：把 e2e 汇总持久化成 JSON + 轻量看板页，跟踪 74 个 spec 的通过率趋势与覆盖映射。
 - **体量估计**：最小可用（summary JSON + 静态页）3–5 天。
@@ -130,10 +130,10 @@
 **解决的问题**：ZCode 把「发布」当成 spec 对象：`specs/zcode-unified-distribution.md` 定义统一 Node 发行版的规则/所有权/打包/验收场景，文末记录 2026-09-20 的真实验证结果（5 个 process/installer 测试、真实 release 解包 smoke、`--web` 启动验证）；`scripts/zcode-distribution-smoke.mjs` + `zcode-distribution.test.mjs` 固化该验收；`deterministic-tar-archive.mjs` 保证归档可复现；ADR 0004 定义 `release-candidate.v1` 契约（对象存储 + 幂等 + 审批 + digest 校验），并给出被否方案及理由（继续扩展 GitLab CI、只传压缩包、平台只审批——均「拒绝」+ 理由）。日常 changelog 由 release-it + conventional-changelog 自定义 writer（`scripts/release-it/changelog-writer.mjs`）生成。
 
 - **证据（ZCode）**：
-  - `/Users/zhvala/SourceCode/ZCode/specs/zcode-unified-distribution.md`（验收与 Recorded validation 节）
-  - `/Users/zhvala/SourceCode/ZCode/docs/adr/0004-release-packaging-platform-contract.md:1-60`（Context/Decision/Alternatives 全流程）
-  - `/Users/zhvala/SourceCode/ZCode/.release-it.mjs:1-33`、`/Users/zhvala/SourceCode/ZCode/scripts/release-it/changelog-writer.mjs`
-  - `/Users/zhvala/SourceCode/ZCode/scripts/zcode-distribution-smoke.mjs`、`scripts/zcode-distribution.test.mjs`、`scripts/deterministic-tar-archive.mjs`
+  - `/Users/zhvala/SourceCode/zcoder/specs/zcode-unified-distribution.md`（验收与 Recorded validation 节）
+  - `/Users/zhvala/SourceCode/zcoder/docs/adr/0004-release-packaging-platform-contract.md:1-60`（Context/Decision/Alternatives 全流程）
+  - `/Users/zhvala/SourceCode/zcoder/.release-it.mjs:1-33`、`/Users/zhvala/SourceCode/zcoder/scripts/release-it/changelog-writer.mjs`
+  - `/Users/zhvala/SourceCode/zcoder/scripts/zcode-distribution-smoke.mjs`、`scripts/zcode-distribution.test.mjs`、`scripts/deterministic-tar-archive.mjs`
 - **zclaudia 现状**：`scripts/release/version-bump.sh`（从 git tag 推导版本 + Android versionCode + dev 后缀，有 `__tests__`）、`validate-updater-signing.mjs`（且 CI 里跑其 preflight 测试，`.github/workflows/ci.yml:43-44`）、4 条 GitHub workflow。差距：无发布规格文档、无 ADR、无发布后 smoke 流程记录、无 changelog 自动生成（无 release-it/conventional-changelog）。
 - **可搬运性**：重写借鉴。ADR 模板与「验收场景 + 记录化验证」格式直接可抄（半天）；release-it changelog 流程可直接引入（1 天）；发布平台契约（ADR 0004）现阶段过重，不建议。
 - **体量估计**：ADR + 发布 spec 模板 0.5–1 天；changelog 自动化 1 天；smoke 脚本 2–3 天。

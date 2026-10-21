@@ -1,6 +1,6 @@
 # T4 多形态与远程能力 对比报告
 
-> 竞品：ZCode（`/Users/zhvala/SourceCode/ZCode`，Apache-2.0）· 本仓库：zclaudia（`/Users/zhvala/SourceCode/zclaudia`）
+> 竞品：ZCode（`/Users/zhvala/SourceCode/zcoder`，Apache-2.0）· 本仓库：zclaudia（`/Users/zhvala/SourceCode/zclaudia`）
 > 维度：多形态分发（TUI / Web / 桌面 / 移动）与远程能力（SSH/WSL 远程工作区、手机远控、容器化 E2E）
 > 日期：2026-10-16 · 探索方式：只读（目录结构 → README/package.json → 关键入口 → 定向 grep）
 

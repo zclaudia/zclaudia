@@ -154,3 +154,84 @@ export async function saveExternalSkillDirsForBackend(
   if (!result.success)
     throw new Error(result.error?.message || 'Failed to save external skill directories');
 }
+
+/** One importable skill found in an external agent's skills directory. */
+export interface ExternalSkillCandidate {
+  agent: string;
+  agentLabel: string;
+  /** Skill directory basename in the external source. */
+  name: string;
+  skillName?: string;
+  description?: string;
+  version?: string;
+  sourceDir: string;
+  skillMdPath: string;
+  importable: boolean;
+  skipReason?: string;
+}
+
+export interface ExternalSkillSourceScan {
+  agent: string;
+  agentLabel: string;
+  path: string;
+  status: 'ok' | 'missing';
+  skills: ExternalSkillCandidate[];
+}
+
+export interface ExternalSkillScan {
+  sources: ExternalSkillSourceScan[];
+  importableCount: number;
+}
+
+export interface ExternalSkillImportOutcome {
+  agent: string;
+  agentLabel: string;
+  name: string;
+  status: 'imported' | 'skipped' | 'failed';
+  reason?: string;
+  targetPath?: string;
+}
+
+export interface ExternalSkillImportResult {
+  mode: 'symlink' | 'copy';
+  outcomes: ExternalSkillImportOutcome[];
+  sources: Array<{
+    agent: string;
+    agentLabel: string;
+    importedCount: number;
+    skippedCount: number;
+    failedCount: number;
+  }>;
+  lockUpdated: boolean;
+}
+
+export async function scanExternalSkillsForBackend(
+  backendId: string | null
+): Promise<ExternalSkillScan> {
+  const result = await fetchApiForBackend<ExternalSkillScan>(
+    '/api/workspace/skills/import/scan',
+    backendId
+  );
+  if (!result.success || !result.data)
+    throw new Error(result.error?.message || 'Failed to scan external skills');
+  return result.data;
+}
+
+export async function importExternalSkillsForBackend(
+  backendId: string | null,
+  selections: Array<{ agent: string; name: string }>,
+  mode: 'symlink' | 'copy'
+): Promise<ExternalSkillImportResult> {
+  const result = await fetchApiForBackend<ExternalSkillImportResult>(
+    '/api/workspace/skills/import',
+    backendId,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selections, mode }),
+    }
+  );
+  if (!result.success || !result.data)
+    throw new Error(result.error?.message || 'Failed to import external skills');
+  return result.data;
+}

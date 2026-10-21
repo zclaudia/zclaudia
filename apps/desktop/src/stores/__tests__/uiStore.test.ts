@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useUIStore, FONT_CONFIGS, type FontSizePreset } from '../uiStore';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { useUIStore, FONT_CONFIGS, MOBILE_FONT_CONFIGS, type FontSizePreset } from '../uiStore';
 
 describe('uiStore', () => {
   beforeEach(() => {
@@ -83,6 +83,46 @@ describe('uiStore', () => {
       expect(parseFloat(FONT_CONFIGS.medium.code)).toBeLessThan(
         parseFloat(FONT_CONFIGS.large.code)
       );
+    });
+  });
+
+  describe('mobile font sizes', () => {
+    const mockViewport = (mobile: boolean) =>
+      vi.spyOn(window, 'matchMedia').mockImplementation(
+        query =>
+          ({
+            matches: mobile && query === '(max-width: 767px)',
+            media: query,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+          }) as unknown as MediaQueryList
+      );
+    const rootVar = (name: string) => document.documentElement.style.getPropertyValue(name);
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('steps every preset up from its desktop size', () => {
+      for (const preset of ['small', 'medium', 'large'] as FontSizePreset[]) {
+        for (const field of ['prose', 'code', 'input'] as const) {
+          expect(parseFloat(MOBILE_FONT_CONFIGS[preset][field])).toBeGreaterThan(
+            parseFloat(FONT_CONFIGS[preset][field])
+          );
+        }
+      }
+    });
+
+    it('applies the mobile table on a phone viewport', () => {
+      mockViewport(true);
+      useUIStore.getState().setFontSize('medium');
+      expect(rootVar('--chat-font-prose')).toBe(MOBILE_FONT_CONFIGS.medium.prose);
+      expect(rootVar('--chat-font-input')).toBe(MOBILE_FONT_CONFIGS.medium.input);
+    });
+
+    it('keeps the desktop table on a wide viewport', () => {
+      mockViewport(false);
+      useUIStore.getState().setFontSize('medium');
+      expect(rootVar('--chat-font-prose')).toBe(FONT_CONFIGS.medium.prose);
+      expect(rootVar('--chat-font-input')).toBe(FONT_CONFIGS.medium.input);
     });
   });
 

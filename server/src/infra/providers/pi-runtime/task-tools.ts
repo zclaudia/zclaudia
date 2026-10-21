@@ -1,6 +1,7 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
+import type { TaskResult, TaskUsageSummary } from '@zclaudia/shared/core/task';
 
 import type { TaskPort } from '../../../utils/task-port.js';
 import type { TaskExecutor } from '../../../utils/task-executor-types.js';
@@ -28,6 +29,38 @@ function taskTitleFromArgs(args: Record<string, unknown>): string | undefined {
   if (typeof args.prompt === 'string' && args.prompt.trim())
     return truncateText(args.prompt.trim(), 120);
   return undefined;
+}
+
+/**
+ * Renders a sub-agent run's terminal usage as a `<usage>` block appended to the
+ * Agent tool's synchronous (wait:true) return, mirroring the usage summary the
+ * async completion path carries (subagent_tokens / tool_uses / duration_ms,
+ * plus the token breakdown when the runtime reported one). Empty when the run
+ * produced no usage at all.
+ */
+export function formatAgentUsageBlock(usage: TaskUsageSummary | undefined): string {
+  if (!usage) return '';
+  const lines: string[] = [];
+  if (typeof usage.totalTokens === 'number') lines.push(`subagent_tokens: ${usage.totalTokens}`);
+  if (typeof usage.input === 'number') lines.push(`input_tokens: ${usage.input}`);
+  if (typeof usage.output === 'number') lines.push(`output_tokens: ${usage.output}`);
+  if (typeof usage.cacheRead === 'number') lines.push(`cache_read_tokens: ${usage.cacheRead}`);
+  if (typeof usage.cacheWrite === 'number') lines.push(`cache_write_tokens: ${usage.cacheWrite}`);
+  if (typeof usage.toolUses === 'number') lines.push(`tool_uses: ${usage.toolUses}`);
+  if (typeof usage.durationMs === 'number') lines.push(`duration_ms: ${usage.durationMs}`);
+  if (lines.length === 0) return '';
+  return `\n\n<usage>\n${lines.join('\n')}\n</usage>`;
+}
+
+/** Sync (wait:true) return payload: JSON body plus the trailing `<usage>` block. */
+function agentSyncResult(taskId: string, status: string, result: TaskResult | undefined) {
+  const payload = { ok: true, taskId, status, result };
+  return textResult(JSON.stringify(payload, null, 2) + formatAgentUsageBlock(result?.usage), {
+    ok: true,
+    taskId,
+    status,
+    ...(result?.usage ? { usage: result.usage } : {}),
+  });
 }
 
 function resolveProjectIdForSession(
@@ -108,7 +141,7 @@ export function createAgentTool(
     name: 'Agent',
     label: 'Agent',
     description:
-      'Delegate work to a background sub-agent task. Set isolation:"worktree" to run it in an ephemeral git worktree so parallel agents never conflict on files; a clean worktree is removed automatically, one with changes is kept and reported. Pick a subagent_type to run it under a specific agent profile (system prompt, model, tool set); omit it for the default profile. Send follow-up instructions to a running or finished sub-agent with SendMessage({ task_id, message }).' +
+      'Delegate work to a background sub-agent task. Set isolation:"worktree" to run it in an ephemeral git worktree so parallel agents never conflict on files; a clean worktree is removed automatically, one with changes is kept and reported. Pick a subagent_type to run it under a specific agent profile (system prompt, model, tool set); omit it for the default profile. Send follow-up instructions to a running or finished sub-agent with SendMessage({ task_id, message }). With wait:true the result ends with a <usage> block reporting the sub-agent run\'s token usage.' +
       describeSubagentTypes(roster),
     parameters: agentToolParameters({
       type: 'object',
@@ -219,12 +252,7 @@ export function createAgentTool(
             : result.status === 'stopped'
               ? taskPort.stopTask(task.id, result.result)
               : taskPort.failTask(task.id, result.result ?? { error: 'Agent task failed' });
-        return jsonResult({
-          ok: true,
-          taskId: task.id,
-          status: updated.status,
-          result: result.result,
-        });
+        return agentSyncResult(task.id, updated.status, result.result);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         taskPort.failTask(task.id, { error: message });

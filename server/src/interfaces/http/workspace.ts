@@ -17,6 +17,11 @@ import {
   getSkillLoadDiagnostics,
   saveExternalSkillDirs,
 } from '../../application/plugins/skill-tools.js';
+import {
+  importExternalSkills,
+  recordImportedExternalSkills,
+  scanExternalSkillSources,
+} from '../../application/plugins/skill-import.js';
 import { pluginSkillReloader } from '../../application/plugins/skill-bootstrap.js';
 import { pluginLoader } from '../../application/plugins/loader.js';
 import { createExecutionEnv } from '../../infra/execution-env.js';
@@ -116,6 +121,84 @@ export function createWorkspaceRoutes(): ReturnType<typeof Router> {
         500,
         'INTERNAL_ERROR',
         error instanceof Error ? error.message : 'Failed to list skills'
+      );
+    }
+  });
+
+  /**
+   * GET /api/workspace/skills/import/scan
+   * Scan well-known external agent skill sources (Claude Code / Codex /
+   * Cursor) for importable skills. Registered before the /skills/:skillId
+   * routes so POST /skills/import is not captured by create/update below.
+   */
+  router.get('/skills/import/scan', (req: Request, res: Response) => {
+    try {
+      res.json({ success: true, data: scanExternalSkillSources() });
+    } catch (error) {
+      console.error('[Workspace API] Error scanning external skills:', error);
+      sendApiError(
+        res,
+        500,
+        'INTERNAL_ERROR',
+        error instanceof Error ? error.message : 'Failed to scan external skills'
+      );
+    }
+  });
+
+  /**
+   * POST /api/workspace/skills/import
+   * Import selected external-agent skills into the global skills dir
+   * (~/.zclaudia/skills). Same-name targets are skipped, never overwritten.
+   * Body: { selections: [{ agent, name }], mode?: 'symlink' | 'copy' }
+   * After importing, the skill cache is refreshed (which refreshes the
+   * skills-lock) and the import origin is recorded in the skills-lock.
+   */
+  router.post('/skills/import', async (req: Request, res: Response) => {
+    try {
+      const { selections, mode } = req.body ?? {};
+      if (
+        !Array.isArray(selections) ||
+        selections.some(
+          (s: unknown) =>
+            !s ||
+            typeof s !== 'object' ||
+            typeof (s as { agent?: unknown }).agent !== 'string' ||
+            typeof (s as { name?: unknown }).name !== 'string'
+        )
+      ) {
+        sendApiError(
+          res,
+          400,
+          'VALIDATION_ERROR',
+          'selections must be an array of { agent, name }'
+        );
+        return;
+      }
+      if (mode !== undefined && mode !== 'symlink' && mode !== 'copy') {
+        sendApiError(res, 400, 'VALIDATION_ERROR', 'mode must be "symlink" or "copy"');
+        return;
+      }
+
+      const result = importExternalSkills({
+        selections: selections as { agent: string; name: string }[],
+        mode: mode ?? 'symlink',
+      });
+
+      // Make imported skills visible immediately (this also refreshes the
+      // skills-lock via the external-skill load pass), then record the import
+      // origin in the lock.
+      workspaceService.clearCache();
+      await refreshSkillCache(createExecutionEnv(process.cwd()), pluginSkillReloader(pluginLoader));
+      const lock = recordImportedExternalSkills({ imports: result.imported });
+
+      res.json({ success: true, data: { ...result, lockUpdated: lock.updated } });
+    } catch (error) {
+      console.error('[Workspace API] Error importing external skills:', error);
+      sendApiError(
+        res,
+        500,
+        'INTERNAL_ERROR',
+        error instanceof Error ? error.message : 'Failed to import external skills'
       );
     }
   });

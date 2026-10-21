@@ -363,7 +363,8 @@ const BUILTIN_TOOL_METADATA_BASE: Readonly<Record<ToolName, ToolMetadata>> = {
   Grep: {
     ref: { source: 'builtin', name: 'Grep' },
     label: 'Grep',
-    description: 'Search file contents with ripgrep and structured results.',
+    description:
+      'Search file contents with ripgrep and structured results (supports type filtering, multiline patterns, and offset pagination).',
     setIds: ['core-coding'],
     declaredReadOnly: true,
     mutatesWorkspace: false,

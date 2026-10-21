@@ -13,6 +13,12 @@ export interface ConnectedClient {
   isAlive: boolean;
   isLocal: boolean; // Whether this is a localhost connection
   authenticated: boolean; // Whether the client has been authenticated
+  /**
+   * Trusted desktop host (connected via `/ws/host` with a valid one-time
+   * capability ticket). Only the upgrade path can set this — no client
+   * message can self-promote to trusted host.
+   */
+  isTrustedHost?: boolean;
 }
 
 // Message sender interface for abstraction

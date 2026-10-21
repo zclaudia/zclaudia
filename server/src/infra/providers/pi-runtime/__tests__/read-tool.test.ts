@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, symlink, writeFile } from 'fs/promises';
+import { mkdir, mkdtemp, symlink, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
 
@@ -281,6 +281,72 @@ describe('Read bridge tool module', () => {
     const result = await read.execute('read-1', { path: 'bundle.zip' });
 
     expect(result.details).toMatchObject({ ok: false, error: 'binary_file' });
+  });
+
+  it('rejects video files with an explicit not-supported error', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-video-'));
+    await writeFile(path.join(root, 'clip.mp4'), Buffer.from([0, 0, 0, 24, 102, 116, 121, 112]));
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-video-1', { path: 'clip.mp4' });
+
+    expect(result.details).toMatchObject({
+      ok: false,
+      error: 'video_not_supported',
+      mimeType: 'video/mp4',
+    });
+    expect(result.content[0].text).toContain('no video content block');
+    expect(result.content[0].text).toContain('ffmpeg');
+  });
+
+  it('suggests same-stem and near names when the read path is missing (max 3)', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-missing-'));
+    await writeFile(path.join(root, 'config.json'), '{}\n');
+    await writeFile(path.join(root, 'config.jsonc'), '{}\n');
+    await writeFile(path.join(root, 'config.js'), '{}\n');
+    await writeFile(path.join(root, 'unrelated.md'), 'x\n');
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-missing-1', { path: 'config.jso' });
+
+    expect(result.details).toMatchObject({ ok: false, error: 'file_not_found' });
+    const suggestions = result.details.suggestions as string[];
+    expect(suggestions).toHaveLength(3);
+    // Same stem first (config.json/config.jsonc/config.js), unrelated.md never suggested.
+    expect(suggestions).toEqual(['config.js', 'config.json', 'config.jsonc']);
+    expect(result.content[0].text).toContain('Did you mean one of:');
+  });
+
+  it('falls back to a project-wide scan for Did-you-mean candidates and orders by distance', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-missing-scan-'));
+    await mkdir(path.join(root, 'src'), { recursive: true });
+    await writeFile(path.join(root, 'src', 'app-contrller.ts'), 'x\n');
+    await writeFile(path.join(root, 'src', 'app-controller.ts'), 'x\n');
+    await writeFile(path.join(root, 'totally-different.txt'), 'x\n');
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-missing-2', { path: 'app-controlelr.ts' });
+
+    expect(result.details).toMatchObject({ ok: false, error: 'file_not_found' });
+    const suggestions = result.details.suggestions as string[];
+    // Both near names are within the edit-distance budget; contrller.ts is one
+    // edit away (closer than controller.ts), so it sorts first.
+    expect(suggestions).toEqual(['src/app-contrller.ts', 'src/app-controller.ts']);
+    expect(result.content[0].text).toContain(
+      'Did you mean one of: src/app-contrller.ts, src/app-controller.ts?'
+    );
+  });
+
+  it('reports file_not_found without suggestions when nothing is similar', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-missing-none-'));
+    await writeFile(path.join(root, 'completely-unrelated.txt'), 'x\n');
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-missing-3', { path: 'zzzzzz.sql' });
+
+    expect(result.details).toMatchObject({ ok: false, error: 'file_not_found' });
+    expect(result.details.suggestions).toBeUndefined();
+    expect(result.content[0].text).not.toContain('Did you mean');
   });
 
   it('reads plain-text files larger than the 512KB mutation cap', async () => {

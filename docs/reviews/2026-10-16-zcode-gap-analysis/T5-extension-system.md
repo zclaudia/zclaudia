@@ -1,7 +1,7 @@
 # T5 扩展体系（插件/技能/工作流/自动化） 对比报告
 
 > 探索日期：2026-10-16。只读探索，所有路径均已在本会话中实际读取验证。
-> 竞品仓库：`/Users/zhvala/SourceCode/ZCode`（下文 ZCode 侧路径均相对其根目录，除非写绝对路径）；本仓库：`/Users/zhvala/SourceCode/zclaudia`。
+> 竞品仓库：`/Users/zhvala/SourceCode/zcoder`（下文 ZCode 侧路径均相对其根目录，除非写绝对路径）；本仓库：`/Users/zhvala/SourceCode/zclaudia`。
 
 ## 1. 两侧结构对照（简表）
 
@@ -44,7 +44,7 @@
 ### 2.4 skills-lock.json：第三方技能的来源锁定与哈希校验
 
 - **解决的问题**：把 GitHub 上的第三方技能 vendored 进仓库（`.agents/skills/`）时，用锁文件记录 `source`（owner/repo）、`sourceType`（github）、可选 `skillPath` 与 `computedHash`（sha256），使技能可溯源、可复现安装、可检测上游或本地篡改。ZCode 自身用它锁定了 `vercel-labs/agent-browser`、`vercel/ai-elements`、`vercel-labs/agent-skills` 等上游技能。
-- **证据路径**：ZCode 侧 `/Users/zhvala/SourceCode/ZCode/skills-lock.json`（4 条记录）、`/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/skills-lock.json`（3 条，含 skillPath）、`docs/vercel-react-best-practices-skill.md`（安装位置与边界说明）、`.agents/skills/` 目录。zclaudia 现状：缺失（仓库内无 skills-lock 或等价的技能来源清单）。
+- **证据路径**：ZCode 侧 `/Users/zhvala/SourceCode/zcoder/skills-lock.json`（4 条记录）、`/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/skills-lock.json`（3 条，含 skillPath）、`docs/vercel-react-best-practices-skill.md`（安装位置与边界说明）、`.agents/skills/` 目录。zclaudia 现状：缺失（仓库内无 skills-lock 或等价的技能来源清单）。
 - **可搬运性**：直接移植。锁文件格式 25 行、纯 JSON；注意：仓库内未发现生成/消费它的代码（推测由外部 skills CLI 维护，见 unverified），移植时需决定"只采纳格式 + 自建校验脚本"还是引入同一外部工具。
 - **体量估计**：极小（格式 + 一个校验脚本）。
 
@@ -72,7 +72,7 @@
 ### 2.8 UI Plugin：MCP Apps 交互页面（Agent 与用户共编一份内容）
 
 - **解决的问题**：工具结果不再只是文本卡片——插件可声明 `ui.surfaces` 侧栏面板与工具级 `_meta.ui.resourceUri`，页面经 MCP Apps 协议与宿主通信：Agent 调工具生成画布/表单/图表，用户直接操作后把选区"引用到对话"，页面可回调插件 MCP 服务、发送下一条消息、在插件界面内采样模型。Excalidraw 演示了"Agent 画初稿→用户改→Agent 按选区局部修改"的共编闭环（版本冲突检查、撤销/重做共享）。
-- **证据路径**：ZCode 侧 `/Users/zhvala/SourceCode/ZCode/UI_PLUGIN.md`（能力表、Excalidraw 工具表、API 速查）、`/Users/zhvala/SourceCode/ZCode/UI_PLUGIN.en.md`；清单解析在 `apps/zcode-cli/packages/contracts/src/plugins/index.ts:160-181`（ui/uiSurfaces）。zclaudia 现状：有静态 UI 贡献（panels/uiExtensions/notchTabs，`shared/src/plugins/manifest.ts:218-223`），无 agent 驱动的交互页面协议。
+- **证据路径**：ZCode 侧 `/Users/zhvala/SourceCode/zcoder/UI_PLUGIN.md`（能力表、Excalidraw 工具表、API 速查）、`/Users/zhvala/SourceCode/zcoder/UI_PLUGIN.en.md`；清单解析在 `apps/zcode-cli/packages/contracts/src/plugins/index.ts:160-181`（ui/uiSurfaces）。zclaudia 现状：有静态 UI 贡献（panels/uiExtensions/notchTabs，`shared/src/plugins/manifest.ts:218-223`），无 agent 驱动的交互页面协议。
 - **可搬运性**：仅思路（短期）/重写借鉴（长期）。页面协议基于官方 `@modelcontextprotocol/ext-apps`（SDK 2.0.0），方向可跟随上游标准；但宿主侧加载、surface 管理、Gen UI 差异需要按 zclaudia 桌面架构重做。Apache-2.0 归属要求同上。
 - **体量估计**：宿主侧页面加载/通信/状态保持估计数千行（本次未逐行统计）。
 
@@ -116,12 +116,12 @@
 
 ## 附：证据与覆盖说明
 
-- 本报告所有 ZCode 侧路径均在 `/Users/zhvala/SourceCode/ZCode` 下实际读取；zclaudia 侧路径均在 `/Users/zhvala/SourceCode/zclaudia` 下实际读取或 grep 验证。
+- 本报告所有 ZCode 侧路径均在 `/Users/zhvala/SourceCode/zcoder` 下实际读取；zclaudia 侧路径均在 `/Users/zhvala/SourceCode/zclaudia` 下实际读取或 grep 验证。
 - 体量数字来自 `find … | xargs wc -l` 实测（dynamic-workflow src 44,312 行含 testing 1,619 行、tests 19,761 行；runtime 4,972；node-repl-host 2,816；browser-use-plugin 1,165；zcode-cua-plugin 2,124；superpowers-plugin 7,212；bundled-skills 3,495）。
 
 ## 5. 独立复核记录
 
-> 复核日期：2026-10-16。复核员与探索员无共享上下文，逐条亲自打开证据文件核对；以下 path:line 均为本次实际读取。ZCode 侧路径省略前缀 `/Users/zhvala/SourceCode/ZCode/`。
+> 复核日期：2026-10-16。复核员与探索员无共享上下文，逐条亲自打开证据文件核对；以下 path:line 均为本次实际读取。ZCode 侧路径省略前缀 `/Users/zhvala/SourceCode/zcoder/`。
 
 - ✅ 插件清单资产广度（P1）：`PluginManifest` 的 agents/channels/commands/dependencies/hooks/lspServers/mcpServers/outputStyles/settings/skills/ui/userConfig 与 `PluginLoadOutcome`、`PluginStoreListing`（多语言/hero 图/示例提示词/requiresPaidPlan）逐字段相符（contracts/src/plugins/index.ts:142-164、:272-281、:115-140）；zclaudia 侧 `shared/src/plugins/contributions.ts:139-161` 确无 mcpServers/agents/outputStyles/userConfig/ui.surfaces，`hooks?: HookContribution[]`（contributions.ts:144）虽存在类型声明但无任何运行时消费者（server loader grep 零命中），报告"缺 hooks"在运行时语义上成立。
 - ✅ Marketplace 分发闭环与 Claude 生态兼容（P1）："可识别、可展示、可诊断，不静默运行"与第三方 hooks 默认只解析待信任门（docs/claude-code-marketplace-plugin-compat.md:8、:31-32、:250-251）；zip 源 schema url/type/sha256/path/stripRoot 且 sha256 必填、校验先于解压（docs/plugin-cdn-zip-source.md:40-66、:223-225）；实现属实：marketplace.ts 的 add/update/remove/install 与依赖闭包 + 跨市场 allowlist（adapters/src/plugins/marketplace.ts:400/:699/:742/:790、resolveDependencyClosure :1268、allowCrossMarketplaces :1275-1285），zip-source.ts 与 github-archive-source.ts 均存在。

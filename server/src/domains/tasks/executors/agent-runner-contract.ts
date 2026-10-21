@@ -37,7 +37,15 @@ export interface AgentRunnerTask {
 export interface AgentTaskRunCallbacks {
   onStarted: (sessionId: string) => void;
   onDelta?: (content: string) => void;
-  onCompleted: (result: { resultSummary: string; responseText: string; toolCount: number }) => void;
+  onCompleted: (result: {
+    resultSummary: string;
+    responseText: string;
+    toolCount: number;
+    /** Terminal usage of the sub-agent run (wire run_completed payload); absent when the runtime reported none. */
+    usage?: import('@zclaudia/shared/core/message').UsageInfo;
+    /** Wall-clock duration of the run, measured by the runner. */
+    durationMs?: number;
+  }) => void;
   onFailed: (errorSummary: string) => void;
 }
 

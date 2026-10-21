@@ -94,7 +94,25 @@ export class AgentTaskExecutor implements TaskExecutor {
       onCompleted: result => {
         pending.resolve({
           status: 'completed',
-          result: { text: result.responseText || result.resultSummary },
+          result: {
+            text: result.responseText || result.resultSummary,
+            // Terminal usage of the sub-agent run: the Agent tool renders it as
+            // a `<usage>` block on the synchronous (wait:true) return, and the
+            // task row keeps it for the UI.
+            ...(result.usage
+              ? {
+                  usage: {
+                    input: result.usage.input,
+                    output: result.usage.output,
+                    cacheRead: result.usage.cacheRead,
+                    cacheWrite: result.usage.cacheWrite,
+                    totalTokens: result.usage.totalTokens,
+                    toolUses: result.toolCount,
+                    ...(result.durationMs !== undefined ? { durationMs: result.durationMs } : {}),
+                  },
+                }
+              : {}),
+          },
         });
       },
       onFailed: errorSummary => {

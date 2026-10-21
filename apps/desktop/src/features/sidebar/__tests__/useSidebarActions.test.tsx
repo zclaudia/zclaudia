@@ -1,14 +1,21 @@
 import { resolveProjectWorkspace } from '../../../actions/projectWorkspaceActions';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { useSidebarActions } from '../useSidebarActions';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useRightWorkspaceStore, flattenPanes } from '../../../stores/rightWorkspaceStore';
 import { useProjectWorkspaceStore } from '../../../stores/projectWorkspaceStore';
 
-const { selectSession } = vi.hoisted(() => ({ selectSession: vi.fn() }));
+const { selectSession, createSession } = vi.hoisted(() => ({
+  selectSession: vi.fn(),
+  createSession: vi.fn(),
+}));
 vi.mock('../../../hooks/useSelectionCoordinator', () => ({
   useSelectionCoordinator: () => ({ selectSession, selectProject: vi.fn() }),
+}));
+vi.mock('../../../services/api', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../../services/api')>()),
+  createSession,
 }));
 
 function options(isMobile = false) {
@@ -74,5 +81,37 @@ describe('useSidebarActions workspace selection', () => {
     );
     expect(selectSession).toHaveBeenCalledWith('new-chat');
     expect(props.onClose).toHaveBeenCalledOnce();
+  });
+});
+
+describe('useSidebarActions session creation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createSession.mockResolvedValue({ id: 'created', projectId: 'project' });
+  });
+
+  it('closes the mobile drawer once the new session is selected', async () => {
+    const props = options(true);
+    const { result } = renderHook(() => useSidebarActions(props));
+    await act(() => result.current.handleCreateSession('project'));
+    expect(selectSession).toHaveBeenCalledWith('created');
+    expect(props.onClose).toHaveBeenCalledOnce();
+  });
+
+  it('leaves the desktop sidebar alone', async () => {
+    const props = options(false);
+    const { result } = renderHook(() => useSidebarActions(props));
+    await act(() => result.current.handleCreateSession('project'));
+    expect(selectSession).toHaveBeenCalledWith('created');
+    expect(props.onClose).not.toHaveBeenCalled();
+  });
+
+  it('keeps the drawer open when creation fails', async () => {
+    createSession.mockRejectedValueOnce(new Error('boom'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const props = options(true);
+    const { result } = renderHook(() => useSidebarActions(props));
+    await act(() => result.current.handleCreateSession('project'));
+    expect(props.onClose).not.toHaveBeenCalled();
   });
 });

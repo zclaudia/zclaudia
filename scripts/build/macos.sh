@@ -233,9 +233,12 @@ verify_release_bundle() {
   # alone is insufficient: directory symlinks can disappear during packaging.
   node scripts/plugins/verify-builtin-agents.mjs "$resources_dir/server/builtin-plugins"
 
-  if rg -n --hidden --no-ignore "server/dist/index.js" "$resources_dir" >/dev/null 2>&1; then
+  # Anchor the path segment so vendored module paths that merely end in
+  # "...-server/dist/index.js" (e.g. @hono/node-server, socks5-server) don't
+  # trip the dev-entry check.
+  if rg -n --hidden --no-ignore "(^|/)server/dist/index\.js" "$resources_dir" >/dev/null 2>&1; then
     echo "ERROR: Release bundle still references dev server path: server/dist/index.js"
-    rg -n --hidden --no-ignore "server/dist/index.js" "$resources_dir" || true
+    rg -n --hidden --no-ignore "(^|/)server/dist/index\.js" "$resources_dir" || true
     exit 1
   fi
 

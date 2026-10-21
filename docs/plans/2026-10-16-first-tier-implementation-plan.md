@@ -27,9 +27,9 @@
 - 扩展 `server/src/infra/providers/pi-runtime/__tests__/retry-stream.test.ts`
 
 **ZCode 参照**（可实读）：
-- `/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/adapters/src/model/failure-provider-business-codes.ts`（402 行映射表：1120/1230/1234/1302/1303/1305/1312 可重试；1113/1304/1308-1313 终止；`insufficient_quota`/`credit_balance_exhausted` 等 OpenAI 风格 code 终止）
-- `/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/adapters/src/model/runner-retry.ts:15,38-56`（`MAX_REASONABLE_RETRY_AFTER_MS = 5 * 60_000`；合理则直接采用，否则指数退避）
-- `/Users/zhvala/SourceCode/ZCode/docs/bigmodel-business-error-retry.md`（业务码出现在 HTTP 200 SSE error frame 的场景与"已产出内容不重放"边界）
+- `/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/adapters/src/model/failure-provider-business-codes.ts`（402 行映射表：1120/1230/1234/1302/1303/1305/1312 可重试；1113/1304/1308-1313 终止；`insufficient_quota`/`credit_balance_exhausted` 等 OpenAI 风格 code 终止）
+- `/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/adapters/src/model/runner-retry.ts:15,38-56`（`MAX_REASONABLE_RETRY_AFTER_MS = 5 * 60_000`；合理则直接采用，否则指数退避）
+- `/Users/zhvala/SourceCode/zcoder/docs/bigmodel-business-error-retry.md`（业务码出现在 HTTP 200 SSE error frame 的场景与"已产出内容不重放"边界）
 
 **规格**：
 1. 新模块 `provider-business-codes.ts`：业务码 → {retryable, reason} 表（对齐 ZCode 语义；表数据注明参考来源）+ 从错误文本解析 `[1302][…][request_id]` 前缀与 OpenAI 风格 `code` 字段的解析器。纯函数、无依赖。
@@ -48,7 +48,7 @@
 - `apps/desktop/scripts/tokens/config.mjs` + `gen-tokens.mjs`（新增静态字号标度段，产出 `--font-ui-*` CSS 变量）
 - `apps/desktop/src/features/chat/message-list/assistantMarkdown.tsx`（h1–h6 与 p 接入标度 class）
 
-**ZCode 参照**：`/Users/zhvala/SourceCode/ZCode/packages/ui/src/components/ai-elements/message.tsx:438-447`（h1→text-ui-xl、h2→text-ui-lg、h3–h6→text-ui-base 且以字重区分）与 `DESIGN.md:12-23` 的规则表述（禁止裸 px、全局缩放只允许根变量）。
+**ZCode 参照**：`/Users/zhvala/SourceCode/zcoder/packages/ui/src/components/ai-elements/message.tsx:438-447`（h1→text-ui-xl、h2→text-ui-lg、h3–h6→text-ui-base 且以字重区分）与 `DESIGN.md:12-23` 的规则表述（禁止裸 px、全局缩放只允许根变量）。
 
 **规格**：
 1. 在 gen-tokens 管线中加一组语义字号 token（如 `--font-ui-xl/lg/base` 等，具体档位按现有 tokens 输出方式定义为静态段；**不改** html 根 font-size），`gen:tokens:check` 必须能校验。
@@ -67,7 +67,7 @@
 - `THIRD-PARTY-NOTICES.md` 生成产物**不入库**（加入 .gitignore），按需生成
 - 新增 `docs/development/third-party-licenses.md`（用法与口径说明）
 
-**ZCode 参照**：`/Users/zhvala/SourceCode/ZCode/scripts/licenses.mjs` 及其 import 的 `generate-third-party-notices.mjs`、`third-party-npm.mjs` 等；分类口径 green（MIT/ISC/BSD/Apache-2.0…）/yellow（LGPL/MPL/EPL 登记复核）/red（GPL/AGPL/SSPL/CC-NC 失败）。
+**ZCode 参照**：`/Users/zhvala/SourceCode/zcoder/scripts/licenses.mjs` 及其 import 的 `generate-third-party-notices.mjs`、`third-party-npm.mjs` 等；分类口径 green（MIT/ISC/BSD/Apache-2.0…）/yellow（LGPL/MPL/EPL 登记复核）/red（GPL/AGPL/SSPL/CC-NC 失败）。
 
 **规格**：
 1. 适配 pnpm workspace：实装清单从 workspace `node_modules` 递归收集（含嵌套版本），prod 判定按 `pnpm-lock.yaml` 生产图。
@@ -87,7 +87,7 @@
 - 新增 `dependency-graph.mmd`（生成产物，入库可 diff）
 - 发现报告写 `docs/reviews/2026-10-16-first-tier-implementation/knip-findings.md`
 
-**ZCode 参照**：`/Users/zhvala/SourceCode/ZCode/knip.json`、`scripts/dep-refs.mjs`（387 行 ts-morph）、`scripts/dependency-graph.mjs`、`package.json:22-23,61`。
+**ZCode 参照**：`/Users/zhvala/SourceCode/zcoder/knip.json`、`scripts/dep-refs.mjs`（387 行 ts-morph）、`scripts/dependency-graph.mjs`、`package.json:22-23,61`。
 
 **规格**：
 1. knip 配置到 `pnpm knip` 退出码 0（可对 docs/e2e/生成产物等合理 ignore）；**发现的问题只记录不删除**——全部写进 knip-findings.md 供后续人工清理。
@@ -103,7 +103,7 @@
 - 根 `package.json` 增 `build:distribution` script
 - 用法说明写在各脚本头部注释（暂不加独立文档）
 
-**ZCode 参照**：`/Users/zhvala/SourceCode/ZCode/scripts/zcode-distribution/runner.mjs`（272 行零依赖：`--web` 分流 `:256`、非本机强制 token `:101-111,173-174`、空闲端口 `:113-129`、子进程环境变量拉起 `:178-192`）、`scripts/build-zcode.mjs`（`stageZCodePackage` `:157-219`）、`scripts/zcode-distribution/installer.mjs`。
+**ZCode 参照**：`/Users/zhvala/SourceCode/zcoder/scripts/zcode-distribution/runner.mjs`（272 行零依赖：`--web` 分流 `:256`、非本机强制 token `:101-111,173-174`、空闲端口 `:113-129`、子进程环境变量拉起 `:178-192`）、`scripts/build-zcode.mjs`（`stageZCodePackage` `:157-219`）、`scripts/zcode-distribution/installer.mjs`。
 
 **规格**：
 1. `runner.mjs`：命令名 `zclaudia`；`--web [--port N] [--host H]` 用系统 `node` 启动打包内的 server 入口并以打包内 web dist 为静态根；无 TUI——无参数时打印用法；非 127.0.0.1/localhost 监听自动生成访问 token 并打印（沿用 ZCode 的 token 逻辑）；自动选空闲端口；SIGINT 优雅退出。零依赖（node 内置模块）。

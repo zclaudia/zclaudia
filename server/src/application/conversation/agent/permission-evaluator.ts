@@ -301,21 +301,51 @@ const READONLY_TOOLS = [
 
 const EDIT_TOOLS = ['Write', 'Edit', 'MultiEdit', 'EditSymbol', 'RenameSymbol', 'NotebookEdit'];
 
+/**
+ * Bash commands classified destructiveOps. This is the coarse classifier: any
+ * match routes the call to the destructiveOps profile action (usually `ask`),
+ * so looser matching is acceptable — the tight, catastrophic shapes live in
+ * the pi-runtime critical gate (bash-guards/patterns.ts), which matches on
+ * quote/flag-normalized and variable-expanded text. Rule set borrows
+ * semantically from ZCode's guarded command rules (Z/core/src/tool/handlers/
+ * guarded/: recursive/bulk rm, find -delete, git clean -f, rsync --delete,
+ * system-storage dd/mkfs); the implementation is this repo's regex tables.
+ */
 const DANGEROUS_BASH_PATTERNS = [
+  // Recursive deletion (rm / find / git / rsync).
   /\brm\s+(-[a-z]*f|-[a-z]*r|--force|--recursive)\b/i,
   /\brm\s+-rf\b/i,
   /\bsudo\b/,
+  // `su` only at command position: `su`, `su -`, `su root`, `su -c …`.
+  /(?:^|[;&|(])\s*su(?:\s|$|[;&|(])/,
   /\bmkfs\b/,
-  /\bdd\s+if=/i,
-  /\bformat\b/i,
+  // Disk destruction: dd writing to a device (of=), not the harmless
+  // `dd if=x of=./image.img` or `of=/dev/null` shapes; macOS diskutil erasure.
+  /\bdd\s+[^|;&]*\bof=\/dev\/(?!null\b)/i,
+  /\bdiskutil\s+(?:erase\w*|zeroDisk|randomDisk|reformat|apfs\s+(?:delete\w*|erase\w*))/i,
+  // The format utility (Windows-style `format C:`), anchored to command
+  // position so `npm run format` / `git format-patch` stay unflagged.
+  /(?:^|[;&|(])\s*format(?:\s|$|[;&|(])/,
   /\b(shutdown|reboot|halt|poweroff)\b/,
   /\bgit\s+push\s+(-f|--force)\b/,
   /\bgit\s+reset\s+--hard\b/,
-  /\bchmod\s+777\b/,
+  /\bgit\s+clean\s+(?:-[a-zA-Z]*f|--force)/,
+  // rsync deletion, unless it is a dry run (`-n` / `--dry-run`).
+  /\brsync\b(?=[^;&|]*\s--delete(?:-(?:before|during|delay|after|excluded))?\b)(?![^;&|]*\s(?:-n|--dry-run)\b)/,
+  // World-writable permission grants: numeric 777 (with or without -R) and the
+  // symbolic equivalent. `chmod u+x` / `chmod 755` stay unflagged.
+  /\bchmod\s+(?:-[a-zA-Z]*[Rr][a-zA-Z]*\s+)?777\b/,
+  /\bchmod\s+(?:-[a-zA-Z]*[Rr][a-zA-Z]*\s+)?a\+rwx\b/,
   /\bchown\b.*-R\b/,
   />\s*\/dev\/sd[a-z]/,
+  // Evasion shapes: piping anything into a shell, decode-then-execute.
   /\bcurl\b.*\|\s*(ba)?sh\b/,
   /\bwget\b.*\|\s*(ba)?sh\b/,
+  /\|\s*(?:sudo\s+)?(?:bash|zsh|fish|sh)\b/,
+  /\bbase64\s+(?:-[a-zA-Z]*[dD][a-zA-Z]*|--decode)\b[^|]*\|\s*(?:bash|sh|zsh|fish)\b/i,
+  /\beval\s+["'`]?\$\([^)]*\bbase64\b[^)]*(?:-[a-zA-Z]*[dD][a-zA-Z]*|--decode)\b/i,
+  /:\(\)\s*\{\s*:\s*\|\s*:/,
+  /\bfind\b[^;&|]*\s-delete\b/,
 ];
 
 const NETWORK_BASH_PATTERNS = [

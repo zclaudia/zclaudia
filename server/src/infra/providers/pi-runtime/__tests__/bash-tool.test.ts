@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
@@ -6,6 +6,16 @@ import path from 'path';
 import { createBashBridgeTool, detectSandboxFsDenial } from '../bash-tool.js';
 import { runBash } from '../bash-runner.js';
 import { __resetSandboxCacheForTests } from '../sandbox.js';
+import { __resetSessionCwdsForTests } from '../bash-session-cwd.js';
+
+// Minimal valid-signature PNG (1x1 pixel); extraction only sniffs magic bytes.
+const TINY_PNG = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+  0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x62, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
+  0x42, 0x60, 0x82,
+]);
 
 describe('detectSandboxFsDenial', () => {
   it('returns undefined when the command was not sandboxed', () => {
@@ -291,5 +301,176 @@ describe('Bash bridge tool module', () => {
     expect(bash.description).toContain('shell control syntax');
     expect(bash.description).toMatch(/pipeline|compound/);
     expect(bash.description).toContain('skips that steering');
+  });
+});
+
+describe('Bash cd persistence and image output', () => {
+  let previousSandbox: string | undefined;
+
+  beforeEach(() => {
+    // Hermetic: the cd probe runs the same either way, but disabling the
+    // sandbox keeps the tests independent of sandbox-exec availability.
+    previousSandbox = process.env.ZCLAUDIA_SANDBOX;
+    process.env.ZCLAUDIA_SANDBOX = 'off';
+    __resetSandboxCacheForTests();
+    __resetSessionCwdsForTests();
+  });
+
+  afterEach(() => {
+    if (previousSandbox === undefined) delete process.env.ZCLAUDIA_SANDBOX;
+    else process.env.ZCLAUDIA_SANDBOX = previousSandbox;
+    __resetSandboxCacheForTests();
+    __resetSessionCwdsForTests();
+  });
+
+  describe('cd persistence', () => {
+    it('carries a successful cd into the next call and never leaks the probe', async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-cwd-'));
+      await mkdir(path.join(dir, 'sub'));
+      const bash = createBashBridgeTool(dir) as any;
+
+      const first = await bash.execute('cd-1', { command: 'cd sub' });
+      const second = await bash.execute('cd-2', { command: 'pwd' });
+
+      await rm(dir, { recursive: true, force: true });
+      expect(first.details).toMatchObject({ ok: true, exitCode: 0 });
+      expect(second.content[0].text).toContain('Cwd: sub');
+      expect(second.content[0].text).toContain('/sub');
+      expect(second.content[0].text).not.toContain('__ZCLAUDIA_CWD__');
+    });
+
+    it('does not update the tracked cwd when the command fails', async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-cwd-'));
+      await mkdir(path.join(dir, 'sub'));
+      const bash = createBashBridgeTool(dir) as any;
+
+      await bash.execute('cd-1', { command: 'cd sub' });
+      await bash.execute('cd-2', { command: 'cd ..; false' });
+      const third = await bash.execute('cd-3', { command: 'pwd' });
+
+      await rm(dir, { recursive: true, force: true });
+      expect(third.content[0].text).toContain('Cwd: sub');
+    });
+
+    it('resets to the workspace root with a note when a command leaves the workspace', async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-cwd-'));
+      const outside = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-outside-'));
+      const bash = createBashBridgeTool(dir) as any;
+
+      const first = await bash.execute('cd-1', { command: `cd '${outside}'` });
+      const second = await bash.execute('cd-2', { command: 'pwd' });
+
+      await rm(dir, { recursive: true, force: true });
+      await rm(outside, { recursive: true, force: true });
+      expect(first.content[0].text).toContain('Shell cwd was reset to .');
+      expect(second.content[0].text).toContain('Cwd: .');
+    });
+
+    it('lets an explicit cwd argument win over the tracked session cwd', async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-cwd-'));
+      await mkdir(path.join(dir, 'sub'));
+      const bash = createBashBridgeTool(dir) as any;
+
+      await bash.execute('cd-1', { command: 'cd sub' });
+      const second = await bash.execute('cd-2', { command: 'pwd', cwd: '.' });
+
+      await rm(dir, { recursive: true, force: true });
+      expect(second.content[0].text).toContain('Cwd: .');
+    });
+
+    it('shares the tracked cwd across instances with the same sessionId only', async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-cwd-'));
+      await mkdir(path.join(dir, 'sub'));
+      const firstInstance = createBashBridgeTool(dir, { sessionId: 'bash-cwd-sess-1' }) as any;
+      const secondInstance = createBashBridgeTool(dir, { sessionId: 'bash-cwd-sess-1' }) as any;
+      const otherSession = createBashBridgeTool(dir, { sessionId: 'bash-cwd-sess-2' }) as any;
+
+      await firstInstance.execute('cd-1', { command: 'cd sub' });
+      const carried = await secondInstance.execute('cd-2', { command: 'pwd' });
+      const isolated = await otherSession.execute('cd-3', { command: 'pwd' });
+
+      await rm(dir, { recursive: true, force: true });
+      expect(carried.content[0].text).toContain('Cwd: sub');
+      expect(isolated.content[0].text).toContain('Cwd: .');
+    });
+
+    it('description discloses cd persistence behavior', () => {
+      const bash = createBashBridgeTool('/tmp');
+      expect(bash.description).toContain('working directory persists across Bash calls');
+      expect(bash.description).toContain('resets it to the workspace root');
+    });
+  });
+
+  describe('image output', () => {
+    it('attaches a stdout data URL as an image block for vision models', async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-img-'));
+      await writeFile(path.join(dir, 't.png'), TINY_PNG);
+      const bash = createBashBridgeTool(dir, { supportsVision: true }) as any;
+
+      const result = await bash.execute('img-1', {
+        command: 'echo "data:image/png;base64,$(base64 < t.png)"',
+      });
+
+      await rm(dir, { recursive: true, force: true });
+      expect(result.details).toMatchObject({ ok: true });
+      expect(result.content).toHaveLength(2);
+      expect(result.content[1]).toMatchObject({ type: 'image', mimeType: 'image/png' });
+      expect(result.content[1].data).toBe(TINY_PNG.toString('base64'));
+      expect(result.details.images[0]).toMatchObject({
+        source: 'stdout data URL',
+        mimeType: 'image/png',
+      });
+      expect(result.content[0].text).toContain('attached as an image block below');
+      // The echoed Command line contains the literal; the output must not.
+      const outputSection = result.content[0].text.slice(
+        result.content[0].text.indexOf('\nOutput:\n')
+      );
+      expect(outputSection).not.toContain(TINY_PNG.toString('base64'));
+    });
+
+    it('attaches an iTerm2 inline-image escape as an image block', async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-img-'));
+      const payload = TINY_PNG.toString('base64');
+      const command = `printf '%s' $'\\033]1337;File=name=t.png;size=${TINY_PNG.length};inline=1:${payload}\\007'`;
+      const bash = createBashBridgeTool(dir, { supportsVision: true }) as any;
+
+      const result = await bash.execute('img-2', { command });
+
+      await rm(dir, { recursive: true, force: true });
+      expect(result.content[1]).toMatchObject({ type: 'image', mimeType: 'image/png' });
+      expect(result.content[1].data).toBe(payload);
+      const outputSection = result.content[0].text.slice(
+        result.content[0].text.indexOf('\nOutput:\n')
+      );
+      expect(outputSection).toContain('[iTerm2 inline image — attached below]');
+      expect(outputSection).not.toContain(payload);
+    });
+
+    it('attaches an image file whose path the command printed', async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-img-'));
+      await writeFile(path.join(dir, 'out.png'), TINY_PNG);
+      const bash = createBashBridgeTool(dir, { supportsVision: true }) as any;
+
+      const result = await bash.execute('img-3', { command: 'echo "saved to out.png"' });
+
+      await rm(dir, { recursive: true, force: true });
+      expect(result.content[1]).toMatchObject({ type: 'image', mimeType: 'image/png' });
+      expect(result.content[1].data).toBe(TINY_PNG.toString('base64'));
+      expect(result.details.images[0].source).toBe(path.join(dir, 'out.png'));
+    });
+
+    it('returns text-only content when the model has no vision', async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-img-'));
+      const bash = createBashBridgeTool(dir) as any;
+
+      const result = await bash.execute('img-4', {
+        command: `printf '%s' 'data:image/png;base64,${TINY_PNG.toString('base64')}'`,
+      });
+
+      await rm(dir, { recursive: true, force: true });
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[0].text).toContain('no vision');
+    });
   });
 });

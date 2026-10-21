@@ -106,6 +106,125 @@ describe('search and listing tools', () => {
     );
   });
 
+  it('Grep multiline matches patterns that span line boundaries', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-multiline-'));
+    await writeFile(path.join(root, 'a.ts'), 'start\nmiddle end\n');
+    const grep = createGrepBridgeTool(root) as any;
+
+    const withoutMultiline = await grep.execute('grep-ml-off', {
+      pattern: 'start.middle',
+      multiline: false,
+    });
+    const withMultiline = await grep.execute('grep-ml-on', {
+      pattern: 'start.middle',
+      multiline: true,
+    });
+
+    expect(JSON.parse(withoutMultiline.content[0].text).total).toBe(0);
+    // In multiline mode rg emits one numbered row per physical line of the
+    // matched region, so a two-line region reports two match rows.
+    const payload = JSON.parse(withMultiline.content[0].text);
+    expect(withMultiline.details).toMatchObject({ ok: true, total: 2 });
+    expect(payload.results).toEqual([
+      expect.objectContaining({ file: 'a.ts', line: 1, preview: 'start', isMatch: true }),
+      expect.objectContaining({ file: 'a.ts', line: 2, preview: 'middle end', isMatch: true }),
+    ]);
+  });
+
+  it('Grep type filters files by ripgrep file type', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-type-'));
+    await writeFile(path.join(root, 'code.js'), 'target in js\n');
+    await writeFile(path.join(root, 'note.md'), 'target in md\n');
+    const grep = createGrepBridgeTool(root) as any;
+
+    const result = await grep.execute('grep-type-js', { pattern: 'target', type: 'js' });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(result.details).toMatchObject({ ok: true, total: 1 });
+    expect(payload.results.map((entry: any) => entry.file)).toEqual(['code.js']);
+  });
+
+  it('Grep surfaces an unknown type name as a structured grep_failed error', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-bad-type-'));
+    await writeFile(path.join(root, 'a.ts'), 'x\n');
+    const grep = createGrepBridgeTool(root) as any;
+
+    const result = await grep.execute('grep-bad-type', { pattern: 'x', type: 'nosuchtype' });
+
+    expect(result.details).toMatchObject({ ok: false, error: 'grep_failed' });
+    expect(result.content[0].text).toContain('unrecognized file type');
+  });
+
+  it('Grep offset skips the first N match lines before applying max_results', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-offset-'));
+    await writeFile(path.join(root, 'a.ts'), 'm1\nm2\nm3\nm4\n');
+    const grep = createGrepBridgeTool(root) as any;
+
+    const all = await grep.execute('grep-offset-all', { pattern: 'm\\d', max_results: 10 });
+    const paged = await grep.execute('grep-offset-page', {
+      pattern: 'm\\d',
+      max_results: 2,
+      offset: 2,
+    });
+
+    expect(JSON.parse(all.content[0].text).results.map((r: any) => r.preview)).toEqual([
+      'm1',
+      'm2',
+      'm3',
+      'm4',
+    ]);
+    const payload = JSON.parse(paged.content[0].text);
+    expect(paged.details).toMatchObject({ ok: true, offset: 2 });
+    expect(payload.results.map((r: any) => r.preview)).toEqual(['m3', 'm4']);
+    expect(payload.offset).toBe(2);
+    expect(payload.nextOffset).toBe(4);
+  });
+
+  it('Grep offset skips whole match groups in context mode', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-offset-ctx-'));
+    await writeFile(path.join(root, 'a.ts'), 'c1\nm1\nc2\nm2\nc3\n');
+    const grep = createGrepBridgeTool(root) as any;
+
+    const result = await grep.execute('grep-offset-ctx', {
+      pattern: 'm\\d',
+      context: 1,
+      offset: 1,
+      max_results: 10,
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    // The first match group (c1/m1/c2) is skipped whole; the second group starts at m2.
+    expect(payload.results[0]).toEqual(
+      expect.objectContaining({ file: 'a.ts', line: 4, preview: 'm2', isMatch: true })
+    );
+    expect(result.details).toMatchObject({ ok: true, offset: 1 });
+  });
+
+  it('Grep multiline and type combine with files_with_matches and count modes', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-modes-'));
+    await writeFile(path.join(root, 'a.js'), 'alpha\nbeta\n');
+    await writeFile(path.join(root, 'b.md'), 'alpha\nbeta\n');
+    const grep = createGrepBridgeTool(root) as any;
+
+    const filesResult = await grep.execute('grep-mode-files', {
+      pattern: 'alpha.beta',
+      multiline: true,
+      type: 'js',
+      output_mode: 'files_with_matches',
+    });
+    const countResult = await grep.execute('grep-mode-count', {
+      pattern: 'alpha.beta',
+      multiline: true,
+      type: 'js',
+      output_mode: 'count',
+    });
+
+    expect(JSON.parse(filesResult.content[0].text).files).toEqual(['a.js']);
+    expect(JSON.parse(countResult.content[0].text).counts).toEqual([
+      expect.objectContaining({ file: 'a.js', count: 1 }),
+    ]);
+  });
+
   it('LS lists entries alphabetically with a trailing slash on directories', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-ls-module-'));
     await mkdir(path.join(root, 'src'));

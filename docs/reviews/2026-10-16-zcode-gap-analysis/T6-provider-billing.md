@@ -28,10 +28,10 @@
 **解决的问题**：BigModel / Z.AI 等 OpenAI 兼容网关会把可恢复失败包装成业务错误码，甚至出现在 HTTP 200 的 SSE error frame 中（message 前缀 `[1302][...][request_id]`）。只按 HTTP status 重试的服务会把这些"并发过高/平台过载"的请求直接判死，或反过来对"日调用上限/套餐到期"这类终止型错误无意义重试、浪费预算并加重平台限流。
 
 **证据路径（ZCode 侧）**：
-- `packages/` 之外的核心实现：`/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/adapters/src/model/failure-provider-business-codes.ts`（402 行映射表：`1120/1230/1234/1302/1303/1305/1312` 可重试；`1113/1304/1308/1309/1310/1311/1313` 终止；另有 `insufficient_quota`、`credit_balance_exhausted` 等 OpenAI 风格 code 的终止映射，`3008/3009/3010` 并发上限走升级引导不重试）
-- `/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/adapters/src/model/failure-classifier.ts`（633 行：HTTP status / 网络 / TLS / AI SDK error chunk 统一分类，Retry-After 提取）
-- `/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/adapters/src/model/provider-finish-business-error.ts`（从 SSE finish/error chunk 重建业务错误）
-- 设计文档：`/Users/zhvala/SourceCode/ZCode/docs/bigmodel-business-error-retry.md`（含"已产出 text_delta/tool_call/finish 后不自动重放"的安全边界）
+- `packages/` 之外的核心实现：`/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/adapters/src/model/failure-provider-business-codes.ts`（402 行映射表：`1120/1230/1234/1302/1303/1305/1312` 可重试；`1113/1304/1308/1309/1310/1311/1313` 终止；另有 `insufficient_quota`、`credit_balance_exhausted` 等 OpenAI 风格 code 的终止映射，`3008/3009/3010` 并发上限走升级引导不重试）
+- `/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/adapters/src/model/failure-classifier.ts`（633 行：HTTP status / 网络 / TLS / AI SDK error chunk 统一分类，Retry-After 提取）
+- `/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/adapters/src/model/provider-finish-business-error.ts`（从 SSE finish/error chunk 重建业务错误）
+- 设计文档：`/Users/zhvala/SourceCode/zcoder/docs/bigmodel-business-error-retry.md`（含"已产出 text_delta/tool_call/finish 后不自动重放"的安全边界）
 
 **zclaudia 现状**：缺失。`server/src/infra/providers/pi-runtime/retry-stream.ts:15` 只有 `RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504, 529}`，HTTP 200 SSE 错误帧不进入重试判定；无任何业务码解析。`server/src/utils/retry-window.ts` 有 `extractRetryDelayMsFromError()` 可从错误文本解析时长/绝对时间（含时区），但 grep 显示生产代码无 importer（仅 `server/src/utils/__tests__/retry-window.test.ts` 引用），属于已备而未接线的能力。
 
@@ -44,9 +44,9 @@
 **解决的问题**：provider 返回的 `retry-after-ms` / `retry-after` 常达数十秒到数分钟；zclaudia 把所有等待封顶 60s，会把合法限流等待截断成短退避、放大失败率。同时 OpenAI 风格 `x-should-retry: false` 表示 provider 明确拒绝重试。
 
 **证据路径（ZCode 侧）**：
-- `/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/adapters/src/model/runner-retry.ts:38-56`（`calculateRetryDelay`：Retry-After 合理（≤5 分钟）则直接采用，否则指数退避 2s→60s + jitter）
-- `/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/adapters/src/model/runner-retry.ts:81-108`（`logRetryDelayDecision`：`retryAfterSource` 区分 `provider_header` / `blocked_by_x_should_retry` / `missing`，结构化落日志，专门排查"Retry-After 在 header 保留、错误归一化或 delay 计算任一层断链"）
-- `/Users/zhvala/SourceCode/ZCode/docs/bigmodel-business-error-retry.md:40-44`（三条路径 header 必须贯穿：fetch 层抛错、error chunk 重建、APICallError.cause 包装）
+- `/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/adapters/src/model/runner-retry.ts:38-56`（`calculateRetryDelay`：Retry-After 合理（≤5 分钟）则直接采用，否则指数退避 2s→60s + jitter）
+- `/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/adapters/src/model/runner-retry.ts:81-108`（`logRetryDelayDecision`：`retryAfterSource` 区分 `provider_header` / `blocked_by_x_should_retry` / `missing`，结构化落日志，专门排查"Retry-After 在 header 保留、错误归一化或 delay 计算任一层断链"）
+- `/Users/zhvala/SourceCode/zcoder/docs/bigmodel-business-error-retry.md:40-44`（三条路径 header 必须贯穿：fetch 层抛错、error chunk 重建、APICallError.cause 包装）
 
 **zclaudia 现状**：`server/src/infra/providers/pi-runtime/retry-stream.ts:45-54` 已支持 Retry-After（秒数或 HTTP-date）但 `Math.min(..., MAX_DELAY_MS=60_000)` 封顶截断；无 `x-should-retry` 处理；无 retry-after 断链诊断日志。
 
@@ -57,9 +57,9 @@
 **解决的问题**：订阅制用户需要看到 5 小时 prompt 池、周池、MCP 月额度的真实剩余与重置时间，而不是本地估算。ZCode 完整接入了 BigModel/Z.AI 官方 monitor 四接口，并定义了严格展示口径（缺失额度项隐藏、不按下标兜底、percentage 反转成剩余百分比、双品牌来源切换）。
 
 **证据路径（ZCode 侧）**：
-- `/Users/zhvala/SourceCode/ZCode/packages/services/src/usage-stats/providers/bigmodelUsageQuotaProvider.ts`（1691 行：`/api/monitor/usage/quota/limit`、`/api/monitor/credit-usage/activity`（365 天活动）、`/api/monitor/credit-usage/usage-detail`（积分/Token/调用序列 + Cache 命中率）、`/api/monitor/usage/model-performance-day`（系统健康度）；zod envelope 解析；API key 来源按 `builtin:zai` → `builtin:bigmodel` → 自定义 endpoint 匹配降级）
-- `/Users/zhvala/SourceCode/ZCode/docs/bigmodel-coding-plan-usage-quota.md`（接口契约、字段语义表 `TOKENS_LIMIT/TIME_LIMIT + unit=3/5/6`、错误处理、架构边界）
-- 测试：`/Users/zhvala/SourceCode/ZCode/packages/services/test/bigmodelUsageQuotaProvider.test.ts`
+- `/Users/zhvala/SourceCode/zcoder/packages/services/src/usage-stats/providers/bigmodelUsageQuotaProvider.ts`（1691 行：`/api/monitor/usage/quota/limit`、`/api/monitor/credit-usage/activity`（365 天活动）、`/api/monitor/credit-usage/usage-detail`（积分/Token/调用序列 + Cache 命中率）、`/api/monitor/usage/model-performance-day`（系统健康度）；zod envelope 解析；API key 来源按 `builtin:zai` → `builtin:bigmodel` → 自定义 endpoint 匹配降级）
+- `/Users/zhvala/SourceCode/zcoder/docs/bigmodel-coding-plan-usage-quota.md`（接口契约、字段语义表 `TOKENS_LIMIT/TIME_LIMIT + unit=3/5/6`、错误处理、架构边界）
+- 测试：`/Users/zhvala/SourceCode/zcoder/packages/services/test/bigmodelUsageQuotaProvider.test.ts`
 
 **zclaudia 现状**：缺失。`shared/src/core/usage-stats.ts` 只有本地 session/token/活跃天统计，无任何远端配额查询。
 
@@ -72,8 +72,8 @@
 **解决的问题**：应用内直接购买/续费/升级套餐：远端静态商品目录 + 运行时 batch-preview 实时价格合并、试算 → 签名 → 轮询支付结果、未完成订单检查、支付宝二维码 / Z.AI 海外 Stripe+PayPal 单页收银台、购买埋点（冻结 preview 金额字段，不上报模糊 amount）。
 
 **证据路径（ZCode 侧）**：
-- `/Users/zhvala/SourceCode/ZCode/docs/bigmodel-coding-plan-subscription.md`（接口链路 `POST /api/biz/pay/batch-preview|preview|create-sign|update/sign`、`GET /api/biz/pay/check|check-pending-orders`；鉴权规则——`/pay`、`/api/biz` 不加 Bearer 前缀；UI 降级行为：batch-preview 失败仍展示静态价格快照）
-- `/Users/zhvala/SourceCode/ZCode/docs/bigmodel-api-environment-origin.md`（环境域名解析收敛在 `/Users/zhvala/SourceCode/ZCode/packages/shared/src/zcodeEndpoint.ts`）
+- `/Users/zhvala/SourceCode/zcoder/docs/bigmodel-coding-plan-subscription.md`（接口链路 `POST /api/biz/pay/batch-preview|preview|create-sign|update/sign`、`GET /api/biz/pay/check|check-pending-orders`；鉴权规则——`/pay`、`/api/biz` 不加 Bearer 前缀；UI 降级行为：batch-preview 失败仍展示静态价格快照）
+- `/Users/zhvala/SourceCode/zcoder/docs/bigmodel-api-environment-origin.md`（环境域名解析收敛在 `/Users/zhvala/SourceCode/zcoder/packages/shared/src/zcodeEndpoint.ts`）
 
 **zclaudia 现状**：缺失（无任何支付/商品/订单代码；`server/src/auth.ts` 无 OAuth 业务态）。
 
@@ -86,9 +86,9 @@
 **解决的问题**：不同 provider/模型对"推理档位 / 最大输出"的请求字段表达完全不同（`thinking.type`、`reasoning_effort`、`max_completion_tokens`…）。ZCode 不在源码里特判每个模型，而是把映射作为模型配置的一部分声明（受限 CEL 表达式 → JSON Merge Patch 程序），编译一次、每请求只绑定冻结的 option value，新增模型零代码改动。
 
 **证据路径（ZCode 侧）**：
-- `/Users/zhvala/SourceCode/ZCode/packages/model-option-map/src/`（867 行：tokenizer/parser/evaluator/compiler 带程序缓存；`merge-patch.ts` 的 `applyOrderedJsonMergePatches` 检测两个 option 写同一路径时抛冲突错误）
-- schema 校验即编译：`/Users/zhvala/SourceCode/ZCode/packages/shared/src/model-config.ts:2-40`（option map 字符串在 zod refine 里 `compileModelOptionMap`，配置下发时即验证可编译）
-- 执行边界：`/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/adapters/src/model/model-option-map-fetch.ts`（fetch 包装器重写请求 body，非 JSON 文本 body 时 fail-closed 拒发，防止静默丢 option）
+- `/Users/zhvala/SourceCode/zcoder/packages/model-option-map/src/`（867 行：tokenizer/parser/evaluator/compiler 带程序缓存；`merge-patch.ts` 的 `applyOrderedJsonMergePatches` 检测两个 option 写同一路径时抛冲突错误）
+- schema 校验即编译：`/Users/zhvala/SourceCode/zcoder/packages/shared/src/model-config.ts:2-40`（option map 字符串在 zod refine 里 `compileModelOptionMap`，配置下发时即验证可编译）
+- 执行边界：`/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/adapters/src/model/model-option-map-fetch.ts`（fetch 包装器重写请求 body，非 JSON 文本 body 时 fail-closed 拒发，防止静默丢 option）
 
 **zclaudia 现状**：`shared/src/core/llm-profile.ts:111-131` 的 `dialect` 预设（moonshotai/deepseek/zai/together/openrouter/xai/openai）走 pi-ai 内置 compat 表；`thinkingLevels` 是固定枚举（`shared/src/core/agent-profile.ts:5`），字段映射硬编码在 pi-ai。对未收录的新网关 quirks 无法配置化表达。
 
@@ -101,9 +101,9 @@
 **解决的问题**：内置配置、账号权益配置、个人自定义配置三层的叠加语义（builtin → account → personal，个人最后生效），配合模型规则表（按 providerId/templateId/modelId/apiType/baseUrl 条件解析），产出带 revision 的只读 Registry 视图供 UI/runtime 消费；每个模型有 enabled/executable/selectable 三态与结构化校验 issue。
 
 **证据路径（ZCode 侧）**：
-- `/Users/zhvala/SourceCode/ZCode/packages/provider/src/resolver.ts:182-344`（`ProviderConfigResolver.resolve`：模板 overlay、账号投影、owned-order 排序、registry 发布只含 executable 模型）
-- `/Users/zhvala/SourceCode/ZCode/packages/provider/src/registry.ts:47-126`（revision 化冻结视图 + `validateSelection` 四种结构化失败码：provider-not-found/model-not-found/reasoning-level-missing/not-supported）
-- `/Users/zhvala/SourceCode/ZCode/packages/provider/src/config/manual-model-config.ts`（手动模式只开放白名单叶子字段，新增系统字段默认不可编辑）
+- `/Users/zhvala/SourceCode/zcoder/packages/provider/src/resolver.ts:182-344`（`ProviderConfigResolver.resolve`：模板 overlay、账号投影、owned-order 排序、registry 发布只含 executable 模型）
+- `/Users/zhvala/SourceCode/zcoder/packages/provider/src/registry.ts:47-126`（revision 化冻结视图 + `validateSelection` 四种结构化失败码：provider-not-found/model-not-found/reasoning-level-missing/not-supported）
+- `/Users/zhvala/SourceCode/zcoder/packages/provider/src/config/manual-model-config.ts`（手动模式只开放白名单叶子字段，新增系统字段默认不可编辑）
 
 **zclaudia 现状**：单层。`server/src/domains/llm-profiles/repository.ts` 的 `llm_profiles` 表 + `recordStatus`（hasModel/hasCredential 推导 draft/ready），无 overlay、无规则表、无 registry 视图。
 
@@ -116,10 +116,10 @@
 **解决的问题**：模型/供应商能力变更（新模型、endpoint 迁移、reasoning 档位调整）不需发版：服务端 `/api/v1/client/configs` 下发 CDN 上带 revision 的 builtin release；客户端 bundled 基线兜底 + Active LKG 缓存 + 文件锁 + fs watch 热更新；多进程（Desktop host + CLI Worker）通过控制文件 lease 合并刷新，失败指数退避。
 
 **证据路径（ZCode 侧）**：
-- `/Users/zhvala/SourceCode/ZCode/packages/provider-node/src/zcode-builtin-release.ts`（schemaVersion/revision/退出 provider 黑名单校验，不兼容 release 整份拒绝回落 bundled）
-- `/Users/zhvala/SourceCode/ZCode/packages/provider-node/src/zcode-builtin-download.ts`（20s 总预算、https-only URL 校验、错误日志不泄漏带凭据 URL）
-- `/Users/zhvala/SourceCode/ZCode/packages/provider-node/src/zcode-builtin-provider-config-source.ts`（bundled/Active/LKG 三级、`applyRemoteRelease` revision 单调 + 同 revision 异内容报错）
-- `/Users/zhvala/SourceCode/ZCode/packages/provider-node/src/zcode-builtin-remote-synchronizer.ts`（多进程 lease 控制文件、endpoint 维度隔离）
+- `/Users/zhvala/SourceCode/zcoder/packages/provider-node/src/zcode-builtin-release.ts`（schemaVersion/revision/退出 provider 黑名单校验，不兼容 release 整份拒绝回落 bundled）
+- `/Users/zhvala/SourceCode/zcoder/packages/provider-node/src/zcode-builtin-download.ts`（20s 总预算、https-only URL 校验、错误日志不泄漏带凭据 URL）
+- `/Users/zhvala/SourceCode/zcoder/packages/provider-node/src/zcode-builtin-provider-config-source.ts`（bundled/Active/LKG 三级、`applyRemoteRelease` revision 单调 + 同 revision 异内容报错）
+- `/Users/zhvala/SourceCode/zcoder/packages/provider-node/src/zcode-builtin-remote-synchronizer.ts`（多进程 lease 控制文件、endpoint 维度隔离）
 
 **zclaudia 现状**：缺失（无 builtin provider 层；模型能力靠 pi-ai 注册表 + profile 手工声明）。
 
@@ -132,8 +132,8 @@
 **解决的问题**：自动化任务需要"无限重试只放宽瞬态失败"，交互场景需要"单次尝试快速失败"；部署环境需要不重编译调整重试参数。
 
 **证据路径（ZCode 侧）**：
-- `/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/adapters/src/model/retry-budget.ts`（`Unbounded`/`SingleAttempt` 两档：unbounded 只放宽闸门，退避曲线/分类/边界事件一律不动——防止无限重试放大故障）
-- `/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/adapters/src/model/retry-policy.ts`（默认 10 次重试、2s 基数、2x 退避、60s 封顶、jitter；`ZCODE_MODEL_RETRY_MAX_RETRIES/BASE_DELAY_MS/BACKOFF_FACTOR/MAX_DELAY_MS` 环境变量覆盖，入参显式传 env 不读全局）
+- `/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/adapters/src/model/retry-budget.ts`（`Unbounded`/`SingleAttempt` 两档：unbounded 只放宽闸门，退避曲线/分类/边界事件一律不动——防止无限重试放大故障）
+- `/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/adapters/src/model/retry-policy.ts`（默认 10 次重试、2s 基数、2x 退避、60s 封顶、jitter；`ZCODE_MODEL_RETRY_MAX_RETRIES/BASE_DELAY_MS/BACKOFF_FACTOR/MAX_DELAY_MS` 环境变量覆盖，入参显式传 env 不读全局）
 
 **zclaudia 现状**：`server/src/infra/providers/pi-runtime/retry-stream.ts:10-13` `MAX_ATTEMPTS=5/BASE_DELAY_MS=1000/MAX_DELAY_MS=60000/JITTER_MS=250` 全部硬编码常量导出，无档位、无 env 覆盖。
 
@@ -144,9 +144,9 @@
 **解决的问题**：配置的默认模型失效（provider 删除/模型下线/档位改名）时，会话不应报错：新草稿按 Registry 顺序自动推荐；已有选择解析为"意图"而非硬绑定（账号型 provider 解析到当前连接的账号；`low-effort` 之类旧档位名自动映射到新档位）。
 
 **证据路径（ZCode 侧）**：
-- `/Users/zhvala/SourceCode/ZCode/packages/provider/src/model-selection-config.ts:24-60`（`resolveInitialModelSelection`：configured-default 失效 → 遍历 registry 跳过 hidden provider 的 `registry-fallback`）
-- `/Users/zhvala/SourceCode/ZCode/packages/provider/src/effective-model-selection.ts:21-66`（`resolveEffectiveModelSelection`：account-plan 绑定当前账号、`selectionIssue` 结构化失败原因、legacy reasoning level 归一化后再校验）
-- `/Users/zhvala/SourceCode/ZCode/packages/provider-node/src/legacy-reasoning-level-renames.ts`（旧档位名迁移表）
+- `/Users/zhvala/SourceCode/zcoder/packages/provider/src/model-selection-config.ts:24-60`（`resolveInitialModelSelection`：configured-default 失效 → 遍历 registry 跳过 hidden provider 的 `registry-fallback`）
+- `/Users/zhvala/SourceCode/zcoder/packages/provider/src/effective-model-selection.ts:21-66`（`resolveEffectiveModelSelection`：account-plan 绑定当前账号、`selectionIssue` 结构化失败原因、legacy reasoning level 归一化后再校验）
+- `/Users/zhvala/SourceCode/zcoder/packages/provider-node/src/legacy-reasoning-level-renames.ts`（旧档位名迁移表）
 
 **zclaudia 现状**：缺失 registry 层；模型选择存于 agent-profile（`shared/src/core/agent-profile.ts`），无失效降级/档位改名归一机制（未确认运行时是否有兜底，本维度 server 侧未见）。
 
@@ -157,9 +157,9 @@
 **解决的问题**：模型返回空轮次（无文本无工具无 usage）自动重试一次；流式连接空闲超时检测；Off-Peak 闲时任务票据过期后"同 task_id 重新取号 → resume 续跑"而非落 failed。
 
 **证据路径（ZCode 侧）**：
-- `/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/adapters/src/model/empty-completion-retry.ts`（`EMPTY_COMPLETION_MAX_RETRIES=1`）
-- `/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/adapters/src/model/stream-idle-timeout.ts`
-- `/Users/zhvala/SourceCode/ZCode/apps/zcode-cli/packages/adapters/src/model/offpeak-retry.ts` 与 `/Users/zhvala/SourceCode/ZCode/packages/shared/src/off-peak-types.ts:36-49`（票据过期 marker 跨包同值，靠错误文本传递）
+- `/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/adapters/src/model/empty-completion-retry.ts`（`EMPTY_COMPLETION_MAX_RETRIES=1`）
+- `/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/adapters/src/model/stream-idle-timeout.ts`
+- `/Users/zhvala/SourceCode/zcoder/apps/zcode-cli/packages/adapters/src/model/offpeak-retry.ts` 与 `/Users/zhvala/SourceCode/zcoder/packages/shared/src/off-peak-types.ts:36-49`（票据过期 marker 跨包同值，靠错误文本传递）
 
 **zclaudia 现状**：均缺失（grep 无 off-peak/空补全重试；`retry-stream.ts` 无空闲超时）。
 
@@ -187,7 +187,7 @@
 
 ## 附：许可与移植注意
 
-ZCode 为 Apache-2.0（`/Users/zhvala/SourceCode/ZCode/LICENSE`，另有 `NOTICE.md` 与 `THIRD-PARTY-NOTICES.md`）。凡"直接移植"项（§2.2、§2.8、§2.5 的 DSL 部分、§2.1 的映射表数据），需在 zclaudia 仓库保留原许可声明与 NOTICE 归属；映射表中的业务码语义摘自 BigModel 公开文档（docs.bigmodel.cn），不构成 ZCode 独有表达，但代码组织仍受 Apache-2.0 约束。
+ZCode 为 Apache-2.0（`/Users/zhvala/SourceCode/zcoder/LICENSE`，另有 `NOTICE.md` 与 `THIRD-PARTY-NOTICES.md`）。凡"直接移植"项（§2.2、§2.8、§2.5 的 DSL 部分、§2.1 的映射表数据），需在 zclaudia 仓库保留原许可声明与 NOTICE 归属；映射表中的业务码语义摘自 BigModel 公开文档（docs.bigmodel.cn），不构成 ZCode 独有表达，但代码组织仍受 Apache-2.0 约束。
 
 ## 附：未覆盖 / 未确认项
 

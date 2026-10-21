@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { safeCompare } from '../auth.js';
+import {
+  safeCompare,
+  createHostCapabilityStore,
+  DEFAULT_HOST_CAPABILITY_TTL_MS,
+  HOST_CAPABILITY_HEADER,
+} from '../auth.js';
 
 describe('safeCompare', () => {
   describe('timing-safe comparison', () => {
@@ -174,5 +179,114 @@ describe('safeCompare', () => {
       expect(safeCompare('TEST', 'test')).toBe(false);
       expect(safeCompare('Test', 'Test')).toBe(true);
     });
+  });
+});
+
+describe('createHostCapabilityStore', () => {
+  // Deterministic clock: each advanceTime() moves time forward.
+  function createClock(start = 1_000) {
+    let current = start;
+    return {
+      now: () => current,
+      advance: (ms: number) => {
+        current += ms;
+      },
+    };
+  }
+
+  it('exposes the one-time ticket header name and default TTL', () => {
+    expect(HOST_CAPABILITY_HEADER).toBe('x-zclaudia-host-capability');
+    expect(DEFAULT_HOST_CAPABILITY_TTL_MS).toBe(30_000);
+  });
+
+  describe('issue', () => {
+    it('returns a capability with an expiry inside the TTL', () => {
+      const clock = createClock();
+      const store = createHostCapabilityStore({ now: clock.now, ttlMs: 5_000 });
+
+      const { capability, expiresAt } = store.issue();
+
+      expect(capability).toBeTruthy();
+      expect(expiresAt).toBe(6_000);
+    });
+
+    it('issues distinct capabilities per call', () => {
+      const store = createHostCapabilityStore();
+      const first = store.issue();
+      const second = store.issue();
+
+      expect(first.capability).not.toBe(second.capability);
+    });
+
+    it('purges expired tickets when issuing', () => {
+      const clock = createClock();
+      const store = createHostCapabilityStore({ now: clock.now, ttlMs: 1_000 });
+      const { capability } = store.issue();
+      clock.advance(2_000);
+
+      store.issue();
+      // The expired ticket was purged; consuming it finds nothing (and
+      // consume is one-time regardless).
+      expect(store.consume(capability)).toBe(false);
+    });
+  });
+
+  describe('consume', () => {
+    it('accepts a fresh ticket exactly once', () => {
+      const clock = createClock();
+      const store = createHostCapabilityStore({ now: clock.now });
+      const { capability } = store.issue();
+
+      expect(store.consume(capability)).toBe(true);
+    });
+
+    it('rejects a replayed ticket (one-time semantics)', () => {
+      const clock = createClock();
+      const store = createHostCapabilityStore({ now: clock.now });
+      const { capability } = store.issue();
+
+      expect(store.consume(capability)).toBe(true);
+      // Replay — even immediately, well inside the TTL — must fail.
+      expect(store.consume(capability)).toBe(false);
+      expect(store.consume(capability)).toBe(false);
+    });
+
+    it('rejects an expired ticket and still deletes it', () => {
+      const clock = createClock();
+      const store = createHostCapabilityStore({ now: clock.now, ttlMs: 1_000 });
+      const { capability } = store.issue();
+      clock.advance(1_001);
+
+      expect(store.consume(capability)).toBe(false);
+      expect(store.consume(capability)).toBe(false);
+    });
+
+    it('rejects unknown, empty, and missing tickets', () => {
+      const store = createHostCapabilityStore();
+
+      expect(store.consume('never-issued')).toBe(false);
+      expect(store.consume('')).toBe(false);
+      expect(store.consume(undefined)).toBe(false);
+    });
+
+    it('rejects a ticket consumed after its store saw later issues', () => {
+      const clock = createClock();
+      const store = createHostCapabilityStore({ now: clock.now });
+      const { capability } = store.issue();
+      store.issue(); // unrelated second ticket
+
+      expect(store.consume(capability)).toBe(true);
+      expect(store.consume(capability)).toBe(false);
+    });
+  });
+
+  it('uses the injected capability generator', () => {
+    const store = createHostCapabilityStore({
+      createCapability: () => 'fixed-ticket',
+    });
+    const { capability } = store.issue();
+
+    expect(capability).toBe('fixed-ticket');
+    expect(store.consume('fixed-ticket')).toBe(true);
   });
 });

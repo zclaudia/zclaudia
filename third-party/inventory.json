@@ -20,5 +20,51 @@
       "reason": "lightningcss 及平台二进制（MPL-2.0）：仅构建/测试工具链（vite、vitest）使用，不进入运行时生产图；MPL-2.0 的源码提供义务以文件级 copyleft 满足，不传染仓库其余代码。"
     }
   ],
-  "copiedComponents": []
+  "copiedComponents": [
+    {
+      "id": "zcode-host-capability",
+      "roots": ["server/src/"],
+      "license": "Apache-2.0",
+      "source": "ZCode packages/server/src/hostCapability.ts",
+      "copyright": "Copyright 2026 Z.AI Co., Ltd.",
+      "importedAt": "2026-10-18",
+      "notes": "一次性 host capability 票据 store（issue/consume，消费即作废 + TTL）移植进 server/src/auth.ts；另按其 http.ts /ws/host 中间件语义在本仓接线（server/src/server.ts upgrade 分支 + interfaces/http/middleware/auth.ts 的 createHostCapabilityUpgradeGuard/rejectUpgrade）。Modified by zclaudia contributors：header 常量改名 x-zclaudia-host-capability，guard 改为依赖注入以遵守本仓分层（interfaces 不得 import root）。"
+    },
+    {
+      "id": "zcode-retry-budget-policy",
+      "roots": ["server/src/infra/providers/pi-runtime/"],
+      "license": "Apache-2.0",
+      "source": "ZCode apps/zcode-cli/packages/adapters/src/model/retry-budget.ts, apps/zcode-cli/packages/adapters/src/model/retry-policy.ts",
+      "copyright": "Copyright 2026 Z.AI Co., Ltd.",
+      "importedAt": "2026-10-18",
+      "notes": "重试预算档位（default/unbounded/single-attempt）与环境变量可调重试策略移植进 retry-stream.ts。适配：默认值保留本仓历史硬编码（5 次尝试/1s 基数/2x 退避/60s 封顶/250ms 加法 jitter），jitter 为毫秒量级而非 ZCode 的布尔乘法抖动，env 改 ZCLAUDIA_MODEL_RETRY_* 前缀且 MAX_ATTEMPTS 含首次尝试。"
+    },
+    {
+      "id": "zcode-read-video-mime",
+      "roots": ["server/src/infra/providers/pi-runtime/"],
+      "license": "Apache-2.0",
+      "source": "ZCode apps/zcode-cli/packages/core/src/runtime/helpers/attachment-video.ts",
+      "copyright": "Copyright 2026 Z.AI Co., Ltd.",
+      "importedAt": "2026-10-18",
+      "notes": "Read 工具的视频扩展名→mime 映射（VIDEO_MIME_BY_EXT）移植进 read-tool.ts。适配：本仓 pi 上游（pi-ai 0.84.1）无 video content block，按差距条目要求不构造视频块，返回明确 video_not_supported 错误并附 ffmpeg 抽帧建议。同条目的缺文件 Did-you-mean 为语义参考、自写实现（目录扫描 + rg --files 项目内兜底，最多 3 个候选，编辑距离阈值与 ZCode 相同 ≤3）。Modified by zclaudia contributors。"
+    },
+    {
+      "id": "superpowers-skills",
+      "roots": ["plugins/skills/superpowers/"],
+      "license": "MIT",
+      "source": "ZCode apps/zcode-cli/packages/superpowers-plugin/skills（上游 obra/superpowers，https://github.com/obra/superpowers）",
+      "copyright": "Copyright (c) 2025 Jesse Vincent",
+      "importedAt": "2026-10-19",
+      "notes": "以内容型插件分发 superpowers 方法论技能 5 个（brainstorming / writing-plans / verification-before-completion / test-driven-development / systematic-debugging 及其 4 个被引用的参考文件），正文逐字保留，上游 MIT LICENSE 原文随插件附带（plugins/skills/superpowers/LICENSE）。适配：frontmatter 换成本仓技能清单格式（name 需与目录同名、description ≤1024）并登记 license/source/sourceType/version 溯源字段；宿主专属引用（superpowers: 前缀、using-git-worktrees、elements-of-style）、brainstorming 的 Visual Companion（依赖未分发的浏览器脚本）与 writing-plans 的 subagent 执行分支已移除；spec/plan 默认路径改为 docs/plans/。依赖宿主子代理/会话钩子语义的技能（subagent-driven-development、dispatching-parallel-agents、using-superpowers 等 9 个）按差距报告 §4 建议不分发。哈希锁定见 plugins/skills/skills-lock.json。Modified by zclaudia contributors。"
+    },
+    {
+      "id": "zcode-guide-diagnosing-skills",
+      "roots": ["plugins/skills/zcode-guide/"],
+      "license": "Apache-2.0",
+      "source": "ZCode apps/zcode-cli/packages/zcode-guide-plugin/skills",
+      "copyright": "Copyright 2026 Z.AI Co., Ltd.",
+      "importedAt": "2026-10-19",
+      "notes": "自诊断五件套（diagnosing-skills / diagnosing-plugins / diagnosing-hooks / diagnosing-mcp / diagnosing-commands）以内容型插件分发。这是按本仓子系统事实的重写而非逐字复制：保留上游的排障方法论骨架（目标/配置模型/检查面/symptom→cause→fix/定位流程），事实层全部改为本仓实现（技能发现与去重优先级、pi frontmatter 校验规则、内置 agent 运行时 + .zplugin + 额外插件目录三分发、DB 存储 user hooks 仅 PreToolUse/PostToolUse 两事件、应用数据库 MCP 配置与外部 CLI 运行时边界、注册表命令 + ~/.claude 命令模板）。上游 zcode-configuration-guide 为纯 ZCode 配置面文档，不适配分发。注意：上游 package.json 虽声明 MIT，但包内无许可文件且从未脱离 Apache-2.0 的 ZCode 仓库发布，按仓库内容以 Apache-2.0 登记。哈希锁定见 plugins/skills/skills-lock.json。Modified by zclaudia contributors。"
+    }
+  ]
 }

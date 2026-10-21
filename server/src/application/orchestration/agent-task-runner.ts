@@ -134,6 +134,7 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
       const clientId = `orchestrator-${task.id}`;
       const clients = deps.getClients();
       let settled = false;
+      const runStartedAtMs = Date.now();
 
       function cleanupVirtualClient() {
         if (settled) return;
@@ -169,10 +170,13 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
               const worktreeNote = settleWorktree();
               const stripped = fullContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
               const summary = stripped.slice(0, 200) || 'Task completed';
+              const usage = msg.usage;
               callbacks.onCompleted({
                 resultSummary: worktreeNote ? `${summary}\n${worktreeNote}` : summary,
                 responseText: worktreeNote ? `${fullContent}\n\n[${worktreeNote}]` : fullContent,
                 toolCount,
+                usage,
+                durationMs: Date.now() - runStartedAtMs,
               });
             } else if (msg.type === 'run_failed' || msg.type === 'error') {
               cleanupVirtualClient();

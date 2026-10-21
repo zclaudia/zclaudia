@@ -23,6 +23,15 @@ import {
   type BashRunResult,
 } from './bash-runner.js';
 import { extractBashOutputInsights, formatBashResultText } from './bash-output.js';
+import { extractBashImageOutput } from './bash-image-output.js';
+import {
+  appendBashCwdProbe,
+  denormalizePhysicalCwd,
+  forgetSessionCwd,
+  getTrackedSessionCwd,
+  stripBashCwdProbe,
+  trackSessionCwd,
+} from './bash-session-cwd.js';
 import { registerInflightForegroundCommand } from './inflight-bash-registry.js';
 import * as sandbox from './sandbox.js';
 import {
@@ -169,6 +178,8 @@ export interface BashBridgeToolOptions extends WorkspaceRootOptions {
   sandboxReadOnly?: boolean;
   sandboxAllowedDomains?: string[];
   bashAutoBackgroundMs?: number;
+  /** Whether the active model accepts image content blocks; gates Bash image output. */
+  supportsVision?: boolean;
 }
 
 /**
@@ -189,11 +200,28 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
   const DEFAULT_AUTO_BACKGROUND_MS = 60_000;
   const TERMINAL_TASK_STATUSES: ReadonlySet<string> = new Set(['completed', 'failed', 'stopped']);
   const grantedDomains = new Set<string>(options?.sandboxAllowedDomains ?? []);
+  // Session shell cwd (cd persistence): each foreground call runs a fresh
+  // `bash -c` process, so the tracked cwd is restored before execution and
+  // re-captured via a probe appended to the command (bash-session-cwd.ts).
+  // With a sessionId the map is module-level (tools are rebuilt per run);
+  // without one it is scoped to this tool instance.
+  const instanceShellCwd = new Map<string, string>();
+  const sessionKey = options?.sessionId;
+  const readShellCwd = (): string | undefined =>
+    sessionKey ? getTrackedSessionCwd(sessionKey) : instanceShellCwd.get('cwd');
+  const writeShellCwd = (value: string): void => {
+    if (sessionKey) trackSessionCwd(sessionKey, value);
+    else instanceShellCwd.set('cwd', value);
+  };
+  const dropShellCwd = (): void => {
+    if (sessionKey) forgetSessionCwd(sessionKey);
+    else instanceShellCwd.delete('cwd');
+  };
   return {
     name: 'Bash',
     label: 'Bash',
     description:
-      'Execute a shell command (bash -c) in the workspace. Returns merged stdout+stderr and the exit code. Output is truncated to the last 2000 lines / 50KB; full output is written to a temp file when truncated. A command still running after 60s is automatically moved to a background task (returns a taskId to poll with TaskOutput); set an explicit timeout (max 600s) to wait inline and kill at the deadline instead. Set run_in_background:true to background immediately (dev servers, watchers). Tool-routing guidance (steering simple ls/find/grep-style commands to LS/Glob/Grep) applies only to standalone commands: any pipeline or compound command containing shell control syntax (| ; & > < ` $(...)) skips that steering and runs as-is.',
+      'Execute a shell command (bash -c) in the workspace. Returns merged stdout+stderr and the exit code. Output is truncated to the last 2000 lines / 50KB; full output is written to a temp file when truncated. The working directory persists across Bash calls within a session: a successful `cd` carries into later calls, and a command that leaves the workspace resets it to the workspace root; pass cwd to override for a single call. When the command produces an image (a stdout data URL, iTerm2 inline-image escapes, or an image file whose path it printed), the result attaches it as an image block on vision-capable models (max 3); sixel streams are reported but not rendered. A command still running after 60s is automatically moved to a background task (returns a taskId to poll with TaskOutput); set an explicit timeout (max 600s) to wait inline and kill at the deadline instead. Set run_in_background:true to background immediately (dev servers, watchers). Tool-routing guidance (steering simple ls/find/grep-style commands to LS/Glob/Grep) applies only to standalone commands: any pipeline or compound command containing shell control syntax (| ; & > < ` $(...)) skips that steering and runs as-is.',
     parameters: agentToolParameters({
       type: 'object',
       properties: {
@@ -206,7 +234,8 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         timeout: { type: 'number', description: 'Timeout in seconds (default 120, max 600)' },
         cwd: {
           type: 'string',
-          description: 'Workspace-relative working directory (default: workspace root)',
+          description:
+            "Workspace-relative working directory (default: the session's shell cwd — the last successful cd; starts at the workspace root)",
         },
         run_in_background: {
           type: 'boolean',
@@ -266,9 +295,25 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         }
       }
 
+      const workspaceRoots = workspaceRootsOf(cwd, options);
+      // Explicit args.cwd wins for the call; otherwise the session's tracked
+      // shell cwd is the start directory. A tracked cwd that has since left
+      // the workspace (or been deleted) is dropped so the next call starts at
+      // the root instead of erroring.
+      let requestedCwd: unknown = args.cwd;
+      if (!(typeof args.cwd === 'string' && args.cwd.trim())) {
+        const tracked = readShellCwd();
+        if (tracked) {
+          try {
+            requestedCwd = resolveInsideWorkspaces(workspaceRoots, tracked);
+          } catch {
+            dropShellCwd();
+          }
+        }
+      }
       let runCwd: string;
       try {
-        runCwd = resolveInsideWorkspaces(workspaceRootsOf(cwd, options), args.cwd);
+        runCwd = resolveInsideWorkspaces(workspaceRoots, requestedCwd);
       } catch (err) {
         return errorResult(
           'path_outside_workspace',
@@ -457,6 +502,13 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
 
       const canBackgroundConvert = isBashBackgroundConvertible(options);
       const manualBackground = canBackgroundConvert ? new AbortController() : undefined;
+      // Foreground only: append the cwd probe so the shell reports its final
+      // physical directory (stripBashCwdProbe removes it from the output and
+      // the success path persists it). Guards, display, and metadata keep the
+      // original command. A command handed off to the background mid-run prints
+      // its probe into the adopted task's log tail — one self-describing
+      // bookkeeping line, tracked cwd deliberately left unchanged.
+      const execCommand = appendBashCwdProbe(command);
       const runForegroundBash = async (bashOpts: BashRunOptions) => {
         const unregisterInflight =
           manualBackground && options?.sessionId
@@ -469,7 +521,11 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
               })
             : undefined;
         try {
-          return await runBash({ ...bashOpts, backgroundSignal: manualBackground?.signal });
+          return await runBash({
+            ...bashOpts,
+            command: execCommand,
+            backgroundSignal: manualBackground?.signal,
+          });
         } finally {
           unregisterInflight?.();
         }
@@ -507,7 +563,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         ];
         const wrap = forceUnsandboxed
           ? ({ sandboxed: false } as sandbox.WrapResult)
-          : await sandbox.wrapCommand(command, {
+          : await sandbox.wrapCommand(execCommand, {
               workspaceRoot: cwd,
               additionalRoots: options?.additionalRoots,
               readOnly: options?.sandboxReadOnly === true,
@@ -547,7 +603,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
           };
         }
         const raw = await runForegroundBash({
-          command,
+          command: execCommand,
           cwd: runCwd,
           timeoutSec,
           signal,
@@ -608,6 +664,13 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
           sandboxed: operationResult.sandboxed,
         });
       }
+
+      // Remove the cwd probe bookkeeping from the output before any branch
+      // formats or persists it; keep the captured directory for the success path.
+      const strippedProbe = stripBashCwdProbe(result.output, result.fullOutput);
+      result.output = strippedProbe.output;
+      result.fullOutput = strippedProbe.fullOutput;
+      const capturedShellCwd = strippedProbe.capturedCwd;
 
       if (result.handoff) {
         const handoff = result.handoff;
@@ -711,13 +774,47 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         });
       }
 
+      // cd persistence: only a successful foreground run updates the tracked
+      // shell cwd (a failed command usually means the cd did not happen as
+      // intended). The physical `pwd -P` path is re-expressed in the root's
+      // spelling first (realpath can cross symlinks like macOS /var), then
+      // validated; a captured cwd outside the workspace resets the session to
+      // the workspace root, with the reset surfaced in the output (ZCode
+      // bash-cwd-policy semantics).
+      let cwdResetNote: string | undefined;
+      if (capturedShellCwd && result.exitCode === 0 && !result.timedOut) {
+        try {
+          writeShellCwd(
+            resolveInsideWorkspaces(
+              workspaceRoots,
+              denormalizePhysicalCwd(capturedShellCwd, workspaceRoots)
+            )
+          );
+        } catch {
+          writeShellCwd(path.resolve(cwd));
+          cwdResetNote =
+            `Shell cwd was reset to ${toWorkspaceRelative(cwd, path.resolve(cwd)) || '.'} ` +
+            '(the command left the workspace).';
+        }
+      }
+
       const fullOutputPath = await persistFullOutputIfTruncated(result);
       const insights = extractBashOutputInsights(result.fullOutput);
+      // Image output: convert produced images into structured blocks instead of
+      // dropping them (decoding is in-memory; no temp files to clean up).
+      const imageExtraction = await extractBashImageOutput({
+        output: result.output,
+        runCwd,
+        supportsVision: options?.supportsVision === true,
+      });
+      const displayOutput = cwdResetNote
+        ? `${imageExtraction.output}${imageExtraction.output ? '\n' : ''}${cwdResetNote}`
+        : imageExtraction.output;
       const text = formatBashResultText(
         {
           command,
           cwd: toWorkspaceRelative(cwd, runCwd) || '.',
-          output: result.output,
+          output: displayOutput,
           fullOutput: result.fullOutput,
           exitCode: result.exitCode,
           durationMs: result.durationMs,
@@ -729,6 +826,14 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         },
         insights
       );
+      const imageNotes = imageExtraction.notes.length
+        ? `\n\n${imageExtraction.notes.join('\n')}`
+        : '';
+      const imageBlocks = imageExtraction.images.map(image => ({
+        type: 'image' as const,
+        data: image.data.toString('base64'),
+        mimeType: image.mimeType,
+      }));
 
       const sandboxFsDenied =
         result.exitCode !== 0 && !result.timedOut
@@ -739,19 +844,31 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
             )
           : undefined;
 
-      return textResult(text, {
-        ok: result.exitCode === 0 && !result.timedOut,
-        exitCode: result.exitCode,
-        truncated: result.truncated,
-        timedOut: result.timedOut,
-        ...(fullOutputPath ? { fullOutputPath } : {}),
-        durationMs: result.durationMs,
-        ...escalated.details,
-        sandboxed: wrap.sandboxed,
-        ...(insights.diagnostics.length ? { diagnostics: insights.diagnostics } : {}),
-        ...(insights.failedTests.length ? { failedTests: insights.failedTests } : {}),
-        ...(sandboxFsDenied ? { sandboxFsDenied } : {}),
-      });
+      return {
+        content: [{ type: 'text', text: text + imageNotes }, ...imageBlocks],
+        details: {
+          ok: result.exitCode === 0 && !result.timedOut,
+          exitCode: result.exitCode,
+          truncated: result.truncated,
+          timedOut: result.timedOut,
+          ...(fullOutputPath ? { fullOutputPath } : {}),
+          durationMs: result.durationMs,
+          ...escalated.details,
+          sandboxed: wrap.sandboxed,
+          ...(insights.diagnostics.length ? { diagnostics: insights.diagnostics } : {}),
+          ...(insights.failedTests.length ? { failedTests: insights.failedTests } : {}),
+          ...(sandboxFsDenied ? { sandboxFsDenied } : {}),
+          ...(imageBlocks.length
+            ? {
+                images: imageExtraction.images.map(image => ({
+                  source: image.source,
+                  mimeType: image.mimeType,
+                  bytes: image.data.length,
+                })),
+              }
+            : {}),
+        },
+      };
     },
   };
 }

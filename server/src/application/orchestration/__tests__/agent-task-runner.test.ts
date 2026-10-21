@@ -86,7 +86,17 @@ describe('AgentTaskRunner', () => {
       client.ws.send({ type: 'delta', content: 'Hello ' });
       client.ws.send({ type: 'tool_use' });
       client.ws.send({ type: 'delta', content: 'world' });
-      client.ws.send({ type: 'run_completed' });
+      client.ws.send({
+        type: 'run_completed',
+        usage: {
+          input: 10,
+          output: 5,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 15,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+      });
     });
     const runner = createAgentTaskRunner({
       db,
@@ -113,6 +123,15 @@ describe('AgentTaskRunner', () => {
       resultSummary: 'Hello world',
       responseText: 'Hello world',
       toolCount: 1,
+      usage: {
+        input: 10,
+        output: 5,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 15,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      durationMs: expect.any(Number),
     });
     expect(handleRunStart).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'orchestrator-task-1' }),

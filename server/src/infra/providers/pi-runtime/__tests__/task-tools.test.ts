@@ -322,6 +322,95 @@ describe('Agent subagent_type and session linkage', () => {
   });
 });
 
+describe('Agent synchronous usage block', () => {
+  function waitTool(waitResult: Record<string, unknown>) {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    const executor = {
+      start: vi.fn(async (task: { id: string }) => ({
+        executorRef: { providerType: 'test', taskId: task.id },
+        sessionId: 'child-usage-1',
+      })),
+      wait: vi.fn(async () => waitResult),
+      stop: vi.fn(async () => ({ status: 'stopped', result: {} })),
+    };
+    const tool = createAgentTool(
+      '/tmp',
+      'session-1',
+      'run-1',
+      db,
+      undefined,
+      executor as never,
+      undefined,
+      createTaskAdapter(db)
+    ) as any;
+    return { db, executor, tool };
+  }
+
+  it('appends a <usage> block to the wait:true return from the run result usage', async () => {
+    const { db, tool } = waitTool({
+      status: 'completed',
+      result: {
+        text: 'All done',
+        usage: {
+          input: 100,
+          output: 50,
+          cacheRead: 1000,
+          cacheWrite: 20,
+          totalTokens: 1170,
+          toolUses: 7,
+          durationMs: 45_678,
+        },
+      },
+    });
+    try {
+      const res = await tool.execute('agent-usage-1', { prompt: 'x', wait: true });
+      const text = res.content[0].text as string;
+      expect(text).toContain('"result"');
+      expect(text.trim()).toMatch(/<\/usage>$/);
+      expect(text).toContain(
+        '<usage>\nsubagent_tokens: 1170\ninput_tokens: 100\noutput_tokens: 50\n' +
+          'cache_read_tokens: 1000\ncache_write_tokens: 20\ntool_uses: 7\nduration_ms: 45678\n</usage>'
+      );
+      // The JSON body must stay parseable on its own (everything before the block).
+      expect(JSON.parse(text.slice(0, text.indexOf('<usage>')).trim())).toMatchObject({
+        ok: true,
+        status: 'completed',
+        result: { text: 'All done' },
+      });
+      expect(res.details).toMatchObject({
+        ok: true,
+        status: 'completed',
+        usage: { totalTokens: 1170, toolUses: 7 },
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('omits the <usage> block when the run carries no usage', async () => {
+    const { db, tool } = waitTool({ status: 'completed', result: { text: 'done' } });
+    try {
+      const res = await tool.execute('agent-usage-2', { prompt: 'x', wait: true });
+      expect(res.content[0].text).not.toContain('<usage>');
+      expect(JSON.parse(res.content[0].text as string)).toMatchObject({
+        ok: true,
+        status: 'completed',
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('formats the usage block only from present fields', () => {
+    expect(taskTools.formatAgentUsageBlock(undefined)).toBe('');
+    expect(taskTools.formatAgentUsageBlock({})).toBe('');
+    expect(taskTools.formatAgentUsageBlock({ totalTokens: 5, durationMs: 12 })).toBe(
+      '\n\n<usage>\nsubagent_tokens: 5\nduration_ms: 12\n</usage>'
+    );
+  });
+});
+
 describe('SendMessage', () => {
   function setup() {
     const db = new Database(':memory:');

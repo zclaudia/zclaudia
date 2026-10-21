@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
@@ -9,6 +9,8 @@ import {
   buildSkillDirectoryHint,
   getDiscoveredSkills,
   getEligibleDiscoveredSkills,
+  getSkillLoadDiagnostics,
+  getSkillsLockPath,
   loadDiscoveredSkillContent,
   addPluginSkills,
   setDatabase,
@@ -16,6 +18,7 @@ import {
   activateConditionalSkillsForToolNames,
   recordSkillUsage,
 } from '../skill-tools.js';
+import { computeSkillLockHash, readSkillsLock } from '../skills-lock.js';
 import { createExecutionEnv } from '../../../infra/execution-env.js';
 import { workspaceService } from '../../services/workspace.js';
 
@@ -423,5 +426,91 @@ describe('skill-tools (pi-backed)', () => {
     expect(discovered).toHaveLength(2);
     expect(discovered.find(s => s.source === 'workspace')?.name).toBe('ws-shared');
     expect(discovered.find(s => s.source === 'plugin')?.name).toBe('plugin-only');
+  });
+
+  describe('skills lock (third-party external skills only)', () => {
+    function readLockFromHome() {
+      return readSkillsLock(getSkillsLockPath()!);
+    }
+
+    it('writes an entry for external skills at load and excludes workspace skills', async () => {
+      const extDir = path.join(process.env.HOME!, '.agents', 'skills');
+      writeSkill(extDir, 'vendored', 'name: vendored\ndescription: ext\nversion: 2.0.0');
+      writeSkill(WORKSPACE_SKILLS_DIR, 'mine', 'name: mine\ndescription: ws');
+
+      await loadAndCacheSkills(createExecutionEnv(tmpRoot));
+
+      const lock = readLockFromHome();
+      expect(Object.keys(lock.skills)).toEqual(['vendored']);
+      expect(lock.skills['vendored']).toMatchObject({
+        name: 'vendored',
+        sourceType: 'external',
+        version: '2.0.0',
+        computedHash: computeSkillLockHash(
+          readFileSync(path.join(extDir, 'vendored', 'SKILL.md'), 'utf-8')
+        ),
+      });
+    });
+
+    it('does not lock plugin-bundled skills merged via addPluginSkills', async () => {
+      const extDir = path.join(process.env.HOME!, '.zclaudia', 'skills');
+      writeSkill(extDir, 'external-one', 'name: external-one\ndescription: ext');
+
+      await loadAndCacheSkills(createExecutionEnv(tmpRoot));
+      addPluginSkills([
+        {
+          skill: { name: 'plugin-only', description: 'p', content: '', filePath: '/p/SKILL.md' },
+          source: 'plugin',
+        },
+      ]);
+
+      expect(Object.keys(readLockFromHome().skills)).toEqual(['external-one']);
+    });
+
+    it('surfaces a hash_mismatch diagnostic when an external skill changes between loads, then clears it', async () => {
+      const extDir = path.join(process.env.HOME!, '.agents', 'skills');
+      const skillFile = path.join(extDir, 'vendored', 'SKILL.md');
+      writeSkill(extDir, 'vendored', 'name: vendored\ndescription: v1');
+      const env = createExecutionEnv(tmpRoot);
+
+      await loadAndCacheSkills(env);
+      expect(getSkillLoadDiagnostics().filter(d => d.code.startsWith('skill_lock_'))).toEqual([]);
+
+      // Tamper (or upstream update) between two loads.
+      writeFileSync(skillFile, '---\nname: vendored\ndescription: v2\n---\n\nchanged\n', 'utf-8');
+      await loadAndCacheSkills(env);
+
+      const mismatches = getSkillLoadDiagnostics().filter(
+        d => d.code === 'skill_lock_hash_mismatch'
+      );
+      expect(mismatches).toHaveLength(1);
+      expect(mismatches[0]).toMatchObject({
+        type: 'warning',
+        source: 'external',
+        path: skillFile,
+      });
+      expect(mismatches[0].message).toContain('expected');
+      expect(readLockFromHome().skills['vendored'].computedHash).toBe(
+        computeSkillLockHash(readFileSync(skillFile, 'utf-8'))
+      );
+
+      // The lock was refreshed, so the next load is clean again.
+      await loadAndCacheSkills(env);
+      expect(getSkillLoadDiagnostics().filter(d => d.code === 'skill_lock_hash_mismatch')).toEqual(
+        []
+      );
+    });
+
+    it('drops the lock entry of an external skill removed between loads', async () => {
+      const extDir = path.join(process.env.HOME!, '.zclaudia', 'skills');
+      writeSkill(extDir, 'gone', 'name: gone\ndescription: tmp');
+      await loadAndCacheSkills(createExecutionEnv(tmpRoot));
+      expect(Object.keys(readLockFromHome().skills)).toEqual(['gone']);
+
+      rmSync(path.join(extDir, 'gone'), { recursive: true, force: true });
+      await loadAndCacheSkills(createExecutionEnv(tmpRoot));
+
+      expect(readLockFromHome().skills).toEqual({});
+    });
   });
 });

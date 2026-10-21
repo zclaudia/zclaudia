@@ -168,6 +168,37 @@ export function normalizeBashCommandForMatch(command: string): string {
 }
 
 /**
+ * Expand simple same-command variable assignments for guard matching ONLY
+ * (never executed): `K=ssh; cat ~/.$K/id_rsa` → `K=ssh; cat ~/.ssh/id_rsa`.
+ * Recognizes `VAR=value` / `export VAR=value` segments that stand alone before
+ * a separator, with a plain-word or fully-quoted single-token value; `$VAR`
+ * and `${VAR}` occurrences in the remainder are replaced. Values containing
+ * quotes, `$`, or backticks are skipped (no recursive or command-substitution
+ * expansion — those stay unverifiable). Over-expansion is safe here: it can
+ * only make a command match a pattern its expanded form would actually run,
+ * i.e. it costs an approval prompt, never a silent block.
+ */
+export function expandAssignedVariables(command: string): string {
+  const assignments = new Map<string, string>();
+  for (const segment of command.split(/&&|\|\||[;&|\n]/)) {
+    const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.+)$/.exec(segment);
+    if (!match) continue;
+    const raw = match[2].trim();
+    const value = /^(['"]).*\1$/.test(raw) ? unquote(raw) : raw.split(/\s+/)[0];
+    if (!value || /[$`"']/.test(value)) continue;
+    assignments.set(match[1], value);
+  }
+  if (assignments.size === 0) return command;
+  return command.replace(
+    /\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g,
+    (whole, braced, plain) => {
+      const value = braced !== undefined ? assignments.get(braced) : assignments.get(plain);
+      return value !== undefined ? value : whole;
+    }
+  );
+}
+
+/**
  * Normalize a matched home path token to the canonical `~/...` form:
  * unquote, drop backslash escapes, rewrite `$HOME` / `${HOME}` / the absolute
  * home directory to `~`. os.homedir() (not process.env.HOME): one consistent

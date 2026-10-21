@@ -1,6 +1,6 @@
 # T1 Agent 核心运行时与终端形态 对比报告
 
-- 对比对象：ZCode（`/Users/zhvala/SourceCode/ZCode/apps/zcode-cli`，Apache-2.0）vs zclaudia（`/Users/zhvala/SourceCode/zclaudia`）
+- 对比对象：ZCode（`/Users/zhvala/SourceCode/zcoder/apps/zcode-cli`，Apache-2.0）vs zclaudia（`/Users/zhvala/SourceCode/zclaudia`）
 - 维度：agent 主循环与子代理体系、工具系统与权限审批、hooks 生命周期、会话恢复与上下文压缩、TUI 终端形态
 - 方法：目录结构 + package.json/README/AGENTS.md → 关键入口文件精读 → 定向 grep；均为本次会话实读，行号/文件数来自 `ls`/`wc -l`/`grep` 实际输出。
 - 许可提示：ZCode 仓库根 `LICENSE` 为 Apache License 2.0（已确认文件头）。任何「直接移植」须保留其许可声明与 NOTICE 归属；下文各项均已注明搬运方式，逐条不再重复。

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Search, Plus } from 'lucide-react';
+import { FolderInput, Plus, Search } from 'lucide-react';
 import type { AgentsBackend, AgentsTab, LibraryItem } from './agents-types';
 import { ItemCard } from './ui/ItemCard';
 import type { ItemCardAction } from './ui/ItemCard';
@@ -20,6 +20,7 @@ export function BrowseView({
   onOpen,
   onSelectBackendFilter,
   onNew,
+  onImportSkills,
   onSetProfileDefault,
   onDeleteProfile,
   onSetLlmProfileDefault,
@@ -34,6 +35,8 @@ export function BrowseView({
   onOpen: (item: LibraryItem) => void;
   onSelectBackendFilter: (key: string) => void;
   onNew: () => void;
+  /** Skills tab only: open the external-agent skills import dialog. */
+  onImportSkills?: () => void;
   onSetProfileDefault?: (item: LibraryItem) => void;
   onDeleteProfile?: (item: LibraryItem) => void;
   onSetLlmProfileDefault?: (item: LibraryItem) => void;
@@ -168,6 +171,15 @@ export function BrowseView({
                 className="w-28 bg-transparent outline-none placeholder:text-muted-foreground"
               />
             </div>
+            {tab === 'skills' && onImportSkills && (
+              <button
+                type="button"
+                onClick={onImportSkills}
+                className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-secondary"
+              >
+                <FolderInput className="h-3.5 w-3.5" strokeWidth={1.75} /> Import
+              </button>
+            )}
             <button
               type="button"
               onClick={onNew}

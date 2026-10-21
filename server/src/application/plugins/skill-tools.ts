@@ -27,6 +27,7 @@ import {
   type SourcedSkill,
 } from './skill-loader.js';
 import { meetsRequirements } from './skill-requirements.js';
+import { syncSkillsLock, type SkillLockIssue } from './skills-lock.js';
 import { resolveSkillStatus } from '@zclaudia/shared/core/record-status-resolvers';
 import type { RecordStatus } from '@zclaudia/shared/core/record-status';
 
@@ -321,6 +322,55 @@ function getWellKnownSkillDirs(): string[] {
   return [path.join(home, '.zclaudia', 'skills'), path.join(home, '.agents', 'skills')];
 }
 
+/**
+ * Lock file for third-party (external) skills: sits next to the well-known
+ * `~/.zclaudia/skills` directory. Null when no home dir is resolvable —
+ * locking is skipped in that case, mirroring getWellKnownSkillDirs.
+ */
+export function getSkillsLockPath(): string | null {
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  if (!home) return null;
+  return path.join(home, '.zclaudia', 'skills-lock.json');
+}
+
+function lockIssueDiagnostic(issue: SkillLockIssue): SkillLoadDiagnostic {
+  return {
+    type: 'warning',
+    code: `skill_lock_${issue.kind}`,
+    message:
+      issue.kind === 'hash_mismatch'
+        ? `Skill content changed since it was locked (expected ${issue.expectedHash}, now ${issue.actualHash})`
+        : 'Skill file could not be read for lock verification',
+    path: issue.path,
+    source: 'external',
+  };
+}
+
+/**
+ * Validate third-party (external) skills against the skills-lock file and
+ * refresh it with the current state. Workspace skills are user-authored
+ * (built-in) and plugin skills ship with their plugin — neither is locked.
+ * Best-effort: lock failures surface as warnings, never break loading.
+ */
+function syncExternalSkillsLock(skills: SourcedSkill[]): void {
+  const lockPath = getSkillsLockPath();
+  if (!lockPath) return;
+  try {
+    const sync = syncSkillsLock({
+      lockPath,
+      skills: skills.map(s => ({ name: skillId(s), filePath: s.skill.filePath })),
+    });
+    if (sync.issues.length > 0) {
+      cachedDiagnostics.push(...sync.issues.map(lockIssueDiagnostic));
+      for (const issue of sync.issues) {
+        console.warn(`[SkillLoader] skill_lock_${issue.kind}: ${issue.name} — ${issue.path}`);
+      }
+    }
+  } catch (error) {
+    console.warn('[SkillLoader] skills-lock sync failed:', error);
+  }
+}
+
 export function getWorkspaceSkillDir(): string {
   return path.join(workspaceService.getWorkspaceDir(), 'skills');
 }
@@ -360,6 +410,8 @@ export async function loadAndCacheSkills(env: ExecutionEnv): Promise<number> {
   activatedConditionalSkillIds = new Set(
     [...activatedConditionalSkillIds].filter(id => deduped.some(skill => skillId(skill) === id))
   );
+
+  syncExternalSkillsLock(deduped.filter(s => s.source === 'external'));
 
   for (const d of result.diagnostics) {
     console.warn(`[SkillLoader] ${d.code} (${d.source}): ${d.message} — ${d.path}`);

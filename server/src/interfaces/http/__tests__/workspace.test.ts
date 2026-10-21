@@ -10,6 +10,11 @@ import {
   refreshSkillCache,
   saveExternalSkillDirs,
 } from '../../../application/plugins/skill-tools.js';
+import {
+  importExternalSkills,
+  recordImportedExternalSkills,
+  scanExternalSkillSources,
+} from '../../../application/plugins/skill-import.js';
 
 vi.mock('../../../application/services/workspace.js', () => ({
   workspaceService: {
@@ -30,6 +35,12 @@ vi.mock('../../../application/plugins/skill-tools.js', () => ({
   getSkillLoadDiagnostics: vi.fn(),
   getExternalSkillDirs: vi.fn(),
   saveExternalSkillDirs: vi.fn(),
+}));
+
+vi.mock('../../../application/plugins/skill-import.js', () => ({
+  scanExternalSkillSources: vi.fn(),
+  importExternalSkills: vi.fn(),
+  recordImportedExternalSkills: vi.fn(),
 }));
 
 function createTestApp() {
@@ -54,6 +65,7 @@ describe('workspace routes', () => {
     vi.mocked(getSkillLoadDiagnostics).mockReturnValue([]);
     vi.mocked(getExternalSkillDirs).mockReturnValue([]);
     vi.mocked(refreshSkillCache).mockResolvedValue(0);
+    vi.mocked(recordImportedExternalSkills).mockReturnValue({ updated: false });
   });
 
   it('returns structured 400 when config update body is empty', async () => {
@@ -177,6 +189,157 @@ describe('workspace routes', () => {
         code: 'INTERNAL_ERROR',
         message: 'boom',
       },
+    });
+  });
+
+  describe('external skills import', () => {
+    it('scans external sources and returns per-source candidates', async () => {
+      vi.mocked(scanExternalSkillSources).mockReturnValueOnce({
+        sources: [
+          {
+            agent: 'claude-code',
+            agentLabel: 'Claude Code',
+            path: '/home/.claude/skills',
+            status: 'ok',
+            skills: [
+              {
+                agent: 'claude-code',
+                agentLabel: 'Claude Code',
+                name: 'review',
+                importable: true,
+                sourceDir: '/home/.claude/skills/review',
+                skillMdPath: '/home/.claude/skills/review/SKILL.md',
+              },
+            ],
+          },
+          {
+            agent: 'codex',
+            agentLabel: 'Codex CLI',
+            path: '/home/.codex/skills',
+            status: 'missing',
+            skills: [],
+          },
+        ],
+        importableCount: 1,
+      } as any);
+
+      const res = await request(app).get('/api/workspace/skills/import/scan');
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.importableCount).toBe(1);
+      expect(res.body.data.sources).toHaveLength(2);
+      expect(scanExternalSkillSources).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns structured 400 when import selections are invalid', async () => {
+      for (const body of [undefined, {}, { selections: 'nope' }, { selections: [{ agent: 1 }] }]) {
+        const res = await request(app)
+          .post('/api/workspace/skills/import')
+          .send(body as object);
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe('VALIDATION_ERROR');
+      }
+      expect(importExternalSkills).not.toHaveBeenCalled();
+    });
+
+    it('returns structured 400 for an invalid import mode', async () => {
+      const res = await request(app)
+        .post('/api/workspace/skills/import')
+        .send({ selections: [{ agent: 'claude-code', name: 'x' }], mode: 'hardlink' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toBe('mode must be "symlink" or "copy"');
+      expect(importExternalSkills).not.toHaveBeenCalled();
+    });
+
+    it('imports, refreshes the skill cache, records the lock, and returns counts', async () => {
+      const importResult = {
+        mode: 'symlink',
+        targetSkillDir: '/home/.zclaudia/skills',
+        outcomes: [
+          {
+            agent: 'claude-code',
+            agentLabel: 'Claude Code',
+            name: 'review',
+            status: 'imported',
+            targetPath: '/home/.zclaudia/skills/review',
+          },
+          {
+            agent: 'codex',
+            agentLabel: 'Codex CLI',
+            name: 'dupe',
+            status: 'skipped',
+            reason: 'target_exists',
+          },
+        ],
+        sources: [
+          {
+            agent: 'claude-code',
+            agentLabel: 'Claude Code',
+            importedCount: 1,
+            skippedCount: 0,
+            failedCount: 0,
+          },
+          {
+            agent: 'codex',
+            agentLabel: 'Codex CLI',
+            importedCount: 0,
+            skippedCount: 1,
+            failedCount: 0,
+          },
+        ],
+        imported: [
+          {
+            agent: 'claude-code',
+            agentLabel: 'Claude Code',
+            name: 'review',
+            sourceDir: '/home/.claude/skills/review',
+            targetPath: '/home/.zclaudia/skills/review',
+          },
+        ],
+      };
+      vi.mocked(importExternalSkills).mockReturnValueOnce(importResult as any);
+      vi.mocked(recordImportedExternalSkills).mockReturnValueOnce({ updated: true });
+
+      const res = await request(app)
+        .post('/api/workspace/skills/import')
+        .send({
+          selections: [{ agent: 'claude-code', name: 'review' }],
+          mode: 'symlink',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toEqual({ ...importResult, lockUpdated: true });
+      expect(importExternalSkills).toHaveBeenCalledWith({
+        selections: [{ agent: 'claude-code', name: 'review' }],
+        mode: 'symlink',
+      });
+      expect(workspaceService.clearCache).toHaveBeenCalled();
+      expect(refreshSkillCache).toHaveBeenCalled();
+      expect(recordImportedExternalSkills).toHaveBeenCalledWith({
+        imports: importResult.imported,
+      });
+    });
+
+    it('defaults the import mode to symlink', async () => {
+      vi.mocked(importExternalSkills).mockReturnValueOnce({
+        mode: 'symlink',
+        outcomes: [],
+        sources: [],
+        imported: [],
+      } as any);
+
+      const res = await request(app)
+        .post('/api/workspace/skills/import')
+        .send({ selections: [{ agent: 'cursor', name: 'x' }] });
+
+      expect(res.status).toBe(200);
+      expect(importExternalSkills).toHaveBeenCalledWith({
+        selections: [{ agent: 'cursor', name: 'x' }],
+        mode: 'symlink',
+      });
     });
   });
 });

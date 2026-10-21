@@ -6,7 +6,7 @@
 
 ## 1. 背景与目标
 
-| | zclaudia（本仓库） | ZCode（竞品，`/Users/zhvala/SourceCode/ZCode`） |
+| | zclaudia（本仓库） | ZCode（竞品，`/Users/zhvala/SourceCode/zcoder`） |
 | --- | --- | --- |
 | 定位 | 跨平台桌面 + gateway 的多 Agent 编程工作台 | AI 编程工作台：桌面 + 浏览器 + 终端 Agent（TUI/CLI） |
 | 技术栈 | Tauri + React，Node 后端，SQLite 本地优先 | Electron + Web + Node 后端，Agent CLI 源码完整入库 |

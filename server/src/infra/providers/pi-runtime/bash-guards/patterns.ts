@@ -18,6 +18,32 @@ export interface CriticalBashPatternEntry {
 export const CRITICAL_BASH_PATTERNS: ReadonlyArray<CriticalBashPatternEntry> = [
   // Recursive destruction.
   { pattern: /\brm\s+-[a-z]*[rRfF][a-z]*\s+\//i, reason: 'recursive delete of a root-level path' },
+  // The home directory itself or its wildcard — NOT `rm -rf ~/some-project`,
+  // which is an ordinary (outside-workspace-guarded) user action.
+  {
+    pattern: /\brm\s+-[a-z]*[rRfF][a-z]*\s+(?:~\/?|\$\{?HOME\}?\/?)\*(?:\s|$)/i,
+    reason: 'recursive delete of the home directory (wildcard)',
+  },
+  {
+    pattern: /\brm\s+-[a-z]*[rRfF][a-z]*\s+(?:~|\$\{?HOME\}?)(?:\s|$)/i,
+    reason: 'recursive delete of the home directory',
+  },
+  // Bare recursive+force glob (`rm -rf *`, `rm -rf *.log`, `rm -rf ./*`).
+  // Requires BOTH r and f so the common `rm -f *.log` cleanup stays unflagged;
+  // targeted globs (`rm -rf build/*`) don't start with the wildcard.
+  {
+    pattern: /\brm\s+-[a-z]*(?:[rR][a-z]*[fF]|[fF][a-z]*[rR])[a-z]*\s+(?:\.\/)?\*/i,
+    reason: 'recursive delete of a wildcard target',
+  },
+  // `find … -delete` rooted outside the workspace (absolute or home). Borrowed
+  // semantically from ZCode's guarded find rule (Z/core/src/tool/handlers/
+  // guarded/find.ts), scoped to root-level paths: workspace-relative
+  // `find . -name tmp -delete` is everyday cleanup and stays with the
+  // destructiveOps classifier instead.
+  {
+    pattern: /\bfind\s+(?:\/|~\/?|\$\{?HOME\}\/?)[^;&|]*\s-delete\b/,
+    reason: 'find -delete over a root-level path',
+  },
   { pattern: /\bsudo\s+rm\b/i, reason: 'privileged file deletion (sudo rm)' },
   {
     pattern: /\bchmod\s+-R\s+[0-7]+\s+\//i,
@@ -32,6 +58,19 @@ export const CRITICAL_BASH_PATTERNS: ReadonlyArray<CriticalBashPatternEntry> = [
     reason: 'recursive ownership change on a root-level path',
   },
 
+  // Privilege escalation. Plain `sudo <package-manager install>` stays with
+  // the destructiveOps classifier; what is critical is becoming root.
+  {
+    pattern: /(?:^|[;&|(])\s*su(?:\s|$|[;&|(])/,
+    reason: 'switch-user shell (su)',
+  },
+  // `(?:-\w+(?:\s+\S+)?\s+)*` steps over short flags and their values
+  // (`sudo -u root sh`), and `\S+` backtracks off when the value IS the shell.
+  {
+    pattern: /(?:^|[;&|(])\s*sudo\s+(?:-\w+(?:\s+\S+)?\s+)*(?:su\b|(?:ba|z|fi)?sh\b|-s\b)/i,
+    reason: 'privileged shell (sudo sh/bash/zsh/su/-s)',
+  },
+
   // Fork bomb (a few common spacings).
   { pattern: /:\(\)\s*\{\s*:\s*\|\s*:/i, reason: 'fork bomb' },
 
@@ -39,7 +78,16 @@ export const CRITICAL_BASH_PATTERNS: ReadonlyArray<CriticalBashPatternEntry> = [
   { pattern: />\s*\/dev\/sd[a-z]/i, reason: 'write to a raw disk device' },
   // Anchored to command position so `grep "mkfs" docs/` doesn't false-positive.
   { pattern: /(?:^|[\s;&|(])mkfs(?:\.\w+)?\b/i, reason: 'filesystem format (mkfs)' },
-  { pattern: /\bdd\s+if=.+of=\/dev\//i, reason: 'dd to a device' },
+  // Any `dd` writing to a device (`of=`), not just the `if=…of=` shape — this
+  // is the write-a-bootable-USB shape too. /dev/null is the harmless exception.
+  { pattern: /\bdd\s+[^|;&]*\bof=\/dev\/(?!null\b)/i, reason: 'dd to a device' },
+  // macOS disk erasure (eraseDisk/eraseVolume/zeroDisk/…); `diskutil list`,
+  // `eject`, `unmount` stay unflagged.
+  {
+    pattern:
+      /\bdiskutil\s+(?:erase\w*|zeroDisk|randomDisk|reformat|apfs\s+(?:delete\w*|erase\w*))/i,
+    reason: 'disk erase/format (diskutil)',
+  },
   { pattern: /\bshred\s+\/dev\//i, reason: 'shred a device' },
   { pattern: /\bcryptsetup\b/i, reason: 'disk encryption manipulation (cryptsetup)' },
 
@@ -65,6 +113,23 @@ export const CRITICAL_BASH_PATTERNS: ReadonlyArray<CriticalBashPatternEntry> = [
   {
     pattern: /\beval\s+["'`]?\$\(\s*(?:curl|wget|fetch)\b|\beval\s+`\s*(?:curl|wget|fetch)\b/i,
     reason: 'remote fetch evaluated as code (fetch-then-execute)',
+  },
+  // `sh -c "$(curl …)"` — the fetch rides a shell -c instead of eval.
+  {
+    pattern: /\b(?:ba|z)?sh\s+-c\s+["'`]?\$\(\s*(?:curl|wget|fetch)\b/i,
+    reason: 'remote fetch executed via sh -c (fetch-then-execute)',
+  },
+
+  // Any output piped into a shell (cat/printf/… | bash) is executing
+  // generated code; the sudo variant pipes INTO a privileged shell.
+  {
+    pattern: /\|\s*(?:sudo\s+)?(?:bash|zsh|fish|sh)\b/i,
+    reason: 'output piped into a shell (fetch-then-execute)',
+  },
+  // `eval "$(… | base64 -d)"` — decode-then-evaluate without a shell pipe.
+  {
+    pattern: /\beval\s+["'`]?\$\([^)]*\bbase64\b[^)]*(?:-[a-zA-Z]*[dD][a-zA-Z]*|--decode)\b/i,
+    reason: 'base64-decoded payload evaluated as code (obfuscated execution)',
   },
 
   // Process/host control.

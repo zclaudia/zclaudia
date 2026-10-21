@@ -1,4 +1,4 @@
-import express, { type Express } from 'express';
+import express, { type Express, type Request, type Response } from 'express';
 import cors from 'cors';
 import { createServer as createHttpServer, type Server, type IncomingMessage } from 'http';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -43,6 +43,11 @@ import { expressErrorHandler } from './interfaces/http/middleware/express-error.
 import { createCorsOriginGuard, isRequestOriginAllowed } from './interfaces/http/trust-boundary.js';
 import { mountBrowserShell } from './interfaces/http/browser-shell.js';
 import { RUNTIME_INITIALIZING_ERROR } from './interfaces/http/middleware/runtime-initialization.js';
+import {
+  createHostCapabilityUpgradeGuard,
+  rejectUpgrade,
+} from './interfaces/http/middleware/auth.js';
+import { createHostCapabilityStore, HOST_CAPABILITY_HEADER } from './auth.js';
 
 // Extracted modules
 import type { ConnectedClient, MessageSender } from './application/conversation/transport/types.js';
@@ -240,6 +245,20 @@ export async function createServer(
   // Create WebSocket server
   const wss = new WebSocketServer({ noServer: true });
 
+  // One-time host capability tickets (ported from ZCode): the desktop host
+  // issues a capability over HTTP, then presents it as a header on the
+  // trusted `/ws/host` upgrade. Consuming invalidates the ticket, so
+  // replays fail and no client can self-promote to trusted host.
+  const hostCapabilities = createHostCapabilityStore();
+  const isTrustedHostUpgrade = createHostCapabilityUpgradeGuard(
+    (capability: string | undefined) => hostCapabilities.consume(capability),
+    HOST_CAPABILITY_HEADER
+  );
+
+  app.post('/api/host-capability', (_req: Request, res: Response) => {
+    res.json({ success: true, data: hostCapabilities.issue() });
+  });
+
   // Create facade WebSocket server (for /ws/backend-facade)
   const facadeWss = new WebSocketServer({ noServer: true });
   facadeWss.on('connection', ws => {
@@ -269,6 +288,8 @@ export async function createServer(
       !agentRuntimesReady &&
       (url === '/ws' ||
         url.startsWith('/ws?') ||
+        url === '/ws/host' ||
+        url.startsWith('/ws/host?') ||
         url === '/ws/backend-facade' ||
         url.startsWith('/ws/backend-facade?'))
     ) {
@@ -279,6 +300,22 @@ export async function createServer(
       return;
     }
     if (url === '/ws' || url.startsWith('/ws?')) {
+      wss.handleUpgrade(req, socket, head, ws => {
+        wss.emit('connection', ws, req);
+      });
+      return;
+    }
+
+    // Trusted desktop host WS. `/ws` is always a terminal client — no header
+    // can self-promote a `/ws` connection to trusted host; `/ws/host` only
+    // completes the upgrade when the one-time capability ticket is valid, and
+    // the ticket is consumed either way (replays are rejected).
+    if (url === '/ws/host' || url.startsWith('/ws/host?')) {
+      if (!isTrustedHostUpgrade(req)) {
+        console.warn('[WS Upgrade] Rejected /ws/host: invalid or expired host capability');
+        rejectUpgrade(socket, 401, 'Invalid or expired host capability');
+        return;
+      }
       wss.handleUpgrade(req, socket, head, ws => {
         wss.emit('connection', ws, req);
       });
@@ -340,16 +377,23 @@ export async function createServer(
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     const clientId = newId();
     const clientIsLocal = isLocalhost(req);
+    const reqUrl = req.url || '';
+    // Only the ticket-guarded `/ws/host` upgrade reaches here as a trusted
+    // host — the capability was already consumed in the upgrade handler.
+    const isTrustedHost = reqUrl === '/ws/host' || reqUrl.startsWith('/ws/host?');
     const client: ConnectedClient = {
       id: clientId,
       ws,
       isAlive: true,
       isLocal: clientIsLocal,
       authenticated: false,
+      isTrustedHost,
     };
     clients.set(clientId, client);
 
-    console.log(`Client connected: ${clientId} (local: ${clientIsLocal}, awaiting authentication)`);
+    console.log(
+      `Client connected: ${clientId} (local: ${clientIsLocal}, trustedHost: ${isTrustedHost}, awaiting authentication)`
+    );
 
     ws.on('pong', () => {
       client.isAlive = true;

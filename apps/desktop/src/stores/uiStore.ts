@@ -38,6 +38,43 @@ const FONT_CONFIGS: Record<FontSizePreset, FontSizeConfig> = {
   },
 };
 
+// Phones read at arm's length, so each preset steps up ~2px there. Input stays
+// at >= 16px from medium up so iOS WebKit doesn't zoom the page on focus.
+const MOBILE_FONT_CONFIGS: Record<FontSizePreset, FontSizeConfig> = {
+  small: {
+    ...FONT_CONFIGS.small,
+    prose: '0.8125rem', // 13px
+    code: '0.75rem', // 12px
+    input: '0.9375rem', // 15px
+  },
+  medium: {
+    ...FONT_CONFIGS.medium,
+    prose: '0.9375rem', // 15px
+    code: '0.8125rem', // 13px
+    input: '1rem', // 16px
+  },
+  large: {
+    ...FONT_CONFIGS.large,
+    prose: '1.0625rem', // 17px
+    code: '0.9375rem', // 15px
+    input: '1.125rem', // 18px
+  },
+};
+
+// Mirrors useIsMobile's breakpoint (hooks/useMediaQuery.ts).
+const MOBILE_QUERY = '(max-width: 767px)';
+
+function mobileMediaQuery(): MediaQueryList | null {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null;
+  return window.matchMedia(MOBILE_QUERY);
+}
+
+function isMobileFontViewport(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (new URLSearchParams(window.location.search).get('forceMobile') === '1') return true;
+  return mobileMediaQuery()?.matches ?? false;
+}
+
 const STORAGE_KEY = 'zclaudia-font-size';
 
 function loadFontSize(): FontSizePreset {
@@ -56,7 +93,7 @@ function applyFontVars(preset: FontSizePreset) {
   // Skip in SSR/test environments (document not available)
   if (typeof document === 'undefined') return;
 
-  const config = FONT_CONFIGS[preset];
+  const config = (isMobileFontViewport() ? MOBILE_FONT_CONFIGS : FONT_CONFIGS)[preset];
   const root = document.documentElement;
   root.style.setProperty('--chat-font-prose', config.prose);
   root.style.setProperty('--chat-font-code', config.code);
@@ -81,10 +118,12 @@ interface UIState {
   removePoppedOutSession: (sessionId: string) => void;
 }
 
-export const useUIStore = create<UIState>(set => {
+export const useUIStore = create<UIState>((set, get) => {
   const initial = loadFontSize();
   // Apply on store creation
   applyFontVars(initial);
+  // Crossing the mobile breakpoint (rotation, window resize) swaps tables.
+  mobileMediaQuery()?.addEventListener?.('change', () => applyFontVars(get().fontSize));
 
   return {
     fontSize: initial,
@@ -130,4 +169,4 @@ export const useUIStore = create<UIState>(set => {
   };
 });
 
-export { FONT_CONFIGS };
+export { FONT_CONFIGS, MOBILE_FONT_CONFIGS };

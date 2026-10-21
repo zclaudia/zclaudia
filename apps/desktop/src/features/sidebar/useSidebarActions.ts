@@ -153,6 +153,8 @@ export function useSidebarActions({
         setNewSessionAgentProfileId('');
         setCreatingSessionForProject(null);
         selectSession(session.id);
+        // Same as selecting an existing session: land the user in the new chat.
+        if (isMobile && onClose) onClose();
       } catch (error) {
         if (error instanceof ApiError && error.code === 'AGENT_NOT_READY') {
           onAgentNotReady?.(error.details);
@@ -167,6 +169,8 @@ export function useSidebarActions({
       newSessionAgentProfileId,
       addSession,
       selectSession,
+      isMobile,
+      onClose,
       setNewSessionName,
       setNewSessionAgentProfileId,
       setCreatingSessionForProject,

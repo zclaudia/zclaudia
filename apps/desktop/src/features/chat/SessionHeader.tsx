@@ -232,7 +232,9 @@ export function SessionHeader({
           <span className="truncate">{chipText}</span>
         </span>
       )}
-      <div className="hidden min-w-6 flex-1 self-stretch sm:block" data-tauri-drag-region />
+      {/* Flexible spacer: pins the trailing actions (mobile "…" menu included)
+          to the right edge instead of trailing the title. */}
+      <div className="min-w-0 flex-1 self-stretch sm:min-w-6" data-tauri-drag-region />
       {/* Task center entry — same chip family as session info, before it */}
       {currentSession.type !== 'background' && taskCenter}
       {/* Session info chip — agent/model + context%, opens a details popover.

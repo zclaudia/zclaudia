@@ -14,12 +14,14 @@ import {
 function parseRipgrepLines(
   cwd: string,
   stdout: string,
-  maxResults: number
+  maxResults: number,
+  offset = 0
 ): Array<{ file: string; line: number; preview: string }> {
   return stdout
     .split('\n')
     .filter(Boolean)
     .slice(0, maxResults)
+    .slice(offset)
     .flatMap(line => {
       // rg runs with `--null`: `path<NUL>line:text` — the only unambiguous
       // framing for paths containing separators (dashed dates, drive letters).
@@ -51,7 +53,8 @@ function parseRipgrepLines(
 function parseRipgrepContextLines(
   cwd: string,
   stdout: string,
-  maxResults: number
+  maxResults: number,
+  offset = 0
 ): Array<{ file: string; line: number; preview: string; isMatch: boolean }> {
   const groups: string[][] = [];
   let currentGroup: string[] = [];
@@ -68,9 +71,8 @@ function parseRipgrepContextLines(
 
   const results: Array<{ file: string; line: number; preview: string; isMatch: boolean }> = [];
   let matchCount = 0;
-  for (const group of groups) {
-    if (matchCount >= maxResults) break;
-    const parsedGroup = group.flatMap(line => {
+  const parseGroup = (group: string[]) =>
+    group.flatMap(line => {
       // rg runs with `--null`: `path<NUL>line<sep>text` where sep is `:` for
       // match lines and `-` for context lines. Parsing left-to-right with a
       // non-greedy file group misparses paths like `report-2024-01.ts` (the
@@ -100,10 +102,33 @@ function parseRipgrepContextLines(
         },
       ];
     });
-    const groupMatches = parsedGroup.filter(entry => entry.isMatch).length;
-    if (groupMatches === 0) continue;
-    results.push(...parsedGroup);
-    matchCount += groupMatches;
+
+  if (offset <= 0) {
+    for (const group of groups) {
+      if (matchCount >= maxResults) break;
+      const parsedGroup = parseGroup(group);
+      const groupMatches = parsedGroup.filter(entry => entry.isMatch).length;
+      if (groupMatches === 0) continue;
+      results.push(...parsedGroup);
+      matchCount += groupMatches;
+    }
+    return results;
+  }
+
+  // offset > 0: drop every row up to and including the Nth match row, then
+  // collect as usual. Context rows travel with their neighbors, so the rows
+  // around skipped matches disappear with them; when rg merges overlapping
+  // context windows into one group, group-granular skipping would drop kept
+  // matches too — hence the row-level walk.
+  let seenMatches = 0;
+  outer: for (const group of groups) {
+    for (const row of parseGroup(group)) {
+      if (row.isMatch) seenMatches += 1;
+      if (seenMatches <= offset) continue;
+      if (matchCount >= maxResults) break outer;
+      results.push(row);
+      if (row.isMatch) matchCount += 1;
+    }
   }
   return results;
 }
@@ -113,21 +138,35 @@ export function createGrepBridgeTool(cwd: string, options?: WorkspaceRootOptions
     name: 'Grep',
     label: 'Grep',
     description:
-      'Search file contents with ripgrep. output_mode: "content" (default, matching lines with optional context), "files_with_matches" (file paths), or "count" (total match count). Supports case_insensitive and a glob include filter. In content mode, total counts matching lines only; returned counts all emitted rows including context lines. When truncated, totals cover only the rows collected.',
+      'Search file contents with ripgrep. output_mode: "content" (default, matching lines with optional context), "files_with_matches" (file paths), or "count" (total match count). Supports case_insensitive, a glob include filter, a type file-type filter (e.g. "js", "py", "rust"), multiline:true for patterns that span lines, and offset to skip the first N results before applying max_results (pagination). In content mode, total counts matching lines only among the rows collected; returned counts all emitted rows including context lines. When truncated, totals cover only the rows collected.',
     parameters: agentToolParameters({
       type: 'object',
       properties: {
         pattern: { type: 'string' },
         path: { type: 'string' },
         include: { type: 'string', description: 'Glob filter, e.g. *.ts' },
+        type: {
+          type: 'string',
+          description: 'File-type filter, e.g. "js", "py", "rust" (ripgrep type names)',
+        },
         output_mode: {
           type: 'string',
           enum: ['content', 'files_with_matches', 'count'],
           default: 'content',
         },
         case_insensitive: { type: 'boolean', default: false },
+        multiline: {
+          type: 'boolean',
+          default: false,
+          description: 'Allow the pattern to match across line boundaries',
+        },
         context: { type: 'number', default: 0 },
         max_results: { type: 'number', default: 100 },
+        offset: {
+          type: 'number',
+          default: 0,
+          description: 'Skip the first N results before applying max_results',
+        },
       },
       required: ['pattern'],
     }),
@@ -153,12 +192,19 @@ export function createGrepBridgeTool(cwd: string, options?: WorkspaceRootOptions
           ? args.output_mode
           : 'content';
       const caseInsensitive = args.case_insensitive === true;
+      const multiline = args.multiline === true;
       const context = Math.max(0, Math.min(Number(args.context ?? 0) || 0, 20));
       const maxResults = Math.max(1, Math.min(Number(args.max_results ?? 100) || 100, 500));
+      const offset = Math.max(0, Math.min(Number(args.offset ?? 0) || 0, 10_000));
       const relPath = toWorkspaceRelative(cwd, searchRoot) || '.';
       const include =
         typeof args.include === 'string' && args.include ? ['--glob', args.include] : [];
       const ci = caseInsensitive ? ['-i'] : [];
+      // -U lets the pattern match across line boundaries; --multiline-dotall
+      // makes `.` cover newlines so "a.*b" spans lines like callers expect.
+      const ml = multiline ? ['-U', '--multiline-dotall'] : [];
+      const typeFilter =
+        typeof args.type === 'string' && args.type.trim() ? ['--type', args.type.trim()] : [];
 
       try {
         if (mode === 'files_with_matches') {
@@ -168,24 +214,41 @@ export function createGrepBridgeTool(cwd: string, options?: WorkspaceRootOptions
               '--color',
               'never',
               '--with-filename',
+              ...ml,
               ...ci,
+              ...typeFilter,
               ...include,
               '--',
               pattern,
               searchRoot,
             ],
-            { maxLines: maxResults, signal }
+            { maxLines: maxResults + offset, signal }
           );
           if (exitCode === 2)
             return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
-          const files = lines.map(f => toWorkspaceRelative(cwd, f));
+          const files = lines.slice(offset).map(f => toWorkspaceRelative(cwd, f));
           return textResult(
             JSON.stringify(
-              { pattern, path: relPath, mode, files, total: files.length, truncated },
+              {
+                pattern,
+                path: relPath,
+                mode,
+                files,
+                total: files.length,
+                truncated,
+                ...(offset > 0 ? { offset, nextOffset: offset + files.length } : {}),
+              },
               null,
               2
             ),
-            { ok: true, pattern, path: relPath, total: files.length, truncated }
+            {
+              ok: true,
+              pattern,
+              path: relPath,
+              total: files.length,
+              truncated,
+              ...(offset > 0 ? { offset } : {}),
+            }
           );
         }
         if (mode === 'count') {
@@ -196,17 +259,19 @@ export function createGrepBridgeTool(cwd: string, options?: WorkspaceRootOptions
               '--color',
               'never',
               '--with-filename',
+              ...ml,
               ...ci,
+              ...typeFilter,
               ...include,
               '--',
               pattern,
               searchRoot,
             ],
-            { maxLines: maxResults, signal }
+            { maxLines: maxResults + offset, signal }
           );
           if (exitCode === 2)
             return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
-          const counts = lines.flatMap(l => {
+          const counts = lines.slice(offset).flatMap(l => {
             const idx = l.lastIndexOf(':');
             if (idx < 0) return [];
             return {
@@ -216,8 +281,27 @@ export function createGrepBridgeTool(cwd: string, options?: WorkspaceRootOptions
           });
           const total = counts.reduce((sum, c) => sum + c.count, 0);
           return textResult(
-            JSON.stringify({ pattern, path: relPath, mode, counts, total, truncated }, null, 2),
-            { ok: true, pattern, path: relPath, total, truncated }
+            JSON.stringify(
+              {
+                pattern,
+                path: relPath,
+                mode,
+                counts,
+                total,
+                truncated,
+                ...(offset > 0 ? { offset, nextOffset: offset + counts.length } : {}),
+              },
+              null,
+              2
+            ),
+            {
+              ok: true,
+              pattern,
+              path: relPath,
+              total,
+              truncated,
+              ...(offset > 0 ? { offset } : {}),
+            }
           );
         }
         const { lines, truncated, exitCode, stderr } = await runRipgrep(
@@ -230,22 +314,31 @@ export function createGrepBridgeTool(cwd: string, options?: WorkspaceRootOptions
             // NUL-terminated path prefix so the parsers handle any filename
             // (dashed dates, colons, drive letters) unambiguously (P1-13).
             '--null',
+            ...ml,
             ...ci,
             ...(context > 0 ? ['-C', String(context)] : []),
+            ...typeFilter,
             ...include,
             '--',
             pattern,
             searchRoot,
           ],
-          { maxLines: maxResults * (context > 0 ? context * 2 + 1 : 1) + maxResults, signal }
+          {
+            maxLines:
+              (maxResults + offset) * (context > 0 ? context * 2 + 1 : 1) + maxResults + offset,
+            signal,
+          }
         );
         if (exitCode === 2)
           return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
         const stdout = lines.join('\n');
         const results =
           context > 0
-            ? parseRipgrepContextLines(cwd, stdout, maxResults)
-            : parseRipgrepLines(cwd, stdout, maxResults).map(row => ({ ...row, isMatch: true }));
+            ? parseRipgrepContextLines(cwd, stdout, maxResults, offset)
+            : parseRipgrepLines(cwd, stdout, maxResults + offset, offset).map(row => ({
+                ...row,
+                isMatch: true,
+              }));
         // `total` counts matching lines only; `returned` counts every emitted
         // row (context lines included) so the two are never conflated.
         const matchCount = results.reduce((count, row) => count + (row.isMatch ? 1 : 0), 0);
@@ -259,6 +352,7 @@ export function createGrepBridgeTool(cwd: string, options?: WorkspaceRootOptions
               total: matchCount,
               returned: results.length,
               truncated,
+              ...(offset > 0 ? { offset, nextOffset: offset + matchCount } : {}),
             },
             null,
             2
@@ -271,6 +365,7 @@ export function createGrepBridgeTool(cwd: string, options?: WorkspaceRootOptions
             returned: results.length,
             truncated,
             context,
+            ...(offset > 0 ? { offset } : {}),
           }
         );
       } catch (err) {

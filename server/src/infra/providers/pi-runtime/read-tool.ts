@@ -1,9 +1,10 @@
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
-import { readFile, stat } from 'fs/promises';
+import { readFile, readdir, stat } from 'fs/promises';
 import * as path from 'path';
 
 import type { ReadFileStateStore } from './read-file-state.js';
 import { getOutlineProvider, type FoldSpan } from './read-outline.js';
+import { runRipgrep } from './ripgrep-runner.js';
 import { decodeTextBuffer } from './text-io.js';
 import {
   buildHashlineEntries,
@@ -24,6 +25,7 @@ import {
   toWorkspaceRelative,
   workspaceRootsOf,
   type WorkspaceRootOptions,
+  type WorkspaceRoots,
 } from './workspace-paths.js';
 
 export interface ReadToolOptions extends WorkspaceRootOptions {
@@ -56,6 +58,31 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGE_FILE_BYTES = 50 * 1024 * 1024;
 const MAX_PDF_BYTES = 50 * 1024 * 1024;
 const MAX_NOTEBOOK_BYTES = 20 * 1024 * 1024;
+
+// Video extensions recognized by Read. The upstream pi runtime has no video
+// content block (pi-ai message content is text/image only), so these are
+// rejected with an explicit not-supported error instead of the generic
+// binary-file refusal.
+// The extension→mime mapping is Copyright 2026 Z.AI Co., Ltd. — adapted from
+// ZCode apps/zcode-cli/packages/core/src/runtime/helpers/attachment-video.ts
+// (Apache-2.0); Modified by zclaudia: no video block is constructed because
+// pi-ai 0.84.1 cannot carry one — Read returns a clear unsupported error.
+const VIDEO_MIME_BY_EXT: Record<string, string> = {
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/x-m4v',
+  '.mov': 'video/quicktime',
+  '.webm': 'video/webm',
+  '.mkv': 'video/x-matroska',
+  '.avi': 'video/x-msvideo',
+};
+
+// Did-you-mean budget: candidates surfaced when a Read path does not exist.
+const MAX_MISSING_FILE_SUGGESTIONS = 3;
+// Maximum edit distance (on the file name) for a candidate to count as similar.
+const MISSING_FILE_SUGGESTION_MAX_DISTANCE = 3;
+// Upper bound on the project-wide rg --files scan used when the file's own
+// directory has nothing similar.
+const MISSING_FILE_SCAN_MAX_FILES = 5000;
 
 // Extensions that are binary even when no NUL byte appears in the leading
 // sample (fonts, archives, media, office docs, compiled artifacts). Caught
@@ -174,6 +201,103 @@ export function isBlockedDevicePath(filePath: string): boolean {
 function isBinaryBuffer(buffer: Buffer): boolean {
   const sample = buffer.subarray(0, Math.min(buffer.length, 8192));
   return sample.includes(0);
+}
+
+function levenshteinDistance(left: string, right: string): number {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  const current = Array.from({ length: right.length + 1 }, () => 0);
+  for (let i = 1; i <= left.length; i += 1) {
+    current[0] = i;
+    for (let j = 1; j <= right.length; j += 1) {
+      const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+      current[j] = Math.min(current[j - 1] + 1, previous[j] + 1, previous[j - 1] + cost);
+    }
+    for (let j = 0; j <= right.length; j += 1) previous[j] = current[j];
+  }
+  return previous[right.length] ?? 0;
+}
+
+function stripExtension(name: string): string {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(0, dot) : name;
+}
+
+interface SimilarNameCandidate {
+  /** Absolute path of the candidate file. */
+  absolutePath: string;
+  /** File name the similarity was computed on. */
+  name: string;
+  sameStem: boolean;
+  distance: number;
+}
+
+/**
+ * Did-you-mean candidates for a missing Read path: files whose name matches the
+ * requested one's stem exactly or is within a small edit distance. The file's
+ * own directory is scanned first; when it has nothing similar, a bounded
+ * project-wide `rg --files` scan (gitignore-aware) backs it up.
+ */
+async function findSimilarFiles(
+  filePath: string,
+  roots: WorkspaceRoots,
+  limit = MAX_MISSING_FILE_SUGGESTIONS
+): Promise<string[]> {
+  const targetName = path.basename(filePath);
+  const targetStem = stripExtension(targetName);
+  const candidates: SimilarNameCandidate[] = [];
+  const seen = new Set<string>();
+
+  const consider = (absolutePath: string, name: string): void => {
+    if (name === targetName || seen.has(absolutePath)) return;
+    seen.add(absolutePath);
+    const sameStem = stripExtension(name) === targetStem;
+    const distance = sameStem ? 0 : levenshteinDistance(name, targetName);
+    if (sameStem || distance <= MISSING_FILE_SUGGESTION_MAX_DISTANCE) {
+      candidates.push({ absolutePath, name, sameStem, distance });
+    }
+  };
+
+  // 1) The requested file's own directory.
+  try {
+    const entries = await readdir(path.dirname(filePath), { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() && !entry.isSymbolicLink()) continue;
+      consider(path.join(path.dirname(filePath), entry.name), entry.name);
+    }
+  } catch {
+    // unreadable/missing directory — the project scan below still applies
+  }
+
+  // 2) Project-wide bounded scan when the directory had nothing similar.
+  if (candidates.length === 0) {
+    for (const root of [roots.primary, ...(roots.additional ?? [])]) {
+      try {
+        const { lines } = await runRipgrep(['--files', '--hidden', root], {
+          maxLines: MISSING_FILE_SCAN_MAX_FILES,
+        });
+        for (const line of lines) consider(line, path.basename(line));
+      } catch {
+        // best-effort: an unavailable scan just yields fewer candidates
+      }
+    }
+  }
+
+  candidates.sort(
+    (a, b) =>
+      Number(b.sameStem) - Number(a.sameStem) ||
+      a.distance - b.distance ||
+      a.name.localeCompare(b.name)
+  );
+  return candidates.slice(0, limit).map(candidate => candidate.absolutePath);
+}
+
+function formatMissingFileMessage(requestedPath: string, suggestions: string[]): string {
+  if (suggestions.length === 0) return `File not found: ${requestedPath}.`;
+  const display =
+    suggestions.length === 1
+      ? `Did you mean ${suggestions[0]}?`
+      : `Did you mean one of: ${suggestions.join(', ')}?`;
+  return `File not found: ${requestedPath}. ${display}`;
 }
 
 function formatNumberedLines(lines: string[], startLine: number): string {
@@ -541,7 +665,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
     name: 'Read',
     label: 'Read',
     description:
-      'Read a file. Text files return up to 2000 lines per call (default reads from the start); the output footer reports the total line count and whether more lines remain, so prefer one large read over many small ones and only paginate with offset when a file exceeds 2000 lines. A large text file (250+ lines, up to 20,000 lines / 2MB) whose foldable bodies cover at least 30% of its lines returns a structural summary by default — an outline with elided bodies, each marked with the offset/limit that re-reads it; pass full:true to read the whole file verbatim instead. To pull back several scattered sections at once, pass ranges (e.g. "5-16,960-973"). Images return vision blocks (oversized ones are downscaled automatically); .ipynb notebooks render as cells with outputs; PDFs extract text per page (use pages, e.g. "1-5", max 20 pages per call).',
+      'Read a file. Text files return up to 2000 lines per call (default reads from the start); the output footer reports the total line count and whether more lines remain, so prefer one large read over many small ones and only paginate with offset when a file exceeds 2000 lines. A large text file (250+ lines, up to 20,000 lines / 2MB) whose foldable bodies cover at least 30% of its lines returns a structural summary by default — an outline with elided bodies, each marked with the offset/limit that re-reads it; pass full:true to read the whole file verbatim instead. To pull back several scattered sections at once, pass ranges (e.g. "5-16,960-973"). Images return vision blocks (oversized ones are downscaled automatically); .ipynb notebooks render as cells with outputs; PDFs extract text per page (use pages, e.g. "1-5", max 20 pages per call). Video files (mp4/mov/webm/…) cannot be read as model input and return an explicit not-supported error; a missing path returns Did-you-mean candidates.',
     parameters: agentToolParameters({
       type: 'object',
       properties: {
@@ -705,6 +829,24 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
               ],
               details: { ok: true, path: relPath, size: fileStat.size, mimeType: imageMime },
             };
+          }
+
+          const videoMime = VIDEO_MIME_BY_EXT[fileExt];
+          if (videoMime) {
+            // The upstream pi runtime cannot carry video content blocks
+            // (pi-ai message content supports text and images only), so a
+            // video file can never reach the model — fail with an explicit,
+            // actionable error instead of the generic binary refusal.
+            const relPath = toWorkspaceRelative(cwd, filePath);
+            return errorResult(
+              'video_not_supported',
+              `Video file ${relPath} (${videoMime}, ${fileStat.size} bytes) cannot be read as model input: the current provider runtime supports text and image content only, with no video content block. Extract stills instead (e.g. \`ffmpeg -i <file> -vf fps=1 frame_%04d.png\` via Bash) and Read those.`,
+              {
+                path: relPath,
+                size: fileStat.size,
+                mimeType: videoMime,
+              }
+            );
           }
 
           if (fileExt === '.pdf') {
@@ -1007,6 +1149,24 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
             ...(view.columnTruncated ? { columnTruncated: READ_MAX_LINE_COLUMNS } : {}),
           });
         } catch (err) {
+          // Missing file: surface Did-you-mean candidates (same stem or close
+          // name, up to 3) instead of a bare ENOENT message.
+          if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
+            const found = await findSimilarFiles(
+              filePath,
+              workspaceRootsOf(cwd, options),
+              MAX_MISSING_FILE_SUGGESTIONS
+            );
+            const suggestions = found.map(candidate => toWorkspaceRelative(cwd, candidate));
+            return errorResult(
+              'file_not_found',
+              formatMissingFileMessage(String(requestedPath), suggestions),
+              {
+                path: String(requestedPath),
+                ...(suggestions.length > 0 ? { suggestions } : {}),
+              }
+            );
+          }
           return errorResult('read_failed', err instanceof Error ? err.message : String(err), {
             path: String(requestedPath),
           });
