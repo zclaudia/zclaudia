@@ -21,6 +21,7 @@ import {
   importExternalSkills,
   recordImportedExternalSkills,
   scanExternalSkillSources,
+  type ExternalSkillSelection,
 } from '../../application/plugins/skill-import.js';
 import { pluginSkillReloader } from '../../application/plugins/skill-bootstrap.js';
 import { pluginLoader } from '../../application/plugins/loader.js';
@@ -180,7 +181,7 @@ export function createWorkspaceRoutes(): ReturnType<typeof Router> {
       }
 
       const result = importExternalSkills({
-        selections: selections as { agent: string; name: string }[],
+        selections: selections as ExternalSkillSelection[],
         mode: mode ?? 'symlink',
       });
 
