@@ -7,8 +7,11 @@ export interface SessionSyncPort {
           | {
               id: string;
               name?: string;
+              projectId?: string;
+              createdAt?: number;
               updatedAt?: number;
               archivedAt?: number | null;
+              lastRunStatus?: string | null;
             }
           | undefined;
       };

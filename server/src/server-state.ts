@@ -50,6 +50,9 @@ function automationPortFor(service: AutomationService): AutomationPort {
 }
 import { ClaudiaBranchService } from './application/orchestration/claudia-branch-service.js';
 import { getGatewayClient } from './infra/gateway/gateway-instance.js';
+import { GatewayBackendDataPublisher } from './infra/gateway/gateway-backend-data-publisher.js';
+import { publishLocalBackendDataEvent } from './infra/gateway/local-backend-data-events.js';
+import type { BackendResourceEventMessage } from '@zclaudia/protocol/sync';
 import { providerRegistry } from './infra/providers/registry.js';
 import {
   buildStateHeartbeat as _buildStateHeartbeat,
@@ -321,15 +324,20 @@ export class ServerState {
   }
 
   getSessionSync(): SessionSyncPort {
+    const localDataPublisher = new GatewayBackendDataPublisher({
+      activeRuns: this.activeRuns,
+      publishTopic: (_topic, payload) => {
+        publishLocalBackendDataEvent(payload as BackendResourceEventMessage);
+      },
+    });
     return {
       broadcastSessionUpdated: (sessionId, db) => {
-        const gatewayClient = getGatewayClient();
-        if (!gatewayClient) return;
-
         const updatedSession = db
           .prepare(
             `
-          SELECT s.id, s.name, s.updated_at as updatedAt, s.archived_at as archivedAt
+          SELECT s.id, s.name, s.project_id as projectId,
+                 s.created_at as createdAt, s.updated_at as updatedAt,
+                 s.archived_at as archivedAt, s.last_run_status as lastRunStatus
           FROM sessions s
           WHERE s.id = ?
         `
@@ -337,7 +345,10 @@ export class ServerState {
           .get(sessionId);
 
         if (updatedSession) {
-          gatewayClient.commands.backendData.broadcastSessionEvent('updated', updatedSession);
+          // Local facade subscribers bypass the gateway, including when a run
+          // was started on another client and has no desktop session stream.
+          localDataPublisher.broadcastSessionEvent('updated', updatedSession);
+          getGatewayClient()?.commands.backendData.broadcastSessionEvent('updated', updatedSession);
         }
       },
     };
