@@ -61,7 +61,7 @@ function buildHunks(lines: DiffLine[], context = CONTEXT): DiffHunk[] {
 interface FileDiffView {
   file: DesignSnapshotFile;
   binary: boolean;
-  hunks?: DiffHunk[];
+  lines?: DiffLine[];
   hasChanges?: boolean;
   truncated?: boolean;
   /** The file no longer exists in the current workspace. */
@@ -125,7 +125,7 @@ export function VersionDiff({
                 file,
                 binary: false,
                 missing,
-                hunks: buildHunks(diff.lines),
+                lines: diff.lines,
                 hasChanges: diff.lines.some(line => line.type !== 'same'),
                 truncated: diff.truncated,
               };
@@ -137,7 +137,7 @@ export function VersionDiff({
                 return {
                   file,
                   binary: false,
-                  hunks: buildHunks(diff.lines),
+                  lines: diff.lines,
                   hasChanges: diff.lines.some(line => line.type !== 'same'),
                   truncated: diff.truncated,
                 };
@@ -151,7 +151,7 @@ export function VersionDiff({
                   file,
                   binary: false,
                   missing: true,
-                  hunks: buildHunks(diff.lines),
+                  lines: diff.lines,
                   hasChanges: true,
                   truncated: diff.truncated,
                 };
@@ -202,6 +202,62 @@ export function VersionDiff({
   );
 }
 
+export interface LineDiffViewProps {
+  /** lineDiff 输出（a=旧，b=新）。 */
+  lines: DiffLine[];
+  /** 输入或输出超过行数上限被截断时展示提示。 */
+  truncated?: boolean;
+}
+
+/**
+ * 行级差异表（P2 §5.2）：增/删/同行 + 双侧行号，长段相同行折叠。版本差异
+ * （VersionDiff）与未保存差异（草稿 vs 磁盘）共用同一套样式。
+ */
+export function LineDiffView({ lines, truncated = false }: LineDiffViewProps) {
+  const hunks = buildHunks(lines);
+  return (
+    <>
+      <div className="flex flex-col rounded-md border border-border">
+        {hunks.map((hunk, hunkIndex) => (
+          <div key={hunkIndex} className="flex flex-col">
+            {hunk.omittedBefore > 0 && (
+              <div className="bg-secondary/60 px-2 py-0.5 text-center font-mono text-[10px] text-muted-foreground">
+                ⋯ 省略 {hunk.omittedBefore} 行相同 ⋯
+              </div>
+            )}
+            {hunk.lines.map((line, lineIndex) => (
+              <div
+                key={lineIndex}
+                className={`flex gap-2 px-2 py-px font-mono text-[10px] leading-4 ${
+                  line.type === 'add'
+                    ? 'bg-success/10 text-success'
+                    : line.type === 'del'
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'text-muted-foreground'
+                }`}
+              >
+                <span className="w-8 shrink-0 select-none text-right opacity-60">
+                  {line.aLine ?? ''}
+                </span>
+                <span className="w-8 shrink-0 select-none text-right opacity-60">
+                  {line.bLine ?? ''}
+                </span>
+                <span className="shrink-0 select-none">
+                  {line.type === 'add' ? '+' : line.type === 'del' ? '−' : ' '}
+                </span>
+                <span className="whitespace-pre-wrap break-all">{line.text}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      {truncated && (
+        <div className="text-[10px] text-muted-foreground">差异超过 5000 行，已截断。</div>
+      )}
+    </>
+  );
+}
+
 function FileDiffSection({ view }: { view: FileDiffView }) {
   return (
     <section aria-label={`差异 ${view.file.path}`} className="flex flex-col gap-1">
@@ -233,43 +289,7 @@ function FileDiffSection({ view }: { view: FileDiffView }) {
           {view.missing && (
             <div className="text-xs text-warning">当前文件已不存在，以下为快照中的内容。</div>
           )}
-          <div className="flex flex-col rounded-md border border-border">
-            {view.hunks?.map((hunk, hunkIndex) => (
-              <div key={hunkIndex} className="flex flex-col">
-                {hunk.omittedBefore > 0 && (
-                  <div className="bg-secondary/60 px-2 py-0.5 text-center font-mono text-[10px] text-muted-foreground">
-                    ⋯ 省略 {hunk.omittedBefore} 行相同 ⋯
-                  </div>
-                )}
-                {hunk.lines.map((line, lineIndex) => (
-                  <div
-                    key={lineIndex}
-                    className={`flex gap-2 px-2 py-px font-mono text-[10px] leading-4 ${
-                      line.type === 'add'
-                        ? 'bg-success/10 text-success'
-                        : line.type === 'del'
-                          ? 'bg-destructive/10 text-destructive'
-                          : 'text-muted-foreground'
-                    }`}
-                  >
-                    <span className="w-8 shrink-0 select-none text-right opacity-60">
-                      {line.aLine ?? ''}
-                    </span>
-                    <span className="w-8 shrink-0 select-none text-right opacity-60">
-                      {line.bLine ?? ''}
-                    </span>
-                    <span className="shrink-0 select-none">
-                      {line.type === 'add' ? '+' : line.type === 'del' ? '−' : ' '}
-                    </span>
-                    <span className="whitespace-pre-wrap break-all">{line.text}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-          {view.truncated && (
-            <div className="text-[10px] text-muted-foreground">差异超过 5000 行，已截断。</div>
-          )}
+          <LineDiffView lines={view.lines ?? []} truncated={view.truncated} />
         </>
       )}
     </section>

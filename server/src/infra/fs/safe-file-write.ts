@@ -38,10 +38,21 @@ export class SafeFileWriteError extends Error {
 
 export interface SafeWriteOptions {
   maxBytes: number;
-  /** SHA-256 hex of the current on-disk content; must match or the write is rejected. */
-  expectedRevision: string;
+  /**
+   * SHA-256 hex of the current on-disk content; must match or the write is
+   * rejected. An empty string (or undefined) is only accepted together with
+   * `createIfMissing` for a missing target.
+   */
+  expectedRevision: string | undefined;
   /** Optional pre-write backup hook; receives the current bytes and stat. */
   backup?: (bytes: Buffer, stat: Stats) => Promise<void>;
+  /**
+   * Create the target when it does not exist. Creation requires
+   * `expectedRevision` to be empty or undefined — any other revision is
+   * rejected as a conflict. When the target exists this flag changes
+   * nothing: the usual revision verification applies.
+   */
+  createIfMissing?: boolean;
 }
 
 const locks = new Map<string, Promise<unknown>>();
@@ -112,6 +123,11 @@ export async function readBoundedFile(
  * synchronous final check → rename. The final check and rename stay
  * synchronous so no other event-loop task can change the target between the
  * revision check and the replace.
+ *
+ * With `createIfMissing`, a missing target is created through the same
+ * temp-file + final-check + rename path (no revision to verify, the target
+ * must still be absent at the final check); the empty-revision requirement
+ * keeps a stale client from silently re-creating a file it never saw.
  */
 export async function safeWriteFile(
   absolutePath: string,
@@ -120,18 +136,37 @@ export async function safeWriteFile(
 ): Promise<{ revision: string }> {
   const target = path.resolve(absolutePath);
   return serialize(target, async () => {
-    const initial = await readBoundedFile(target, options.maxBytes, 'File');
-    if (sha256(initial.bytes) !== options.expectedRevision) throw conflict();
-    if (options.backup) await options.backup(initial.bytes, initial.stat);
+    let initial: { bytes: Buffer; stat: Stats } | null = null;
+    try {
+      initial = await readBoundedFile(target, options.maxBytes, 'File');
+    } catch (error) {
+      const creatable =
+        options.createIfMissing === true &&
+        error instanceof SafeFileWriteError &&
+        error.code === 'FILE_NOT_FOUND';
+      if (!creatable) throw error;
+      if (options.expectedRevision !== '' && options.expectedRevision !== undefined)
+        throw conflict();
+    }
+    if (initial) {
+      if (sha256(initial.bytes) !== options.expectedRevision) throw conflict();
+      if (options.backup) await options.backup(initial.bytes, initial.stat);
+    }
+    const mode = (initial ? initial.stat.mode : 0o644) & 0o777;
     const temp = path.join(path.dirname(target), `.tmp-${randomUUID()}`);
     try {
-      await fs.writeFile(temp, next, { flag: 'wx', mode: initial.stat.mode & 0o777 });
-      await fs.chmod(temp, initial.stat.mode & 0o777);
+      await fs.writeFile(temp, next, { flag: 'wx', mode });
+      await fs.chmod(temp, mode);
       // Keep the final compare and rename synchronous so another event-loop
       // task cannot change the file between the revision check and replace.
+      let current: Stats | null = null;
       try {
-        const linkStat = lstatSync(target);
-        if (linkStat.isSymbolicLink()) throw conflict();
+        current = lstatSync(target);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw conflict();
+      }
+      if (initial) {
+        if (!current || current.isSymbolicLink()) throw conflict();
         const currentStat = statSync(target);
         if (
           !currentStat.isFile() ||
@@ -141,8 +176,8 @@ export async function safeWriteFile(
           throw conflict();
         }
         if (sha256(readFileSync(target)) !== options.expectedRevision) throw conflict();
-      } catch (error) {
-        if (error instanceof SafeFileWriteError) throw error;
+      } else if (current) {
+        // The target appeared between the existence check and the rename.
         throw conflict();
       }
       // External processes can still race this final syscall; the check is

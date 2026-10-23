@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import Database from 'better-sqlite3';
+import JSZip from 'jszip';
 import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -393,5 +394,185 @@ describe('design snapshot routes', () => {
       });
     expect(confirmed.status).toBe(200);
     expect(await readFile(path.join(rootA, 'index.html'), 'utf8')).toContain('incomplete');
+  });
+});
+
+describe('design deps and export routes', () => {
+  let db: Database.Database;
+  let app: express.Express;
+  let temp: string;
+  let rootA: string;
+
+  const sha256 = (source: string | Buffer): string =>
+    createHash('sha256').update(source).digest('hex');
+
+  beforeEach(async () => {
+    temp = await mkdtemp(path.join(os.tmpdir(), 'design-deps-api-'));
+    rootA = path.join(temp, 'a');
+    await mkdir(rootA);
+    db = new Database(':memory:');
+    db.exec(`CREATE TABLE projects (id TEXT PRIMARY KEY, root_path TEXT);
+      CREATE TABLE sessions (id TEXT PRIMARY KEY, project_id TEXT, working_directory TEXT);
+      INSERT INTO projects VALUES ('pa', '${rootA}');
+      INSERT INTO sessions VALUES ('sa', 'pa', NULL);`);
+    app = express();
+    app.use(express.json({ limit: '3mb' }));
+    app.use('/api/design', createDesignRoutes(db));
+  });
+
+  afterEach(async () => {
+    db.close();
+    await rm(temp, { recursive: true, force: true });
+  });
+
+  async function seedSite(): Promise<{ html: string; css: string }> {
+    await mkdir(path.join(rootA, 'assets'), { recursive: true });
+    const html =
+      '<html><head><link rel="stylesheet" href="assets/site.css"></head><body><img src="assets/bg.png"></body></html>';
+    const css = 'body { background: url("bg.png"); }';
+    await writeFile(path.join(rootA, 'index.html'), html);
+    await writeFile(path.join(rootA, 'assets', 'site.css'), css);
+    await writeFile(path.join(rootA, 'assets', 'bg.png'), Buffer.from([1, 2, 3, 4]));
+    return { html, css };
+  }
+
+  function parseBinary(res: unknown, callback: (error: Error | null, body?: Buffer) => void): void {
+    const stream = res as { on: (event: string, listener: (chunk?: Buffer) => void) => void };
+    const chunks: Buffer[] = [];
+    stream.on('data', chunk => chunks.push(chunk as Buffer));
+    stream.on('end', () => callback(null, Buffer.concat(chunks)));
+  }
+
+  it('returns dependency stats for an entry with kinds and skip reasons', async () => {
+    await seedSite();
+    const listed = await request(app)
+      .get('/api/design/deps')
+      .query({ sessionId: 'sa', path: 'index.html' });
+    expect(listed.status).toBe(200);
+    expect(listed.body.success).toBe(true);
+    expect(listed.body.data.entry.path).toBe('index.html');
+    expect(typeof listed.body.data.entry.size).toBe('number');
+    const files = new Map(
+      (listed.body.data.files as Array<{ path: string; kind: string; missing: boolean }>).map(
+        file => [file.path, file]
+      )
+    );
+    expect([...files.keys()].sort()).toEqual(['assets/bg.png', 'assets/site.css']);
+    expect(files.get('assets/site.css')).toMatchObject({ kind: 'css', missing: false });
+    expect(files.get('assets/bg.png')).toMatchObject({ kind: 'image', missing: false });
+    expect(listed.body.data.skipped).toEqual([]);
+
+    const missing = await request(app)
+      .get('/api/design/deps')
+      .query({ sessionId: 'sa', path: 'nope.html' });
+    expect(missing.status).toBe(404);
+    expect(missing.body.error.code).toBe('FILE_NOT_FOUND');
+  });
+
+  it('exports a zip attachment and falls back to JSON errors', async () => {
+    const { html } = await seedSite();
+    const loaded = await request(app)
+      .get('/api/design/document')
+      .query({ sessionId: 'sa', path: 'index.html' });
+    const revision: string = loaded.body.data.revision;
+
+    const ok = await request(app)
+      .post('/api/design/export')
+      .buffer(true)
+      .parse(parseBinary)
+      .send({ sessionId: 'sa', path: 'index.html', mode: 'disk', expectedRevision: revision });
+    expect(ok.status).toBe(200);
+    expect(ok.headers['content-type']).toBe('application/zip');
+    expect(ok.headers['content-disposition']).toMatch(
+      /^attachment; filename="index-\d{8}-\d{6}\.zip"$/
+    );
+    expect(Number(ok.headers['content-length'])).toBe(ok.body.length);
+    const zip = await JSZip.loadAsync(ok.body);
+    expect(await zip.file('index.html')?.async('string')).toBe(html);
+    expect(await zip.file('assets/site.css')?.async('string')).toBe('body { background: url("bg.png"); }');
+    expect(zip.file('zclaudia-export.json')).toBeTruthy();
+
+    const stale = await request(app)
+      .post('/api/design/export')
+      .send({ sessionId: 'sa', path: 'index.html', mode: 'disk', expectedRevision: '0'.repeat(64) });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe('REVISION_CONFLICT');
+
+    const unknown = await request(app)
+      .post('/api/design/export')
+      .send({ sessionId: 'absent', path: 'index.html', mode: 'disk' });
+    expect(unknown.status).toBe(404);
+    expect(unknown.body.error.code).toBe('SESSION_NOT_FOUND');
+  });
+
+  it('surfaces EXPORT_INCOMPLETE with the missing list and honors confirmIncomplete', async () => {
+    await seedSite();
+    await writeFile(
+      path.join(rootA, 'index.html'),
+      '<html><body><img src="gone.png"></body></html>'
+    );
+
+    const denied = await request(app)
+      .post('/api/design/export')
+      .send({ sessionId: 'sa', path: 'index.html', mode: 'disk' });
+    expect(denied.status).toBe(409);
+    expect(denied.body.error.code).toBe('EXPORT_INCOMPLETE');
+    expect(denied.body.error.files).toEqual(['gone.png']);
+
+    const ok = await request(app)
+      .post('/api/design/export')
+      .buffer(true)
+      .parse(parseBinary)
+      .send({ sessionId: 'sa', path: 'index.html', mode: 'disk', confirmIncomplete: true });
+    expect(ok.status).toBe(200);
+    expect(ok.headers['content-type']).toBe('application/zip');
+    const zip = await JSZip.loadAsync(ok.body);
+    const manifest = JSON.parse((await zip.file('zclaudia-export.json')?.async('string')) ?? 'null');
+    expect(manifest.missing).toEqual(['gone.png']);
+    expect(zip.file('gone.png')).toBeNull();
+  });
+
+  it('recreates a deleted document via allowCreate while keeping the guards', async () => {
+    await writeFile(path.join(rootA, 'index.html'), '<p>v1</p>');
+
+    // Rebuild after deletion: empty revision + allowCreate.
+    await rm(path.join(rootA, 'index.html'));
+    const rebuilt = await request(app)
+      .put('/api/design/document')
+      .send({ sessionId: 'sa', path: 'index.html', source: '<p>rebuilt</p>', expectedRevision: '', allowCreate: true });
+    expect(rebuilt.status).toBe(200);
+    expect(rebuilt.body.data.revision).toBe(sha256('<p>rebuilt</p>'));
+    expect(await readFile(path.join(rootA, 'index.html'), 'utf8')).toBe('<p>rebuilt</p>');
+
+    // Without allowCreate a missing file stays FILE_NOT_FOUND (an empty
+    // revision alone is a VALIDATION_ERROR, so a real hash is sent here).
+    await rm(path.join(rootA, 'index.html'));
+    const denied = await request(app)
+      .put('/api/design/document')
+      .send({ sessionId: 'sa', path: 'index.html', source: 'x', expectedRevision: 'b'.repeat(64) });
+    expect(denied.status).toBe(404);
+    expect(denied.body.error.code).toBe('FILE_NOT_FOUND');
+
+    // allowCreate with a non-empty revision on a missing file is a conflict.
+    const conflict = await request(app)
+      .put('/api/design/document')
+      .send({
+        sessionId: 'sa',
+        path: 'index.html',
+        source: 'x',
+        expectedRevision: 'a'.repeat(64),
+        allowCreate: true,
+      });
+    expect(conflict.status).toBe(409);
+    expect(conflict.body.error.code).toBe('REVISION_CONFLICT');
+
+    // allowCreate against an existing file still verifies the revision.
+    await writeFile(path.join(rootA, 'index.html'), '<p>live</p>');
+    const stale = await request(app)
+      .put('/api/design/document')
+      .send({ sessionId: 'sa', path: 'index.html', source: 'x', expectedRevision: '', allowCreate: true });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe('REVISION_CONFLICT');
+    expect(await readFile(path.join(rootA, 'index.html'), 'utf8')).toBe('<p>live</p>');
   });
 });

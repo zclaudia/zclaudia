@@ -98,6 +98,27 @@ export async function downloadPushedFile(fileId: string): Promise<void> {
 }
 
 /**
+ * Save a self-produced blob (e.g. a design export ZIP) without touching the
+ * file-push store: Tauri writes to Downloads with the same dedupe as
+ * `saveFileTauri`; web falls back to the browser download dialog. Returns the
+ * saved file path, or null when the browser-download path was taken (no
+ * filesystem path exists). Never leaves a half-written file: the blob is
+ * complete before this is called and Tauri failures fall through to the
+ * browser download instead of partial writes.
+ */
+export async function saveBlobToFile(blob: Blob, fileName: string): Promise<string | null> {
+  if (isTauri()) {
+    try {
+      return await saveFileTauri(blob, fileName);
+    } catch (err) {
+      console.warn('[fileDownload] Tauri save failed, falling back to browser download:', err);
+    }
+  }
+  triggerBrowserDownload(blob, fileName);
+  return null;
+}
+
+/**
  * Save to Downloads folder on Tauri desktop, or trigger browser download otherwise.
  */
 async function saveOrDownload(blob: Blob, fileName: string, fileId: string): Promise<void> {

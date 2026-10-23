@@ -1,6 +1,12 @@
 import { apiCallForBackend } from '../../services/api/unwrap';
-import { fetchApiForBackend } from '../../services/api/base';
-import type { DesignDocument, DesignSnapshotFile, DesignSnapshotSummary } from './types';
+import { fetchApiForBackend, getAuthHeadersForBackend, getBaseUrlForBackend } from '../../services/api/base';
+import type {
+  DesignDepsResult,
+  DesignDocument,
+  DesignExportRequest,
+  DesignSnapshotFile,
+  DesignSnapshotSummary,
+} from './types';
 
 export type { DesignDocument } from './types';
 export type { DesignSnapshotFile, DesignSnapshotSummary } from './types';
@@ -95,7 +101,14 @@ export function getDesignDocument(
 
 export function putDesignDocument(
   backendId: string,
-  input: { sessionId: string; path: string; source: string; expectedRevision: string }
+  input: {
+    sessionId: string;
+    path: string;
+    source: string;
+    expectedRevision: string;
+    /** 文件被删除后重建保存（服务端仅在文件不存在时接受空 expectedRevision）。 */
+    allowCreate?: boolean;
+  }
 ): Promise<DesignDocument> {
   return apiCallForBackend<DesignDocument>(backendId, '/api/design/document', {
     method: 'PUT',
@@ -212,4 +225,86 @@ export async function restoreDesignSnapshot(
     );
   }
   return result.data as DesignRestoreResult;
+}
+
+// ---------------------------------------------------------------------------
+// P2 完整静态工作台：依赖 stat 与 ZIP 导出
+// ---------------------------------------------------------------------------
+
+/**
+ * Server error from the deps/export endpoints. Mirrors `DesignSnapshotError`
+ * (message + code + optional `files` detail) but is export-specific so the
+ * snapshot error's contract stays untouched.
+ */
+export class DesignHttpError extends Error {
+  constructor(
+    message: string,
+    readonly code: string | undefined,
+    readonly files: string[] = []
+  ) {
+    super(message);
+    this.name = 'DesignHttpError';
+  }
+}
+
+export function isDesignHttpError(error: unknown): error is DesignHttpError {
+  return error instanceof DesignHttpError;
+}
+
+/** stat snapshot of an entry's local resource graph (no content hashing). */
+export function getDesignDeps(
+  backendId: string,
+  sessionId: string,
+  path: string
+): Promise<DesignDepsResult> {
+  return apiCallForBackend<DesignDepsResult>(
+    backendId,
+    `/api/design/deps?${query(sessionId, path)}`
+  );
+}
+
+/**
+ * Export the entry plus its local resources as a ZIP. The success response is
+ * a binary stream (not the shared JSON envelope), so this uses a direct fetch
+ * like `fileDownload.ts`; JSON error bodies are lifted into `DesignHttpError`
+ * with the EXPORT_INCOMPLETE `files` list preserved.
+ */
+export async function exportDesignZip(
+  backendId: string,
+  request: DesignExportRequest
+): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch(`${getBaseUrlForBackend(backendId)}/api/design/export`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeadersForBackend(backendId),
+    },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    let message = `导出失败（${response.status}）`;
+    let code: string | undefined;
+    let files: string[] = [];
+    try {
+      const body = (await response.json()) as {
+        error?: { message?: string; code?: string; files?: unknown };
+      };
+      if (body?.error) {
+        if (typeof body.error.message === 'string') message = body.error.message;
+        if (typeof body.error.code === 'string') code = body.error.code;
+        if (Array.isArray(body.error.files)) {
+          files = body.error.files.filter((entry): entry is string => typeof entry === 'string');
+        }
+      }
+    } catch {
+      // non-JSON error body: keep the fallback message
+    }
+    throw new DesignHttpError(message, code, files);
+  }
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const match = disposition.match(/filename="([^"]+)"/);
+  const filename =
+    match?.[1] ??
+    `design-export-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 17)}.zip`;
+  return { blob: await response.blob(), filename };
 }

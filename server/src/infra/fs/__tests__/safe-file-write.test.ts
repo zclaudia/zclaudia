@@ -155,4 +155,58 @@ describe('safe-file-write', () => {
       { code: 'FILE_NOT_FOUND' }
     );
   });
+
+  it('creates a missing file when createIfMissing is set with an empty or omitted revision', async () => {
+    const file = path.join(dir, 'created.html');
+    const result = await safeWriteFile(file, Buffer.from('<p>created</p>'), {
+      maxBytes: 1024,
+      expectedRevision: '',
+      createIfMissing: true,
+    });
+    expect(result.revision).toBe(sha256('<p>created</p>'));
+    expect(await readFile(file, 'utf8')).toBe('<p>created</p>');
+
+    const second = path.join(dir, 'created-2.html');
+    await safeWriteFile(second, Buffer.from('x'), {
+      maxBytes: 8,
+      expectedRevision: undefined,
+      createIfMissing: true,
+    });
+    expect(await readFile(second, 'utf8')).toBe('x');
+    // No temp files left behind and the created files are regular (not links).
+    expect((await readdir(dir)).filter(name => name.startsWith('.tmp-'))).toEqual([]);
+  });
+
+  it('refuses to create with a non-empty expectedRevision while the target is missing', async () => {
+    const file = path.join(dir, 'absent.html');
+    await expect(
+      safeWriteFile(file, Buffer.from('<p>next</p>'), {
+        maxBytes: 1024,
+        expectedRevision: sha256('<p>anything</p>'),
+        createIfMissing: true,
+      })
+    ).rejects.toMatchObject({ code: 'REVISION_CONFLICT' });
+    expect(await readdir(dir)).not.toContain('absent.html');
+    expect((await readdir(dir)).filter(name => name.startsWith('.tmp-'))).toEqual([]);
+  });
+
+  it('still verifies revisions for existing files when createIfMissing is set', async () => {
+    const file = path.join(dir, 'existing.html');
+    await writeFile(file, '<p>base</p>');
+    const updated = await safeWriteFile(file, Buffer.from('<p>next</p>'), {
+      maxBytes: 1024,
+      expectedRevision: sha256('<p>base</p>'),
+      createIfMissing: true,
+    });
+    expect(updated.revision).toBe(sha256('<p>next</p>'));
+
+    await expect(
+      safeWriteFile(file, Buffer.from('<p>lost</p>'), {
+        maxBytes: 1024,
+        expectedRevision: '',
+        createIfMissing: true,
+      })
+    ).rejects.toMatchObject({ code: 'REVISION_CONFLICT' });
+    expect(await readFile(file, 'utf8')).toBe('<p>next</p>');
+  });
 });

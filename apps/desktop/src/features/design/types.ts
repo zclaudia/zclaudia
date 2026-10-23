@@ -84,3 +84,54 @@ export interface DesignSnapshotFile {
   kind: 'entry' | 'css' | 'image' | 'font' | 'other';
   mime: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// P2 完整静态工作台
+// ---------------------------------------------------------------------------
+
+export type DesignViewportPreset = 'fill' | 'desktop' | 'tablet' | 'mobile' | 'custom';
+
+/** fill = 跟随可用宽度（默认）；custom 必须带 width。 */
+export interface DesignViewport {
+  preset: DesignViewportPreset;
+  /** 240–3840；preset === 'fill' 时为 null。 */
+  width: number | null;
+}
+
+/** mode 'fit' 自动适应可用宽度；manual value 0.25–2。 */
+export interface DesignZoom {
+  mode: 'fit' | 'manual';
+  value: number;
+}
+
+export type DesignDependencyKind = 'css' | 'image' | 'font' | 'other';
+
+export interface DesignDependencyStat {
+  /** 工作区相对路径。 */
+  path: string;
+  kind: DesignDependencyKind;
+  size: number | null;
+  missing: boolean;
+  mtimeMs: number | null;
+}
+
+export interface DesignDepsResult {
+  entry: { path: string; size: number; mtimeMs: number };
+  files: DesignDependencyStat[];
+  skipped: { raw: string; reason: string }[];
+}
+
+export type DesignExportMode = 'disk' | 'draft';
+
+export interface DesignExportRequest {
+  sessionId: string;
+  /** 入口 HTML 工作区相对路径。 */
+  path: string;
+  mode: DesignExportMode;
+  /** disk 模式：当前磁盘哈希；不符 → REVISION_CONFLICT。 */
+  expectedRevision?: string;
+  /** draft 模式必填；≤ 2 MiB。 */
+  draftSource?: string;
+  /** 缺资源仍导出（ZIP 清单记录 missing）。 */
+  confirmIncomplete?: boolean;
+}

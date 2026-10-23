@@ -7,6 +7,8 @@ import {
   DesignError,
   DesignService,
 } from '../../application/design/design-service.js';
+import { DepsService } from '../../application/design/deps-service.js';
+import { ExportService } from '../../application/design/export-service.js';
 import { SnapshotService } from '../../application/design/snapshot-service.js';
 import { RestoreService } from '../../application/design/restore-service.js';
 
@@ -34,6 +36,8 @@ export function createDesignRoutes(db: Database.Database): Router {
   const blobs = new BlobStore(path.join(resolveDataDir(), 'design-snapshots'));
   const snapshots = new SnapshotService(db, blobs);
   const restores = new RestoreService(db, blobs, snapshots);
+  const deps = new DepsService(db);
+  const exportService = new ExportService(db);
   router.get('/files', async (req: Request, res: Response) => {
     try {
       res.json({ success: true, data: await service.list(req.query.sessionId) });
@@ -53,11 +57,29 @@ export function createDesignRoutes(db: Database.Database): Router {
   });
   router.put('/document', async (req: Request, res: Response) => {
     try {
-      const { sessionId, path, source, expectedRevision } = req.body ?? {};
+      const { sessionId, path, source, expectedRevision, allowCreate } = req.body ?? {};
       res.json({
         success: true,
-        data: await service.writeDocument(sessionId, path, source, expectedRevision),
+        data: await service.writeDocument(sessionId, path, source, expectedRevision, allowCreate),
       });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  router.get('/deps', async (req: Request, res: Response) => {
+    try {
+      res.json({ success: true, data: await deps.stat(req.query.sessionId, req.query.path) });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  router.post('/export', async (req: Request, res: Response) => {
+    try {
+      const result = await exportService.exportZip(req.body ?? {});
+      res.set('Content-Type', 'application/zip');
+      res.set('Content-Disposition', `attachment; filename="${result.filename}"`);
+      res.set('Content-Length', String(result.buffer.length));
+      res.send(result.buffer);
     } catch (error) {
       handleError(res, error);
     }

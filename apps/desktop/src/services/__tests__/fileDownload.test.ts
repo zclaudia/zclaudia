@@ -6,6 +6,7 @@ import {
   openFileAndroid,
   openFile,
   openFolder,
+  saveBlobToFile,
 } from '../fileDownload.js';
 
 // Mock stores (path from __tests__/ to ../../stores/)
@@ -656,6 +657,76 @@ describe('services/fileDownload', () => {
 
       expect(mockFilePushStoreState.updateProgress).not.toHaveBeenCalled();
       expect(mockFilePushStoreState.updateStatus).toHaveBeenCalledWith('file-123', 'completed');
+    });
+  });
+
+  describe('saveBlobToFile', () => {
+    const stubBrowserDownload = () => {
+      vi.stubGlobal('URL', {
+        createObjectURL: vi.fn(() => 'blob:test'),
+        revokeObjectURL: vi.fn(),
+      });
+      const mockAnchor = { href: '', download: '', click: vi.fn() };
+      vi.stubGlobal('document', {
+        body: { appendChild: vi.fn(), removeChild: vi.fn() },
+        createElement: vi.fn(() => mockAnchor),
+      });
+      return mockAnchor;
+    };
+
+    it('非 Tauri 环境走浏览器下载并返回 null（不经 filePushStore）', async () => {
+      removeTauriInternals();
+      const anchor = stubBrowserDownload();
+      const blob = new Blob(['zip-bytes'], { type: 'application/zip' });
+
+      const result = await saveBlobToFile(blob, 'export.zip');
+
+      expect(result).toBeNull();
+      expect(anchor.download).toBe('export.zip');
+      expect(anchor.click).toHaveBeenCalledTimes(1);
+      expect(mockFilePushStoreState.updateStatus).not.toHaveBeenCalled();
+      expect(mockFilePushStoreState.updateSavedPath).not.toHaveBeenCalled();
+    });
+
+    it('Tauri 环境写入 Downloads 并返回保存路径', async () => {
+      mockTauriInternals();
+      const { writeFile, exists } = await import('@tauri-apps/plugin-fs');
+      vi.mocked(exists).mockResolvedValue(false);
+      const blob = new Blob(['zip-bytes'], { type: 'application/zip' });
+
+      const result = await saveBlobToFile(blob, 'export.zip');
+
+      expect(result).toBe('/home/user/Downloads/export.zip');
+      expect(writeFile).toHaveBeenCalledWith(
+        '/home/user/Downloads/export.zip',
+        expect.any(Uint8Array)
+      );
+    });
+
+    it('Tauri 环境重名去重：已存在时追加 (1)', async () => {
+      mockTauriInternals();
+      const { exists } = await import('@tauri-apps/plugin-fs');
+      vi.mocked(exists).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+      const result = await saveBlobToFile(new Blob(['zip-bytes']), 'export.zip');
+
+      expect(result).toBe('/home/user/Downloads/export (1).zip');
+    });
+
+    it('Tauri 写入失败时回退浏览器下载并返回 null', async () => {
+      mockTauriInternals();
+      const { writeFile } = await import('@tauri-apps/plugin-fs');
+      vi.mocked(writeFile).mockRejectedValueOnce(new Error('write failed'));
+      const anchor = stubBrowserDownload();
+
+      const result = await saveBlobToFile(new Blob(['zip-bytes']), 'export.zip');
+
+      expect(result).toBeNull();
+      expect(anchor.click).toHaveBeenCalledTimes(1);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Tauri save failed'),
+        expect.any(Error)
+      );
     });
   });
 });

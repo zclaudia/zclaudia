@@ -34,14 +34,27 @@
 - 现存限制：HTTP 保存为 SHA-256 修订校验下的原子替换，未共用锁的外部进程仍存在极短并发窗口；快照校验一致不等于同一时刻一致；恢复中断的恢复路径是 pre-restore 快照。
 - 远端请求沿用当前 backend 的 API 通道，不向 iframe 传入地址或凭据；远端设备仍需单独验证。macOS Tauri WebView 已完成下述本机实测。
 
+## P2 完整静态工作台（2026-10-23）
+
+面板从单文档扩展为多页工作台，设计与验收细节见 [P2 实现设计](plans/2026-10-23-design-workbench-p2-implementation.md)：
+
+- **页面组织**：文件标签（脏点/缺失标记/关闭确认）、页面总览缩略图、最近打开与每页草稿；纯 TS 多页控制器按工作区 identity 注册（同工作区多聊天共享草稿，进程内跨会话存活），UI 偏好持久化 localStorage；最多 8 页，LRU 淘汰干净页；文件删除/改名标 missing 并可保存重建（`allowCreate`）。
+- **画布视口**：充满/桌面 1280/平板 768/手机 390/自定义宽度；缩放为纯显示 transform（25%–200% + 适应），iframe 布局宽度只由视口决定，不写 CSS、不改响应式逻辑视口。
+- **资源变化传播**：新增 `GET /api/design/deps`（资源图 stat：mtime/size/missing，不哈希）；面板可见时 2s 轮询 + 外部 agent 文件事件（chatMessageStore 指纹）400ms 去抖即时刷新；CSS/图片 mtime 变化即触发预览重建（assetEpoch），脏页保留草稿并提示外部更新；隐藏/关闭面板即停轮询。
+- **源码联动**：选区「查看源码」以 parse5 偏移计算草稿行号并跳转现有文件查看器（脏页明示行号偏移与「查看器显示已保存版本」）；「未保存差异」复用行级 diff 对比草稿与磁盘基线。
+- **基础导出**：`POST /api/design/export` 打包入口 HTML 与本地资源（工作区相对路径原位 + `zclaudia-export.json` 清单，jszip/DEFLATE）；disk 模式以 expectedRevision 钉死明确版本，draft 模式显式携带草稿；缺资源默认 409 `EXPORT_INCOMPLETE`，确认后包内清单标注 missing；桌面经 Tauri 落盘 Downloads（复用 fileDownload 通路）。
+- 写入边界新增 `createIfMissing`（重建保存走同一临时文件+终检+原子替换路径）；错误码新增 `EXPORT_INCOMPLETE`/`EXPORT_LIMIT_EXCEEDED`（含 CSS 深度超限）。
+- 待补：真实 Agent + macOS Tauri 冒烟（三页作品全流程、设备视口实机、ZIP 离线解包）、远端 backend 验证。
+
 ## 模块边界
 
-- `apps/desktop/src/features/design/`：面板与组件、静态预览、精确编辑引擎（`html/`）、撤销历史（`history/`）、行差异（`diff.ts`）、backend-aware API 客户端。
+- `apps/desktop/src/features/design/`：面板与组件（多页标签/视口/总览/导出对话框）、静态预览、精确编辑引擎（`html/`）、撤销历史（`history/`）、行差异（`diff.ts`）、多页工作台核心（`workspace/`：controller/storage/ports/source-lines）、backend-aware API 客户端。
 - `apps/desktop/src/plugins/builtinPanels.ts`：原生内置面板注册。
-- `server/src/application/design/design-service.ts`：从会话解析工作目录、限定文件访问、版本校验和保存。
+- `server/src/application/design/design-service.ts`：从会话解析工作目录、限定文件访问、版本校验和保存（含 allowCreate 重建）。
 - `server/src/application/design/snapshot-service.ts`、`restore-service.ts`、`resource-graph.ts`：快照捕获/清单、分阶段恢复、HTML/CSS 资源引用图。
-- `server/src/infra/design/blob-store.ts`：内容寻址快照存储；`server/src/infra/fs/safe-file-write.ts`：共享文件写入边界（锁/修订/备份/原子替换）。
-- `server/src/interfaces/http/design.ts`：已有认证中间件保护的 `/api/design` 路由（文件、快照、恢复）。
+- `server/src/application/design/deps-service.ts`、`export-service.ts`：资源 stat 轮询与 ZIP 导出。
+- `server/src/infra/design/blob-store.ts`：内容寻址快照存储；`server/src/infra/fs/safe-file-write.ts`：共享文件写入边界（锁/修订/备份/原子替换/缺失重建）。
+- `server/src/interfaces/http/design.ts`：已有认证中间件保护的 `/api/design` 路由（文件、快照、恢复、依赖、导出）。
 
 预览使用不含 `allow-same-origin` 的 sandbox iframe。宿主只接收目标 iframe 且 channel 匹配的元素选择消息；预览资源通过受认证的宿主 API 读取后内联，不让作品自行访问宿主文件接口。
 
@@ -57,6 +70,8 @@ bash scripts/with-project-node.sh env E2E_BROWSER_CHANNEL=chrome pnpm exec playw
 浏览器验收使用独立临时数据目录和确定性的 Claude CLI 测试桩，经过真实插件 adapter、聊天消息和文件接口，验证生成、本地资源预览、可视编辑保存、同一会话续改、外部写入冲突和重新打开。它验证应用集成，不评价真实模型的设计质量。
 
 P1 单元/接口测试覆盖：逐字节源码保留、重复节点与过期选区拒绝、隐式节点与重复属性拒绝、撤销/重做与保存边界、并发写入互斥与过期修订拒绝、快照捕获/去重/隔离、恢复冲突与中断三段报告、路径越界与错误 snapshotId 防护（证据见 [P1 实现设计 §8.7](plans/2026-10-23-design-workbench-p1-implementation.md)）。
+
+P2 测试覆盖（desktop 220 + server 69 + fileDownload 30，全绿；双端 tsc/eslint 与 react-lifecycle/radius 约束检查通过）：多页打开/编辑/保存互不串扰、8 页上限与 LRU 淘汰、身份隔离与 dispose 陈旧防护、missing/allowCreate 重建、deps stat 变化触发预览重建、可见门控与消息指纹去抖轮询、视口与缩放互不干预、导出解包相对路径原位与清单一致、缺资源 409 与 confirmIncomplete 放行、draft/disk 模式与版本钉（证据见 [P2 实现设计 §10](plans/2026-10-23-design-workbench-p2-implementation.md)）。
 
 2026-10-23 本机实测：在 macOS 的 Claudia Dev（Tauri 开发版）中，通过真实 Codex CLI 会话生成 `design/index.html`、本地 CSS 和 5 个 SVG；设计面板自动发现并显示页面。点击纯文本主标题，修改文字与颜色，应用并保存后，直接检查磁盘 HTML 确认写入，再重新载入并重新选择标题，确认文字及计算颜色仍然一致。体验项目位于 `/Users/zhvala/SourceCode/zclaudia-design-demo`，会话名为 `Codex · 设计闭环体验`。
 

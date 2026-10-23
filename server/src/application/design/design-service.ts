@@ -135,23 +135,37 @@ export class DesignService {
 
   async resolve(
     root: string,
-    value: unknown
+    value: unknown,
+    options?: { allowMissingLeaf?: boolean }
   ): Promise<{ relative: string; absolute: string }> {
     const relative = validateRelativePath(value);
     const absolute = path.resolve(root, relative);
     assertContained(root, absolute);
+    const parts = relative.split(path.sep);
     let current = root;
+    for (let index = 0; index < parts.length; index += 1) {
+      current = path.join(current, parts[index]);
+      let info: Stats;
+      try {
+        info = await fs.lstat(current);
+      } catch (error) {
+        // With allowMissingLeaf only the final component may be absent
+        // (creation path): parents were still symlink-checked above and
+        // containment was already enforced syntactically.
+        const missingLeaf =
+          options?.allowMissingLeaf === true &&
+          index === parts.length - 1 &&
+          (error as NodeJS.ErrnoException).code === 'ENOENT';
+        if (!missingLeaf) throw new DesignError(404, 'FILE_NOT_FOUND', 'File was not found');
+        return { relative: parts.join('/'), absolute };
+      }
+      if (info.isSymbolicLink())
+        throw new DesignError(403, 'PATH_FORBIDDEN', 'Symbolic links are not allowed');
+    }
     let real: string;
     try {
-      for (const part of relative.split(path.sep)) {
-        current = path.join(current, part);
-        const info = await fs.lstat(current);
-        if (info.isSymbolicLink())
-          throw new DesignError(403, 'PATH_FORBIDDEN', 'Symbolic links are not allowed');
-      }
       real = await fs.realpath(absolute);
-    } catch (error) {
-      if (error instanceof DesignError) throw error;
+    } catch {
       throw new DesignError(404, 'FILE_NOT_FOUND', 'File was not found');
     }
     assertContained(root, real);
@@ -160,6 +174,21 @@ export class DesignService {
       throw new DesignError(403, 'PATH_FORBIDDEN', 'Private files are not available');
     }
     return { relative: relative.split(path.sep).join('/'), absolute: real };
+  }
+
+  /**
+   * Resolve a session-scoped file path to its workspace root plus normalized
+   * relative/absolute paths. Shared entry point for the design services
+   * (deps/export) so workspace and path rules stay in one place.
+   */
+  async resolveFile(
+    sessionId: unknown,
+    filePath: unknown,
+    options?: { allowMissingLeaf?: boolean }
+  ): Promise<{ root: string; relative: string; absolute: string }> {
+    const root = await this.workspace(sessionId);
+    const file = await this.resolve(root, filePath, options);
+    return { root, relative: file.relative, absolute: file.absolute };
   }
 
   private async readBounded(
@@ -228,23 +257,31 @@ export class DesignService {
     sessionId: unknown,
     filePath: unknown,
     source: unknown,
-    expectedRevision: unknown
+    expectedRevision: unknown,
+    allowCreate?: unknown
   ) {
     if (typeof source !== 'string')
       throw new DesignError(400, 'VALIDATION_ERROR', 'source must be a string');
     const bytes = Buffer.from(source, 'utf8');
     if (bytes.length > MAX_SOURCE_BYTES)
       throw new DesignError(413, 'FILE_TOO_LARGE', 'HTML document exceeds the 2 MiB limit');
-    if (typeof expectedRevision !== 'string' || !/^[a-f0-9]{64}$/.test(expectedRevision))
+    if (allowCreate !== undefined && typeof allowCreate !== 'boolean')
+      throw new DesignError(400, 'VALIDATION_ERROR', 'allowCreate must be a boolean');
+    const create = allowCreate === true;
+    const revisionIsHash =
+      typeof expectedRevision === 'string' && /^[a-f0-9]{64}$/.test(expectedRevision);
+    // A rebuild-after-delete save passes an empty (or omitted) revision.
+    const revisionForCreate = create && (expectedRevision === '' || expectedRevision === undefined);
+    if (!revisionIsHash && !revisionForCreate)
       throw new DesignError(400, 'VALIDATION_ERROR', 'expectedRevision must be a SHA-256 revision');
-    const root = await this.workspace(sessionId);
-    const file = await this.resolve(root, filePath);
+    const file = await this.resolveFile(sessionId, filePath, { allowMissingLeaf: create });
     if (!/\.html?$/i.test(file.relative))
       throw new DesignError(400, 'UNSUPPORTED_FILE', 'Only existing HTML documents can be edited');
     try {
       await safeWriteFile(file.absolute, bytes, {
         maxBytes: MAX_SOURCE_BYTES,
-        expectedRevision,
+        expectedRevision: revisionIsHash ? (expectedRevision as string) : '',
+        createIfMissing: create,
         backup: async (current, stat) => {
           // Backups are best-effort: a failure must never fail the save
           // (the write itself stays fully guarded by safeWriteFile).

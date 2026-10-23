@@ -1,23 +1,48 @@
 import { useEffect, useState } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { FIELD_CLASS, Input } from '../../../components/ui/Input';
+import { useFileViewerStore } from '../../../stores/fileViewerStore';
+import { elementLineRange } from '../workspace/source-lines';
 import type { DesignEditOperation, DesignSelection } from '../types';
 
 const OVERRIDE_WARNING =
   '修改已写入源码，但计算样式仍被外部样式覆盖（如 !important）；已按内联声明写入，未提高优先级。';
+const LINE_OFFSET_HINT = '文件查看器显示已保存版本，行号以草稿计算可能有偏移';
+const LOCATE_ERROR = '无法定位源码位置';
 
 export interface SelectionEditorProps {
   selection: DesignSelection | null;
   busy: boolean;
   overrideWarning: boolean;
+  /** 活动页草稿全文；源码行号以草稿计算。null 时禁用「查看源码」。 */
+  docSource: string | null;
+  /** 活动页工作区相对路径（fileViewer 的打开入口）。 */
+  docPath: string | null;
+  /** 活动页是否 dirty：fileViewer 只显示磁盘版本，行号可能有偏移。 */
+  dirty: boolean;
+  /** fileViewer 入参（workspace 工具上下文经 props 传入）。 */
+  projectRoot?: string;
+  backendId?: string;
   onApply: (operations: DesignEditOperation[]) => void;
 }
 
 /** Form for the element selected in the preview: text, colors, apply and per-color clear. */
-export function SelectionEditor({ selection, busy, overrideWarning, onApply }: SelectionEditorProps) {
+export function SelectionEditor({
+  selection,
+  busy,
+  overrideWarning,
+  docSource,
+  docPath,
+  dirty,
+  projectRoot,
+  backendId,
+  onApply,
+}: SelectionEditorProps) {
   const [textValue, setTextValue] = useState('');
   const [colorValue, setColorValue] = useState('');
   const [backgroundValue, setBackgroundValue] = useState('');
+  /** 定位失败的选区；仅对发起跳转的那次选区显示错误，选区变化即失效。 */
+  const [locateFailed, setLocateFailed] = useState<DesignSelection | null>(null);
 
   useEffect(() => {
     setTextValue(selection?.sourceText ?? selection?.text ?? '');
@@ -49,6 +74,25 @@ export function SelectionEditor({ selection, busy, overrideWarning, onApply }: S
       operations.push({ kind: 'style', property: 'background-color', value: backgroundValue });
     }
     return operations;
+  };
+
+  /** 查看源码（P2 §5.2）：行号基于草稿计算；fileViewer 永远显示磁盘版本。 */
+  const viewSource = () => {
+    if (!docSource || !docPath) return;
+    const range = elementLineRange(
+      docSource,
+      selection.elementPath,
+      selection.tagName,
+      selection.sourceText
+    );
+    if (!range) {
+      setLocateFailed(selection);
+      return;
+    }
+    setLocateFailed(null);
+    useFileViewerStore
+      .getState()
+      .openFile(projectRoot ?? '', docPath, range.startLine, range.endLine, backendId);
   };
 
   return (
@@ -112,15 +156,30 @@ export function SelectionEditor({ selection, busy, overrideWarning, onApply }: S
           </Button>
         </div>
       </div>
-      <Button
-        size="sm"
-        variant="primary"
-        className="self-start"
-        onClick={() => onApply(buildOperations())}
-        disabled={busy}
-      >
-        应用修改
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={() => onApply(buildOperations())}
+          disabled={busy}
+        >
+          应用修改
+        </Button>
+        <Button
+          size="sm"
+          onClick={viewSource}
+          disabled={busy || !docSource || !docPath}
+          aria-label="查看源码"
+        >
+          查看源码
+        </Button>
+      </div>
+      {locateFailed === selection && (
+        <div role="alert" className="text-xs text-destructive">
+          {LOCATE_ERROR}
+        </div>
+      )}
+      {dirty && <div className="text-[10px] text-muted-foreground">{LINE_OFFSET_HINT}</div>}
     </section>
   );
 }
