@@ -67,9 +67,19 @@
 - **能力边界**：无全局素材库（素材即工作区文件）、无选区截图；品牌表单仅在两文件首次生成时提供（此后走文本编辑）；Agent 写入的成功信号来自磁盘对比（文件清单 + 修订），失败与取消以横幅文案如实呈现；上下文只经当前 backend 的 API 组装，不跨 backend。
 - 待补：真实 Agent 冒烟（沿用 P3 口径，M2 门槛）。
 
+## P5 交互原型与演示文稿（2026-10-23，P5.1–P5.4）
+
+预览从「只读静态」扩展为三态模式（编辑 / 运行 / 演示），并新增幻灯片与客户端渲染导出；全部客户端实现，服务端与 `api.ts` 零改动，设计与验收细节见 [P5 实现设计](plans/2026-10-23-design-workbench-p5-implementation.md)：
+
+- **三态模式**：编辑模式与 P1–P4 完全一致（脚本与 on* 剥离、选区桥接可用）；**运行模式**为页面级交互执行——作品脚本保留（本地脚本内联、远程脚本移除并计数）、CSP `connect-src 'none'` 拒绝一切网络、opaque origin 下以桥接注入的内存存储 shim（可用不持久）、sandbox 维持 `allow-scripts`（弹窗/表单/顶层导航全禁）。三态策略边界（脚本/网络/导航/存储/弹窗/桥接/选区）见 [P5 实现设计 §1 策略表](plans/2026-10-23-design-workbench-p5-implementation.md)。工具栏「编辑/运行」分段按钮切换；运行模式为只读体验：隐藏选区编辑区与结构树、禁用「交给 Agent 修改」，状态条固定提示并显示被移除的外部脚本/链接计数（均 0 时省略）。预览缓存键扩为 `草稿修订:资源纪元:模式`，切模式即按新模式重建。
+- **运行导航**：相对 `.html`/`.htm` 链接由构建期打标、运行期经 `design-navigate` 桥接上报宿主开页（path 经长度/反斜杠/控制字符/scheme 校验且必须在文件清单内）；`#锚点` 放行；外部链接与非 HTML 相对链接被阻止并经 `design-nav-blocked` 上报。提示条出现在预览区上方，5 秒自动消失或手动关闭。
+- **deck 约定与操作**：源码内任意元素带 `data-zclaudia-slide` 即一页（文档顺序 = 页序，≤60 页），可选 `data-title`/`data-notes`，比例存 `<body data-zclaudia-deck-ratio="16:9|4:3">`（缺省 16:9）。deck 是普通 HTML 页：经既有编辑链路可编辑、保存、快照、ZIP 导出。检测到标记后工具栏出现可用「幻灯片」按钮（无标记则禁用并提示，保持工具栏稳定），面板支持缩略图、标题/备注编辑、同父级排序、增删页与比例设置；全部结构操作走 deck 纯函数源码块切片 + `controller.applySource` 原子草稿替换（继承撤销/修订/busy 链路，无关字节零改动）。切页时面板/播放器/渲染导出对话框一并关闭。「演示」打开全屏覆盖层播放器（请求全屏、失败静默降级），键盘翻页（←/→/PgUp/PgDn/Space/Home/End/Esc/N 备注），播放 HTML 剥离全部脚本、翻页由宿主处理，不执行作品脚本。
+- **渲染导出边界**：全部客户端捕获（SVG foreignObject 光栅化 + 白底 canvas）。deck 页导出「导出 PDF（N 页 · 整页图片）」或逐页 PNG；非 deck 页导出视口区域（宽度 × 900px）单张 PNG——opaque-origin iframe 无法量测内容高度，不做整页高度捕获（已声明边界）。PDF 为整页图片 PDF（每页一张 JPEG 直通嵌入，无文字层），界面与文档统一口径「**整页图片，不可编辑文字**」，不与可编辑导出混称；PPTX 不提供（可行性结论见 P5 实现设计 §8）。导出内容 = 当前预览（草稿源码 + 磁盘资源内联，含未保存修改，对话框明示）；单页失败进错误列表、其余页继续；捕获不可用/失败显式报错（`capture-unsupported`/`capture-failed`），不静默。真实 macOS Tauri（WKWebView foreignObject 光栅化）与浏览器实测为 M3 手工门槛。
+- 待补：真实浏览器与 macOS Tauri 下的渲染捕获、运行模式与全屏演示实测（M3 门槛）。
+
 ## 模块边界
 
-- `apps/desktop/src/features/design/`：面板与组件（多页标签/视口/总览/导出对话框/元素结构树/模板对话框/品牌面板/素材库/上下文检视）、静态预览（含选区导航桥接）、精确编辑引擎（`html/`：样式/属性/结构操作与值校验）、撤销历史（`history/`）、行差异（`diff.ts`）、多页工作台核心（`workspace/`：controller/storage/ports/source-lines）、元素树（`element-tree.ts`）、图片相对引用（`asset-ref.ts`）、品牌渲染与校验（`brand.ts`）、Agent 上下文组装（`agent-context.ts`）、run 结束监视（`agent-run-watch.ts`）、backend-aware API 客户端。
+- `apps/desktop/src/features/design/`：面板与组件（多页标签/视口/总览/导出对话框/元素结构树/模板对话框/品牌面板/素材库/上下文检视，以及 P5 的幻灯片面板/播放器/渲染导出对话框）、静态预览（含选区导航桥接）、交互运行预览（`interactive.ts`：运行 CSP/桥接/存储 shim/脚本内联）、deck 纯逻辑（`deck.ts`：解析/排序/增删/备注/比例/播放过滤）、客户端渲染导出（`render-export.ts`、`pdf.ts`）、精确编辑引擎（`html/`：样式/属性/结构操作与值校验）、撤销历史（`history/`）、行差异（`diff.ts`）、多页工作台核心（`workspace/`：controller/storage/ports/source-lines）、元素树（`element-tree.ts`）、图片相对引用（`asset-ref.ts`）、品牌渲染与校验（`brand.ts`）、Agent 上下文组装（`agent-context.ts`）、run 结束监视（`agent-run-watch.ts`）、backend-aware API 客户端。
 - `apps/desktop/src/plugins/builtinPanels.ts`：原生内置面板注册。
 - `server/src/application/design/design-service.ts`：从会话解析工作目录、限定文件访问、版本校验和保存（含 allowCreate 重建）。
 - `server/src/application/design/snapshot-service.ts`、`restore-service.ts`、`resource-graph.ts`：快照捕获/清单、分阶段恢复、HTML/CSS 资源引用图。
@@ -98,6 +108,8 @@ P2 测试覆盖（desktop 220 + server 69 + fileDownload 30，全绿；双端 ts
 P3 测试覆盖（desktop 435 + server 72 + fileDownload 30，全绿；双端 tsc 0 错、eslint 0 error、lifecycle/radius 通过）：24 属性校验逐类合法/非法样本、简写/长写共存与清除语义、无关字节逐字节保持、属性标签匹配拒绝、duplicate 的 id 去重与内部锚点重写、delete 锚点引用拒绝与选父级、move 交换公式与首末拒绝、结构操作混用/根元素拒绝、桥接 select 载荷与 select-path/select-failed 回路、树 capability/truncated/childElementPath、表单分组渲染与预检拦截、图片清单选择与相对路径换算、应用后重选对比（含混合事务颜色失配锁定用例）、纯颜色 verify 回路回归（证据见 [P3 实现设计 §10](plans/2026-10-23-design-workbench-p3-implementation.md)）。
 
 P4 测试覆盖（desktop 524 + server 115，全绿；双端 tsc 0 错、eslint 0 error、lifecycle/radius 通过）：模板目录不变量（骨架/无脚本/无外链/大小/语义分区）与安装全链路（409 files/覆盖重装/symlink 403/并发 403）、品牌读写修订语义与两文件独立写入、素材导入白名单/上限/重名去重/越界拒绝、kinds 向后兼容、品牌渲染器与校验、上下文组装快照与截断、run 反馈 diff/文案/快照失败附注/防抖与清理、三对话框与检视模态、面板接线（生成/续改经检视、横幅 chip、品牌缓存与最近导入入上下文）（证据见 [P4 实现设计 §9](plans/2026-10-23-design-workbench-p4-implementation.md)）。
+
+P5 测试覆盖（desktop 651 用例全绿；desktop tsc 0 错、eslint 0 error、lifecycle/radius 通过；服务端零改动）：运行构建器脚本内联/远程移除计数/上限/导航标记与 blocked 统计、桥接 nav/blocked/存储 shim/CSP、deck 解析与排序/增删/备注/比例的逐字节保真、60 页与转义边界、PDF 字节结构（xref/DCTDecode 直通）、捕获请求组装与文件名、DeckPanel 乐观更新与回退、DeckPresenter 键盘翻页与全屏降级、RenderExportDialog 进度/取消/错误列表；面板集成（L25）：模式分段按钮 aria-pressed、切运行模式隐藏编辑区与缓存键分叉（run 构建器被调而静态构建器不重复）、blocked 计数状态条、navigate 清单内开页/清单外提示、nav-blocked 两类 reason 提示与手动关闭、deck 检测与幻灯片按钮可用性、DeckPanel/DeckPresenter/渲染导出对话框挂载与回调连线（onCommit → controller.applySource、切页三者关闭）、非 deck 页 deck=null 的 PNG 视口模式（证据见 [P5 实现设计 §9.5/§10](plans/2026-10-23-design-workbench-p5-implementation.md)）。
 
 2026-10-23 本机实测：在 macOS 的 Claudia Dev（Tauri 开发版）中，通过真实 Codex CLI 会话生成 `design/index.html`、本地 CSS 和 5 个 SVG；设计面板自动发现并显示页面。点击纯文本主标题，修改文字与颜色，应用并保存后，直接检查磁盘 HTML 确认写入，再重新载入并重新选择标题，确认文字及计算颜色仍然一致。体验项目位于 `/Users/zhvala/SourceCode/zclaudia-design-demo`，会话名为 `Codex · 设计闭环体验`。
 

@@ -8,6 +8,7 @@ import { acquireWorkspaceController } from '../workspace/controller';
 import { createWorkspacePorts } from '../workspace/api-adapter';
 import * as api from '../api';
 import * as preview from '../preview';
+import * as interactive from '../interactive';
 import { sha256HexSync } from '../html/hash';
 import type { DesignDepsResult } from '../types';
 
@@ -42,6 +43,11 @@ vi.mock('../api', () => ({
   importDesignAsset: vi.fn(),
 }));
 vi.mock('../preview', () => ({ buildDesignPreview: vi.fn(async () => '<html></html>') }));
+vi.mock('../interactive', () => ({
+  buildDesignRunPreview: vi.fn(
+    async () => ({ html: '<html></html>', blocked: { scripts: 0, links: 0 } })
+  ),
+}));
 
 /** run 反馈 hook 的受控返回值（横幅用例直接改 status + rerender）。 */
 const runFeedbackMock = vi.hoisted(() => ({
@@ -88,6 +94,82 @@ vi.mock('../components/AssetLibrary', () => ({
     ) : null,
 }));
 
+/** P5 三组件（L23/L24）按既有 mock 风格打桩：只断言挂载与回调连线（专属测试文件覆盖内部行为）。 */
+vi.mock('../components/DeckPanel', () => ({
+  DeckPanel: (props: {
+    open: boolean;
+    page: { path: string; source: string; busy: boolean } | null;
+    previewHtml: string | null;
+    deck: { slides: unknown[]; ratio: string } | null;
+    onCommit: (source: string, label: string) => Promise<boolean>;
+    onPresent: (index: number) => void;
+    onClose: () => void;
+  }) =>
+    props.open ? (
+      <div data-testid="deck-panel">
+        <span data-testid="deck-panel-page">{props.page?.path ?? ''}</span>
+        <span data-testid="deck-panel-slides">
+          {props.deck ? props.deck.slides.length : 'none'}
+        </span>
+        <span data-testid="deck-panel-ratio">{props.deck?.ratio ?? 'none'}</span>
+        <span data-testid="deck-panel-preview">
+          {props.previewHtml === null ? 'building' : 'ready'}
+        </span>
+        <button
+          type="button"
+          onClick={() =>
+            void props.onCommit(
+              '<html><body><section data-zclaudia-slide data-title="改">X</section></body></html>',
+              '测试提交'
+            )
+          }
+        >
+          mock-提交幻灯片
+        </button>
+        <button type="button" onClick={() => props.onPresent(1)}>mock-演示</button>
+        <button type="button" onClick={props.onClose}>mock-关闭幻灯片</button>
+      </div>
+    ) : null,
+}));
+vi.mock('../components/DeckPresenter', () => ({
+  DeckPresenter: (props: {
+    slides: unknown[];
+    ratio: string;
+    previewHtml: string | null;
+    startIndex: number;
+    onClose: () => void;
+  }) => (
+    <div data-testid="deck-presenter">
+      <span data-testid="deck-presenter-start">{props.startIndex}</span>
+      <span data-testid="deck-presenter-slides">{props.slides.length}</span>
+      <span data-testid="deck-presenter-ratio">{props.ratio}</span>
+      <button type="button" onClick={props.onClose}>mock-关闭演示</button>
+    </div>
+  ),
+}));
+vi.mock('../components/RenderExportDialog', () => ({
+  RenderExportDialog: (props: {
+    open: boolean;
+    entryPath: string;
+    previewHtml: string | null;
+    deck: { slides: unknown[]; ratio: string } | null;
+    viewport: { preset: string; width: number | null };
+    onClose: () => void;
+  }) =>
+    props.open ? (
+      <div data-testid="render-export-dialog">
+        <span data-testid="render-export-entry">{props.entryPath}</span>
+        <span data-testid="render-export-deck">
+          {props.deck ? `${props.deck.slides.length}:${props.deck.ratio}` : 'none'}
+        </span>
+        <span data-testid="render-export-viewport">
+          {`${props.viewport.preset}:${props.viewport.width === null ? 'null' : props.viewport.width}`}
+        </span>
+        <button type="button" onClick={props.onClose}>mock-关闭渲染导出</button>
+      </div>
+    ) : null,
+}));
+
 const openFileMock = vi.fn();
 vi.mock('../../../stores/fileViewerStore', () => ({
   useFileViewerStore: { getState: () => ({ openFile: openFileMock }) },
@@ -98,6 +180,9 @@ vi.mock('../../../services/fileDownload', () => ({
 }));
 
 const SOURCE = '<html><body><h1>Hello</h1></body></html>';
+const DECK_SOURCE =
+  '<html><body><section data-zclaudia-slide data-title="第一页"><h2>A</h2></section>' +
+  '<section data-zclaudia-slide data-title="第二页"><h2>B</h2></section></body></html>';
 const sha = (source: string): string => sha256HexSync(source);
 const pageSource = (text: string): string => `<html><body><h1>${text}</h1></body></html>`;
 const depsResultFor = (path: string, mtimeMs: number): DesignDepsResult => ({
@@ -249,6 +334,11 @@ describe('DesignPanel', () => {
       tokensCssRevision: null,
     });
     runFeedbackMock.status = null;
+    // clearAllMocks 不还原实现：显式恢复运行预览构建器的缺省返回（blocked 全 0）。
+    vi.mocked(interactive.buildDesignRunPreview).mockResolvedValue({
+      html: '<html></html>',
+      blocked: { scripts: 0, links: 0 },
+    });
   });
 
   afterEach(() => {
@@ -1408,6 +1498,214 @@ describe('DesignPanel', () => {
       expect(screen.getAllByRole('tab', { name: /index\.html/ })).toHaveLength(2)
     );
     expect(screen.queryByTestId('template-dialog')).not.toBeInTheDocument();
+  });
+
+  // ---- P5（L25）面板接线：模式切换 / 运行桥接消息 / deck 三组件 / 渲染导出 ----
+
+  it('P5：工具栏提供编辑/运行分段按钮（aria-pressed），非 deck 页幻灯片禁用', async () => {
+    mount();
+    await screen.findByTitle('设计预览');
+    const edit = screen.getByRole('button', { name: '编辑模式' });
+    const run = screen.getByRole('button', { name: '运行模式' });
+    expect(edit).toHaveAttribute('aria-pressed', 'true');
+    expect(run).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(run);
+    expect(screen.getByRole('button', { name: '编辑模式' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: '运行模式' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: '编辑模式' }));
+    expect(screen.getByRole('button', { name: '编辑模式' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '幻灯片' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '渲染导出' })).toBeEnabled();
+  });
+
+  it('P5：切运行模式后隐藏编辑区、显示状态条与 blocked 计数，预览构建分叉且缓存键含模式', async () => {
+    vi.mocked(interactive.buildDesignRunPreview).mockResolvedValue({
+      html: '<html><body>run</body></html>',
+      blocked: { scripts: 2, links: 1 },
+    });
+    mount();
+    await screen.findByTitle('设计预览');
+    await selectElement();
+    expect(screen.getByRole('button', { name: '交给 Agent 修改' })).toBeEnabled();
+    expect(preview.buildDesignPreview).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByText('运行模式：仅供交互体验，编辑请切回编辑模式')
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '运行模式' }));
+    await waitFor(() => expect(interactive.buildDesignRunPreview).toHaveBeenCalledTimes(1));
+    const options = vi.mocked(interactive.buildDesignRunPreview).mock.calls[0][0];
+    expect(options.source).toBe(SOURCE);
+    expect(options.filePath).toBe('design/index.html');
+    expect(typeof options.channel).toBe('string');
+    // 缓存键分叉：本页未再走静态构建器。
+    expect(preview.buildDesignPreview).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('textbox', { name: '元素文字' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/点击预览中的元素进行编辑/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText('运行模式：仅供交互体验，编辑请切回编辑模式')
+    ).toBeInTheDocument();
+    expect(screen.getByText('已移除 2 个外部脚本、1 个外部链接')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '交给 Agent 修改' })).toBeDisabled();
+
+    // 切回编辑模式：状态条消失，静态预览按新模式键重建（缓存按 path 单槽替换），编辑区恢复。
+    fireEvent.click(screen.getByRole('button', { name: '编辑模式' }));
+    expect(
+      screen.queryByText('运行模式：仅供交互体验，编辑请切回编辑模式')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('已移除 2 个外部脚本、1 个外部链接')).not.toBeInTheDocument();
+    expect(await screen.findByRole('textbox', { name: '元素文字' })).toBeInTheDocument();
+    expect(preview.buildDesignPreview).toHaveBeenCalledTimes(2);
+    expect(interactive.buildDesignRunPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it('P5：运行模式 design-navigate——清单内路径开页并提示，清单外仅提示', async () => {
+    disk.set('design/new.html', { source: SOURCE, revision: 'rev-new' });
+    vi.mocked(api.listDesignFiles).mockResolvedValue({
+      files: ['design/index.html', 'design/new.html'],
+    });
+    mount();
+    await screen.findByTitle('设计预览');
+    fireEvent.click(screen.getByRole('button', { name: '运行模式' }));
+    await waitFor(() => expect(interactive.buildDesignRunPreview).toHaveBeenCalled());
+    const frame = screen.getByTitle('设计预览') as HTMLIFrameElement;
+    const channel = vi.mocked(interactive.buildDesignRunPreview).mock.calls.at(-1)![0].channel;
+
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        source: frame.contentWindow,
+        data: { type: 'zclaudia:design-navigate', channel, path: 'design/new.html' },
+      })
+    );
+    expect(await screen.findByText('已打开 design/new.html')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /new\.html/ })).toBeInTheDocument()
+    );
+    // 新活动页在运行模式下同样走运行构建器。
+    await waitFor(() => {
+      const calls = vi.mocked(interactive.buildDesignRunPreview).mock.calls;
+      expect(calls.at(-1)![0].filePath).toBe('design/new.html');
+    });
+
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        source: frame.contentWindow,
+        data: { type: 'zclaudia:design-navigate', channel, path: 'design/elsewhere.html' },
+      })
+    );
+    expect(
+      await screen.findByText('目标页面不在工作区：design/elsewhere.html')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /elsewhere/ })).not.toBeInTheDocument();
+  });
+
+  it('P5：运行模式 design-nav-blocked 按 reason 提示且可手动关闭', async () => {
+    mount();
+    await screen.findByTitle('设计预览');
+    fireEvent.click(screen.getByRole('button', { name: '运行模式' }));
+    await waitFor(() => expect(interactive.buildDesignRunPreview).toHaveBeenCalled());
+    const frame = screen.getByTitle('设计预览') as HTMLIFrameElement;
+    const channel = vi.mocked(interactive.buildDesignRunPreview).mock.calls.at(-1)![0].channel;
+
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        source: frame.contentWindow,
+        data: {
+          type: 'zclaudia:design-nav-blocked',
+          channel,
+          reason: 'external',
+          href: 'https://example.com',
+        },
+      })
+    );
+    expect(await screen.findByText('已阻止打开外部链接')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '关闭导航提示' }));
+    expect(screen.queryByText('已阻止打开外部链接')).not.toBeInTheDocument();
+
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        source: frame.contentWindow,
+        data: {
+          type: 'zclaudia:design-nav-blocked',
+          channel,
+          reason: 'unsupported',
+          href: 'assets/a.css',
+        },
+      })
+    );
+    expect(
+      await screen.findByText('已阻止非页面链接（仅支持工作区内 HTML 跳转）')
+    ).toBeInTheDocument();
+  });
+
+  it('P5：deck 页幻灯片可用，DeckPanel 挂载且 onCommit 走 controller.applySource；切页关闭', async () => {
+    disk.set('design/index.html', { source: DECK_SOURCE, revision: 'revision-1' });
+    disk.set('p2.html', { source: pageSource('B'), revision: 'rev-b' });
+    vi.mocked(api.listDesignFiles).mockResolvedValue({
+      files: ['design/index.html', 'p2.html'],
+    });
+    mount();
+    await screen.findByTitle('设计预览');
+    const deckButton = screen.getByRole('button', { name: '幻灯片' });
+    expect(deckButton).toBeEnabled();
+    fireEvent.click(deckButton);
+    expect(screen.getByTestId('deck-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('deck-panel-page')).toHaveTextContent('design/index.html');
+    expect(screen.getByTestId('deck-panel-slides')).toHaveTextContent('2');
+    expect(screen.getByTestId('deck-panel-ratio')).toHaveTextContent('16:9');
+    expect(screen.getByTestId('deck-panel-preview')).toHaveTextContent('ready');
+
+    fireEvent.click(screen.getByRole('button', { name: 'mock-提交幻灯片' }));
+    // applySource 生效：草稿变化 → 保存/撤销可用。
+    await waitFor(() => expect(screen.getByRole('button', { name: '保存' })).toBeEnabled());
+    expect(screen.getByRole('button', { name: '撤销' })).toBeEnabled();
+
+    // 切页：面板/播放器/渲染导出对话框一并关闭，避免陈旧 deck 展示。
+    await openPage('p2.html');
+    expect(screen.queryByTestId('deck-panel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('deck-presenter')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('render-export-dialog')).not.toBeInTheDocument();
+  });
+
+  it('P5：DeckPanel onPresent 挂载 DeckPresenter（起始页/页数/比例），onClose 关闭', async () => {
+    disk.set('design/index.html', { source: DECK_SOURCE, revision: 'revision-1' });
+    mount();
+    await screen.findByTitle('设计预览');
+    fireEvent.click(screen.getByRole('button', { name: '幻灯片' }));
+    fireEvent.click(screen.getByRole('button', { name: 'mock-演示' }));
+    expect(screen.getByTestId('deck-presenter')).toBeInTheDocument();
+    expect(screen.getByTestId('deck-presenter-start')).toHaveTextContent('1');
+    expect(screen.getByTestId('deck-presenter-slides')).toHaveTextContent('2');
+    expect(screen.getByTestId('deck-presenter-ratio')).toHaveTextContent('16:9');
+    fireEvent.click(screen.getByRole('button', { name: 'mock-关闭演示' }));
+    expect(screen.queryByTestId('deck-presenter')).not.toBeInTheDocument();
+  });
+
+  it('P5：deck 页渲染导出对话框携带 entryPath/deck/viewport', async () => {
+    disk.set('design/index.html', { source: DECK_SOURCE, revision: 'revision-1' });
+    mount();
+    await screen.findByTitle('设计预览');
+    fireEvent.click(screen.getByRole('button', { name: '渲染导出' }));
+    expect(screen.getByTestId('render-export-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('render-export-entry')).toHaveTextContent('design/index.html');
+    expect(screen.getByTestId('render-export-deck')).toHaveTextContent('2:16:9');
+    expect(screen.getByTestId('render-export-viewport')).toHaveTextContent('fill:null');
+    fireEvent.click(screen.getByRole('button', { name: 'mock-关闭渲染导出' }));
+    expect(screen.queryByTestId('render-export-dialog')).not.toBeInTheDocument();
+  });
+
+  it('P5：非 deck 页渲染导出 deck=null（仅 PNG 视口区域模式）', async () => {
+    mount();
+    await screen.findByTitle('设计预览');
+    fireEvent.click(screen.getByRole('button', { name: '渲染导出' }));
+    expect(screen.getByTestId('render-export-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('render-export-entry')).toHaveTextContent('design/index.html');
+    expect(screen.getByTestId('render-export-deck')).toHaveTextContent('none');
+    expect(screen.getByTestId('render-export-viewport')).toHaveTextContent('fill:null');
   });
 });
 

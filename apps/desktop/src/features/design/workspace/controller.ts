@@ -331,6 +331,42 @@ export class DesignWorkspaceController {
     }
   }
 
+  /**
+   * P5 deck 页级源码替换（deck 纯函数变换的提交口）：以原子草稿替换走既有
+   * 历史/修订链路。守卫：busy / loading 页 / source 与当前草稿相同 → false
+   * （不记录历史）；替换后清 selection，作为一步独立 undo 记录。
+   */
+  async applySource(source: string, label: string): Promise<boolean> {
+    const page = this.activePage();
+    if (!page || page.busy || page.doc === null || source === page.draft) return false;
+    const before = page.draft;
+    page.busy = true;
+    page.error = '';
+    const request = ++page.requestId;
+    this.touch(page);
+    this.emit();
+    try {
+      const revision = await this.getPorts(this.sessionId).sha256(source);
+      if (this.disposed || page.requestId !== request) return false;
+      page.draft = source;
+      page.draftRevision = revision;
+      page.selection = null;
+      page.history.record({ before, after: source, label, at: Date.now() });
+      this.touch(page);
+      return true;
+    } catch (error) {
+      if (!this.disposed && page.requestId === request) {
+        page.error = errorMessage(error);
+        this.touch(page);
+      }
+      return false;
+    } finally {
+      page.busy = false;
+      this.touch(page);
+      this.emit();
+    }
+  }
+
   async undo(): Promise<void> {
     await this.moveHistory('undo');
   }

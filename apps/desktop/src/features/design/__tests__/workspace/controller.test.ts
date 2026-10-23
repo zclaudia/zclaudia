@@ -778,4 +778,39 @@ describe('DesignWorkspaceController', () => {
     expect(revived.getSnapshot().ui.zoom).toEqual({ mode: 'manual', value: 0.5 });
     expect(revived.getSnapshot().pages).toEqual([]);
   });
+
+  it('applySource replaces the draft atomically with undo, guards and selection clearing', async () => {
+    const h = createHarness();
+    h.docs.set('p1.html', { source: pageSource('A'), revision: 'rev-1' });
+    const c = new DesignWorkspaceController('k', h.getPorts);
+    c.rebind('s1');
+    await open(c, 'p1.html');
+
+    // Same source as the draft: rejected without recording history.
+    expect(await c.applySource(pageOf(c, 'p1.html').source, 'no-op')).toBe(false);
+    expect(pageOf(c, 'p1.html').canUndo).toBe(false);
+
+    // A selection exists before the replacement; it must be cleared after.
+    c.handleSelectionMessage(h1Selection(pageOf(c, 'p1.html').source, 'A'));
+    expect(pageOf(c, 'p1.html').selection).not.toBeNull();
+
+    const next = pageSource('decked');
+    expect(await c.applySource(next, 'reorder slides')).toBe(true);
+    const replaced = pageOf(c, 'p1.html');
+    expect(replaced.source).toBe(next);
+    expect(replaced.draftRevision).toBe(sha(next));
+    expect(replaced.selection).toBeNull();
+    expect(replaced.status).toBe('dirty');
+    expect(replaced.canUndo).toBe(true);
+
+    // Undo restores the exact previous draft as one step.
+    await c.undo();
+    expect(pageOf(c, 'p1.html').source).toBe(pageSource('A'));
+    expect(pageOf(c, 'p1.html').draftRevision).toBe(sha(pageSource('A')));
+
+    // No active page: rejected.
+    expect(await c.applySource('<html></html>', 'orphan')).toBe(true); // still active page
+    c.close('p1.html');
+    expect(await c.applySource('<html></html>', 'orphan')).toBe(false);
+  });
 });

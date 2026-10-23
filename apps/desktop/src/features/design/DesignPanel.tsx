@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useWorkspaceTool } from '../../components/workspace/WorkspaceToolContext';
 import { useWorkspaceVisible } from '../../components/workspace/WorkspaceContext';
@@ -20,8 +20,11 @@ import { lineDiff } from './diff';
 import { AgentContextPreview } from './components/AgentContextPreview';
 import { AssetLibrary } from './components/AssetLibrary';
 import { BrandPanel } from './components/BrandPanel';
+import { DeckPanel } from './components/DeckPanel';
+import { DeckPresenter } from './components/DeckPresenter';
 import { DesignToolbar } from './components/DesignToolbar';
 import { ExportDialog } from './components/ExportDialog';
+import { RenderExportDialog } from './components/RenderExportDialog';
 import { TemplateDialog } from './components/TemplateDialog';
 import { PageOverview } from './components/PageOverview';
 import { PageTabs } from './components/PageTabs';
@@ -30,16 +33,39 @@ import { SelectionEditor } from './components/SelectionEditor';
 import { VersionHistory } from './components/VersionHistory';
 import { LineDiffView } from './components/VersionDiff';
 import { ViewportControls } from './components/ViewportControls';
+import { isDeck, parseDeck } from './deck';
+import type { DeckInfo } from './deck';
+import { buildDesignRunPreview } from './interactive';
 import { buildDesignPreview } from './preview';
 import { ElementTree } from './components/ElementTree';
 import { useDesignWorkspace } from './useDesignWorkspace';
 import type { DesignComputedStyles, DesignEditOperation, DesignSelection } from './types';
 import type { DesignPageSnapshot } from './workspace/controller';
 
-/** 面板级预览缓存上限（LRU；键 path → {key, html}）。 */
+/** 面板级预览缓存上限（LRU；键 path → {key, html, blocked?}）。 */
 const PREVIEW_CACHE_MAX = 8;
 /** 总览缩略图惰性构建的并发上限。 */
 const PREVIEW_MAX_CONCURRENT = 2;
+
+/** 运行桥接 navigate 的 path 校验上限（P5 §2.4）。 */
+const RUN_NAV_PATH_MAX = 500;
+/** scheme 形态引用（运行 navigate path 与外部链接同口径）。 */
+const SCHEME_LIKE = /^[a-z][a-z\d+.-]*:/i;
+
+/** C0 控制字符与 DEL（码点比较，规避 no-control-regex；对齐 deck.ts）。 */
+function hasControlChars(value: string): boolean {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) return true;
+  }
+  return false;
+}
+
+/** 运行构建结果里被移除的远程引用计数（状态行展示）。 */
+interface RunBlockedCount {
+  scripts: number;
+  links: number;
+}
 
 const isValidSelection = (value: unknown): value is DesignSelection => {
   if (!value || typeof value !== 'object') return false;
@@ -231,6 +257,36 @@ function DesignPanelSession({
     : null;
   const visible = useWorkspaceVisible();
 
+  // ---- P5 三态模式与 deck / 渲染导出（§2.4/§5）：面板会话内 state，不持久化 ----
+  const [previewMode, setPreviewMode] = useState<'edit' | 'run'>('edit');
+  const [presentDeck, setPresentDeck] = useState<{ startIndex: number } | null>(null);
+  const [deckOpen, setDeckOpen] = useState(false);
+  const [renderExportOpen, setRenderExportOpen] = useState(false);
+  /** 运行模式导航提示（design-navigate / design-nav-blocked），5 秒自动消失或手动关闭。 */
+  const [runNotice, setRunNotice] = useState<{ text: string } | null>(null);
+
+  // 切页时关闭幻灯片面板/播放器与渲染导出对话框，避免陈旧 deck 展示；会话切换经 key 重挂载自然复位。
+  const activePath = state.activePath;
+  useEffect(() => {
+    setDeckOpen(false);
+    setPresentDeck(null);
+    setRenderExportOpen(false);
+  }, [activePath]);
+
+  /** deck 检测与结构解析：按活动页快照 memo（页对象仅在自身 rev 变化时更换，含草稿修订推进）。 */
+  const deckDetected = useMemo(
+    () => (activePage ? isDeck(activePage.source) : false),
+    [activePage]
+  );
+  const deckInfo = useMemo<DeckInfo | null>(() => {
+    if (!activePage || !deckDetected) return null;
+    try {
+      return parseDeck(activePage.source);
+    } catch {
+      return null;
+    }
+  }, [activePage, deckDetected]);
+
   // ---- P4.6 模板 / 品牌 / 素材对话框与上下文检视（§5.3） ----
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [brandOpen, setBrandOpen] = useState(false);
@@ -279,24 +335,31 @@ function DesignPanelSession({
   const [overrideWarning, setOverrideWarning] = useState(false);
   const [treeOpen, setTreeOpen] = useState(false);
 
-  // ---- 面板级预览缓存：Map<path, {key: draftRevision:assetEpoch, html}>，LRU ≤8 ----
-  const previewCacheRef = useRef(new Map<string, { key: string; html: string }>());
+  // files 经 ref 每渲染同步，避免闭包过期（P4.5 run 反馈与 P5 navigate 消息共用）。
+  const filesRef = useRef(files);
+  filesRef.current = files;
+
+  // ---- 面板级预览缓存：Map<path, {key: draftRevision:assetEpoch:mode, html, blocked?}>，LRU ≤8 ----
+  const previewCacheRef = useRef(new Map<string, { key: string; html: string; blocked?: RunBlockedCount }>());
   const previewPendingRef = useRef(new Map<string, string>());
   const previewQueueRef = useRef<Array<() => Promise<void>>>([]);
   const previewInflightRef = useRef(0);
   const [, setPreviewTick] = useState(0);
 
-  const cachePreview = useCallback((path: string, key: string, html: string) => {
-    const cache = previewCacheRef.current;
-    cache.delete(path); // 刷新 LRU 插入顺序
-    cache.set(path, { key, html });
-    while (cache.size > PREVIEW_CACHE_MAX) {
-      const oldest = cache.keys().next().value;
-      if (oldest === undefined) break;
-      cache.delete(oldest);
-    }
-    setPreviewTick(tick => tick + 1);
-  }, []);
+  const cachePreview = useCallback(
+    (path: string, key: string, html: string, blocked?: RunBlockedCount) => {
+      const cache = previewCacheRef.current;
+      cache.delete(path); // 刷新 LRU 插入顺序
+      cache.set(path, blocked ? { key, html, blocked } : { key, html });
+      while (cache.size > PREVIEW_CACHE_MAX) {
+        const oldest = cache.keys().next().value;
+        if (oldest === undefined) break;
+        cache.delete(oldest);
+      }
+      setPreviewTick(tick => tick + 1);
+    },
+    []
+  );
 
   const pumpPreviews = useCallback(() => {
     while (
@@ -313,26 +376,37 @@ function DesignPanelSession({
     }
   }, []);
 
-  /** 构建（或复用）一页的预览串；front=true 时插队（活动页优先）。 */
+  /** 构建（或复用）一页的预览串；front=true 时插队（活动页优先）。缓存键含模式（P5 §2.4）。 */
   const ensurePreview = useCallback(
     (page: DesignPageSnapshot, front = false) => {
-      const key = `${page.draftRevision}:${state.assetEpoch}`;
+      const key = `${page.draftRevision}:${state.assetEpoch}:${previewMode}`;
       const cached = previewCacheRef.current.get(page.path);
       if (cached && cached.key === key) return;
       if (previewPendingRef.current.get(page.path) === key) return;
       previewPendingRef.current.set(page.path, key);
       const job = async () => {
         try {
-          const html = await buildDesignPreview(
-            page.source,
-            page.path,
-            assetPath => getDesignAsset(backendId, sessionId, assetPath),
-            channel,
-            page.draftRevision
-          );
-          cachePreview(page.path, key, html);
+          if (previewMode === 'run') {
+            // 运行模式（P5 §2）：脚本保留执行、远程引用移除并计数；blocked 随缓存供状态条读取。
+            const result = await buildDesignRunPreview({
+              source: page.source,
+              filePath: page.path,
+              loadAsset: assetPath => getDesignAsset(backendId, sessionId, assetPath),
+              channel,
+            });
+            cachePreview(page.path, key, result.html, result.blocked);
+          } else {
+            const html = await buildDesignPreview(
+              page.source,
+              page.path,
+              assetPath => getDesignAsset(backendId, sessionId, assetPath),
+              channel,
+              page.draftRevision
+            );
+            cachePreview(page.path, key, html);
+          }
         } catch {
-          // 预览构建失败不阻塞面板；资源拉取失败已在 buildDesignPreview 内部降级。
+          // 预览构建失败不阻塞面板；资源拉取失败已在构建器内部降级。
         } finally {
           previewPendingRef.current.delete(page.path);
         }
@@ -341,16 +415,23 @@ function DesignPanelSession({
       else previewQueueRef.current.push(job);
       pumpPreviews();
     },
-    [backendId, channel, cachePreview, pumpPreviews, sessionId, state.assetEpoch]
+    [backendId, channel, cachePreview, pumpPreviews, previewMode, sessionId, state.assetEpoch]
   );
 
-  // 活动页预览：effect 依赖 (activePath, draftRevision, assetEpoch)；缓存命中直接用。
-  const activePreviewKey = activePage ? `${activePage.draftRevision}:${state.assetEpoch}` : null;
+  // 活动页预览：effect 依赖 (activePath, draftRevision, assetEpoch, mode)；缓存命中直接用。
+  const activePreviewKey = activePage
+    ? `${activePage.draftRevision}:${state.assetEpoch}:${previewMode}`
+    : null;
   const cachedActive = activePage ? previewCacheRef.current.get(activePage.path) : undefined;
   const activePreview =
     cachedActive && activePreviewKey && cachedActive.key === activePreviewKey
       ? cachedActive.html
       : '';
+  /** 运行模式状态条的 blocked 计数（随缓存构建落定；N+M 均 0 不显示该行）。 */
+  const runBlocked =
+    previewMode === 'run' && cachedActive && cachedActive.key === activePreviewKey
+      ? (cachedActive.blocked ?? null)
+      : null;
 
   useEffect(() => {
     if (!activePage || !activePreviewKey || activePreview) return;
@@ -360,7 +441,7 @@ function DesignPanelSession({
   // 总览用的预览表（本次渲染时从共享缓存读取；构建完成经 previewTick 触发重渲染）。
   const previews: Record<string, string> = {};
   for (const page of state.pages) {
-    const key = `${page.draftRevision}:${state.assetEpoch}`;
+    const key = `${page.draftRevision}:${state.assetEpoch}:${previewMode}`;
     const cached = previewCacheRef.current.get(page.path);
     if (cached && cached.key === key) previews[page.path] = cached.html;
   }
@@ -376,8 +457,36 @@ function DesignPanelSession({
         elementPath?: unknown;
         color?: unknown;
         backgroundColor?: unknown;
+        path?: unknown;
+        reason?: unknown;
       } | null;
       if (!data || data.channel !== channel) return;
+      // P5 运行模式导航（§2.4）：仅运行预览的桥接会发这两类消息，编辑模式不响应。
+      if (previewMode === 'run' && data.type === 'zclaudia:design-navigate') {
+        const raw = typeof data.path === 'string' ? data.path : '';
+        const valid =
+          raw.length > 0 &&
+          raw.length <= RUN_NAV_PATH_MAX &&
+          !raw.includes('\\') &&
+          !hasControlChars(raw) &&
+          !SCHEME_LIKE.test(raw);
+        if (valid && filesRef.current.includes(raw)) {
+          setRunNotice({ text: `已打开 ${raw}` });
+          void controller.open(raw);
+        } else {
+          setRunNotice({ text: `目标页面不在工作区：${raw}` });
+        }
+        return;
+      }
+      if (previewMode === 'run' && data.type === 'zclaudia:design-nav-blocked') {
+        setRunNotice({
+          text:
+            data.reason === 'external'
+              ? '已阻止打开外部链接'
+              : '已阻止非页面链接（仅支持工作区内 HTML 跳转）',
+        });
+        return;
+      }
       if (data.type === 'zclaudia:design-select') {
         if (!isValidSelection(data.selection)) return;
         verifyRef.current = null;
@@ -418,7 +527,20 @@ function DesignPanelSession({
     };
     window.addEventListener('message', handle);
     return () => window.removeEventListener('message', handle);
-  }, [channel, controller]);
+  }, [channel, controller, previewMode]);
+
+  // 运行导航提示 5 秒自动消失（§2.4）；手动关闭走提示条按钮。
+  useEffect(() => {
+    if (!runNotice) return;
+    const timer = window.setTimeout(() => setRunNotice(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [runNotice]);
+
+  /** 模式切换（P5 §0.1）：会话内 state 不持久化；切离运行模式即撤导航提示。 */
+  const changePreviewMode = (mode: 'edit' | 'run') => {
+    setPreviewMode(mode);
+    setRunNotice(null);
+  };
 
   // The verify request and the post-apply reselect must reach the rebuilt preview,
   // so both are sent on the iframe's load event (at most once per frame load).
@@ -575,9 +697,6 @@ function DesignPanelSession({
   const [draftDiffOpen, setDraftDiffOpen] = useState(false);
 
   // ---- P4.5 run 结束反馈（§6.2/§6.3）：面板可见时监视本会话 run 过渡 ----
-  // files 经 ref 每渲染同步，避免闭包过期。
-  const filesRef = useRef(files);
-  filesRef.current = files;
   const runFeedback = useAgentRunFeedback({
     sessionId,
     backendId,
@@ -676,6 +795,12 @@ function DesignPanelSession({
         canUndo={activePage?.canUndo ?? false}
         canRedo={activePage?.canRedo ?? false}
         hasSelection={!!activePage?.selection}
+        previewMode={previewMode}
+        onPreviewModeChange={changePreviewMode}
+        deckAvailable={deckDetected}
+        onDeck={() => setDeckOpen(true)}
+        onRenderExport={() => setRenderExportOpen(true)}
+        runMode={previewMode === 'run'}
         overviewOpen={overviewOpen}
         onToggleOverview={() => setOverviewOpen(value => !value)}
         treeOpen={treeOpen}
@@ -766,6 +891,35 @@ function DesignPanelSession({
           {activePage.error}
         </div>
       )}
+      {previewMode === 'run' && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5 text-xs text-muted-foreground"
+        >
+          <span>运行模式：仅供交互体验，编辑请切回编辑模式</span>
+          {runBlocked && runBlocked.scripts + runBlocked.links > 0 && (
+            <span>
+              {`已移除 ${runBlocked.scripts} 个外部脚本、${runBlocked.links} 个外部链接`}
+            </span>
+          )}
+        </div>
+      )}
+      {runNotice && (
+        <div
+          role="status"
+          className="flex items-center gap-1.5 border-b border-border px-3 py-1.5 text-xs text-muted-foreground"
+        >
+          <span>{runNotice.text}</span>
+          <button
+            type="button"
+            aria-label="关闭导航提示"
+            onClick={() => setRunNotice(null)}
+            className="ml-auto rounded-md px-1 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            ×
+          </button>
+        </div>
+      )}
       <div className="flex min-h-0 flex-1 flex-col overflow-auto">
         {overviewOpen ? (
           <PageOverview
@@ -785,30 +939,33 @@ function DesignPanelSession({
             className="min-h-52 flex-1"
           />
         )}
-        <div className="max-h-64 min-h-36 shrink-0 overflow-y-auto border-t border-border p-3">
-          {treeOpen && (
-            <div className="mb-3 overflow-hidden rounded-md border border-border">
-              <ElementTree
-                source={activePage?.source ?? ''}
-                selectionPath={activePage?.selection?.elementPath ?? null}
-                onSelectPath={selectPath}
-              />
-            </div>
-          )}
-          <SelectionEditor
-            selection={activePage?.selection ?? null}
-            busy={activePage?.busy ?? false}
-            overrideWarning={overrideWarning}
-            docSource={activePage?.source ?? null}
-            docPath={activePage?.path ?? null}
-            dirty={activePage?.status === 'dirty'}
-            projectRoot={projectRoot}
-            backendId={backendId}
-            sessionId={sessionId}
-            onSelectPath={selectPath}
-            onApply={handleApply}
-          />
-        </div>
+        {/* P5 运行模式为只读体验：隐藏整个底部编辑区（含结构树与选区编辑器）。 */}
+        {previewMode === 'edit' && (
+          <div className="max-h-64 min-h-36 shrink-0 overflow-y-auto border-t border-border p-3">
+            {treeOpen && (
+              <div className="mb-3 overflow-hidden rounded-md border border-border">
+                <ElementTree
+                  source={activePage?.source ?? ''}
+                  selectionPath={activePage?.selection?.elementPath ?? null}
+                  onSelectPath={selectPath}
+                />
+              </div>
+            )}
+            <SelectionEditor
+              selection={activePage?.selection ?? null}
+              busy={activePage?.busy ?? false}
+              overrideWarning={overrideWarning}
+              docSource={activePage?.source ?? null}
+              docPath={activePage?.path ?? null}
+              dirty={activePage?.status === 'dirty'}
+              projectRoot={projectRoot}
+              backendId={backendId}
+              sessionId={sessionId}
+              onSelectPath={selectPath}
+              onApply={handleApply}
+            />
+          </div>
+        )}
         <div className="shrink-0 border-t border-border">
           <button
             type="button"
@@ -912,6 +1069,37 @@ function DesignPanelSession({
           onSave={saveForExport}
           onRefresh={refreshNow}
           onClose={() => setExportOpen(false)}
+        />
+      )}
+      {/* ---- P5 幻灯片面板 / 播放器 / 渲染导出（§5/§6.3）；切页由上方 effect 统一关闭 ---- */}
+      {deckOpen && activePage && (
+        <DeckPanel
+          open
+          page={{ path: activePage.path, source: activePage.source, busy: activePage.busy }}
+          previewHtml={activePreview || null}
+          deck={deckInfo}
+          onCommit={(source, label) => controller.applySource(source, label)}
+          onPresent={startIndex => setPresentDeck({ startIndex })}
+          onClose={() => setDeckOpen(false)}
+        />
+      )}
+      {presentDeck && deckInfo && (
+        <DeckPresenter
+          slides={deckInfo.slides}
+          ratio={deckInfo.ratio}
+          previewHtml={activePreview || null}
+          startIndex={presentDeck.startIndex}
+          onClose={() => setPresentDeck(null)}
+        />
+      )}
+      {renderExportOpen && activePage && (
+        <RenderExportDialog
+          open
+          onClose={() => setRenderExportOpen(false)}
+          entryPath={activePage.path}
+          previewHtml={activePreview || null}
+          deck={deckInfo}
+          viewport={state.ui.viewport}
         />
       )}
       {confirmClosePath && (

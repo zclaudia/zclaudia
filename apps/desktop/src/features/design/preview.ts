@@ -33,6 +33,54 @@ const BRIDGE_STYLE_KEYS = [
 /** select 消息额外携带的元素属性白名单。 */
 const BRIDGE_ATTR_NAMES = ['src', 'alt', 'href'] as const;
 
+/** 资产内联加载器：静态/运行两种预览构建共用（P5.2 §2.1 增量导出）。 */
+export interface AssetInlineLoader {
+  /** 工作区相对路径 → data URL；超限/失败 → null。上限沿用 MAX_ASSETS/MAX_ASSET_BYTES/MAX_TOTAL_ASSET_BYTES。 */
+  loadInlineAsset(path: string): Promise<string | null>;
+  /** 原始引用值 → data URL（data:/blob:/#/scheme 原样返回 null）。 */
+  resolveAsset(raw: string, fromDir?: string): Promise<string | null>;
+}
+
+/** 创建资产内联加载器；同一实例内按路径缓存并共享总量预算。 */
+export function createAssetInlineLoader(
+  loadAsset: (relativeWorkspacePath: string) => Promise<{ mimeType: string; data: string }>
+): AssetInlineLoader {
+  const assets = new Map<string, string | null>();
+  let totalAssetBytes = 0;
+  const loadInlineAsset = async (path: string): Promise<string | null> => {
+    if (assets.has(path)) return assets.get(path)!;
+    if (assets.size >= MAX_ASSETS) return null;
+    try {
+      const asset = await loadAsset(path);
+      const bytes = Math.ceil((asset.data.length * 3) / 4);
+      if (bytes > MAX_ASSET_BYTES || totalAssetBytes + bytes > MAX_TOTAL_ASSET_BYTES) {
+        assets.set(path, null);
+        return null;
+      }
+      totalAssetBytes += bytes;
+      const result = `data:${asset.mimeType};base64,${asset.data}`;
+      assets.set(path, result);
+      return result;
+    } catch {
+      assets.set(path, null);
+      return null;
+    }
+  };
+  const resolveAsset = async (raw: string, fromDir = ''): Promise<string | null> => {
+    const value = raw.trim();
+    if (!value || /^(?:data:|blob:|#|\/\/)/i.test(value) || /^[a-z][a-z\d+.-]*:/i.test(value))
+      return null;
+    return loadInlineAsset(workspacePath(value, fromDir));
+  };
+  return { loadInlineAsset, resolveAsset };
+}
+
+/** 工作区文件路径 → 所在目录（含末尾斜杠；根级文件 → ''）。 */
+export function workspaceSourceDir(filePath: string): string {
+  const sourcePath = normalizeWorkspacePath(filePath);
+  return sourcePath.slice(0, sourcePath.lastIndexOf('/') + 1);
+}
+
 export async function buildDesignPreview(
   source: string,
   filePath: string,
@@ -58,40 +106,13 @@ export async function buildDesignPreview(
     });
   });
 
-  const sourcePath = normalizeWorkspacePath(filePath);
-  const sourceDir = sourcePath.slice(0, sourcePath.lastIndexOf('/') + 1);
-  const assets = new Map<string, string | null>();
-  let totalAssetBytes = 0;
-  const loadInlineAsset = async (path: string): Promise<string | null> => {
-    if (assets.has(path)) return assets.get(path)!;
-    if (assets.size >= MAX_ASSETS) return null;
-    try {
-      const asset = await loadAsset(path);
-      const bytes = Math.ceil((asset.data.length * 3) / 4);
-      if (bytes > MAX_ASSET_BYTES || totalAssetBytes + bytes > MAX_TOTAL_ASSET_BYTES) {
-        assets.set(path, null);
-        return null;
-      }
-      totalAssetBytes += bytes;
-      const result = `data:${asset.mimeType};base64,${asset.data}`;
-      assets.set(path, result);
-      return result;
-    } catch {
-      assets.set(path, null);
-      return null;
-    }
-  };
-  const resolveAsset = async (raw: string, fromDir = sourceDir): Promise<string | null> => {
-    const value = raw.trim();
-    if (!value || /^(?:data:|blob:|#|\/\/)/i.test(value) || /^[a-z][a-z\d+.-]*:/i.test(value))
-      return null;
-    return loadInlineAsset(workspacePath(value, fromDir));
-  };
+  const sourceDir = workspaceSourceDir(filePath);
+  const { loadInlineAsset, resolveAsset } = createAssetInlineLoader(loadAsset);
 
   for (const image of Array.from(doc.querySelectorAll('img'))) {
     const src = image.getAttribute('src');
     if (src) {
-      const inlined = await resolveAsset(src);
+      const inlined = await resolveAsset(src, sourceDir);
       if (inlined) image.setAttribute('src', inlined);
       else if (!/^(?:data:|blob:)/i.test(src)) image.removeAttribute('src');
     }
@@ -100,7 +121,7 @@ export async function buildDesignPreview(
       const entries = await Promise.all(
         srcset.split(',').map(async entry => {
           const [url, ...descriptor] = entry.trim().split(/\s+/);
-          const inlined = await resolveAsset(url);
+          const inlined = await resolveAsset(url, sourceDir);
           return inlined ? `${inlined}${descriptor.length ? ` ${descriptor.join(' ')}` : ''}` : '';
         })
       );
@@ -111,7 +132,7 @@ export async function buildDesignPreview(
 
   for (const link of Array.from(doc.querySelectorAll('link[rel~="stylesheet"][href]'))) {
     const href = link.getAttribute('href') ?? '';
-    const cssData = await resolveAsset(href);
+    const cssData = await resolveAsset(href, sourceDir);
     if (!cssData) {
       link.remove();
       continue;
@@ -354,7 +375,8 @@ async function rewriteCssUrls(
   return result;
 }
 
-function decodeBase64Utf8(base64: string): string {
+/** base64 → UTF-8 文本（本地脚本/样式内联共用）。 */
+export function decodeBase64Utf8(base64: string): string {
   const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
   return new TextDecoder().decode(bytes);
 }

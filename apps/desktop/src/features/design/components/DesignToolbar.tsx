@@ -11,6 +11,17 @@ export interface DesignToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   hasSelection: boolean;
+  /** 预览模式（P5 §2.4）：分段按钮「编辑/运行」，aria-pressed 反映当前态。 */
+  previewMode: 'edit' | 'run';
+  onPreviewModeChange: (mode: 'edit' | 'run') => void;
+  /** 活动页含幻灯片标记（P5 §3.1）时「幻灯片」可用。 */
+  deckAvailable: boolean;
+  /** 打开幻灯片面板。 */
+  onDeck: () => void;
+  /** 打开渲染导出对话框（需存在打开且非 loading 的活动页）。 */
+  onRenderExport: () => void;
+  /** 运行模式（P5 只读体验）：「交给 Agent 修改」禁用。 */
+  runMode: boolean;
   /** 总览开关状态（开关按钮用 aria-pressed 反映）。 */
   overviewOpen: boolean;
   onToggleOverview: () => void;
@@ -36,7 +47,7 @@ export interface DesignToolbarProps {
   onReload: () => void;
 }
 
-/** 工具栏：文件选择由标签条承担；这里保留刷新/历史/保存/交接并作用于活动页。 */
+/** 工具栏：文件选择由标签条承担；这里保留刷新/模式/历史/保存/交接并作用于活动页。 */
 export function DesignToolbar({
   docPath,
   loading,
@@ -45,6 +56,12 @@ export function DesignToolbar({
   canUndo,
   canRedo,
   hasSelection,
+  previewMode,
+  onPreviewModeChange,
+  deckAvailable,
+  onDeck,
+  onRenderExport,
+  runMode,
   overviewOpen,
   onToggleOverview,
   treeOpen,
@@ -78,6 +95,26 @@ export function DesignToolbar({
       <Button size="sm" onClick={onRefresh} aria-label="刷新设计文件">
         <RefreshCw size={13} />
       </Button>
+      <div className="flex items-center gap-1" role="group" aria-label="预览模式">
+        <Button
+          size="sm"
+          onClick={() => onPreviewModeChange('edit')}
+          aria-label="编辑模式"
+          aria-pressed={previewMode === 'edit'}
+          variant={previewMode === 'edit' ? 'primary' : 'ghost'}
+        >
+          编辑
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => onPreviewModeChange('run')}
+          aria-label="运行模式"
+          aria-pressed={previewMode === 'run'}
+          variant={previewMode === 'run' ? 'primary' : 'ghost'}
+        >
+          运行
+        </Button>
+      </div>
       <Button size="sm" onClick={onUndo} disabled={!canUndo || busy} aria-label="撤销">
         撤销
       </Button>
@@ -87,7 +124,12 @@ export function DesignToolbar({
       <Button size="sm" onClick={onGenerate} disabled={dirty}>
         生成页面
       </Button>
-      <Button size="sm" onClick={onHandoff} disabled={!hasSelection || !docPath || dirty || busy}>
+      <Button
+        size="sm"
+        onClick={onHandoff}
+        disabled={!hasSelection || !docPath || dirty || busy || runMode}
+        title={runMode ? '运行模式仅供交互体验；请切回编辑模式后再交给 Agent' : undefined}
+      >
         交给 Agent 修改
       </Button>
       <Button size="sm" variant="primary" onClick={onSave} disabled={!dirty || busy}>
@@ -122,6 +164,24 @@ export function DesignToolbar({
         title={docPath ? '把页面与本地资源打包为 ZIP' : undefined}
       >
         导出
+      </Button>
+      <Button
+        size="sm"
+        onClick={onDeck}
+        disabled={!deckAvailable}
+        aria-label="幻灯片"
+        title={deckAvailable ? '打开幻灯片面板' : '当前页没有幻灯片标记（data-zclaudia-slide）'}
+      >
+        幻灯片
+      </Button>
+      <Button
+        size="sm"
+        onClick={onRenderExport}
+        disabled={!docPath || loading}
+        aria-label="渲染导出"
+        title={docPath ? '把当前预览渲染导出为 PNG/PDF（整页图片）' : undefined}
+      >
+        渲染导出
       </Button>
       <Button size="sm" onClick={onToggleDiff} disabled={!dirty} aria-label="未保存差异">
         未保存差异
