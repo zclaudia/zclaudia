@@ -1,4 +1,4 @@
-import { ImagePlay, RefreshCw } from 'lucide-react';
+import { ImagePlay, RefreshCw, Share2 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 
 export interface DesignToolbarProps {
@@ -32,6 +32,8 @@ export interface DesignToolbarProps {
   onExport: () => void;
   /** 打开未保存差异视图（仅活动页 dirty 时可用）。 */
   onToggleDiff: () => void;
+  /** 打开分享面板（P7 §7.2，需存在打开且非 loading 的活动页）。 */
+  onShare: () => void;
   /** 打开模板对话框（P4 §2.4，与活动页无关）。 */
   onTemplates: () => void;
   /** 打开品牌面板（P4 §3.4，与活动页无关）。 */
@@ -70,6 +72,7 @@ export function DesignToolbar({
   onToggleTree,
   onExport,
   onToggleDiff,
+  onShare,
   onTemplates,
   onBrand,
   onAssets,
@@ -192,6 +195,16 @@ export function DesignToolbar({
       </Button>
       <Button size="sm" onClick={onToggleDiff} disabled={!dirty} aria-label="未保存差异">
         未保存差异
+      </Button>
+      <Button
+        size="sm"
+        onClick={onShare}
+        disabled={!docPath || loading}
+        aria-label="分享"
+        title={docPath ? '创建分享链接并查看审阅评论' : undefined}
+      >
+        <Share2 size={13} />
+        分享
       </Button>
     </div>
   );

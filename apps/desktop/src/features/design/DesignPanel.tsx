@@ -27,6 +27,7 @@ import { DesignToolbar } from './components/DesignToolbar';
 import { ExportDialog } from './components/ExportDialog';
 import { MediaGenPanel } from './components/MediaGenPanel';
 import { RenderExportDialog } from './components/RenderExportDialog';
+import { SharePanel } from './components/SharePanel';
 import { TemplateDialog } from './components/TemplateDialog';
 import { PageOverview } from './components/PageOverview';
 import { PageTabs } from './components/PageTabs';
@@ -266,16 +267,19 @@ function DesignPanelSession({
   const [renderExportOpen, setRenderExportOpen] = useState(false);
   /** P6 §8.3 媒体生成面板：与活动页无关的入口（视频 tab 缺省入口为活动页）。 */
   const [mediaOpen, setMediaOpen] = useState(false);
+  /** P7 §7.2 分享与审阅面板：作用于活动页（docPath/currentSource 取活动页）。 */
+  const [shareOpen, setShareOpen] = useState(false);
   /** 运行模式导航提示（design-navigate / design-nav-blocked），5 秒自动消失或手动关闭。 */
   const [runNotice, setRunNotice] = useState<{ text: string } | null>(null);
 
-  // 切页时关闭幻灯片面板/播放器、渲染导出对话框与媒体生成面板，避免陈旧 deck 展示；会话切换经 key 重挂载自然复位。
+  // 切页时关闭幻灯片面板/播放器、渲染导出对话框、媒体生成面板与分享面板，避免陈旧页数据展示；会话切换经 key 重挂载自然复位。
   const activePath = state.activePath;
   useEffect(() => {
     setDeckOpen(false);
     setPresentDeck(null);
     setRenderExportOpen(false);
     setMediaOpen(false);
+    setShareOpen(false);
   }, [activePath]);
 
   /** deck 检测与结构解析：按活动页快照 memo（页对象仅在自身 rev 变化时更换，含草稿修订推进）。 */
@@ -743,6 +747,12 @@ function DesignPanelSession({
     setPrefillNotice(true);
   };
 
+  /** P7 §7.2 分享面板交接：复用 prefill（含「已填入当前聊天」提示条）并收起面板。 */
+  const handleShareHandoff = (prompt: string) => {
+    prefill(prompt);
+    setShareOpen(false);
+  };
+
   /**
    * 组装 §5.1 上下文输入（P4 §5.3）：面板已知页面与修订、活动页选区、
    * 品牌缓存、活动页素材引用 + 本会话导入、视口。两品牌文件都缺失时
@@ -819,6 +829,7 @@ function DesignPanelSession({
         onToggleTree={() => setTreeOpen(value => !value)}
         onExport={() => setExportOpen(true)}
         onToggleDiff={() => setDraftDiffOpen(true)}
+        onShare={() => setShareOpen(true)}
         onTemplates={() => setTemplatesOpen(true)}
         onBrand={() => setBrandOpen(true)}
         onAssets={() => setAssetsOpen(true)}
@@ -1072,6 +1083,19 @@ function DesignPanelSession({
           onReplaceSelectionSrc={handleReplaceSelectionSrc}
           onAssetImported={handleAssetImported}
           onClose={() => setMediaOpen(false)}
+        />
+      )}
+      {/* P7 §7.2 分享与审阅面板：docPath/currentSource 取活动页（评论失效判定与交接用）；
+          交接经 handleShareHandoff 复用 prefill，切页由上方 effect 统一关闭。 */}
+      {shareOpen && (
+        <SharePanel
+          open
+          onClose={() => setShareOpen(false)}
+          backendId={backendId}
+          sessionId={sessionId}
+          docPath={activePage?.path ?? null}
+          currentSource={activePage?.source ?? null}
+          onHandoff={handleShareHandoff}
         />
       )}
       {draftDiffOpen && activePage && (

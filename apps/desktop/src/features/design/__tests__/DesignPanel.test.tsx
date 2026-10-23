@@ -46,6 +46,11 @@ vi.mock('../api', () => ({
   cancelDesignMediaTask: vi.fn(),
   listDesignMediaProviders: vi.fn(),
   downloadDesignMediaTaskResult: vi.fn(),
+  createDesignShare: vi.fn(),
+  listDesignShares: vi.fn(),
+  revokeDesignShare: vi.fn(),
+  listDesignShareComments: vi.fn(),
+  setDesignShareCommentResolved: vi.fn(),
 }));
 vi.mock('../preview', () => ({ buildDesignPreview: vi.fn(async () => '<html></html>') }));
 vi.mock('../interactive', () => ({
@@ -366,6 +371,9 @@ describe('DesignPanel', () => {
     // P6 媒体端点：面板本体不消费（MediaGenPanel 打桩），补缺省返回保持 mock 全量。
     vi.mocked(api.listDesignMediaProviders).mockResolvedValue({ providers: [], profiles: [] });
     vi.mocked(api.listDesignMediaTasks).mockResolvedValue({ tasks: [] });
+    // P7 分享端点：分享面板（真实挂载）打开即拉列表；缺省空列表保持 mock 全量。
+    vi.mocked(api.listDesignShares).mockResolvedValue({ shares: [] });
+    vi.mocked(api.listDesignShareComments).mockResolvedValue({ comments: [] });
     runFeedbackMock.status = null;
     // clearAllMocks 不还原实现：显式恢复运行预览构建器的缺省返回（blocked 全 0）。
     vi.mocked(interactive.buildDesignRunPreview).mockResolvedValue({
@@ -1807,6 +1815,113 @@ describe('DesignPanel', () => {
     expect(screen.getByTestId('media-gen-panel')).toBeInTheDocument();
     await openPage('p2.html');
     expect(screen.queryByTestId('media-gen-panel')).not.toBeInTheDocument();
+  });
+
+  // ---- P7（S7）面板接线：分享按钮 / 真实 SharePanel 挂载 / 交接 prefill / 切页关闭 ----
+
+  it('P7：分享按钮无活动页禁用，有活动页可打开分享面板（分享链接 tab）', async () => {
+    vi.mocked(api.listDesignFiles).mockResolvedValue({ files: [] });
+    const empty = mount();
+    await waitFor(() => expect(api.listDesignFiles).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: '分享' })).toBeDisabled();
+    empty.unmount();
+
+    vi.mocked(api.listDesignFiles).mockResolvedValue({ files: ['design/index.html'] });
+    mount();
+    await screen.findByTitle('设计预览');
+    expect(screen.getByRole('button', { name: '分享' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: '分享' }));
+    const dialog = await screen.findByRole('dialog', { name: '分享' });
+    expect(within(dialog).getByRole('tab', { name: '分享链接' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    // SharePanel 挂载即拉版本与分享列表（活动页作为 entryPath）。
+    await waitFor(() =>
+      expect(api.listDesignShares).toHaveBeenCalledWith(
+        'remote-1',
+        'session-1',
+        'design/index.html'
+      )
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }));
+    expect(screen.queryByRole('dialog', { name: '分享' })).not.toBeInTheDocument();
+  });
+
+  it('P7：审阅评论「交给 Agent 修改」把含评论正文的 prompt 填入聊天并关闭面板', async () => {
+    vi.mocked(api.listDesignSnapshots).mockResolvedValue([
+      {
+        id: 'ds-1',
+        entryPath: 'design/index.html',
+        label: 'v1',
+        source: 'save',
+        complete: true,
+        incompleteReasons: [],
+        fileCount: 1,
+        totalBytes: SOURCE.length,
+        createdAt: 1730000000000,
+      },
+    ]);
+    vi.mocked(api.listDesignShares).mockResolvedValue({
+      shares: [
+        {
+          id: 'sh-1',
+          token: 'tok-1',
+          snapshotId: 'ds-1',
+          entryPath: 'design/index.html',
+          title: null,
+          scope: 'link',
+          createdAt: 1730000000000,
+          expiresAt: null,
+          revokedAt: null,
+          commentCount: 1,
+          lastAccessAt: null,
+        },
+      ],
+    });
+    const comment = {
+      id: 'sc-1',
+      author: '审阅者',
+      body: '标题改成蓝色更好',
+      target: null,
+      createdAt: 1730000100000,
+      resolvedAt: null,
+    };
+    vi.mocked(api.listDesignShareComments).mockResolvedValue({ comments: [comment] });
+    vi.mocked(api.getDesignSnapshotFile).mockResolvedValue({
+      mime: 'text/html',
+      data: btoa(SOURCE),
+    });
+    mount();
+    await screen.findByTitle('设计预览');
+    fireEvent.click(screen.getByRole('button', { name: '分享' }));
+    const dialog = await screen.findByRole('dialog', { name: '分享' });
+    fireEvent.click(within(dialog).getByRole('tab', { name: '审阅评论' }));
+    const handoffButton = await within(dialog).findByRole('button', {
+      name: '交给 Agent 修改 sc-1',
+    });
+    expect(useComposerStore.getState().pendingPrefills['session-1']).toBeUndefined();
+    fireEvent.click(handoffButton);
+
+    await waitFor(() => {
+      const content = useComposerStore.getState().pendingPrefills['session-1']?.content ?? '';
+      expect(content).toContain('标题改成蓝色更好');
+    });
+    const content = useComposerStore.getState().pendingPrefills['session-1']?.content ?? '';
+    expect(content).toContain('请根据以上审阅反馈修改当前页面 design/index.html');
+    expect(await screen.findByText('已填入当前聊天，补充需求后发送。')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '分享' })).not.toBeInTheDocument();
+  });
+
+  it('P7：切页时分享面板一并关闭（deck/media 同款 effect）', async () => {
+    disk.set('p2.html', { source: pageSource('B'), revision: 'rev-b' });
+    vi.mocked(api.listDesignFiles).mockResolvedValue({ files: ['design/index.html', 'p2.html'] });
+    mount();
+    await screen.findByTitle('设计预览');
+    fireEvent.click(screen.getByRole('button', { name: '分享' }));
+    expect(await screen.findByRole('dialog', { name: '分享' })).toBeInTheDocument();
+    await openPage('p2.html');
+    expect(screen.queryByRole('dialog', { name: '分享' })).not.toBeInTheDocument();
   });
 });
 

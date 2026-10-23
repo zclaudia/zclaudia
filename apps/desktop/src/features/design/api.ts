@@ -636,3 +636,129 @@ export async function downloadDesignMediaTaskResult(
   const filename = match?.[1] ?? `media-${taskId}`;
   return { blob: await response.blob(), filename };
 }
+
+// ---------------------------------------------------------------------------
+// 分享与审阅（P7；服务端 S1–S4 落地，桌面契约先冻结）
+// 设计文档：docs/plans/2026-10-24-design-workbench-p7-implementation-plan.md §6
+// ---------------------------------------------------------------------------
+
+/** link = 任何持有 token 的访问者；local = 仅限本机访问。 */
+export type DesignShareScope = 'link' | 'local';
+
+export interface DesignShareSummary {
+  id: string;
+  token: string;
+  snapshotId: string;
+  /** 工作区相对入口路径（快照 entry_path）。 */
+  entryPath: string;
+  title: string | null;
+  scope: DesignShareScope;
+  createdAt: number;
+  /** null = 永不过期。 */
+  expiresAt: number | null;
+  /** null = 未撤销。 */
+  revokedAt: number | null;
+  commentCount: number;
+  /** null = 创建后无人访问。 */
+  lastAccessAt: number | null;
+}
+
+/** 元素评论定位载荷（与 DesignSelection.elementPath 同构）；null = 整页评论。 */
+export interface DesignShareCommentTarget {
+  elementPath: number[];
+  tagName: string;
+  text: string;
+}
+
+export interface DesignShareComment {
+  id: string;
+  author: string;
+  body: string;
+  target: DesignShareCommentTarget | null;
+  createdAt: number;
+  /** null = 未解决。 */
+  resolvedAt: number | null;
+}
+
+/** 创建分享；服务端返回可直接打开的绝对地址（shareUrl 为主、lanUrls 尽力而为）。 */
+export function createDesignShare(
+  backendId: string,
+  input: {
+    sessionId: string;
+    snapshotId: string;
+    scope?: DesignShareScope;
+    /** null/缺省 = 永不过期；1..365 天。 */
+    expiresInDays?: number | null;
+    title?: string | null;
+  }
+): Promise<{ share: DesignShareSummary; shareUrl: string; lanUrls: string[] }> {
+  return apiCallForBackend<{ share: DesignShareSummary; shareUrl: string; lanUrls: string[] }>(
+    backendId,
+    '/api/design/shares',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }
+  );
+}
+
+/** 工作区分享列表（newest first）；entryPath 缺省为全部入口。 */
+export function listDesignShares(
+  backendId: string,
+  sessionId: string,
+  entryPath?: string
+): Promise<{ shares: DesignShareSummary[] }> {
+  const params = new URLSearchParams({ sessionId });
+  if (entryPath !== undefined) params.set('entryPath', entryPath);
+  return apiCallForBackend<{ shares: DesignShareSummary[] }>(
+    backendId,
+    `/api/design/shares?${params.toString()}`
+  );
+}
+
+/** 撤销分享：公开端点随即 404；重复撤销 → 409 SHARE_ALREADY_REVOKED。 */
+export function revokeDesignShare(
+  backendId: string,
+  input: { sessionId: string; shareId: string }
+): Promise<{ share: DesignShareSummary }> {
+  return apiCallForBackend<{ share: DesignShareSummary }>(
+    backendId,
+    `/api/design/shares/${encodeURIComponent(input.shareId)}/revoke`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: input.sessionId }),
+    }
+  );
+}
+
+/** 分享的评论列表（created_at 升序）。 */
+export function listDesignShareComments(
+  backendId: string,
+  input: { sessionId: string; shareId: string }
+): Promise<{ comments: DesignShareComment[] }> {
+  const params = new URLSearchParams({ sessionId: input.sessionId });
+  return apiCallForBackend<{ comments: DesignShareComment[] }>(
+    backendId,
+    `/api/design/shares/${encodeURIComponent(input.shareId)}/comments?${params.toString()}`
+  );
+}
+
+/** 所有者标记/取消解决评论（幂等）。 */
+export function setDesignShareCommentResolved(
+  backendId: string,
+  input: { sessionId: string; shareId: string; commentId: string; resolved: boolean }
+): Promise<{ comment: DesignShareComment }> {
+  return apiCallForBackend<{ comment: DesignShareComment }>(
+    backendId,
+    `/api/design/shares/${encodeURIComponent(input.shareId)}/comments/${encodeURIComponent(
+      input.commentId
+    )}/resolve`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: input.sessionId, resolved: input.resolved }),
+    }
+  );
+}
