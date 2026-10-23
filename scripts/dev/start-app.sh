@@ -48,6 +48,9 @@ source_env() {
 
 source_env "$PROJECT_ROOT/.env"
 source_env "$PROJECT_ROOT/.env.local"
+# Dev owns a separate Gateway credential; it overrides any inherited/shared
+# Gateway settings without putting the credential in the repository.
+source_env "$HOME/.zclaudia-dev/.env"
 
 # --- Soft warning for missing provider key (server starts fine but pi-agent will error on first message) ---
 if [[ -n "${OPENAI_BASE_URL:-}" && -z "${OPENAI_API_KEY:-}" ]]; then
@@ -291,7 +294,7 @@ start_tauri() {
   (
     cd "$PROJECT_ROOT"
     setup_node
-    ZCLAUDIA_DATA_DIR=/tmp/zclaudia-dev/ \
+    ZCLAUDIA_DATA_DIR="${ZCLAUDIA_DATA_DIR:-$HOME/.zclaudia-dev}" \
     ZCLAUDIA_CHANNEL=dev \
     PORT=3100 \
     SERVER_HOST=127.0.0.1 \
@@ -327,7 +330,13 @@ start_standalone() {
   build
 
   info "Starting server (tsx watch)..."
-  (cd "$PROJECT_ROOT/server" && setup_node && npx tsx watch src/index.ts) &
+  (
+    cd "$PROJECT_ROOT/server"
+    setup_node
+    ZCLAUDIA_DATA_DIR="${ZCLAUDIA_DATA_DIR:-$HOME/.zclaudia-dev}" \
+    ZCLAUDIA_CHANNEL=dev \
+    npx tsx watch src/index.ts
+  ) &
   SERVER_PID=$!
 
   info "Starting frontend (vite)..."
@@ -363,7 +372,7 @@ start_browser() {
   (
     cd "$PROJECT_ROOT"
     setup_node
-    ZCLAUDIA_DATA_DIR="${ZCLAUDIA_DATA_DIR:-$HOME/.zclaudia}" \
+    ZCLAUDIA_DATA_DIR="${ZCLAUDIA_DATA_DIR:-$HOME/.zclaudia-dev}" \
     ZCLAUDIA_CHANNEL="${ZCLAUDIA_CHANNEL:-dev}" \
     PORT="$BROWSER_PORT" \
     SERVER_HOST=127.0.0.1 \

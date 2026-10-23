@@ -53,6 +53,40 @@ test('start-app routes every pnpm call through the run_pnpm helper', () => {
   assert.doesNotMatch(script, /[^a-zA-Z_"]pnpm (install|build|dev|exec)/);
 });
 
+test('dedicated dev credentials override inherited and repository Gateway settings', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'dev-gateway-env-'));
+  try {
+    writeFileSync(path.join(root, '.env'), 'GATEWAY_SECRET=production-base\n');
+    writeFileSync(path.join(root, '.env.local'), 'GATEWAY_SECRET=production-local\n');
+    const devEnv = path.join(root, 'dev.env');
+    writeFileSync(devEnv, 'GATEWAY_SECRET=dedicated-dev\nZCLAUDIA_CHANNEL=dev\n');
+    const envSetup = script
+      .slice(script.indexOf('source_env() {'), script.indexOf('# --- Soft warning'))
+      .replace('$HOME/.zclaudia-dev/.env', '$DEV_TEST_ENV_FILE');
+    const result = spawnSync(
+      'bash',
+      [
+        '-c',
+        `set -euo pipefail
+        PROJECT_ROOT="$1"
+        DEV_TEST_ENV_FILE="$2"
+        info() { :; }
+        ${envSetup}
+        bash -c 'printf "%s\\n" "$GATEWAY_SECRET" "$ZCLAUDIA_CHANNEL"'`,
+        'test',
+        root,
+        devEnv,
+      ],
+      { encoding: 'utf8', env: { ...process.env, GATEWAY_SECRET: 'inherited-production' } }
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, 'dedicated-dev\ndev\n');
+    assert.equal(readFileSync(path.join(root, '.env'), 'utf8'), 'GATEWAY_SECRET=production-base\n');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test(
   'macOS cleanup stops a dev socket owner outside target/debug and preserves other instances',
   {

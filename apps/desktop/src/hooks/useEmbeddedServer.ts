@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Command, type Child } from '@tauri-apps/plugin-shell';
-import { appDataDir, resolveResource } from '@tauri-apps/api/path';
+import { appDataDir, homeDir, join, resolveResource } from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/core';
 import { useIsMounted } from './useIsMounted';
 
@@ -164,8 +164,9 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
         }
       }
 
-      // Use /tmp to avoid space issues in env vars with sidecar
-      const dataDir = '/tmp/zclaudia-dev/';
+      // Share the persistent dev profile with the dev launch scripts so a
+      // standalone dev window also uses its own saved Gateway credential.
+      const dataDir = await join(await homeDir(), '.zclaudia-dev');
       const serverPath = await resolveServerPath();
 
       console.log(`[EmbeddedServer] DEV mode: serverPath=${serverPath}, dataDir=${dataDir}`);
@@ -203,6 +204,12 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
           SERVER_HOST: '127.0.0.1',
           ZCLAUDIA_DATA_DIR: dataDir,
           ZCLAUDIA_CHANNEL: 'dev',
+          // Gateway environment settings inherited from the launching shell
+          // may belong to production. The dev profile's database owns these.
+          GATEWAY_URL: '',
+          GATEWAY_SECRET: '',
+          GATEWAY_NAME: '',
+          GATEWAY_NAMESPACE: '',
           ...shellNetworkEnv,
         },
       });

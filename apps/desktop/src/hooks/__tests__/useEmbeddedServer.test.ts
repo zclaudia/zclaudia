@@ -56,6 +56,8 @@ vi.mock('@tauri-apps/plugin-shell', () => ({
 
 vi.mock('@tauri-apps/api/path', () => ({
   appDataDir: vi.fn(() => Promise.resolve('/app/data')),
+  homeDir: vi.fn(() => Promise.resolve('/home/dev user')),
+  join: vi.fn((...parts: string[]) => Promise.resolve(parts.join('/'))),
   resolveResource: vi.fn(() => Promise.resolve('/app/resources/server.js')),
 }));
 
@@ -635,7 +637,7 @@ describe('hooks/useEmbeddedServer', () => {
   describe('dev mode server spawning', () => {
     // import.meta.env.DEV is true in vitest, so this is the default path
 
-    it('calls Command.sidecar with correct arguments', async () => {
+    it('starts the dev profile without inheriting production Gateway credentials', async () => {
       mockTauriInternals();
       mockFetch.mockRejectedValue(new Error('Not running'));
 
@@ -663,8 +665,12 @@ describe('hooks/useEmbeddedServer', () => {
           env: expect.objectContaining({
             PORT: '0',
             SERVER_HOST: '127.0.0.1',
-            ZCLAUDIA_DATA_DIR: '/tmp/zclaudia-dev/',
+            ZCLAUDIA_DATA_DIR: '/home/dev user/.zclaudia-dev',
             ZCLAUDIA_CHANNEL: 'dev',
+            GATEWAY_URL: '',
+            GATEWAY_SECRET: '',
+            GATEWAY_NAME: '',
+            GATEWAY_NAMESPACE: '',
           }),
         })
       );

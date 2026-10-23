@@ -143,6 +143,7 @@ cmd_run() {
   env \
     PORT="$PORT" \
     ZCLAUDIA_DATA_DIR="$DATA_DIR" \
+    ZCLAUDIA_CHANNEL=dev \
     NODE_ENV=production \
     node "$PROJECT_ROOT/server/dist/index.js" \
     > "$LOG_FILE" 2>&1 &
