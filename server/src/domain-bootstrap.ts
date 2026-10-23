@@ -19,6 +19,7 @@ import { createCommandsRoutes } from './interfaces/http/commands.js';
 import { createAgentRoutes } from './interfaces/http/agent.js';
 import { createClaudiaRoutes } from './interfaces/http/claudia.js';
 import { createDesignRoutes } from './interfaces/http/design.js';
+import { createDesignShareRoutes } from './interfaces/http/share-viewer.js';
 import { createDelegationRoutes } from './interfaces/http/delegation.js';
 import type { NotificationService } from './domains/notification-feed/index.js';
 import type { ProcessSupervisor } from './infra/services/process-supervisor.js';
@@ -218,6 +219,8 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
   app.use('/api/delegation', authMiddleware, createDelegationRoutes(db));
   app.use('/api/claudia', authMiddleware, createClaudiaRoutes(db));
   app.use('/api/design', authMiddleware, createDesignRoutes(db));
+  // 公开分享路由（/s/:token）：token 即权限，无会话鉴权（P7 §0.2）
+  app.use(createDesignShareRoutes(db));
 
   const {
     supervisorService,

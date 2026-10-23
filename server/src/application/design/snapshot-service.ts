@@ -501,16 +501,38 @@ export class SnapshotService {
     };
   }
 
-  /** Per-workspace cap (§6.1): delete the oldest rows beyond 500 (with their file rows). */
+  /**
+   * Per-workspace cap (§6.1): delete the oldest rows beyond 500 (with their
+   * file rows). Snapshots pinned by an unrevoked share (`design_shares`,
+   * P7 §3) are never prune candidates, so the limit acts as a history quota
+   * for unpinned history rather than a hard cap — the workspace total may
+   * transiently exceed 500 while pins hold. Expired-but-unrevoked shares
+   * still pin (the row remains reachable, so its content must not vanish).
+   * The blob sweep after capture needs no change: its referenced set is
+   * derived from all surviving file rows, so a pinned row keeps its blobs.
+   */
   private pruneOldest(workspaceRoot: string): void {
     const { count } = this.db
-      .prepare('SELECT COUNT(*) AS count FROM design_snapshots WHERE workspace_root = ?')
+      .prepare(
+        `SELECT COUNT(*) AS count FROM design_snapshots
+       WHERE workspace_root = ?
+         AND NOT EXISTS (
+           SELECT 1 FROM design_shares sh
+           WHERE sh.snapshot_id = design_snapshots.id AND sh.revoked_at IS NULL
+         )`
+      )
       .get(workspaceRoot) as { count: number };
     if (count <= MAX_SNAPSHOTS_PER_WORKSPACE) return;
     const excess = count - MAX_SNAPSHOTS_PER_WORKSPACE;
     const oldest = this.db
       .prepare(
-        'SELECT id FROM design_snapshots WHERE workspace_root = ? ORDER BY created_at ASC, rowid ASC LIMIT ?'
+        `SELECT id FROM design_snapshots
+       WHERE workspace_root = ?
+         AND NOT EXISTS (
+           SELECT 1 FROM design_shares sh
+           WHERE sh.snapshot_id = design_snapshots.id AND sh.revoked_at IS NULL
+         )
+       ORDER BY created_at ASC, rowid ASC LIMIT ?`
       )
       .all(workspaceRoot, excess) as Array<{ id: string }>;
     if (!oldest.length) return;

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { BlobStore } from '../../../infra/design/blob-store.js';
 import { migration as migration050 } from '../../../infra/storage/migrations/050_design_snapshots.js';
+import { migration as migration052 } from '../../../infra/storage/migrations/052_design_shares.js';
 import { DesignError } from '../design-service.js';
 import { RestoreService } from '../restore-service.js';
 import { MAX_SNAPSHOTS_PER_WORKSPACE, SnapshotService, sha256 } from '../snapshot-service.js';
@@ -57,6 +58,7 @@ describe('SnapshotService', () => {
       INSERT INTO projects VALUES ('pa', '${rootA}'), ('pb', '${rootB}');
       INSERT INTO sessions VALUES ('sa', 'pa', NULL), ('sa2', 'pa', NULL), ('sb', 'pb', NULL);`);
     db.exec(migration050.sql);
+    db.exec(migration052.sql); // design_shares: pruneOldest pins snapshots with unrevoked shares
     blobs = new BlobStore(path.join(temp, 'blobs-root'));
     snapshots = new SnapshotService(db, blobs);
     restores = new RestoreService(db, blobs, snapshots);
@@ -264,6 +266,128 @@ describe('SnapshotService', () => {
     expect(await blobs.hasBlob(straySha)).toBe(false);
     expect(captured.source).toBe('save');
   });
+
+  // —— P7 §3 snapshot pin：存在未撤销分享的快照永不进入裁剪候选 ——
+
+  /**
+   * Batch-seed minimal valid snapshot+file rows straight into the db: pruning
+   * only reads manifests, never blob content, so the fake blob need not exist.
+   */
+  function seedSnapshotRows(
+    prefix: string,
+    storedRoot: string,
+    from: number,
+    to: number,
+    baseCreatedAt = 0
+  ): void {
+    const insertSnapshot = db.prepare(
+      `INSERT INTO design_snapshots (id, workspace_root, session_id, entry_path, label, source, run_id, complete, incomplete_reasons, file_count, total_bytes, created_at)
+       VALUES (?, ?, 'sa', 'index.html', NULL, 'save', NULL, 1, '[]', 1, 4, ?)`
+    );
+    const insertFile = db.prepare(
+      `INSERT INTO design_snapshot_files (snapshot_id, path, sha256, bytes, kind, mime)
+       VALUES (?, 'index.html', ?, 4, 'entry', 'text/html')`
+    );
+    const fakeSha = 'ab'.repeat(32); // any valid 64-hex; never read as a blob
+    for (let i = from; i <= to; i++) {
+      insertSnapshot.run(`${prefix}-${i}`, storedRoot, baseCreatedAt + i);
+      insertFile.run(`${prefix}-${i}`, fakeSha);
+    }
+  }
+
+  function pinWithShare(shareId: string, storedRoot: string, snapshotId: string): void {
+    db.prepare(
+      `INSERT INTO design_shares (id, workspace_root, session_id, snapshot_id, token, title, scope, created_at)
+       VALUES (?, ?, 'sa', ?, ?, NULL, 'link', ?)`
+    ).run(shareId, storedRoot, snapshotId, `tok-${shareId}`, Date.now());
+  }
+
+  function snapshotIds(storedRoot: string): string[] {
+    return (
+      db.prepare('SELECT id FROM design_snapshots WHERE workspace_root = ?').all(storedRoot) as Array<{
+        id: string;
+      }>
+    ).map(row => row.id);
+  }
+
+  function fileRowCount(snapshotId: string): number {
+    return (
+      db.prepare('SELECT COUNT(*) AS count FROM design_snapshot_files WHERE snapshot_id = ?').get(
+        snapshotId
+      ) as { count: number }
+    ).count;
+  }
+
+  it('never prunes a snapshot pinned by an unrevoked share (P7 §3)', async () => {
+    await writeSite(rootA);
+    const storedRoot = await realpath(rootA);
+    seedSnapshotRows('pin-seed', storedRoot, 1, MAX_SNAPSHOTS_PER_WORKSPACE + 1);
+    pinWithShare('sh-pin', storedRoot, 'pin-seed-1'); // pins the oldest row
+
+    const captured = await snapshots.capture('sa', 'index.html', null, 'save');
+
+    // The pinned row and its file row survive although it is the oldest...
+    expect(snapshotIds(storedRoot).some(id => id === 'pin-seed-1')).toBe(true);
+    expect(fileRowCount('pin-seed-1')).toBe(1);
+    // ...while the quota still trims the oldest unpinned row: 502 rows
+    // (501 seeds + capture) minus the pinned one leave exactly one excess.
+    const ids = snapshotIds(storedRoot);
+    expect(ids).toHaveLength(MAX_SNAPSHOTS_PER_WORKSPACE + 1);
+    expect(ids.some(id => id === 'pin-seed-2')).toBe(false);
+    expect(fileRowCount('pin-seed-2')).toBe(0);
+    expect(ids.some(id => id === `pin-seed-${MAX_SNAPSHOTS_PER_WORKSPACE + 1}`)).toBe(true);
+    expect(ids.some(id => id === captured.id)).toBe(true);
+  });
+
+  it('prunes a formerly pinned snapshot once its share is revoked (P7 §3)', async () => {
+    await writeSite(rootA);
+    const storedRoot = await realpath(rootA);
+    seedSnapshotRows('rev-seed', storedRoot, 1, MAX_SNAPSHOTS_PER_WORKSPACE);
+    pinWithShare('sh-rev', storedRoot, 'rev-seed-1'); // pins the oldest row
+
+    // At the quota with the pin held: the capture leaves the oldest row alone.
+    const first = await snapshots.capture('sa', 'index.html', 'protected', 'save');
+    expect(snapshotIds(storedRoot).some(id => id === 'rev-seed-1')).toBe(true);
+
+    // Revocation lifts the pin; the next prune deletes the now-oldest rows.
+    db.prepare('UPDATE design_shares SET revoked_at = ? WHERE id = ?').run(Date.now(), 'sh-rev');
+    await writeFile(path.join(rootA, 'assets', 'site.css'), 'body { color: black; }');
+    const second = await snapshots.capture('sa', 'index.html', 'unprotected', 'save');
+
+    const ids = snapshotIds(storedRoot);
+    expect(ids.some(id => id === 'rev-seed-1')).toBe(false);
+    expect(fileRowCount('rev-seed-1')).toBe(0);
+    expect(ids.some(id => id === 'rev-seed-3')).toBe(true);
+    expect(ids.some(id => id === first.id)).toBe(true);
+    expect(ids.some(id => id === second.id)).toBe(true);
+    expect(ids).toHaveLength(MAX_SNAPSHOTS_PER_WORKSPACE);
+  });
+
+  it('keeps a pinned snapshot out of the blob sweep, so its blobs stay readable (P7 §3)', async () => {
+    await writeSite(rootA);
+    const storedRoot = await realpath(rootA);
+    const pinned = await snapshots.capture('sa', 'index.html', 'pinned', 'save');
+    const bg = (await snapshots.detail('sa', pinned.id)).files.find(
+      file => file.path === 'assets/bg.png'
+    );
+    expect(bg).toBeTruthy();
+    expect(await blobs.hasBlob(bg!.sha256)).toBe(true);
+    pinWithShare('sh-blob', storedRoot, pinned.id);
+
+    // Push the workspace over the quota with unpinned rows newer than the
+    // pinned snapshot, then capture to trigger prune + blob sweep.
+    seedSnapshotRows('sweep-seed', storedRoot, 1, MAX_SNAPSHOTS_PER_WORKSPACE, pinned.createdAt);
+    await writeFile(path.join(rootA, 'assets', 'site.css'), 'body { color: black; }');
+    await snapshots.capture('sa', 'index.html', 'trigger', 'save');
+
+    // The pinned snapshot's manifest rows survive, so its blobs stay
+    // referenced and survive sweepUnreferenced.
+    expect(fileRowCount(pinned.id)).toBe(pinned.fileCount);
+    expect(await blobs.hasBlob(bg!.sha256)).toBe(true);
+    expect(await blobs.readBlob(bg!.sha256)).toEqual(Buffer.from([1, 2, 3, 4]));
+    const served = await snapshots.readFile('sa', pinned.id, 'assets/bg.png');
+    expect(Buffer.from(served.data, 'base64')).toEqual(Buffer.from([1, 2, 3, 4]));
+  });
 });
 
 describe('RestoreService', () => {
@@ -284,6 +408,7 @@ describe('RestoreService', () => {
       INSERT INTO projects VALUES ('pa', '${rootA}');
       INSERT INTO sessions VALUES ('sa', 'pa', NULL);`);
     db.exec(migration050.sql);
+    db.exec(migration052.sql); // design_shares: pruneOldest pins snapshots with unrevoked shares
     blobs = new BlobStore(path.join(temp, 'blobs-root'));
     snapshots = new SnapshotService(db, blobs);
     restores = new RestoreService(db, blobs, snapshots);

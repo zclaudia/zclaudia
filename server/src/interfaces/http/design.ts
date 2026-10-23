@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type Database from 'better-sqlite3';
 import { createReadStream } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { resolveDataDir } from '../../infra/storage/db.js';
 import { BlobStore } from '../../infra/design/blob-store.js';
@@ -14,6 +15,7 @@ import { DepsService } from '../../application/design/deps-service.js';
 import { ExportService } from '../../application/design/export-service.js';
 import { SnapshotService } from '../../application/design/snapshot-service.js';
 import { RestoreService } from '../../application/design/restore-service.js';
+import { ShareService } from '../../application/design/share-service.js';
 import { TemplateService } from '../../application/design/template-service.js';
 import {
   MediaTaskService,
@@ -161,6 +163,27 @@ function buildVideoExecutor(service: DesignService): MediaTaskExecutor {
     })(execution, ctx);
 }
 
+/**
+ * 局域网分享 URL 尽力而为枚举（P7 §0.7/§5）：仅当服务绑定非回环
+ * （SERVER_HOST=0.0.0.0 或 ZCLAUDIA_ALLOW_LAN=1）时，枚举非 internal 的
+ * IPv4 地址拼 `/s/<token>`（端口取 PORT ?? 3100）；未启用时为空数组。
+ */
+function lanShareUrls(token: string): string[] {
+  if (process.env.SERVER_HOST !== '0.0.0.0' && process.env.ZCLAUDIA_ALLOW_LAN !== '1') {
+    return [];
+  }
+  const port = process.env.PORT ?? '3100';
+  const urls: string[] = [];
+  for (const interfaces of Object.values(os.networkInterfaces())) {
+    for (const entry of interfaces ?? []) {
+      if (entry.family === 'IPv4' && !entry.internal) {
+        urls.push(`http://${entry.address}:${port}/s/${token}`);
+      }
+    }
+  }
+  return urls;
+}
+
 export function createDesignRoutes(db: Database.Database, mediaDeps?: DesignMediaRoutesDeps): Router {
   const router = Router();
   const service = new DesignService(db);
@@ -171,6 +194,8 @@ export function createDesignRoutes(db: Database.Database, mediaDeps?: DesignMedi
   const exportService = new ExportService(db);
   const templates = new TemplateService(service);
   const brand = new BrandService(service);
+  // P7 §5 分享装配：与既有服务同款一行式（快照引用 + 公开 token 访问）。
+  const shares = new ShareService(db, service, blobs);
 
   // --- P6 媒体装配：mediaService 注入则完全绕开真装配（测试用）。 ---
   // MediaTaskService 惰性构造（首个媒体端点调用时才装配）：其构造期重启收尾
@@ -437,6 +462,69 @@ export function createDesignRoutes(db: Database.Database, mediaDeps?: DesignMedi
         }
       });
       stream.pipe(res);
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  // --- P7 §5 分享所有者路由：sessionId 鉴权在服务层；shareUrl/lanUrls 路由层拼。 ---
+  router.post('/shares', async (req: Request, res: Response) => {
+    try {
+      const { sessionId, ...input } = req.body ?? {};
+      const share = await shares.create(sessionId, input);
+      res.status(201).json({
+        success: true,
+        data: {
+          share,
+          shareUrl: `${req.protocol}://${req.get('host')}/s/${share.token}`,
+          lanUrls: lanShareUrls(share.token),
+        },
+      });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  router.get('/shares', async (req: Request, res: Response) => {
+    try {
+      res.json({
+        success: true,
+        data: { shares: await shares.list(req.query.sessionId, req.query.entryPath) },
+      });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  router.post('/shares/:id/revoke', async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.body ?? {};
+      res.json({ success: true, data: { share: await shares.revoke(sessionId, req.params.id) } });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  router.get('/shares/:id/comments', async (req: Request, res: Response) => {
+    try {
+      res.json({
+        success: true,
+        data: { comments: await shares.listComments(req.query.sessionId, req.params.id) },
+      });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  router.post('/shares/:id/comments/:commentId/resolve', async (req: Request, res: Response) => {
+    try {
+      const { sessionId, resolved } = req.body ?? {};
+      res.json({
+        success: true,
+        data: {
+          comment: await shares.setResolved(
+            sessionId,
+            req.params.id,
+            req.params.commentId,
+            resolved
+          ),
+        },
+      });
     } catch (error) {
       handleError(res, error);
     }

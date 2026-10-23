@@ -53,6 +53,7 @@ import { migration as m_048_project_additional_paths } from './048_project_addit
 import { migration as m_049_auto_title_config } from './049_auto_title_config.js';
 import { migration as m_050_design_snapshots } from './050_design_snapshots.js';
 import { migration as m_051_design_media_tasks } from './051_design_media_tasks.js';
+import { migration as m_052_design_shares } from './052_design_shares.js';
 
 export type { Migration };
 
@@ -108,6 +109,7 @@ export const migrations: Migration[] = [
   m_049_auto_title_config,
   m_050_design_snapshots,
   m_051_design_media_tasks,
+  m_052_design_shares,
 ];
 
 /**

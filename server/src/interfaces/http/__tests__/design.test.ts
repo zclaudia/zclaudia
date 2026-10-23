@@ -10,6 +10,7 @@ import path from 'node:path';
 import { createDesignRoutes, type DesignMediaRoutesDeps } from '../design.js';
 import { migration as migration050 } from '../../../infra/storage/migrations/050_design_snapshots.js';
 import { migration as migration051 } from '../../../infra/storage/migrations/051_design_media_tasks.js';
+import { migration as migration052 } from '../../../infra/storage/migrations/052_design_shares.js';
 import { DesignError } from '../../../application/design/design-service.js';
 import {
   MediaTaskService,
@@ -250,6 +251,7 @@ describe('design snapshot routes', () => {
       INSERT INTO projects VALUES ('pa', '${rootA}'), ('pb', '${rootB}');
       INSERT INTO sessions VALUES ('sa', 'pa', NULL), ('sa2', 'pa', NULL), ('sb', 'pb', NULL), ('sw', 'pa', '${rootB}');`);
     db.exec(migration050.sql);
+    db.exec(migration052.sql); // pruneOldest 引用 design_shares（P7 §3 pin）
     app = express();
     app.use(express.json({ limit: '3mb' }));
     app.use('/api/design', createDesignRoutes(db));
@@ -1314,5 +1316,282 @@ describe('design media routes real assembly', () => {
     // 失败任务不落任何产物文件。
     const assets = await request(app).get('/api/design/assets').query({ sessionId: 'sa' });
     expect(assets.body.data.files).toEqual([]);
+  });
+});
+
+describe('design share routes (P7)', () => {
+  let db: Database.Database;
+  let app: express.Express;
+  let temp: string;
+  let rootA: string;
+  let rootB: string;
+
+  const DAY_MS = 86_400_000;
+  let commentSeq = 0;
+
+  beforeEach(async () => {
+    temp = await mkdtemp(path.join(os.tmpdir(), 'design-share-api-'));
+    rootA = path.join(temp, 'a');
+    rootB = path.join(temp, 'b');
+    await mkdir(rootA);
+    await mkdir(rootB);
+    // Blob content must stay inside the test temp dir; LAN exposure off by default.
+    process.env.ZCLAUDIA_DATA_DIR = temp;
+    delete process.env.SERVER_HOST;
+    delete process.env.ZCLAUDIA_ALLOW_LAN;
+    db = new Database(':memory:');
+    db.exec(`CREATE TABLE projects (id TEXT PRIMARY KEY, root_path TEXT);
+      CREATE TABLE sessions (id TEXT PRIMARY KEY, project_id TEXT, working_directory TEXT);
+      INSERT INTO projects VALUES ('pa', '${rootA}'), ('pb', '${rootB}');
+      INSERT INTO sessions VALUES ('sa', 'pa', NULL), ('sb', 'pb', NULL), ('sw', 'pa', '${rootB}');`);
+    db.exec(migration050.sql);
+    db.exec(migration052.sql);
+    app = express();
+    app.use(express.json({ limit: '3mb' }));
+    app.use('/api/design', createDesignRoutes(db));
+  });
+
+  afterEach(async () => {
+    db.close();
+    delete process.env.ZCLAUDIA_DATA_DIR;
+    await rm(temp, { recursive: true, force: true });
+  });
+
+  async function seedSite(): Promise<void> {
+    await mkdir(path.join(rootA, 'assets'), { recursive: true });
+    await mkdir(path.join(rootA, 'pages'), { recursive: true });
+    await writeFile(
+      path.join(rootA, 'index.html'),
+      '<html><head><link rel="stylesheet" href="assets/site.css"></head><body><p>v1</p></body></html>'
+    );
+    await writeFile(path.join(rootA, 'assets', 'site.css'), 'p { color: red; }');
+    await writeFile(
+      path.join(rootA, 'pages', 'about.html'),
+      '<html><body><p>about</p></body></html>'
+    );
+  }
+
+  /** 经真实快照路由（真实 SnapshotService）建快照，返回 snapshotId。 */
+  async function captureSnapshot(sessionId: string, entryPath: string): Promise<string> {
+    const captured = await request(app)
+      .post('/api/design/snapshots')
+      .send({ sessionId, path: entryPath, label: 'v1' });
+    expect(captured.status).toBe(200);
+    return captured.body.data.id as string;
+  }
+
+  async function createShare(input: {
+    sessionId?: string;
+    snapshotId: string;
+    scope?: string;
+    expiresInDays?: number | null;
+    title?: string;
+  }): Promise<request.Response> {
+    return request(app)
+      .post('/api/design/shares')
+      .send({ sessionId: 'sa', ...input });
+  }
+
+  /** 直插 design_share_comments（评论内容已由 S1 服务测试覆盖，这里只造数）。 */
+  function insertComment(
+    shareId: string,
+    body: string,
+    options?: { target?: unknown; createdAtOffsetMs?: number }
+  ): string {
+    const id = `sc-test-${++commentSeq}`;
+    db.prepare(
+      `INSERT INTO design_share_comments (id, share_id, author, body, target_json, created_at, resolved_at)
+       VALUES (?, ?, ?, ?, ?, ?, NULL)`
+    ).run(
+      id,
+      shareId,
+      'Reviewer',
+      body,
+      options?.target === undefined ? null : JSON.stringify(options.target),
+      Date.now() + (options?.createdAtOffsetMs ?? 0)
+    );
+    return id;
+  }
+
+  it('creates a share with the request host URL, trimmed title and default 7-day expiry', async () => {
+    await seedSite();
+    const snapshotId = await captureSnapshot('sa', 'index.html');
+    const before = Date.now();
+    const created = await request(app)
+      .post('/api/design/shares')
+      .set('Host', 'design.test:4310')
+      .send({ sessionId: 'sa', snapshotId, expiresInDays: 7, title: '  Alpha landing  ' });
+    const after = Date.now();
+    expect(created.status).toBe(201);
+    expect(created.body.success).toBe(true);
+
+    const { share, shareUrl, lanUrls } = created.body.data;
+    expect(share).toMatchObject({
+      snapshotId,
+      entryPath: 'index.html',
+      title: 'Alpha landing',
+      scope: 'link',
+      revokedAt: null,
+      commentCount: 0,
+      lastAccessAt: null,
+    });
+    expect(share.id).toMatch(/^sh/);
+    // token = base64url(32 字节) = 43 字符。
+    expect(share.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    // shareUrl 按请求 host 拼绝对地址。
+    expect(shareUrl).toBe(`http://design.test:4310/s/${share.token}`);
+    // SERVER_HOST / ZCLAUDIA_ALLOW_LAN 均未设 → 无局域网地址。
+    expect(lanUrls).toEqual([]);
+
+    expect(share.createdAt).toBeGreaterThanOrEqual(before);
+    expect(share.createdAt).toBeLessThanOrEqual(after);
+    const span = (share.expiresAt as number) - share.createdAt;
+    expect(span).toBeGreaterThanOrEqual(7 * DAY_MS);
+    expect(span).toBeLessThan(7 * DAY_MS + 10);
+  });
+
+  it('validates create inputs and maps unknown or foreign snapshots to 404', async () => {
+    await seedSite();
+    const snapshotId = await captureSnapshot('sa', 'index.html');
+
+    for (const bad of [
+      { scope: 'world' },
+      { expiresInDays: 0 },
+      { expiresInDays: 366 },
+      { title: 'x'.repeat(121) },
+    ]) {
+      const invalid = await createShare({ snapshotId, ...bad });
+      expect(invalid.status).toBe(400);
+      expect(invalid.body.error.code).toBe('SHARE_VALIDATION');
+    }
+
+    const missing = await createShare({ snapshotId: 'snap-absent' });
+    expect(missing.status).toBe(404);
+    expect(missing.body.error.code).toBe('SNAPSHOT_NOT_FOUND');
+
+    await writeFile(path.join(rootB, 'index.html'), '<html><body><p>B</p></body></html>');
+    const foreignSnapshotId = await captureSnapshot('sb', 'index.html');
+    const foreign = await createShare({ snapshotId: foreignSnapshotId });
+    expect(foreign.status).toBe(404);
+    expect(foreign.body.error.code).toBe('SNAPSHOT_NOT_FOUND');
+  });
+
+  it('lists shares newest first, filters by entryPath and isolates per workspace', async () => {
+    await seedSite();
+    const homeSnapshot = await captureSnapshot('sa', 'index.html');
+    const aboutSnapshot = await captureSnapshot('sa', 'pages/about.html');
+    const home = (await createShare({ snapshotId: homeSnapshot })).body.data.share;
+    const about = (await createShare({ snapshotId: aboutSnapshot })).body.data.share;
+
+    const all = await request(app).get('/api/design/shares').query({ sessionId: 'sa' });
+    expect(all.status).toBe(200);
+    expect(all.body.data.shares.map((entry: { id: string }) => entry.id)).toEqual([
+      about.id,
+      home.id,
+    ]);
+
+    const filtered = await request(app)
+      .get('/api/design/shares')
+      .query({ sessionId: 'sa', entryPath: 'pages/about.html' });
+    expect(filtered.body.data.shares.map((entry: { id: string }) => entry.id)).toEqual([about.id]);
+
+    const other = await request(app).get('/api/design/shares').query({ sessionId: 'sb' });
+    expect(other.body.data.shares).toEqual([]);
+  });
+
+  it('revokes once, rejects repeats with 409 and cross-workspace owners with 404', async () => {
+    await seedSite();
+    const snapshotId = await captureSnapshot('sa', 'index.html');
+    const share = (await createShare({ snapshotId })).body.data.share;
+
+    const revoked = await request(app)
+      .post(`/api/design/shares/${share.id}/revoke`)
+      .send({ sessionId: 'sa' });
+    expect(revoked.status).toBe(200);
+    expect(revoked.body.data.share.revokedAt).not.toBeNull();
+
+    const repeat = await request(app)
+      .post(`/api/design/shares/${share.id}/revoke`)
+      .send({ sessionId: 'sa' });
+    expect(repeat.status).toBe(409);
+    expect(repeat.body.error.code).toBe('SHARE_ALREADY_REVOKED');
+
+    // sw 与 sa 同项目但工作目录指向 rootB → 跨工作区 404。
+    const cross = await request(app)
+      .post(`/api/design/shares/${share.id}/revoke`)
+      .send({ sessionId: 'sw' });
+    expect(cross.status).toBe(404);
+    expect(cross.body.error.code).toBe('SHARE_NOT_FOUND');
+
+    const unknown = await request(app)
+      .post('/api/design/shares/sh-absent/revoke')
+      .send({ sessionId: 'sa' });
+    expect(unknown.status).toBe(404);
+    expect(unknown.body.error.code).toBe('SHARE_NOT_FOUND');
+  });
+
+  it('lists comments ascending with parsed targets and resolves idempotently', async () => {
+    await seedSite();
+    const snapshotId = await captureSnapshot('sa', 'index.html');
+    const share = (await createShare({ snapshotId })).body.data.share;
+    const firstId = insertComment(share.id, '整页意见', { createdAtOffsetMs: -2000 });
+    const secondId = insertComment(share.id, '这个标题字号偏大', {
+      createdAtOffsetMs: -1000,
+      target: { elementPath: [0, 1], tagName: 'p', text: 'v1' },
+    });
+    const thirdId = insertComment(share.id, '按钮颜色再亮一点');
+
+    const listed = await request(app)
+      .get(`/api/design/shares/${share.id}/comments`)
+      .query({ sessionId: 'sa' });
+    expect(listed.status).toBe(200);
+    expect(listed.body.data.comments.map((comment: { id: string }) => comment.id)).toEqual([
+      firstId,
+      secondId,
+      thirdId,
+    ]);
+    expect(listed.body.data.comments[0].target).toBeNull();
+    expect(listed.body.data.comments[0].resolvedAt).toBeNull();
+    expect(listed.body.data.comments[1].target).toEqual({
+      elementPath: [0, 1],
+      tagName: 'p',
+      text: 'v1',
+    });
+
+    const resolved = await request(app)
+      .post(`/api/design/shares/${share.id}/comments/${firstId}/resolve`)
+      .send({ sessionId: 'sa', resolved: true });
+    expect(resolved.status).toBe(200);
+    const resolvedAt: number = resolved.body.data.comment.resolvedAt;
+    expect(resolvedAt).not.toBeNull();
+
+    // 幂等：重复置 true 返回同一 resolvedAt，不重写时间戳。
+    const again = await request(app)
+      .post(`/api/design/shares/${share.id}/comments/${firstId}/resolve`)
+      .send({ sessionId: 'sa', resolved: true });
+    expect(again.status).toBe(200);
+    expect(again.body.data.comment.resolvedAt).toBe(resolvedAt);
+
+    const unresolved = await request(app)
+      .post(`/api/design/shares/${share.id}/comments/${firstId}/resolve`)
+      .send({ sessionId: 'sa', resolved: false });
+    expect(unresolved.status).toBe(200);
+    expect(unresolved.body.data.comment.resolvedAt).toBeNull();
+
+    const unknownComment = await request(app)
+      .post(`/api/design/shares/${share.id}/comments/sc-absent/resolve`)
+      .send({ sessionId: 'sa', resolved: true });
+    expect(unknownComment.status).toBe(404);
+    expect(unknownComment.body.error.code).toBe('SHARE_COMMENT_NOT_FOUND');
+  });
+
+  it('omits lanUrls when LAN exposure is not enabled', async () => {
+    await seedSite();
+    const snapshotId = await captureSnapshot('sa', 'index.html');
+    const created = await createShare({ snapshotId });
+    expect(created.status).toBe(201);
+    expect(created.body.data.lanUrls).toEqual([]);
+    // 缺省 expiresInDays → 永不过期。
+    expect(created.body.data.share.expiresAt).toBeNull();
   });
 });
