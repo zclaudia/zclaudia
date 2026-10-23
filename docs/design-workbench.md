@@ -89,6 +89,19 @@
 - **传输**：任务结果经专用端点二进制流式下载（Content-Disposition 附件，不经 base64 JSON）；客户端下载落盘，视频以 blob 内存组装（≤256 MiB）内嵌 `<video>` 预览。
 - 待补验证（手工门槛）：真实付费图片服务（CogView/OpenAI）生成、编辑与替换到页面冒烟；macOS Tauri 内嵌服务端的视频渲染实测（Chrome + ffmpeg 就绪机器）；费用与服务控制台用量核对。
 
+## P7 分享与审阅（2026-10-24）
+
+工具栏新增 **分享** 入口（需存在打开且非 loading 的活动页）：把作品某个不可变版本快照发布为 `/s/<token>` 能力链接供评审者浏览与评论，评审评论可一键交接给 Agent 修改并自动形成新恢复点，设计与验收细节见 [P7 实现设计](plans/2026-10-24-design-workbench-p7-implementation.md)：
+
+- **不可变分享**：分享引用 P1 内容寻址快照（不复制第二套作品库），旧分享不随本地修改变化；存在未撤销分享的快照在 500 条裁剪中被 pin 保留；撤销与未知 token 一律 404（不区分存在性）、已过期 410；撤销不删除内容（可再出新分享，v1 无恢复撤销）。
+- **访问范围与身份**：`link`（任何持有 token 者）/`local`（仅本机访问者）两档 scope；token 为 256 位随机（知悉链接即权限），无账号体系，评审者自报姓名（缺省「匿名」）；创建响应给出绝对 shareUrl 与尽力而为的局域网地址。
+- **静态分享视图**：`/s/<token>` 单页（无框架、无外链资源），iframe `sandbox="allow-same-origin"` 无 `allow-scripts` 且文件端点 CSP `default-src 'none'`——作品脚本永不执行，表单、弹窗与链接跳转被拦截并提示；文件仅限清单内路径（穿越与清单外 404），不暴露本机绝对路径、sessionId，无任何列举端点。
+- **元素评论与失效判定**：评审者在视图内点击元素发表评论，定位载荷（elementPath/tagName/text）与桌面选区同构；桌面侧对新版本源码做严格匹配（路径越界/标签不符/文本不符即失效并显示原因徽章），绝不静默挂到其他元素；评论无通知，面板手动刷新；所有者可标记解决（v1 无评论编辑/删除）。
+- **交接 Agent**：评论列表「交给 Agent 修改」把评论原文、分享版本、快照与当前两版的定位结果（快照片段或失效原因）与任务指令组装为中文 prompt 填入当前聊天；定位失效也允许交接，但明确要求 Agent 修改前自证定位；Agent 写入后的新恢复点由既有 run 反馈自动快照（P4.5）承担。
+- **端点清单**：公开侧（无会话鉴权，token 即授权）`GET /s/:token` 视图 HTML、`GET /s/:token/manifest.json` 清单、`GET /s/:token/f/*` 清单内文件、`GET|POST /s/:token/comments` 评论读写；所有者侧 `POST /api/design/shares` 创建、`GET /api/design/shares` 列表、`POST /api/design/shares/:id/revoke` 撤销、`GET /api/design/shares/:id/comments` 评论读取、`POST /api/design/shares/:id/comments/:commentId/resolve` 解决切换。
+- 已知边界：分享为单入口快照（该入口 HTML 的资源闭包，不打包工作区其他页面，快照内链接跳转在分享视图被拦截）；无账号与更细权限粒度；评论无通知/推送（手动刷新）；局域网访问需 `SERVER_HOST=0.0.0.0` 或 `ZCLAUDIA_ALLOW_LAN=1`（此时该客户端其余 `/api` 仍需 Bearer，仅 `/s/*` 凭 token）；撤销后内容保留（行与 blob 由 pin 保住）；不完整快照可分享但如实标注 incompleteReasons；多人同时编辑（P7.4）仅评估不实现——维持单人编辑 + 快照审阅闭环，触发重评条件与方案对比见 P7 实现文档 §9。
+- 待补验证（手工门槛）：真实第二客户端 LAN 冒烟（`SERVER_HOST=0.0.0.0` 下另一设备打开分享链接、浏览、评论）；macOS Tauri 内嵌服务端创建分享并由系统浏览器访问。
+
 ## 模块边界
 
 - `apps/desktop/src/features/design/`：面板与组件（多页标签/视口/总览/导出对话框/元素结构树/模板对话框/品牌面板/素材库/上下文检视，以及 P5 的幻灯片面板/播放器/渲染导出对话框与 P6 的媒体生成面板 `components/MediaGenPanel.tsx` + 媒体任务 hook `media-task-client.ts`）、静态预览（含选区导航桥接）、交互运行预览（`interactive.ts`：运行 CSP/桥接/存储 shim/脚本内联）、deck 纯逻辑（`deck.ts`：解析/排序/增删/备注/比例/播放过滤）、客户端渲染导出（`render-export.ts`、`pdf.ts`）、精确编辑引擎（`html/`：样式/属性/结构操作与值校验）、撤销历史（`history/`）、行差异（`diff.ts`）、多页工作台核心（`workspace/`：controller/storage/ports/source-lines）、元素树（`element-tree.ts`）、图片相对引用（`asset-ref.ts`）、品牌渲染与校验（`brand.ts`）、Agent 上下文组装（`agent-context.ts`）、run 结束监视（`agent-run-watch.ts`）、backend-aware API 客户端。
