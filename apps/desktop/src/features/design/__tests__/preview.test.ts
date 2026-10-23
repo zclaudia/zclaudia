@@ -3,6 +3,62 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { buildDesignPreview } from '../preview';
 
+const STYLE_KEYS = [
+  'font-family',
+  'font-size',
+  'font-weight',
+  'line-height',
+  'text-align',
+  'width',
+  'height',
+  'margin-top',
+  'margin-right',
+  'margin-bottom',
+  'margin-left',
+  'padding-top',
+  'padding-right',
+  'padding-bottom',
+  'padding-left',
+  'border-width',
+  'border-style',
+  'border-color',
+  'border-radius',
+  'object-fit',
+];
+
+interface BridgeHarness {
+  window: JSDOM['window'];
+  document: Document;
+  sent: Record<string, unknown>[];
+  post: (data: unknown) => void;
+  close: () => void;
+}
+
+async function openBridge(
+  source: string,
+  channel: string,
+  loadAsset: (path: string) => Promise<{ mimeType: string; data: string }> = async () => {
+    throw new Error('no assets');
+  }
+): Promise<BridgeHarness> {
+  const html = await buildDesignPreview(source, 'index.html', loadAsset, channel, 'bridge-rev');
+  const dom = new JSDOM(html, { runScripts: 'outside-only' });
+  const sent: Record<string, unknown>[] = [];
+  Object.defineProperty(dom.window, 'parent', {
+    configurable: true,
+    value: { postMessage: (message: unknown) => sent.push(message as Record<string, unknown>) },
+  });
+  dom.window.eval(dom.window.document.querySelector('script')?.textContent ?? '');
+  return {
+    window: dom.window,
+    document: dom.window.document,
+    sent,
+    post: (data: unknown) =>
+      dom.window.dispatchEvent(new dom.window.MessageEvent('message', { data })),
+    close: () => dom.window.close(),
+  };
+}
+
 describe('buildDesignPreview', () => {
   beforeEach(() => {
     vi.stubGlobal('crypto', {
@@ -158,5 +214,122 @@ describe('buildDesignPreview', () => {
     expect(sent).toHaveLength(2);
 
     dom.window.close();
+  });
+
+  it('click selections carry computed styles, whitelist attrs and the inline style attribute', async () => {
+    const harness = await openBridge(
+      '<body><p style="color: red" class="note">Styled</p><span>Plain</span></body>',
+      'styled-channel'
+    );
+    harness.document
+      .querySelector('p')
+      ?.dispatchEvent(new harness.window.MouseEvent('click', { bubbles: true }));
+
+    expect(harness.sent).toHaveLength(1);
+    const selection = harness.sent[0]?.selection as Record<string, unknown>;
+    expect(harness.sent[0]).toMatchObject({
+      type: 'zclaudia:design-select',
+      channel: 'styled-channel',
+      selection: {
+        elementPath: [0],
+        tagName: 'p',
+        base: 'bridge-rev',
+      },
+    });
+    // jsdom computes most layout keywords; unsupported keys (e.g. text-align here) stay absent.
+    const styles = selection.styles as Record<string, unknown>;
+    expect(Object.keys(styles).length).toBeGreaterThan(0);
+    for (const key of Object.keys(styles)) {
+      expect(STYLE_KEYS).toContain(key);
+      expect(typeof styles[key]).toBe('string');
+      expect((styles[key] as string).length).toBeLessThanOrEqual(120);
+    }
+    expect(styles['font-size']).toBe('medium');
+    expect(styles['object-fit']).toBe('fill');
+    expect(styles['text-align']).toBeUndefined();
+    expect(selection.inlineStyle).toBe('color: red');
+    expect(selection.attrs).toBeUndefined();
+    harness.close();
+  });
+
+  it('click selections of img/a elements carry only attributes the element actually has', async () => {
+    const harness = await openBridge(
+      '<body><a href="#section"><img src="a.png" alt="A picture"></a><a>No href</a></body>',
+      'attrs-channel',
+      async path => {
+        if (path === 'a.png') return { mimeType: 'image/png', data: 'YWJj' };
+        throw new Error('missing');
+      }
+    );
+    harness.document
+      .querySelector('img')
+      ?.dispatchEvent(new harness.window.MouseEvent('click', { bubbles: true }));
+    expect(harness.sent).toHaveLength(1);
+    const imgSelection = harness.sent[0]?.selection as Record<string, unknown>;
+    expect(imgSelection.tagName).toBe('img');
+    expect(imgSelection.attrs).toEqual({
+      src: 'data:image/png;base64,YWJj',
+      alt: 'A picture',
+    });
+
+    harness.document
+      .querySelectorAll('a')[1]
+      ?.dispatchEvent(new harness.window.MouseEvent('click', { bubbles: true }));
+    expect(harness.sent).toHaveLength(2);
+    const aSelection = harness.sent[1]?.selection as Record<string, unknown>;
+    expect(aSelection.tagName).toBe('a');
+    expect(aSelection.attrs).toBeUndefined();
+
+    harness.document
+      .querySelector('a')
+      ?.dispatchEvent(new harness.window.MouseEvent('click', { bubbles: true }));
+    expect(harness.sent).toHaveLength(3);
+    const linkSelection = harness.sent[2]?.selection as Record<string, unknown>;
+    expect(linkSelection.attrs).toEqual({ href: '#section' });
+    harness.close();
+  });
+
+  it('selects unmarked elements by path and answers failures for out-of-tree paths', async () => {
+    const harness = await openBridge(
+      '<body><main><p>Target</p><div style="width: 10px"></div></main></body>',
+      'path-channel'
+    );
+
+    harness.post({ type: 'zclaudia:design-select-path', channel: 'path-channel', elementPath: [0, 0] });
+    expect(harness.sent).toHaveLength(1);
+    const selection = harness.sent[0]?.selection as Record<string, unknown>;
+    expect(harness.sent[0]).toMatchObject({
+      type: 'zclaudia:design-select',
+      channel: 'path-channel',
+      selection: { elementPath: [0, 0], tagName: 'p', base: 'bridge-rev' },
+    });
+    // select-path has no saved-source text, so sourceText is omitted; styles still ride along.
+    expect('sourceText' in selection).toBe(false);
+    expect(Object.keys(selection.styles as Record<string, unknown>).length).toBeGreaterThan(0);
+    expect(harness.document.querySelector('p')?.style.outline).toBe('2px dashed #808080');
+    expect(harness.document.querySelector('p')?.style.outlineOffset).toBe('3px');
+
+    // A second selection restores the previously highlighted element's outline.
+    harness.post({ type: 'zclaudia:design-select-path', channel: 'path-channel', elementPath: [0] });
+    expect(harness.sent).toHaveLength(2);
+    expect((harness.sent[1]?.selection as Record<string, unknown>).tagName).toBe('main');
+    expect(harness.document.querySelector('p')?.style.outline).toBe('');
+    expect(harness.document.querySelector('main')?.style.outline).toBe('2px dashed #808080');
+
+    // Out-of-tree paths report failure; malformed payloads and wrong channels stay silent.
+    harness.post({ type: 'zclaudia:design-select-path', channel: 'path-channel', elementPath: [9, 9] });
+    expect(harness.sent).toHaveLength(3);
+    expect(harness.sent[2]).toEqual({
+      type: 'zclaudia:design-select-failed',
+      channel: 'path-channel',
+      reason: 'not-found',
+    });
+
+    harness.post({ type: 'zclaudia:design-select-path', channel: 'other', elementPath: [0] });
+    harness.post({ type: 'zclaudia:design-select-path', channel: 'path-channel', elementPath: 'nope' });
+    harness.post({ type: 'zclaudia:design-select-path', channel: 'path-channel', elementPath: [-1] });
+    harness.post({ type: 'zclaudia:design-select-path', channel: 'path-channel', elementPath: [0.5] });
+    expect(harness.sent).toHaveLength(3);
+    harness.close();
   });
 });

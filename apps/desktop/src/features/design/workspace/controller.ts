@@ -93,6 +93,12 @@ function editErrorMessage(error: unknown): string {
       return '颜色值无效，请输入合法的 CSS 颜色';
     case 'EMPTY_TRANSACTION':
       return '没有需要应用的修改';
+    case 'ATTRIBUTE_NOT_ALLOWED':
+      return '该元素不支持修改此属性（src/alt 仅图片，href 仅链接）';
+    case 'STRUCTURE_NOT_ALLOWED':
+      return '该结构操作在此元素上不可用（可能混用了其他修改，或没有可交换的相邻元素）';
+    case 'ANCHOR_REFERENCED':
+      return '此元素（或其子元素）的 id 被页面锚点引用，删除会断开链接；请先处理引用';
     default:
       return errorMessage(error);
   }

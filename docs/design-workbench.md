@@ -46,9 +46,20 @@
 - 写入边界新增 `createIfMissing`（重建保存走同一临时文件+终检+原子替换路径）；错误码新增 `EXPORT_INCOMPLETE`/`EXPORT_LIMIT_EXCEEDED`（含 CSS 深度超限）。
 - 待补：真实 Agent + macOS Tauri 冒烟（三页作品全流程、设备视口实机、ZIP 离线解包）、远端 backend 验证。
 
+## P3 扩展可视编辑（2026-10-23，P3.1–P3.4）
+
+可视编辑从文字/双色扩展为日常排版能力，全部继续经过 P1 事务管线（撤销/保存/冲突语义继承），设计与验收细节见 [P3 实现设计](plans/2026-10-23-design-workbench-p3-implementation.md)：
+
+- **排版与盒模型**：24 属性白名单（字体/字号/行高/字重/对齐/宽高/内外边距/边框三件套/圆角/颜色），逐属性单位与范围校验（多值简写、负 margin、auto、关键字集），每属性可清除 inline 覆盖；编辑器按计算样式预填并标注「内联」徽标；简写与长写共存按 CSS 后写者胜。
+- **图片与链接**：`src`（工作区图片清单选择 `GET /api/design/assets` + 相对路径换算，保持可移植）、`alt`、`object-fit`、`href`（拒 javascript:/data:/vbscript:）；链接文字沿用文字编辑。
+- **元素导航**：父级/子级按钮 + 元素结构树（源码构建，含 id/class/文本预览、SVG/隐式/超深能力边界中文原因、截断标记），经 `zclaudia:design-select-path` 桥接消息高亮并回发标准选区（携带计算样式/白名单属性/inline style）；伪元素与脚本生成节点不出现（能力边界明示）。
+- **受限结构修改**：复制（副本 id 全量 `-copy` 去重 + 内部锚点同步重写）、删除（子树 id 被子树外锚点引用即拒绝 `ANCHOR_REFERENCED`，删除后选父级）、上移/下移（同父级交换，中间字节保持）；结构操作独占事务，一次操作一条撤销记录，修改后自动重选刷新定位。
+- **覆盖提示扩展**：应用后自动重选并按属性对比表核对计算样式（颜色等价、关键字、纯 px 数值、font-weight 归一；无可靠口径的键跳过），失配显示既有 override 提示；纯颜色应用沿用 verify 回路。
+- 错误码新增 `ATTRIBUTE_NOT_ALLOWED`/`STRUCTURE_NOT_ALLOWED`/`ANCHOR_REFERENCED`；P3.5（CSS 来源编辑）为独立后续批次。
+
 ## 模块边界
 
-- `apps/desktop/src/features/design/`：面板与组件（多页标签/视口/总览/导出对话框）、静态预览、精确编辑引擎（`html/`）、撤销历史（`history/`）、行差异（`diff.ts`）、多页工作台核心（`workspace/`：controller/storage/ports/source-lines）、backend-aware API 客户端。
+- `apps/desktop/src/features/design/`：面板与组件（多页标签/视口/总览/导出对话框/元素结构树）、静态预览（含选区导航桥接）、精确编辑引擎（`html/`：样式/属性/结构操作与值校验）、撤销历史（`history/`）、行差异（`diff.ts`）、多页工作台核心（`workspace/`：controller/storage/ports/source-lines）、元素树（`element-tree.ts`）、图片相对引用（`asset-ref.ts`）、backend-aware API 客户端。
 - `apps/desktop/src/plugins/builtinPanels.ts`：原生内置面板注册。
 - `server/src/application/design/design-service.ts`：从会话解析工作目录、限定文件访问、版本校验和保存（含 allowCreate 重建）。
 - `server/src/application/design/snapshot-service.ts`、`restore-service.ts`、`resource-graph.ts`：快照捕获/清单、分阶段恢复、HTML/CSS 资源引用图。
@@ -72,6 +83,8 @@ bash scripts/with-project-node.sh env E2E_BROWSER_CHANNEL=chrome pnpm exec playw
 P1 单元/接口测试覆盖：逐字节源码保留、重复节点与过期选区拒绝、隐式节点与重复属性拒绝、撤销/重做与保存边界、并发写入互斥与过期修订拒绝、快照捕获/去重/隔离、恢复冲突与中断三段报告、路径越界与错误 snapshotId 防护（证据见 [P1 实现设计 §8.7](plans/2026-10-23-design-workbench-p1-implementation.md)）。
 
 P2 测试覆盖（desktop 220 + server 69 + fileDownload 30，全绿；双端 tsc/eslint 与 react-lifecycle/radius 约束检查通过）：多页打开/编辑/保存互不串扰、8 页上限与 LRU 淘汰、身份隔离与 dispose 陈旧防护、missing/allowCreate 重建、deps stat 变化触发预览重建、可见门控与消息指纹去抖轮询、视口与缩放互不干预、导出解包相对路径原位与清单一致、缺资源 409 与 confirmIncomplete 放行、draft/disk 模式与版本钉（证据见 [P2 实现设计 §10](plans/2026-10-23-design-workbench-p2-implementation.md)）。
+
+P3 测试覆盖（desktop 435 + server 72 + fileDownload 30，全绿；双端 tsc 0 错、eslint 0 error、lifecycle/radius 通过）：24 属性校验逐类合法/非法样本、简写/长写共存与清除语义、无关字节逐字节保持、属性标签匹配拒绝、duplicate 的 id 去重与内部锚点重写、delete 锚点引用拒绝与选父级、move 交换公式与首末拒绝、结构操作混用/根元素拒绝、桥接 select 载荷与 select-path/select-failed 回路、树 capability/truncated/childElementPath、表单分组渲染与预检拦截、图片清单选择与相对路径换算、应用后重选对比（含混合事务颜色失配锁定用例）、纯颜色 verify 回路回归（证据见 [P3 实现设计 §10](plans/2026-10-23-design-workbench-p3-implementation.md)）。
 
 2026-10-23 本机实测：在 macOS 的 Claudia Dev（Tauri 开发版）中，通过真实 Codex CLI 会话生成 `design/index.html`、本地 CSS 和 5 个 SVG；设计面板自动发现并显示页面。点击纯文本主标题，修改文字与颜色，应用并保存后，直接检查磁盘 HTML 确认写入，再重新载入并重新选择标题，确认文字及计算颜色仍然一致。体验项目位于 `/Users/zhvala/SourceCode/zclaudia-design-demo`，会话名为 `Codex · 设计闭环体验`。
 

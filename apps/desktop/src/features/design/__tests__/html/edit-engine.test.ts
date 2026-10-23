@@ -2,10 +2,17 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { attributeSpan, findElement, newAttributeInsertOffset, parseDocument, textChildSpan } from '../../html/parse';
+import { attributeSpan, elementSpan, findElement, newAttributeInsertOffset, parseDocument, textChildSpan } from '../../html/parse';
 import { applyEditTransaction } from '../../html/edit-engine';
 import { sha256HexSync } from '../../html/hash';
-import type { DesignEditErrorCode, DesignEditTransaction, DesignSelection } from '../../types';
+import type {
+  DesignAttributeName,
+  DesignEditErrorCode,
+  DesignEditTransaction,
+  DesignSelection,
+  DesignStyleProperty,
+  DesignStructureAction,
+} from '../../types';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
 const load = (name: string): string => readFileSync(join(fixtureDir, name), 'utf8');
@@ -551,5 +558,488 @@ describe('applyEditTransaction — chaining', () => {
     expect(result.selection.text).toBe(H1_TEXT);
     expect(result.selection.sourceText).toBe(H1_TEXT);
     expect(result.selection.color).toBe('red');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P3 (L10): style whitelist, attribute and structure operations
+// ---------------------------------------------------------------------------
+
+const styleTxnP = (
+  source: string,
+  locator: DesignSelection,
+  property: DesignStyleProperty,
+  value: string | null
+): DesignEditTransaction => ({
+  baseRevision: sha(source),
+  locator,
+  operations: [{ kind: 'style', property, value }],
+});
+
+const plainLocator = (path: number[], tagName: string): DesignSelection => ({
+  elementPath: path,
+  tagName,
+  text: '',
+  sourceText: '',
+});
+
+const attributeTxn = (
+  source: string,
+  locator: DesignSelection,
+  name: DesignAttributeName,
+  value: string | null
+): DesignEditTransaction => ({
+  baseRevision: sha(source),
+  locator,
+  operations: [{ kind: 'attribute', name, value }],
+});
+
+const structureTxn = (
+  source: string,
+  locator: DesignSelection,
+  action: DesignStructureAction
+): DesignEditTransaction => ({
+  baseRevision: sha(source),
+  locator,
+  operations: [{ kind: 'structure', action }],
+});
+
+describe('applyEditTransaction — P3 style whitelist', () => {
+  const simple = (): DesignSelection => ({
+    elementPath: [0, 0],
+    tagName: 'p',
+    text: 'hi',
+    sourceText: 'hi',
+  });
+
+  it.each([
+    ['font-family', 'JetBrains Mono, monospace'],
+    ['font-size', '1.25rem'],
+    ['font-weight', 'bold'],
+    ['line-height', '1.5'],
+    ['text-align', 'center'],
+    ['color', '#369'],
+    ['background-color', 'rgb(1, 2, 3)'],
+    ['width', 'auto'],
+    ['height', '50vh'],
+    ['margin', '8px 12px'],
+    ['margin-top', '-4px'],
+    ['padding', '0'],
+    ['padding-top', '2em'],
+    ['border-width', '1px 2px'],
+    ['border-style', 'dashed'],
+    ['border-color', 'red'],
+    ['border-radius', '4px'],
+    ['object-fit', 'cover'],
+  ])('writes %s: %s into a fresh style attribute, byte-exactly', async (property, value) => {
+    const before = '<main><p>hi</p></main>';
+    const result = await applyEditTransaction(before, styleTxnP(before, simple(), property, value));
+    // Byte-exact: everything outside the inserted attribute is unchanged.
+    expect(result.source).toBe(`<main><p style="${property}: ${value}">hi</p></main>`);
+    expect(result.revision).toBe(sha(result.source));
+  });
+
+  it('does not mirror non-color style values into the selection', async () => {
+    const before = load('cascade.html');
+    const locator: DesignSelection = {
+      elementPath: [1],
+      tagName: 'p',
+      text: 'multi declaration',
+      sourceText: 'multi declaration',
+    };
+    const result = await applyEditTransaction(before, styleTxnP(before, locator, 'margin-top', '4px'));
+    expect(result.selection).toEqual({
+      elementPath: [1],
+      tagName: 'p',
+      text: 'multi declaration',
+      sourceText: 'multi declaration',
+      base: result.revision,
+    });
+  });
+
+  it('appends margin-top after an existing margin shorthand (later writer wins)', async () => {
+    const before = load('cascade.html');
+    const locator: DesignSelection = {
+      elementPath: [1],
+      tagName: 'p',
+      text: 'multi declaration',
+      sourceText: 'multi declaration',
+    };
+    const result = await applyEditTransaction(before, styleTxnP(before, locator, 'margin-top', '4px'));
+    const attrSpan = attributeSpan(findElement(parseDocument(before).document, [1])!, 'style')!;
+    expect(before.slice(attrSpan.start, attrSpan.end)).toBe('style="color: blue; margin : 0"');
+    expect(result.source).toBe(
+      `${before.slice(0, attrSpan.start)}style="color: blue; margin : 0; margin-top: 4px"${before.slice(attrSpan.end)}`
+    );
+  });
+
+  it('clearing a missing margin-top above a margin shorthand is a no-op (EMPTY_TRANSACTION)', async () => {
+    const before = load('cascade.html');
+    const locator: DesignSelection = {
+      elementPath: [1],
+      tagName: 'p',
+      text: 'multi declaration',
+      sourceText: 'multi declaration',
+    };
+    await expectErrorCode(
+      () => applyEditTransaction(before, styleTxnP(before, locator, 'margin-top', null)),
+      'EMPTY_TRANSACTION'
+    );
+  });
+
+  it('clearing the margin shorthand removes the whole declaration', async () => {
+    const before = load('cascade.html');
+    const locator: DesignSelection = {
+      elementPath: [1],
+      tagName: 'p',
+      text: 'multi declaration',
+      sourceText: 'multi declaration',
+    };
+    const result = await applyEditTransaction(before, styleTxnP(before, locator, 'margin', null));
+    expect(result.source).toContain('<p class="multi" style="color: blue">');
+  });
+
+  it('validates non-color values through the per-property rules (INVALID_VALUE)', async () => {
+    const before = load('basic.html');
+    await expectErrorCode(
+      () => applyEditTransaction(before, styleTxnP(before, h1Locator(), 'font-size', 'xx')),
+      'INVALID_VALUE'
+    );
+    await expectErrorCode(
+      () => applyEditTransaction(before, styleTxnP(before, h1Locator(), 'margin', '-1px auto bogus')),
+      'INVALID_VALUE'
+    );
+  });
+
+  it('keeps the original keyword spelling (case-insensitive match)', async () => {
+    const before = '<main><p>hi</p></main>';
+    const result = await applyEditTransaction(before, styleTxnP(before, simple(), 'text-align', 'CENTER'));
+    expect(result.source).toBe('<main><p style="text-align: CENTER">hi</p></main>');
+  });
+});
+
+describe('applyEditTransaction — attribute operations', () => {
+  const imgLocator = (attrs?: DesignSelection['attrs']): DesignSelection => ({
+    elementPath: [1, 1],
+    tagName: 'img',
+    text: '',
+    ...(attrs ? { attrs } : {}),
+  });
+
+  it('replaces an existing attribute in place and escapes the value', async () => {
+    const before = load('basic.html');
+    const result = await applyEditTransaction(before, attributeTxn(before, imgLocator(), 'alt', 'Coffee & Co logo'));
+    const span = attributeSpan(findElement(parseDocument(before).document, [1, 1])!, 'alt')!;
+    expect(before.slice(span.start, span.end)).toBe('alt="logo"');
+    expect(result.source).toBe(
+      `${before.slice(0, span.start)}alt="Coffee &amp; Co logo"${before.slice(span.end)}`
+    );
+    expect(result.selection.attrs).toEqual({ alt: 'Coffee & Co logo' });
+    expect(result.selection.base).toBe(result.revision);
+  });
+
+  it('inserts a new attribute after the last existing attribute', async () => {
+    const before = '<main><img alt="logo"></main>';
+    const result = await applyEditTransaction(before, attributeTxn(before, plainLocator([0, 0], 'img'), 'src', 'images/pic.png'));
+    expect(result.source).toBe('<main><img alt="logo" src="images/pic.png"></main>');
+    expect(result.selection.attrs).toEqual({ src: 'images/pic.png' });
+  });
+
+  it('inserts several new attributes in operation order', async () => {
+    const before = '<main><img></main>';
+    const result = await applyEditTransaction(before, {
+      baseRevision: sha(before),
+      locator: plainLocator([0, 0], 'img'),
+      operations: [
+        { kind: 'attribute', name: 'alt', value: 'x' },
+        { kind: 'attribute', name: 'src', value: 'y.png' },
+      ],
+    });
+    expect(result.source).toBe('<main><img alt="x" src="y.png"></main>');
+    expect(result.selection.attrs).toEqual({ alt: 'x', src: 'y.png' });
+  });
+
+  it('merges same-name attribute operations, the last one wins (single splice)', async () => {
+    const before = '<main><img alt="one" src="a.png"></main>';
+    const result = await applyEditTransaction(before, {
+      baseRevision: sha(before),
+      locator: plainLocator([0, 0], 'img'),
+      operations: [
+        { kind: 'attribute', name: 'alt', value: 'two' },
+        { kind: 'attribute', name: 'alt', value: 'three' },
+      ],
+    });
+    expect(result.source).toBe('<main><img alt="three" src="a.png"></main>');
+    expect(result.selection.attrs).toEqual({ alt: 'three' });
+  });
+
+  it('deletes an attribute and reflects it in selection.attrs', async () => {
+    const before = load('basic.html');
+    const result = await applyEditTransaction(
+      before,
+      attributeTxn(before, imgLocator({ src: 'images/logo.svg', alt: 'logo' }), 'alt', null)
+    );
+    const span = attributeSpan(findElement(parseDocument(before).document, [1, 1])!, 'alt')!;
+    expect(result.source).toBe(`${before.slice(0, span.start)}${before.slice(span.end)}`);
+    expect(result.selection.attrs).toEqual({ src: 'images/logo.svg' });
+  });
+
+  it('omits selection.attrs when nothing remains after a delete', async () => {
+    const before = load('basic.html');
+    const result = await applyEditTransaction(before, attributeTxn(before, imgLocator(), 'alt', null));
+    expect(result.selection.attrs).toBeUndefined();
+  });
+
+  it('deleting an absent attribute is a no-op (EMPTY_TRANSACTION)', async () => {
+    const before = '<main><img src="a.png"></main>';
+    await expectErrorCode(
+      () => applyEditTransaction(before, attributeTxn(before, plainLocator([0, 0], 'img'), 'alt', null)),
+      'EMPTY_TRANSACTION'
+    );
+  });
+
+  it('rejects attributes whose tag does not match (ATTRIBUTE_NOT_ALLOWED)', async () => {
+    const anchor = '<main><a href="#top">x</a></main>';
+    await expectErrorCode(
+      () => applyEditTransaction(anchor, attributeTxn(anchor, plainLocator([0, 0], 'a'), 'src', 'a.png')),
+      'ATTRIBUTE_NOT_ALLOWED'
+    );
+    const img = '<main><img src="a.png"></main>';
+    await expectErrorCode(
+      () => applyEditTransaction(img, attributeTxn(img, plainLocator([0, 0], 'img'), 'href', '#top')),
+      'ATTRIBUTE_NOT_ALLOWED'
+    );
+    const div = '<main><div>x</div></main>';
+    await expectErrorCode(
+      () => applyEditTransaction(div, attributeTxn(div, plainLocator([0, 0], 'div'), 'alt', 'x')),
+      'ATTRIBUTE_NOT_ALLOWED'
+    );
+  });
+
+  it('rejects values failing safeAttrValue (INVALID_VALUE)', async () => {
+    const before = '<main><img src="a.png"></main>';
+    await expectErrorCode(
+      () => applyEditTransaction(before, attributeTxn(before, plainLocator([0, 0], 'img'), 'src', 'a.txt')),
+      'INVALID_VALUE'
+    );
+    await expectErrorCode(
+      () => applyEditTransaction(before, attributeTxn(before, plainLocator([0, 0], 'img'), 'src', ' a.png')),
+      'INVALID_VALUE'
+    );
+    const anchor = '<main><a href="#top">x</a></main>';
+    await expectErrorCode(
+      () =>
+        applyEditTransaction(anchor, attributeTxn(anchor, plainLocator([0, 0], 'a'), 'href', 'javascript:alert(1)')),
+      'INVALID_VALUE'
+    );
+  });
+
+  it('rewrites an href on an anchor in place', async () => {
+    const before = '<main><a id="lnk" href="#old">x</a></main>';
+    const result = await applyEditTransaction(
+      before,
+      attributeTxn(before, plainLocator([0, 0], 'a'), 'href', 'https://example.com/page')
+    );
+    expect(result.source).toBe('<main><a id="lnk" href="https://example.com/page">x</a></main>');
+    expect(result.selection.attrs).toEqual({ href: 'https://example.com/page' });
+  });
+});
+
+describe('applyEditTransaction — structure: duplicate', () => {
+  it('duplicates a subtree after span.end, renaming ids and rewriting inner anchors', async () => {
+    const before = '<main><section id="wrap"><a id="lnk" href="#inner">go</a><div id="inner">t</div></section><p id="other">o</p></main>';
+    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 0], 'section'), 'duplicate'));
+
+    const span = elementSpan(findElement(parseDocument(before).document, [0, 0])!)!;
+    const copy = before.slice(span.start, span.end);
+    const renamedCopy = copy
+      .replace('id="wrap"', 'id="wrap-copy"')
+      .replace('id="lnk"', 'id="lnk-copy"')
+      .replace('href="#inner"', 'href="#inner-copy"')
+      .replace('id="inner"', 'id="inner-copy"');
+    expect(result.source).toBe(`${before.slice(0, span.end)}${renamedCopy}${before.slice(span.end)}`);
+    // The original subtree keeps its ids and its external anchor target.
+    expect(result.source).toContain('<section id="wrap"><a id="lnk" href="#inner">go</a>');
+    expect(result.selection).toEqual({
+      elementPath: [0, 1],
+      tagName: 'section',
+      text: 'got',
+      sourceText: 'got',
+      base: result.revision,
+    });
+  });
+
+  it('resolves -copy conflicts with -copy-2 inside the uniqueness domain', async () => {
+    const before = '<main><p id="a">x</p><p id="a-copy">y</p><div id="z"><span id="a">w</span></div></main>';
+    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 2], 'div'), 'duplicate'));
+
+    const span = elementSpan(findElement(parseDocument(before).document, [0, 2])!)!;
+    const expected = `${before.slice(0, span.end)}<div id="z-copy"><span id="a-copy-2">w</span></div>${before.slice(span.end)}`;
+    expect(result.source).toBe(expected);
+    expect(result.selection.elementPath).toEqual([0, 3]);
+    expect(result.selection.text).toBe('w');
+  });
+
+  it('keeps anchors pointing outside the copied subtree untouched', async () => {
+    const before = '<main><nav id="n"><a href="#sec">go</a></nav><section id="sec">s</section></main>';
+    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 0], 'nav'), 'duplicate'));
+    // The copy is inserted directly after `</nav>`; the external #sec anchor is not rewritten.
+    expect(result.source).toBe(
+      before.replace('</nav>', '</nav><nav id="n-copy"><a href="#sec">go</a></nav>')
+    );
+    expect(result.selection.elementPath).toEqual([0, 1]);
+    expect(result.selection.tagName).toBe('nav');
+  });
+});
+
+describe('applyEditTransaction — structure: delete', () => {
+  it('rejects when an id is referenced by an anchor outside the subtree (ANCHOR_REFERENCED)', async () => {
+    const before = '<main><p id="x">a</p></main>\n<footer><a href="#x">jump</a></footer>';
+    try {
+      await applyEditTransaction(before, structureTxn(before, plainLocator([0, 0], 'p'), 'delete'));
+      throw new Error('Expected ANCHOR_REFERENCED');
+    } catch (error) {
+      expect((error as { code?: string }).code).toBe('ANCHOR_REFERENCED');
+      expect((error as { message?: string }).message).toContain('x');
+    }
+  });
+
+  it('allows anchors that live inside the deleted subtree', async () => {
+    const before = '<main><div id="wrap"><a href="#wrap">up</a><p id="x">t</p></div></main>';
+    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 0], 'div'), 'delete'));
+    expect(result.source).toBe('<main></main>');
+    expect(result.selection).toEqual({
+      elementPath: [0],
+      tagName: 'main',
+      text: 'upt',
+      sourceText: 'upt',
+      base: result.revision,
+    });
+  });
+
+  it('removes exactly the element bytes and selects the parent', async () => {
+    const before = '<main>\n  <p>one</p>\n  <p>two</p>\n</main>';
+    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 1], 'p'), 'delete'));
+
+    const span = elementSpan(findElement(parseDocument(before).document, [0, 1])!)!;
+    expect(result.source).toBe(`${before.slice(0, span.start)}${before.slice(span.end)}`);
+    // Parent text comes from the parse tree (contract §3.3), so it still
+    // contains the deleted child's text here.
+    expect(result.selection).toEqual({
+      elementPath: [0],
+      tagName: 'main',
+      text: 'one\n  two',
+      sourceText: 'one\n  two',
+      base: result.revision,
+    });
+  });
+});
+
+describe('applyEditTransaction — structure: move-up / move-down', () => {
+  const NAV = '<main>\n  <p id="a">A</p>\n  <span id="b">B</span>\n  <em id="c">C</em>\n</main>';
+
+  const navSpan = (source: string, index: number) =>
+    elementSpan(findElement(parseDocument(source).document, [0, index])!)!;
+
+  it('moves an element down, preserving the bytes between the two elements', async () => {
+    const before = NAV;
+    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 0], 'p'), 'move-down'));
+
+    const t = navSpan(before, 0);
+    const n = navSpan(before, 1);
+    // Region [t.start, n.end) becomes n + middle + t.
+    const expected =
+      before.slice(0, t.start) +
+      before.slice(n.start, n.end) +
+      before.slice(t.end, n.start) +
+      before.slice(t.start, t.end) +
+      before.slice(n.end);
+    expect(result.source).toBe(expected);
+    expect(result.selection).toEqual({
+      elementPath: [0, 1],
+      tagName: 'p',
+      text: 'A',
+      sourceText: 'A',
+      base: result.revision,
+    });
+  });
+
+  it('moves an element up, preserving the bytes between the two elements', async () => {
+    const before = NAV;
+    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 2], 'em'), 'move-up'));
+
+    const t = navSpan(before, 2);
+    const p = navSpan(before, 1);
+    // Region [p.start, t.end) becomes t + middle + p.
+    const expected =
+      before.slice(0, p.start) +
+      before.slice(t.start, t.end) +
+      before.slice(p.end, t.start) +
+      before.slice(p.start, p.end) +
+      before.slice(t.end);
+    expect(result.source).toBe(expected);
+    expect(result.selection.elementPath).toEqual([0, 1]);
+    expect(result.selection.tagName).toBe('em');
+  });
+
+  it('rejects moving the first element up and the last element down', async () => {
+    await expectErrorCode(
+      () => applyEditTransaction(NAV, structureTxn(NAV, plainLocator([0, 0], 'p'), 'move-up')),
+      'STRUCTURE_NOT_ALLOWED'
+    );
+    await expectErrorCode(
+      () => applyEditTransaction(NAV, structureTxn(NAV, plainLocator([0, 2], 'em'), 'move-down')),
+      'STRUCTURE_NOT_ALLOWED'
+    );
+  });
+});
+
+describe('applyEditTransaction — structure guards', () => {
+  const NAV = '<main>\n  <p>A</p>\n</main>';
+
+  it('rejects structure operations mixed with other kinds', async () => {
+    await expectErrorCode(
+      () =>
+        applyEditTransaction(NAV, {
+          baseRevision: sha(NAV),
+          locator: plainLocator([0, 0], 'p'),
+          operations: [
+            { kind: 'structure', action: 'delete' },
+            { kind: 'style', property: 'color', value: 'red' },
+          ],
+        }),
+      'STRUCTURE_NOT_ALLOWED'
+    );
+    await expectErrorCode(
+      () =>
+        applyEditTransaction(NAV, {
+          baseRevision: sha(NAV),
+          locator: plainLocator([0, 0], 'p'),
+          operations: [
+            { kind: 'text', value: 'x' },
+            { kind: 'structure', action: 'delete' },
+          ],
+        }),
+      'STRUCTURE_NOT_ALLOWED'
+    );
+    await expectErrorCode(
+      () =>
+        applyEditTransaction(NAV, {
+          baseRevision: sha(NAV),
+          locator: plainLocator([0, 0], 'p'),
+          operations: [
+            { kind: 'structure', action: 'duplicate' },
+            { kind: 'structure', action: 'delete' },
+          ],
+        }),
+      'STRUCTURE_NOT_ALLOWED'
+    );
+  });
+
+  it('rejects structure operations on the body root', async () => {
+    await expectErrorCode(
+      () => applyEditTransaction(NAV, structureTxn(NAV, plainLocator([], 'body'), 'delete')),
+      'STRUCTURE_NOT_ALLOWED'
+    );
   });
 });

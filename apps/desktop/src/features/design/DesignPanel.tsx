@@ -22,8 +22,9 @@ import { VersionHistory } from './components/VersionHistory';
 import { LineDiffView } from './components/VersionDiff';
 import { ViewportControls } from './components/ViewportControls';
 import { buildDesignPreview } from './preview';
+import { ElementTree } from './components/ElementTree';
 import { useDesignWorkspace } from './useDesignWorkspace';
-import type { DesignEditOperation, DesignSelection } from './types';
+import type { DesignComputedStyles, DesignEditOperation, DesignSelection } from './types';
 import type { DesignPageSnapshot } from './workspace/controller';
 
 /** 面板级预览缓存上限（LRU；键 path → {key, html}）。 */
@@ -46,7 +47,31 @@ const isValidSelection = (value: unknown): value is DesignSelection => {
       (typeof v.sourceText === 'string' && v.sourceText.length <= 20000)) &&
     (v.color === undefined || typeof v.color === 'string') &&
     (v.backgroundColor === undefined || typeof v.backgroundColor === 'string') &&
-    (v.base === undefined || typeof v.base === 'string')
+    (v.base === undefined || typeof v.base === 'string') &&
+    isValidComputedStyles(v.styles) &&
+    isValidSelectionAttrs(v.attrs) &&
+    (v.inlineStyle === undefined || (typeof v.inlineStyle === 'string' && v.inlineStyle.length <= 2000))
+  );
+};
+
+/** §6.1：styles 为普通对象（非 null/数组），键数 ≤32、值均为 string ≤200。 */
+const isValidComputedStyles = (styles: unknown): boolean => {
+  if (styles === undefined) return true;
+  if (styles === null || typeof styles !== 'object' || Array.isArray(styles)) return false;
+  const entries = Object.entries(styles as Record<string, unknown>);
+  return entries.length <= 32 && entries.every(([, v]) => typeof v === 'string' && v.length <= 200);
+};
+
+/** §6.1：attrs 键 ∈ {src,alt,href}、值 string ≤500。 */
+const isValidSelectionAttrs = (attrs: unknown): boolean => {
+  if (attrs === undefined) return true;
+  if (attrs === null || typeof attrs !== 'object' || Array.isArray(attrs)) return false;
+  const entries = Object.entries(attrs as Record<string, unknown>);
+  return entries.every(
+    ([key, v]) =>
+      (key === 'src' || key === 'alt' || key === 'href') &&
+      typeof v === 'string' &&
+      v.length <= 500
   );
 };
 
@@ -54,6 +79,86 @@ interface VerifyExpectation {
   elementPath: number[];
   expected: { color?: string; backgroundColor?: string };
 }
+
+/** 应用后重选（§6.1/§6.3）：本轮写入的属性期望值，等 iframe 回发 select 消息时核对。 */
+interface ReselectExpectation {
+  elementPath: number[];
+  /** 属性名 → 写入值（仅 value 非 null 的 style 操作；键与 select 消息 styles 一致）。 */
+  expected: Map<string, string>;
+}
+
+const RESELECT_COLOR_KEYS = new Set(['color', 'background-color', 'border-color']);
+const RESELECT_KEYWORD_KEYS = new Set(['text-align', 'border-style', 'object-fit']);
+const RESELECT_LENGTH_KEYS = new Set([
+  'width',
+  'height',
+  'font-size',
+  'line-height',
+  'margin-top',
+  'margin-right',
+  'margin-bottom',
+  'margin-left',
+  'padding-top',
+  'padding-right',
+  'padding-bottom',
+  'padding-left',
+  'border-width',
+  'border-radius',
+]);
+const PX_LENGTH = /^[+-]?[\d.]+px$/;
+
+/** font-weight 归一到 100–900 数值；bold→700、normal→400，bolder/lighter 与白名单外值返回 null（跳过）。 */
+function fontWeightValue(value: string): number | null {
+  const keyword = value.trim().toLowerCase();
+  if (keyword === 'bold') return 700;
+  if (keyword === 'normal') return 400;
+  if (keyword === 'bolder' || keyword === 'lighter') return null;
+  if (/^\d+$/.test(keyword)) {
+    const numeric = Number(keyword);
+    return numeric >= 100 && numeric <= 900 ? numeric : null;
+  }
+  return null;
+}
+
+/**
+ * §6.3 重选对比表：expected 中任一属性与计算样式失配返回 true。
+ * color/background-color 是 select 消息的顶层字段（不在 styles 映射里）；
+ * 无可靠口径的键（font-family、margin/padding 简写、非 px 写法的长度、缺计算值）一律跳过，宁缺勿误报。
+ */
+function reselectMismatch(expected: Map<string, string>, selection: DesignSelection): boolean {
+  for (const [property, written] of expected) {
+    const computed =
+      property === 'color'
+        ? selection.color
+        : property === 'background-color'
+          ? selection.backgroundColor
+          : selection.styles?.[property as keyof DesignComputedStyles];
+    if (typeof computed !== 'string') continue;
+    if (RESELECT_COLOR_KEYS.has(property)) {
+      if (!colorsEquivalent(written, computed)) return true;
+    } else if (property === 'font-weight') {
+      const expectedWeight = fontWeightValue(written);
+      const computedWeight = fontWeightValue(computed);
+      if (expectedWeight !== null && computedWeight !== null && expectedWeight !== computedWeight)
+        return true;
+    } else if (RESELECT_KEYWORD_KEYS.has(property)) {
+      if (written.trim().toLowerCase() !== computed.trim().toLowerCase()) return true;
+    } else if (RESELECT_LENGTH_KEYS.has(property)) {
+      // 长度键仅当双方都是纯 px 写法时按数值比对（em/%/简写不可靠）。
+      if (
+        PX_LENGTH.test(written) &&
+        PX_LENGTH.test(computed) &&
+        Number.parseFloat(written) !== Number.parseFloat(computed)
+      )
+        return true;
+    }
+    // font-family 与 margin/padding 简写：跳过（无可靠口径）。
+  }
+  return false;
+}
+
+const pathsEqual = (a: number[], b: number[]): boolean =>
+  a.length === b.length && a.every((value, index) => value === b[index]);
 
 /** Compare two CSS color notations via the browser's own serializer. */
 function colorsEquivalent(written: string, computed: string): boolean {
@@ -121,7 +226,9 @@ function DesignPanelSession({
   );
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const verifyRef = useRef<VerifyExpectation | null>(null);
+  const reselectRef = useRef<ReselectExpectation | null>(null);
   const [overrideWarning, setOverrideWarning] = useState(false);
+  const [treeOpen, setTreeOpen] = useState(false);
 
   // ---- 面板级预览缓存：Map<path, {key: draftRevision:assetEpoch, html}>，LRU ≤8 ----
   const previewCacheRef = useRef(new Map<string, { key: string; html: string }>());
@@ -226,7 +333,23 @@ function DesignPanelSession({
         if (!isValidSelection(data.selection)) return;
         verifyRef.current = null;
         setOverrideWarning(false);
+        const reselect = reselectRef.current;
+        if (reselect) {
+          if (pathsEqual(data.selection.elementPath, reselect.elementPath)) {
+            // §6.3：应用后的重选到达，按对比表核对写入值与计算样式。
+            if (reselectMismatch(reselect.expected, data.selection)) {
+              setOverrideWarning(true);
+            }
+          }
+          // 路径不同 = 用户已点选其他元素：本轮重选作废，不告警。
+          reselectRef.current = null;
+        }
         controller.handleSelectionMessage(data.selection);
+        return;
+      }
+      if (data.type === 'zclaudia:design-select-failed') {
+        // 树与预览短暂不同步属正常（§6.1）：清挂起重选、不弹错，用户下次点击自愈。
+        reselectRef.current = null;
         return;
       }
       if (data.type === 'zclaudia:design-verify-result') {
@@ -248,26 +371,85 @@ function DesignPanelSession({
     return () => window.removeEventListener('message', handle);
   }, [channel, controller]);
 
-  // The verify request must reach the rebuilt preview, so it is sent on the iframe's load event.
+  // The verify request and the post-apply reselect must reach the rebuilt preview,
+  // so both are sent on the iframe's load event (at most once per frame load).
   const handleFrameLoad = useCallback(() => {
-    const pending = verifyRef.current;
     const frame = iframeRef.current;
-    if (!pending || !frame?.contentWindow) return;
-    frame.contentWindow.postMessage(
-      { type: 'zclaudia:design-verify', channel, elementPath: pending.elementPath },
-      '*'
-    );
+    if (!frame?.contentWindow) return;
+    const pending = verifyRef.current;
+    if (pending) {
+      frame.contentWindow.postMessage(
+        { type: 'zclaudia:design-verify', channel, elementPath: pending.elementPath },
+        '*'
+      );
+    }
+    if (reselectRef.current) {
+      frame.contentWindow.postMessage(
+        {
+          type: 'zclaudia:design-select-path',
+          channel,
+          elementPath: reselectRef.current.elementPath,
+        },
+        '*'
+      );
+    }
   }, [channel]);
+
+  /** 元素导航（树节点 / 父级 / 子级）：向预览桥接发送路径选择请求（§6.1）。 */
+  const selectPath = useCallback(
+    (path: number[]) => {
+      const frame = iframeRef.current;
+      if (!frame?.contentWindow) return;
+      frame.contentWindow.postMessage(
+        { type: 'zclaudia:design-select-path', channel, elementPath: path },
+        '*'
+      );
+    },
+    [channel]
+  );
 
   const handleApply = async (operations: DesignEditOperation[]) => {
     const selection = activePage?.selection;
     if (!selection) return;
     const pathKey = selection.elementPath.join('.');
-    const mergeKey = `${pathKey}:${operations
-      .map(operation => (operation.kind === 'text' ? 'text' : `style:${operation.property}`))
-      .join('+')}`;
+    // 结构操作不设 mergeKey：每次操作独立成一条撤销记录；其余按 属性/文字 归并。
+    const mergeKey = operations.some(operation => operation.kind === 'structure')
+      ? undefined
+      : `${pathKey}:${operations
+          .map(operation =>
+            operation.kind === 'text'
+              ? 'text'
+              : operation.kind === 'style'
+                ? `style:${operation.property}`
+                : operation.kind === 'attribute'
+                  ? `attr:${operation.name}`
+                  : `struct:${operation.action}`
+          )
+          .join('+')}`;
     const applied = await controller.apply(operations, `编辑元素 ${pathKey}`, mergeKey);
     if (!applied) return;
+    // 应用后重选（§6.1/§6.3）：attribute/structure/非颜色 style 需要 iframe 回发 select
+    // 消息刷新计算样式并核对 override；纯颜色沿用既有 verify 回路，不动。
+    const needsReselect = operations.some(
+      operation =>
+        operation.kind === 'structure' ||
+        operation.kind === 'attribute' ||
+        (operation.kind === 'style' &&
+          operation.property !== 'color' &&
+          operation.property !== 'background-color')
+    );
+    if (needsReselect) {
+      const expected = new Map<string, string>();
+      for (const operation of operations) {
+        if (operation.kind !== 'style' || operation.value === null) continue;
+        // 颜色两项也放进去，键用 'color'/'background-color'（与 select 消息字段对应）；
+        // 其余键用 CSS 属性名（与 selection.styles 键对应）。
+        expected.set(operation.property, operation.value);
+      }
+      reselectRef.current = { elementPath: applied.elementPath, expected };
+      verifyRef.current = null;
+      return;
+    }
     const expected: { color?: string; backgroundColor?: string } = {};
     for (const operation of operations) {
       if (operation.kind !== 'style' || operation.value === null) continue;
@@ -387,6 +569,8 @@ function DesignPanelSession({
         hasSelection={!!activePage?.selection}
         overviewOpen={overviewOpen}
         onToggleOverview={() => setOverviewOpen(value => !value)}
+        treeOpen={treeOpen}
+        onToggleTree={() => setTreeOpen(value => !value)}
         onExport={() => setExportOpen(true)}
         onToggleDiff={() => setDraftDiffOpen(true)}
         onRefresh={refreshNow}
@@ -462,6 +646,15 @@ function DesignPanelSession({
           />
         )}
         <div className="max-h-64 min-h-36 shrink-0 overflow-y-auto border-t border-border p-3">
+          {treeOpen && (
+            <div className="mb-3 overflow-hidden rounded-md border border-border">
+              <ElementTree
+                source={activePage?.source ?? ''}
+                selectionPath={activePage?.selection?.elementPath ?? null}
+                onSelectPath={selectPath}
+              />
+            </div>
+          )}
           <SelectionEditor
             selection={activePage?.selection ?? null}
             busy={activePage?.busy ?? false}
@@ -471,6 +664,8 @@ function DesignPanelSession({
             dirty={activePage?.status === 'dirty'}
             projectRoot={projectRoot}
             backendId={backendId}
+            sessionId={sessionId}
+            onSelectPath={selectPath}
             onApply={handleApply}
           />
         </div>

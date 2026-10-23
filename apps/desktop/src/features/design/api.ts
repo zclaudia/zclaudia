@@ -88,6 +88,14 @@ export function listDesignFiles(backendId: string, sessionId: string): Promise<D
   return apiCallForBackend<DesignFileList>(backendId, `/api/design/files?${query(sessionId)}`);
 }
 
+/**
+ * 工作区图片文件清单（P3.2 素材选择）：工作区相对路径，按 localeCompare
+ * 排序；服务端谓词为图片扩展名白名单。
+ */
+export function listDesignAssets(backendId: string, sessionId: string): Promise<DesignFileList> {
+  return apiCallForBackend<DesignFileList>(backendId, `/api/design/assets?${query(sessionId)}`);
+}
+
 export function getDesignDocument(
   backendId: string,
   sessionId: string,

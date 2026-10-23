@@ -106,3 +106,29 @@ export function setDeclaration(styleValue: string, property: string, value: stri
   if (trimmed.endsWith(';')) return `${trimmed} ${property}: ${value}`;
   return `${trimmed}; ${property}: ${value}`;
 }
+
+export interface StyleDeclaration {
+  name: string;
+  value: string;
+}
+
+/**
+ * 解析 inline 声明列表（设计文档 §3.1）。
+ *
+ * - 复用顶层分号切分（引号/括号/注释内的 `;` 不切分）；
+ * - 无冒号的段落跳过；name/value 各自 trim；
+ * - 保留原文拼写；同名属性（大小写不敏感）只保留最后一条，
+ *   位置按首次出现的顺序。
+ */
+export function parseDeclarations(styleValue: string): StyleDeclaration[] {
+  const byName = new Map<string, StyleDeclaration>();
+  for (const segment of splitTopLevel(styleValue)) {
+    const text = styleValue.slice(segment.start, segment.end);
+    const colon = text.indexOf(':');
+    if (colon === -1) continue;
+    const name = text.slice(0, colon).trim();
+    const value = text.slice(colon + 1).trim();
+    byName.set(name.toLowerCase(), { name, value });
+  }
+  return [...byName.values()];
+}

@@ -6,6 +6,33 @@ const MAX_MARKED_ELEMENTS = 5000;
 const MAX_VISITED_ELEMENTS = 10000;
 const MAX_SELECTION_TEXT_LENGTH = 2000;
 
+/** 计算样式白名单键，随 select 消息携带（DesignComputedStyles 键集）。 */
+const BRIDGE_STYLE_KEYS = [
+  'font-family',
+  'font-size',
+  'font-weight',
+  'line-height',
+  'text-align',
+  'width',
+  'height',
+  'margin-top',
+  'margin-right',
+  'margin-bottom',
+  'margin-left',
+  'padding-top',
+  'padding-right',
+  'padding-bottom',
+  'padding-left',
+  'border-width',
+  'border-style',
+  'border-color',
+  'border-radius',
+  'object-fit',
+] as const;
+
+/** select 消息额外携带的元素属性白名单。 */
+const BRIDGE_ATTR_NAMES = ['src', 'alt', 'href'] as const;
+
 export async function buildDesignPreview(
   source: string,
   filePath: string,
@@ -157,9 +184,13 @@ function workspacePath(raw: string, fromDir: string): string {
 function makeBridge(channel: string, baseRevision: string): string {
   const safeChannel = JSON.stringify(channel).replace(/</g, '\\u003c');
   const safeBaseRevision = JSON.stringify(baseRevision).replace(/</g, '\\u003c');
+  const safeStyleKeys = JSON.stringify(BRIDGE_STYLE_KEYS);
+  const safeAttrNames = JSON.stringify(BRIDGE_ATTR_NAMES);
   return `(() => {
     const channel=${safeChannel};
     const base=${safeBaseRevision};
+    const styleKeys=${safeStyleKeys};
+    const attrNames=${safeAttrNames};
     const identities = new WeakMap();
     let selected = null;
     let originalOutline = '';
@@ -193,47 +224,77 @@ function makeBridge(channel: string, baseRevision: string): string {
         element.removeAttribute('data-zclaudia-source-text');
       });
     }, { once: true });
+    const selectElement = (node, path, sourceText) => {
+      const inlineStyle = node.getAttribute('style');
+      if (selected) {
+        selected.style.outline = originalOutline;
+        selected.style.outlineOffset = originalOutlineOffset;
+      }
+      selected = node;
+      originalOutline = node.style.outline;
+      originalOutlineOffset = node.style.outlineOffset;
+      node.style.outline = '2px dashed #808080';
+      node.style.outlineOffset = '3px';
+      const computed = getComputedStyle(node);
+      const selection = {
+        elementPath: path,
+        tagName: node.tagName.toLowerCase(),
+        text: (node.textContent || '').trim().slice(0, 2000),
+        color: computed.color,
+        backgroundColor: computed.backgroundColor,
+        base
+      };
+      if (typeof sourceText === 'string') selection.sourceText = sourceText;
+      const styles = {};
+      for (const key of styleKeys) {
+        const value = computed[key];
+        if (value) styles[key] = String(value).slice(0, 120);
+      }
+      if (Object.keys(styles).length > 0) selection.styles = styles;
+      const attrs = {};
+      for (const name of attrNames) {
+        const value = node.getAttribute(name);
+        if (value !== null) attrs[name] = String(value).slice(0, 500);
+      }
+      if (Object.keys(attrs).length > 0) selection.attrs = attrs;
+      const inlineStyleValue = inlineStyle === null ? null : String(inlineStyle).slice(0, 2000);
+      if (inlineStyleValue !== null) selection.inlineStyle = inlineStyleValue;
+      parent.postMessage({ type:'zclaudia:design-select', channel, selection }, '*');
+    };
     document.addEventListener('click', event => {
       const target = event.target instanceof Element ? event.target : null;
       if (!target) return;
       if (target.closest('a')) event.preventDefault();
       const identity = identityFor(target);
       if (!identity) return;
-      if (selected) {
-        selected.style.outline = originalOutline;
-        selected.style.outlineOffset = originalOutlineOffset;
-      }
-      selected = target;
-      originalOutline = target.style.outline;
-      originalOutlineOffset = target.style.outlineOffset;
-      target.style.outline = '2px dashed #808080';
-      target.style.outlineOffset = '3px';
-      const style = getComputedStyle(target);
-      parent.postMessage({
-        type:'zclaudia:design-select', channel,
-        selection: {
-          elementPath: identity.path,
-          tagName: target.tagName.toLowerCase(),
-          text: (target.textContent || '').trim().slice(0, 2000),
-          sourceText: identity.text,
-          color: style.color,
-          backgroundColor: style.backgroundColor,
-          base
-        }
-      }, '*');
+      selectElement(target, identity.path, identity.text);
     }, true);
     document.addEventListener('submit', event => event.preventDefault(), true);
     window.addEventListener('message', event => {
       const data = event.data;
-      if (!data || data.type !== 'zclaudia:design-verify' || data.channel !== channel) return;
+      if (
+        !data ||
+        (data.type !== 'zclaudia:design-verify' && data.type !== 'zclaudia:design-select-path') ||
+        data.channel !== channel
+      )
+        return;
       const path = Array.isArray(data.elementPath) ? data.elementPath : null;
       if (!path || path.length > 64 || !path.every(step => Number.isInteger(step) && step >= 0)) return;
       let node = document.body;
       for (const step of path) {
-        if (!node) return;
+        if (!node) break;
         node = node.children[step] ?? null;
       }
-      if (!node) return;
+      if (!node) {
+        if (data.type === 'zclaudia:design-select-path') {
+          parent.postMessage({ type:'zclaudia:design-select-failed', channel, reason:'not-found' }, '*');
+        }
+        return;
+      }
+      if (data.type === 'zclaudia:design-select-path') {
+        selectElement(node, path, undefined);
+        return;
+      }
       const style = getComputedStyle(node);
       parent.postMessage({
         type:'zclaudia:design-verify-result', channel,

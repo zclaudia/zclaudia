@@ -45,6 +45,13 @@ export function createDesignRoutes(db: Database.Database): Router {
       handleError(res, error);
     }
   });
+  router.get('/assets', async (req: Request, res: Response) => {
+    try {
+      res.json({ success: true, data: await service.listAssets(req.query.sessionId) });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
   router.get('/document', async (req: Request, res: Response) => {
     try {
       res.json({

@@ -14,6 +14,9 @@ export interface DesignToolbarProps {
   /** 总览开关状态（开关按钮用 aria-pressed 反映）。 */
   overviewOpen: boolean;
   onToggleOverview: () => void;
+  /** 结构树开关状态（P3 §7.2，样式对齐「总览」按钮）。 */
+  treeOpen: boolean;
+  onToggleTree: () => void;
   /** 打开导出对话框（需存在打开且非 loading 的活动页）。 */
   onExport: () => void;
   /** 打开未保存差异视图（仅活动页 dirty 时可用）。 */
@@ -38,6 +41,8 @@ export function DesignToolbar({
   hasSelection,
   overviewOpen,
   onToggleOverview,
+  treeOpen,
+  onToggleTree,
   onExport,
   onToggleDiff,
   onRefresh,
@@ -79,6 +84,15 @@ export function DesignToolbar({
         variant={overviewOpen ? 'primary' : 'ghost'}
       >
         总览
+      </Button>
+      <Button
+        size="sm"
+        onClick={onToggleTree}
+        aria-label="结构树"
+        aria-pressed={treeOpen}
+        variant={treeOpen ? 'primary' : 'ghost'}
+      >
+        结构树
       </Button>
       <Button
         size="sm"

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { setDeclaration } from '../../html/style-declarations';
+import { parseDeclarations, setDeclaration } from '../../html/style-declarations';
 
 describe('setDeclaration', () => {
   it('replaces the matched declaration and preserves the rest byte-for-byte', () => {
@@ -69,5 +69,54 @@ describe('setDeclaration', () => {
       '/* keep; me */ color: red; margin: 0; color: blue'
     );
     expect(setDeclaration(value, 'margin', null)).toBe('/* keep; me */ color: red');
+  });
+});
+
+describe('parseDeclarations', () => {
+  it('parses name/value pairs with trims and keeps original spelling', () => {
+    expect(parseDeclarations('color: red')).toEqual([{ name: 'color', value: 'red' }]);
+    expect(parseDeclarations('  Color :   red  ')).toEqual([{ name: 'Color', value: 'red' }]);
+    expect(parseDeclarations('margin:0')).toEqual([{ name: 'margin', value: '0' }]);
+  });
+
+  it('parses multiple declarations in document order', () => {
+    expect(parseDeclarations('color: red; margin: 0')).toEqual([
+      { name: 'color', value: 'red' },
+      { name: 'margin', value: '0' },
+    ]);
+  });
+
+  it('keeps the last same-name declaration (case-insensitive)', () => {
+    expect(parseDeclarations('color: red; COLOR: blue')).toEqual([{ name: 'COLOR', value: 'blue' }]);
+    expect(parseDeclarations('margin: 0; color: red; color: green')).toEqual([
+      { name: 'margin', value: '0' },
+      { name: 'color', value: 'green' },
+    ]);
+  });
+
+  it('skips segments without a colon', () => {
+    expect(parseDeclarations('bogus; color: red; ; margin: 0')).toEqual([
+      { name: 'color', value: 'red' },
+      { name: 'margin', value: '0' },
+    ]);
+    expect(parseDeclarations('bogus')).toEqual([]);
+  });
+
+  it('does not split inside quoted url() values or comments', () => {
+    expect(parseDeclarations('background: url("a;b.png"); color: red')).toEqual([
+      { name: 'background', value: 'url("a;b.png")' },
+      { name: 'color', value: 'red' },
+    ]);
+    // The `;` inside the comment stays in the segment; its first-`:` name is
+    // "/* c;s */ color" — preserved verbatim.
+    expect(parseDeclarations('/* c;s */ color: red')).toEqual([
+      { name: '/* c;s */ color', value: 'red' },
+    ]);
+  });
+
+  it('keeps empty values and empty input', () => {
+    expect(parseDeclarations('color:')).toEqual([{ name: 'color', value: '' }]);
+    expect(parseDeclarations('')).toEqual([]);
+    expect(parseDeclarations('   ')).toEqual([]);
   });
 });

@@ -57,6 +57,59 @@ describe('design routes', () => {
     expect(result.body.error.code).toBe('SESSION_NOT_FOUND');
   });
 
+  it('lists workspace image assets and skips non-images, private and build trees', async () => {
+    await mkdir(path.join(rootA, 'assets'));
+    await mkdir(path.join(rootA, 'assets', 'sub'));
+    await mkdir(path.join(rootA, '.git'));
+    await mkdir(path.join(rootA, 'node_modules'));
+    await mkdir(path.join(rootA, '.hidden'));
+    await writeFile(path.join(rootA, 'assets', 'photo.png'), Buffer.from([1]));
+    await writeFile(path.join(rootA, 'assets', 'sub', 'pic.JPG'), Buffer.from([2]));
+    await writeFile(path.join(rootA, 'hero.webp'), Buffer.from([3]));
+    await writeFile(path.join(rootA, 'logo.svg'), '<svg/>');
+    await writeFile(path.join(rootA, 'icon.avif'), Buffer.from([4]));
+    await writeFile(path.join(rootA, 'page.html'), '<p>doc</p>');
+    await writeFile(path.join(rootA, 'notes.txt'), 'no');
+    await writeFile(path.join(rootA, '.git', 'commit.png'), Buffer.from([5]));
+    await writeFile(path.join(rootA, 'node_modules', 'pkg.png'), Buffer.from([6]));
+    await writeFile(path.join(rootA, '.hidden', 'secret.png'), Buffer.from([7]));
+    const response = await request(app).get('/api/design/assets').query({ sessionId: 'sa' });
+    expect(response.status).toBe(200);
+    expect(response.body.data.files).toEqual([
+      'assets/photo.png',
+      'assets/sub/pic.JPG',
+      'hero.webp',
+      'icon.avif',
+      'logo.svg',
+    ]);
+  });
+
+  it('silently skips escaping and broken image symlinks and validates the session', async () => {
+    await writeFile(path.join(temp, 'outside.png'), Buffer.from([1]));
+    await symlink(path.join(temp, 'outside.png'), path.join(rootA, 'escape.png'));
+    await symlink(path.join(rootA, 'missing-target.png'), path.join(rootA, 'broken.png'));
+    const response = await request(app).get('/api/design/assets').query({ sessionId: 'sa' });
+    expect(response.status).toBe(200);
+    expect(response.body.data.files).toEqual([]);
+    const absent = await request(app).get('/api/design/assets').query({ sessionId: 'absent' });
+    expect(absent.status).toBe(404);
+    expect(absent.body.error.code).toBe('SESSION_NOT_FOUND');
+    expect((await request(app).get('/api/design/assets')).status).toBe(400);
+  });
+
+  it('caps asset listing at MAX_LIST_FILES entries', async () => {
+    const dir = path.join(rootA, 'many');
+    await mkdir(dir);
+    const names = Array.from({ length: 5001 }, (_, i) => `img-${String(i).padStart(4, '0')}.png`);
+    for (let i = 0; i < names.length; i += 500) {
+      await Promise.all(names.slice(i, i + 500).map(name => writeFile(path.join(dir, name), 'x')));
+    }
+    const response = await request(app).get('/api/design/assets').query({ sessionId: 'sa' });
+    expect(response.status).toBe(200);
+    expect(response.body.data.files).toHaveLength(5000);
+    expect(response.body.data.files[0]).toBe('many/img-0000.png');
+  });
+
   it('reads and updates existing HTML with revision protection', async () => {
     const file = path.join(rootA, 'index.html');
     await writeFile(file, '<p>old</p>');

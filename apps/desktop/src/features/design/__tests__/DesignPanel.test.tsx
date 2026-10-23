@@ -25,6 +25,7 @@ vi.mock('../api', () => ({
   listDesignFiles: vi.fn(),
   getDesignDocument: vi.fn(),
   getDesignAsset: vi.fn(),
+  listDesignAssets: vi.fn(),
   putDesignDocument: vi.fn(),
   getDesignDeps: vi.fn(),
   listDesignSnapshots: vi.fn(),
@@ -880,6 +881,279 @@ describe('DesignPanel', () => {
       within(dialog).getByText('<html><body><h1>Changed</h1></body></html>')
     ).toBeInTheDocument();
   });
+
+  it('accepts a select message carrying styles, attrs and inlineStyle payloads', async () => {
+    const source = '<html><body><a href="index.html">Home</a></body></html>';
+    disk.set('design/index.html', { source, revision: 'revision-1' });
+    mount();
+    const frame = (await screen.findByTitle('设计预览')) as HTMLIFrameElement;
+    await sendSelection(frame, {
+      elementPath: [0],
+      tagName: 'a',
+      text: 'Home',
+      sourceText: 'Home',
+      color: 'rgb(0, 0, 0)',
+      backgroundColor: 'rgba(0, 0, 0, 0)',
+      base: sha(source),
+      styles: { 'font-size': '14px', 'text-align': 'center' },
+      attrs: { href: 'index.html' },
+      inlineStyle: 'font-size: 14px',
+    });
+    await screen.findByRole('textbox', { name: '元素文字' });
+    // 计算样式作为编辑器初始值。
+    expect(screen.getByRole('textbox', { name: '字号' })).toHaveValue('14px');
+    expect(screen.getByRole('combobox', { name: '对齐' })).toHaveValue('center');
+    // attrs 与「内联」徽标。
+    expect(screen.getByRole('textbox', { name: '链接地址' })).toHaveValue('index.html');
+    expect(screen.getByTestId('inline-badge-font-size')).toBeInTheDocument();
+  });
+
+  it('posts zclaudia:design-select-path to the iframe when navigating to a child', async () => {
+    const source = '<html><body><div id="wrap"><p>child</p></div></body></html>';
+    disk.set('design/index.html', { source, revision: 'revision-1' });
+    mount();
+    const frame = (await screen.findByTitle('设计预览')) as HTMLIFrameElement;
+    await sendSelection(frame, {
+      elementPath: [0],
+      tagName: 'div',
+      text: 'child',
+      sourceText: '<p>child</p>',
+      color: 'rgb(0, 0, 0)',
+      backgroundColor: 'rgba(0, 0, 0, 0)',
+      base: sha(source),
+    });
+    await screen.findByRole('textbox', { name: '元素文字' });
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.click(screen.getByRole('button', { name: '子级' }));
+    expect(postMessage).toHaveBeenCalledWith(
+      { type: 'zclaudia:design-select-path', channel: latestChannel(), elementPath: [0, 0] },
+      '*'
+    );
+  });
+
+  it('reselects after a font-size apply and compares computed styles on the reply', async () => {
+    mount();
+    const frame = await selectElementForFrame();
+    fireEvent.change(screen.getByRole('textbox', { name: '字号' }), {
+      target: { value: '20px' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '应用修改' }));
+    const styled = '<html><body><h1 style="font-size: 20px">Hello</h1></body></html>';
+    await waitFor(() =>
+      expect(
+        vi.mocked(preview.buildDesignPreview).mock.calls.some(call => call[0] === styled)
+      ).toBe(true)
+    );
+    // 帧重建后补发 select-path（不是颜色 verify）。
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.load(frame);
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'zclaudia:design-select-path', elementPath: [0] }),
+      '*'
+    );
+    expect(postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'zclaudia:design-verify' }),
+      '*'
+    );
+    const reply = (styles: Record<string, string>) => {
+      fireEvent(
+        window,
+        new MessageEvent('message', {
+          source: frame.contentWindow,
+          data: {
+            type: 'zclaudia:design-select',
+            channel: latestChannel(),
+            selection: {
+              elementPath: [0],
+              tagName: 'h1',
+              text: 'Rendered',
+              sourceText: 'Hello',
+              color: 'rgb(0, 0, 0)',
+              backgroundColor: 'rgba(0, 0, 0, 0)',
+              base: sha(styled),
+              styles,
+            },
+          },
+        })
+      );
+    };
+    // 计算值失配 → override 告警显示。
+    reply({ 'font-size': '32px' });
+    expect(await screen.findByText(OVERRIDE_WARNING_TEXT)).toBeInTheDocument();
+    // 计算值匹配 → 告警隐藏。
+    reply({ 'font-size': '20px' });
+    await waitFor(() =>
+      expect(screen.queryByText(OVERRIDE_WARNING_TEXT)).not.toBeInTheDocument()
+    );
+  });
+
+  it('compares top-level color fields on the reselect reply for mixed color+style applies', async () => {
+    mount();
+    const frame = await selectElementForFrame();
+    fireEvent.change(screen.getByRole('textbox', { name: '字号' }), {
+      target: { value: '20px' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: '文字颜色' }), {
+      target: { value: '#123456' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '应用修改' }));
+    const styled =
+      '<html><body><h1 style="color: #123456; font-size: 20px">Hello</h1></body></html>';
+    await waitFor(() =>
+      expect(vi.mocked(preview.buildDesignPreview).mock.calls.some(call => call[0] === styled)).toBe(
+        true
+      )
+    );
+    fireEvent.load(frame);
+    const reply = (color: string) => {
+      fireEvent(
+        window,
+        new MessageEvent('message', {
+          source: frame.contentWindow,
+          data: {
+            type: 'zclaudia:design-select',
+            channel: latestChannel(),
+            selection: {
+              elementPath: [0],
+              tagName: 'h1',
+              text: 'Rendered',
+              sourceText: 'Hello',
+              color,
+              backgroundColor: 'rgba(0, 0, 0, 0)',
+              base: sha(styled),
+              styles: { 'font-size': '20px' },
+            },
+          },
+        })
+      );
+    };
+    // 字号匹配但顶层颜色失配（styles 映射里没有 color 键）→ 告警仍要显示。
+    reply('rgb(0, 0, 0)');
+    expect(await screen.findByText(OVERRIDE_WARNING_TEXT)).toBeInTheDocument();
+    // 等价颜色（#123456 = rgb(18, 52, 86)）→ 不再告警。
+    reply('rgb(18, 52, 86)');
+    await waitFor(() =>
+      expect(screen.queryByText(OVERRIDE_WARNING_TEXT)).not.toBeInTheDocument()
+    );
+  });
+
+  it('a pure color edit keeps the legacy verify loop and never sends select-path', async () => {
+    mount();
+    const frame = await selectElementForFrame();
+    fireEvent.change(screen.getByRole('textbox', { name: '文字颜色' }), {
+      target: { value: '#123456' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '应用修改' }));
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(preview.buildDesignPreview)
+          .mock.calls.some(
+            call =>
+              typeof call[0] === 'string' &&
+              call[0].includes('<h1 style="color: #123456">Hello</h1>')
+          )
+      ).toBe(true)
+    );
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.load(frame);
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'zclaudia:design-verify', elementPath: [0] }),
+      '*'
+    );
+    expect(postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'zclaudia:design-select-path' }),
+      '*'
+    );
+  });
+
+  it('handles zclaudia:design-select-failed quietly and drops the pending reselect', async () => {
+    mount();
+    const frame = await selectElementForFrame();
+    fireEvent.change(screen.getByRole('textbox', { name: '字号' }), {
+      target: { value: '20px' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '应用修改' }));
+    const styled = '<html><body><h1 style="font-size: 20px">Hello</h1></body></html>';
+    await waitFor(() =>
+      expect(
+        vi.mocked(preview.buildDesignPreview).mock.calls.some(call => call[0] === styled)
+      ).toBe(true)
+    );
+    const channel = latestChannel();
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        source: frame.contentWindow,
+        data: { type: 'zclaudia:design-select-failed', channel, reason: 'not-found' },
+      })
+    );
+    // 重选已被清除：随后同路径的失配 select 不再触发 override 告警，也不崩溃。
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        source: frame.contentWindow,
+        data: {
+          type: 'zclaudia:design-select',
+          channel,
+          selection: {
+            elementPath: [0],
+            tagName: 'h1',
+            text: 'Rendered',
+            sourceText: 'Hello',
+            color: 'rgb(0, 0, 0)',
+            backgroundColor: 'rgba(0, 0, 0, 0)',
+            base: sha(styled),
+            styles: { 'font-size': '32px' },
+          },
+        },
+      })
+    );
+    await screen.findByRole('textbox', { name: '元素文字' });
+    expect(screen.queryByText(OVERRIDE_WARNING_TEXT)).not.toBeInTheDocument();
+  });
+
+  it('toggles the element tree and selects a tree node through the bridge', async () => {
+    mount();
+    await screen.findByTitle('设计预览');
+    fireEvent.click(screen.getByRole('button', { name: '结构树' }));
+    expect(
+      screen.getByText('结构树由页面源码构建；伪元素与脚本生成的内容不会出现在这里。')
+    ).toBeInTheDocument();
+    const frame = screen.getByTitle('设计预览') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.click(screen.getByRole('button', { name: '选中 h1 0' }));
+    const channel = latestChannel();
+    expect(postMessage).toHaveBeenCalledWith(
+      { type: 'zclaudia:design-select-path', channel, elementPath: [0] },
+      '*'
+    );
+    // 桥接回发 select → 树行高亮、编辑器出现，树保持挂载。
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        source: frame.contentWindow,
+        data: {
+          type: 'zclaudia:design-select',
+          channel,
+          selection: {
+            elementPath: [0],
+            tagName: 'h1',
+            text: 'Rendered',
+            sourceText: 'Hello',
+            color: 'rgb(0, 0, 0)',
+            backgroundColor: 'rgba(0, 0, 0, 0)',
+            base: sha(SOURCE),
+          },
+        },
+      })
+    );
+    await screen.findByRole('textbox', { name: '元素文字' });
+    expect(screen.getByRole('button', { name: '选中 h1 0' })).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+  });
 });
 
 /** helper: wait for the preview then return the main preview iframe. */
@@ -887,3 +1161,24 @@ async function selectElementForFrame() {
   await selectElement();
   return screen.getByTitle('设计预览');
 }
+
+/** helper: latest preview build's bridge channel. */
+function latestChannel(): string {
+  const calls = vi.mocked(preview.buildDesignPreview).mock.calls;
+  return calls[calls.length - 1]?.[3] as string;
+}
+
+/** helper: send a select message from the preview iframe (extended payloads allowed). */
+async function sendSelection(frame: HTMLIFrameElement, selection: Record<string, unknown>) {
+  await waitFor(() => expect(preview.buildDesignPreview).toHaveBeenCalled());
+  fireEvent(
+    window,
+    new MessageEvent('message', {
+      source: frame.contentWindow,
+      data: { type: 'zclaudia:design-select', channel: latestChannel(), selection },
+    })
+  );
+}
+
+const OVERRIDE_WARNING_TEXT =
+  '修改已写入源码，但计算样式仍被外部样式覆盖（如 !important）；已按内联声明写入，未提高优先级。';

@@ -203,8 +203,13 @@ export class DesignService {
     }
   }
 
-  async list(sessionId: unknown): Promise<{ files: string[] }> {
-    const root = await this.workspace(sessionId);
+  /**
+   * Walk the workspace collecting relative paths of files whose name matches
+   * predicate. Shared skeleton for list/listAssets: SKIP_DIRS and dot-prefixed
+   * entries are skipped, depth/dir/file budgets enforced, unreadable
+   * directories and broken or escaping symbolic links silently ignored.
+   */
+  private async walkFiles(root: string, predicate: (name: string) => boolean): Promise<string[]> {
     const files: string[] = [];
     let visitedDirs = 0;
     const walk = async (dir: string, prefix: string): Promise<void> => {
@@ -225,7 +230,7 @@ export class DesignService {
         const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
         const abs = path.join(dir, entry.name);
         if (entry.isDirectory()) await walk(abs, rel);
-        else if (entry.isFile() && /\.html?$/i.test(entry.name)) {
+        else if (entry.isFile() && predicate(entry.name)) {
           try {
             const real = await fs.realpath(abs);
             assertContained(root, real);
@@ -240,7 +245,19 @@ export class DesignService {
       }
     };
     await walk(root, '');
-    return { files: files.sort((a, b) => a.localeCompare(b)) };
+    return files.sort((a, b) => a.localeCompare(b));
+  }
+
+  async list(sessionId: unknown): Promise<{ files: string[] }> {
+    const root = await this.workspace(sessionId);
+    return { files: await this.walkFiles(root, name => /\.html?$/i.test(name)) };
+  }
+
+  async listAssets(sessionId: unknown): Promise<{ files: string[] }> {
+    const root = await this.workspace(sessionId);
+    return {
+      files: await this.walkFiles(root, name => /\.(png|jpe?g|gif|webp|svg|ico|avif)$/i.test(name)),
+    };
   }
 
   async readDocument(sessionId: unknown, filePath: unknown) {

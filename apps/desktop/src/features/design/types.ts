@@ -15,7 +15,40 @@ export interface DesignSelection {
   backgroundColor?: string;
   /** Draft revision the preview was built from; stale selections are rejected. */
   base?: string;
+  /** 桥接携带的计算样式子集（每值 ≤120 字符）；非桥接来源的选区可缺省。 */
+  styles?: DesignComputedStyles;
+  /** 选中元素的白名单属性现值（src/alt/href，各 ≤500 字符）。 */
+  attrs?: Partial<Record<DesignAttributeName, string>>;
+  /** 选中元素 style 属性原文（≤2000 字符），编辑器据此标「内联」徽标。 */
+  inlineStyle?: string;
 }
+
+/** 选区携带的计算样式键集（P3 编辑器初始值来源）。 */
+export type DesignComputedStyles = Partial<
+  Record<
+    | 'font-family'
+    | 'font-size'
+    | 'font-weight'
+    | 'line-height'
+    | 'text-align'
+    | 'width'
+    | 'height'
+    | 'margin-top'
+    | 'margin-right'
+    | 'margin-bottom'
+    | 'margin-left'
+    | 'padding-top'
+    | 'padding-right'
+    | 'padding-bottom'
+    | 'padding-left'
+    | 'border-width'
+    | 'border-style'
+    | 'border-color'
+    | 'border-radius'
+    | 'object-fit',
+    string
+  >
+>;
 
 export interface DesignPatch {
   text?: string;
@@ -23,11 +56,47 @@ export interface DesignPatch {
   backgroundColor?: string;
 }
 
-export type DesignStyleProperty = 'color' | 'background-color';
+/**
+ * P3 可编辑的 inline 样式属性白名单。值只写入选中元素的 style 声明
+ * （P1.8 语义）；校验规则见 html/values.ts 的 safeStyleValue。
+ */
+export type DesignStyleProperty =
+  | 'font-family'
+  | 'font-size'
+  | 'font-weight'
+  | 'line-height'
+  | 'text-align'
+  | 'color'
+  | 'background-color'
+  | 'width'
+  | 'height'
+  | 'margin'
+  | 'margin-top'
+  | 'margin-right'
+  | 'margin-bottom'
+  | 'margin-left'
+  | 'padding'
+  | 'padding-top'
+  | 'padding-right'
+  | 'padding-bottom'
+  | 'padding-left'
+  | 'border-width'
+  | 'border-style'
+  | 'border-color'
+  | 'border-radius'
+  | 'object-fit';
+
+/** 可编辑的元素属性白名单；适用标签：src/alt 仅 img，href 仅 a。 */
+export type DesignAttributeName = 'src' | 'alt' | 'href';
+
+/** 受限结构修改（P3.4）：同父级自包含动作，结构操作必须独占事务。 */
+export type DesignStructureAction = 'duplicate' | 'delete' | 'move-up' | 'move-down';
 
 export type DesignEditOperation =
   | { kind: 'text'; value: string }
-  | { kind: 'style'; property: DesignStyleProperty; value: string | null };
+  | { kind: 'style'; property: DesignStyleProperty; value: string | null }
+  | { kind: 'attribute'; name: DesignAttributeName; value: string | null }
+  | { kind: 'structure'; action: DesignStructureAction };
 
 export interface DesignEditTransaction {
   /** Must equal the SHA-256 revision of the draft the transaction applies to. */
@@ -53,7 +122,10 @@ export type DesignEditErrorCode =
   | 'DUPLICATE_ATTRIBUTE'
   | 'MALFORMED_HTML'
   | 'INVALID_VALUE'
-  | 'EMPTY_TRANSACTION';
+  | 'EMPTY_TRANSACTION'
+  | 'ATTRIBUTE_NOT_ALLOWED'
+  | 'STRUCTURE_NOT_ALLOWED'
+  | 'ANCHOR_REFERENCED';
 
 export class DesignEditError extends Error {
   constructor(
