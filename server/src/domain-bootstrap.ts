@@ -18,6 +18,7 @@ import { createFilesRoutes } from './interfaces/http/files.js';
 import { createCommandsRoutes } from './interfaces/http/commands.js';
 import { createAgentRoutes } from './interfaces/http/agent.js';
 import { createClaudiaRoutes } from './interfaces/http/claudia.js';
+import { createDesignRoutes } from './interfaces/http/design.js';
 import { createDelegationRoutes } from './interfaces/http/delegation.js';
 import type { NotificationService } from './domains/notification-feed/index.js';
 import type { ProcessSupervisor } from './infra/services/process-supervisor.js';
@@ -216,6 +217,7 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
   app.use('/api/agent', authMiddleware, createAgentRoutes(db));
   app.use('/api/delegation', authMiddleware, createDelegationRoutes(db));
   app.use('/api/claudia', authMiddleware, createClaudiaRoutes(db));
+  app.use('/api/design', authMiddleware, createDesignRoutes(db));
 
   const {
     supervisorService,

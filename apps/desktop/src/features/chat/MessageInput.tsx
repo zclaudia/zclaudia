@@ -129,6 +129,7 @@ export function MessageInput({
     pendingDraftAttachmentsRef,
     scheduleDraftPersistence,
     clearDraftPersistence,
+    flushDraftPersistence,
   } = useComposerDraft(sessionId);
   const { workspaceSkills, loadWorkspaceSkills } = useWorkspaceSkills();
   const {
@@ -741,7 +742,17 @@ export function MessageInput({
     !disabled && (!!value.trim() || attachments.length > 0) && !(isLoading && onCancel);
 
   return (
-    <div ref={rootRef} className="relative">
+    <div
+      ref={rootRef}
+      className="relative"
+      onBlurCapture={event => {
+        // Workbench actions append to the stored composer draft. Flush before
+        // their click runs, including text typed inside the debounce window.
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          flushDraftPersistence();
+        }
+      }}
+    >
       {/* Cursor-style command/skill dropdown */}
       {showCommands && (
         <SlashMenu

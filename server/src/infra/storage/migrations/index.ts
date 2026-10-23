@@ -51,6 +51,7 @@ import { migration as m_046_claudia_request_records } from './046_claudia_reques
 import { migration as m_047_prompt_cache_trace } from './047_prompt_cache_trace.js';
 import { migration as m_048_project_additional_paths } from './048_project_additional_paths.js';
 import { migration as m_049_auto_title_config } from './049_auto_title_config.js';
+import { migration as m_050_design_snapshots } from './050_design_snapshots.js';
 
 export type { Migration };
 
@@ -104,6 +105,7 @@ export const migrations: Migration[] = [
   m_047_prompt_cache_trace,
   m_048_project_additional_paths,
   m_049_auto_title_config,
+  m_050_design_snapshots,
 ];
 
 /**

@@ -1,5 +1,5 @@
 import { exerciseMcp, waitForConcurrentRelease } from './mcp.mjs';
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createInterface } from 'node:readline';
@@ -169,6 +169,59 @@ createInterface({ input: process.stdin }).on('line', async line => {
     return;
   }
   if (prompt.includes('E2E_MCP')) await exerciseMcp('claude', args, process.cwd(), prompt);
+  // Deterministic design-workbench acceptance flow, through the real runtime
+  // adapter and conversation transport. No provider credentials are needed.
+  if (prompt.includes('E2E_DESIGN_GENERATE') || prompt.includes('E2E_DESIGN_REFINE')) {
+    mkdirSync('design', { recursive: true });
+    const target = path.join(process.cwd(), 'design/index.html');
+    const source = prompt.includes('E2E_DESIGN_REFINE')
+      ? readFileSync(target, 'utf8').replace('Original subtitle', 'Agent refined subtitle')
+      : '<!doctype html><html><head><meta charset="utf-8"><title>Design fixture</title><link rel="stylesheet" href="style.css"></head><body><main><h1>Generated heading</h1><p>Original subtitle</p><img src="hero.svg" alt="Local artwork"></main></body></html>';
+    assistant([
+      {
+        type: 'tool_use',
+        id: 'design-write',
+        name: 'Write',
+        input: { file_path: target, content: source },
+      },
+    ]);
+    writeFileSync(target, source);
+    writeFileSync(
+      'design/style.css',
+      'body{font-family:sans-serif;background:#f6f4ef}main{padding:40px}h1{color:#222222}img{width:80px;height:80px}'
+    );
+    writeFileSync(
+      'design/hero.svg',
+      '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#668877"/></svg>'
+    );
+    result('design-write', 'HTML and local assets saved');
+    audit({
+      design: prompt.includes('E2E_DESIGN_REFINE') ? 'refine' : 'generate',
+      cwd: process.cwd(),
+    });
+    assistant([
+      {
+        type: 'text',
+        text: prompt.includes('E2E_DESIGN_REFINE') ? 'E2E_DESIGN_REFINED' : 'E2E_DESIGN_GENERATED',
+      },
+    ]);
+    emit({
+      type: 'result',
+      subtype: 'success',
+      session_id: sessionId,
+      uuid: randomUUID(),
+      is_error: false,
+      result: 'Design saved',
+      duration_ms: 1,
+      duration_api_ms: 0,
+      num_turns: 1,
+      total_cost_usd: 0,
+      usage: { input_tokens: 1, output_tokens: 1 },
+      modelUsage: {},
+      permission_denials: [],
+    });
+    return;
+  }
   const file = path.join(process.cwd(), 'add.mjs');
   readFileSync(file, 'utf8');
   assistant([

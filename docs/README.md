@@ -25,6 +25,7 @@
 - [native-agent-context.md](native-agent-context.md) — 原生 agent 上下文说明
 - [plugin-packages.md](plugin-packages.md) — 插件包安装机制
 - [agent-playground.md](agent-playground.md) — Agent playground(事件、热重载、安全模型)
+- [design-workbench.md](design-workbench.md) — 内置设计工作台(预览、精确编辑、版本快照与恢复)
 
 ### development/
 
@@ -56,6 +57,7 @@
 - [2026-10-16 ZCode 差距分析](plans/2026-10-16-zcode-gap-analysis-plan.md)(已完成 → [报告](reviews/2026-10-16-zcode-gap-analysis/00-summary.md))
 - [2026-10-16 第一梯队实现](plans/2026-10-16-first-tier-implementation-plan.md)(验收 5/5 → [验收报告](reviews/2026-10-16-first-tier-implementation/acceptance.md))
 - [2026-10-16 多目录项目](plans/2026-10-16-multi-directory-projects-plan.md)(已落地)
+- [2026-10-23 设计工作台迁移](plans/2026-10-23-design-workbench-implementation-plan.md)(P0/P1 已落地,真实 Tauri 冒烟与远端 backend 验证待补)· [P1 实现设计](plans/2026-10-23-design-workbench-p1-implementation.md)
 
 ## 审查与审计(reviews/)
 

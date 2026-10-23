@@ -98,6 +98,28 @@ describe('MessageInput', () => {
     });
   });
 
+  it('flushes fresh text before focus moves to a workbench action', () => {
+    vi.useFakeTimers();
+    render(
+      <>
+        <MessageInput {...defaultProps} />
+        <button>Generate design</button>
+      </>
+    );
+    const textarea = screen.getByPlaceholderText(/Type a message/);
+    fireEvent.change(textarea, { target: { value: 'Keep this unfinished request' } });
+    expect(mockSetDraft).not.toHaveBeenCalled();
+    fireEvent.blur(textarea, {
+      relatedTarget: screen.getByRole('button', { name: 'Generate design' }),
+    });
+    expect(mockSetDraft).toHaveBeenCalledWith('session-1', {
+      content: 'Keep this unfinished request',
+      attachments: [],
+    });
+    vi.advanceTimersByTime(300);
+    expect(mockSetDraft).toHaveBeenCalledTimes(1);
+  });
+
   it('renders with initialValue', () => {
     render(<MessageInput {...defaultProps} initialValue="Prefilled text" />);
     const textarea = screen.getByRole('textbox');

@@ -44,6 +44,9 @@ vi.mock('../../features/git/components/GitSidebarPanel', () => ({
 vi.mock('../../features/browser/BrowserPanel', () => ({
   BrowserPanel: () => null,
 }));
+vi.mock('../../features/design/DesignPanel', () => ({
+  DesignPanel: () => null,
+}));
 vi.mock('../../stores/terminalStore', () => ({
   useTerminalStore: { getState: () => terminal },
 }));
@@ -112,7 +115,7 @@ describe('initBuiltinPanels', () => {
     const { initBuiltinPanels } = await import('../builtinPanels');
     initBuiltinPanels();
 
-    expect(registerSpy).toHaveBeenCalledTimes(9);
+    expect(registerSpy).toHaveBeenCalledTimes(10);
     expect(registerSpy).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'terminal', pluginId: 'com.claudia.terminal' })
     );
@@ -136,6 +139,14 @@ describe('initBuiltinPanels', () => {
     );
     expect(registerSpy).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'browser', pluginId: 'com.zclaudia.browser' })
+    );
+    expect(registerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'design',
+        pluginId: 'com.zclaudia.design',
+        openMode: 'dedicated',
+        defaultPlacement: 'right',
+      })
     );
   });
 
@@ -245,7 +256,7 @@ describe('builtinPanels openMode', () => {
     usePluginStore.getState().unregisterPanel('draft');
     initBuiltinPanels();
     const restored = usePluginStore.getState().panels;
-    expect(restored).toHaveLength(9);
+    expect(restored).toHaveLength(10);
     expect(restored.find(panel => panel.id === 'terminal')).toBe(terminal);
     expect(restored.find(panel => panel.id === 'draft')?.builtin).toBe(true);
   });

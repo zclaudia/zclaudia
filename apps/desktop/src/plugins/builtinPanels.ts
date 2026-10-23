@@ -18,6 +18,7 @@ import { MemoryPanel } from '../features/memory/MemoryPanel';
 import { LineageActions, LineagePanel } from '../features/lineage/LineagePanel';
 import { GitSidebarPanel } from '../features/git/components/GitSidebarPanel';
 import { BrowserPanel } from '../features/browser/BrowserPanel';
+import { DesignPanel } from '../features/design/DesignPanel';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useFileViewerStore } from '../stores/fileViewerStore';
 import { useDraftEditorStore } from '../stores/draftEditorStore';
@@ -30,6 +31,22 @@ export function initBuiltinPanels() {
   };
 
   // --- Core panels ---
+
+  registerPanel({
+    id: 'design',
+    pluginId: 'com.zclaudia.design',
+    builtin: true,
+    type: 'panel',
+    label: '设计',
+    icon: 'Paintbrush',
+    component: DesignPanel,
+    order: 9,
+    platforms: ['desktop'],
+    defaultPlacement: 'right',
+    openMode: 'dedicated',
+    alwaysMount: false,
+    visible: false,
+  });
 
   // Terminal: always mounted to preserve xterm WebGL state, visibility toggled by user
   registerPanel({

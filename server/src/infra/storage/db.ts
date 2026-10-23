@@ -6,9 +6,18 @@ import { migrations, applyPendingMigrations } from './migrations/index.js';
 import { backfillProtectedMcpOAuthCredentials } from '../../utils/mcp-oauth-credential-protector.js';
 import { withDevAutoReset } from './dev-db-recovery.js';
 
-const DEFAULT_DB_DIR = process.env.ZCLAUDIA_DATA_DIR
-  ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
-  : path.join(os.homedir(), '.zclaudia');
+/**
+ * Resolve the zclaudia data directory (ZCLAUDIA_DATA_DIR ?? ~/.zclaudia).
+ * Shared by initDatabase and any storage that lives beside the database
+ * (e.g. the design snapshot blob store).
+ */
+export function resolveDataDir(): string {
+  return process.env.ZCLAUDIA_DATA_DIR
+    ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
+    : path.join(os.homedir(), '.zclaudia');
+}
+
+const DEFAULT_DB_DIR = resolveDataDir();
 
 export function initDatabase(dbDir: string = DEFAULT_DB_DIR): Database.Database {
   // Ensure directory exists
