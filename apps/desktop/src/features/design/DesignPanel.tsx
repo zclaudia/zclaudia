@@ -1,19 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useWorkspaceTool } from '../../components/workspace/WorkspaceToolContext';
+import { useWorkspaceVisible } from '../../components/workspace/WorkspaceContext';
 import { useComposerStore } from '../../stores/composerStore';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import {
   DesignSnapshotError,
   getDesignAsset,
+  getDesignBrand,
   getDesignDocument,
   restoreDesignSnapshot,
 } from './api';
-import type { DesignConflictFile } from './api';
+import type { DesignBrand, DesignConflictFile } from './api';
+import { buildDesignAgentContext } from './agent-context';
+import type { AgentContextInput, AgentContextSection, AgentContextTask } from './agent-context';
+import { useAgentRunFeedback } from './agent-run-watch';
 import { lineDiff } from './diff';
+import { AgentContextPreview } from './components/AgentContextPreview';
+import { AssetLibrary } from './components/AssetLibrary';
+import { BrandPanel } from './components/BrandPanel';
 import { DesignToolbar } from './components/DesignToolbar';
 import { ExportDialog } from './components/ExportDialog';
+import { TemplateDialog } from './components/TemplateDialog';
 import { PageOverview } from './components/PageOverview';
 import { PageTabs } from './components/PageTabs';
 import { PreviewCanvas } from './components/PreviewCanvas';
@@ -220,6 +229,46 @@ function DesignPanelSession({
   const activePage = state.activePath
     ? (state.pages.find(page => page.path === state.activePath) ?? null)
     : null;
+  const visible = useWorkspaceVisible();
+
+  // ---- P4.6 模板 / 品牌 / 素材对话框与上下文检视（§5.3） ----
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [brandOpen, setBrandOpen] = useState(false);
+  const [assetsOpen, setAssetsOpen] = useState(false);
+  const [contextPreview, setContextPreview] = useState<{
+    task: AgentContextTask;
+    sections: AgentContextSection[];
+    prompt: string;
+  } | null>(null);
+
+  /** 品牌缓存：挂载拉一次，BrandPanel 保存成功后重拉；失败静默（保持 null，section 省略）。 */
+  const brandRef = useRef<DesignBrand | null>(null);
+  const reloadBrand = useCallback(() => {
+    void (async () => {
+      try {
+        brandRef.current = await getDesignBrand(backendId, sessionId);
+      } catch {
+        brandRef.current = null;
+      }
+    })();
+  }, [backendId, sessionId]);
+  useEffect(() => {
+    reloadBrand();
+  }, [reloadBrand]);
+
+  /** 本面板会话内最近导入的素材路径（≤10；进入上下文 Assets，unshift 去重）。 */
+  const recentImportsRef = useRef<string[]>([]);
+  const handleAssetImported = useCallback(
+    (path: string) => {
+      recentImportsRef.current = [path, ...recentImportsRef.current.filter(p => p !== path)].slice(
+        0,
+        10
+      );
+      // 素材变化让下一轮轮询尽快刷新 assetEpoch。
+      refreshNow();
+    },
+    [refreshNow]
+  );
 
   const [channel] = useState(
     () => `design-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`
@@ -525,6 +574,24 @@ function DesignPanelSession({
   const [exportOpen, setExportOpen] = useState(false);
   const [draftDiffOpen, setDraftDiffOpen] = useState(false);
 
+  // ---- P4.5 run 结束反馈（§6.2/§6.3）：面板可见时监视本会话 run 过渡 ----
+  // files 经 ref 每渲染同步，避免闭包过期。
+  const filesRef = useRef(files);
+  filesRef.current = files;
+  const runFeedback = useAgentRunFeedback({
+    sessionId,
+    backendId,
+    enabled: visible,
+    getWatchState: () => ({
+      files: filesRef.current,
+      openPages: controller
+        .getSnapshot()
+        .pages.filter(page => page.docRevision)
+        .map(page => ({ path: page.path, docRevision: page.docRevision as string })),
+    }),
+    refreshNow,
+  });
+
   /** 「保存并导出」的保存步骤：复用 controller.save；成功返回保存后的磁盘修订。 */
   const saveForExport = useCallback(async (): Promise<string | null> => {
     const saved = await controller.save();
@@ -544,17 +611,59 @@ function DesignPanelSession({
     composer.setPendingPrefill(sessionId, combined);
     setPrefillNotice(true);
   };
+
+  /**
+   * 组装 §5.1 上下文输入（P4 §5.3）：面板已知页面与修订、活动页选区、
+   * 品牌缓存、活动页素材引用 + 本会话导入、视口。两品牌文件都缺失时
+   * brand 传 null（section 省略是诚实表现）。
+   */
+  const buildContextInput = useCallback((): AgentContextInput => {
+    const brand = brandRef.current;
+    return {
+      workingDirectory,
+      projectId,
+      pages: state.pages.map(page => ({
+        path: page.path,
+        docRevision: page.docRevision ?? '',
+        dirty: page.status === 'dirty',
+      })),
+      active: activePage
+        ? {
+            path: activePage.path,
+            docRevision: activePage.docRevision ?? '',
+            dirty: activePage.status === 'dirty',
+            selection: activePage.selection
+              ? {
+                  tagName: activePage.selection.tagName,
+                  elementPath: activePage.selection.elementPath,
+                  text: activePage.selection.text,
+                  sourceText: activePage.selection.sourceText,
+                }
+              : null,
+          }
+        : null,
+      brand:
+        brand && (brand.designMd !== null || brand.tokensCss !== null)
+          ? { designMd: brand.designMd, tokensCss: brand.tokensCss }
+          : null,
+      assets: {
+        referenced: (activePage?.deps ?? [])
+          .filter(dep => dep.kind === 'image' || dep.kind === 'font')
+          .map(dep => ({ path: dep.path, kind: dep.kind })),
+        importedRecently: recentImportsRef.current,
+      },
+      viewport: { preset: state.ui.viewport.preset, width: state.ui.viewport.width },
+    };
+  }, [activePage, projectId, state.pages, state.ui.viewport, workingDirectory]);
+
   const generate = () => {
-    prefill(
-      `Create or update a polished static HTML/CSS page at design/index.html in this workspace${workingDirectory ? ` (${workingDirectory})` : ''}. Use local files in the design/ folder with relative paths; do not use JavaScript to render the page or depend on CDN/external resources. Save the page so it appears in the Design panel. Keep the existing project context${projectId ? ` for project ${projectId}` : ''}.`
-    );
+    const context = buildDesignAgentContext(buildContextInput(), 'generate');
+    setContextPreview({ task: 'generate', sections: context.sections, prompt: context.prompt });
   };
   const handoff = () => {
     if (!activePage || !activePage.selection || activePage.status === 'dirty') return;
-    const snippet = (activePage.selection.sourceText ?? activePage.selection.text).slice(0, 1000);
-    prefill(
-      `Modify the selected element in ${activePage.path}. Element: <${activePage.selection.tagName}>; text: ${JSON.stringify(snippet)}; element path: ${activePage.selection.elementPath.join('.')}. Please update the HTML file and preserve the surrounding design.`
-    );
+    const context = buildDesignAgentContext(buildContextInput(), 'modify');
+    setContextPreview({ task: 'modify', sections: context.sections, prompt: context.prompt });
   };
 
   return (
@@ -573,6 +682,9 @@ function DesignPanelSession({
         onToggleTree={() => setTreeOpen(value => !value)}
         onExport={() => setExportOpen(true)}
         onToggleDiff={() => setDraftDiffOpen(true)}
+        onTemplates={() => setTemplatesOpen(true)}
+        onBrand={() => setBrandOpen(true)}
+        onAssets={() => setAssetsOpen(true)}
         onRefresh={refreshNow}
         onGenerate={generate}
         onHandoff={handoff}
@@ -609,6 +721,34 @@ function DesignPanelSession({
           className="border-b border-border px-3 py-1.5 text-xs text-muted-foreground"
         >
           有未保存的修改；请先保存后再交给 Agent 修改。
+        </div>
+      )}
+      {runFeedback.status && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5 text-xs text-muted-foreground"
+        >
+          <span>{runFeedback.status.text}</span>
+          {[...new Set([...runFeedback.status.diff.addedFiles, ...runFeedback.status.diff.changedPages])].map(
+            path => (
+              <button
+                key={path}
+                type="button"
+                onClick={() => void controller.open(path)}
+                className="rounded-md border border-border px-1.5 py-0.5 font-mono text-[11px] transition-colors hover:bg-accent"
+              >
+                {path}
+              </button>
+            )
+          )}
+          <button
+            type="button"
+            aria-label="关闭运行反馈"
+            onClick={runFeedback.dismiss}
+            className="ml-auto rounded-md px-1 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            ×
+          </button>
         </div>
       )}
       {activePage?.externalChange && (
@@ -700,6 +840,56 @@ function DesignPanelSession({
           )}
         </div>
       </div>
+      {contextPreview && (
+        <AgentContextPreview
+          open
+          sections={contextPreview.sections}
+          prompt={contextPreview.prompt}
+          task={contextPreview.task}
+          onClose={() => setContextPreview(null)}
+          onConfirm={() => {
+            prefill(contextPreview.prompt);
+            setContextPreview(null);
+          }}
+        />
+      )}
+      {templatesOpen && (
+        <TemplateDialog
+          open
+          backendId={backendId}
+          sessionId={sessionId}
+          onClose={() => setTemplatesOpen(false)}
+          onInstalled={entry => {
+            // 安装即刷新文件清单并打开入口页；open 失败由页面 error 呈现（结果忽略）。
+            refreshNow();
+            void controller.open(entry);
+            setTemplatesOpen(false);
+          }}
+        />
+      )}
+      {brandOpen && (
+        <BrandPanel
+          open
+          backendId={backendId}
+          sessionId={sessionId}
+          onClose={() => setBrandOpen(false)}
+          onSaved={reloadBrand}
+        />
+      )}
+      {assetsOpen && (
+        <AssetLibrary
+          open
+          backendId={backendId}
+          sessionId={sessionId}
+          openPages={state.pages.map(page => ({ path: page.path, source: page.source }))}
+          referencedAssets={(activePage?.deps ?? []).map(dep => dep.path)}
+          activeDocPath={activePage?.path ?? null}
+          selection={activePage?.selection ? { tagName: activePage.selection.tagName } : null}
+          onApply={handleApply}
+          onImported={handleAssetImported}
+          onClose={() => setAssetsOpen(false)}
+        />
+      )}
       {draftDiffOpen && activePage && (
         <DraftDiffModal
           open

@@ -629,3 +629,261 @@ describe('design deps and export routes', () => {
     expect(await readFile(path.join(rootA, 'index.html'), 'utf8')).toBe('<p>live</p>');
   });
 });
+
+describe('design template, brand and asset routes', () => {
+  let db: Database.Database;
+  let app: express.Express;
+  let temp: string;
+  let rootA: string;
+
+  const sha256 = (source: string | Buffer): string =>
+    createHash('sha256').update(source).digest('hex');
+
+  beforeEach(async () => {
+    temp = await mkdtemp(path.join(os.tmpdir(), 'design-p4-api-'));
+    rootA = path.join(temp, 'a');
+    await mkdir(rootA);
+    db = new Database(':memory:');
+    db.exec(`CREATE TABLE projects (id TEXT PRIMARY KEY, root_path TEXT);
+      CREATE TABLE sessions (id TEXT PRIMARY KEY, project_id TEXT, working_directory TEXT);
+      INSERT INTO projects VALUES ('pa', '${rootA}');
+      INSERT INTO sessions VALUES ('sa', 'pa', NULL);`);
+    app = express();
+    // Mirrors the production body limit so a >10 MiB decoded import fits as
+    // ~13.4 MiB of base64 JSON.
+    app.use(express.json({ limit: '15mb' }));
+    app.use('/api/design', createDesignRoutes(db));
+  });
+  afterEach(async () => {
+    db.close();
+    await rm(temp, { recursive: true, force: true });
+  });
+
+  it('lists the built-in template catalog', async () => {
+    const response = await request(app).get('/api/design/templates');
+    expect(response.status).toBe(200);
+    const templates = response.body.data.templates;
+    expect(templates.map((template: { id: string }) => template.id)).toEqual([
+      'landing',
+      'dashboard',
+      'mobile',
+      'showcase',
+    ]);
+    for (const template of templates) {
+      expect(template).toMatchObject({ version: '1.0.0', source: 'zclaudia-builtin' });
+      expect(template.entry).toBe(`design/${template.id}/index.html`);
+      expect(template.files).toContain(template.entry);
+    }
+  });
+
+  it('installs a template end to end and guards repeats with the conflict file list', async () => {
+    const installed = await request(app)
+      .post('/api/design/templates/install')
+      .send({ sessionId: 'sa', templateId: 'landing' });
+    expect(installed.status).toBe(200);
+    expect(installed.body.data).toEqual({
+      installed: [
+        'design/landing/index.html',
+        'design/landing/styles.css',
+        'design/landing/TEMPLATE.json',
+      ],
+      entry: 'design/landing/index.html',
+    });
+    expect(await readFile(path.join(rootA, 'design', 'landing', 'index.html'), 'utf8')).toContain(
+      '<html lang="zh-CN">'
+    );
+    const marker = JSON.parse(
+      await readFile(path.join(rootA, 'design', 'landing', 'TEMPLATE.json'), 'utf8')
+    );
+    expect(marker).toMatchObject({
+      templateId: 'landing',
+      version: '1.0.0',
+      entry: 'design/landing/index.html',
+    });
+
+    const repeat = await request(app)
+      .post('/api/design/templates/install')
+      .send({ sessionId: 'sa', templateId: 'landing' });
+    expect(repeat.status).toBe(409);
+    expect(repeat.body.error.code).toBe('TEMPLATE_TARGET_EXISTS');
+    expect(repeat.body.error.files).toEqual([
+      'design/landing/index.html',
+      'design/landing/styles.css',
+      'design/landing/TEMPLATE.json',
+    ]);
+
+    const overwritten = await request(app)
+      .post('/api/design/templates/install')
+      .send({ sessionId: 'sa', templateId: 'landing', overwrite: true });
+    expect(overwritten.status).toBe(200);
+    expect(overwritten.body.data.installed).toHaveLength(3);
+
+    // An external edit between installs is still replaceable by an explicit
+    // overwrite (the service hashes the current content before writing; the
+    // mid-install race itself is covered by the application-layer test).
+    await writeFile(path.join(rootA, 'design', 'landing', 'index.html'), '<p>hand-edited</p>');
+    const restored = await request(app)
+      .post('/api/design/templates/install')
+      .send({ sessionId: 'sa', templateId: 'landing', overwrite: true });
+    expect(restored.status).toBe(200);
+    expect(await readFile(path.join(rootA, 'design', 'landing', 'index.html'), 'utf8')).toContain(
+      '<html lang="zh-CN">'
+    );
+
+    const unknown = await request(app)
+      .post('/api/design/templates/install')
+      .send({ sessionId: 'sa', templateId: 'nope' });
+    expect(unknown.status).toBe(404);
+    expect(unknown.body.error.code).toBe('TEMPLATE_NOT_FOUND');
+  });
+
+  it('reads and writes the brand pair with revision protection', async () => {
+    const empty = await request(app).get('/api/design/brand').query({ sessionId: 'sa' });
+    expect(empty.status).toBe(200);
+    expect(empty.body.data).toEqual({
+      designMd: null,
+      designMdRevision: null,
+      tokensCss: null,
+      tokensCssRevision: null,
+    });
+
+    const designMd = '# 品牌与设计系统\n';
+    const tokensCss = ':root { --color-primary: #4f46e5; }\n';
+    const created = await request(app)
+      .put('/api/design/brand')
+      .send({ sessionId: 'sa', designMd, designMdRevision: '', tokensCss, tokensCssRevision: '' });
+    expect(created.status).toBe(200);
+    expect(created.body.data).toEqual({
+      designMdRevision: sha256(designMd),
+      tokensCssRevision: sha256(tokensCss),
+    });
+    const loaded = await request(app).get('/api/design/brand').query({ sessionId: 'sa' });
+    expect(loaded.body.data).toEqual({
+      designMd,
+      designMdRevision: sha256(designMd),
+      tokensCss,
+      tokensCssRevision: sha256(tokensCss),
+    });
+
+    const stale = await request(app)
+      .put('/api/design/brand')
+      .send({ sessionId: 'sa', designMd: '# 过期更新\n', designMdRevision: '' });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe('REVISION_CONFLICT');
+
+    // Single-file commit: tokens.css update leaves DESIGN.md alone.
+    const tokensNext = ':root { --color-primary: #7c3aed; }\n';
+    const single = await request(app).put('/api/design/brand').send({
+      sessionId: 'sa',
+      tokensCss: tokensNext,
+      tokensCssRevision: sha256(tokensCss),
+    });
+    expect(single.status).toBe(200);
+    expect(single.body.data).toEqual({ designMdRevision: null, tokensCssRevision: sha256(tokensNext) });
+    expect((await request(app).get('/api/design/brand').query({ sessionId: 'sa' })).body.data.designMd).toBe(designMd);
+
+    const oversized = 'x'.repeat(256 * 1024 + 1);
+    const tooLarge = await request(app)
+      .put('/api/design/brand')
+      .send({ sessionId: 'sa', designMd: oversized, designMdRevision: '' });
+    expect(tooLarge.status).toBe(413);
+    expect(tooLarge.body.error.code).toBe('FILE_TOO_LARGE');
+
+    const invalid = await request(app).put('/api/design/brand').send({ sessionId: 'sa' });
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('filters assets by kinds with image as the backward-compatible default', async () => {
+    await mkdir(path.join(rootA, 'assets'), { recursive: true });
+    await writeFile(path.join(rootA, 'assets', 'photo.png'), Buffer.from([1]));
+    await writeFile(path.join(rootA, 'assets', 'logo.svg'), '<svg/>');
+    await writeFile(path.join(rootA, 'assets', 'text.woff2'), Buffer.from([2]));
+    await writeFile(path.join(rootA, 'assets', 'font.ttf'), Buffer.from([3]));
+    await writeFile(path.join(rootA, 'assets', 'notes.txt'), 'no');
+
+    const byKinds = new Map<string, string[]>();
+    for (const kinds of [undefined, 'image', 'font', 'all']) {
+      const response = await request(app)
+        .get('/api/design/assets')
+        .query({ sessionId: 'sa', ...(kinds === undefined ? {} : { kinds }) });
+      expect(response.status).toBe(200);
+      byKinds.set(kinds ?? 'default', response.body.data.files);
+    }
+    const images = ['assets/logo.svg', 'assets/photo.png'];
+    const fonts = ['assets/font.ttf', 'assets/text.woff2'];
+    expect(byKinds.get('default')).toEqual(images);
+    expect(byKinds.get('image')).toEqual(images);
+    expect(byKinds.get('font')).toEqual(fonts);
+    expect(byKinds.get('all')).toEqual([...images, ...fonts].sort());
+
+    const bogus = await request(app)
+      .get('/api/design/assets')
+      .query({ sessionId: 'sa', kinds: 'video' });
+    expect(bogus.status).toBe(400);
+    expect(bogus.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('imports assets with dedupe suffixes and rejects invalid names, extensions and payloads', async () => {
+    const png = Buffer.from([137, 80, 78, 71]);
+    const first = await request(app)
+      .post('/api/design/assets/import')
+      .send({ sessionId: 'sa', fileName: 'logo.png', dataBase64: png.toString('base64') });
+    expect(first.status).toBe(200);
+    expect(first.body.data).toEqual({ path: 'design/assets/logo.png' });
+    expect(await readFile(path.join(rootA, 'design', 'assets', 'logo.png'))).toEqual(png);
+
+    const second = await request(app)
+      .post('/api/design/assets/import')
+      .send({ sessionId: 'sa', fileName: 'logo.png', dataBase64: png.toString('base64') });
+    expect(second.status).toBe(200);
+    expect(second.body.data).toEqual({ path: 'design/assets/logo-2.png' });
+    expect(await readFile(path.join(rootA, 'design', 'assets', 'logo-2.png'))).toEqual(png);
+    // Original never overwritten.
+    expect(await readFile(path.join(rootA, 'design', 'assets', 'logo.png'))).toEqual(png);
+
+    const custom = await request(app)
+      .post('/api/design/assets/import')
+      .send({
+        sessionId: 'sa',
+        fileName: 'brand.woff2',
+        dataBase64: Buffer.from([9]).toString('base64'),
+        targetDir: 'design/fonts',
+      });
+    expect(custom.status).toBe(200);
+    expect(custom.body.data).toEqual({ path: 'design/fonts/brand.woff2' });
+
+    const rejects: Array<{ payload: Record<string, unknown>; reason: string }> = [
+      { payload: { fileName: 'a/b.png', dataBase64: 'AAAA' }, reason: 'path separator' },
+      { payload: { fileName: 'notes.txt', dataBase64: 'AAAA' }, reason: 'bad extension' },
+      { payload: { fileName: 'noext', dataBase64: 'AAAA' }, reason: 'missing extension' },
+      { payload: { fileName: 'ok.png', dataBase64: 'not base64!!' }, reason: 'bad base64' },
+      { payload: { fileName: 'ok.png', dataBase64: '' }, reason: 'empty payload' },
+      {
+        payload: {
+          fileName: 'huge.png',
+          dataBase64: Buffer.alloc(10 * 1024 * 1024 + 1).toString('base64'),
+        },
+        reason: 'oversize payload',
+      },
+    ];
+    for (const { payload, reason } of rejects) {
+      const response = await request(app)
+        .post('/api/design/assets/import')
+        .send({ sessionId: 'sa', ...payload });
+      expect(response.status, reason).toBe(400);
+      expect(response.body.error.code, reason).toBe('ASSET_INVALID');
+    }
+
+    const traversal = await request(app)
+      .post('/api/design/assets/import')
+      .send({
+        sessionId: 'sa',
+        fileName: 'ok.png',
+        dataBase64: 'AAAA',
+        targetDir: '../outside',
+      });
+    expect(traversal.status).toBe(400);
+    expect(traversal.body.error.code).toBe('VALIDATION_ERROR');
+  });
+});

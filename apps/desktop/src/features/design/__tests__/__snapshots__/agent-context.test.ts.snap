@@ -1,0 +1,219 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildDesignAgentContext（P4 §5.1 上下文组装） > 完整样例：generate 快照 1`] = `
+{
+  "prompt": "## Workspace
+- Working directory: /Users/dev/demo-site
+- Project: proj-42
+
+## Pages
+- design/index.html (disk rev ba7816bf8f01)
+- design/about.html (disk rev e3b0c44298fc, unsaved local draft)
+
+## Selection
+- Element: <button>
+- Element path: 0.2.1
+- Text: "提交表单"
+- Source: "<button class=\\"cta\\" type=\\"button\\">提交表单</button>"
+
+## Brand rules (design/DESIGN.md)
+# 品牌与设计系统
+
+## 色彩
+| 用途 | Token | 值 |
+|---|---|---|
+| 主色 | --color-primary | #4f46e5 |
+
+## 使用规则
+按钮一律使用主色，圆角统一 md。
+
+## Brand tokens (design/tokens.css)
+:root {
+  --color-primary: #4f46e5;
+  --radius-md: 8px;
+}
+
+## Assets
+- design/assets/logo.svg (image)
+- design/assets/inter.woff2 (font)
+- design/assets/hero.png (imported recently)
+
+## Viewport
+- Preset: mobile
+- Width: 390px
+
+Create or update a polished static HTML/CSS page at design/index.html in this workspace (/Users/dev/demo-site). Use local files in the design/ folder with relative paths; do not use JavaScript to render the page or depend on CDN/external resources. Save the page so it appears in the Design panel. Keep the existing project context for project proj-42. Follow the brand rules and tokens above when present and keep using local files with relative paths.",
+  "sections": [
+    {
+      "lines": [
+        "- Working directory: /Users/dev/demo-site",
+        "- Project: proj-42",
+      ],
+      "title": "Workspace",
+    },
+    {
+      "lines": [
+        "- design/index.html (disk rev ba7816bf8f01)",
+        "- design/about.html (disk rev e3b0c44298fc, unsaved local draft)",
+      ],
+      "title": "Pages",
+    },
+    {
+      "lines": [
+        "- Element: <button>",
+        "- Element path: 0.2.1",
+        "- Text: "提交表单"",
+        "- Source: "<button class=\\"cta\\" type=\\"button\\">提交表单</button>"",
+      ],
+      "title": "Selection",
+    },
+    {
+      "lines": [
+        "# 品牌与设计系统",
+        "",
+        "## 色彩",
+        "| 用途 | Token | 值 |",
+        "|---|---|---|",
+        "| 主色 | --color-primary | #4f46e5 |",
+        "",
+        "## 使用规则",
+        "按钮一律使用主色，圆角统一 md。",
+      ],
+      "title": "Brand rules (design/DESIGN.md)",
+    },
+    {
+      "lines": [
+        ":root {",
+        "  --color-primary: #4f46e5;",
+        "  --radius-md: 8px;",
+        "}",
+      ],
+      "title": "Brand tokens (design/tokens.css)",
+    },
+    {
+      "lines": [
+        "- design/assets/logo.svg (image)",
+        "- design/assets/inter.woff2 (font)",
+        "- design/assets/hero.png (imported recently)",
+      ],
+      "title": "Assets",
+    },
+    {
+      "lines": [
+        "- Preset: mobile",
+        "- Width: 390px",
+      ],
+      "title": "Viewport",
+    },
+  ],
+}
+`;
+
+exports[`buildDesignAgentContext（P4 §5.1 上下文组装） > 完整样例：modify 快照 1`] = `
+{
+  "prompt": "## Workspace
+- Working directory: /Users/dev/demo-site
+- Project: proj-42
+
+## Pages
+- design/index.html (disk rev ba7816bf8f01)
+- design/about.html (disk rev e3b0c44298fc, unsaved local draft)
+
+## Selection
+- Element: <button>
+- Element path: 0.2.1
+- Text: "提交表单"
+- Source: "<button class=\\"cta\\" type=\\"button\\">提交表单</button>"
+
+## Brand rules (design/DESIGN.md)
+# 品牌与设计系统
+
+## 色彩
+| 用途 | Token | 值 |
+|---|---|---|
+| 主色 | --color-primary | #4f46e5 |
+
+## 使用规则
+按钮一律使用主色，圆角统一 md。
+
+## Brand tokens (design/tokens.css)
+:root {
+  --color-primary: #4f46e5;
+  --radius-md: 8px;
+}
+
+## Assets
+- design/assets/logo.svg (image)
+- design/assets/inter.woff2 (font)
+- design/assets/hero.png (imported recently)
+
+## Viewport
+- Preset: mobile
+- Width: 390px
+
+Modify the selected element in design/index.html. Element: <button>; text: "<button class=\\"cta\\" type=\\"button\\">提交表单</button>"; element path: 0.2.1. Please update the HTML file and preserve the surrounding design. Follow the brand rules and tokens above when present and keep using local files with relative paths.",
+  "sections": [
+    {
+      "lines": [
+        "- Working directory: /Users/dev/demo-site",
+        "- Project: proj-42",
+      ],
+      "title": "Workspace",
+    },
+    {
+      "lines": [
+        "- design/index.html (disk rev ba7816bf8f01)",
+        "- design/about.html (disk rev e3b0c44298fc, unsaved local draft)",
+      ],
+      "title": "Pages",
+    },
+    {
+      "lines": [
+        "- Element: <button>",
+        "- Element path: 0.2.1",
+        "- Text: "提交表单"",
+        "- Source: "<button class=\\"cta\\" type=\\"button\\">提交表单</button>"",
+      ],
+      "title": "Selection",
+    },
+    {
+      "lines": [
+        "# 品牌与设计系统",
+        "",
+        "## 色彩",
+        "| 用途 | Token | 值 |",
+        "|---|---|---|",
+        "| 主色 | --color-primary | #4f46e5 |",
+        "",
+        "## 使用规则",
+        "按钮一律使用主色，圆角统一 md。",
+      ],
+      "title": "Brand rules (design/DESIGN.md)",
+    },
+    {
+      "lines": [
+        ":root {",
+        "  --color-primary: #4f46e5;",
+        "  --radius-md: 8px;",
+        "}",
+      ],
+      "title": "Brand tokens (design/tokens.css)",
+    },
+    {
+      "lines": [
+        "- design/assets/logo.svg (image)",
+        "- design/assets/inter.woff2 (font)",
+        "- design/assets/hero.png (imported recently)",
+      ],
+      "title": "Assets",
+    },
+    {
+      "lines": [
+        "- Preset: mobile",
+        "- Width: 390px",
+      ],
+      "title": "Viewport",
+    },
+  ],
+}
+`;

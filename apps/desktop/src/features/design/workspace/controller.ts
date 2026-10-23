@@ -43,6 +43,8 @@ export interface DesignPageSnapshot {
   canUndo: boolean;
   canRedo: boolean;
   error: string;
+  /** 最近一轮 deps stat（无变化探测的原始清单）；null = 尚未拉取。P4 素材引用用。 */
+  deps: DesignDependencyStat[] | null;
 }
 
 export interface DesignWorkspaceSnapshot {
@@ -491,13 +493,17 @@ export class DesignWorkspaceController {
     if (this.disposed) return;
     const page = this.pages.get(result.entry.path);
     if (!page) return;
-    // 首次采样仅建立基线：预览刚按当前磁盘状态构建，无需重建。
+    // 首次采样仅建立基线：预览刚按当前磁盘状态构建，无需重建（assetEpoch
+    // 不变），但公共快照开始携带 deps，仍需失效缓存并通知订阅者。
     if (page.depsFiles === null) {
       page.depsFiles = result.files.map(file => ({ ...file }));
+      this.touch(page);
+      this.emit();
       return;
     }
     if (depsStatsEqual(page.depsFiles, result.files)) return;
     page.depsFiles = result.files.map(file => ({ ...file }));
+    this.touch(page);
     this.assetEpoch += 1;
     this.emit();
   }
@@ -580,6 +586,7 @@ export class DesignWorkspaceController {
         canUndo: page.history.canUndo,
         canRedo: page.history.canRedo,
         error: page.error,
+        deps: page.depsFiles,
       };
       page.snapshotCache = built;
       page.snapshotRev = page.rev;

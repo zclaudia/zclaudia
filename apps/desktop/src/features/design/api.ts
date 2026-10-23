@@ -89,11 +89,18 @@ export function listDesignFiles(backendId: string, sessionId: string): Promise<D
 }
 
 /**
- * 工作区图片文件清单（P3.2 素材选择）：工作区相对路径，按 localeCompare
- * 排序；服务端谓词为图片扩展名白名单。
+ * 工作区素材文件清单（P3.2 素材选择 / P4.3 素材库）：工作区相对路径，
+ * 按 localeCompare 排序。kinds 缺省为 'image'（P3 图片谓词，向后兼容）；
+ * 'font' 为字体扩展名白名单，'all' 为两者并集。
  */
-export function listDesignAssets(backendId: string, sessionId: string): Promise<DesignFileList> {
-  return apiCallForBackend<DesignFileList>(backendId, `/api/design/assets?${query(sessionId)}`);
+export function listDesignAssets(
+  backendId: string,
+  sessionId: string,
+  kinds?: 'image' | 'font' | 'all'
+): Promise<DesignFileList> {
+  const params = new URLSearchParams({ sessionId });
+  if (kinds) params.set('kinds', kinds);
+  return apiCallForBackend<DesignFileList>(backendId, `/api/design/assets?${params.toString()}`);
 }
 
 export function getDesignDocument(
@@ -315,4 +322,119 @@ export async function exportDesignZip(
     match?.[1] ??
     `design-export-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 17)}.zip`;
   return { blob: await response.blob(), filename };
+}
+
+// ---------------------------------------------------------------------------
+// P4 模板与品牌体系
+// ---------------------------------------------------------------------------
+
+/** 内置模板目录项（来源固定 'zclaudia-builtin'，version 随目录演进）。 */
+export interface DesignTemplateSummary {
+  id: string;
+  /** 中文名。 */
+  name: string;
+  /** 中文一句话描述。 */
+  description: string;
+  /** 安装后的工作区相对入口路径（如 'design/landing/index.html'）。 */
+  entry: string;
+  /** 模板将写入的全部文件（不含安装时生成的 TEMPLATE.json）。 */
+  files: string[];
+  version: string;
+  source: string;
+}
+
+/** 模板安装结果：实际写入的工作区相对路径（含 TEMPLATE.json）与入口。 */
+export interface DesignTemplateInstallResult {
+  installed: string[];
+  entry: string;
+}
+
+/** 品牌文件对（design/DESIGN.md + design/tokens.css）；文件不存在时内容与修订为 null。 */
+export interface DesignBrand {
+  designMd: string | null;
+  tokensCss: string | null;
+  designMdRevision: string | null;
+  tokensCssRevision: string | null;
+}
+
+/**
+ * 内置模板目录（静态，无 sessionId）。409 TEMPLATE_TARGET_EXISTS 抛
+ * DesignHttpError，files 为工作区内已存在的冲突路径。
+ */
+export async function installDesignTemplate(
+  backendId: string,
+  input: { sessionId: string; templateId: string; overwrite?: boolean }
+): Promise<DesignTemplateInstallResult> {
+  const path = '/api/design/templates/install';
+  const result = await fetchApiForBackend<DesignTemplateInstallResult>(path, backendId, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: input.sessionId,
+      templateId: input.templateId,
+      ...(input.overwrite === undefined ? {} : { overwrite: input.overwrite }),
+    }),
+  });
+  if (!result.success) {
+    const error = (result.error ?? {}) as { message?: string; code?: string; files?: unknown };
+    throw new DesignHttpError(
+      error.message || `API call failed: POST ${path}`,
+      error.code,
+      Array.isArray(error.files) ? error.files.filter((f): f is string => typeof f === 'string') : []
+    );
+  }
+  return result.data as DesignTemplateInstallResult;
+}
+
+export function listDesignTemplates(
+  backendId: string
+): Promise<{ templates: DesignTemplateSummary[] }> {
+  return apiCallForBackend<{ templates: DesignTemplateSummary[] }>(
+    backendId,
+    '/api/design/templates'
+  );
+}
+
+export function getDesignBrand(backendId: string, sessionId: string): Promise<DesignBrand> {
+  return apiCallForBackend<DesignBrand>(backendId, `/api/design/brand?${query(sessionId)}`);
+}
+
+/**
+ * 写品牌文件：只提交出现的键，两文件独立写入（不跨文件原子）。
+ * 修订规则同 putDesignDocument：SHA-256 校验；文件不存在时传 '' 创建。
+ */
+export function putDesignBrand(
+  backendId: string,
+  input: {
+    sessionId: string;
+    designMd?: string;
+    designMdRevision?: string;
+    tokensCss?: string;
+    tokensCssRevision?: string;
+  }
+): Promise<{ designMdRevision: string | null; tokensCssRevision: string | null }> {
+  return apiCallForBackend<{
+    designMdRevision: string | null;
+    tokensCssRevision: string | null;
+  }>(backendId, '/api/design/brand', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * 导入素材到工作区（默认 design/assets/）：JSON base64，解码后 ≤10 MiB，
+ * 扩展名白名单 = 图片 ∪ 字体。目标已存在时服务端自动加 -2/-3 后缀去重，
+ * 永不覆盖；返回最终写入的工作区相对路径。
+ */
+export function importDesignAsset(
+  backendId: string,
+  input: { sessionId: string; fileName: string; dataBase64: string; targetDir?: string }
+): Promise<{ path: string }> {
+  return apiCallForBackend<{ path: string }>(backendId, '/api/design/assets/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
 }

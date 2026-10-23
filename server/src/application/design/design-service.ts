@@ -15,6 +15,26 @@ const MAX_ASSET_BYTES = 10 * 1024 * 1024;
 const MAX_LIST_FILES = 5000;
 const MAX_LIST_DIRS = 20000;
 const MAX_LIST_DEPTH = 64;
+const MAX_IMPORT_NAME_LENGTH = 200;
+const MAX_IMPORT_NAME_CANDIDATES = 100;
+const IMAGE_ASSET_PATTERN = /\.(png|jpe?g|gif|webp|svg|ico|avif)$/i;
+const FONT_ASSET_PATTERN = /\.(woff2?|ttf|otf|eot)$/i;
+/** Import whitelist = image ∪ font extensions (§4.1). */
+const IMPORTABLE_EXTENSIONS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.ico',
+  '.avif',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.otf',
+  '.eot',
+]);
 const SKIP_DIRS = new Set(['.git', 'node_modules', 'vendor', 'dist', 'build', 'coverage']);
 export const ASSET_TYPES: Record<string, string> = {
   '.png': 'image/png',
@@ -80,6 +100,12 @@ export function toDesignError(error: unknown): unknown {
 
 function hash(source: Buffer | string): string {
   return createHash('sha256').update(source).digest('hex');
+}
+/** Asset listing filters (P4.3): image (P3 default), font, or their union. */
+export type DesignAssetKind = 'image' | 'font' | 'all';
+
+export function isDesignAssetKind(value: unknown): value is DesignAssetKind {
+  return value === 'image' || value === 'font' || value === 'all';
 }
 export function validateRelativePath(value: unknown): string {
   if (
@@ -253,11 +279,19 @@ export class DesignService {
     return { files: await this.walkFiles(root, name => /\.html?$/i.test(name)) };
   }
 
-  async listAssets(sessionId: unknown): Promise<{ files: string[] }> {
+  async listAssets(sessionId: unknown, kinds?: unknown): Promise<{ files: string[] }> {
     const root = await this.workspace(sessionId);
-    return {
-      files: await this.walkFiles(root, name => /\.(png|jpe?g|gif|webp|svg|ico|avif)$/i.test(name)),
-    };
+    let predicate: (name: string) => boolean;
+    if (kinds === undefined || kinds === 'image') {
+      predicate = name => IMAGE_ASSET_PATTERN.test(name);
+    } else if (kinds === 'font') {
+      predicate = name => FONT_ASSET_PATTERN.test(name);
+    } else if (kinds === 'all') {
+      predicate = name => IMAGE_ASSET_PATTERN.test(name) || FONT_ASSET_PATTERN.test(name);
+    } else {
+      throw new DesignError(400, 'VALIDATION_ERROR', "kinds must be one of 'image', 'font' or 'all'");
+    }
+    return { files: await this.walkFiles(root, predicate) };
   }
 
   async readDocument(sessionId: unknown, filePath: unknown) {
@@ -323,5 +357,84 @@ export class DesignService {
     if (!mimeType) throw new DesignError(415, 'UNSUPPORTED_ASSET', 'Asset type is not allowed');
     const { bytes } = await this.readBounded(file.absolute, MAX_ASSET_BYTES, 'Asset');
     return { mimeType, data: bytes.toString('base64') };
+  }
+
+  /**
+   * Import a binary asset (image or font) into the workspace (P4.3 §4.1).
+   * Name, extension and decoded size are validated up front; a name collision
+   * is resolved by appending -2/-3/… suffixes — existing files are never
+   * overwritten. Returns the final workspace-relative path ('/' separated).
+   */
+  async importAsset(
+    sessionId: unknown,
+    fileName: unknown,
+    dataBase64: unknown,
+    targetDir?: unknown
+  ): Promise<{ path: string }> {
+    const name = DesignService.validateAssetFileName(fileName);
+    const bytes = DesignService.decodeAssetDataBase64(dataBase64);
+    const dirRelative = validateRelativePath(targetDir === undefined ? 'design/assets' : targetDir);
+    const root = await this.workspace(sessionId);
+    const dirAbsolute = path.resolve(root, dirRelative);
+    assertContained(root, dirAbsolute);
+    await fs.mkdir(dirAbsolute, { recursive: true });
+    // A symlinked parent must not carry the import outside the workspace;
+    // the leaf itself is guarded by safeWriteFile's no-follow checks.
+    assertContained(root, await fs.realpath(dirAbsolute));
+
+    const extension = path.extname(name);
+    const stem = name.slice(0, name.length - extension.length);
+    let candidate = name;
+    for (let taken = 0; ; taken += 1) {
+      const absolute = path.join(dirAbsolute, candidate);
+      try {
+        await fs.lstat(absolute);
+      } catch {
+        // Free: create it through the guarded write path.
+        try {
+          await safeWriteFile(absolute, bytes, {
+            maxBytes: MAX_ASSET_BYTES,
+            expectedRevision: '',
+            createIfMissing: true,
+          });
+        } catch (error) {
+          throw toDesignError(error);
+        }
+        return { path: [dirRelative.split(path.sep).join('/'), candidate].join('/') };
+      }
+      if (taken >= MAX_IMPORT_NAME_CANDIDATES)
+        throw new DesignError(400, 'ASSET_INVALID', `目标目录同名文件过多，无法为 ${name} 生成新文件名`);
+      candidate = `${stem}-${taken + 2}${extension}`;
+    }
+  }
+
+  /** File-name rules for imports; every violation is a readable ASSET_INVALID. */
+  private static validateAssetFileName(fileName: unknown): string {
+    if (typeof fileName !== 'string' || !fileName || fileName.length > MAX_IMPORT_NAME_LENGTH)
+      throw new DesignError(400, 'ASSET_INVALID', '文件名必须是非空且不超过 200 个字符的字符串');
+    if (/[/\\]/.test(fileName) || path.basename(fileName) !== fileName)
+      throw new DesignError(400, 'ASSET_INVALID', '文件名不能包含路径分隔符');
+    if (/[\u0000-\u001f\u007f]/.test(fileName))
+      throw new DesignError(400, 'ASSET_INVALID', '文件名不能包含控制字符');
+    const extension = path.extname(fileName).toLowerCase();
+    if (!IMPORTABLE_EXTENSIONS.has(extension))
+      throw new DesignError(
+        400,
+        'ASSET_INVALID',
+        `不支持的文件扩展名「${extension || '（无）'}」，仅允许图片与字体文件`
+      );
+    return fileName;
+  }
+
+  /** base64 payload rules: strict syntax, decoded size 1 B–10 MiB. */
+  private static decodeAssetDataBase64(dataBase64: unknown): Buffer {
+    if (typeof dataBase64 !== 'string' || dataBase64.length === 0)
+      throw new DesignError(400, 'ASSET_INVALID', 'dataBase64 必须是非空字符串');
+    if (dataBase64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(dataBase64))
+      throw new DesignError(400, 'ASSET_INVALID', 'dataBase64 不是有效的 base64 编码');
+    const bytes = Buffer.from(dataBase64, 'base64');
+    if (bytes.length < 1 || bytes.length > MAX_ASSET_BYTES)
+      throw new DesignError(400, 'ASSET_INVALID', '素材解码后大小必须在 1 字节到 10 MiB 之间');
+    return bytes;
   }
 }

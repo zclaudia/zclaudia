@@ -6,11 +6,14 @@ import { BlobStore } from '../../infra/design/blob-store.js';
 import {
   DesignError,
   DesignService,
+  isDesignAssetKind,
 } from '../../application/design/design-service.js';
+import { BrandService } from '../../application/design/brand-service.js';
 import { DepsService } from '../../application/design/deps-service.js';
 import { ExportService } from '../../application/design/export-service.js';
 import { SnapshotService } from '../../application/design/snapshot-service.js';
 import { RestoreService } from '../../application/design/restore-service.js';
+import { TemplateService } from '../../application/design/template-service.js';
 
 function handleError(res: Response, error: unknown): void {
   if (error instanceof DesignError) {
@@ -38,6 +41,8 @@ export function createDesignRoutes(db: Database.Database): Router {
   const restores = new RestoreService(db, blobs, snapshots);
   const deps = new DepsService(db);
   const exportService = new ExportService(db);
+  const templates = new TemplateService(service);
+  const brand = new BrandService(service);
   router.get('/files', async (req: Request, res: Response) => {
     try {
       res.json({ success: true, data: await service.list(req.query.sessionId) });
@@ -45,9 +50,68 @@ export function createDesignRoutes(db: Database.Database): Router {
       handleError(res, error);
     }
   });
+  router.get('/templates', async (req: Request, res: Response) => {
+    try {
+      res.json({ success: true, data: templates.list() });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  router.post('/templates/install', async (req: Request, res: Response) => {
+    try {
+      const { sessionId, templateId, overwrite } = req.body ?? {};
+      res.json({
+        success: true,
+        data: await templates.install(sessionId, templateId, overwrite),
+      });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  router.get('/brand', async (req: Request, res: Response) => {
+    try {
+      res.json({ success: true, data: await brand.read(req.query.sessionId) });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  router.put('/brand', async (req: Request, res: Response) => {
+    try {
+      const { sessionId, designMd, designMdRevision, tokensCss, tokensCssRevision } = req.body ?? {};
+      res.json({
+        success: true,
+        data: await brand.write(sessionId, {
+          designMd,
+          designMdRevision,
+          tokensCss,
+          tokensCssRevision,
+        }),
+      });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
   router.get('/assets', async (req: Request, res: Response) => {
     try {
-      res.json({ success: true, data: await service.listAssets(req.query.sessionId) });
+      const kinds = req.query.kinds;
+      if (kinds !== undefined && !isDesignAssetKind(kinds))
+        throw new DesignError(
+          400,
+          'VALIDATION_ERROR',
+          "kinds must be one of 'image', 'font' or 'all'"
+        );
+      res.json({ success: true, data: await service.listAssets(req.query.sessionId, kinds) });
+    } catch (error) {
+      handleError(res, error);
+    }
+  });
+  router.post('/assets/import', async (req: Request, res: Response) => {
+    try {
+      const { sessionId, fileName, dataBase64, targetDir } = req.body ?? {};
+      res.json({
+        success: true,
+        data: await service.importAsset(sessionId, fileName, dataBase64, targetDir),
+      });
     } catch (error) {
       handleError(res, error);
     }

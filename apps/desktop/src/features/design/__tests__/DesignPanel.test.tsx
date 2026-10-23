@@ -35,8 +35,58 @@ vi.mock('../api', () => ({
   restoreDesignSnapshot: vi.fn(),
   exportDesignZip: vi.fn(),
   isDesignHttpError: vi.fn(() => false),
+  listDesignTemplates: vi.fn(),
+  installDesignTemplate: vi.fn(),
+  getDesignBrand: vi.fn(),
+  putDesignBrand: vi.fn(),
+  importDesignAsset: vi.fn(),
 }));
 vi.mock('../preview', () => ({ buildDesignPreview: vi.fn(async () => '<html></html>') }));
+
+/** run 反馈 hook 的受控返回值（横幅用例直接改 status + rerender）。 */
+const runFeedbackMock = vi.hoisted(() => ({
+  status: null as {
+    text: string;
+    diff: { addedFiles: string[]; changedPages: string[] };
+  } | null,
+  dismiss: vi.fn(),
+}));
+vi.mock('../agent-run-watch', () => ({
+  useAgentRunFeedback: vi.fn(() => runFeedbackMock),
+}));
+
+/** L17 三个对话框按既有 mock 风格打桩：只验证接线（open/回调），内部行为有专属测试文件。 */
+vi.mock('../components/TemplateDialog', () => ({
+  TemplateDialog: (props: { open: boolean; onClose: () => void; onInstalled: (entry: string) => void }) =>
+    props.open ? (
+      <div data-testid="template-dialog">
+        <button type="button" onClick={() => props.onInstalled('design/landing/index.html')}>
+          mock-安装并打开入口
+        </button>
+        <button type="button" onClick={props.onClose}>mock-关闭模板</button>
+      </div>
+    ) : null,
+}));
+vi.mock('../components/BrandPanel', () => ({
+  BrandPanel: (props: { open: boolean; onClose: () => void; onSaved: () => void }) =>
+    props.open ? (
+      <div data-testid="brand-panel">
+        <button type="button" onClick={props.onSaved}>mock-保存品牌</button>
+        <button type="button" onClick={props.onClose}>mock-关闭品牌</button>
+      </div>
+    ) : null,
+}));
+vi.mock('../components/AssetLibrary', () => ({
+  AssetLibrary: (props: { open: boolean; onClose: () => void; onImported: (path: string) => void }) =>
+    props.open ? (
+      <div data-testid="asset-library">
+        <button type="button" onClick={() => props.onImported('assets/logo.png')}>
+          mock-导入素材
+        </button>
+        <button type="button" onClick={props.onClose}>mock-关闭素材</button>
+      </div>
+    ) : null,
+}));
 
 const openFileMock = vi.fn();
 vi.mock('../../../stores/fileViewerStore', () => ({
@@ -192,6 +242,13 @@ describe('DesignPanel', () => {
       createdAt: 1730000000000,
     });
     vi.mocked(api.listDesignSnapshots).mockResolvedValue([]);
+    vi.mocked(api.getDesignBrand).mockResolvedValue({
+      designMd: null,
+      tokensCss: null,
+      designMdRevision: null,
+      tokensCssRevision: null,
+    });
+    runFeedbackMock.status = null;
   });
 
   afterEach(() => {
@@ -219,6 +276,12 @@ describe('DesignPanel', () => {
       )
     );
     fireEvent.click(await screen.findByRole('button', { name: '生成页面' }));
+    // P4 §5.3：generate 先经上下文检视模态，确认后才填入聊天。
+    fireEvent.click(
+      await within(
+        await screen.findByRole('dialog', { name: '生成页面 · 设计上下文' })
+      ).getByRole('button', { name: '填入聊天' })
+    );
     const state = useComposerStore.getState();
     expect(state.pendingPrefills['session-1']?.content).toContain('Existing request');
     expect(state.pendingPrefills['session-1']?.content).toContain('design/index.html');
@@ -1153,6 +1216,198 @@ describe('DesignPanel', () => {
       'aria-current',
       'true'
     );
+  });
+
+  // ---- P4（L19）面板接线：三对话框 / 上下文检视 / run 反馈横幅 ----
+
+  it('工具栏模板/品牌/素材按钮打开对应对话框并可关闭', async () => {
+    mount();
+    await screen.findByTitle('设计预览');
+    fireEvent.click(screen.getByRole('button', { name: '模板' }));
+    expect(screen.getByTestId('template-dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'mock-关闭模板' }));
+    expect(screen.queryByTestId('template-dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '品牌' }));
+    expect(screen.getByTestId('brand-panel')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'mock-关闭品牌' }));
+    expect(screen.queryByTestId('brand-panel')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '素材' }));
+    expect(screen.getByTestId('asset-library')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'mock-关闭素材' }));
+    expect(screen.queryByTestId('asset-library')).not.toBeInTheDocument();
+  });
+
+  it('generate：先在检视模态确认，再填入聊天（含工作区路径与品牌遵循句）', async () => {
+    mount();
+    await screen.findByTitle('设计预览');
+    fireEvent.click(screen.getByRole('button', { name: '生成页面' }));
+    const dialog = await screen.findByRole('dialog', { name: '生成页面 · 设计上下文' });
+    expect(useComposerStore.getState().pendingPrefills['session-1']).toBeUndefined();
+    const promptEl = within(dialog).getByText(/Create or update a polished static HTML/);
+    expect(promptEl.textContent).toContain('Working directory: /work');
+    expect(promptEl.textContent).toContain('Follow the brand rules and tokens above when present');
+    fireEvent.click(within(dialog).getByRole('button', { name: '填入聊天' }));
+    const content = useComposerStore.getState().pendingPrefills['session-1']?.content ?? '';
+    expect(content).toContain('design/index.html');
+    expect(content).toContain('Follow the brand rules and tokens above when present');
+    expect(await screen.findByText('已填入当前聊天，补充需求后发送。')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '生成页面 · 设计上下文' })).not.toBeInTheDocument();
+  });
+
+  it('generate：检视模态取消则不填入聊天', async () => {
+    mount();
+    await screen.findByTitle('设计预览');
+    fireEvent.click(screen.getByRole('button', { name: '生成页面' }));
+    const dialog = await screen.findByRole('dialog', { name: '生成页面 · 设计上下文' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
+    expect(useComposerStore.getState().pendingPrefills['session-1']).toBeUndefined();
+    expect(screen.queryByRole('dialog', { name: '生成页面 · 设计上下文' })).not.toBeInTheDocument();
+    expect(screen.queryByText('已填入当前聊天，补充需求后发送。')).not.toBeInTheDocument();
+  });
+
+  it('handoff：检视 prompt 含选中元素 tag/path，确认后填入聊天', async () => {
+    mount();
+    await screen.findByTitle('设计预览');
+    await selectElement();
+    fireEvent.click(screen.getByRole('button', { name: '交给 Agent 修改' }));
+    const dialog = await screen.findByRole('dialog', { name: '交给 Agent 修改 · 设计上下文' });
+    const promptEl = within(dialog).getByText(/Modify the selected element in design\/index\.html/);
+    expect(promptEl.textContent).toContain('Element: <h1>');
+    expect(promptEl.textContent).toContain('element path: 0');
+    fireEvent.click(within(dialog).getByRole('button', { name: '填入聊天' }));
+    const content = useComposerStore.getState().pendingPrefills['session-1']?.content ?? '';
+    expect(content).toContain('Modify the selected element in design/index.html');
+    expect(content).toContain('<h1>');
+    expect(content).toContain('Follow the brand rules and tokens above when present');
+  });
+
+  it('dirty 页仍禁用生成与交接按钮（既有禁用态不变）', async () => {
+    mount();
+    await screen.findByTitle('设计预览');
+    await selectElement();
+    expect(screen.getByRole('button', { name: '生成页面' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '交给 Agent 修改' })).toBeEnabled();
+    fireEvent.change(screen.getByRole('textbox', { name: '元素文字' }), {
+      target: { value: 'Changed' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '应用修改' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '保存' })).toBeEnabled());
+    expect(screen.getByRole('button', { name: '生成页面' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '交给 Agent 修改' })).toBeDisabled();
+  });
+
+  it('品牌缓存进入上下文：检视 prompt 含 DESIGN.md 与 tokens.css 内容', async () => {
+    vi.mocked(api.getDesignBrand).mockResolvedValue({
+      designMd: '# 品牌\n\nBrand voice: calm and precise',
+      tokensCss: ':root { --color-primary: #123456; }',
+      designMdRevision: 'rev-md',
+      tokensCssRevision: 'rev-css',
+    });
+    mount();
+    await screen.findByTitle('设计预览');
+    await waitFor(() => expect(api.getDesignBrand).toHaveBeenCalledWith('remote-1', 'session-1'));
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    fireEvent.click(screen.getByRole('button', { name: '生成页面' }));
+    const dialog = await screen.findByRole('dialog', { name: '生成页面 · 设计上下文' });
+    expect(dialog.textContent).toContain('Brand rules (design/DESIGN.md)');
+    expect(dialog.textContent).toContain('Brand voice: calm and precise');
+    expect(dialog.textContent).toContain('Brand tokens (design/tokens.css)');
+    expect(dialog.textContent).toContain('--color-primary: #123456');
+  });
+
+  it('run 反馈横幅：渲染文案与文件 chip，点击 chip 打开页面，× 触发 dismiss', async () => {
+    disk.set('design/new.html', { source: SOURCE, revision: 'rev-new' });
+    vi.mocked(api.listDesignFiles).mockResolvedValue({
+      files: ['design/index.html', 'design/new.html'],
+    });
+    runFeedbackMock.status = {
+      text: 'Agent 已写入 2 个文件',
+      diff: { addedFiles: ['design/new.html'], changedPages: ['design/index.html'] },
+    };
+    const renderTree = () => (
+      <WorkspaceToolProvider
+        sessionId="session-1"
+        projectId="project-1"
+        projectRoot="/work"
+        workingDirectory="/work"
+        backendId="remote-1"
+        toolId="design"
+        visible
+      >
+        <DesignPanel />
+      </WorkspaceToolProvider>
+    );
+    const view = render(renderTree());
+    expect(await screen.findByText('Agent 已写入 2 个文件')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'design/new.html' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'design/index.html' })).toBeInTheDocument();
+
+    // chip 点击 → controller.open(path)：新页签出现。
+    fireEvent.click(screen.getByRole('button', { name: 'design/new.html' }));
+    expect(await screen.findByRole('tab', { name: /new\.html/ })).toBeInTheDocument();
+
+    // × 关闭走 hook 的 dismiss；status 清空 + rerender 后横幅消失。
+    fireEvent.click(screen.getByRole('button', { name: '关闭运行反馈' }));
+    expect(runFeedbackMock.dismiss).toHaveBeenCalledTimes(1);
+    runFeedbackMock.status = null;
+    view.rerender(renderTree());
+    expect(screen.queryByText('Agent 已写入 2 个文件')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'design/new.html' })).not.toBeInTheDocument();
+  });
+
+  it('素材导入回调：导入路径进入下一次生成的上下文', async () => {
+    mount();
+    await screen.findByTitle('设计预览');
+    fireEvent.click(screen.getByRole('button', { name: '素材' }));
+    expect(screen.getByTestId('asset-library')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'mock-导入素材' }));
+    fireEvent.click(screen.getByRole('button', { name: 'mock-关闭素材' }));
+    expect(screen.queryByTestId('asset-library')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '生成页面' }));
+    const dialog = await screen.findByRole('dialog', { name: '生成页面 · 设计上下文' });
+    expect(dialog.textContent).toContain('assets/logo.png (imported recently)');
+    // 活动页 deps 只有 css（kind 过滤只留 image/font），不出现在素材 section。
+    expect(dialog.textContent).not.toContain('assets/a.css');
+  });
+
+  it('品牌保存成功后面板重拉品牌缓存', async () => {
+    mount();
+    await screen.findByTitle('设计预览');
+    await waitFor(() => expect(api.getDesignBrand).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: '品牌' }));
+    fireEvent.click(screen.getByRole('button', { name: 'mock-保存品牌' }));
+    await waitFor(() => expect(api.getDesignBrand).toHaveBeenCalledTimes(2));
+  });
+
+  it('模板安装回调：刷新清单、打开入口页并关闭对话框', async () => {
+    disk.set('design/landing/index.html', { source: SOURCE, revision: 'rev-landing' });
+    vi.mocked(api.listDesignFiles).mockResolvedValue({
+      files: ['design/index.html', 'design/landing/index.html'],
+    });
+    mount();
+    await screen.findByTitle('设计预览');
+    const callsBefore = vi.mocked(api.listDesignFiles).mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: '模板' }));
+    fireEvent.click(screen.getByRole('button', { name: 'mock-安装并打开入口' }));
+    await waitFor(() =>
+      expect(vi.mocked(api.listDesignFiles).mock.calls.length).toBeGreaterThan(callsBefore)
+    );
+    await waitFor(() =>
+      expect(api.getDesignDocument).toHaveBeenCalledWith(
+        'remote-1',
+        'session-1',
+        'design/landing/index.html'
+      )
+    );
+    // 入口页与初始页 basename 同名（index.html）→ 出现两个同名页签。
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab', { name: /index\.html/ })).toHaveLength(2)
+    );
+    expect(screen.queryByTestId('template-dialog')).not.toBeInTheDocument();
   });
 });
 

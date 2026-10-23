@@ -21,6 +21,12 @@ export interface DesignToolbarProps {
   onExport: () => void;
   /** 打开未保存差异视图（仅活动页 dirty 时可用）。 */
   onToggleDiff: () => void;
+  /** 打开模板对话框（P4 §2.4，与活动页无关）。 */
+  onTemplates: () => void;
+  /** 打开品牌面板（P4 §3.4，与活动页无关）。 */
+  onBrand: () => void;
+  /** 打开素材库（P4 §4.2，与活动页无关）。 */
+  onAssets: () => void;
   onRefresh: () => void;
   onGenerate: () => void;
   onHandoff: () => void;
@@ -45,6 +51,9 @@ export function DesignToolbar({
   onToggleTree,
   onExport,
   onToggleDiff,
+  onTemplates,
+  onBrand,
+  onAssets,
   onRefresh,
   onGenerate,
   onHandoff,
@@ -55,6 +64,17 @@ export function DesignToolbar({
 }: DesignToolbarProps) {
   return (
     <div className="flex flex-wrap items-center gap-1 border-b border-border px-2 py-1.5">
+      <div className="flex items-center gap-1">
+        <Button size="sm" onClick={onTemplates} aria-label="模板">
+          模板
+        </Button>
+        <Button size="sm" onClick={onBrand} aria-label="品牌">
+          品牌
+        </Button>
+        <Button size="sm" onClick={onAssets} aria-label="素材">
+          素材
+        </Button>
+      </div>
       <Button size="sm" onClick={onRefresh} aria-label="刷新设计文件">
         <RefreshCw size={13} />
       </Button>

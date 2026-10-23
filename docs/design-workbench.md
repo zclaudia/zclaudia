@@ -57,15 +57,26 @@
 - **覆盖提示扩展**：应用后自动重选并按属性对比表核对计算样式（颜色等价、关键字、纯 px 数值、font-weight 归一；无可靠口径的键跳过），失配显示既有 override 提示；纯颜色应用沿用 verify 回路。
 - 错误码新增 `ATTRIBUTE_NOT_ALLOWED`/`STRUCTURE_NOT_ALLOWED`/`ANCHOR_REFERENCED`；P3.5（CSS 来源编辑）为独立后续批次。
 
+## P4 模板与品牌体系（2026-10-23）
+
+模板、品牌、素材与「发送前可见」的 Agent 上下文组合，设计与验收细节见 [P4 实现设计](plans/2026-10-23-design-workbench-p4-implementation.md)：
+
+- **使用方式**：工具栏新增 **模板 / 品牌 / 素材** 三个入口（与活动页无关，随时可开）。**模板** 对话框列出内置模板目录，一键安装到工作区（409 冲突需显式「覆盖重装」），安装成功可直接打开入口页，作品与模板互不影响、可独立继续编辑；**品牌** 面板在两文件缺失时提供表单生成 `design/DESIGN.md` + `design/tokens.css`，已存在时切换为带修订校验的文本编辑；**素材** 库按图片/字体分页浏览与导入（重名自动加后缀永不覆盖），可把选中的 `<img>` 替换为素材相对引用。
+- **上下文检视**：**生成页面 / 交给 Agent 修改** 不再直接填入聊天，而是先组装上下文（工作区、各页修订与草稿状态、选中元素定位与源码片段、品牌全文、活动页素材引用与本会话最近导入、当前视口），在检视模态里完整展示，确认后才填入聊天（保留追加语义与提示条）；取消则不填入。品牌文件在面板挂载时拉取缓存、保存成功后刷新。
+- **Agent 反馈横幅**：面板可见时监视本会话 run 结束（runId 非空 → 空），对比前后磁盘文件清单与打开页修订，以 `role="status"` 横幅报告「Agent 已写入 N 个文件」或未检测到变化；新增/变化的文件以可点 chip 打开对应页面，右侧 × 关闭；run 报错时在文案后注明；对修订变化的打开页自动创建 `Agent 时间` 恢复点快照。
+- **能力边界**：无全局素材库（素材即工作区文件）、无选区截图；品牌表单仅在两文件首次生成时提供（此后走文本编辑）；Agent 写入的成功信号来自磁盘对比（文件清单 + 修订），失败与取消以横幅文案如实呈现；上下文只经当前 backend 的 API 组装，不跨 backend。
+- 待补：真实 Agent 冒烟（沿用 P3 口径，M2 门槛）。
+
 ## 模块边界
 
-- `apps/desktop/src/features/design/`：面板与组件（多页标签/视口/总览/导出对话框/元素结构树）、静态预览（含选区导航桥接）、精确编辑引擎（`html/`：样式/属性/结构操作与值校验）、撤销历史（`history/`）、行差异（`diff.ts`）、多页工作台核心（`workspace/`：controller/storage/ports/source-lines）、元素树（`element-tree.ts`）、图片相对引用（`asset-ref.ts`）、backend-aware API 客户端。
+- `apps/desktop/src/features/design/`：面板与组件（多页标签/视口/总览/导出对话框/元素结构树/模板对话框/品牌面板/素材库/上下文检视）、静态预览（含选区导航桥接）、精确编辑引擎（`html/`：样式/属性/结构操作与值校验）、撤销历史（`history/`）、行差异（`diff.ts`）、多页工作台核心（`workspace/`：controller/storage/ports/source-lines）、元素树（`element-tree.ts`）、图片相对引用（`asset-ref.ts`）、品牌渲染与校验（`brand.ts`）、Agent 上下文组装（`agent-context.ts`）、run 结束监视（`agent-run-watch.ts`）、backend-aware API 客户端。
 - `apps/desktop/src/plugins/builtinPanels.ts`：原生内置面板注册。
 - `server/src/application/design/design-service.ts`：从会话解析工作目录、限定文件访问、版本校验和保存（含 allowCreate 重建）。
 - `server/src/application/design/snapshot-service.ts`、`restore-service.ts`、`resource-graph.ts`：快照捕获/清单、分阶段恢复、HTML/CSS 资源引用图。
 - `server/src/application/design/deps-service.ts`、`export-service.ts`：资源 stat 轮询与 ZIP 导出。
+- `server/src/application/design/template-catalog.ts`、`template-service.ts`、`brand-service.ts`：内置模板目录与安装（TEMPLATE.json 标记、覆盖语义）、品牌文件读写（DESIGN.md/tokens.css 渲染与修订校验在 desktop `brand.ts`）；`design-service.ts` 增加素材导入（白名单/上限/自动去重）与素材清单 kinds。
 - `server/src/infra/design/blob-store.ts`：内容寻址快照存储；`server/src/infra/fs/safe-file-write.ts`：共享文件写入边界（锁/修订/备份/原子替换/缺失重建）。
-- `server/src/interfaces/http/design.ts`：已有认证中间件保护的 `/api/design` 路由（文件、快照、恢复、依赖、导出）。
+- `server/src/interfaces/http/design.ts`：已有认证中间件保护的 `/api/design` 路由（文件、快照、恢复、依赖、导出，以及 P4 的模板目录/模板安装/品牌读写/素材清单扩展/素材导入共六个端点）。
 
 预览使用不含 `allow-same-origin` 的 sandbox iframe。宿主只接收目标 iframe 且 channel 匹配的元素选择消息；预览资源通过受认证的宿主 API 读取后内联，不让作品自行访问宿主文件接口。
 
@@ -85,6 +96,8 @@ P1 单元/接口测试覆盖：逐字节源码保留、重复节点与过期选�
 P2 测试覆盖（desktop 220 + server 69 + fileDownload 30，全绿；双端 tsc/eslint 与 react-lifecycle/radius 约束检查通过）：多页打开/编辑/保存互不串扰、8 页上限与 LRU 淘汰、身份隔离与 dispose 陈旧防护、missing/allowCreate 重建、deps stat 变化触发预览重建、可见门控与消息指纹去抖轮询、视口与缩放互不干预、导出解包相对路径原位与清单一致、缺资源 409 与 confirmIncomplete 放行、draft/disk 模式与版本钉（证据见 [P2 实现设计 §10](plans/2026-10-23-design-workbench-p2-implementation.md)）。
 
 P3 测试覆盖（desktop 435 + server 72 + fileDownload 30，全绿；双端 tsc 0 错、eslint 0 error、lifecycle/radius 通过）：24 属性校验逐类合法/非法样本、简写/长写共存与清除语义、无关字节逐字节保持、属性标签匹配拒绝、duplicate 的 id 去重与内部锚点重写、delete 锚点引用拒绝与选父级、move 交换公式与首末拒绝、结构操作混用/根元素拒绝、桥接 select 载荷与 select-path/select-failed 回路、树 capability/truncated/childElementPath、表单分组渲染与预检拦截、图片清单选择与相对路径换算、应用后重选对比（含混合事务颜色失配锁定用例）、纯颜色 verify 回路回归（证据见 [P3 实现设计 §10](plans/2026-10-23-design-workbench-p3-implementation.md)）。
+
+P4 测试覆盖（desktop 524 + server 115，全绿；双端 tsc 0 错、eslint 0 error、lifecycle/radius 通过）：模板目录不变量（骨架/无脚本/无外链/大小/语义分区）与安装全链路（409 files/覆盖重装/symlink 403/并发 403）、品牌读写修订语义与两文件独立写入、素材导入白名单/上限/重名去重/越界拒绝、kinds 向后兼容、品牌渲染器与校验、上下文组装快照与截断、run 反馈 diff/文案/快照失败附注/防抖与清理、三对话框与检视模态、面板接线（生成/续改经检视、横幅 chip、品牌缓存与最近导入入上下文）（证据见 [P4 实现设计 §9](plans/2026-10-23-design-workbench-p4-implementation.md)）。
 
 2026-10-23 本机实测：在 macOS 的 Claudia Dev（Tauri 开发版）中，通过真实 Codex CLI 会话生成 `design/index.html`、本地 CSS 和 5 个 SVG；设计面板自动发现并显示页面。点击纯文本主标题，修改文字与颜色，应用并保存后，直接检查磁盘 HTML 确认写入，再重新载入并重新选择标题，确认文字及计算颜色仍然一致。体验项目位于 `/Users/zhvala/SourceCode/zclaudia-design-demo`，会话名为 `Codex · 设计闭环体验`。
 
