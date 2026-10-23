@@ -224,4 +224,25 @@ describe('ExportService', () => {
     });
     expect(result.filename).toMatch(/^my_page_-\d{8}-\d{6}\.zip$/);
   });
+
+  it('packages referenced videos with kind video in the manifest (§5.3)', async () => {
+    const html = '<html><body><video src="assets/demo.mp4" controls></video></body></html>';
+    await writeFile(path.join(rootA, 'index.html'), html);
+    await mkdir(path.join(rootA, 'assets'), { recursive: true });
+    await writeFile(path.join(rootA, 'assets', 'demo.mp4'), Buffer.from([9, 9, 9, 9]));
+    const result = await exporter.exportZip({
+      sessionId: 'sa',
+      path: 'index.html',
+      mode: 'disk',
+    });
+    expect(result.manifest.missing).toEqual([]);
+    const entry = result.manifest.files.find(file => file.path === 'assets/demo.mp4');
+    expect(entry).toMatchObject({
+      kind: 'video',
+      sha256: sha256(Buffer.from([9, 9, 9, 9])),
+      bytes: 4,
+    });
+    const zip = await JSZip.loadAsync(result.buffer);
+    expect(await zip.file('assets/demo.mp4')?.async('nodebuffer')).toEqual(Buffer.from([9, 9, 9, 9]));
+  });
 });

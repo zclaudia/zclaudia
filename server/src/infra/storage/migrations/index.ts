@@ -52,6 +52,7 @@ import { migration as m_047_prompt_cache_trace } from './047_prompt_cache_trace.
 import { migration as m_048_project_additional_paths } from './048_project_additional_paths.js';
 import { migration as m_049_auto_title_config } from './049_auto_title_config.js';
 import { migration as m_050_design_snapshots } from './050_design_snapshots.js';
+import { migration as m_051_design_media_tasks } from './051_design_media_tasks.js';
 
 export type { Migration };
 
@@ -106,6 +107,7 @@ export const migrations: Migration[] = [
   m_048_project_additional_paths,
   m_049_auto_title_config,
   m_050_design_snapshots,
+  m_051_design_media_tasks,
 ];
 
 /**

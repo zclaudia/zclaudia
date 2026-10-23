@@ -19,7 +19,7 @@ export const DEPS_MAX_CSS_READ_BYTES = 10 * 1024 * 1024;
 export const DEPS_MAX_RESOURCES = 200;
 export const DEPS_MAX_CSS_DEPTH = 4;
 
-export type DesignDependencyKind = 'css' | 'image' | 'font' | 'other';
+export type DesignDependencyKind = 'css' | 'image' | 'font' | 'video' | 'other';
 
 export interface DesignDependencyStat {
   /** Workspace-relative path. */

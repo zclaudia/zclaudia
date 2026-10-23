@@ -29,7 +29,7 @@ export const MAX_LISTED_SNAPSHOTS = 100;
 const SNAPSHOT_SOURCES = new Set(['save', 'manual', 'pre-restore', 'restore']);
 
 export type SnapshotSource = 'save' | 'manual' | 'pre-restore' | 'restore';
-export type SnapshotFileKind = 'entry' | 'css' | 'image' | 'font' | 'other';
+export type SnapshotFileKind = 'entry' | 'css' | 'image' | 'font' | 'video' | 'other';
 
 export interface SnapshotFile {
   path: string;

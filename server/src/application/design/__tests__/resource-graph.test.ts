@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   collectCssResourceRefs,
   collectHtmlResourceRefs,
+  kindForPath,
 } from '../resource-graph.js';
 
 describe('collectHtmlResourceRefs', () => {
@@ -32,7 +33,7 @@ describe('collectHtmlResourceRefs', () => {
     const kinds = new Map(refs.map(ref => [ref.path, ref.kind]));
     expect(kinds.get('assets/site.css')).toBe('css');
     expect(kinds.get('assets/pic.png')).toBe('image');
-    expect(kinds.get('media/clip.mp4')).toBe('other');
+    expect(kinds.get('media/clip.mp4')).toBe('video');
     expect(kinds.get('style-bg.png')).toBe('image');
   });
 
@@ -65,6 +66,29 @@ describe('collectHtmlResourceRefs', () => {
     const html = `<img src="a.png"><img src="a.png"><img src="./a.png">`;
     const { refs } = collectHtmlResourceRefs(html, 'index.html');
     expect(refs).toEqual([{ path: 'a.png', kind: 'image' }]);
+  });
+
+  it('collects <video src> and <source src> references as kind video (§5.3)', () => {
+    const html = `
+      <video src="media/clip.mp4" controls></video>
+      <video controls><source src="media/clip.webm"></video>
+    `;
+    const { refs } = collectHtmlResourceRefs(html, 'index.html');
+    const kinds = new Map(refs.map(ref => [ref.path, ref.kind]));
+    expect(kinds.get('media/clip.mp4')).toBe('video');
+    expect(kinds.get('media/clip.webm')).toBe('video');
+  });
+});
+
+describe('kindForPath', () => {
+  it('maps mp4/webm/mov (any case) to video and leaves other extensions alone', () => {
+    expect(kindForPath('media/clip.mp4')).toBe('video');
+    expect(kindForPath('media/clip.webm')).toBe('video');
+    expect(kindForPath('media/clip.MOV')).toBe('video');
+    expect(kindForPath('media/clip.mp3')).toBe('other');
+    expect(kindForPath('media/clip.png')).toBe('image');
+    expect(kindForPath('media/clip.woff2')).toBe('font');
+    expect(kindForPath('media/clip.css')).toBe('css');
   });
 });
 

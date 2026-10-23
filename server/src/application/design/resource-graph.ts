@@ -13,7 +13,7 @@ import path from 'node:path';
  * treated as resources.
  */
 
-export type ResourceRefKind = 'css' | 'image' | 'font' | 'other';
+export type ResourceRefKind = 'css' | 'image' | 'font' | 'video' | 'other';
 
 export interface ResourceRef {
   /** Workspace-relative, normalized path. */
@@ -34,12 +34,14 @@ export interface ResourceRefResult {
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.avif']);
 const FONT_EXTENSIONS = new Set(['.woff', '.woff2', '.ttf', '.otf', '.eot']);
+const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.mov']);
 
 export function kindForPath(refPath: string): ResourceRefKind {
   const ext = path.posix.extname(refPath).toLowerCase();
   if (ext === '.css') return 'css';
   if (IMAGE_EXTENSIONS.has(ext)) return 'image';
   if (FONT_EXTENSIONS.has(ext)) return 'font';
+  if (VIDEO_EXTENSIONS.has(ext)) return 'video';
   return 'other';
 }
 
@@ -163,6 +165,13 @@ export function collectHtmlResourceRefs(html: string, entryPath: string): Resour
       if (srcset !== null) {
         for (const candidate of parseSrcset(srcset)) candidates.push({ raw: candidate });
       }
+      return;
+    }
+    if (element.tagName === 'video') {
+      // §5.3: <video src> is collected alongside <source src> (poster is out
+      // of scope for the video kind contract).
+      const src = attr(element, 'src');
+      if (src !== null) candidates.push({ raw: src });
       return;
     }
     if (element.tagName === 'source') {

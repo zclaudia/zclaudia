@@ -19,7 +19,7 @@ export const EXPORT_MAX_RESOURCES = 200;
 export const EXPORT_MAX_CSS_DEPTH = 4;
 export const EXPORT_MANIFEST_NAME = 'zclaudia-export.json';
 
-export type DesignExportFileKind = 'entry' | 'css' | 'image' | 'font' | 'other';
+export type DesignExportFileKind = 'entry' | 'css' | 'image' | 'font' | 'video' | 'other';
 
 export interface DesignExportManifestFile {
   path: string;

@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm, truncate, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -165,6 +165,36 @@ describe('SnapshotService', () => {
     const summary = await snapshots.capture('sa', 'index.html');
     expect(summary.complete).toBe(false);
     expect(summary.incompleteReasons.some(reason => reason.includes('big.png'))).toBe(true);
+  });
+
+  it('captures a small referenced video with kind video and its mime (§5.3)', async () => {
+    await writeFile(
+      path.join(rootA, 'index.html'),
+      '<html><body><video src="media/clip.mp4" controls></video></body></html>'
+    );
+    await mkdir(path.join(rootA, 'media'));
+    await writeFile(path.join(rootA, 'media', 'clip.mp4'), Buffer.from([1, 2, 3, 4]));
+    const summary = await snapshots.capture('sa', 'index.html');
+    expect(summary.complete).toBe(true);
+    const detail = await snapshots.detail('sa', summary.id);
+    const clip = detail.files.find(file => file.path === 'media/clip.mp4');
+    expect(clip).toMatchObject({ kind: 'video', mime: 'video/mp4', bytes: 4 });
+  });
+
+  it('marks a >10 MiB video incomplete (sparse file) without claiming a full snapshot', async () => {
+    await writeFile(
+      path.join(rootA, 'index.html'),
+      '<html><body><video src="media/big.mp4" controls></video></body></html>'
+    );
+    await mkdir(path.join(rootA, 'media'));
+    // Sparse file: stat.size exceeds the 10 MiB capture cap without real bytes.
+    await writeFile(path.join(rootA, 'media', 'big.mp4'), '');
+    await truncate(path.join(rootA, 'media', 'big.mp4'), 10 * 1024 * 1024 + 1);
+    const summary = await snapshots.capture('sa', 'index.html');
+    expect(summary.complete).toBe(false);
+    expect(summary.incompleteReasons.some(reason => reason.includes('media/big.mp4'))).toBe(true);
+    const detail = await snapshots.detail('sa', summary.id);
+    expect(detail.files.map(file => file.path)).toEqual(['index.html']);
   });
 
   it('stops at the resource reference limit with an explicit reason', async () => {

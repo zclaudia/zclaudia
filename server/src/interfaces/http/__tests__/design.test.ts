@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import Database from 'better-sqlite3';
@@ -7,8 +7,23 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createDesignRoutes } from '../design.js';
+import { createDesignRoutes, type DesignMediaRoutesDeps } from '../design.js';
 import { migration as migration050 } from '../../../infra/storage/migrations/050_design_snapshots.js';
+import { migration as migration051 } from '../../../infra/storage/migrations/051_design_media_tasks.js';
+import { DesignError } from '../../../application/design/design-service.js';
+import {
+  MediaTaskService,
+  type DesignMediaTaskSummary,
+} from '../../../application/design/media-task-service.js';
+import type { MediaImageProvider } from '../../../application/design/media-types.js';
+
+/** supertest 二进制响应收集（export 与媒体 result 流式端点共用形态）。 */
+function parseBinary(res: unknown, callback: (error: Error | null, body?: Buffer) => void): void {
+  const stream = res as { on: (event: string, listener: (chunk?: Buffer) => void) => void };
+  const chunks: Buffer[] = [];
+  stream.on('data', chunk => chunks.push(chunk as Buffer));
+  stream.on('end', () => callback(null, Buffer.concat(chunks)));
+}
 
 describe('design routes', () => {
   let db: Database.Database;
@@ -817,9 +832,10 @@ describe('design template, brand and asset routes', () => {
     expect(byKinds.get('font')).toEqual(fonts);
     expect(byKinds.get('all')).toEqual([...images, ...fonts].sort());
 
+    // 'video' is a valid kind since P6 §5.3; a truly unknown kind still rejects.
     const bogus = await request(app)
       .get('/api/design/assets')
-      .query({ sessionId: 'sa', kinds: 'video' });
+      .query({ sessionId: 'sa', kinds: 'audio' });
     expect(bogus.status).toBe(400);
     expect(bogus.body.error.code).toBe('VALIDATION_ERROR');
   });
@@ -885,5 +901,418 @@ describe('design template, brand and asset routes', () => {
       });
     expect(traversal.status).toBe(400);
     expect(traversal.body.error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+/** 媒体路由假件：记录调用并返回固定信封数据（不触真装配）。 */
+class FakeMediaService {
+  createCalls: Array<{ sessionId: unknown; input: unknown }> = [];
+  listCalls: Array<{ sessionId: unknown; limit: unknown }> = [];
+  cancelCalls: Array<{ sessionId: unknown; taskId: unknown }> = [];
+  resultTargetCalls: Array<{ sessionId: unknown; taskId: unknown }> = [];
+  listResult: DesignMediaTaskSummary[] = [];
+  createError: DesignError | null = null;
+  resultTargetError: DesignError | null = null;
+  resultTargetValue: {
+    absolutePath: string;
+    fileName: string;
+    mime: string;
+    bytes: number;
+  } = { absolutePath: '/nowhere/x.png', fileName: 'x.png', mime: 'image/png', bytes: 0 };
+
+  async create(sessionId: unknown, input: unknown): Promise<DesignMediaTaskSummary> {
+    this.createCalls.push({ sessionId, input });
+    if (this.createError) throw this.createError;
+    return {
+      id: `task-${this.createCalls.length}`,
+      kind: 'image-generate',
+      status: 'queued',
+      createdAt: 100,
+      updatedAt: 100,
+      provider: {
+        providerId: 'openai-images',
+        profileId: 'p1',
+        profileName: 'BigModel',
+        model: 'cogview-4',
+      },
+      params: { type: 'image-generate', prompt: 'a cat', targetDir: 'design/assets' },
+      progress: null,
+      result: null,
+      error: null,
+    };
+  }
+
+  async list(sessionId: unknown, limit?: unknown): Promise<DesignMediaTaskSummary[]> {
+    this.listCalls.push({ sessionId, limit });
+    return this.listResult;
+  }
+
+  async cancel(sessionId: unknown, taskId: unknown): Promise<DesignMediaTaskSummary> {
+    this.cancelCalls.push({ sessionId, taskId });
+    return {
+      id: String(taskId),
+      kind: 'image-generate',
+      status: 'cancelled',
+      createdAt: 100,
+      updatedAt: 200,
+      provider: null,
+      params: { type: 'image-generate', prompt: 'a cat', targetDir: 'design/assets' },
+      progress: null,
+      result: null,
+      error: null,
+    };
+  }
+
+  async resultTarget(
+    sessionId: unknown,
+    taskId: unknown
+  ): Promise<{ absolutePath: string; fileName: string; mime: string; bytes: number }> {
+    this.resultTargetCalls.push({ sessionId, taskId });
+    if (this.resultTargetError) throw this.resultTargetError;
+    return this.resultTargetValue;
+  }
+}
+
+describe('design media routes', () => {
+  let db: Database.Database;
+  let app: express.Express;
+  let temp: string;
+  let rootA: string;
+  let media: FakeMediaService;
+
+  beforeEach(async () => {
+    temp = await mkdtemp(path.join(os.tmpdir(), 'design-media-api-'));
+    rootA = path.join(temp, 'a');
+    await mkdir(rootA);
+    db = new Database(':memory:');
+    db.exec(`CREATE TABLE projects (id TEXT PRIMARY KEY, root_path TEXT);
+      CREATE TABLE sessions (id TEXT PRIMARY KEY, project_id TEXT, working_directory TEXT);
+      INSERT INTO projects VALUES ('pa', '${rootA}');
+      INSERT INTO sessions VALUES ('sa', 'pa', NULL);`);
+    media = new FakeMediaService();
+    app = express();
+    app.use(express.json({ limit: '3mb' }));
+    app.use(
+      '/api/design',
+      createDesignRoutes(db, {
+        mediaService: media as unknown as MediaTaskService,
+        listProfiles: () => [
+          { id: 'p1', name: 'BigModel', providerType: 'openai', apiKey: 'sk-secret' },
+          { id: 'p2', name: 'Keyless', providerType: 'openai' },
+          { id: 'p3', name: 'Claude', providerType: 'anthropic', apiKey: 'sk-anthropic' },
+        ],
+      })
+    );
+  });
+  afterEach(async () => {
+    db.close();
+    await rm(temp, { recursive: true, force: true });
+  });
+
+  it('lists the provider catalog with openai-only profiles and no credential material', async () => {
+    const response = await request(app).get('/api/design/media/providers');
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.providers).toEqual([
+      { id: 'openai-images', label: 'OpenAI 兼容图片服务', capabilities: ['generate', 'edit'] },
+    ]);
+    expect(response.body.data.profiles).toEqual([
+      { id: 'p1', name: 'BigModel', providerType: 'openai', hasCredential: true },
+      { id: 'p2', name: 'Keyless', providerType: 'openai', hasCredential: false },
+    ]);
+    const raw = JSON.stringify(response.body);
+    expect(raw).not.toContain('sk-secret');
+    expect(raw).not.toContain('sk-anthropic');
+    expect(raw).not.toContain('apiKey');
+  });
+
+  it('creates tasks through the service with the body minus sessionId and maps errors to envelopes', async () => {
+    const payload = {
+      kind: 'image-generate',
+      provider: { profileId: 'p1', model: 'cogview-4' },
+      prompt: 'a cat',
+    };
+    const created = await request(app)
+      .post('/api/design/media-tasks')
+      .send({ sessionId: 'sa', ...payload });
+    expect(created.status).toBe(201);
+    expect(created.body.success).toBe(true);
+    expect(created.body.data).toMatchObject({ id: 'task-1', kind: 'image-generate', status: 'queued' });
+    expect(media.createCalls).toEqual([{ sessionId: 'sa', input: payload }]);
+
+    media.createError = new DesignError(409, 'MEDIA_TASK_ACTIVE_EXISTS', '已有相同任务在进行中');
+    const conflict = await request(app)
+      .post('/api/design/media-tasks')
+      .send({ sessionId: 'sa', ...payload });
+    expect(conflict.status).toBe(409);
+    expect(conflict.body).toMatchObject({
+      success: false,
+      error: { code: 'MEDIA_TASK_ACTIVE_EXISTS', message: '已有相同任务在进行中' },
+    });
+
+    media.createError = new DesignError(400, 'MEDIA_VALIDATION', 'prompt 必须是非空字符串');
+    const invalid = await request(app)
+      .post('/api/design/media-tasks')
+      .send({ sessionId: 'sa', kind: 'image-generate' });
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.error).toMatchObject({
+      code: 'MEDIA_VALIDATION',
+      message: 'prompt 必须是非空字符串',
+    });
+  });
+
+  it('lists tasks newest first and coerces a numeric limit from the query', async () => {
+    media.listResult = [
+      { id: 't2' } as DesignMediaTaskSummary,
+      { id: 't1' } as DesignMediaTaskSummary,
+    ];
+    const all = await request(app).get('/api/design/media-tasks').query({ sessionId: 'sa' });
+    expect(all.status).toBe(200);
+    expect(all.body).toEqual({ success: true, data: { tasks: media.listResult } });
+    expect(media.listCalls[0]).toEqual({ sessionId: 'sa', limit: undefined });
+
+    await request(app).get('/api/design/media-tasks').query({ sessionId: 'sa', limit: '2' });
+    expect(media.listCalls[1]).toEqual({ sessionId: 'sa', limit: 2 });
+  });
+
+  it('cancels by task id from the path with the body session', async () => {
+    const cancelled = await request(app)
+      .post('/api/design/media-tasks/task-9/cancel')
+      .send({ sessionId: 'sa' });
+    expect(cancelled.status).toBe(200);
+    expect(cancelled.body).toMatchObject({
+      success: true,
+      data: { id: 'task-9', status: 'cancelled' },
+    });
+    expect(media.cancelCalls).toEqual([{ sessionId: 'sa', taskId: 'task-9' }]);
+  });
+
+  it('streams completed results as binary attachments and maps invalid state to a 409 envelope', async () => {
+    const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+    await mkdir(path.join(rootA, 'design', 'assets'), { recursive: true });
+    await writeFile(path.join(rootA, 'design', 'assets', 'gen-cat.png'), bytes);
+    media.resultTargetValue = {
+      absolutePath: path.join(rootA, 'design', 'assets', 'gen-cat.png'),
+      fileName: 'gen-cat.png',
+      mime: 'image/png',
+      bytes: bytes.length,
+    };
+
+    const ok = await request(app)
+      .get('/api/design/media-tasks/task-1/result')
+      .query({ sessionId: 'sa' })
+      .buffer(true)
+      .parse(parseBinary);
+    expect(ok.status).toBe(200);
+    expect(ok.headers['content-type']).toBe('image/png');
+    expect(ok.headers['content-disposition']).toBe('attachment; filename="gen-cat.png"');
+    expect(Number(ok.headers['content-length'])).toBe(bytes.length);
+    expect(ok.body).toEqual(bytes);
+    expect(media.resultTargetCalls).toEqual([{ sessionId: 'sa', taskId: 'task-1' }]);
+
+    media.resultTargetError = new DesignError(
+      409,
+      'MEDIA_TASK_INVALID_STATE',
+      '任务尚未完成或没有产物'
+    );
+    const conflict = await request(app)
+      .get('/api/design/media-tasks/task-1/result')
+      .query({ sessionId: 'sa' });
+    expect(conflict.status).toBe(409);
+    expect(conflict.body.error).toMatchObject({
+      code: 'MEDIA_TASK_INVALID_STATE',
+      message: '任务尚未完成或没有产物',
+    });
+  });
+});
+
+describe('design media routes real assembly', () => {
+  let db: Database.Database;
+  let temp: string;
+  let rootA: string;
+
+  beforeEach(async () => {
+    temp = await mkdtemp(path.join(os.tmpdir(), 'design-media-real-'));
+    rootA = path.join(temp, 'a');
+    await mkdir(rootA);
+    db = new Database(':memory:');
+    db.exec(`CREATE TABLE projects (id TEXT PRIMARY KEY, root_path TEXT);
+      CREATE TABLE sessions (id TEXT PRIMARY KEY, project_id TEXT, working_directory TEXT);
+      INSERT INTO projects VALUES ('pa', '${rootA}');
+      INSERT INTO sessions VALUES ('sa', 'pa', NULL);`);
+    db.exec(migration051.sql);
+    // llm_profiles 最小 DDL（migration 001 同款前缀列；mapRow 对缺省列宽容）。
+    db.exec(`CREATE TABLE IF NOT EXISTS llm_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      provider_type TEXT NOT NULL DEFAULT 'anthropic',
+      base_url TEXT,
+      api_key TEXT,
+      compat TEXT,
+      env TEXT,
+      is_default INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );`);
+    const insertProfile = db.prepare(
+      `INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, is_default, created_at, updated_at)
+       VALUES (?, ?, ?, 'https://api.openai.com/v1', ?, 0, 1, 1)`
+    );
+    insertProfile.run('p-live', 'BigModel Live', 'openai', 'sk-live-1');
+    insertProfile.run('p-blank', 'Keyless OpenAI', 'openai', null);
+    insertProfile.run('p-claude', 'Claude', 'anthropic', 'sk-anthropic');
+  });
+  afterEach(async () => {
+    db.close();
+    await rm(temp, { recursive: true, force: true });
+  });
+
+  function mountApp(mediaDeps?: DesignMediaRoutesDeps): express.Express {
+    const app = express();
+    app.use(express.json({ limit: '3mb' }));
+    app.use('/api/design', createDesignRoutes(db, mediaDeps));
+    return app;
+  }
+
+  /** 轮询任务列表直至终态（媒体任务经 HTTP 轮询观察，进度即列表）。 */
+  async function waitForTerminal(
+    app: express.Express,
+    sessionId: string,
+    taskId: string
+  ): Promise<DesignMediaTaskSummary> {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const listed = await request(app).get('/api/design/media-tasks').query({ sessionId });
+      const task = listed.body.data.tasks.find((entry: { id: string }) => entry.id === taskId);
+      if (task && (task.status === 'completed' || task.status === 'failed')) return task;
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    throw new Error(`task ${taskId} did not reach a terminal state in time`);
+  }
+
+  it('serves the provider catalog from the real profile repository without leaking keys', async () => {
+    const response = await request(mountApp()).get('/api/design/media/providers');
+    expect(response.status).toBe(200);
+    expect(response.body.data.providers).toEqual([
+      { id: 'openai-images', label: 'OpenAI 兼容图片服务', capabilities: ['generate', 'edit'] },
+    ]);
+    // findAllOrdered：is_default DESC 后 name ASC。
+    expect(response.body.data.profiles).toEqual([
+      { id: 'p-live', name: 'BigModel Live', providerType: 'openai', hasCredential: true },
+      { id: 'p-blank', name: 'Keyless OpenAI', providerType: 'openai', hasCredential: false },
+    ]);
+    expect(JSON.stringify(response.body)).not.toContain('sk-');
+  });
+
+  it('validates create bodies through the real service before any task row exists', async () => {
+    const app = mountApp();
+    const invalid = await request(app)
+      .post('/api/design/media-tasks')
+      .send({ sessionId: 'sa', kind: 'nope' });
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.error.code).toBe('MEDIA_VALIDATION');
+
+    const unknownProfile = await request(app)
+      .post('/api/design/media-tasks')
+      .send({
+        sessionId: 'sa',
+        kind: 'image-generate',
+        provider: { profileId: 'absent', model: 'm' },
+        prompt: 'x',
+      });
+    expect(unknownProfile.status).toBe(400);
+    expect(unknownProfile.body.error.message).toBe('指定的服务配置不存在');
+  });
+
+  it('runs image generation end to end with an injected provider and streams the artifact back', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 9, 8, 7]);
+    const generate = vi.fn(async () => ({
+      bytes: png,
+      mime: 'image/png' as const,
+      usage: { totalCostUsd: 0.01 },
+    }));
+    const fakeProvider: MediaImageProvider = {
+      info: { id: 'fake-images', label: '假图片服务', capabilities: ['generate'] },
+      generate: generate as unknown as MediaImageProvider['generate'],
+      edit: async () => ({ bytes: png, mime: 'image/png', usage: null }),
+    };
+    const app = mountApp({ makeImageProvider: async () => fakeProvider });
+
+    const created = await request(app)
+      .post('/api/design/media-tasks')
+      .send({
+        sessionId: 'sa',
+        kind: 'image-generate',
+        provider: { profileId: 'p-live', model: 'cogview-4' },
+        prompt: 'a cat',
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.data.provider).toEqual({
+      providerId: 'openai-images',
+      profileId: 'p-live',
+      profileName: 'BigModel Live',
+      model: 'cogview-4',
+    });
+    const id: string = created.body.data.id;
+
+    const summary = await waitForTerminal(app, 'sa', id);
+    expect(summary.status).toBe('completed');
+    expect(summary.result).toMatchObject({ mime: 'image/png', usage: { totalCostUsd: 0.01 } });
+    expect(summary.result.path).toMatch(/^design\/assets\/gen-a-cat-\d{8}-\d{6}\.png$/);
+    expect(await readFile(path.join(rootA, summary.result.path))).toEqual(png);
+    expect(generate).toHaveBeenCalledWith({
+      prompt: 'a cat',
+      size: undefined,
+      signal: expect.anything(),
+    });
+
+    const download = await request(app)
+      .get(`/api/design/media-tasks/${id}/result`)
+      .query({ sessionId: 'sa' })
+      .buffer(true)
+      .parse(parseBinary);
+    expect(download.status).toBe(200);
+    expect(download.headers['content-type']).toBe('image/png');
+    expect(download.headers['content-disposition']).toBe(
+      `attachment; filename="${path.basename(summary.result.path)}"`
+    );
+    expect(download.body).toEqual(png);
+  });
+
+  it('fails tasks through the real credential guards without touching the network', async () => {
+    const app = mountApp();
+    // 非 openai 型 profile 在提交期即被拒（resolveProfileName 限定）。
+    const anthropic = await request(app)
+      .post('/api/design/media-tasks')
+      .send({
+        sessionId: 'sa',
+        kind: 'image-generate',
+        provider: { profileId: 'p-claude', model: 'm' },
+        prompt: 'guard one',
+      });
+    expect(anthropic.status).toBe(400);
+    expect(anthropic.body.error).toMatchObject({
+      code: 'MEDIA_VALIDATION',
+      message: '指定的服务配置不存在',
+    });
+
+    // openai 型但缺 apiKey：提交通过，执行期凭据守卫让任务失败（不触网）。
+    const keyless = await request(app)
+      .post('/api/design/media-tasks')
+      .send({
+        sessionId: 'sa',
+        kind: 'image-generate',
+        provider: { profileId: 'p-blank', model: 'm' },
+        prompt: 'guard two',
+      });
+    const missingKey = await waitForTerminal(app, 'sa', keyless.body.data.id);
+    expect(missingKey.status).toBe('failed');
+    expect(missingKey.error).toMatchObject({
+      code: 'INTERNAL',
+      message: '所选服务配置缺少 API Key',
+    });
+
+    // 失败任务不落任何产物文件。
+    const assets = await request(app).get('/api/design/assets').query({ sessionId: 'sa' });
+    expect(assets.body.data.files).toEqual([]);
   });
 });
