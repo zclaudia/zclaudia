@@ -153,7 +153,7 @@ export interface DesignSnapshotFile {
   path: string;
   sha256: string;
   bytes: number;
-  kind: 'entry' | 'css' | 'image' | 'font' | 'other';
+  kind: 'entry' | 'css' | 'image' | 'font' | 'video' | 'other';
   mime: string | null;
 }
 
@@ -176,7 +176,7 @@ export interface DesignZoom {
   value: number;
 }
 
-export type DesignDependencyKind = 'css' | 'image' | 'font' | 'other';
+export type DesignDependencyKind = 'css' | 'image' | 'font' | 'video' | 'other';
 
 export interface DesignDependencyStat {
   /** 工作区相对路径。 */

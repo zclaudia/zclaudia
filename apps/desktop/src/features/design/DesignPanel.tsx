@@ -13,6 +13,7 @@ import {
   restoreDesignSnapshot,
 } from './api';
 import type { DesignBrand, DesignConflictFile } from './api';
+import { relativeAssetRef } from './asset-ref';
 import { buildDesignAgentContext } from './agent-context';
 import type { AgentContextInput, AgentContextSection, AgentContextTask } from './agent-context';
 import { useAgentRunFeedback } from './agent-run-watch';
@@ -24,6 +25,7 @@ import { DeckPanel } from './components/DeckPanel';
 import { DeckPresenter } from './components/DeckPresenter';
 import { DesignToolbar } from './components/DesignToolbar';
 import { ExportDialog } from './components/ExportDialog';
+import { MediaGenPanel } from './components/MediaGenPanel';
 import { RenderExportDialog } from './components/RenderExportDialog';
 import { TemplateDialog } from './components/TemplateDialog';
 import { PageOverview } from './components/PageOverview';
@@ -262,15 +264,18 @@ function DesignPanelSession({
   const [presentDeck, setPresentDeck] = useState<{ startIndex: number } | null>(null);
   const [deckOpen, setDeckOpen] = useState(false);
   const [renderExportOpen, setRenderExportOpen] = useState(false);
+  /** P6 §8.3 媒体生成面板：与活动页无关的入口（视频 tab 缺省入口为活动页）。 */
+  const [mediaOpen, setMediaOpen] = useState(false);
   /** 运行模式导航提示（design-navigate / design-nav-blocked），5 秒自动消失或手动关闭。 */
   const [runNotice, setRunNotice] = useState<{ text: string } | null>(null);
 
-  // 切页时关闭幻灯片面板/播放器与渲染导出对话框，避免陈旧 deck 展示；会话切换经 key 重挂载自然复位。
+  // 切页时关闭幻灯片面板/播放器、渲染导出对话框与媒体生成面板，避免陈旧 deck 展示；会话切换经 key 重挂载自然复位。
   const activePath = state.activePath;
   useEffect(() => {
     setDeckOpen(false);
     setPresentDeck(null);
     setRenderExportOpen(false);
+    setMediaOpen(false);
   }, [activePath]);
 
   /** deck 检测与结构解析：按活动页快照 memo（页对象仅在自身 rev 变化时更换，含草稿修订推进）。 */
@@ -633,6 +638,13 @@ function DesignPanelSession({
         : null;
   };
 
+  /** P6 §8.3：媒体面板「替换选中图片」——产物相对引用写入选中 <img> 的 src（AssetLibrary 替换同款事务）。 */
+  const handleReplaceSelectionSrc = (assetPath: string) => {
+    void handleApply([
+      { kind: 'attribute', name: 'src', value: relativeAssetRef(activePage?.path ?? '', assetPath) },
+    ]);
+  };
+
   // ---- 页面关闭确认（dirty 页：保存 / 放弃修改 / 取消） ----
   const [confirmClosePath, setConfirmClosePath] = useState<string | null>(null);
 
@@ -810,6 +822,7 @@ function DesignPanelSession({
         onTemplates={() => setTemplatesOpen(true)}
         onBrand={() => setBrandOpen(true)}
         onAssets={() => setAssetsOpen(true)}
+        onMedia={() => setMediaOpen(true)}
         onRefresh={refreshNow}
         onGenerate={generate}
         onHandoff={handoff}
@@ -1045,6 +1058,20 @@ function DesignPanelSession({
           onApply={handleApply}
           onImported={handleAssetImported}
           onClose={() => setAssetsOpen(false)}
+        />
+      )}
+      {/* P6 §8.3 媒体生成面板：入口与活动页无关（视频 tab 缺省入口为活动页）；
+          产物落库走 P4 同款 recentImports + refreshNow，切页由上方 effect 统一关闭。 */}
+      {mediaOpen && (
+        <MediaGenPanel
+          open
+          backendId={backendId}
+          sessionId={sessionId}
+          activeDocPath={activePage?.path ?? null}
+          imageSelectionReady={activePage?.selection?.tagName === 'img'}
+          onReplaceSelectionSrc={handleReplaceSelectionSrc}
+          onAssetImported={handleAssetImported}
+          onClose={() => setMediaOpen(false)}
         />
       )}
       {draftDiffOpen && activePage && (

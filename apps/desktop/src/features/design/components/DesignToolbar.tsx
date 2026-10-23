@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react';
+import { ImagePlay, RefreshCw } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 
 export interface DesignToolbarProps {
@@ -38,6 +38,8 @@ export interface DesignToolbarProps {
   onBrand: () => void;
   /** 打开素材库（P4 §4.2，与活动页无关）。 */
   onAssets: () => void;
+  /** 打开媒体生成面板（P6 §8.3，与活动页无关）。 */
+  onMedia: () => void;
   onRefresh: () => void;
   onGenerate: () => void;
   onHandoff: () => void;
@@ -71,6 +73,7 @@ export function DesignToolbar({
   onTemplates,
   onBrand,
   onAssets,
+  onMedia,
   onRefresh,
   onGenerate,
   onHandoff,
@@ -90,6 +93,10 @@ export function DesignToolbar({
         </Button>
         <Button size="sm" onClick={onAssets} aria-label="素材">
           素材
+        </Button>
+        <Button size="sm" onClick={onMedia} aria-label="媒体">
+          <ImagePlay size={13} />
+          媒体
         </Button>
       </div>
       <Button size="sm" onClick={onRefresh} aria-label="刷新设计文件">

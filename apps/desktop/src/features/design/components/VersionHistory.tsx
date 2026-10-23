@@ -22,6 +22,7 @@ const KIND_LABEL: Record<DesignSnapshotFile['kind'], string> = {
   css: 'CSS',
   image: '图片',
   font: '字体',
+  video: '视频',
   other: '文件',
 };
 

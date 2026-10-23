@@ -195,4 +195,37 @@ describe('AssetLibrary（P4 §4.2）', () => {
     expect(await screen.findByText('工作区暂无素材')).toBeInTheDocument();
     expect(listDesignAssets).toHaveBeenCalledTimes(2);
   });
+
+  it('视频 tab 以 kinds=video 拉清单：行显示体积，无缩略图、无替换与导入按钮（P6 §5.3）', async () => {
+    const videos = ['design/assets/clip.mp4', 'media/demo.webm'];
+    vi.mocked(listDesignAssets).mockResolvedValue({ files: videos });
+    mount();
+    fireEvent.click(screen.getByRole('tab', { name: '视频' }));
+    await waitFor(() => expect(listDesignAssets).toHaveBeenCalledWith('remote-1', 's1', 'video'));
+    expect(await screen.findByText('design/assets/clip.mp4')).toBeInTheDocument();
+    expect(screen.getByText('media/demo.webm')).toBeInTheDocument();
+    // 体积经 asset 接口 base64 长度换算（QUJD → 3 B）。
+    await waitFor(() =>
+      expect(getDesignAsset).toHaveBeenCalledWith('remote-1', 's1', 'design/assets/clip.mp4')
+    );
+    expect((await screen.findAllByText('3 B')).length).toBe(2);
+    expect(document.querySelectorAll('img')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /替换选中图片/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '导入' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('选择要导入的素材文件')).not.toBeInTheDocument();
+    expect(screen.getByText('视频由媒体生成任务产生，不支持导入')).toBeInTheDocument();
+    // 切回图片 tab：导入与替换按钮照常回归。
+    fireEvent.click(screen.getByRole('tab', { name: '图片' }));
+    expect(await screen.findByRole('button', { name: '导入' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '替换选中图片 clip.mp4' })).toBeInTheDocument();
+  });
+
+  it('视频体积读取失败（如 >10 MiB）显示「体积未知」', async () => {
+    vi.mocked(listDesignAssets).mockResolvedValue({ files: ['media/big.mp4'] });
+    vi.mocked(getDesignAsset).mockRejectedValue(new Error('FILE_TOO_LARGE'));
+    mount();
+    fireEvent.click(screen.getByRole('tab', { name: '视频' }));
+    expect(await screen.findByText('media/big.mp4')).toBeInTheDocument();
+    expect(await screen.findByText('体积未知')).toBeInTheDocument();
+  });
 });

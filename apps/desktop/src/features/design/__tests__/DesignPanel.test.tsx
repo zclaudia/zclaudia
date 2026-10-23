@@ -41,6 +41,11 @@ vi.mock('../api', () => ({
   getDesignBrand: vi.fn(),
   putDesignBrand: vi.fn(),
   importDesignAsset: vi.fn(),
+  createDesignMediaTask: vi.fn(),
+  listDesignMediaTasks: vi.fn(),
+  cancelDesignMediaTask: vi.fn(),
+  listDesignMediaProviders: vi.fn(),
+  downloadDesignMediaTaskResult: vi.fn(),
 }));
 vi.mock('../preview', () => ({ buildDesignPreview: vi.fn(async () => '<html></html>') }));
 vi.mock('../interactive', () => ({
@@ -166,6 +171,31 @@ vi.mock('../components/RenderExportDialog', () => ({
           {`${props.viewport.preset}:${props.viewport.width === null ? 'null' : props.viewport.width}`}
         </span>
         <button type="button" onClick={props.onClose}>mock-关闭渲染导出</button>
+      </div>
+    ) : null,
+}));
+vi.mock('../components/MediaGenPanel', () => ({
+  MediaGenPanel: (props: {
+    open: boolean;
+    sessionId: string | null;
+    activeDocPath: string | null;
+    imageSelectionReady: boolean;
+    onReplaceSelectionSrc: (assetPath: string) => void;
+    onAssetImported: (path: string) => void;
+    onClose: () => void;
+  }) =>
+    props.open ? (
+      <div data-testid="media-gen-panel">
+        <span data-testid="media-gen-session">{props.sessionId ?? 'none'}</span>
+        <span data-testid="media-gen-active-doc">{props.activeDocPath ?? 'none'}</span>
+        <span data-testid="media-gen-image-ready">{props.imageSelectionReady ? 'yes' : 'no'}</span>
+        <button type="button" onClick={() => props.onReplaceSelectionSrc('assets/gen-1.png')}>
+          mock-替换选中图片
+        </button>
+        <button type="button" onClick={() => props.onAssetImported('assets/gen-1.png')}>
+          mock-产物落库
+        </button>
+        <button type="button" onClick={props.onClose}>mock-关闭媒体</button>
       </div>
     ) : null,
 }));
@@ -333,6 +363,9 @@ describe('DesignPanel', () => {
       designMdRevision: null,
       tokensCssRevision: null,
     });
+    // P6 媒体端点：面板本体不消费（MediaGenPanel 打桩），补缺省返回保持 mock 全量。
+    vi.mocked(api.listDesignMediaProviders).mockResolvedValue({ providers: [], profiles: [] });
+    vi.mocked(api.listDesignMediaTasks).mockResolvedValue({ tasks: [] });
     runFeedbackMock.status = null;
     // clearAllMocks 不还原实现：显式恢复运行预览构建器的缺省返回（blocked 全 0）。
     vi.mocked(interactive.buildDesignRunPreview).mockResolvedValue({
@@ -1706,6 +1739,74 @@ describe('DesignPanel', () => {
     expect(screen.getByTestId('render-export-entry')).toHaveTextContent('design/index.html');
     expect(screen.getByTestId('render-export-deck')).toHaveTextContent('none');
     expect(screen.getByTestId('render-export-viewport')).toHaveTextContent('fill:null');
+  });
+
+  // ---- P6（L36）面板接线：媒体生成面板打开/props 透传/替换事务/落库刷新/切页关闭 ----
+
+  it('P6：媒体按钮打开媒体生成面板并透传会话与活动页，无选区时 imageSelectionReady 为否', async () => {
+    mount();
+    await screen.findByTitle('设计预览');
+    expect(screen.queryByTestId('media-gen-panel')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '媒体' }));
+    expect(screen.getByTestId('media-gen-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('media-gen-session')).toHaveTextContent('session-1');
+    expect(screen.getByTestId('media-gen-active-doc')).toHaveTextContent('design/index.html');
+    expect(screen.getByTestId('media-gen-image-ready')).toHaveTextContent('no');
+    fireEvent.click(screen.getByRole('button', { name: 'mock-关闭媒体' }));
+    expect(screen.queryByTestId('media-gen-panel')).not.toBeInTheDocument();
+  });
+
+  it('P6：img 选区 imageSelectionReady 为真，替换回调触发 src attribute 事务（相对引用换算）', async () => {
+    const source = '<html><body><img src="assets/a.png" alt="预览图"></body></html>';
+    disk.set('design/index.html', { source, revision: 'revision-1' });
+    mount();
+    const frame = (await screen.findByTitle('设计预览')) as HTMLIFrameElement;
+    await sendSelection(frame, {
+      elementPath: [0],
+      tagName: 'img',
+      text: '',
+      sourceText: '',
+      color: 'rgb(0, 0, 0)',
+      backgroundColor: 'rgba(0, 0, 0, 0)',
+      base: sha(source),
+    });
+    await screen.findByRole('textbox', { name: '图片地址' });
+    fireEvent.click(screen.getByRole('button', { name: '媒体' }));
+    expect(screen.getByTestId('media-gen-image-ready')).toHaveTextContent('yes');
+
+    fireEvent.click(screen.getByRole('button', { name: 'mock-替换选中图片' }));
+    // asset-ref 换算：design/index.html + assets/gen-1.png → ../assets/gen-1.png。
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(preview.buildDesignPreview)
+          .mock.calls.some(
+            call => typeof call[0] === 'string' && call[0].includes('src="../assets/gen-1.png"')
+          )
+      ).toBe(true)
+    );
+  });
+
+  it('P6：媒体产物落库回调触发工作区刷新（refreshNow 重新拉取文件清单）', async () => {
+    mount();
+    await screen.findByTitle('设计预览');
+    const callsBefore = vi.mocked(api.listDesignFiles).mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: '媒体' }));
+    fireEvent.click(screen.getByRole('button', { name: 'mock-产物落库' }));
+    await waitFor(() =>
+      expect(vi.mocked(api.listDesignFiles).mock.calls.length).toBeGreaterThan(callsBefore)
+    );
+  });
+
+  it('P6：切页时媒体生成面板一并关闭（deckOpen/renderExportOpen 同款 effect）', async () => {
+    disk.set('p2.html', { source: pageSource('B'), revision: 'rev-b' });
+    vi.mocked(api.listDesignFiles).mockResolvedValue({ files: ['design/index.html', 'p2.html'] });
+    mount();
+    await screen.findByTitle('设计预览');
+    fireEvent.click(screen.getByRole('button', { name: '媒体' }));
+    expect(screen.getByTestId('media-gen-panel')).toBeInTheDocument();
+    await openPage('p2.html');
+    expect(screen.queryByTestId('media-gen-panel')).not.toBeInTheDocument();
   });
 });
 
