@@ -1,6 +1,6 @@
 # P3.5 CSS 来源编辑 — 实现设计
 
-日期：2026-10-24。状态：设计定稿（用户已确认三项决策），执行协议已定（§7.4，luna @ GLM-5.3-Flash 逐卡 + 主代理验收）；第一批未开始。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P3.5 条目；P3.1–P3.4 基线见 [P3 实现设计](2026-10-23-design-workbench-p3-implementation.md)。
+日期：2026-10-24。状态：第一批（规则展示 + `<style>` 块声明写回）已实现并通过主代理逐卡验收（2026-10-24，见 §11；desktop 844 用例全绿）；第二批（外部 `.css` 写回）未开始。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P3.5 条目；P3.1–P3.4 基线见 [P3 实现设计](2026-10-23-design-workbench-p3-implementation.md)。
 
 本批分两批交付（用户 2026-10-24 确认）：
 
@@ -198,4 +198,12 @@ fnm exec --using 22.20.0 pnpm --filter @zclaudia/server exec tsc --noEmit
 - 抽取共享比较器 `html/style-compare.ts`（`compareCssValues` 三态 + `colorsEquivalent`/`fontWeightValue`），DesignPanel `reselectMismatch` 改为委托（verify 回路的 `colorsEquivalent` 改为 import）——保证 C1∥C2 并行时文件集不相交（css-source 与 reselect 共用同一比较口径）。新增 `__tests__/style-compare.test.ts` 3 用例。
 - 门禁：desktop design 723 通过（720 基线 + 3）；tsc 0 错；eslint 0 error / 37 warning（基线不变）。
 
-（待续：每卡 luna 报告要点、主代理审查与修正、门禁计数、commit 哈希；第一批 C4 后小终验、第二批 C7 后终验收。）
+### C1–C4 第一批（2026-10-24，主代理逐卡验收通过）
+
+- **C1 预览与桥接**（`4e37eb24`）：`inlineStyleSources()` 抽出并双向打标（link→style 带工作区路径、入口自有块 `@inline/<n>`，interactive.ts 复用）；桥接新增 `design-rules-request`/`design-rules` 消息（CSSOM 枚举 + 分组递归 + 选择器组逐个 matches + 特异性含 :not()/:is() 递归，上限 200/300/9999/64 + truncated）；DesignPanel `isValidRulesMessage`（形状/上限 + elementPath 与当前选区一致校验，迟到丢弃）。接受偏差：isValidRulesMessage 导出供测试（+1 处 react-refresh disable 记录）；选择器组多命中产出多条同 rulePath 条目（C4 渲染层去重合并）。+10 用例。
+- **C2 源码对齐**（`ddbfd61e`）：`css-source.ts` 纯模块（parse5 块枚举 → postcss 解析 → rulePath + selectorText 指纹对齐 → 只读四原因；winning 判定复用 compareCssValues，仅计算键且有值时给 true/false）。主代理裁决接受：winning 键集 = DesignComputedStyles（20 键，文档误写 21）∪ {color, background-color}（与 reselect 口径一致）；末位可靠失配时同属性行全 false。+18 用例。
+- **C3 事务 op**（`65e55b91`）：`styleBlock` 并入 union（与 DesignPanel mergeKey/needsReselect 接线同卡）；引擎改值（值子区间替换）/删除（声明+分号+前导空白）/新增（缩进感知插入，末条无分号时前置 `;` 修复）；同目标折叠 property 大小写归一；未消费 op → INVALID_VALUE 加固；`safeSourceCssValue` 黑名单。裁决接受：删除不存在的属性 → STYLE_SOURCE_NOT_FOUND（源码漂移信号，不走 EMPTY_TRANSACTION）；css-source 增导出 8 项（仅 export，零行为改动）。+62 用例。
+- **C4 面板与接线**（`28548795`）：`StyleSourcePanel.tsx`（规则卡分组/来源与 Active/Overridden/只读四原因徽标/改值/删除/新增/截断提示/空态；同 rulePath 去重合并）；DesignPanel 接线（styleRules 取值侧 + buildStyleRules memo + 挂载于 SelectionEditor 下方、runMode 随编辑区隐藏、切页清空；改值→重建→重选→rules 刷新链路有用例钉住）。裁决接受：空值输入就地拒绝（safeSourceCssValue('') 会放行导致写出 `prop: ;`）；重建期以 busy 禁用 + 陈旧载荷抑制实现，无独立 loading 态；inline 声明提示仅空态文案（props 未携带 inlineStyle）。+31 用例。
+- **小终验（2026-10-24，主代理）**：desktop design **844 通过（45 文件；基线 723 + T0 3 + C1 10 + C2 18 + C3 62 + C4 31）**；tsc 0 错；eslint 0 error / **37 warning 与基线逐条一致（零新增）**；git 范围核对全部变更落在 design 模块与本文档。真实 Agent + macOS Tauri 冒烟并入 §10 清单待用户配合。
+
+（待续：第二批 C5–C7 记录与终验收。）
