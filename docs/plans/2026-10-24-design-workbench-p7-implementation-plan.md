@@ -65,21 +65,36 @@ CREATE INDEX IF NOT EXISTS idx_design_share_comments_share
 ```ts
 export type DesignShareScope = 'link' | 'local';
 export interface DesignShareSummary {
-  id: string; token: string; snapshotId: string; entryPath: string;
-  title: string | null; scope: DesignShareScope;
-  createdAt: number; expiresAt: number | null; revokedAt: number | null;
-  commentCount: number; lastAccessAt: number | null;
+  id: string;
+  token: string;
+  snapshotId: string;
+  entryPath: string;
+  title: string | null;
+  scope: DesignShareScope;
+  createdAt: number;
+  expiresAt: number | null;
+  revokedAt: number | null;
+  commentCount: number;
+  lastAccessAt: number | null;
 }
 export interface DesignShareComment {
-  id: string; author: string; body: string;
+  id: string;
+  author: string;
+  body: string;
   target: { elementPath: number[]; tagName: string; text: string } | null;
-  createdAt: number; resolvedAt: number | null;
+  createdAt: number;
+  resolvedAt: number | null;
 }
 export interface DesignPublicShareManifest {
-  title: string; entryPath: string; snapshotLabel: string | null;
-  snapshotCreatedAt: number; complete: boolean; incompleteReasons: string[];
+  title: string;
+  entryPath: string;
+  snapshotLabel: string | null;
+  snapshotCreatedAt: number;
+  complete: boolean;
+  incompleteReasons: string[];
   files: Array<{ path: string; kind: string; bytes: number }>;
-  shareCreatedAt: number; expiresAt: number | null;
+  shareCreatedAt: number;
+  expiresAt: number | null;
 }
 ```
 
@@ -94,11 +109,19 @@ export class ShareService {
   list(sessionId: unknown, entryPath?: unknown): Promise<DesignShareSummary[]>;
   revoke(sessionId: unknown, shareId: unknown): Promise<DesignShareSummary>;
   listComments(sessionId: unknown, shareId: unknown): Promise<DesignShareComment[]>;
-  setResolved(sessionId: unknown, shareId: unknown, commentId: unknown, resolved: unknown): Promise<DesignShareComment>;
+  setResolved(
+    sessionId: unknown,
+    shareId: unknown,
+    commentId: unknown,
+    resolved: unknown
+  ): Promise<DesignShareComment>;
   // —— 公开侧（token 授权）——
-  resolveByToken(token: unknown): Promise<ShareAccess>;        // 见下
+  resolveByToken(token: unknown): Promise<ShareAccess>; // 见下
   publicManifest(access: ShareAccess): Promise<DesignPublicShareManifest>;
-  publicFile(access: ShareAccess, filePath: unknown): Promise<{ mime: string; bytes: Buffer; sha256: string }>;
+  publicFile(
+    access: ShareAccess,
+    filePath: unknown
+  ): Promise<{ mime: string; bytes: Buffer; sha256: string }>;
   addComment(access: ShareAccess, input: unknown): Promise<DesignShareComment>;
   publicComments(access: ShareAccess): Promise<DesignShareComment[]>;
 }
@@ -112,12 +135,19 @@ export class ShareService {
 ```ts
 interface ShareAccess {
   share: DesignShareSummary & { workspaceRoot: string };
-  snapshot: { id: string; entryPath: string; label: string | null; createdAt: number;
-              complete: boolean; incompleteReasons: string[] };
+  snapshot: {
+    id: string;
+    entryPath: string;
+    label: string | null;
+    createdAt: number;
+    complete: boolean;
+    incompleteReasons: string[];
+  };
 }
 ```
 
-  `resolveByToken(token)`：token 非 string/空 → `404 SHARE_NOT_FOUND`；查 `design_shares JOIN design_snapshots`（快照行必须仍在）→ 无行或 `revoked_at != null` → `404 SHARE_NOT_FOUND`；`expires_at != null && <= now` → `410 SHARE_EXPIRED`。
+`resolveByToken(token)`：token 非 string/空 → `404 SHARE_NOT_FOUND`；查 `design_shares JOIN design_snapshots`（快照行必须仍在）→ 无行或 `revoked_at != null` → `404 SHARE_NOT_FOUND`；`expires_at != null && <= now` → `410 SHARE_EXPIRED`。
+
 - **scope 执行**在路由层：`scope === 'local'` 且请求非本机（`isLocalhost(req)`，middleware/local-only.ts 既有判定）→ `403 SHARE_LOCAL_ONLY`。服务层不管网络属性（可测性）。
 - `publicFile`：路径校验复用 `validateManifestPath` 同款语义（非空、≤512、无 `\`、非绝对、无 `..`/`.`/点前缀组件；实现可复制该私有函数或等价重写）→ `design_snapshot_files` 查 `(snapshot_id, path)` → 无行 `404 SHARE_FILE_NOT_FOUND` → `blobs.readBlob(sha)`（单文件 ≤10 MiB，内存返回即可，无需流式）。
 - `addComment`：author 规范化（trim；空 → `'匿名'`；>60 → `400 SHARE_COMMENT_INVALID`）；body trim 1..4000；target `null` 或 `{ elementPath: number[]（1..64 项整数 0..9999）, tagName: string（trim 1..40）, text: string（≤200） }`，违规 `400 SHARE_COMMENT_INVALID`；上限检查 → insert。
@@ -126,18 +156,18 @@ interface ShareAccess {
 
 ### 2.3 错误码表（HTTP 层统一 `sendApiError` 信封）
 
-| code | status | 场景 |
-|---|---|---|
-| `SHARE_NOT_FOUND` | 404 | 未知/已撤销 token；所有者侧 shareId 不存在或跨工作区 |
-| `SHARE_EXPIRED` | 410 | 已过期（公开侧） |
-| `SHARE_LOCAL_ONLY` | 403 | `local` 范围 + 非本机请求 |
-| `SHARE_VALIDATION` | 400 | create 参数（scope/天数/title/snapshotId 形状） |
-| `SHARE_ALREADY_REVOKED` | 409 | 重复撤销 |
-| `SHARE_FILE_NOT_FOUND` | 404 | 清单外文件路径 |
-| `SHARE_COMMENT_INVALID` | 400 | 评论 author/body/target 校验 |
-| `SHARE_COMMENT_LIMIT` | 400 | 超 500 条 |
-| `SHARE_COMMENT_NOT_FOUND` | 404 | 所有者 resolve 不存在的评论 |
-| `SNAPSHOT_NOT_FOUND` | 404 | create 引用的快照不存在/跨工作区 |
+| code                      | status | 场景                                                 |
+| ------------------------- | ------ | ---------------------------------------------------- |
+| `SHARE_NOT_FOUND`         | 404    | 未知/已撤销 token；所有者侧 shareId 不存在或跨工作区 |
+| `SHARE_EXPIRED`           | 410    | 已过期（公开侧）                                     |
+| `SHARE_LOCAL_ONLY`        | 403    | `local` 范围 + 非本机请求                            |
+| `SHARE_VALIDATION`        | 400    | create 参数（scope/天数/title/snapshotId 形状）      |
+| `SHARE_ALREADY_REVOKED`   | 409    | 重复撤销                                             |
+| `SHARE_FILE_NOT_FOUND`    | 404    | 清单外文件路径                                       |
+| `SHARE_COMMENT_INVALID`   | 400    | 评论 author/body/target 校验                         |
+| `SHARE_COMMENT_LIMIT`     | 400    | 超 500 条                                            |
+| `SHARE_COMMENT_NOT_FOUND` | 404    | 所有者 resolve 不存在的评论                          |
+| `SNAPSHOT_NOT_FOUND`      | 404    | create 引用的快照不存在/跨工作区                     |
 
 ## 3. 快照 pin（`snapshot-service.ts`，S3）
 
@@ -162,13 +192,13 @@ app.use(createDesignShareRoutes(db)); // 公开分享路由（/s/:token），tok
 
 路由表（全部无 authMiddleware；Express 4）：
 
-| 方法+路径 | 行为 |
-|---|---|
-| `GET /s/:token` | 视图 HTML（§4.2），`Content-Type: text/html; charset=utf-8`，`Cache-Control: no-store` |
-| `GET /s/:token/manifest.json` | `DesignPublicShareManifest`；命中更新 `last_access_at` |
-| `GET /s/:token/f/*` | 清单内文件内容；头见下 |
-| `GET /s/:token/comments` | `{ comments: DesignShareComment[] }`（created_at ASC） |
-| `POST /s/:token/comments` | body `{ author?, body, target? }` → 201 comment |
+| 方法+路径                     | 行为                                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------------- |
+| `GET /s/:token`               | 视图 HTML（§4.2），`Content-Type: text/html; charset=utf-8`，`Cache-Control: no-store` |
+| `GET /s/:token/manifest.json` | `DesignPublicShareManifest`；命中更新 `last_access_at`                                 |
+| `GET /s/:token/f/*`           | 清单内文件内容；头见下                                                                 |
+| `GET /s/:token/comments`      | `{ comments: DesignShareComment[] }`（created_at ASC）                                 |
+| `POST /s/:token/comments`     | body `{ author?, body, target? }` → 201 comment                                        |
 
 - 全部先 `resolveByToken`；`scope==='local'` 时以 `isLocalhost(req)` 判定（本机放行，否则 `403 SHARE_LOCAL_ONLY`）。
 - 文件响应头：`Content-Type: <manifest mime ?? 'application/octet-stream'>`、`X-Content-Type-Options: nosniff`、`Cache-Control: private, no-store`、`Content-Security-Policy: default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; media-src 'self'`（script/object/frame 全被 default-src 'none' 封死；`style-src 'unsafe-inline'` 供页内 `<style>`）。入口 HTML 同款头。
@@ -190,29 +220,52 @@ app.use(createDesignShareRoutes(db)); // 公开分享路由（/s/:token），tok
 
 `createDesignRoutes` 内构造 `ShareService`（与既有服务同款一行式）并追加端点（全部走既有 `handleError` 信封）：
 
-| 方法+路径 | 请求 → 响应 |
-|---|---|
-| `POST /api/design/shares` | `{ sessionId, snapshotId, scope?, expiresInDays?, title? }` → 201 `{ share: DesignShareSummary; shareUrl: string; lanUrls: string[] }`（`shareUrl = ${req.protocol}://${req.get('host')}/s/${token}`；`lanUrls`：绑定非回环时枚举非 internal IPv4 → `http://<ip>:<port>/s/${token}`，port 取 `process.env.PORT ?? 3100`，尽力而为） |
-| `GET /api/design/shares?sessionId&entryPath?` | → `{ shares: DesignShareSummary[] }`（created_at DESC；entryPath 过滤经 snapshot join） |
-| `POST /api/design/shares/:id/revoke` | body `{ sessionId }` → `{ share }` |
-| `GET /api/design/shares/:id/comments?sessionId` | → `{ comments: DesignShareComment[] }` |
-| `POST /api/design/shares/:id/comments/:commentId/resolve` | body `{ sessionId, resolved }` → `{ comment }` |
+| 方法+路径                                                 | 请求 → 响应                                                                                                                                                                                                                                                                                                                         |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/design/shares`                                 | `{ sessionId, snapshotId, scope?, expiresInDays?, title? }` → 201 `{ share: DesignShareSummary; shareUrl: string; lanUrls: string[] }`（`shareUrl = ${req.protocol}://${req.get('host')}/s/${token}`；`lanUrls`：绑定非回环时枚举非 internal IPv4 → `http://<ip>:<port>/s/${token}`，port 取 `process.env.PORT ?? 3100`，尽力而为） |
+| `GET /api/design/shares?sessionId&entryPath?`             | → `{ shares: DesignShareSummary[] }`（created_at DESC；entryPath 过滤经 snapshot join）                                                                                                                                                                                                                                             |
+| `POST /api/design/shares/:id/revoke`                      | body `{ sessionId }` → `{ share }`                                                                                                                                                                                                                                                                                                  |
+| `GET /api/design/shares/:id/comments?sessionId`           | → `{ comments: DesignShareComment[] }`                                                                                                                                                                                                                                                                                              |
+| `POST /api/design/shares/:id/comments/:commentId/resolve` | body `{ sessionId, resolved }` → `{ comment }`                                                                                                                                                                                                                                                                                      |
 
 ## 6. 桌面契约（T0 预落 `api.ts` 分享分节；S5 定位与交接模块）
 
 ```ts
 // api.ts（T0）：类型镜像 §2.1 + 五个所有者函数
 export type DesignShareScope = 'link' | 'local';
-export interface DesignShareSummary { /* §2.1 */ }
-export interface DesignShareComment { /* §2.1 */ }
-export function createDesignShare(backendId: string, input: {
-  sessionId: string; snapshotId: string; scope?: DesignShareScope;
-  expiresInDays?: number | null; title?: string | null;
-}): Promise<{ share: DesignShareSummary; shareUrl: string; lanUrls: string[] }>;
-export function listDesignShares(backendId: string, sessionId: string, entryPath?: string): Promise<{ shares: DesignShareSummary[] }>;
-export function revokeDesignShare(backendId: string, input: { sessionId: string; shareId: string }): Promise<{ share: DesignShareSummary }>;
-export function listDesignShareComments(backendId: string, input: { sessionId: string; shareId: string }): Promise<{ comments: DesignShareComment[] }>;
-export function setDesignShareCommentResolved(backendId: string, input: { sessionId: string; shareId: string; commentId: string; resolved: boolean }): Promise<{ comment: DesignShareComment }>;
+export interface DesignShareSummary {
+  /* §2.1 */
+}
+export interface DesignShareComment {
+  /* §2.1 */
+}
+export function createDesignShare(
+  backendId: string,
+  input: {
+    sessionId: string;
+    snapshotId: string;
+    scope?: DesignShareScope;
+    expiresInDays?: number | null;
+    title?: string | null;
+  }
+): Promise<{ share: DesignShareSummary; shareUrl: string; lanUrls: string[] }>;
+export function listDesignShares(
+  backendId: string,
+  sessionId: string,
+  entryPath?: string
+): Promise<{ shares: DesignShareSummary[] }>;
+export function revokeDesignShare(
+  backendId: string,
+  input: { sessionId: string; shareId: string }
+): Promise<{ share: DesignShareSummary }>;
+export function listDesignShareComments(
+  backendId: string,
+  input: { sessionId: string; shareId: string }
+): Promise<{ comments: DesignShareComment[] }>;
+export function setDesignShareCommentResolved(
+  backendId: string,
+  input: { sessionId: string; shareId: string; commentId: string; resolved: boolean }
+): Promise<{ comment: DesignShareComment }>;
 ```
 
 ### 6.1 `comment-locator.ts`（S5 新文件，纯函数）
@@ -221,10 +274,13 @@ export function setDesignShareCommentResolved(backendId: string, input: { sessio
 export interface CommentLocatorMatch {
   matched: boolean;
   reason?: 'path-missing' | 'tag-mismatch' | 'text-mismatch';
-  text?: string;      // 命中元素的折叠文本（≤200）
-  snippet?: string;   // 命中元素的源码切片（parse5 sourceCodeLocation，≤1200 字符）
+  text?: string; // 命中元素的折叠文本（≤200）
+  snippet?: string; // 命中元素的源码切片（parse5 sourceCodeLocation，≤1200 字符）
 }
-export function matchCommentTarget(source: string, target: DesignShareComment['target']): CommentLocatorMatch;
+export function matchCommentTarget(
+  source: string,
+  target: DesignShareComment['target']
+): CommentLocatorMatch;
 ```
 
 parse5（既有依赖，`{ sourceCodeLocationInfo: true, treeAdapter }` 与 element-tree.ts 同款用法）：从 body 按 `elementPath` 逐级取元素子节点；越界 → `path-missing`；tagName 严格比对（小写）不符 → `tag-mismatch`；文本折叠空白后前 200 字符与 `target.text` 不等 → `text-mismatch`。命中则给 text + snippet（起止 offset 切源码，截 1200）。**target 为 null → `{ matched: true }`（整页评论无定位失效概念）**。只做严格匹配，不做模糊/邻近重挂（P7.2 红线）。
@@ -233,13 +289,17 @@ parse5（既有依赖，`{ sourceCodeLocationInfo: true, treeAdapter }` 与 elem
 
 ```ts
 export interface ReviewHandoffInput {
-  comment: DesignShareComment; share: DesignShareSummary;
+  comment: DesignShareComment;
+  share: DesignShareSummary;
   snapshot: { label: string | null; createdAt: number; entryPath: string };
-  snapshotSource: string | null;   // 快照入口 HTML（getDesignSnapshotFile base64 解码；拿不到为 null）
-  currentSource: string | null;    // 当前磁盘入口 HTML
+  snapshotSource: string | null; // 快照入口 HTML（getDesignSnapshotFile base64 解码；拿不到为 null）
+  currentSource: string | null; // 当前磁盘入口 HTML
   currentDocPath: string | null;
 }
-export function buildReviewHandoff(input: ReviewHandoffInput): { sections: Array<{ title: string; body: string }>; prompt: string };
+export function buildReviewHandoff(input: ReviewHandoffInput): {
+  sections: Array<{ title: string; body: string }>;
+  prompt: string;
+};
 ```
 
 sections（agent-context.ts 风格，空则省略、prompt = `## title` 块拼接）：
@@ -256,10 +316,13 @@ sections（agent-context.ts 风格，空则省略、prompt = `## title` 块拼�
 
 ```ts
 export interface SharePanelProps {
-  open: boolean; onClose: () => void;
-  backendId: string; sessionId: string | null; docPath: string | null;
-  currentSource: string | null;                 // 失效判定与交接用
-  onHandoff: (prompt: string) => void;          // DesignPanel prefill + 关面板 + 提示
+  open: boolean;
+  onClose: () => void;
+  backendId: string;
+  sessionId: string | null;
+  docPath: string | null;
+  currentSource: string | null; // 失效判定与交接用
+  onHandoff: (prompt: string) => void; // DesignPanel prefill + 关面板 + 提示
 }
 ```
 
@@ -308,26 +371,26 @@ bash /Users/zhvala/SourceCode/zclaudia/scripts/with-project-node.sh pnpm --filte
 
 前提：ZClaudia 的分享是「快照 + 评论」异步审阅，不是实时协作；评论同步 ≠ 共同编辑（计划原文红线）。选项与判据：
 
-| 方案 | 适用 | 代价 |
-|---|---|---|
-| 文档锁（检出/检入） | 单人轮流改，冲突零容忍 | 最低；体验割裂 |
-| 操作日志同步（op-based） | 站点可控、在线为主 | 中；需因果排序与补丁管道 |
-| CRDT（如 Yjs）/ OT | 真并发、离线容忍 | 高；HTML 文本级合并与设计语义冲突难解 |
+| 方案                     | 适用                   | 代价                                  |
+| ------------------------ | ---------------------- | ------------------------------------- |
+| 文档锁（检出/检入）      | 单人轮流改，冲突零容忍 | 最低；体验割裂                        |
+| 操作日志同步（op-based） | 站点可控、在线为主     | 中；需因果排序与补丁管道              |
+| CRDT（如 Yjs）/ OT       | 真并发、离线容忍       | 高；HTML 文本级合并与设计语义冲突难解 |
 
 **结论：维持现状（单人编辑 + 快照审阅闭环），不引入任何方案。** 触发重评条件：出现真实的「两人同时改同一作品」需求且评论流程已不够用。届时优先在「精确源码编辑引擎（P1.2）」的事务/op 抽象上做操作同步试点，而不是引入第二套 CRDT 文档模型与现有快照/恢复体系并行。
 
 ## 10. 验收对照（上游计划 P7 验收条目）
 
-| 计划验收项 | 覆盖证据 |
-|---|---|
-| P7.1 分享指定版本及资源包；访问范围、撤销、过期；排除本机路径/凭据/无关文件 | §1–§5：快照引用 + scope link/local + revoke + expiresAt；清单仅含入口资源闭包的相对路径；凭据不在设计文件域（llm_profiles 不进快照） |
-| P7.2 评论绑定快照与元素定位；新版本找不到元素显示失效，不静默挂到其他元素 | §1 target_json 绑定 share→snapshot；§6.1 严格匹配三态失效；§7.1 失效徽章 |
-| P7.3 选评论组合原版本/当前版本/反馈进聊天；Agent 写入成新恢复点；旧分享仍显示原版本 | §6.2 handoff 五段（含失效自证要求）；P4.5 useAgentRunFeedback 自动快照；快照不可变 + §3 pin |
-| 第二个独立客户端只能访问授权快照 | §0.2 公开面仅视图/清单/清单内文件/评论；无列举；token 256 位；CSP/sandbox 封脚本 |
-| 访问撤销生效 | revoke → 公开端点 404（S1/S2 测试） |
-| 评论能回到正确版本与选区 | 视图内重走 elementPath 高亮；桌面侧失效判定 + 快照片段（S5/S6 测试） |
-| 按反馈生成新版本后，旧版仍可审阅和恢复 | 快照不可变；既有 RestoreService 恢复链路不变 |
-| P7.4 评估不实现 | §9 |
+| 计划验收项                                                                          | 覆盖证据                                                                                                                             |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| P7.1 分享指定版本及资源包；访问范围、撤销、过期；排除本机路径/凭据/无关文件         | §1–§5：快照引用 + scope link/local + revoke + expiresAt；清单仅含入口资源闭包的相对路径；凭据不在设计文件域（llm_profiles 不进快照） |
+| P7.2 评论绑定快照与元素定位；新版本找不到元素显示失效，不静默挂到其他元素           | §1 target_json 绑定 share→snapshot；§6.1 严格匹配三态失效；§7.1 失效徽章                                                             |
+| P7.3 选评论组合原版本/当前版本/反馈进聊天；Agent 写入成新恢复点；旧分享仍显示原版本 | §6.2 handoff 五段（含失效自证要求）；P4.5 useAgentRunFeedback 自动快照；快照不可变 + §3 pin                                          |
+| 第二个独立客户端只能访问授权快照                                                    | §0.2 公开面仅视图/清单/清单内文件/评论；无列举；token 256 位；CSP/sandbox 封脚本                                                     |
+| 访问撤销生效                                                                        | revoke → 公开端点 404（S1/S2 测试）                                                                                                  |
+| 评论能回到正确版本与选区                                                            | 视图内重走 elementPath 高亮；桌面侧失效判定 + 快照片段（S5/S6 测试）                                                                 |
+| 按反馈生成新版本后，旧版仍可审阅和恢复                                              | 快照不可变；既有 RestoreService 恢复链路不变                                                                                         |
+| P7.4 评估不实现                                                                     | §9                                                                                                                                   |
 
 ## 11. 架构约束对照
 
@@ -345,7 +408,7 @@ bash /Users/zhvala/SourceCode/zclaudia/scripts/with-project-node.sh pnpm --filte
 七卡串行完成（每卡 luna 实现、主代理代码审查 + 门禁复跑后放行下一卡）：
 
 - **S1 分享服务**：`share-service.ts`（528 行）+ 24 用例。接受偏差：publicFile 路径形状错误沿用 validateManifestPath 原始码（形状非法 400 VALIDATION_ERROR、越界 403 PATH_FORBIDDEN、清单外 404）；setResolved 非布尔 → 400 SHARE_VALIDATION；已撤销分享的快照行被裁剪时 entryPath 以 '' 呈现（LEFT JOIN COALESCE，S3 pin 只保未撤销）。
-- **S2 分享视图路由**：`share-viewer.ts`（448 行，视图 HTML ~311 行静态模板，token 从 location.pathname 解析不进模板）+ 10 用例 + domain-bootstrap 一行挂载。接受偏差：Express 对 text/* 自动追加 charset；`..` 归一化发生在 HTTP 客户端侧，穿越测试改用 raw `node:http` 原始请求目标断言 403；`%` 双重解码边缘归 404 不 500。
+- **S2 分享视图路由**：`share-viewer.ts`（448 行，视图 HTML ~311 行静态模板，token 从 location.pathname 解析不进模板）+ 10 用例 + domain-bootstrap 一行挂载。接受偏差：Express 对 text/\* 自动追加 charset；`..` 归一化发生在 HTTP 客户端侧，穿越测试改用 raw `node:http` 原始请求目标断言 403；`%` 双重解码边缘归 404 不 500。
 - **S3 快照 pin**：pruneOldest 两处 SQL 加 NOT EXISTS 排除 + 3 用例（pin 存活 / 撤销后可裁剪 / blob 清扫后仍可读）。**主代理修正**：`design.test.ts` 快照路由 describe fixture 只应用 050，pruneOldest 引用 design_shares 后 6 用例失败——补 `db.exec(migration052.sql)` 一行（fixture 增补，非断言改动）。
 - **S4 所有者路由**：design.ts 五端点 + lanShareUrls 帮助函数 + 6 用例；`{ success, data }` 信封与桌面 apiCallForBackend 解包一致；`req.get('host')` 直接用请求 Host 头（§5 字面）。
 - **S5 定位与交接**：comment-locator.ts（96 行）+ review-handoff.ts（124 行）+ 26 用例（含 1 快照）。elementPath 采用元素子节点序号（与 DesignSelection 注释、element-tree/parse findElement、视图侧 DOM `children`（仅元素）三方一致）；tagName 比对对 target 兜底 toLowerCase；隐式节点命中但 snippet undefined。
@@ -364,3 +427,5 @@ bash /Users/zhvala/SourceCode/zclaudia/scripts/with-project-node.sh pnpm --filte
 1. **真实第二客户端冒烟（用户）**：LAN 场景（`SERVER_HOST=0.0.0.0` 或 `ZCLAUDIA_ALLOW_LAN=1`）另一设备打开分享链接、浏览、发评论；本机第二浏览器场景已由上述冒烟覆盖。
 2. **macOS Tauri 内嵌服务端同流程（用户）**：桌面构建内创建分享 → 系统浏览器访问。
 3. **审阅→Agent 修改→新恢复点全链路（用户）**：真实 Agent 会话中点「交给 Agent 修改」发送、确认 useAgentRunFeedback 自动快照落点与旧分享不变。
+
+2026-10-24 更新：e2e 真实验收（[验收报告](2026-10-24-design-workbench-e2e-acceptance-report.md)）已覆盖本机第二浏览器（Playwright 独立上下文）与第 3 项全链路（S5，恢复点缺陷修复 `67d63de4` 后复验通过）；仍待补：LAN 第二设备（用户）与 macOS Tauri 内嵌服务端分享流程。

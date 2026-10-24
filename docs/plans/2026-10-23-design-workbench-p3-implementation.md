@@ -73,27 +73,29 @@ export type DesignEditErrorCode =
 
 新增错误码（引擎抛出，`DesignEditError.code`）：
 
-| code | 场景 |
-|---|---|
-| `ATTRIBUTE_NOT_ALLOWED` | 属性名不在 {src, alt, href}；或 src/alt 用于非 `img`、href 用于非 `a` |
+| code                    | 场景                                                                                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `ATTRIBUTE_NOT_ALLOWED` | 属性名不在 {src, alt, href}；或 src/alt 用于非 `img`、href 用于非 `a`                                                                  |
 | `STRUCTURE_NOT_ALLOWED` | 事务里结构操作与其他操作并存（结构操作必须独占事务且仅一个）；对 `elementPath: []`（body）做结构操作；move-up/move-down 无相邻兄弟元素 |
 
 `ANCHOR_REFERENCED`、`INVALID_VALUE`、`IMPLICIT_ELEMENT` 等复用既有码（`ANCHOR_REFERENCED` 为新增第 12 个码：删除会断开子树外 `href="#id"` 引用）。
 
 ### 1.2 桥接消息（`preview.ts`，L11）
 
-| 方向 | 消息 | 载荷 |
-|---|---|---|
-| 面板→iframe | `zclaudia:design-select-path` | `{ channel, elementPath: number[] }`（沿 verify 的路径校验：≤64 层，整数 ≥0） |
-| iframe→面板 | `zclaudia:design-select`（既有） | 追加 `styles` / `attrs` / `inlineStyle`（§4.1） |
-| iframe→面板 | `zclaudia:design-select-failed` | `{ channel, reason: 'not-found' }`（路径在预览 DOM 中无对应元素） |
+| 方向        | 消息                             | 载荷                                                                          |
+| ----------- | -------------------------------- | ----------------------------------------------------------------------------- |
+| 面板→iframe | `zclaudia:design-select-path`    | `{ channel, elementPath: number[] }`（沿 verify 的路径校验：≤64 层，整数 ≥0） |
+| iframe→面板 | `zclaudia:design-select`（既有） | 追加 `styles` / `attrs` / `inlineStyle`（§4.1）                               |
+| iframe→面板 | `zclaudia:design-select-failed`  | `{ channel, reason: 'not-found' }`（路径在预览 DOM 中无对应元素）             |
 
 `zclaudia:design-verify` / `zclaudia:design-verify-result` 原样保留（颜色 override 回路不变）。
 
 ### 1.3 `api.ts` 追加（T0 落库）
 
 ```ts
-export interface DesignAssetList { files: string[]; }
+export interface DesignAssetList {
+  files: string[];
+}
 export function listDesignAssets(backendId: string, sessionId: string): Promise<DesignAssetList>;
 // GET /api/design/assets?sessionId=   —— 工作区图片文件清单（§5.1）
 ```
@@ -114,7 +116,11 @@ GET /api/design/assets?sessionId=   → { files: string[] }（工作区相对路
 /** 校验一个白名单属性的 inline 值。返回规整后的值或 null（非法）。 */
 export function safeStyleValue(property: DesignStyleProperty, value: string): string | null;
 /** 校验元素属性值（name 已由引擎限白名单与标签）。返回规整值或 null。 */
-export function safeAttrValue(name: DesignAttributeName, value: string, tagName: string): string | null;
+export function safeAttrValue(
+  name: DesignAttributeName,
+  value: string,
+  tagName: string
+): string | null;
 ```
 
 校验规则（每条都是测试断言点）：
@@ -138,14 +144,14 @@ export function safeAttrValue(name: DesignAttributeName, value: string, tagName:
 
 分组（每组标题 + 两列网格，紧凑行距；沿用面板中文文案风格）：
 
-| 分组 | 字段（label → 输入形态） |
-|---|---|
-| 文字 | 文字（textarea，既有）；文字颜色 / 背景颜色（Input + 清除按钮，既有） |
-| 排版 | 字体（font-family Input）、字号（font-size）、行高（line-height）、字重（font-weight 下拉：normal/bold/100–900 自由输入 → 用 Input+datalist 或纯 Input；实现取纯 Input）、对齐（text-align 下拉 6 项） |
-| 尺寸与间距 | 宽度 / 高度（Input，placeholder auto）；外边距 / 内边距（Input，接受简写多值如 `8px 12px`——按 §2.1 长度校验扩展：**简写值 = 1–4 个空格分隔的合法长度/auto**，仅 margin/padding/border-radius/border-width 接受多值） |
-| 边框 | 边框宽度 / 边框颜色 / 圆角（Input）；边框样式（下拉 10 项） |
-| 图片（仅 img） | 图片（src Input + 「选择…」按钮开图片清单下拉 + 「清除」）；替代文本（alt）；显示方式（object-fit 下拉） |
-| 链接（仅 a） | 链接地址（href Input）；链接文字即「文字」字段（text 操作，既有） |
+| 分组           | 字段（label → 输入形态）                                                                                                                                                                                             |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 文字           | 文字（textarea，既有）；文字颜色 / 背景颜色（Input + 清除按钮，既有）                                                                                                                                                |
+| 排版           | 字体（font-family Input）、字号（font-size）、行高（line-height）、字重（font-weight 下拉：normal/bold/100–900 自由输入 → 用 Input+datalist 或纯 Input；实现取纯 Input）、对齐（text-align 下拉 6 项）               |
+| 尺寸与间距     | 宽度 / 高度（Input，placeholder auto）；外边距 / 内边距（Input，接受简写多值如 `8px 12px`——按 §2.1 长度校验扩展：**简写值 = 1–4 个空格分隔的合法长度/auto**，仅 margin/padding/border-radius/border-width 接受多值） |
+| 边框           | 边框宽度 / 边框颜色 / 圆角（Input）；边框样式（下拉 10 项）                                                                                                                                                          |
+| 图片（仅 img） | 图片（src Input + 「选择…」按钮开图片清单下拉 + 「清除」）；替代文本（alt）；显示方式（object-fit 下拉）                                                                                                             |
+| 链接（仅 a）   | 链接地址（href Input）；链接文字即「文字」字段（text 操作，既有）                                                                                                                                                    |
 
 - 初始值：`selection.styles` / `selection.attrs` / 既有 color/backgroundColor/text 字段；没有对应来源的字段初始为空串。
 - 「内联」徽标：字段 label 右侧小标记，当 `parseDeclarations(selection.inlineStyle ?? '')` 最后一值为该属性时显示（§3.1 的 `parseDeclarations` 由 L10 导出）。
@@ -190,11 +196,11 @@ export function parseDeclarations(styleValue: string): { name: string; value: st
 
 ### 3.4 错误文案（T0 已入 `controller.ts` `editErrorMessage`）
 
-| code | 文案 |
-|---|---|
-| `ATTRIBUTE_NOT_ALLOWED` | 该元素不支持修改此属性（src/alt 仅图片，href 仅链接） |
+| code                    | 文案                                                                     |
+| ----------------------- | ------------------------------------------------------------------------ |
+| `ATTRIBUTE_NOT_ALLOWED` | 该元素不支持修改此属性（src/alt 仅图片，href 仅链接）                    |
 | `STRUCTURE_NOT_ALLOWED` | 该结构操作在此元素上不可用（可能混用了其他修改，或没有可交换的相邻元素） |
-| `ANCHOR_REFERENCED` | 此元素（或其子元素）的 id 被页面锚点引用，删除会断开链接；请先处理引用 |
+| `ANCHOR_REFERENCED`     | 此元素（或其子元素）的 id 被页面锚点引用，删除会断开链接；请先处理引用   |
 
 ## 4. 预览桥接扩展（L11，`preview.ts`）
 
@@ -262,13 +268,13 @@ export interface ElementTreeNode {
   path: number[];
   tagName: string;
   id: string | null;
-  classes: string[];      // ≤3 个，超出省略
-  textPreview: string;    // 首个文本节点 trim ≤40 字符；无则 ''
+  classes: string[]; // ≤3 个，超出省略
+  textPreview: string; // 首个文本节点 trim ≤40 字符；无则 ''
   /** editable 可全量编辑；implicit 源码无显式标签（只读）；svg- subtree 仅文字/样式/结构；deep 超出桥接 64 层（树内只读）。 */
   capability: 'editable' | 'implicit' | 'svg-subtree' | 'deep';
-  reason?: string;        // 非 editable 时的中文原因
+  reason?: string; // 非 editable 时的中文原因
   children: ElementTreeNode[];
-  truncated?: boolean;    // 子树因节点数上限被截断（≤10000 访问 / ≤128 深度，对齐 markStaticElements）
+  truncated?: boolean; // 子树因节点数上限被截断（≤10000 访问 / ≤128 深度，对齐 markStaticElements）
 }
 
 export function buildElementTree(source: string): ElementTreeNode[];
@@ -285,17 +291,17 @@ export function childElementPath(source: string, path: number[]): number[] | nul
 
 ## 8. 验收对照（上游计划 P3 验收条目）
 
-| 计划验收项 | 覆盖证据 |
-|---|---|
-| 卡片改排版、间距、图片、链接后与源码一致 | L10 引擎测试（各属性写入/字节保持/无关源码不动）+ L13 表单测试（提交正确操作数组）+ L14 接线测试 |
-| 普通样式覆盖 | L10：style 属性追加/原位替换；L14：verify+重选对比通过不告警 |
-| `!important` / 媒体查询覆盖 | L14：计算样式失配 → overrideWarning=true（mock select 消息）；既有颜色回路回归 |
-| 简写属性 | L10：margin 简写下写 margin-top 追加生效；清除不存在长写 → EMPTY_TRANSACTION；清除简写整条移除 |
-| 复制、排序、撤销、保存与重载 | L10 结构操作（id 改名/锚点重写/插入位置/字节保持/新选区路径）；L13 按钮提交；既有 controller apply/undo/save 管线回归 |
-| 锚点引用 | L10：删除被引用 id → ANCHOR_REFERENCED；副本内引用随改名重写 |
-| 不能可靠处理的组合明确拒绝 | 结构操作混用/根元素/无兄弟 → STRUCTURE_NOT_ALLOWED；非法值 → INVALID_VALUE；属性标签不匹配 → ATTRIBUTE_NOT_ALLOWED |
-| 只读原因 / 能力边界 | L11 树 capability/reason；L14 树 UI 呈现 + 帮助文案（伪元素/脚本节点说明） |
-| 素材相对路径可移植 | L12 清单端点；L13 relativeAssetRef 换算测试；预览资产内联回路回归 |
+| 计划验收项                               | 覆盖证据                                                                                                              |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| 卡片改排版、间距、图片、链接后与源码一致 | L10 引擎测试（各属性写入/字节保持/无关源码不动）+ L13 表单测试（提交正确操作数组）+ L14 接线测试                      |
+| 普通样式覆盖                             | L10：style 属性追加/原位替换；L14：verify+重选对比通过不告警                                                          |
+| `!important` / 媒体查询覆盖              | L14：计算样式失配 → overrideWarning=true（mock select 消息）；既有颜色回路回归                                        |
+| 简写属性                                 | L10：margin 简写下写 margin-top 追加生效；清除不存在长写 → EMPTY_TRANSACTION；清除简写整条移除                        |
+| 复制、排序、撤销、保存与重载             | L10 结构操作（id 改名/锚点重写/插入位置/字节保持/新选区路径）；L13 按钮提交；既有 controller apply/undo/save 管线回归 |
+| 锚点引用                                 | L10：删除被引用 id → ANCHOR_REFERENCED；副本内引用随改名重写                                                          |
+| 不能可靠处理的组合明确拒绝               | 结构操作混用/根元素/无兄弟 → STRUCTURE_NOT_ALLOWED；非法值 → INVALID_VALUE；属性标签不匹配 → ATTRIBUTE_NOT_ALLOWED    |
+| 只读原因 / 能力边界                      | L11 树 capability/reason；L14 树 UI 呈现 + 帮助文案（伪元素/脚本节点说明）                                            |
+| 素材相对路径可移植                       | L12 清单端点；L13 relativeAssetRef 换算测试；预览资产内联回路回归                                                     |
 
 ## 9. 测试与任务卡
 
@@ -356,3 +362,5 @@ L13（SelectionEditor 扩展 + asset-ref）单卡完成；L14（ElementTree + De
 ### 待补验证（M2 门槛）
 
 真实 Agent + macOS Tauri 冒烟（卡片全流程实机：排版/间距/图片/链接修改 → 复制/排序/撤销 → 保存重载；结构树与父级/子级导航实机；图片清单拉取）、浏览器与远端 backend 验证。本批以自动化测试为准并记录待办。
+
+2026-10-24 更新：e2e 真实验收（浏览器路径，[验收报告](2026-10-24-design-workbench-e2e-acceptance-report.md)）已覆盖排版修改与保存重载（S2）、素材替换与图片链路（S2/S3）；macOS Tauri 实机与远端 backend 仍待补。

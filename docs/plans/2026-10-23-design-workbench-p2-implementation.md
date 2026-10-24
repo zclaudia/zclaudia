@@ -10,7 +10,7 @@
    - **宿主自身写入**（面板保存）本地已知；
    - **外部 Agent 插件写入**（codex/cursor 附带 `file_change` effect，落在 `chatMessageStore`）由面板订阅 store 变化即时触发刷新（去抖 400ms）；
    - **兜底**：面板可见时每 2s stat 轮询 `GET /api/design/deps`（mtime/size，不哈希）+ 既有文档 revision 轮询。pi-runtime 内置工具写入与任意外部编辑器由此覆盖（≤2s 延迟）。
-   WS 推送事件与 `FileChangeNotifier` 接线记为后续优化，不阻塞 P2 验收。
+     WS 推送事件与 `FileChangeNotifier` 接线记为后续优化，不阻塞 P2 验收。
 2. **多页状态用模块级 controller（纯 TS，非 React state）。** 按工作区 identity 注册 + 引用计数；同一工作区多个聊天共享同一 controller（草稿互通，「相同工作区的多个聊天可以看到同一作品」）；页面草稿在应用进程内跨会话切换存活，仅 UI 元数据（最近打开、活动页、视口/缩放偏好）持久化 localStorage（key 按工作区 identity 隔离）。不持久化草稿本身（localStorage 容量不可靠，2 MiB 文档会超限）。
 3. **视口与缩放严格分离。** 视口 = iframe 的布局宽度（设备预设或自定义，媒体查询按它生效）；缩放 = 外层容器 CSS `transform: scale()`，仅影响显示，不写任何 CSS、不改变 iframe 布局宽度。
 4. **ZIP 库选 jszip `^3.10.1`**（MIT、纯 JS、自带类型、`generateAsync('nodebuffer')`）。规模上限沿用 P1 快照（≤200 引用、单文件 ≤10 MiB、总计 ≤50 MiB），内存内打包可行，不需要流式。
@@ -76,13 +76,18 @@ export interface DesignExportRequest {
 ### 1.2 `apps/desktop/src/features/design/api.ts` 追加/扩展
 
 ```ts
-export interface DesignHttpError extends Error {  // 导出/依赖类服务端错误
-  code: string;                                    // EXPORT_INCOMPLETE / EXPORT_LIMIT_EXCEEDED / REVISION_CONFLICT / ...
-  files?: string[];                                // EXPORT_INCOMPLETE 时的缺失清单
+export interface DesignHttpError extends Error {
+  // 导出/依赖类服务端错误
+  code: string; // EXPORT_INCOMPLETE / EXPORT_LIMIT_EXCEEDED / REVISION_CONFLICT / ...
+  files?: string[]; // EXPORT_INCOMPLETE 时的缺失清单
 }
 export function isDesignHttpError(e: unknown): e is DesignHttpError;
 
-export async function getDesignDeps(backendId: string, sessionId: string, path: string): Promise<DesignDepsResult>;
+export async function getDesignDeps(
+  backendId: string,
+  sessionId: string,
+  path: string
+): Promise<DesignDepsResult>;
 // GET /api/design/deps?sessionId=&path=
 
 // putDesignDocument 的请求体追加可选 allowCreate?: boolean（文件被删除后重建保存）。
@@ -106,7 +111,7 @@ export interface DesignWorkspacePorts {
   putDocument(req: {
     path: string;
     source: string;
-    expectedRevision: string;   // 重建保存时为 ''
+    expectedRevision: string; // 重建保存时为 ''
     allowCreate?: boolean;
   }): Promise<DesignDocument>;
   listDeps(path: string): Promise<DesignDepsResult>;
@@ -119,10 +124,10 @@ export type DesignWorkspacePortsFactory = (sessionId: string) => DesignWorkspace
 
 ### 1.4 服务端错误码（新增）
 
-| code | status | 场景 |
-|---|---|---|
-| `EXPORT_INCOMPLETE` | 409 | 引用的本地资源缺失；`details.files` 为缺失相对路径列表；`confirmIncomplete` 后放行 |
-| `EXPORT_LIMIT_EXCEEDED` | 413 | 引用数 >200 / 单文件 >10 MiB / 总计 >50 MiB / draftSource >2 MiB / CSS @import 深度 >4（深度超限抛 413 而非静默截断：静默截断会产出离线打不开的包——Wave 1 验收确认） |
+| code                    | status | 场景                                                                                                                                                                 |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EXPORT_INCOMPLETE`     | 409    | 引用的本地资源缺失；`details.files` 为缺失相对路径列表；`confirmIncomplete` 后放行                                                                                   |
+| `EXPORT_LIMIT_EXCEEDED` | 413    | 引用数 >200 / 单文件 >10 MiB / 总计 >50 MiB / draftSource >2 MiB / CSS @import 深度 >4（深度超限抛 413 而非静默截断：静默截断会产出离线打不开的包——Wave 1 验收确认） |
 
 既有 `REVISION_CONFLICT`（disk 模式版本钉死失败）、`FILE_NOT_FOUND`、`PATH_FORBIDDEN`、`SESSION_NOT_FOUND`、`WORKSPACE_UNAVAILABLE`、`FILE_TOO_LARGE`、`UNSUPPORTED_FILE` 原样复用。
 
@@ -138,13 +143,13 @@ PUT  /api/document 扩展：body 追加 allowCreate?: boolean（见 §6.3）
 
 ### 2.1 模块与文件
 
-| 文件 | 职责 |
-|---|---|
-| `workspace/controller.ts` | `DesignWorkspaceController`：多页状态机（打开/激活/关闭/编辑/撤销/保存/外部变更/缺失检测）+ registry |
-| `workspace/storage.ts` | UI 元数据持久化（localStorage，版本化，损坏容错回默认） |
-| `workspace/api-adapter.ts` | `createWorkspacePorts(backendId, sessionId): DesignWorkspacePorts`，包装 api.ts |
-| `workspace/source-lines.ts` | 选区 → 源码行号（P2.4 用，见 §5.1） |
-| `__tests__/workspace/*` | 上述测试 |
+| 文件                        | 职责                                                                                                 |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `workspace/controller.ts`   | `DesignWorkspaceController`：多页状态机（打开/激活/关闭/编辑/撤销/保存/外部变更/缺失检测）+ registry |
+| `workspace/storage.ts`      | UI 元数据持久化（localStorage，版本化，损坏容错回默认）                                              |
+| `workspace/api-adapter.ts`  | `createWorkspacePorts(backendId, sessionId): DesignWorkspacePorts`，包装 api.ts                      |
+| `workspace/source-lines.ts` | 选区 → 源码行号（P2.4 用，见 §5.1）                                                                  |
+| `__tests__/workspace/*`     | 上述测试                                                                                             |
 
 ### 2.2 状态与快照
 
@@ -160,8 +165,8 @@ export interface DesignPageSnapshot {
   /** 最近已知磁盘修订；null = 尚未成功载入。 */
   docRevision: string | null;
   selection: DesignSelection | null;
-  externalChange: boolean;    // 脏页期间磁盘已变化
-  missing: boolean;           // 文件已从工作区消失（删除/改名）
+  externalChange: boolean; // 脏页期间磁盘已变化
+  missing: boolean; // 文件已从工作区消失（删除/改名）
   busy: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -170,10 +175,10 @@ export interface DesignPageSnapshot {
 
 export interface DesignWorkspaceUiState {
   version: 1;
-  activePath: string | null;  // 上次活动页（重新打开面板时恢复）
-  recents: string[];          // 最近打开，去重，上限 12
-  viewport: DesignViewport;   // 默认 { preset: 'fill', width: null }
-  zoom: DesignZoom;           // 默认 { mode: 'fit', value: 1 }
+  activePath: string | null; // 上次活动页（重新打开面板时恢复）
+  recents: string[]; // 最近打开，去重，上限 12
+  viewport: DesignViewport; // 默认 { preset: 'fill', width: null }
+  zoom: DesignZoom; // 默认 { mode: 'fit', value: 1 }
 }
 
 export interface DesignWorkspaceSnapshot {
@@ -197,29 +202,37 @@ export type OpenPageResult =
 
 export class DesignWorkspaceController {
   /** identityKey 见 workspaceIdentityKey；getPorts 每次动作时以最新 sessionId 取 ports（支持 rebind）。 */
-  constructor(identityKey: string, getPorts: DesignWorkspacePortsFactory, uiState?: DesignWorkspaceUiState);
+  constructor(
+    identityKey: string,
+    getPorts: DesignWorkspacePortsFactory,
+    uiState?: DesignWorkspaceUiState
+  );
   subscribe(listener: () => void): () => void;
-  getSnapshot(): DesignWorkspaceSnapshot;      // 引用稳定：仅在变更点更换快照对象
+  getSnapshot(): DesignWorkspaceSnapshot; // 引用稳定：仅在变更点更换快照对象
   rebind(sessionId: string): void;
 
   open(path: string): Promise<OpenPageResult>;
   activate(path: string): void;
   close(path: string, opts?: { discardDraft?: boolean }): ClosePageResult;
 
-  apply(operations: DesignEditOperation[], label: string, mergeKey?: string): Promise<DesignSelection | null>;
+  apply(
+    operations: DesignEditOperation[],
+    label: string,
+    mergeKey?: string
+  ): Promise<DesignSelection | null>;
   undo(): Promise<void>;
   redo(): Promise<void>;
   save(): Promise<boolean>;
   reload(): Promise<void>;
 
-  refreshFiles(files: string[]): void;             // 文件清单轮询结果 → missing 检测
-  handleExternalDoc(next: DesignDocument): Promise<void>;  // 仅当 next.path 为活动页
-  applyDepsStats(result: DesignDepsResult): void;  // stat 变化 → assetEpoch++
+  refreshFiles(files: string[]): void; // 文件清单轮询结果 → missing 检测
+  handleExternalDoc(next: DesignDocument): Promise<void>; // 仅当 next.path 为活动页
+  applyDepsStats(result: DesignDepsResult): void; // stat 变化 → assetEpoch++
 
   setViewport(viewport: DesignViewport): void;
   setZoom(zoom: DesignZoom): void;
 
-  dispose(): void;   // 仅由上层显式调用；registry 在引用计数归零时不销毁实例（§2.4）
+  dispose(): void; // 仅由上层显式调用；registry 在引用计数归零时不销毁实例（§2.4）
 }
 
 // Wave 1 落地补充（L8 面板需要）：
@@ -235,9 +248,12 @@ export function workspaceIdentityKey(identity: {
   backendId: string;
   projectId?: string;
   workingDirectory?: string;
-}): string;  // 稳定非加密哈希（FNV-1a，8 hex）——identity key 需同步计算，sha256Hex 为异步不可用
+}): string; // 稳定非加密哈希（FNV-1a，8 hex）——identity key 需同步计算，sha256Hex 为异步不可用
 
-export interface ControllerLease { controller: DesignWorkspaceController; release(): void; }
+export interface ControllerLease {
+  controller: DesignWorkspaceController;
+  release(): void;
+}
 export function acquireWorkspaceController(
   identity: { backendId: string; projectId?: string; workingDirectory?: string },
   sessionId: string,
@@ -266,10 +282,10 @@ export function acquireWorkspaceController(
 
 组件（L8）：
 
-| 文件 | 职责 |
-|---|---|
+| 文件                              | 职责                                                                                                                                                                                                |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `components/ViewportControls.tsx` | 预设选择（充满 / 桌面 1280 / 平板 768 / 手机 390 / 自定义）、自定义宽度输入（240–3840 整数，非法回退）、缩放 −/+（步进 10%，夹在 25%–200%）、百分比显示、「适应」切换 fit/manual、双击百分比回 100% |
-| `components/PreviewCanvas.tsx` | 受缩放 iframe 容器 |
+| `components/PreviewCanvas.tsx`    | 受缩放 iframe 容器                                                                                                                                                                                  |
 
 `PreviewCanvas` 结构与不变式：
 
@@ -292,7 +308,7 @@ export function acquireWorkspaceController(
 
 ```ts
 export class DepsService {
-  constructor(db: Database.Database);           // 组合 DesignService（workspace 解析 + 文件 resolve）
+  constructor(db: Database.Database); // 组合 DesignService（workspace 解析 + 文件 resolve）
   async stat(sessionId: unknown, entryPath: unknown): Promise<DesignDepsResult>;
 }
 ```
@@ -346,7 +362,11 @@ export interface ExportInvocation {
   draftSource?: unknown;
   confirmIncomplete?: unknown;
 }
-export interface ExportResult { buffer: Buffer; filename: string; manifest: DesignExportManifestShape; }
+export interface ExportResult {
+  buffer: Buffer;
+  filename: string;
+  manifest: DesignExportManifestShape;
+}
 
 export class ExportService {
   constructor(db: Database.Database);
@@ -396,29 +416,29 @@ export class ExportService {
 
 ## 7. 面板集成（P2.1/P2.2/P2.3 UI，L8）
 
-| 文件 | 职责 |
-|---|---|
-| `useDesignWorkspace.ts` | acquire lease + `useSyncExternalStore` 订阅 + 可见门控轮询（清单/文档/依赖）+ chatMessageStore 指纹订阅 + 动作包装 |
-| `components/PageTabs.tsx` | 标签条：basename 标签、脏点 •、缺失 ⚠、关闭 ×（dirty 先走确认）、点击激活；文件下拉「打开页面」列出未打开文件 |
-| `components/PageOverview.tsx` | 页面总览（缩略图）：打开页网格，每格 mini iframe（360×240 布局，`transform scale` 到显示尺寸，pointer-events:none）+ basename + 脏/缺失徽标 + 点击激活 + 「在查看器中打开」；预览串用面板级缓存 `Map<path, {key: path+draftRevision+assetEpoch, html}>`（≤8 条），非活动页在总览打开时惰性构建 |
-| `components/DesignToolbar.tsx` | 改造：去掉文件 Select（由标签条承担）；保留刷新/撤销/重做/生成/交给 Agent/保存/重新载入；新增 导出、总览、未保存差异（dirty 时可用）按钮 |
-| `DesignPanel.tsx` | 重写组合：工具栏 + 视口控件 + 画布（PreviewCanvas 包现有 iframe 行为：message 校验、verify、预览构建）+ 标签条 + SelectionEditor/VersionHistory（绑定活动页）+ 各对话框挂载；`useDesignDocument.ts` 删除，其行为由 controller 承担（测试迁移） |
-| 空态/发现 | 保持现有逻辑（design/index.html 优先、生成等待、prefill 通道不变）；存储 activePath 存在则直接恢复该页 |
+| 文件                           | 职责                                                                                                                                                                                                                                                                                           |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useDesignWorkspace.ts`        | acquire lease + `useSyncExternalStore` 订阅 + 可见门控轮询（清单/文档/依赖）+ chatMessageStore 指纹订阅 + 动作包装                                                                                                                                                                             |
+| `components/PageTabs.tsx`      | 标签条：basename 标签、脏点 •、缺失 ⚠、关闭 ×（dirty 先走确认）、点击激活；文件下拉「打开页面」列出未打开文件                                                                                                                                                                                  |
+| `components/PageOverview.tsx`  | 页面总览（缩略图）：打开页网格，每格 mini iframe（360×240 布局，`transform scale` 到显示尺寸，pointer-events:none）+ basename + 脏/缺失徽标 + 点击激活 + 「在查看器中打开」；预览串用面板级缓存 `Map<path, {key: path+draftRevision+assetEpoch, html}>`（≤8 条），非活动页在总览打开时惰性构建 |
+| `components/DesignToolbar.tsx` | 改造：去掉文件 Select（由标签条承担）；保留刷新/撤销/重做/生成/交给 Agent/保存/重新载入；新增 导出、总览、未保存差异（dirty 时可用）按钮                                                                                                                                                       |
+| `DesignPanel.tsx`              | 重写组合：工具栏 + 视口控件 + 画布（PreviewCanvas 包现有 iframe 行为：message 校验、verify、预览构建）+ 标签条 + SelectionEditor/VersionHistory（绑定活动页）+ 各对话框挂载；`useDesignDocument.ts` 删除，其行为由 controller 承担（测试迁移）                                                 |
+| 空态/发现                      | 保持现有逻辑（design/index.html 优先、生成等待、prefill 通道不变）；存储 activePath 存在则直接恢复该页                                                                                                                                                                                         |
 
 保持不变的既有行为（回归点）：iframe 选择消息 `base === 当前草稿修订` 校验；verify 回路；生成/交给 Agent 的 prefill；版本历史按活动页；P1 错误文案映射沿用（迁入 controller 或面板层 util）。
 
 ## 8. 验收对照（对上游计划 P2 验收条目）
 
-| 计划验收项 | 覆盖证据 |
-|---|---|
-| 同一会话管理三页作品，分别编辑与保存 | L7 controller 测试：三页 open/apply/save 互不串扰，磁盘按页写入；L8 面板测试：三标签切换草稿保留 |
-| 仅 CSS 或图片变化也会刷新 | L6 deps 测试（stat 汇总正确）；L7 applyDepsStats 测试（mtime 变化 → assetEpoch++）；L8 预览 effect 依赖 assetEpoch 的组件测试 |
-| 切换会话/backend 旧请求不污染当前页 | L7 测试：两个 identity 的 controller，慢响应后到不写入新实例；dispose 后 in-flight 丢弃 |
-| 设备宽度与缩放独立 | L8 PreviewCanvas 测试：width 390 + scale 0.5 断言互不干预；fit 模式随容器宽计算 |
-| 导出包离线可打开且资源齐全 | L6 export 测试：HTML+CSS+图片+字体工作区 → 解包断言相对路径原位、清单一致、入口引用全部在包内；缺失资源默认 409，confirm 后清单含 missing；draft 模式用 draftSource 字节 |
-| 文件删除/改名/关闭未保存明确处理 | L7 测试：refreshFiles 标 missing；dirty close 返回 'dirty'；allowCreate 保存重建（L6 safe-file-write 测试：createIfMissing 路径 + expectedRevision 非空拒绝） |
-| 状态按工作区隔离 | L7 storage 测试：不同 identityKey 不同 key；UI 元数据字段校验 |
-| 宿主写入事件优先 + 轮询兜底 | L8：chatMessageStore 指纹变化 → 去抖刷新测试；可见门控轮询测试（隐藏即停） |
+| 计划验收项                           | 覆盖证据                                                                                                                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 同一会话管理三页作品，分别编辑与保存 | L7 controller 测试：三页 open/apply/save 互不串扰，磁盘按页写入；L8 面板测试：三标签切换草稿保留                                                                         |
+| 仅 CSS 或图片变化也会刷新            | L6 deps 测试（stat 汇总正确）；L7 applyDepsStats 测试（mtime 变化 → assetEpoch++）；L8 预览 effect 依赖 assetEpoch 的组件测试                                            |
+| 切换会话/backend 旧请求不污染当前页  | L7 测试：两个 identity 的 controller，慢响应后到不写入新实例；dispose 后 in-flight 丢弃                                                                                  |
+| 设备宽度与缩放独立                   | L8 PreviewCanvas 测试：width 390 + scale 0.5 断言互不干预；fit 模式随容器宽计算                                                                                          |
+| 导出包离线可打开且资源齐全           | L6 export 测试：HTML+CSS+图片+字体工作区 → 解包断言相对路径原位、清单一致、入口引用全部在包内；缺失资源默认 409，confirm 后清单含 missing；draft 模式用 draftSource 字节 |
+| 文件删除/改名/关闭未保存明确处理     | L7 测试：refreshFiles 标 missing；dirty close 返回 'dirty'；allowCreate 保存重建（L6 safe-file-write 测试：createIfMissing 路径 + expectedRevision 非空拒绝）            |
+| 状态按工作区隔离                     | L7 storage 测试：不同 identityKey 不同 key；UI 元数据字段校验                                                                                                            |
+| 宿主写入事件优先 + 轮询兜底          | L8：chatMessageStore 指纹变化 → 去抖刷新测试；可见门控轮询测试（隐藏即停）                                                                                               |
 
 ## 9. 测试与任务卡
 
@@ -463,4 +483,5 @@ T0 契约与 L6–L9 由主代理 + GLM-5.3-Flash 子代理（三轮 workflow，
 - **验收裁决与修正（主代理）**：① Wave 1 接受 L6 四项偏差（export CSS 深度超限抛 413、deps 私有点路径 skipped `private-path`、非普通文件计入 missing、allowCreate+非空修订→REVISION_CONFLICT）与 L7 七项判断（快照类型落 controller/storage、新增 handleSelectionMessage、applyDepsStats 首采样仅建基线、registry 永不 dispose 等），均已回写本文档相应章节；② 直接修码：controller.activate 非空断言重构（消除唯一新增 eslint 警告）；③ L9 为绕过任务卡中 eslint 路径笔误创建的 `apps/desktop/services → src/services` 符号链接已删除（以正确路径复跑证实文件集一致）；④ 补 T0 契约测试 `__tests__/api-p2.test.ts` 5 例（deps 查询、allowCreate 透传、导出 filename 解析、EXPORT_INCOMPLETE 分流、非 JSON 错误回退）。
 - **已知事项**：desktop 27 条 eslint 警告为基线规则族（含 L8 新文件 16 条），按 0 error 门禁口径放行，未清零以免改行为；VersionHistory 的 currentSource 传活动页草稿（dirty 页差异基线为草稿而非磁盘）；独立「依赖资源列表」UI 裁决不做（§5.2）。
 - **待补验证（M1 门槛）**：真实 Agent + macOS Tauri 冒烟（含 ZIP 落盘 Downloads、三页作品全流程、设备视口实机）、浏览器与远端 backend 验证、e2e 导出链路扩展。
+- **2026-10-24 更新**：e2e 真实验收（浏览器路径，[验收报告](2026-10-24-design-workbench-e2e-acceptance-report.md) S1）已覆盖三页全流程、设备视口与 ZIP 解包核验；macOS Tauri 实机（含 ZIP 落盘 Downloads 通路）与远端 backend 仍待补。
 - **执行注记**：workflow 的 `world.run` 沿用主代理会话 shell 的持久 cwd——主代理验收时 `cd apps/desktop` 导致后续 wave 的相对路径门禁全部落空（两次升级后定位）；门禁命令一律使用绝对路径。子代理按卡不得改锁文件与运行器配置，遇此情形应升级而非自建变通（symlink 事件）。

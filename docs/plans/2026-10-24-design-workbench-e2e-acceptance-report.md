@@ -1,6 +1,6 @@
 # 设计工作台端到端真实验收报告
 
-日期：2026-10-24。状态：S1/S3/S4/S6 pass，S2/S5 fail（同一产品缺陷，已定位可修），S7 skipped（留白）——**未达收官判据**，阻塞项与修复建议见 §6。上游：[验收计划](2026-10-24-design-workbench-e2e-acceptance-plan.md)。执行方式：dynamic workflow 编排、逐场景 sub-agent 经仓库本地 Playwright 驱动真实 Chrome（有头）操作真实应用与真实 Codex/Claude CLI 子进程，全程无人值守；运行目录与演示工作区保留供查验。
+日期：2026-10-24。状态：初验 S1/S3/S4/S6 pass、S2/S5 fail（同一产品缺陷，已定位）；**该缺陷已于同日修复（commit 67d63de4）并经真实环境聚焦复验三目全 pass（§7）——收官判据达成**；S7 skipped（留白）。上游：[验收计划](2026-10-24-design-workbench-e2e-acceptance-plan.md)。执行方式：dynamic workflow 编排、逐场景 sub-agent 经仓库本地 Playwright 驱动真实 Chrome（有头）操作真实应用与真实 Codex/Claude CLI 子进程，全程无人值守；运行目录与演示工作区保留供查验。
 
 ## 1. 环境信息
 
@@ -121,17 +121,17 @@ S6 备注：未熔断，一次通过（19:54:53 发送→19:55:03 完成，约 2
 
 computer use 探测不可用（node_repl 宿主返回 "Computer Use is unavailable for this node_repl session"；SDK client 脚本存在于 computer-use 插件 0.6.4，但本会话宿主未启用该能力，技能文档标注 main-agent-only），按验收计划 §0 决策 1 与 §2.4 口径标 skipped，不阻塞主链路。S7 计划项（WKWebView foreignObject 光栅化 PNG、deck 全屏播放、ZIP 落盘 ~/Downloads 的 Tauri 通路）全部未验证，归入 §5 留白清单。交接 JSON 中 S7 的 notes 字段文本截断，结论以本节与 §1 探测记录为准。
 
-## 4. 结果汇总
+## 4. 结果汇总（初验时点；S2/S5 经修复复验翻转为 pass，见 §7）
 
-| 场景                   | 状态     | 条目数（pass/fail） | 要点                                                                                |
-| ---------------------- | -------- | ------------------- | ----------------------------------------------------------------------------------- |
-| S1-M1-core             | pass     | 9 / 0               | 真实 Codex 生成→发现→编辑→撤销重做→保存→冲突→版本→导出全链路通过                    |
-| S2-M2-brand            | **fail** | 7 / 2               | Agent 交接后横幅误报零变更（S2-4c）、无 Agent 恢复点（S2-4d）；品牌与续改其余项通过 |
-| S3-P35-style-source    | pass     | 7 / 0               | 样式来源分组/徽标/内联编辑/撤销/外部 CSS 草稿/409 冲突/导出提示全通过               |
-| S4-P5-interactive-deck | pass     | 9 / 0               | 运行模式链接拦截、deck 标记/缩略图/排序/备注/演示、PDF/PNG 导出全通过               |
-| S5-P7-share-review     | **fail** | 6 / 1               | 分享/第二客户端/评论/解决/不可变/撤销全通过；S5-5 Agent 恢复点未出现（同 S2 缺陷）  |
-| S6-claude              | pass     | 4 / 0               | 真实 Claude CLI run 24s 一次通过，未触发熔断                                        |
-| S7-tauri               | skipped  | —                   | computer use 不可用，按计划留白                                                     |
+| 场景                   | 状态                  | 条目数（pass/fail） | 要点                                                                                |
+| ---------------------- | --------------------- | ------------------- | ----------------------------------------------------------------------------------- |
+| S1-M1-core             | pass                  | 9 / 0               | 真实 Codex 生成→发现→编辑→撤销重做→保存→冲突→版本→导出全链路通过                    |
+| S2-M2-brand            | fail → **pass（§7）** | 7 / 2               | Agent 交接后横幅误报零变更（S2-4c）、无 Agent 恢复点（S2-4d）；品牌与续改其余项通过 |
+| S3-P35-style-source    | pass                  | 7 / 0               | 样式来源分组/徽标/内联编辑/撤销/外部 CSS 草稿/409 冲突/导出提示全通过               |
+| S4-P5-interactive-deck | pass                  | 9 / 0               | 运行模式链接拦截、deck 标记/缩略图/排序/备注/演示、PDF/PNG 导出全通过               |
+| S5-P7-share-review     | fail → **pass（§7）** | 6 / 1               | 分享/第二客户端/评论/解决/不可变/撤销全通过；S5-5 Agent 恢复点未出现（同 S2 缺陷）  |
+| S6-claude              | pass                  | 4 / 0               | 真实 Claude CLI run 24s 一次通过，未触发熔断                                        |
+| S7-tauri               | skipped               | —                   | computer use 不可用，按计划留白                                                     |
 
 ## 5. 留白清单（本计划明确不覆盖或条件跳过）
 
@@ -145,9 +145,9 @@ computer use 探测不可用（node_repl 宿主返回 "Computer Use is unavailab
 
 注：S6 未 skipped（pass，如上）；S2/S5 的 fail 项为缺陷而非留白，见 §6。
 
-## 6. 总结论
+## 6. 总结论（初验时点）
 
-**未达收官判据**（验收计划 §5：S1–S5 全 pass、S6 如实记录、S7 pass 或明确留白）。当前 S1/S3/S4/S6 pass、S7 明确留白，但 S2 与 S5 各含 fail 条目。
+初验**未达收官判据**（验收计划 §5：S1–S5 全 pass、S6 如实记录、S7 pass 或明确留白）：S1/S3/S4/S6 pass、S7 明确留白，但 S2 与 S5 各含 fail 条目——**该缺陷已于同日修复并真实复验通过，最终结论见 §7：收官判据达成**。
 
 **唯一阻塞缺陷（同一根因，4/4 真实 run 复现）**：Agent 交接（S2 交改、S5 按反馈修改）落盘成功后——
 
@@ -161,3 +161,13 @@ computer use 探测不可用（node_repl 宿主返回 "Computer Use is unavailab
 **非阻塞已记录事项**：S1-9 导出单包按入口页资源图收集（不含 `<a>` 导航目标页，P2 §6.4 设计边界，三页各自 ZIP 已补证）；S1-2 run 状态归位 ~5.5min 略超 300s 驱动熔断窗（产物完整）；S1-5 h1 含子元素时文本编辑受限（按设计）；S4-5 DeckPanel 卡片按钮行换行溢出致 Notes 按钮物理点击被拦截（轻微 UI 缺陷，JS click 可用）；S3-3 组选择器规则对不上源码即只读（按设计）。其余全部条目 pass，证据齐全（179 处引用 0 缺失）。
 
 遗留状态：运行目录 run-pf01（含 data/、drivers/、evidence/、results/、workspace/、server.log）保留供查验；验收报告撰写完成后已按收尾流程停止验收 server（pid 37177）并确认端口 65422 释放。
+
+## 7. 缺陷修复与复核记录（2026-10-24 晚，主代理）
+
+- **修复**（commit `67d63de4`）：`agent-run-watch` 的 before 观测态改为在 **run 开始**（runId 空→非空）捕获，结束时仅补读错误标记——run 期间面板 2s 轮询对干净页的静默收编不再能掩盖 diff；挂载于 run 进行中的 run 无可靠 before，如实放弃评估。回归测试 +2（run 期间收编不掩盖 diff、挂载中途不评估），desktop design **887 用例全绿**、tsc 0 错、eslint 0 error / 37 warning 基线不变。
+- **真实复验**（聚焦复验，覆盖原 S2-4c / S2-4d / S5-5 三条目，同一根因一次交接流程即可全覆盖）：重建浏览器构建后以原 run-pf01 隔离数据目录重启真实应用（端口 65510），会话 S1 Codex Session 内「Hand off to Agent」发送真实 Codex 小改（h1#hero-title → "Reverify heading"，run 约 50s）。三目全 pass：
+  1. 横幅原文 **`Agent wrote 1 files`**（附 chip design/index.html）——ev-rv-banner.png；
+  2. 版本历史新增置顶条目 **`Agent 10-24 21:10`**，服务端 design_snapshots 表新增对应行（该表首条 Agent-\* 记录，修复前 4 次真实 run 均无）——ev-rv-restore-point.png、ev-rv-disk.txt；
+  3. 磁盘 index.html sha `4dcc9c6c…→f71089db…`（mtime 落在 run 窗口内），预览 innerText = Reverify heading——ev-rv-disk.txt、ev-rv-preview.png。
+- 复验偏差如实记录：主驱动点开 Version history 时遇一次 20s 未展开的一次性 UI 现象（重开即正常），恢复点由补充驱动 + DB 双重取证；复验 server 已停止并确认端口释放。
+- **最终结论：S1–S5 全部 pass（S2/S5 经修复复验翻转）、S6 pass、S7 明确留白——收官判据达成。**

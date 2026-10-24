@@ -155,3 +155,12 @@ P6 测试覆盖（desktop 682 + server 224 用例全绿；双端 tsc 0 错、des
 2026-10-23 本机实测：在 macOS 的 Claudia Dev（Tauri 开发版）中，通过真实 Codex CLI 会话生成 `design/index.html`、本地 CSS 和 5 个 SVG；设计面板自动发现并显示页面。点击纯文本主标题，修改文字与颜色，应用并保存后，直接检查磁盘 HTML 确认写入，再重新载入并重新选择标题，确认文字及计算颜色仍然一致。体验项目位于 `/Users/zhvala/SourceCode/zclaudia-design-demo`，会话名为 `Codex · 设计闭环体验`。
 
 此前一次真实 Claude CLI 尝试停留在重复的 `ToolSearch` 调用，未写文件，已取消。该次 CLI 为 2.1.304，超过运行时已测试上限 2.1.181；现有证据不能认定版本就是根因。此次原生闭环成功结果来自 Codex，不计为 Claude 实测通过。
+
+## 端到端真实验收（2026-10-24）
+
+以 dynamic workflow 编排逐场景 sub-agent、经仓库本地 Playwright 驱动真实 Chrome（有头）操作真实应用与真实 Codex/Claude CLI 子进程，无人值守完成主计划 M1–M3 与 P3.5 的**浏览器路径全链路验收**（生成→可视编辑→撤销→保存→冲突→版本恢复→ZIP 导出→品牌续改→样式来源→运行模式/deck→分享审阅→交接修改；179 处证据引用零缺失），设计与结论见 [验收报告](plans/2026-10-24-design-workbench-e2e-acceptance-report.md)：
+
+- **场景结果**：S1 主链路 / S2 品牌续改 / S3 样式来源 / S4 交互与 deck / S5 分享审阅（Playwright 独立上下文充当第二客户端）通过；S7 Tauri 实机因 computer use 不可用按计划留白。
+- **初验发现并修复唯一阻塞缺陷**：Agent 交接落盘后反馈横幅误报「未检测到变化」且不建 `Agent 时间` 恢复点（4/4 真实 run 复现；根因 = watcher 在 run 结束才取 before，而面板 2s 轮询已在 run 期间收编磁盘写入）。当日修复（`67d63de4`，before 改在 run 开始捕获，回归测试 +2，887 用例全绿）并经真实环境聚焦复验三目全 pass（横幅 `Agent wrote 1 files`、恢复点入库、磁盘与预览双证）——验收报告 §7。
+- **真实 Claude CLI 首次实测通过**：推翻上一段「不计为通过」的历史记录——CLI 2.1.304（cli 引擎模式）24 秒一次完成 hello.html 生成（单次 Write 工具调用，无 ToolSearch 循环、未触发熔断；验收报告 S6）。
+- 留白（待用户配合）：macOS Tauri 实机（WKWebView 捕获/全屏播放/Downloads 落盘）、P6 付费图片（待配 key）、P7 LAN 第二设备、远端 backend、其他操作系统。

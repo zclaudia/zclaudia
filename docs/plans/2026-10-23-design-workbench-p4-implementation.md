@@ -31,15 +31,17 @@
 
 export interface DesignTemplateSummary {
   id: string;
-  name: string;          // 中文名
-  description: string;   // 中文一句话
-  entry: string;         // 工作区相对入口路径，如 'design/landing/index.html'
-  files: string[];       // 模板将写入的全部文件（不含 TEMPLATE.json）
-  version: string;       // '1.0.0'
-  source: string;        // 'zclaudia-builtin'
+  name: string; // 中文名
+  description: string; // 中文一句话
+  entry: string; // 工作区相对入口路径，如 'design/landing/index.html'
+  files: string[]; // 模板将写入的全部文件（不含 TEMPLATE.json）
+  version: string; // '1.0.0'
+  source: string; // 'zclaudia-builtin'
 }
 
-export function listDesignTemplates(backendId: string): Promise<{ templates: DesignTemplateSummary[] }>;
+export function listDesignTemplates(
+  backendId: string
+): Promise<{ templates: DesignTemplateSummary[] }>;
 // GET /api/design/templates —— 静态目录，无 sessionId
 
 export function installDesignTemplate(
@@ -49,7 +51,7 @@ export function installDesignTemplate(
 // POST /api/design/templates/install —— 409 TEMPLATE_TARGET_EXISTS 时错误对象带 files（复用 DesignHttpError 形态）
 
 export interface DesignBrand {
-  designMd: string | null;        // 文件不存在为 null
+  designMd: string | null; // 文件不存在为 null
   tokensCss: string | null;
   designMdRevision: string | null;
   tokensCssRevision: string | null;
@@ -63,7 +65,7 @@ export function putDesignBrand(
   input: {
     sessionId: string;
     designMd?: string;
-    designMdRevision?: string;    // SHA-256；文件不存在时传 '' 创建
+    designMdRevision?: string; // SHA-256；文件不存在时传 '' 创建
     tokensCss?: string;
     tokensCssRevision?: string;
   }
@@ -110,12 +112,12 @@ POST /api/design/assets/import                      → { path }
 
 4 个自研模板，全部纯静态：
 
-| id | 名称 | 安装目录 | 文件 |
-|---|---|---|---|
-| `landing` | 落地页 | `design/landing/` | `index.html` + `styles.css` |
-| `dashboard` | 仪表盘 | `design/dashboard/` | `index.html` + `styles.css` |
-| `mobile` | 移动原型 | `design/mobile/` | `index.html` + `styles.css` |
-| `showcase` | 静态展示页 | `design/showcase/` | `index.html` + `styles.css` |
+| id          | 名称       | 安装目录            | 文件                        |
+| ----------- | ---------- | ------------------- | --------------------------- |
+| `landing`   | 落地页     | `design/landing/`   | `index.html` + `styles.css` |
+| `dashboard` | 仪表盘     | `design/dashboard/` | `index.html` + `styles.css` |
+| `mobile`    | 移动原型   | `design/mobile/`    | `index.html` + `styles.css` |
+| `showcase`  | 静态展示页 | `design/showcase/`  | `index.html` + `styles.css` |
 
 每个模板内容硬性要求（服务端测试逐条锁死，见 §2.3）：
 
@@ -140,7 +142,7 @@ POST /api/design/assets/import                      → { path }
 
 ### 2.3 目录不变量测试（L15）
 
-`template-service.test.ts` 含目录自检用例：遍历目录断言 §2.1 硬性要求（entry ∈ files、路径都在 `design/<id>/` 下、HTML 无 script/on*=、href/src 无 scheme 与 `//` 开头、含 styles.css link、文件大小上限、zh-CN）。**模板内容的验收以这些不变量 + 主代理人工审查 HTML 为准**，不追求像素级设计评审。
+`template-service.test.ts` 含目录自检用例：遍历目录断言 §2.1 硬性要求（entry ∈ files、路径都在 `design/<id>/` 下、HTML 无 script/on\*=、href/src 无 scheme 与 `//` 开头、含 styles.css link、文件大小上限、zh-CN）。**模板内容的验收以这些不变量 + 主代理人工审查 HTML 为准**，不追求像素级设计评审。
 
 ### 2.4 TemplateDialog（L17，新文件 `components/TemplateDialog.tsx`）
 
@@ -158,25 +160,30 @@ Modal（复用既有 Modal 组件，形态对齐 ExportDialog）：打开时 `li
 > 由 ZClaudia 设计工作台生成。可直接编辑本文件与 tokens.css；Agent 修改页面时会读取两者。
 
 ## 色彩
-| 用途 | Token | 值 |
-|---|---|---|
-| 主色 | --color-primary | #4f46e5 |
-| 辅色 | --color-secondary | … |
-| 背景 | --color-background | … |
-| 文字 | --color-text | … |
+
+| 用途 | Token              | 值      |
+| ---- | ------------------ | ------- |
+| 主色 | --color-primary    | #4f46e5 |
+| 辅色 | --color-secondary  | …       |
+| 背景 | --color-background | …       |
+| 文字 | --color-text       | …       |
 
 ## 字体
+
 - 正文：…
 - 标题：…
 
 ## 间距与圆角
+
 - 间距基准：8px（--space-unit）
 - 圆角：…
 
 ## Logo
+
 - 引用：assets/logo.svg（相对 design/ 的路径，素材需已在素材库中）
 
 ## 使用规则
+
 …（表单 notes）
 ```
 
@@ -192,7 +199,7 @@ Modal（复用既有 Modal 组件，形态对齐 ExportDialog）：打开时 `li
   --font-body: …;
   --font-heading: …;
   --space-unit: 8px;
-  --radius-md: 8px;   /* radius 档位：none=0 / sm=4px / md=8px / lg=16px */
+  --radius-md: 8px; /* radius 档位：none=0 / sm=4px / md=8px / lg=16px */
 }
 ```
 
@@ -200,12 +207,16 @@ Modal（复用既有 Modal 组件，形态对齐 ExportDialog）：打开时 `li
 
 ```ts
 export interface BrandSpec {
-  primary: string; secondary: string; background: string; text: string; // CSS 颜色语法，trim 后非空 ≤40 字符
-  fontBody: string; fontHeading: string;                                // ≤120，同 P3 font-family 校验口径（禁 ;{}<>\ url( var( expression(）
+  primary: string;
+  secondary: string;
+  background: string;
+  text: string; // CSS 颜色语法，trim 后非空 ≤40 字符
+  fontBody: string;
+  fontHeading: string; // ≤120，同 P3 font-family 校验口径（禁 ;{}<>\ url( var( expression(）
   spacingUnit: '4px' | '8px';
   radius: 'none' | 'sm' | 'md' | 'lg';
-  logoPath: string;   // 空 或 工作区相对路径（≥1、≤500、禁 scheme/反斜杠/控制字符，与 safeAttrValue src 同口径的语法检查）
-  notes: string;      // ≤2000
+  logoPath: string; // 空 或 工作区相对路径（≥1、≤500、禁 scheme/反斜杠/控制字符，与 safeAttrValue src 同口径的语法检查）
+  notes: string; // ≤2000
 }
 /** 返回违规字段中文错误列表；空数组 = 合法。 */
 export function validateBrandSpec(spec: BrandSpec): string[];
@@ -261,19 +272,27 @@ Modal：「图片 / 字体」两个 tab（`listDesignAssets(…, 'image' | 'font
 ### 5.1 纯逻辑（L16，新文件 `agent-context.ts`）
 
 ```ts
-export interface AgentContextSection { title: string; lines: string[] }
+export interface AgentContextSection {
+  title: string;
+  lines: string[];
+}
 
 export interface AgentContextInput {
   workingDirectory?: string;
   projectId?: string;
-  pages: { path: string; docRevision: string; dirty: boolean }[];        // ≤12，超出截断标记
+  pages: { path: string; docRevision: string; dirty: boolean }[]; // ≤12，超出截断标记
   active: {
-    path: string; docRevision: string; dirty: boolean;
+    path: string;
+    docRevision: string;
+    dirty: boolean;
     selection?: {
-      tagName: string; elementPath: number[]; text: string; sourceText?: string;
+      tagName: string;
+      elementPath: number[];
+      text: string;
+      sourceText?: string;
     } | null;
   } | null;
-  brand: { designMd: string | null; tokensCss: string | null } | null;   // null = 未创建（section 省略）
+  brand: { designMd: string | null; tokensCss: string | null } | null; // null = 未创建（section 省略）
   assets: { referenced: { path: string; kind: string }[]; importedRecently: string[] };
   viewport: { preset: string; width: number | null };
 }
@@ -307,14 +326,17 @@ Props：`{ open, context: { sections, prompt }, task, onClose, onConfirm }`。�
 
 ```ts
 export interface DesignWatchState {
-  files: string[];                                       // 已知 HTML 文件清单
-  openPages: { path: string; docRevision: string }[];    // 面板最后已知磁盘修订
+  files: string[]; // 已知 HTML 文件清单
+  openPages: { path: string; docRevision: string }[]; // 面板最后已知磁盘修订
 }
 export interface AgentRunDiff {
-  addedFiles: string[];      // 磁盘新增 HTML
-  changedPages: string[];    // 打开页磁盘修订 ≠ 面板已知
+  addedFiles: string[]; // 磁盘新增 HTML
+  changedPages: string[]; // 打开页磁盘修订 ≠ 面板已知
 }
-export function diffDesignWatchState(before: DesignWatchState, after: DesignWatchState): AgentRunDiff;
+export function diffDesignWatchState(
+  before: DesignWatchState,
+  after: DesignWatchState
+): AgentRunDiff;
 /** 中文状态文案；runErrored=true 时追加「运行报告了错误，详情见聊天。」 */
 export function agentRunStatusText(diff: AgentRunDiff, runErrored: boolean): string;
 ```
@@ -337,15 +359,15 @@ export function agentRunStatusText(diff: AgentRunDiff, runErrored: boolean): str
 
 ## 7. 验收对照（上游计划 P4 验收条目）
 
-| 计划验收项 | 覆盖证据 |
-|---|---|
-| 模板记录入口/能力/资源/来源/版本；复制后独立编辑；更新不覆盖作品 | L15 目录元数据 + TEMPLATE.json 标记 + 409/overwrite 语义测试；安装文件经 P1–P3 编辑链路全量可编辑 |
-| 品牌落为可读项目文件（DESIGN.md + tokens.css） | L16 渲染器快照测试；L15 读写端点与修订冲突测试；L17 表单生成 + 文本编辑 |
-| 素材导入/预览/重名/被引用提示；共用资源引用契约 | L15 导入白名单/上限/自动去重测试；L17 缩略图、重命名提示、已引用徽标、替换选中图片（走 P3 attribute 契约） |
-| 上下文组合（文件+修订/选区/源码/品牌/素材）且发送前可见；不跨 backend | L16 构建器截断/顺序/确定性测试；L18 检视模态；L19 全部数据经 backendId API 的接线 |
-| Agent 写入后更新文档与恢复点、记录来源；无写入/失败/取消明确显示 | L16 diff/文案测试；L18 run 结束监视 + 快照；L19 横幅；成功信号来自磁盘对比 |
-| 自动测试覆盖上下文结构 | agent-context 快照 + 截断用例 |
-| 真实 Agent 冒烟 | 待用户配合（M2 门槛，沿用 P3 待办口径）；本批自动化 + 模板内容人工审查 |
+| 计划验收项                                                            | 覆盖证据                                                                                                   |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 模板记录入口/能力/资源/来源/版本；复制后独立编辑；更新不覆盖作品      | L15 目录元数据 + TEMPLATE.json 标记 + 409/overwrite 语义测试；安装文件经 P1–P3 编辑链路全量可编辑          |
+| 品牌落为可读项目文件（DESIGN.md + tokens.css）                        | L16 渲染器快照测试；L15 读写端点与修订冲突测试；L17 表单生成 + 文本编辑                                    |
+| 素材导入/预览/重名/被引用提示；共用资源引用契约                       | L15 导入白名单/上限/自动去重测试；L17 缩略图、重命名提示、已引用徽标、替换选中图片（走 P3 attribute 契约） |
+| 上下文组合（文件+修订/选区/源码/品牌/素材）且发送前可见；不跨 backend | L16 构建器截断/顺序/确定性测试；L18 检视模态；L19 全部数据经 backendId API 的接线                          |
+| Agent 写入后更新文档与恢复点、记录来源；无写入/失败/取消明确显示      | L16 diff/文案测试；L18 run 结束监视 + 快照；L19 横幅；成功信号来自磁盘对比                                 |
+| 自动测试覆盖上下文结构                                                | agent-context 快照 + 截断用例                                                                              |
+| 真实 Agent 冒烟                                                       | 待用户配合（M2 门槛，沿用 P3 待办口径）；本批自动化 + 模板内容人工审查                                     |
 
 ## 8. 测试与任务卡
 
@@ -413,3 +435,5 @@ L19（面板接线与文档）单卡完成：
 ### 待补验证（M2 门槛）
 
 真实 Agent + macOS Tauri 冒烟（品牌 + 模板安装 → 经检视上下文真实生成 → 局部续改保持品牌 → 素材替换重开 → run 反馈横幅实机）、浏览器与远端 backend 验证。本批以自动化测试为准并记录待办。
+
+2026-10-24 更新：e2e 真实验收（浏览器路径，[验收报告](2026-10-24-design-workbench-e2e-acceptance-report.md) §7）已覆盖本阶段全部条目——模板/品牌/续改/素材（S2）与 run 反馈横幅（初验发现的 before 捕获时机缺陷当日修复 `67d63de4` 并真实复验通过）；macOS Tauri 实机与远端 backend 仍待补。

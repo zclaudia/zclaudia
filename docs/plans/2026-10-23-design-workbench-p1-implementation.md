@@ -29,16 +29,20 @@
 ### 1.2 类型（全部放 `apps/desktop/src/features/design/types.ts`，Wave 1 由主代理一次性落库，子代理不得改动该文件）
 
 ```ts
-export interface DesignDocument { path: string; source: string; revision: string; }  // 现状保留
+export interface DesignDocument {
+  path: string;
+  source: string;
+  revision: string;
+} // 现状保留
 
 export interface DesignSelection {
-  elementPath: number[];        // body 起的子元素序号，仅用于查找
+  elementPath: number[]; // body 起的子元素序号，仅用于查找
   tagName: string;
-  text: string;                 // 预览计算文本（展示用）
-  sourceText?: string;          // 源码 textContent（解码、trim 后），校验指纹
+  text: string; // 预览计算文本（展示用）
+  sourceText?: string; // 源码 textContent（解码、trim 后），校验指纹
   color?: string;
   backgroundColor?: string;
-  base?: string;                // 构建预览时的 draftRevision
+  base?: string; // 构建预览时的 draftRevision
 }
 
 export type DesignStyleProperty = 'color' | 'background-color';
@@ -48,28 +52,28 @@ export type DesignEditOperation =
   | { kind: 'style'; property: DesignStyleProperty; value: string | null }; // null = 清除该声明
 
 export interface DesignEditTransaction {
-  baseRevision: string;         // 必须 === 当前草稿修订
+  baseRevision: string; // 必须 === 当前草稿修订
   locator: DesignSelection;
   operations: DesignEditOperation[];
 }
 
 export interface DesignEditResult {
   source: string;
-  revision: string;             // 新草稿修订
-  selection: DesignSelection;   // 更新后的定位（sourceText/base 跟随新草稿）
+  revision: string; // 新草稿修订
+  selection: DesignSelection; // 更新后的定位（sourceText/base 跟随新草稿）
 }
 
 export type DesignEditErrorCode =
-  | 'REVISION_MISMATCH'      // 事务 baseRevision ≠ 当前草稿修订（迟到消息/并发编辑）
-  | 'ELEMENT_NOT_FOUND'      // 路径走不到
-  | 'TAG_MISMATCH'           // 标签名与定位不符
-  | 'TEXT_MISMATCH'          // 文本指纹不符（重复节点/兄弟插入/源码已变）
-  | 'NOT_PLAIN_TEXT'         // 含子元素，不能改文字
-  | 'IMPLICIT_ELEMENT'       // 目标或所需标签无源码位置（隐式节点）
-  | 'DUPLICATE_ATTRIBUTE'    // 目标开始标签内存在重复属性
-  | 'MALFORMED_HTML'         // 目标元素跨度内存在其他解析错误
-  | 'INVALID_VALUE'          // 颜色值非法
-  | 'EMPTY_TRANSACTION';     // 没有可应用操作
+  | 'REVISION_MISMATCH' // 事务 baseRevision ≠ 当前草稿修订（迟到消息/并发编辑）
+  | 'ELEMENT_NOT_FOUND' // 路径走不到
+  | 'TAG_MISMATCH' // 标签名与定位不符
+  | 'TEXT_MISMATCH' // 文本指纹不符（重复节点/兄弟插入/源码已变）
+  | 'NOT_PLAIN_TEXT' // 含子元素，不能改文字
+  | 'IMPLICIT_ELEMENT' // 目标或所需标签无源码位置（隐式节点）
+  | 'DUPLICATE_ATTRIBUTE' // 目标开始标签内存在重复属性
+  | 'MALFORMED_HTML' // 目标元素跨度内存在其他解析错误
+  | 'INVALID_VALUE' // 颜色值非法
+  | 'EMPTY_TRANSACTION'; // 没有可应用操作
 ```
 
 ### 1.3 服务端错误码（新增）
@@ -82,13 +86,13 @@ export type DesignEditErrorCode =
 
 目录 `apps/desktop/src/features/design/html/`，全部纯函数，无 React 依赖：
 
-| 文件 | 职责 |
-|---|---|
-| `parse.ts` | `parseDocument(source)`：parse5 解析 + 收集解析错误（`onParseError` 记 `code` 与 `startOffset`）；`findElement(doc, path)`；`childElements(node)`；`tagSpan(el)`/`textSpan(el)` 等区间助手 |
-| `values.ts` | `safeColor(value): string \| null`（从现 `editing.ts` 迁移规则）；`escapeText`、`escapeAttr` |
-| `style-declarations.ts` | 内联 style 声明编辑：`setDeclaration(styleValue, property, value): string`（见 §2.2） |
-| `hash.ts` | **主代理随 T1 提供，子代理直接使用**：`sha256Hex(source)`（WebCrypto 优先，jsdom 无 subtle 时走已验证的纯 JS 回退 `sha256HexSync`） |
-| `edit-engine.ts` | `applyEditTransaction(source, txn): Promise<DesignEditResult>`，抛 `DesignEditError(code)` |
+| 文件                    | 职责                                                                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `parse.ts`              | `parseDocument(source)`：parse5 解析 + 收集解析错误（`onParseError` 记 `code` 与 `startOffset`）；`findElement(doc, path)`；`childElements(node)`；`tagSpan(el)`/`textSpan(el)` 等区间助手 |
+| `values.ts`             | `safeColor(value): string \| null`（从现 `editing.ts` 迁移规则）；`escapeText`、`escapeAttr`                                                                                               |
+| `style-declarations.ts` | 内联 style 声明编辑：`setDeclaration(styleValue, property, value): string`（见 §2.2）                                                                                                      |
+| `hash.ts`               | **主代理随 T1 提供，子代理直接使用**：`sha256Hex(source)`（WebCrypto 优先，jsdom 无 subtle 时走已验证的纯 JS 回退 `sha256HexSync`）                                                        |
+| `edit-engine.ts`        | `applyEditTransaction(source, txn): Promise<DesignEditResult>`，抛 `DesignEditError(code)`                                                                                                 |
 
 ### 2.1 引擎算法
 
@@ -102,11 +106,13 @@ export type DesignEditErrorCode =
 6. 降序拼接返回新源码；新 `selection`：`sourceText` 更新为 text 操作后的值（trim），`base` 更新为新修订；`text/color/backgroundColor` 反映已应用值。
 
 **text 操作**：
+
 - 目标 childNodes 必须全为单一文本节点或为空（无子节点）。含元素或其他节点 → `NOT_PLAIN_TEXT`。
 - 有文本节点时：其解码值 trim 后 ≠ `locator.sourceText`（当提供）→ `TEXT_MISMATCH`。splice 区间 = 文本节点 `sourceCodeLocation`；替换为 `escapeText(value)`（`&`→`&amp;`、`<`→`&lt;`、`>`→`&gt;`）。
 - 无子节点（空元素）：若 `sourceText` 提供且非空 → `TEXT_MISMATCH`；否则在 `startTag.endOffset` 处零宽插入转义文本（紧随开始标签之后；在 `>` 之前插入会拼进标签名产生坏标签，自闭合 `/>` 后的文本按 HTML 规则也归属该元素）。
 
 **style 操作**：
+
 - `value !== null` 时先 `safeColor` 校验 → 失败 `INVALID_VALUE`。
 - 元素 `attrs` 有 `style`：取解码值 `v`，`next = setDeclaration(v, property, value)`；`next === v`（清除不存在的声明）→ 该操作跳过；否则替换 `startTag.attrs.style` 全跨度为 `style="${escapeAttr(next)}"`（`&`→`&amp;`、`"`→`&quot;`）。
 - 无 `style`：`value === null` → 跳过；否则插入 ` style="property: value"`：位置在有属性时取 `startTag.attrs` 各全跨度最大 endOffset 之后，无属性时在开始标签 `>`（或 `/>` 的 `/`）之前。
@@ -134,19 +140,30 @@ export type DesignEditErrorCode =
 `apps/desktop/src/features/design/history/edit-history.ts`：
 
 ```ts
-export interface EditHistoryEntry { before: string; after: string; label: string; at: number; }
-export interface EditHistoryOptions { limit?: number; maxBytes?: number; mergeWindowMs?: number; }
+export interface EditHistoryEntry {
+  before: string;
+  after: string;
+  label: string;
+  at: number;
+}
+export interface EditHistoryOptions {
+  limit?: number;
+  maxBytes?: number;
+  mergeWindowMs?: number;
+}
 export class EditHistory {
-  constructor(options?: EditHistoryOptions);            // limit=100, maxBytes=32MiB, mergeWindowMs=1500
+  constructor(options?: EditHistoryOptions); // limit=100, maxBytes=32MiB, mergeWindowMs=1500
   record(entry: EditHistory & { mergeKey?: string }): void;
-      // mergeKey 与栈顶相同且 now-at < mergeWindowMs → 只替换栈顶 after（保留原 before/at），否则压栈；
-      // 压栈清空 redo；超 limit 或累计字节(所有 entry 的 before+after 长度和)超 maxBytes 时淘汰最旧并调整保存标记。
+  // mergeKey 与栈顶相同且 now-at < mergeWindowMs → 只替换栈顶 after（保留原 before/at），否则压栈；
+  // 压栈清空 redo；超 limit 或累计字节(所有 entry 的 before+after 长度和)超 maxBytes 时淘汰最旧并调整保存标记。
   undo(current: string): string | null;
-      // 无可撤销返回 null；防御：current !== 栈顶 after → 视为外部改动，rebuild(current) 后返回 null。
-  redo(current: string): string | null;                 // 对称：current !== redo 目标 before → rebuild 后 null。
-  markSaved(source: string): void;                      // 记录保存基线（不清历史：保存后仍可撤销为新草稿）。
-  rebuild(source: string): void;                        // 外部接管/重新载入/恢复后重建基线并清空历史。
-  get canUndo(): boolean; get canRedo(): boolean; get savedSource(): string | null;
+  // 无可撤销返回 null；防御：current !== 栈顶 after → 视为外部改动，rebuild(current) 后返回 null。
+  redo(current: string): string | null; // 对称：current !== redo 目标 before → rebuild 后 null。
+  markSaved(source: string): void; // 记录保存基线（不清历史：保存后仍可撤销为新草稿）。
+  rebuild(source: string): void; // 外部接管/重新载入/恢复后重建基线并清空历史。
+  get canUndo(): boolean;
+  get canRedo(): boolean;
+  get savedSource(): string | null;
 }
 ```
 
@@ -157,12 +174,12 @@ export class EditHistory {
 
 `DesignPanel.tsx` 拆分（只拆本阶段需要的部分）：
 
-| 文件 | 职责 |
-|---|---|
-| `useDesignDocument.ts` | 文档状态机：load/draft/revision、history、selection、apply/undo/redo/save/reload、外部变更与冲突标志 |
-| `components/DesignToolbar.tsx` | 文件选择、刷新、生成、交给 Agent、撤销/重做、保存、重新载入 |
-| `components/SelectionEditor.tsx` | 选中元素表单 + **清除文字颜色/清除背景颜色**按钮（`value: null` 操作）+ 覆盖警告条 |
-| `DesignPanel.tsx` | 组合与布局，保持现有空态/轮询/发现逻辑 |
+| 文件                             | 职责                                                                                                 |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `useDesignDocument.ts`           | 文档状态机：load/draft/revision、history、selection、apply/undo/redo/save/reload、外部变更与冲突标志 |
+| `components/DesignToolbar.tsx`   | 文件选择、刷新、生成、交给 Agent、撤销/重做、保存、重新载入                                          |
+| `components/SelectionEditor.tsx` | 选中元素表单 + **清除文字颜色/清除背景颜色**按钮（`value: null` 操作）+ 覆盖警告条                   |
+| `DesignPanel.tsx`                | 组合与布局，保持现有空态/轮询/发现逻辑                                                               |
 
 状态机要点：
 
@@ -179,11 +196,19 @@ export class EditHistory {
 ```ts
 export interface SafeWriteOptions {
   maxBytes: number;
-  expectedRevision: string;                 // 当前内容 sha256，必须匹配
+  expectedRevision: string; // 当前内容 sha256，必须匹配
   backup?: (bytes: Buffer, stat: fs.Stats) => Promise<void>; // 可选写前备份钩子（由调用方决定存放）
 }
-export async function safeWriteFile(absolutePath: string, next: Buffer, o: SafeWriteOptions): Promise<{ revision: string }>;
-export async function readBoundedFile(filePath: string, maxBytes: number, description: string): Promise<{ bytes: Buffer; stat: fs.Stats }>; // 从 design-service 迁出并导出，语义不变
+export async function safeWriteFile(
+  absolutePath: string,
+  next: Buffer,
+  o: SafeWriteOptions
+): Promise<{ revision: string }>;
+export async function readBoundedFile(
+  filePath: string,
+  maxBytes: number,
+  description: string
+): Promise<{ bytes: Buffer; stat: fs.Stats }>; // 从 design-service 迁出并导出，语义不变
 ```
 
 行为：模块级按文件 promise 链互斥（移植 `file-write-lock.ts` 模式，独立 Map）→ `readBoundedFile` → 修订校验 → 可选备份 → `wx` 写同目录临时文件并保留 mode → **同步**终检（lstat 非 symlink、realpath 仍在根内由调用方校验、stat dev+ino 一致、内容哈希仍为 expectedRevision）→ `renameSync` → finally 清理临时文件。
@@ -284,17 +309,17 @@ POST /api/design/snapshots/:id/restore {sessionId, expectedRevisions: Record<pat
 
 ## 7. 验收对照（对上游计划 P1 验收条目）
 
-| 计划验收项 | 覆盖证据 |
-|---|---|
-| 相同工作区两聊天看到一致历史 | server 测试：两 session 同 workspace 列表一致；快照归属 workspace_root |
-| 不同 backend/worktree 不串 | server 测试：不同 workspace 的快照互不可见；restore 跨 workspace → WORKSPACE_MISMATCH |
-| 改标题无关字节不变 | 引擎测试：before/after 差异恰为预期 splice（逐字节断言），fixtures 含注释/实体/未引号属性/CRLF |
-| 旧选区/重复节点/无效源码不猜测 | 引擎测试：重复兄弟、插入兄弟后路径漂移、duplicate-attribute、隐式 tbody、TEXT_MISMATCH/拒绝 |
-| 撤销/重做/保存/重载/冲突符合规则 | history 单测 + useDesignDocument/组件测试（合并窗口、redo 清除、保存后撤销、外部接管 rebuild） |
-| HTML/CSS/二进制图片快照可恢复；中断可报告 | server 测试：完整捕获恢复回读；恢复中途失败（目标路径造目录冲突）→ report 三段 + pre-restore 存在 |
-| 受控写入互斥、过期修订拒绝 | safe-file-write 测试：并发 10 写串行无交错；过期 revision 409 |
-| 外部写入：草稿保留、备份可恢复 | 既有面板行为保持 + 备份钩子测试（5 份淘汰） |
-| 路径越界/symlink/私密/超限/错误 snapshotId | 快照端点测试：清单外 file 读取 403/404、不存在 id 404、超限捕获 incomplete |
+| 计划验收项                                 | 覆盖证据                                                                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| 相同工作区两聊天看到一致历史               | server 测试：两 session 同 workspace 列表一致；快照归属 workspace_root                            |
+| 不同 backend/worktree 不串                 | server 测试：不同 workspace 的快照互不可见；restore 跨 workspace → WORKSPACE_MISMATCH             |
+| 改标题无关字节不变                         | 引擎测试：before/after 差异恰为预期 splice（逐字节断言），fixtures 含注释/实体/未引号属性/CRLF    |
+| 旧选区/重复节点/无效源码不猜测             | 引擎测试：重复兄弟、插入兄弟后路径漂移、duplicate-attribute、隐式 tbody、TEXT_MISMATCH/拒绝       |
+| 撤销/重做/保存/重载/冲突符合规则           | history 单测 + useDesignDocument/组件测试（合并窗口、redo 清除、保存后撤销、外部接管 rebuild）    |
+| HTML/CSS/二进制图片快照可恢复；中断可报告  | server 测试：完整捕获恢复回读；恢复中途失败（目标路径造目录冲突）→ report 三段 + pre-restore 存在 |
+| 受控写入互斥、过期修订拒绝                 | safe-file-write 测试：并发 10 写串行无交错；过期 revision 409                                     |
+| 外部写入：草稿保留、备份可恢复             | 既有面板行为保持 + 备份钩子测试（5 份淘汰）                                                       |
+| 路径越界/symlink/私密/超限/错误 snapshotId | 快照端点测试：清单外 file 读取 403/404、不存在 id 404、超限捕获 incomplete                        |
 
 ## 8. 测试与工具
 
@@ -342,3 +367,4 @@ Wave 1（P1a）与 Wave 2（P1b）由 GLM-5.3-Flash 子代理实现（两轮 wor
 - 验收修正（主代理直接改码）：① POST /api/design/snapshots 接受 `source: 'save'`（面板保存自动捕获此前会被记成 manual——L4/L5 并行契约缺口）；② restore 成功后的 post-restore 捕获失败降级为返回原快照 summary（不再出现"文件已恢复但 HTTP 500"）。
 - 已知缺口（记录在案）：changed-during-capture 稳定性复验路径无自动化用例（测试环境无法在捕获窗口内可靠制造并发写）；`SNAPSHOT_LIMIT_EXCEEDED` 为保留错误码，现行"超限删最旧"策略下无触发路径；恢复中断场景由"预置目录制造 rename 失败"用例覆盖。
 - 待补验证：真实 Agent + macOS Tauri 冒烟（M1 门槛）、浏览器与远端 backend 验证、e2e 快照恢复链路扩展。
+- 2026-10-24 更新：e2e 真实验收（浏览器路径，[验收报告](2026-10-24-design-workbench-e2e-acceptance-report.md)）已覆盖真实 Agent 冒烟、浏览器验证与快照/导出链路（S1）；macOS Tauri 实机与远端 backend 仍待补。

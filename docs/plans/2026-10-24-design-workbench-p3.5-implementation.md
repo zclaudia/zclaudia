@@ -190,6 +190,8 @@ fnm exec --using 22.20.0 pnpm --filter @zclaudia/server exec tsc --noEmit
 
 真实 Agent + macOS Tauri 冒烟（与 P3 既有待补合并执行）：选中卡片查看规则来源 → 在 `<style>` 块改值/删声明 → 撤销 → 保存重载一致；第二批再加外部 `.css` 修改 → 预览即时刷新 → 保存 → 冲突场景（外部改文件后保存被拒）。本批以自动化测试为准并记录待办。
 
+2026-10-24 更新：e2e 真实验收（浏览器路径，[验收报告](2026-10-24-design-workbench-e2e-acceptance-report.md) S3）已覆盖上述全部条目（规则来源查看、`<style>` 块与外部 `.css` 修改、撤销、保存重载、409 冲突与 Reload、导出提示）；macOS Tauri 实机仍待补。
+
 ## 11. 验收记录
 
 ### T0（2026-10-24，主代理）

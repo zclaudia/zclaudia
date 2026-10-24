@@ -16,7 +16,7 @@
 
 ## 0. 已定决策（主代理勘察，2026-10-23）
 
-1. **三态模式：编辑（现状）/ 运行 / 演示。** 编辑模式行为与 P1–P4 完全一致（脚本与 on* 剥离、选区桥接可用）；运行模式为页面级交互执行（§2）；演示模式是 deck 专用的覆盖层播放（§5），不是预览模式。模式切换是面板会话内 state，不持久化（每次挂载默认编辑）。
+1. **三态模式：编辑（现状）/ 运行 / 演示。** 编辑模式行为与 P1–P4 完全一致（脚本与 on\* 剥离、选区桥接可用）；运行模式为页面级交互执行（§2）；演示模式是 deck 专用的覆盖层播放（§5），不是预览模式。模式切换是面板会话内 state，不持久化（每次挂载默认编辑）。
 2. **运行模式不放开任何宿主权限。** iframe sandbox 维持 `allow-scripts`（无 `allow-same-origin` / `allow-popups` / `allow-forms` / `allow-top-navigation`），CSP `connect-src 'none'` 拒绝一切网络。存储策略 = opaque origin 下以桥接注入的内存 shim 提供 `localStorage`/`sessionStorage` API（可用、不持久、刷新即失）；`IndexedDB` 在 opaque origin 抛错属已声明限制，不 shim。导航策略 = 构建期分类 + 桥接拦截（§2.2）。弹窗策略 = sandbox 禁止（`window.open` 返回 null）。
 3. **交互原型 = 任何页面可切运行模式**，不要求声明清单；「声明范围内的交互」（上游 P5.2）由边界本身定义：本地多页跳转（工作区内 .html）、页内菜单/弹窗（作品脚本自理）、锚点。外部链接与非 HTML 相对链接被阻止并上报状态。运行模式禁用选区/结构树/交给 Agent（只读体验）；切回编辑模式后静态预览重建，支持的节点照常定位（上游验收项）。
 4. **deck 约定 = 源码内 `data-zclaudia-slide` 标记元素**（推荐 `<section>`），文档顺序即页序；可选 `data-title` / `data-notes` 属性；比例存 `<body data-zclaudia-deck-ratio="16:9|4:3">`（缺省 16:9）。含 ≥1 个标记元素即视为 deck（工具栏出现「幻灯片」按钮）。**deck 是普通 HTML 页**：经 P1–P3 全部编辑链路可编辑、可保存、可快照、可 ZIP 导出；排序/备注/比例是字节保真的源码块切片（§3）。
@@ -26,15 +26,15 @@
 
 ## 1. P5.1 预览执行边界（策略表）
 
-| 维度 | 编辑模式（现状，不变） | 运行模式（新） | 演示模式（新，deck 专用） |
-|---|---|---|---|
-| 作品脚本 / on* 内联事件 | 剥离 | **保留执行**（本地脚本内联为文本；远程 script src 移除并计数上报） | 剥离 |
-| 网络 | 无脚本执行 | CSP `connect-src 'none'`，XHR/fetch/EventSource 全拒 | 同编辑 |
-| 导航 | 锚点放行，其余阻止 | 相对 `.html`/`.htm` → 桥接 `design-navigate` 上报宿主开页；`#锚点` 放行；外部 scheme / 非 HTML 相对链接 → 阻止并上报 `design-nav-blocked` | 页内导航无（键盘翻页由宿主处理） |
-| 存储 | 无 | opaque origin + 内存 shim（可用不持久）；IndexedDB 抛错（声明限制） | 无 |
-| 弹窗 / 表单 | sandbox 禁 / preventDefault | sandbox 禁 / preventDefault | 同编辑 |
-| 消息桥接 | select / verify / select-path | 仅 `design-navigate` / `design-nav-blocked`（无选区消息） | 无桥接（缩略图/播放 HTML 由 §3.4 过滤掉全部 script） |
-| 选区/编辑 | 可用 | 禁用（只读体验） | 不适用 |
+| 维度                     | 编辑模式（现状，不变）        | 运行模式（新）                                                                                                                            | 演示模式（新，deck 专用）                            |
+| ------------------------ | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 作品脚本 / on\* 内联事件 | 剥离                          | **保留执行**（本地脚本内联为文本；远程 script src 移除并计数上报）                                                                        | 剥离                                                 |
+| 网络                     | 无脚本执行                    | CSP `connect-src 'none'`，XHR/fetch/EventSource 全拒                                                                                      | 同编辑                                               |
+| 导航                     | 锚点放行，其余阻止            | 相对 `.html`/`.htm` → 桥接 `design-navigate` 上报宿主开页；`#锚点` 放行；外部 scheme / 非 HTML 相对链接 → 阻止并上报 `design-nav-blocked` | 页内导航无（键盘翻页由宿主处理）                     |
+| 存储                     | 无                            | opaque origin + 内存 shim（可用不持久）；IndexedDB 抛错（声明限制）                                                                       | 无                                                   |
+| 弹窗 / 表单              | sandbox 禁 / preventDefault   | sandbox 禁 / preventDefault                                                                                                               | 同编辑                                               |
+| 消息桥接                 | select / verify / select-path | 仅 `design-navigate` / `design-nav-blocked`（无选区消息）                                                                                 | 无桥接（缩略图/播放 HTML 由 §3.4 过滤掉全部 script） |
+| 选区/编辑                | 可用                          | 禁用（只读体验）                                                                                                                          | 不适用                                               |
 
 运行模式 CSP（构建期注入，与编辑模式的差异仅 script-src 一项）：
 
@@ -63,8 +63,8 @@ export interface AssetInlineLoader {
 export function createAssetInlineLoader(
   loadAsset: (relativeWorkspacePath: string) => Promise<{ mimeType: string; data: string }>
 ): AssetInlineLoader;
-export function workspaceSourceDir(filePath: string): string;   // 原 sourceDir 计算
-export function decodeBase64Utf8(base64: string): string;        // 原私有函数导出
+export function workspaceSourceDir(filePath: string): string; // 原 sourceDir 计算
+export function decodeBase64Utf8(base64: string): string; // 原私有函数导出
 ```
 
 ### 2.2 `buildDesignRunPreview`（L20，新文件 `interactive.ts`）
@@ -90,7 +90,7 @@ export async function buildDesignRunPreview(options: RunPreviewOptions): Promise
 1. DOMParser 解析；移除 `base, object, embed, iframe, meta[http-equiv refresh/csp]`（同静态）。
 2. `<script>`：无 src 的内联脚本原样保留；`src` 为远程（scheme 或 `//` 开头）→ 移除且 `blocked.scripts++`；`src` 为相对路径 → `loadAsset` 读取（utf8 解码）内联为 `textContent`。上限：脚本数 ≤12、单脚本 ≤512 KiB、总内联 ≤2 MiB，超限移除并入 `blocked.scripts` 计数。
 3. 图片/srcset/`link[stylesheet]`/`style`/`[style]` url() 内联：复用 `createAssetInlineLoader`（同静态规则与上限）；`<link rel="stylesheet">` 失败移除（同静态）。
-4. on* 内联事件**保留**；`form[action]` 移除 action、远程 href/src 移除（同静态的远程剥离）。
+4. on\* 内联事件**保留**；`form[action]` 移除 action、远程 href/src 移除（同静态的远程剥离）。
 5. **导航标记**：`a[href]` 中相对 `.html`/`.htm`（可带 `#hash`/`?query`，取 pathname 判后缀）→ 追加属性 `data-zclaudia-nav="<工作区相对路径>"`（原 href 保留，供 `:link` 样式）；`#` 开头锚点不动；其余（外部 scheme、非 HTML 相对）不动，由桥接运行期分类阻止。
 6. 注入 §1 运行模式 CSP meta（无 nonce）+ 运行桥接 `<script>`（`head.children[1]` 前插入，同静态位置约定）。
 7. `blocked.links` = 远程 `a[href]`（scheme/`//`）与相对非 HTML 链接的合计计数（构建期统计，仅用于提示）。
@@ -128,7 +128,10 @@ export type DeckRatio = '16:9' | '4:3';
 export const DECK_RATIO_DIMENSIONS: Record<DeckRatio, { width: number; height: number }>;
 // '16:9' → { width: 1600, height: 900 }；'4:3' → { width: 1200, height: 900 }
 
-export interface DeckSlideSpan { start: number; end: number }   // 含标签的整元素源码范围
+export interface DeckSlideSpan {
+  start: number;
+  end: number;
+} // 含标签的整元素源码范围
 export interface DeckSlide {
   index: number;
   /** 从 body 子元素起的元素序号路径（与选区/树口径一致）。 */
@@ -138,10 +141,14 @@ export interface DeckSlide {
   tagName: string;
   span: DeckSlideSpan;
 }
-export interface DeckInfo { slides: DeckSlide[]; ratio: DeckRatio; siblings: boolean }
+export interface DeckInfo {
+  slides: DeckSlide[];
+  ratio: DeckRatio;
+  siblings: boolean;
+}
 
-export function parseDeck(source: string): DeckInfo;        // 解析失败抛 DesignEditError('MALFORMED_HTML')
-export function isDeck(source: string): boolean;            // parseDeck 成功且 slides.length > 0
+export function parseDeck(source: string): DeckInfo; // 解析失败抛 DesignEditError('MALFORMED_HTML')
+export function isDeck(source: string): boolean; // parseDeck 成功且 slides.length > 0
 
 /** 幻灯片重排（from → to）；越界抛 'INVALID_VALUE'，非 siblings 抛 'STRUCTURE_NOT_ALLOWED'。
  *  实现 = 源码块 [start,end) 拼接搬移，块外字节零改动。 */
@@ -238,8 +245,14 @@ Props：`{ slides: DeckSlide[]; ratio: DeckRatio; previewHtml: string | null; st
 ### 6.1 `pdf.ts`（新文件，零依赖 JPEG 直通写入器）
 
 ```ts
-export interface PdfJpegPage { widthPx: number; heightPx: number; jpegBytes: Uint8Array }
-export interface BuildImagePdfOptions { dpi?: number }   // 缺省 96；pt = px * 72 / dpi（四舍五入）
+export interface PdfJpegPage {
+  widthPx: number;
+  heightPx: number;
+  jpegBytes: Uint8Array;
+}
+export interface BuildImagePdfOptions {
+  dpi?: number;
+} // 缺省 96；pt = px * 72 / dpi（四舍五入）
 /** 每页一张 JPEG 的整页图片 PDF（无文字层）。页数 1–200；尺寸 1–10000px；
  * jpegBytes ≥4 且以 0xFF 0xD8 开头；否则抛 Error（中文消息）。 */
 export function buildImagePdf(pages: PdfJpegPage[], options?: BuildImagePdfOptions): Uint8Array;
@@ -283,18 +296,18 @@ Props：`{ open; onClose; entryPath: string; previewHtml: string | null; deck: D
 
 ## 7. 验收对照（上游计划 P5 验收条目）
 
-| 计划验收项 | 覆盖证据 |
-|---|---|
-| 区分静态编辑/交互运行/演示模式；脚本隔离来源与受控资源服务；导航/网络/存储/弹窗/消息策略 | §1 策略表 + L20 桥接测试（nav/blocked/存储 shim/CSP/脚本内联与远程移除）+ 零新通路（资源仍经鉴权 API data URL 内联） |
-| 交互作品可运行但不能访问宿主凭据或文件接口 | sandbox `allow-scripts`（无 same-origin/popups/forms/top-nav）+ `connect-src 'none'`；L26 集成测试断言运行模式消息仅两类且 path 经校验 |
-| 本地多页跳转、菜单、弹窗等声明范围内交互；编辑/运行可切换 | L20 navigate 桥接 + L26 宿主开页/状态条 + 模式切换集成测试（切回编辑后选区可用） |
-| 动态节点无法映射源码 → 只读或交给 Agent | 运行模式禁用选区编辑（只读）；编辑模式从源码构建，动态节点不存在于静态预览 |
-| 固定 HTML deck 约定、缩略图、排序、备注、键盘翻页、全屏演示、比例设置 | §3 约定 + L21 纯逻辑测试 + L23 DeckPanel/DeckPresenter 测试 |
-| 三页 deck 可排序、编辑、播放、保存、重新打开 | L26 集成测试（deck 操作走 applySource → save → 重新 parse 一致）+ controller 测试 |
-| PNG/PDF 从同一明确版本与资源包导出；字体、分页、截图与实际预览一致性 | 捕获输入 = 预览 HTML（同一构建管线与 data URL 资源）→ 结构上一致；页数 = slides.length（L22/L24 断言）；字体随预览内联；实际光栅化 M3 实测 |
-| PDF 页数与页面内容一致 | buildImagePdf 页数断言 + 对话框进度/汇总 |
-| PPTX 可行性验证、界面不混称 | §8 结论；UI 固定「整页图片，不可编辑文字」文案 |
-| macOS Tauri 与浏览器分别验证 | M3 手工门槛，本批自动化 + 失败路径显式化 |
+| 计划验收项                                                                               | 覆盖证据                                                                                                                                   |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 区分静态编辑/交互运行/演示模式；脚本隔离来源与受控资源服务；导航/网络/存储/弹窗/消息策略 | §1 策略表 + L20 桥接测试（nav/blocked/存储 shim/CSP/脚本内联与远程移除）+ 零新通路（资源仍经鉴权 API data URL 内联）                       |
+| 交互作品可运行但不能访问宿主凭据或文件接口                                               | sandbox `allow-scripts`（无 same-origin/popups/forms/top-nav）+ `connect-src 'none'`；L26 集成测试断言运行模式消息仅两类且 path 经校验     |
+| 本地多页跳转、菜单、弹窗等声明范围内交互；编辑/运行可切换                                | L20 navigate 桥接 + L26 宿主开页/状态条 + 模式切换集成测试（切回编辑后选区可用）                                                           |
+| 动态节点无法映射源码 → 只读或交给 Agent                                                  | 运行模式禁用选区编辑（只读）；编辑模式从源码构建，动态节点不存在于静态预览                                                                 |
+| 固定 HTML deck 约定、缩略图、排序、备注、键盘翻页、全屏演示、比例设置                    | §3 约定 + L21 纯逻辑测试 + L23 DeckPanel/DeckPresenter 测试                                                                                |
+| 三页 deck 可排序、编辑、播放、保存、重新打开                                             | L26 集成测试（deck 操作走 applySource → save → 重新 parse 一致）+ controller 测试                                                          |
+| PNG/PDF 从同一明确版本与资源包导出；字体、分页、截图与实际预览一致性                     | 捕获输入 = 预览 HTML（同一构建管线与 data URL 资源）→ 结构上一致；页数 = slides.length（L22/L24 断言）；字体随预览内联；实际光栅化 M3 实测 |
+| PDF 页数与页面内容一致                                                                   | buildImagePdf 页数断言 + 对话框进度/汇总                                                                                                   |
+| PPTX 可行性验证、界面不混称                                                              | §8 结论；UI 固定「整页图片，不可编辑文字」文案                                                                                             |
+| macOS Tauri 与浏览器分别验证                                                             | M3 手工门槛，本批自动化 + 失败路径显式化                                                                                                   |
 
 ## 8. PPTX 可行性结论（本批交付物之一，不写代码）
 
@@ -367,3 +380,5 @@ L25（面板接线与文档）单卡完成：
 ### 待补验证（M3 门槛）
 
 真实 macOS Tauri（尤其 WKWebView 下 SVG foreignObject 捕获是否污染画布、全屏播放体验）与浏览器实测：三页 deck 排序/备注/播放/保存/重开、运行模式多页跳转与菜单弹窗、PDF 页数与内容一致性、PNG 落盘；自动测试已覆盖结构、协议与失败路径，光栅化真实成图以实测为准。
+
+2026-10-24 更新：e2e 真实验收（浏览器路径，[验收报告](2026-10-24-design-workbench-e2e-acceptance-report.md) S4）已覆盖运行模式跳转与拦截、deck 排序/备注/演示播放、PDF 页数与 PNG 光栅化真实成图核验；**WKWebView（Tauri）路径仍未验证**（computer use 不可用留白），全屏播放实机体验与 PNG 落盘 ~/Downloads 的 Tauri 通路待补。
