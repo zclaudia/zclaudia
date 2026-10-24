@@ -1,6 +1,6 @@
 # P4 模板与品牌体系 — 实现设计
 
-日期：2026-10-23。状态：设计定稿，T0 契约由主代理预落，L15–L19 由 flash 子代理（luna）分波实现、主代理逐波验收。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P4 章节；基线见 [P1](2026-10-23-design-workbench-p1-implementation.md)、[P2](2026-10-23-design-workbench-p2-implementation.md)、[P3](2026-10-23-design-workbench-p3-implementation.md)。
+日期：2026-10-23。状态：P4 已实现并通过主代理验收（2026-10-23，见 §9 验收记录；L15–L19 由 flash 子代理（luna）分波实现）；真实 Agent/Tauri 冒烟与远端 backend 验证待 M2 前补做。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P4 章节；基线见 [P1](2026-10-23-design-workbench-p1-implementation.md)、[P2](2026-10-23-design-workbench-p2-implementation.md)、[P3](2026-10-23-design-workbench-p3-implementation.md)。
 
 本批覆盖 **P4.1 模板清单 / P4.2 品牌与设计系统 / P4.3 素材库 / P4.4 Agent 设计上下文 / P4.5 生成与续改反馈**。
 

@@ -1,6 +1,6 @@
 # P3 扩展可视编辑 — 实现设计
 
-日期：2026-10-23。状态：设计定稿，T0 契约由主代理预落，L10–L14 由 flash 子代理（luna）分波实现、主代理逐波验收。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P3 章节；基线见 [P1](2026-10-23-design-workbench-p1-implementation.md) 与 [P2](2026-10-23-design-workbench-p2-implementation.md)。
+日期：2026-10-23。状态：P3.1–P3.4 已实现并通过主代理验收（2026-10-23，见 §10 验收记录；L10–L14 由 flash 子代理（luna）分波实现）；P3.5 为独立后续批次未含；真实 Agent/Tauri 冒烟与远端 backend 验证待 M2 前补做。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P3 章节；基线见 [P1](2026-10-23-design-workbench-p1-implementation.md) 与 [P2](2026-10-23-design-workbench-p2-implementation.md)。
 
 本批覆盖 **P3.1 排版与盒模型 / P3.2 图片与链接 / P3.3 元素导航 / P3.4 受限结构修改**。**P3.5 CSS 来源编辑是独立交付批次，不在本批**（生效规则的展示与外部样式表写回另行设计）。自由拖拽绝对定位画布、任意 React/Vue 组件源码反向编辑、跨容器移动元素均明确排除。
 

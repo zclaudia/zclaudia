@@ -1,6 +1,6 @@
 # P7 分享与审阅协作 — 实现设计
 
-日期：2026-10-24。状态：设计定稿。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P7 章节；基线见 [P5](2026-10-23-design-workbench-p5-implementation.md)、[P6](2026-10-24-design-workbench-p6-implementation.md)。
+日期：2026-10-24。状态：P7.1–P7.3 已实现并通过主代理终验收（2026-10-24，见 §12 验收记录；S1–S7 由 flash 子代理（luna）逐卡实现）；本机浏览器真实冒烟通过；第二客户端 LAN 冒烟与 macOS Tauri 分享实测为手工门槛待补；P7.4 仅评估、结论维持现状（§9）。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P7 章节；基线见 [P5](2026-10-23-design-workbench-p5-implementation.md)、[P6](2026-10-24-design-workbench-p6-implementation.md)。
 
 本批覆盖 **P7.1 不可变分享快照 / P7.2 页面与元素评论 / P7.3 审阅到 Agent 修改**；P7.4 多人同时编辑仅做评估（§9，无代码）。T0 契约由主代理预落，S1–S7 由 flash 子代理（luna）逐卡串行实现、主代理逐卡验收。
 

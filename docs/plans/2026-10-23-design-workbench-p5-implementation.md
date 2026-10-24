@@ -1,6 +1,6 @@
 # P5 交互原型与演示文稿 — 实现设计
 
-日期：2026-10-23。状态：设计定稿，T0 契约由主代理预落，L20–L26 由 flash 子代理（luna）分波实现、主代理逐波验收。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P5 章节；基线见 [P1](2026-10-23-design-workbench-p1-implementation.md)、[P2](2026-10-23-design-workbench-p2-implementation.md)、[P3](2026-10-23-design-workbench-p3-implementation.md)、[P4](2026-10-23-design-workbench-p4-implementation.md)。
+日期：2026-10-23。状态：P5 已实现并通过主代理验收（2026-10-23/24，见 §10 验收记录；L20–L26 由 flash 子代理（luna）分波实现）；全部客户端实现、服务端零改动；真实 macOS Tauri 与浏览器实测待 M3 前补做。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P5 章节；基线见 [P1](2026-10-23-design-workbench-p1-implementation.md)、[P2](2026-10-23-design-workbench-p2-implementation.md)、[P3](2026-10-23-design-workbench-p3-implementation.md)、[P4](2026-10-23-design-workbench-p4-implementation.md)。
 
 本批覆盖 **P5.1 预览执行边界 / P5.2 交互原型 / P5.3 演示文稿 / P5.4 渲染与导出（PNG + PDF）**。
 

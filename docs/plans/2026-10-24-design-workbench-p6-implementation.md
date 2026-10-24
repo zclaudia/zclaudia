@@ -1,6 +1,6 @@
 # P6 图片与视频能力 — 实现设计
 
-日期：2026-10-24。状态：设计定稿，T0 契约由主代理预落，L30–L36 由 flash 子代理（luna）分波实现、主代理逐波验收。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P6 章节；基线见 [P1](2026-10-23-design-workbench-p1-implementation.md)、[P2](2026-10-23-design-workbench-p2-implementation.md)、[P3](2026-10-23-design-workbench-p3-implementation.md)、[P4](2026-10-23-design-workbench-p4-implementation.md)、[P5](2026-10-23-design-workbench-p5-implementation.md)。
+日期：2026-10-24。状态：P6 已实现并通过主代理验收（2026-10-24，见 §12 验收记录；L30–L36 由 flash 子代理（luna）分波实现）；本机真实视频冒烟通过；真实付费图片服务冒烟与 macOS Tauri 视频流程为手工门槛待补。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P6 章节；基线见 [P1](2026-10-23-design-workbench-p1-implementation.md)、[P2](2026-10-23-design-workbench-p2-implementation.md)、[P3](2026-10-23-design-workbench-p3-implementation.md)、[P4](2026-10-23-design-workbench-p4-implementation.md)、[P5](2026-10-23-design-workbench-p5-implementation.md)。
 
 本批覆盖 **P6.1 媒体任务接口 / P6.2 图片生成与编辑 / P6.3 模型与费用体验 / P6.4 动效与视频验证 / P6.5 媒体交付**。图片与视频同批实施、波次并行（L32 视频与 L30/L31 图片并行），符合上游「图片先、视频单独交付」的顺序：视频链路的真实 Chrome/ffmpeg 冒烟独立成档（§12）。
 
