@@ -125,7 +125,8 @@ export type DesignEditErrorCode =
   | 'EMPTY_TRANSACTION'
   | 'ATTRIBUTE_NOT_ALLOWED'
   | 'STRUCTURE_NOT_ALLOWED'
-  | 'ANCHOR_REFERENCED';
+  | 'ANCHOR_REFERENCED'
+  | 'STYLE_SOURCE_NOT_FOUND';
 
 export class DesignEditError extends Error {
   constructor(
@@ -136,6 +137,64 @@ export class DesignEditError extends Error {
     this.name = 'DesignEditError';
   }
 }
+
+// ---------------------------------------------------------------------------
+// P3.5 CSS 来源编辑（T0 契约；实现见设计文档 C1–C4 卡）
+// ---------------------------------------------------------------------------
+
+/**
+ * 预览 `<style>` 来源标记（`data-zclaudia-style-origin`）的值：
+ * `@inline/<n>`（入口 HTML 第 n 个自有样式块，n 从 0 起）或工作区相对 CSS 路径。
+ * 仅存在于预览 DOM，不写入作品文件。
+ */
+export type DesignStyleOrigin = string;
+
+/** 桥接上报的单条匹配规则身份（§2）。CSSOM 文本不上屏：声明展示走宿主侧源码解析。 */
+export interface DesignMatchedRule {
+  origin: DesignStyleOrigin;
+  /** 顶层规则索引 + 分组内索引（@media 等嵌套），文档序；与宿主侧 postcss 解析同构。 */
+  rulePath: number[];
+  /** 命中的那个选择器原文（选择器组逐个 matches 取命中项）。 */
+  selectorText: string;
+  specificity: [number, number, number];
+  /** 该规则内带 !important 的属性名（徽标用）。 */
+  importantProps: string[];
+}
+
+/** iframe → 宿主 `zclaudia:design-rules` 消息载荷（宿主校验后经 css-source 对齐）。 */
+export interface DesignRulesMessage {
+  elementPath: number[];
+  rules: DesignMatchedRule[];
+  truncated?: boolean;
+}
+
+/**
+ * 声明级样式来源修改 op（§4）。T0 仅定义契约；C3 并入 DesignEditOperation
+ * 联合并实现引擎（并入需与 DesignPanel 的 mergeKey/needsReselect 接线同卡落地）。
+ */
+export interface DesignStyleBlockOperation {
+  kind: 'styleBlock';
+  /** 入口 HTML `<style>` 块文档序（0 起）。 */
+  styleOrdinal: number;
+  /** 与 DesignMatchedRule.rulePath 同构的规则索引路径。 */
+  rulePath: number[];
+  /** 须匹配 STYLE_SOURCE_PROPERTY_PATTERN 且 ≤ STYLE_SOURCE_PROPERTY_MAX。 */
+  property: string;
+  /** null = 删除声明；否则为经 safeSourceCssValue 校验的新值。 */
+  value: string | null;
+  /** true 且属性不存在时在规则末尾新增声明。 */
+  create: boolean;
+}
+
+/** §2/§3/§4 上限集合（桥内裁剪与宿主校验共用）。 */
+export const STYLE_RULES_MAX = 200;
+export const STYLE_RULE_SELECTOR_MAX = 300;
+export const STYLE_SPECIFICITY_MAX = 9999;
+export const STYLE_IMPORTANT_PROPS_MAX = 64;
+export const STYLE_BLOCK_MAX_BYTES = 1024 * 1024;
+export const STYLE_SOURCE_VALUE_MAX = 500;
+export const STYLE_SOURCE_PROPERTY_MAX = 64;
+export const STYLE_SOURCE_PROPERTY_PATTERN = /^-?[A-Za-z][A-Za-z0-9-]*$/;
 
 export interface DesignSnapshotSummary {
   id: string;

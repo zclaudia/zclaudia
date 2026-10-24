@@ -41,6 +41,7 @@ import type { DeckInfo } from './deck';
 import { buildDesignRunPreview } from './interactive';
 import { buildDesignPreview } from './preview';
 import { ElementTree } from './components/ElementTree';
+import { colorsEquivalent, compareCssValues } from './html/style-compare';
 import { useDesignWorkspace } from './useDesignWorkspace';
 import type { DesignComputedStyles, DesignEditOperation, DesignSelection } from './types';
 import type { DesignPageSnapshot } from './workspace/controller';
@@ -125,43 +126,13 @@ interface ReselectExpectation {
   expected: Map<string, string>;
 }
 
-const RESELECT_COLOR_KEYS = new Set(['color', 'background-color', 'border-color']);
-const RESELECT_KEYWORD_KEYS = new Set(['text-align', 'border-style', 'object-fit']);
-const RESELECT_LENGTH_KEYS = new Set([
-  'width',
-  'height',
-  'font-size',
-  'line-height',
-  'margin-top',
-  'margin-right',
-  'margin-bottom',
-  'margin-left',
-  'padding-top',
-  'padding-right',
-  'padding-bottom',
-  'padding-left',
-  'border-width',
-  'border-radius',
-]);
-const PX_LENGTH = /^[+-]?[\d.]+px$/;
-
-/** font-weight 归一到 100–900 数值；bold→700、normal→400，bolder/lighter 与白名单外值返回 null（跳过）。 */
-function fontWeightValue(value: string): number | null {
-  const keyword = value.trim().toLowerCase();
-  if (keyword === 'bold') return 700;
-  if (keyword === 'normal') return 400;
-  if (keyword === 'bolder' || keyword === 'lighter') return null;
-  if (/^\d+$/.test(keyword)) {
-    const numeric = Number(keyword);
-    return numeric >= 100 && numeric <= 900 ? numeric : null;
-  }
-  return null;
-}
+const pathsEqual = (a: number[], b: number[]): boolean =>
+  a.length === b.length && a.every((value, index) => value === b[index]);
 
 /**
  * §6.3 重选对比表：expected 中任一属性与计算样式失配返回 true。
  * color/background-color 是 select 消息的顶层字段（不在 styles 映射里）；
- * 无可靠口径的键（font-family、margin/padding 简写、非 px 写法的长度、缺计算值）一律跳过，宁缺勿误报。
+ * 比较口径见 html/style-compare.ts（无可靠口径的组合跳过，宁缺勿误报）。
  */
 function reselectMismatch(expected: Map<string, string>, selection: DesignSelection): boolean {
   for (const [property, written] of expected) {
@@ -172,41 +143,9 @@ function reselectMismatch(expected: Map<string, string>, selection: DesignSelect
           ? selection.backgroundColor
           : selection.styles?.[property as keyof DesignComputedStyles];
     if (typeof computed !== 'string') continue;
-    if (RESELECT_COLOR_KEYS.has(property)) {
-      if (!colorsEquivalent(written, computed)) return true;
-    } else if (property === 'font-weight') {
-      const expectedWeight = fontWeightValue(written);
-      const computedWeight = fontWeightValue(computed);
-      if (expectedWeight !== null && computedWeight !== null && expectedWeight !== computedWeight)
-        return true;
-    } else if (RESELECT_KEYWORD_KEYS.has(property)) {
-      if (written.trim().toLowerCase() !== computed.trim().toLowerCase()) return true;
-    } else if (RESELECT_LENGTH_KEYS.has(property)) {
-      // 长度键仅当双方都是纯 px 写法时按数值比对（em/%/简写不可靠）。
-      if (
-        PX_LENGTH.test(written) &&
-        PX_LENGTH.test(computed) &&
-        Number.parseFloat(written) !== Number.parseFloat(computed)
-      )
-        return true;
-    }
-    // font-family 与 margin/padding 简写：跳过（无可靠口径）。
+    if (compareCssValues(property, written, computed) === false) return true;
   }
   return false;
-}
-
-const pathsEqual = (a: number[], b: number[]): boolean =>
-  a.length === b.length && a.every((value, index) => value === b[index]);
-
-/** Compare two CSS color notations via the browser's own serializer. */
-function colorsEquivalent(written: string, computed: string): boolean {
-  const a = written.trim();
-  const b = computed.trim();
-  if (a.toLowerCase() === b.toLowerCase()) return true;
-  const probe = document.createElement('span');
-  probe.style.color = a;
-  const normalized = probe.style.color;
-  return !!normalized && normalized.replace(/\s+/g, '').toLowerCase() === b.replace(/\s+/g, '').toLowerCase();
 }
 
 export function DesignPanel() {

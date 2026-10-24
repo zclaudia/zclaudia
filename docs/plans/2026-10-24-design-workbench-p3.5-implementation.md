@@ -148,7 +148,7 @@ fnm exec --using 22.20.0 pnpm --filter @zclaudia/server exec tsc --noEmit
 - **T0（主代理，派发前）**：本设计文档 + `types.ts` 契约（`DesignStyleOrigin`/`MatchedRule`/`DesignRulesMessage` 类型与 `styleBlock` op 类型 + 常量：上限集合）。除此之外无共享契约文件改动。
 - **C1 预览与桥接**：`preview.ts`（来源标记 + 规则枚举消息 + 抽公共内联函数）+ `interactive.ts`（同步打标）+ `DesignPanel` 校验与 rules-request 发送。测试：标记正确性（link/自有块/多块序号）、桥内选择器组命中与特异性、上限截断、宿主校验（迟到 elementPath 丢弃/形状违规丢弃）。禁改：`css-source.ts`、`edit-engine.ts`、服务端。
 - **C2 源码对齐纯模块**：`css-source.ts` + `__tests__/css-source.test.ts`。测试：对齐命中矩阵（嵌套 @media 索引/多 `@inline` 块/指纹不符/parse 失败/超限只读）、winning 判定（颜色等价/font-weight/px/跳过集合）、外部 origin 第一批只读。禁改：preview/桥接、edit-engine、组件、服务端。
-- **C3 事务 op**：`types.ts` 落 op（T0 已定契约）+ `edit-engine.ts` 实现 + `html/values.ts` `safeSourceCssValue`。测试：改值/删除/新增的逐字节保持（无关空白、相邻声明、末声明分号）、多 op 高偏移先应用、与 structure 混排拒绝、对齐失败整体拒绝不部分应用、值黑名单矩阵。禁改：组件、服务端、preview。
+- **C3 事务 op**：`types.ts` 落 op（T0 已定契约，**union 并入在本卡**——T0 勘察发现 DesignPanel mergeKey 三元链末支假定 structure，先加变体会破坏 tsc，故并入联合须与 DesignPanel 的 mergeKey/needsReselect 两处接线同卡落地）+ `edit-engine.ts` 实现 + `html/values.ts` `safeSourceCssValue`。测试：改值/删除/新增的逐字节保持（无关空白、相邻声明、末声明分号）、多 op 高偏移先应用、与 structure 混排拒绝、对齐失败整体拒绝不部分应用、值黑名单矩阵。禁改：组件（DesignPanel 的 mergeKey/needsReselect 两处接线除外）、服务端、preview。
 - **C4 面板与接线**：`StyleSourcePanel.tsx` + DesignPanel/SelectionEditor 接线 + 用例（分组渲染/徽标/只读原因/编辑经 controller.apply/撤销与脏点/空态/运行模式隐藏/reselect 后刷新）。禁改：契约与引擎行为（props 微调记录）。
 - **C5 服务端 .css 读写**（第二批）：`design-service.ts` 白名单 + `design.test.ts` 追加。测试：.css 读写往返、修订冲突 409、越界路径/超限/HTML 之外其他扩展仍拒。禁改：桌面端。
 - **C6 CSS 草稿与预览内联**（第二批）：`css-drafts.ts` + `patchCssText` 抽取（自 C2/C3 落点，签名微调须记录）+ DesignPanel loadAsset 包装与缓存键 + 保存/冲突 UI + 用例。禁改：服务端、edit-engine 事务语义。
@@ -192,4 +192,10 @@ fnm exec --using 22.20.0 pnpm --filter @zclaudia/server exec tsc --noEmit
 
 ## 11. 验收记录
 
-（待填：每卡 luna 报告要点、主代理审查与修正、门禁计数、commit 哈希；第一批 C4 后小终验、第二批 C7 后终验收。）
+### T0（2026-10-24，主代理）
+
+- `types.ts` 落契约：`DesignStyleOrigin`/`DesignMatchedRule`/`DesignRulesMessage`/`DesignStyleBlockOperation`（暂独立接口，C3 并入 `DesignEditOperation`，原因见 C3 卡）+ 错误码 `STYLE_SOURCE_NOT_FOUND` + 上限常量（`STYLE_RULES_MAX` 等 8 项）。命名取文件既有 `Design` 前缀（文档 §2 草图名 `MatchedRule` → `DesignMatchedRule`）。
+- 抽取共享比较器 `html/style-compare.ts`（`compareCssValues` 三态 + `colorsEquivalent`/`fontWeightValue`），DesignPanel `reselectMismatch` 改为委托（verify 回路的 `colorsEquivalent` 改为 import）——保证 C1∥C2 并行时文件集不相交（css-source 与 reselect 共用同一比较口径）。新增 `__tests__/style-compare.test.ts` 3 用例。
+- 门禁：desktop design 723 通过（720 基线 + 3）；tsc 0 错；eslint 0 error / 37 warning（基线不变）。
+
+（待续：每卡 luna 报告要点、主代理审查与修正、门禁计数、commit 哈希；第一批 C4 后小终验、第二批 C7 后终验收。）
