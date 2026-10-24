@@ -1972,6 +1972,141 @@ describe('DesignPanel', () => {
     expect(screen.getByRole('textbox', { name: 'Element text' })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+
+  // ---- P3.5（C4）样式来源面板接线：渲染 / onApply→handleApply / reselect 刷新 / runMode 隐藏 / 切页清空 ----
+
+  const STYLE_SOURCE_PAGE =
+    '<html><head><style>h1 { color: #ff0000; }</style></head><body><h1>Hello</h1></body></html>';
+  const H1_RULE = {
+    origin: '@inline/0',
+    rulePath: [0],
+    selectorText: 'h1',
+    specificity: [0, 0, 1],
+    importantProps: [],
+  };
+  const EMPTY_NOTICE =
+    'No matching stylesheet rules for this element; inline styles can be edited in the panel above.';
+
+  /** 打开带 `<style>` 块的页面并让选区落地（computed color 与源码值等值 → Active 徽标）。 */
+  async function mountStyleSourcePage() {
+    disk.set('design/index.html', { source: STYLE_SOURCE_PAGE, revision: 'revision-1' });
+    mount();
+    const frame = (await screen.findByTitle('Design preview')) as HTMLIFrameElement;
+    await sendSelection(frame, {
+      elementPath: [0],
+      tagName: 'h1',
+      text: 'Rendered',
+      sourceText: 'Hello',
+      color: 'rgb(255, 0, 0)',
+      backgroundColor: 'rgba(0, 0, 0, 0)',
+      base: sha(STYLE_SOURCE_PAGE),
+    });
+    await screen.findByRole('textbox', { name: 'Element text' });
+    return frame;
+  }
+
+  /** 以最新构建的 channel 从预览 iframe 发 design-rules 载荷。 */
+  const sendRules = (frame: HTMLIFrameElement, rules: unknown, extra: Record<string, unknown> = {}) =>
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        source: frame.contentWindow,
+        data: { type: 'zclaudia:design-rules', channel: latestChannel(), elementPath: [0], rules, ...extra },
+      })
+    );
+
+  it('P3.5 C4：选区 + design-rules 到达后样式来源区渲染规则卡（来源徽标/声明/Active）', async () => {
+    const frame = await mountStyleSourcePage();
+    sendRules(frame, [H1_RULE]);
+    expect(await screen.findByTestId('rule-@inline/0-0')).toBeInTheDocument();
+    expect(screen.getByText('Style block #0')).toBeInTheDocument();
+    const card = screen.getByTestId('rule-@inline/0-0');
+    expect(within(card).getByText('h1')).toBeInTheDocument();
+    expect(within(card).getByTestId('declaration-color')).toHaveTextContent('#ff0000');
+    // computed color rgb(255,0,0) 与源码 #ff0000 等值 → 生效徽标 Active。
+    expect(within(card).getByTestId('winning-color')).toHaveTextContent('Active');
+  });
+
+  it('P3.5 C4：来源区改值经 handleApply 提交事务（controller.apply 落草稿、保存/撤销可用、预览重建）', async () => {
+    const frame = await mountStyleSourcePage();
+    sendRules(frame, [H1_RULE]);
+    await screen.findByTestId('rule-@inline/0-0');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Value for color' }), {
+      target: { value: '#00ff00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply value for color' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(preview.buildDesignPreview)
+          .mock.calls.some(
+            call => typeof call[0] === 'string' && call[0].includes('color: #00ff00')
+          )
+      ).toBe(true)
+    );
+  });
+
+  it('P3.5 C4：应用后 reselect 刷新链路——帧载入补发 select-path、新选区重发 rules-request、新规则重渲染', async () => {
+    const frame = await mountStyleSourcePage();
+    sendRules(frame, [H1_RULE]);
+    await screen.findByTestId('rule-@inline/0-0');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Value for color' }), {
+      target: { value: '#00ff00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply value for color' }));
+    const styled = STYLE_SOURCE_PAGE.replace('#ff0000', '#00ff00');
+    await waitFor(() =>
+      expect(vi.mocked(preview.buildDesignPreview).mock.calls.some(call => call[0] === styled)).toBe(
+        true
+      )
+    );
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.load(frame);
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'zclaudia:design-select-path', elementPath: [0] }),
+      '*'
+    );
+    await sendSelection(frame, {
+      elementPath: [0],
+      tagName: 'h1',
+      text: 'Rendered',
+      sourceText: 'Hello',
+      color: 'rgb(0, 255, 0)',
+      backgroundColor: 'rgba(0, 0, 0, 0)',
+      base: sha(styled),
+    });
+    expect(postMessage).toHaveBeenCalledWith(
+      { type: 'zclaudia:design-rules-request', channel: latestChannel(), elementPath: [0] },
+      '*'
+    );
+    sendRules(frame, [H1_RULE]);
+    expect(await screen.findByText('#00ff00')).toBeInTheDocument();
+  });
+
+  it('P3.5 C4：运行模式整体隐藏编辑区，样式来源区一并隐藏', async () => {
+    const frame = await mountStyleSourcePage();
+    sendRules(frame, [H1_RULE]);
+    expect(await screen.findByTestId('rule-@inline/0-0')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Run mode' }));
+    await waitFor(() => expect(interactive.buildDesignRunPreview).toHaveBeenCalled());
+    expect(screen.queryByTestId('rule-@inline/0-0')).not.toBeInTheDocument();
+    expect(screen.queryByText('Style sources')).not.toBeInTheDocument();
+  });
+
+  it('P3.5 C4：切页后样式来源区清空（旧规则卡不渲染，回到空态）', async () => {
+    disk.set('p2.html', { source: pageSource('B'), revision: 'rev-b' });
+    vi.mocked(api.listDesignFiles).mockResolvedValue({
+      files: ['design/index.html', 'p2.html'],
+    });
+    const frame = await mountStyleSourcePage();
+    sendRules(frame, [H1_RULE]);
+    expect(await screen.findByTestId('rule-@inline/0-0')).toBeInTheDocument();
+    await openPage('p2.html');
+    expect(screen.queryByTestId('rule-@inline/0-0')).not.toBeInTheDocument();
+    expect(screen.getByText(EMPTY_NOTICE)).toBeInTheDocument();
+  });
 });
 
 // ---- P3.5 §2：design-rules 载荷校验矩阵（isValidRulesMessage） ----

@@ -33,11 +33,14 @@ import { PageOverview } from './components/PageOverview';
 import { PageTabs } from './components/PageTabs';
 import { PreviewCanvas } from './components/PreviewCanvas';
 import { SelectionEditor } from './components/SelectionEditor';
+import { StyleSourcePanel } from './components/StyleSourcePanel';
 import { VersionHistory } from './components/VersionHistory';
 import { LineDiffView } from './components/VersionDiff';
 import { ViewportControls } from './components/ViewportControls';
 import { isDeck, parseDeck } from './deck';
 import type { DeckInfo } from './deck';
+import { buildStyleRules } from './css-source';
+import type { CssRuleRow } from './css-source';
 import { buildDesignRunPreview } from './interactive';
 import { buildDesignPreview } from './preview';
 import { ElementTree } from './components/ElementTree';
@@ -153,7 +156,7 @@ const isValidMatchedRule = (value: unknown): value is DesignMatchedRule => {
 /**
  * P3.5 §2：design-rules 消息载荷校验（形状 + 上限，违规整体丢弃）。
  * 与当前选区 elementPath 的一致性由消息处理处核对（迟到消息不污染新选区）。
- * 导出仅供 C1 测试直接覆盖校验矩阵；C4 面板渲染前样式规则不消费。
+ * 导出仅供 C1 测试直接覆盖校验矩阵；C4 起校验通过的载荷进入样式来源区渲染。
  */
 // eslint-disable-next-line react-refresh/only-export-components -- 校验器按卡面钉死落在 DesignPanel 消息处理旁；导出仅供测试矩阵使用
 export const isValidRulesMessage = (value: unknown): value is DesignRulesMessage => {
@@ -266,6 +269,33 @@ function DesignPanelSession({
   const [shareOpen, setShareOpen] = useState(false);
   /** 运行模式导航提示（design-navigate / design-nav-blocked），5 秒自动消失或手动关闭。 */
   const [runNotice, setRunNotice] = useState<{ text: string } | null>(null);
+  // P3.5 §5：校验通过的生效规则载荷；样式来源区按当前选区即时对齐渲染（下方 memo）。
+  const [styleRules, setStyleRules] = useState<DesignRulesMessage | null>(null);
+
+  /**
+   * P3.5 §5：样式来源区数据（选区或规则载荷变化即重算）。elementPath 与当前
+   * 选区不一致（切页/换选区、迟到载荷）一律清空；computed 取 selection.styles
+   * 与顶层 color/backgroundColor 合成（与 reselectMismatch 同一口径）。
+   */
+  const styleSource = useMemo<{ rows: CssRuleRow[]; truncated: boolean }>(() => {
+    const selection = activePage?.selection ?? null;
+    if (!styleRules || !selection || !pathsEqual(styleRules.elementPath, selection.elementPath)) {
+      return { rows: [], truncated: false };
+    }
+    const computed: Partial<Record<string, string>> = { ...(selection.styles ?? {}) };
+    if (typeof selection.color === 'string') computed.color = selection.color;
+    if (typeof selection.backgroundColor === 'string')
+      computed['background-color'] = selection.backgroundColor;
+    return {
+      rows: buildStyleRules({
+        htmlSource: activePage?.source ?? '',
+        matched: styleRules.rules,
+        computed,
+        inlineStyle: selection.inlineStyle ?? null,
+      }),
+      truncated: styleRules.truncated ?? false,
+    };
+  }, [activePage, styleRules]);
 
   // 切页时关闭幻灯片面板/播放器、渲染导出对话框、媒体生成面板与分享面板，避免陈旧页数据展示；会话切换经 key 重挂载自然复位。
   const activePath = state.activePath;
@@ -275,6 +305,8 @@ function DesignPanelSession({
     setRenderExportOpen(false);
     setMediaOpen(false);
     setShareOpen(false);
+    // P3.5 §5：切页一并清空样式来源区，旧页规则不污染新选区（选区回落由 rules-request 重新拉取）。
+    setStyleRules(null);
   }, [activePath]);
 
   /** deck 检测与结构解析：按活动页快照 memo（页对象仅在自身 rev 变化时更换，含草稿修订推进）。 */
@@ -338,9 +370,6 @@ function DesignPanelSession({
   const reselectRef = useRef<ReselectExpectation | null>(null);
   const [overrideWarning, setOverrideWarning] = useState(false);
   const [treeOpen, setTreeOpen] = useState(false);
-  // P3.5 §2：校验通过的生效规则载荷（样式来源区渲染属 C4 卡，本卡仅接收与校验；setter-only 避免未读变量）。
-  const [, setStyleRules] = useState<DesignRulesMessage | null>(null);
-
   // files 经 ref 每渲染同步，避免闭包过期（P4.5 run 反馈与 P5 navigate 消息共用）。
   const filesRef = useRef(files);
   filesRef.current = files;
@@ -1015,6 +1044,17 @@ function DesignPanelSession({
               onSelectPath={selectPath}
               onApply={handleApply}
             />
+            {/* P3.5 §5：样式来源区挂于选区编辑器下方；应用走同一 handleApply，
+                改值后的刷新链路为 预览重建 → 帧载入补发 select-path → 新 select → rules-request → 新 rules。 */}
+            <div className="mt-3 border-t border-border pt-3">
+              <StyleSourcePanel
+                rules={styleRules}
+                rows={styleSource.rows}
+                truncated={styleSource.truncated}
+                busy={activePage?.busy ?? false}
+                onApply={handleApply}
+              />
+            </div>
           </div>
         )}
         <div className="shrink-0 border-t border-border">
