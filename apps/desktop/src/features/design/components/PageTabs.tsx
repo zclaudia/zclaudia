@@ -4,7 +4,7 @@ import type { DesignPageSnapshot, OpenPageResult } from '../workspace/controller
 
 /** open 失败的用户提示：limit 是既定文案，其余透出控制器返回的 message。 */
 const openFailureMessage = (result: Extract<OpenPageResult, { ok: false }>): string =>
-  result.reason === 'limit' ? '先关闭未保存的页面' : (result.message ?? '页面打开失败');
+  result.reason === 'limit' ? 'Close unsaved pages first' : (result.message ?? 'Failed to open page');
 
 export interface PageTabsProps {
   pages: DesignPageSnapshot[];
@@ -44,7 +44,7 @@ export function PageTabs({ pages, activePath, files, onActivate, onClose, onOpen
     <div className="flex items-center gap-2 border-b border-border px-2 py-1">
       <div
         role="tablist"
-        aria-label="设计页面"
+        aria-label="Design pages"
         className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
       >
         {pages.map(page => {
@@ -73,15 +73,15 @@ export function PageTabs({ pages, activePath, files, onActivate, onClose, onOpen
                 )}
                 <span className="max-w-40 truncate">{basename(page.path)}</span>
                 {page.missing && (
-                  <span title="此文件已从工作区消失" aria-label={`文件缺失 ${page.path}`}>
+                  <span title="This file no longer exists in the workspace" aria-label={`Missing file ${page.path}`}>
                     ⚠
                   </span>
                 )}
               </button>
               <button
                 type="button"
-                aria-label={`关闭 ${page.path}`}
-                title="关闭页面"
+                aria-label={`Close ${page.path}`}
+                title="Close page"
                 onClick={() => onClose(page.path)}
                 className="rounded p-0.5 leading-none text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
               >
@@ -95,8 +95,8 @@ export function PageTabs({ pages, activePath, files, onActivate, onClose, onOpen
         value=""
         onChange={path => void handleOpen(path)}
         options={openOptions}
-        placeholder="打开页面"
-        ariaLabel="打开页面"
+        placeholder="Open page"
+        ariaLabel="Open page"
         disabled={openOptions.length === 0}
         size="sm"
         className="w-32 shrink-0"

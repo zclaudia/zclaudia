@@ -2,66 +2,66 @@
 
 exports[`buildReviewHandoff（P7 §6.2 审阅进聊天交接） > 完整样例：快照锁定 1`] = `
 {
-  "prompt": "## 审阅反馈
-- 作者：林一
-- 时间：2026/10/24 12:30:00
-- 评论原文：
+  "prompt": "## Review feedback
+- Author: 林一
+- Time: 2026/10/24 12:30:00
+- Comment:
 请把这段标题换成蓝色，谢谢。
 
-## 分享版本
-- 标签：v3 定稿
-- 快照时间：2026/10/23 16:00:00
-- 入口文件：design/index.html
-- 旧分享仍显示此版本，不会因本次修改变化。
+## Shared version
+- Label: v3 定稿
+- Snapshot time: 2026/10/23 16:00:00
+- Entry file: design/index.html
+- Existing shares still show this version; they will not change with this edit.
 
-## 快照中的目标元素
-- 元素：<p>
-- 折叠文本：你好 世界
-- 快照源码片段：
+## Target element in the snapshot
+- Element: <p>
+- Collapsed text: 你好 世界
+- Snapshot source snippet:
 <p id="intro">你好 世界</p>
 
-## 当前版本定位
-- 页面：design/index.html
-- 元素：<p>
-- 折叠文本：你好 世界
-- 当前源码片段：
+## Location in the current version
+- Page: design/index.html
+- Element: <p>
+- Collapsed text: 你好 世界
+- Current source snippet:
 <p id="intro">你好 世界</p>
 
-## 任务指令
-请根据以上审阅反馈修改当前页面 design/index.html。保持与反馈无关的内容不变。",
+## Instruction
+Please update the current page design/index.html based on the review feedback above. Keep everything unrelated to the feedback unchanged.",
   "sections": [
     {
-      "body": "- 作者：林一
-- 时间：2026/10/24 12:30:00
-- 评论原文：
+      "body": "- Author: 林一
+- Time: 2026/10/24 12:30:00
+- Comment:
 请把这段标题换成蓝色，谢谢。",
-      "title": "审阅反馈",
+      "title": "Review feedback",
     },
     {
-      "body": "- 标签：v3 定稿
-- 快照时间：2026/10/23 16:00:00
-- 入口文件：design/index.html
-- 旧分享仍显示此版本，不会因本次修改变化。",
-      "title": "分享版本",
+      "body": "- Label: v3 定稿
+- Snapshot time: 2026/10/23 16:00:00
+- Entry file: design/index.html
+- Existing shares still show this version; they will not change with this edit.",
+      "title": "Shared version",
     },
     {
-      "body": "- 元素：<p>
-- 折叠文本：你好 世界
-- 快照源码片段：
+      "body": "- Element: <p>
+- Collapsed text: 你好 世界
+- Snapshot source snippet:
 <p id="intro">你好 世界</p>",
-      "title": "快照中的目标元素",
+      "title": "Target element in the snapshot",
     },
     {
-      "body": "- 页面：design/index.html
-- 元素：<p>
-- 折叠文本：你好 世界
-- 当前源码片段：
+      "body": "- Page: design/index.html
+- Element: <p>
+- Collapsed text: 你好 世界
+- Current source snippet:
 <p id="intro">你好 世界</p>",
-      "title": "当前版本定位",
+      "title": "Location in the current version",
     },
     {
-      "body": "请根据以上审阅反馈修改当前页面 design/index.html。保持与反馈无关的内容不变。",
-      "title": "任务指令",
+      "body": "Please update the current page design/index.html based on the review feedback above. Keep everything unrelated to the feedback unchanged.",
+      "title": "Instruction",
     },
   ],
 }

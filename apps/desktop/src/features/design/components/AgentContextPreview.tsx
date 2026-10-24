@@ -3,12 +3,13 @@ import { Modal } from '../../../components/ui/Modal';
 import type { AgentContextSection, AgentContextTask } from '../agent-context';
 
 const TASK_TITLE: Record<AgentContextTask, string> = {
-  generate: '生成页面 · 设计上下文',
-  modify: '交给 Agent 修改 · 设计上下文',
+  generate: 'Generate page · design context',
+  modify: 'Hand off to Agent · design context',
 };
 
-const INTRO_NOTICE = '以下内容将随指令进入当前聊天，可在输入框继续补充。';
-const PROMPT_LABEL = '将填入聊天的指令';
+const INTRO_NOTICE =
+  'The following content will be sent with your instruction in the current chat; you can add more in the input box.';
+const PROMPT_LABEL = 'Instruction to be filled into the chat';
 
 export interface AgentContextPreviewProps {
   open: boolean;
@@ -44,10 +45,10 @@ export function AgentContextPreview({
       footer={
         <div className="flex justify-end gap-2">
           <Button size="sm" variant="primary" onClick={onConfirm}>
-            填入聊天
+            Fill into chat
           </Button>
           <Button size="sm" onClick={onClose}>
-            取消
+            Cancel
           </Button>
         </div>
       }

@@ -1016,7 +1016,7 @@ describe('design media routes', () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data.providers).toEqual([
-      { id: 'openai-images', label: 'OpenAI 兼容图片服务', capabilities: ['generate', 'edit'] },
+      { id: 'openai-images', label: 'OpenAI-compatible image service', capabilities: ['generate', 'edit'] },
     ]);
     expect(response.body.data.profiles).toEqual([
       { id: 'p1', name: 'BigModel', providerType: 'openai', hasCredential: true },
@@ -1042,24 +1042,24 @@ describe('design media routes', () => {
     expect(created.body.data).toMatchObject({ id: 'task-1', kind: 'image-generate', status: 'queued' });
     expect(media.createCalls).toEqual([{ sessionId: 'sa', input: payload }]);
 
-    media.createError = new DesignError(409, 'MEDIA_TASK_ACTIVE_EXISTS', '已有相同任务在进行中');
+    media.createError = new DesignError(409, 'MEDIA_TASK_ACTIVE_EXISTS', 'An identical task is already in progress');
     const conflict = await request(app)
       .post('/api/design/media-tasks')
       .send({ sessionId: 'sa', ...payload });
     expect(conflict.status).toBe(409);
     expect(conflict.body).toMatchObject({
       success: false,
-      error: { code: 'MEDIA_TASK_ACTIVE_EXISTS', message: '已有相同任务在进行中' },
+      error: { code: 'MEDIA_TASK_ACTIVE_EXISTS', message: 'An identical task is already in progress' },
     });
 
-    media.createError = new DesignError(400, 'MEDIA_VALIDATION', 'prompt 必须是非空字符串');
+    media.createError = new DesignError(400, 'MEDIA_VALIDATION', 'prompt must be a non-empty string');
     const invalid = await request(app)
       .post('/api/design/media-tasks')
       .send({ sessionId: 'sa', kind: 'image-generate' });
     expect(invalid.status).toBe(400);
     expect(invalid.body.error).toMatchObject({
       code: 'MEDIA_VALIDATION',
-      message: 'prompt 必须是非空字符串',
+      message: 'prompt must be a non-empty string',
     });
   });
 
@@ -1115,7 +1115,7 @@ describe('design media routes', () => {
     media.resultTargetError = new DesignError(
       409,
       'MEDIA_TASK_INVALID_STATE',
-      '任务尚未完成或没有产物'
+      'The task is not finished yet or has no artifact'
     );
     const conflict = await request(app)
       .get('/api/design/media-tasks/task-1/result')
@@ -1123,7 +1123,7 @@ describe('design media routes', () => {
     expect(conflict.status).toBe(409);
     expect(conflict.body.error).toMatchObject({
       code: 'MEDIA_TASK_INVALID_STATE',
-      message: '任务尚未完成或没有产物',
+      message: 'The task is not finished yet or has no artifact',
     });
   });
 });
@@ -1195,7 +1195,7 @@ describe('design media routes real assembly', () => {
     const response = await request(mountApp()).get('/api/design/media/providers');
     expect(response.status).toBe(200);
     expect(response.body.data.providers).toEqual([
-      { id: 'openai-images', label: 'OpenAI 兼容图片服务', capabilities: ['generate', 'edit'] },
+      { id: 'openai-images', label: 'OpenAI-compatible image service', capabilities: ['generate', 'edit'] },
     ]);
     // findAllOrdered：is_default DESC 后 name ASC。
     expect(response.body.data.profiles).toEqual([
@@ -1222,7 +1222,7 @@ describe('design media routes real assembly', () => {
         prompt: 'x',
       });
     expect(unknownProfile.status).toBe(400);
-    expect(unknownProfile.body.error.message).toBe('指定的服务配置不存在');
+    expect(unknownProfile.body.error.message).toBe('The specified service profile does not exist');
   });
 
   it('runs image generation end to end with an injected provider and streams the artifact back', async () => {
@@ -1294,7 +1294,7 @@ describe('design media routes real assembly', () => {
     expect(anthropic.status).toBe(400);
     expect(anthropic.body.error).toMatchObject({
       code: 'MEDIA_VALIDATION',
-      message: '指定的服务配置不存在',
+      message: 'The specified service profile does not exist',
     });
 
     // openai 型但缺 apiKey：提交通过，执行期凭据守卫让任务失败（不触网）。
@@ -1310,7 +1310,7 @@ describe('design media routes real assembly', () => {
     expect(missingKey.status).toBe('failed');
     expect(missingKey.error).toMatchObject({
       code: 'INTERNAL',
-      message: '所选服务配置缺少 API Key',
+      message: 'The selected service profile has no API key',
     });
 
     // 失败任务不落任何产物文件。

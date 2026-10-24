@@ -47,8 +47,8 @@ describe('design template catalog invariants', () => {
       'showcase',
     ]);
     for (const template of DESIGN_TEMPLATES) {
-      expect(template.name).toMatch(/[\u4e00-\u9fff]/);
-      expect(template.description).toMatch(/[\u4e00-\u9fff]/);
+      expect(template.name).toMatch(/[A-Za-z]/);
+      expect(template.description).toMatch(/[A-Za-z]/);
       expect(template.version).toBe('1.0.0');
       expect(template.source).toBe('zclaudia-builtin');
       expect(template.entry).toBe(`design/${template.id}/index.html`);

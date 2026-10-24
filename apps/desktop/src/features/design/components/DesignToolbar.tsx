@@ -88,123 +88,123 @@ export function DesignToolbar({
   return (
     <div className="flex flex-wrap items-center gap-1 border-b border-border px-2 py-1.5">
       <div className="flex items-center gap-1">
-        <Button size="sm" onClick={onTemplates} aria-label="模板">
-          模板
+        <Button size="sm" onClick={onTemplates} aria-label="Templates">
+          Templates
         </Button>
-        <Button size="sm" onClick={onBrand} aria-label="品牌">
-          品牌
+        <Button size="sm" onClick={onBrand} aria-label="Brand">
+          Brand
         </Button>
-        <Button size="sm" onClick={onAssets} aria-label="素材">
-          素材
+        <Button size="sm" onClick={onAssets} aria-label="Assets">
+          Assets
         </Button>
-        <Button size="sm" onClick={onMedia} aria-label="媒体">
+        <Button size="sm" onClick={onMedia} aria-label="Media">
           <ImagePlay size={13} />
-          媒体
+          Media
         </Button>
       </div>
-      <Button size="sm" onClick={onRefresh} aria-label="刷新设计文件">
+      <Button size="sm" onClick={onRefresh} aria-label="Refresh design files">
         <RefreshCw size={13} />
       </Button>
-      <div className="flex items-center gap-1" role="group" aria-label="预览模式">
+      <div className="flex items-center gap-1" role="group" aria-label="Preview mode">
         <Button
           size="sm"
           onClick={() => onPreviewModeChange('edit')}
-          aria-label="编辑模式"
+          aria-label="Edit mode"
           aria-pressed={previewMode === 'edit'}
           variant={previewMode === 'edit' ? 'primary' : 'ghost'}
         >
-          编辑
+          Edit
         </Button>
         <Button
           size="sm"
           onClick={() => onPreviewModeChange('run')}
-          aria-label="运行模式"
+          aria-label="Run mode"
           aria-pressed={previewMode === 'run'}
           variant={previewMode === 'run' ? 'primary' : 'ghost'}
         >
-          运行
+          Run
         </Button>
       </div>
-      <Button size="sm" onClick={onUndo} disabled={!canUndo || busy} aria-label="撤销">
-        撤销
+      <Button size="sm" onClick={onUndo} disabled={!canUndo || busy} aria-label="Undo">
+        Undo
       </Button>
-      <Button size="sm" onClick={onRedo} disabled={!canRedo || busy} aria-label="重做">
-        重做
+      <Button size="sm" onClick={onRedo} disabled={!canRedo || busy} aria-label="Redo">
+        Redo
       </Button>
       <Button size="sm" onClick={onGenerate} disabled={dirty}>
-        生成页面
+        Generate page
       </Button>
       <Button
         size="sm"
         onClick={onHandoff}
         disabled={!hasSelection || !docPath || dirty || busy || runMode}
-        title={runMode ? '运行模式仅供交互体验；请切回编辑模式后再交给 Agent' : undefined}
+        title={runMode ? 'Run mode is for interaction only; switch back to Edit mode before handing off to the Agent' : undefined}
       >
-        交给 Agent 修改
+        Hand off to Agent
       </Button>
       <Button size="sm" variant="primary" onClick={onSave} disabled={!dirty || busy}>
-        保存
+        Save
       </Button>
       <Button size="sm" onClick={onReload} disabled={!docPath || busy}>
-        重新载入
+        Reload
       </Button>
       <Button
         size="sm"
         onClick={onToggleOverview}
-        aria-label="总览"
+        aria-label="Overview"
         aria-pressed={overviewOpen}
         variant={overviewOpen ? 'primary' : 'ghost'}
       >
-        总览
+        Overview
       </Button>
       <Button
         size="sm"
         onClick={onToggleTree}
-        aria-label="结构树"
+        aria-label="Structure"
         aria-pressed={treeOpen}
         variant={treeOpen ? 'primary' : 'ghost'}
       >
-        结构树
+        Structure
       </Button>
       <Button
         size="sm"
         onClick={onExport}
         disabled={!docPath || loading}
-        aria-label="导出"
-        title={docPath ? '把页面与本地资源打包为 ZIP' : undefined}
+        aria-label="Export"
+        title={docPath ? 'Package the page and local assets as a ZIP' : undefined}
       >
-        导出
+        Export
       </Button>
       <Button
         size="sm"
         onClick={onDeck}
         disabled={!deckAvailable}
-        aria-label="幻灯片"
-        title={deckAvailable ? '打开幻灯片面板' : '当前页没有幻灯片标记（data-zclaudia-slide）'}
+        aria-label="Slides"
+        title={deckAvailable ? 'Open the slides panel' : 'This page has no slide markers (data-zclaudia-slide)'}
       >
-        幻灯片
+        Slides
       </Button>
       <Button
         size="sm"
         onClick={onRenderExport}
         disabled={!docPath || loading}
-        aria-label="渲染导出"
-        title={docPath ? '把当前预览渲染导出为 PNG/PDF（整页图片）' : undefined}
+        aria-label="Render export"
+        title={docPath ? 'Render the current preview and export it as PNG/PDF (full-page image)' : undefined}
       >
-        渲染导出
+        Render export
       </Button>
-      <Button size="sm" onClick={onToggleDiff} disabled={!dirty} aria-label="未保存差异">
-        未保存差异
+      <Button size="sm" onClick={onToggleDiff} disabled={!dirty} aria-label="Unsaved changes">
+        Unsaved changes
       </Button>
       <Button
         size="sm"
         onClick={onShare}
         disabled={!docPath || loading}
-        aria-label="分享"
-        title={docPath ? '创建分享链接并查看审阅评论' : undefined}
+        aria-label="Share"
+        title={docPath ? 'Create a share link and view review comments' : undefined}
       >
         <Share2 size={13} />
-        分享
+        Share
       </Button>
     </div>
   );

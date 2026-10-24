@@ -64,7 +64,7 @@ export type OpenPageResult =
 
 const RECENTS_LIMIT = 12;
 const HISTORY_OPTIONS = { limit: 100, maxBytes: 8 * 1024 * 1024, mergeWindowMs: 1500 };
-const HISTORY_INVALID_MESSAGE = '编辑历史已失效，已重新载入';
+const HISTORY_INVALID_MESSAGE = 'Edit history is stale; the file was reloaded';
 
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -78,29 +78,29 @@ function editErrorMessage(error: unknown): string {
   switch (error.code) {
     case 'REVISION_MISMATCH':
     case 'TEXT_MISMATCH':
-      return '所选元素已变化，请重新选择后再试';
+      return 'The selected element has changed; re-select it and try again';
     case 'ELEMENT_NOT_FOUND':
-      return '所选元素已不存在，请重新选择后再试';
+      return 'The selected element no longer exists; re-select it and try again';
     case 'TAG_MISMATCH':
-      return '所选元素类型已变化，请重新选择后再试';
+      return "The selected element's type has changed; re-select it and try again";
     case 'NOT_PLAIN_TEXT':
-      return '该元素包含子元素，只能修改纯文本元素的文字';
+      return 'This element has children; only plain-text elements can have their text edited';
     case 'IMPLICIT_ELEMENT':
-      return '该元素在源码中没有明确位置，无法修改';
+      return 'This element has no explicit source location and cannot be edited';
     case 'DUPLICATE_ATTRIBUTE':
-      return '该元素的开始标签存在重复属性，无法安全修改';
+      return "This element's opening tag has duplicate attributes and cannot be safely edited";
     case 'MALFORMED_HTML':
-      return '该元素附近的源码无法解析，请先修复后再编辑';
+      return 'The source near this element cannot be parsed; fix it before editing';
     case 'INVALID_VALUE':
-      return '颜色值无效，请输入合法的 CSS 颜色';
+      return 'Invalid color value; enter a valid CSS color';
     case 'EMPTY_TRANSACTION':
-      return '没有需要应用的修改';
+      return 'No changes to apply';
     case 'ATTRIBUTE_NOT_ALLOWED':
-      return '该元素不支持修改此属性（src/alt 仅图片，href 仅链接）';
+      return 'This element does not support this property (src/alt only on images, href only on links)';
     case 'STRUCTURE_NOT_ALLOWED':
-      return '该结构操作在此元素上不可用（可能混用了其他修改，或没有可交换的相邻元素）';
+      return 'This structure operation is unavailable on this element (it may be combined with other edits, or there is no adjacent element to swap with)';
     case 'ANCHOR_REFERENCED':
-      return '此元素（或其子元素）的 id 被页面锚点引用，删除会断开链接；请先处理引用';
+      return 'This element (or a child) has an id referenced by a page anchor; deleting it would break the link — resolve the reference first';
     default:
       return errorMessage(error);
   }
@@ -228,7 +228,12 @@ export class DesignWorkspaceController {
   // -------------------------------------------------------------------------
 
   async open(path: string): Promise<OpenPageResult> {
-    if (this.disposed) return { ok: false, reason: 'load-failed', message: '工作台已释放' };
+    if (this.disposed)
+      return {
+        ok: false,
+        reason: 'load-failed',
+        message: 'The design workbench has been released',
+      };
     const existing = this.pages.get(path);
     if (existing) {
       this.activate(path);
@@ -253,10 +258,19 @@ export class DesignWorkspaceController {
       return { ok: false, reason: 'load-failed', message: errorMessage(error) };
     }
     if (this.disposed || page.requestId !== request || this.pages.get(path) !== page) {
-      return { ok: false, reason: 'load-failed', message: '工作台已释放，载入已取消' };
+      return {
+        ok: false,
+        reason: 'load-failed',
+        message: 'The design workbench has been released; loading was cancelled',
+      };
     }
     await this.adoptDocument(page, next);
-    if (this.disposed) return { ok: false, reason: 'load-failed', message: '工作台已释放' };
+    if (this.disposed)
+      return {
+        ok: false,
+        reason: 'load-failed',
+        message: 'The design workbench has been released',
+      };
     this.activate(path);
     return { ok: true };
   }
@@ -447,7 +461,7 @@ export class DesignWorkspaceController {
         await ports.createSnapshot(saved.path, 'save');
       } catch (snapshotError) {
         if (!this.disposed && page.requestId === request) {
-          page.error = `保存成功，但快照未创建：${errorMessage(snapshotError)}`;
+          page.error = `Saved, but the snapshot was not created: ${errorMessage(snapshotError)}`;
           this.touch(page);
           this.emit();
         }

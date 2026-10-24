@@ -33,7 +33,7 @@ vi.mock('../../../services/api/base', () => ({
 }));
 
 const SERVER_BASE = 'http://127.0.0.1:4123';
-const REVOKE_CONFIRM_TEXT = '撤销后链接立即失效且不可恢复，确认撤销？';
+const REVOKE_CONFIRM_TEXT = 'Once revoked, the link stops working immediately and cannot be recovered. Revoke?';
 
 function makeShare(overrides: Partial<DesignShareSummary> = {}): DesignShareSummary {
   return {
@@ -142,13 +142,13 @@ describe('SharePanel（P7 §7.1）', () => {
 
   it('空态：无活动页 / 无会话只显示提示，不发任何请求；open=false 不渲染也不发请求', async () => {
     const { rerender } = mount({ docPath: null });
-    expect(screen.getByText('先打开一个页面再管理分享')).toBeInTheDocument();
+    expect(screen.getByText('Open a page before managing shares')).toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(listDesignSnapshots).not.toHaveBeenCalled();
     expect(listDesignShares).not.toHaveBeenCalled();
 
     rerender({ docPath: 'design/index.html', sessionId: null });
-    expect(screen.getByText('先打开一个页面再管理分享')).toBeInTheDocument();
+    expect(screen.getByText('Open a page before managing shares')).toBeInTheDocument();
     expect(listDesignSnapshots).not.toHaveBeenCalled();
 
     rerender({ open: false, sessionId: 's1', docPath: 'design/index.html' });
@@ -174,30 +174,30 @@ describe('SharePanel（P7 §7.1）', () => {
     mount();
 
     // 版本下拉缺省最新（newest first 的第一条，有 label 显示 label）。
-    const versionTrigger = await screen.findByRole('button', { name: '分享版本' });
+    const versionTrigger = await screen.findByRole('button', { name: 'Share version' });
     expect(versionTrigger).toHaveTextContent('V2');
 
     const activeRow = await screen.findByTestId('share-row-sh-1');
-    expect(within(activeRow).getByText('进行中')).toBeInTheDocument();
+    expect(within(activeRow).getByText('Active')).toBeInTheDocument();
     expect(within(activeRow).getByText('首发审阅')).toBeInTheDocument();
     expect(within(activeRow).getByText(`${SERVER_BASE}/s/tok-1`)).toBeInTheDocument();
-    expect(within(activeRow).getByText('2 条评论 · 未访问')).toBeInTheDocument();
-    const openLink = within(activeRow).getByRole('link', { name: '打开分享 sh-1' });
+    expect(within(activeRow).getByText('2 comments · Not visited')).toBeInTheDocument();
+    const openLink = within(activeRow).getByRole('link', { name: 'Open share sh-1' });
     expect(openLink).toHaveAttribute('href', `${SERVER_BASE}/s/tok-1`);
     expect(openLink).toHaveAttribute('target', '_blank');
     expect(openLink).toHaveAttribute('rel', 'noreferrer');
-    expect(within(activeRow).getByRole('button', { name: '复制链接 sh-1' })).toBeInTheDocument();
+    expect(within(activeRow).getByRole('button', { name: 'Copy link sh-1' })).toBeInTheDocument();
 
     const revokedRow = screen.getByTestId('share-row-sh-2');
-    expect(within(revokedRow).getByText('已撤销')).toBeInTheDocument();
+    expect(within(revokedRow).getByText('Revoked')).toBeInTheDocument();
     expect(
-      within(revokedRow).queryByRole('button', { name: '撤销分享 sh-2' })
+      within(revokedRow).queryByRole('button', { name: 'Revoke share sh-2' })
     ).not.toBeInTheDocument();
 
     const expiredRow = screen.getByTestId('share-row-sh-3');
-    expect(within(expiredRow).getByText('已过期')).toBeInTheDocument();
-    expect(within(expiredRow).getByText('（未命名分享）')).toBeInTheDocument();
-    expect(within(expiredRow).getByText(/最近访问 /)).toBeInTheDocument();
+    expect(within(expiredRow).getByText('Expired')).toBeInTheDocument();
+    expect(within(expiredRow).getByText('(Untitled share)')).toBeInTheDocument();
+    expect(within(expiredRow).getByText(/Last visited /)).toBeInTheDocument();
   });
 
   it('复制按钮：clipboard 成功显示「已复制」；失败退回 window.prompt', async () => {
@@ -207,13 +207,13 @@ describe('SharePanel（P7 §7.1）', () => {
     vi.mocked(listDesignShares).mockResolvedValue({ shares: [makeShare()] });
     mount();
 
-    fireEvent.click(await screen.findByRole('button', { name: '复制链接 sh-1' }));
-    await waitFor(() => expect(promptSpy).toHaveBeenCalledWith('复制失败，请手动复制该链接', `${SERVER_BASE}/s/tok-1`));
-    expect(screen.queryByText('已复制')).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy link sh-1' }));
+    await waitFor(() => expect(promptSpy).toHaveBeenCalledWith('Copy failed; copy the link manually', `${SERVER_BASE}/s/tok-1`));
+    expect(screen.queryByText('Copied')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '复制链接 sh-1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link sh-1' }));
     await waitFor(() => expect(writeText).toHaveBeenLastCalledWith(`${SERVER_BASE}/s/tok-1`));
-    expect(await screen.findByText('已复制')).toBeInTheDocument();
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
     promptSpy.mockRestore();
   });
 
@@ -226,10 +226,10 @@ describe('SharePanel（P7 §7.1）', () => {
     mount();
     await screen.findByTestId('share-row-sh-1');
 
-    fireEvent.change(screen.getByLabelText('分享标题'), { target: { value: '  首发版本  ' } });
-    await pickOption('访问范围', '仅本机');
-    await pickOption('有效期', '7 天');
-    fireEvent.click(screen.getByRole('button', { name: '创建分享' }));
+    fireEvent.change(screen.getByLabelText('Share title'), { target: { value: '  首发版本  ' } });
+    await pickOption('Access scope', 'Local only');
+    await pickOption('Expiry', '7 days');
+    fireEvent.click(screen.getByRole('button', { name: 'Create share' }));
 
     await waitFor(() =>
       expect(createDesignShare).toHaveBeenCalledWith('remote-1', {
@@ -241,18 +241,18 @@ describe('SharePanel（P7 §7.1）', () => {
       })
     );
     const result = await screen.findByTestId('share-created-result');
-    expect(within(result).getByText('分享链接已创建：')).toBeInTheDocument();
+    expect(within(result).getByText('Share link created:')).toBeInTheDocument();
     expect(within(result).getByText(`${SERVER_BASE}/s/tok-new`)).toBeInTheDocument();
-    expect(within(result).getByRole('button', { name: '复制新分享链接' })).toBeInTheDocument();
-    expect(within(result).getByText(/局域网地址（需服务端开启 LAN 监听）/)).toBeInTheDocument();
+    expect(within(result).getByRole('button', { name: 'Copy new share link' })).toBeInTheDocument();
+    expect(within(result).getByText(/LAN address \(requires the server to listen on LAN\)/)).toBeInTheDocument();
     await screen.findByTestId('share-row-sh-new');
     expect(listDesignShares).toHaveBeenCalledTimes(2);
 
     // 改回缺省组合：scope=link、永久、无标题 → null/缺省映射。
-    await pickOption('访问范围', '任何持有链接的人');
-    await pickOption('有效期', '永久');
-    fireEvent.change(screen.getByLabelText('分享标题'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: '创建分享' }));
+    await pickOption('Access scope', 'Anyone with the link');
+    await pickOption('Expiry', 'Never');
+    fireEvent.change(screen.getByLabelText('Share title'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create share' }));
     await waitFor(() =>
       expect(createDesignShare).toHaveBeenLastCalledWith('remote-1', {
         sessionId: 's1',
@@ -274,17 +274,17 @@ describe('SharePanel（P7 §7.1）', () => {
     mount();
     const row = await screen.findByTestId('share-row-sh-1');
 
-    fireEvent.click(within(row).getByRole('button', { name: '撤销分享 sh-1' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Revoke share sh-1' }));
     await waitFor(() => expect(confirmSpy).toHaveBeenCalledWith(REVOKE_CONFIRM_TEXT));
     expect(revokeDesignShare).not.toHaveBeenCalled();
 
     confirmSpy.mockReturnValue(true);
-    fireEvent.click(within(row).getByRole('button', { name: '撤销分享 sh-1' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Revoke share sh-1' }));
     await waitFor(() =>
       expect(revokeDesignShare).toHaveBeenCalledWith('remote-1', { sessionId: 's1', shareId: 'sh-1' })
     );
     await waitFor(() => expect(listDesignShares).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText('已撤销')).toBeInTheDocument();
+    expect(await screen.findByText('Revoked')).toBeInTheDocument();
     confirmSpy.mockRestore();
   });
 
@@ -315,7 +315,7 @@ describe('SharePanel（P7 §7.1）', () => {
       ],
     });
     mount();
-    fireEvent.click(await screen.findByRole('tab', { name: '审阅评论' }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Review comments' }));
 
     await screen.findByTestId('share-comment-c-ok');
     expect(listDesignShareComments).toHaveBeenCalledWith('remote-1', {
@@ -324,30 +324,30 @@ describe('SharePanel（P7 §7.1）', () => {
     });
 
     // 下拉只含未撤销分享。
-    fireEvent.click(screen.getByRole('button', { name: '选择分享' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose share' }));
     expect(screen.getByRole('option', { name: /首发审阅 ·/ })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /已撤销的分享 ·/ })).not.toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
 
     const okRow = screen.getByTestId('share-comment-c-ok');
-    expect(within(okRow).getByText('定位：h1 标题文本')).toBeInTheDocument();
-    expect(within(okRow).queryByText(/定位失效/)).not.toBeInTheDocument();
+    expect(within(okRow).getByText('Anchor: h1 标题文本')).toBeInTheDocument();
+    expect(within(okRow).queryByText(/Anchor lost/)).not.toBeInTheDocument();
 
     const pathRow = screen.getByTestId('share-comment-c-path');
-    expect(within(pathRow).getByText('定位失效：路径越界')).toBeInTheDocument();
+    expect(within(pathRow).getByText('Anchor lost: Path out of range')).toBeInTheDocument();
 
     const textRow = screen.getByTestId('share-comment-c-text');
-    expect(within(textRow).getByText('定位失效：文本已变化')).toBeInTheDocument();
+    expect(within(textRow).getByText('Anchor lost: Text changed')).toBeInTheDocument();
 
     const pageRow = screen.getByTestId('share-comment-c-page');
-    expect(within(pageRow).getByText('整页评论')).toBeInTheDocument();
-    expect(within(pageRow).getByText('已解决')).toBeInTheDocument();
-    expect(within(pageRow).getByRole('button', { name: '取消解决 c-page' })).toBeInTheDocument();
+    expect(within(pageRow).getByText('Whole-page comment')).toBeInTheDocument();
+    expect(within(pageRow).getByText('Resolved')).toBeInTheDocument();
+    expect(within(pageRow).getByRole('button', { name: 'Unresolve c-page' })).toBeInTheDocument();
     expect(
-      within(pageRow).queryByRole('button', { name: '交给 Agent 修改 c-page' })
+      within(pageRow).queryByRole('button', { name: 'Hand off to Agent c-page' })
     ).not.toBeInTheDocument();
     expect(
-      within(okRow).getByRole('button', { name: '交给 Agent 修改 c-ok' })
+      within(okRow).getByRole('button', { name: 'Hand off to Agent c-ok' })
     ).toBeInTheDocument();
   });
 
@@ -358,10 +358,10 @@ describe('SharePanel（P7 §7.1）', () => {
         comments: [makeComment({ id: 'c1', resolvedAt: new Date('2026-10-24T12:00:00').getTime() })],
       });
     mount();
-    fireEvent.click(await screen.findByRole('tab', { name: '审阅评论' }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Review comments' }));
     const row = await screen.findByTestId('share-comment-c1');
 
-    fireEvent.click(within(row).getByRole('button', { name: '标记解决 c1' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Mark resolved c1' }));
     await waitFor(() =>
       expect(setDesignShareCommentResolved).toHaveBeenCalledWith('remote-1', {
         sessionId: 's1',
@@ -373,7 +373,7 @@ describe('SharePanel（P7 §7.1）', () => {
     await waitFor(() => expect(listDesignShareComments).toHaveBeenCalledTimes(2));
 
     const resolvedRow = await screen.findByTestId('share-comment-c1');
-    fireEvent.click(within(resolvedRow).getByRole('button', { name: '取消解决 c1' }));
+    fireEvent.click(within(resolvedRow).getByRole('button', { name: 'Unresolve c1' }));
     await waitFor(() =>
       expect(setDesignShareCommentResolved).toHaveBeenLastCalledWith('remote-1', {
         sessionId: 's1',
@@ -399,16 +399,16 @@ describe('SharePanel（P7 §7.1）', () => {
       ],
     });
     const { props } = mount();
-    fireEvent.click(await screen.findByRole('tab', { name: '审阅评论' }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Review comments' }));
     const row = await screen.findByTestId('share-comment-c1');
 
-    fireEvent.click(within(row).getByRole('button', { name: '交给 Agent 修改 c1' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Hand off to Agent c1' }));
     expect(getDesignSnapshotFile).toHaveBeenCalledWith('remote-1', 's1', 'ds-2', 'design/index.html');
     await waitFor(() => expect(props.onHandoff).toHaveBeenCalledTimes(1));
     const prompt = vi.mocked(props.onHandoff).mock.calls[0][0];
     expect(prompt).toContain('请把标题改成「新品上市」');
-    expect(prompt).toContain('任务指令');
-    expect(prompt).toContain('修改当前页面 design/index.html');
+    expect(prompt).toContain('Instruction');
+    expect(prompt).toContain('update the current page design/index.html');
     // 快照元数据取自 Tab1 加载的快照列表（最新一条 label）。
     expect(prompt).toContain('V2');
   });
@@ -419,13 +419,13 @@ describe('SharePanel（P7 §7.1）', () => {
       comments: [makeComment({ id: 'c1', body: '请检查排版' })],
     });
     const { props } = mount();
-    fireEvent.click(await screen.findByRole('tab', { name: '审阅评论' }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Review comments' }));
     const row = await screen.findByTestId('share-comment-c1');
 
-    fireEvent.click(within(row).getByRole('button', { name: '交给 Agent 修改 c1' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Hand off to Agent c1' }));
     await waitFor(() => expect(props.onHandoff).toHaveBeenCalledTimes(1));
     const prompt = vi.mocked(props.onHandoff).mock.calls[0][0];
     expect(prompt).toContain('请检查排版');
-    expect(prompt).toContain('快照源码不可用');
+    expect(prompt).toContain('Snapshot source unavailable');
   });
 });

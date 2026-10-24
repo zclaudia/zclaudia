@@ -62,11 +62,11 @@ describe('PageOverview', () => {
 
   it('renders one thumbnail grid cell per open page with badges', () => {
     mount();
-    expect(screen.getByTitle('页面缩略图 design/index.html')).toBeInTheDocument();
-    expect(screen.getByTitle('页面缩略图 pages/about.html')).toBeInTheDocument();
-    expect(screen.getByTitle('页面缩略图 pages/gone.html')).toBeInTheDocument();
-    expect(screen.getByText('未保存')).toBeInTheDocument();
-    expect(screen.getByText('缺失')).toBeInTheDocument();
+    expect(screen.getByTitle('Page thumbnail design/index.html')).toBeInTheDocument();
+    expect(screen.getByTitle('Page thumbnail pages/about.html')).toBeInTheDocument();
+    expect(screen.getByTitle('Page thumbnail pages/gone.html')).toBeInTheDocument();
+    expect(screen.getByText('Unsaved')).toBeInTheDocument();
+    expect(screen.getByText('Missing')).toBeInTheDocument();
   });
 
   it('requests lazy preview builds only for pages missing from the cache', () => {
@@ -80,13 +80,13 @@ describe('PageOverview', () => {
 
   it('activates a page when its card is clicked', () => {
     const h = mount();
-    fireEvent.click(screen.getByRole('button', { name: '激活 pages/about.html' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Activate pages/about.html' }));
     expect(h.onActivate).toHaveBeenCalledWith('pages/about.html');
   });
 
   it('opens the disk file in the viewer with the workspace project root', async () => {
     mount();
-    fireEvent.click(screen.getByRole('button', { name: '在查看器中打开 pages/about.html' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open in viewer pages/about.html' }));
     await waitFor(() => {
       const viewer = useFileViewerStore.getState();
       expect(viewer.isOpen).toBe(true);
@@ -98,6 +98,6 @@ describe('PageOverview', () => {
 
   it('shows the empty hint when no page is open', () => {
     mount({ pages: [], previews: {} });
-    expect(screen.getByText(/尚无打开的页面/)).toBeInTheDocument();
+    expect(screen.getByText(/No page open yet/)).toBeInTheDocument();
   });
 });

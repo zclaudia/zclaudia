@@ -22,11 +22,11 @@ const clampZoom = (value: number): number =>
   Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(value * 100) / 100));
 
 const PRESET_OPTIONS: Array<{ value: DesignViewportPreset; label: string }> = [
-  { value: 'fill', label: '充满' },
-  { value: 'desktop', label: '桌面 1280' },
-  { value: 'tablet', label: '平板 768' },
-  { value: 'mobile', label: '手机 390' },
-  { value: 'custom', label: '自定义' },
+  { value: 'fill', label: 'Fill' },
+  { value: 'desktop', label: 'Desktop 1280' },
+  { value: 'tablet', label: 'Tablet 768' },
+  { value: 'mobile', label: 'Mobile 390' },
+  { value: 'custom', label: 'Custom' },
 ];
 
 const PRESET_WIDTH: Partial<Record<DesignViewportPreset, number>> = {
@@ -87,13 +87,13 @@ export function ViewportControls({
         value={viewport.preset}
         onChange={handlePresetChange}
         options={PRESET_OPTIONS}
-        ariaLabel="视口预设"
+        ariaLabel="Viewport presets"
         size="sm"
         className="w-28"
       />
       {!fill && (
         <Input
-          aria-label="自定义宽度"
+          aria-label="Custom width"
           inputMode="numeric"
           value={widthText}
           onChange={event => setWidthText(event.target.value)}
@@ -108,7 +108,7 @@ export function ViewportControls({
       <div className="flex items-center gap-0.5">
         <Button
           size="sm"
-          aria-label="缩小"
+          aria-label="Zoom out"
           disabled={fill || zoom.value <= ZOOM_MIN}
           onClick={() => onZoomChange({ mode: 'manual', value: clampZoom(zoom.value - ZOOM_STEP) })}
         >
@@ -116,8 +116,8 @@ export function ViewportControls({
         </Button>
         <button
           type="button"
-          aria-label={`缩放 ${zoomPercent}，双击复位`}
-          title="双击复位到 100%"
+          aria-label={`Zoom ${zoomPercent}, double-click to reset`}
+          title="Double-click to reset to 100%"
           disabled={fill}
           onDoubleClick={() => onZoomChange({ mode: 'manual', value: 1 })}
           className="min-w-12 rounded px-1 text-center text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
@@ -126,15 +126,15 @@ export function ViewportControls({
         </button>
         <Button
           size="sm"
-          aria-label="放大"
+          aria-label="Zoom in"
           disabled={fill || zoom.value >= ZOOM_MAX}
           onClick={() => onZoomChange({ mode: 'manual', value: clampZoom(zoom.value + ZOOM_STEP) })}
         >
-          ＋
+          +
         </Button>
         <Button
           size="sm"
-          aria-label="适应宽度"
+          aria-label="Fit width"
           aria-pressed={zoom.mode === 'fit'}
           variant={zoom.mode === 'fit' ? 'primary' : 'ghost'}
           disabled={fill}
@@ -146,7 +146,7 @@ export function ViewportControls({
             )
           }
         >
-          适应
+          Fit
         </Button>
       </div>
     </div>

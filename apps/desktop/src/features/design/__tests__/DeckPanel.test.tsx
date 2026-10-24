@@ -71,36 +71,36 @@ describe('DeckPanel（P5 §5.1）', () => {
 
   it('每页渲染一张缩略图 iframe 与页卡控件，页数显示 N/60', () => {
     mount();
-    expect(screen.getByTitle('第 1 页缩略图')).toBeInTheDocument();
-    expect(screen.getByTitle('第 2 页缩略图')).toBeInTheDocument();
-    expect(screen.getByTitle('第 3 页缩略图')).toBeInTheDocument();
-    expect(screen.getByLabelText('第 1 页标题')).toHaveValue('第一页');
-    expect(screen.getByLabelText('第 3 页标题')).toHaveValue('第三页');
+    expect(screen.getByTitle('Thumbnail of page 1')).toBeInTheDocument();
+    expect(screen.getByTitle('Thumbnail of page 2')).toBeInTheDocument();
+    expect(screen.getByTitle('Thumbnail of page 3')).toBeInTheDocument();
+    expect(screen.getByLabelText('Title of page 1')).toHaveValue('第一页');
+    expect(screen.getByLabelText('Title of page 3')).toHaveValue('第三页');
     expect(screen.getByText('3/60')).toBeInTheDocument();
   });
 
   it('previewHtml 为 null 时缩略图显示占位', () => {
     mount({ previewHtml: null });
-    expect(screen.queryByTitle('第 1 页缩略图')).not.toBeInTheDocument();
-    expect(screen.getAllByText('预览构建中…')).toHaveLength(3);
+    expect(screen.queryByTitle('Thumbnail of page 1')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Building preview…')).toHaveLength(3);
   });
 
   it('上移/下移调用 onCommit 且参数为 reorder 结果；首末页边界禁用', async () => {
     const h = mount();
-    const upFirst = screen.getByRole('button', { name: '上移第 1 页' });
+    const upFirst = screen.getByRole('button', { name: 'Move page 1 up' });
     expect(upFirst).toBeDisabled();
-    expect(upFirst).toHaveAttribute('title', '已是第一页');
-    expect(screen.getByRole('button', { name: '下移第 3 页' })).toBeDisabled();
+    expect(upFirst).toHaveAttribute('title', 'Already the first page');
+    expect(screen.getByRole('button', { name: 'Move page 3 down' })).toBeDisabled();
 
-    fireEvent.click(screen.getByRole('button', { name: '上移第 2 页' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Move page 2 up' }));
     await waitFor(() => expect(h.onCommit).toHaveBeenCalledTimes(1));
-    expect(h.onCommit).toHaveBeenCalledWith(reorderDeckSlides(DECK_SOURCE, 1, 0), '上移第 2 页');
+    expect(h.onCommit).toHaveBeenCalledWith(reorderDeckSlides(DECK_SOURCE, 1, 0), 'Move page 2 up');
 
     // 连续操作以乐观更新后的本地 source 为基线（§5.1「以返回的 source 重建本地视图」）。
     const afterUp = reorderDeckSlides(DECK_SOURCE, 1, 0);
-    fireEvent.click(screen.getByRole('button', { name: '下移第 1 页' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Move page 1 down' }));
     await waitFor(() => expect(h.onCommit).toHaveBeenCalledTimes(2));
-    expect(h.onCommit).toHaveBeenLastCalledWith(reorderDeckSlides(afterUp, 0, 1), '下移第 1 页');
+    expect(h.onCommit).toHaveBeenLastCalledWith(reorderDeckSlides(afterUp, 0, 1), 'Move page 1 down');
   });
 
   it('标记元素非同父级时排序按钮禁用并显示原因', () => {
@@ -108,107 +108,107 @@ describe('DeckPanel（P5 §5.1）', () => {
       page: { path: 'deck/nested.html', source: NESTED_SOURCE, busy: false },
       deck: parseDeck(NESTED_SOURCE),
     });
-    const up = screen.getByRole('button', { name: '上移第 1 页' });
+    const up = screen.getByRole('button', { name: 'Move page 1 up' });
     expect(up).toBeDisabled();
-    expect(up).toHaveAttribute('title', '幻灯片不在同一父级，无法排序');
-    expect(screen.getByRole('button', { name: '下移第 1 页' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '下移第 3 页' })).toBeDisabled();
+    expect(up).toHaveAttribute('title', 'Slides are not under the same parent and cannot be reordered');
+    expect(screen.getByRole('button', { name: 'Move page 1 down' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move page 3 down' })).toBeDisabled();
   });
 
   it('修改标题经 updateDeckSlideTitle 提交', async () => {
     const h = mount();
-    fireEvent.change(screen.getByLabelText('第 1 页标题'), { target: { value: '新标题' } });
+    fireEvent.change(screen.getByLabelText('Title of page 1'), { target: { value: '新标题' } });
     await waitFor(() => expect(h.onCommit).toHaveBeenCalledTimes(1));
     expect(h.onCommit).toHaveBeenCalledWith(
       updateDeckSlideTitle(DECK_SOURCE, 0, '新标题'),
-      '修改第 1 页标题'
+      'Edit title of page 1'
     );
   });
 
   it('标题超长时纯函数抛错：页内 alert 显示且不提交', async () => {
     const h = mount();
-    fireEvent.change(screen.getByLabelText('第 1 页标题'), {
+    fireEvent.change(screen.getByLabelText('Title of page 1'), {
       target: { value: '长'.repeat(201) },
     });
-    expect(await screen.findByRole('alert')).toHaveTextContent('标题不能超过 200 字符');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Title must be at most 200 characters');
     expect(h.onCommit).not.toHaveBeenCalled();
   });
 
   it('备注展开后可编辑并经 updateDeckSlideNotes 保存', async () => {
     const h = mount();
-    fireEvent.click(screen.getByRole('button', { name: '第 1 页备注' }));
-    const textarea = screen.getByLabelText('第 1 页备注内容');
+    fireEvent.click(screen.getByRole('button', { name: 'Notes of page 1' }));
+    const textarea = screen.getByLabelText('Notes content of page 1');
     expect(textarea).toHaveValue('备注 A');
     fireEvent.change(textarea, { target: { value: '更新后的备注' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存第 1 页备注' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save notes of page 1' }));
     await waitFor(() => expect(h.onCommit).toHaveBeenCalledTimes(1));
     expect(h.onCommit).toHaveBeenCalledWith(
       updateDeckSlideNotes(DECK_SOURCE, 0, '更新后的备注'),
-      '修改第 1 页备注'
+      'Edit notes of page 1'
     );
   });
 
   it('备注超过 2000 字时禁用保存并显示计数', () => {
     mount();
-    fireEvent.click(screen.getByRole('button', { name: '第 1 页备注' }));
-    fireEvent.change(screen.getByLabelText('第 1 页备注内容'), {
+    fireEvent.click(screen.getByRole('button', { name: 'Notes of page 1' }));
+    fireEvent.change(screen.getByLabelText('Notes content of page 1'), {
       target: { value: 'n'.repeat(2001) },
     });
-    expect(screen.getByRole('button', { name: '保存第 1 页备注' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save notes of page 1' })).toBeDisabled();
     expect(screen.getByText('2001/2000')).toBeInTheDocument();
   });
 
   it('新增页经 addDeckSlide 提交', async () => {
     const h = mount();
-    fireEvent.click(screen.getByRole('button', { name: '新增页' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add page' }));
     await waitFor(() => expect(h.onCommit).toHaveBeenCalledTimes(1));
-    expect(h.onCommit).toHaveBeenCalledWith(addDeckSlide(DECK_SOURCE).source, '新增幻灯片');
+    expect(h.onCommit).toHaveBeenCalledWith(addDeckSlide(DECK_SOURCE).source, 'Add slide');
   });
 
   it('删除需二次确认：确认后经 deleteDeckSlide 提交', async () => {
     const h = mount();
-    fireEvent.click(screen.getByRole('button', { name: '删除第 2 页' }));
-    const dialog = screen.getByRole('dialog', { name: '删除幻灯片' });
+    fireEvent.click(screen.getByRole('button', { name: 'Delete page 2' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete slide' });
     expect(h.onCommit).not.toHaveBeenCalled();
-    fireEvent.click(within(dialog).getByRole('button', { name: '确认删除第 2 页' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm deleting page 2' }));
     await waitFor(() => expect(h.onCommit).toHaveBeenCalledTimes(1));
-    expect(h.onCommit).toHaveBeenCalledWith(deleteDeckSlide(DECK_SOURCE, 1), '删除第 2 页');
+    expect(h.onCommit).toHaveBeenCalledWith(deleteDeckSlide(DECK_SOURCE, 1), 'Delete page 2');
   });
 
   it('删除二次确认可取消：不提交', () => {
     const h = mount();
-    fireEvent.click(screen.getByRole('button', { name: '删除第 2 页' }));
-    const dialog = screen.getByRole('dialog', { name: '删除幻灯片' });
-    fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete page 2' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete slide' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(h.onCommit).not.toHaveBeenCalled();
-    expect(screen.queryByRole('dialog', { name: '删除幻灯片' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Delete slide' })).not.toBeInTheDocument();
   });
 
   it('比例切换经 setDeckRatio 提交', async () => {
     const h = mount();
-    fireEvent.click(screen.getByRole('button', { name: '幻灯片比例' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Slide aspect ratio' }));
     fireEvent.click(screen.getByRole('option', { name: '4:3' }));
     await waitFor(() => expect(h.onCommit).toHaveBeenCalledTimes(1));
-    expect(h.onCommit).toHaveBeenCalledWith(setDeckRatio(DECK_SOURCE, '4:3'), '设置幻灯片比例 4:3');
+    expect(h.onCommit).toHaveBeenCalledWith(setDeckRatio(DECK_SOURCE, '4:3'), 'Set slide aspect ratio to 4:3');
   });
 
   it('onCommit 返回 false 时页内 alert 显示提交失败', async () => {
     const h = mount({ onCommit: vi.fn().mockResolvedValue(false) });
-    fireEvent.click(screen.getByRole('button', { name: '下移第 1 页' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('提交未生效');
-    expect(h.onCommit).toHaveBeenCalledWith(reorderDeckSlides(DECK_SOURCE, 0, 1), '下移第 1 页');
+    fireEvent.click(screen.getByRole('button', { name: 'Move page 1 down' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The change did not take effect');
+    expect(h.onCommit).toHaveBeenCalledWith(reorderDeckSlides(DECK_SOURCE, 0, 1), 'Move page 1 down');
   });
 
   it('busy 时全部操作禁用', () => {
     mount({ page: { path: 'deck/slides.html', source: DECK_SOURCE, busy: true } });
-    expect(screen.getByLabelText('第 1 页标题')).toBeDisabled();
-    expect(screen.getByRole('button', { name: '上移第 1 页' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '下移第 1 页' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '删除第 1 页' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '演示第 1 页' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '第 1 页备注' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '新增页' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '幻灯片比例' })).toBeDisabled();
+    expect(screen.getByLabelText('Title of page 1')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move page 1 up' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move page 1 down' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Delete page 1' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Present page 1' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Notes of page 1' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add page' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Slide aspect ratio' })).toBeDisabled();
   });
 
   it('已达 60 页上限时禁用新增页并提示', () => {
@@ -223,14 +223,14 @@ describe('DeckPanel（P5 §5.1）', () => {
       previewHtml: null,
     });
     expect(screen.getByText('60/60')).toBeInTheDocument();
-    const add = screen.getByRole('button', { name: '新增页' });
+    const add = screen.getByRole('button', { name: 'Add page' });
     expect(add).toBeDisabled();
-    expect(add).toHaveAttribute('title', '已达 60 页上限');
+    expect(add).toHaveAttribute('title', 'Reached the 60-page limit');
   });
 
   it('页卡「演示」按钮以该页序号上抛 onPresent', () => {
     const h = mount();
-    fireEvent.click(screen.getByRole('button', { name: '演示第 2 页' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Present page 2' }));
     expect(h.onPresent).toHaveBeenCalledWith(1);
   });
 
@@ -241,6 +241,6 @@ describe('DeckPanel（P5 §5.1）', () => {
       deck: parseDeck(source),
       previewHtml: null,
     });
-    expect(screen.getByText(/此页面没有幻灯片标记/)).toBeInTheDocument();
+    expect(screen.getByText(/This page has no slide markers/)).toBeInTheDocument();
   });
 });

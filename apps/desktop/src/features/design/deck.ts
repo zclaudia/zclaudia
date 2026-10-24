@@ -103,7 +103,7 @@ function parseDeckInternal(source: string): ParsedDeck {
   const parsed = parseDocument(source);
   const body = parsed.body;
   if (!body || !body.sourceCodeLocation) {
-    throw new DesignEditError('MALFORMED_HTML', '页面缺少可解析的 body 元素');
+    throw new DesignEditError('MALFORMED_HTML', 'Page has no parseable body element');
   }
 
   const hits: SlideHit[] = [];
@@ -117,10 +117,10 @@ function parseDeckInternal(source: string): ParsedDeck {
       if (isSlideElement(element)) {
         const span = elementSpan(element);
         if (!span) {
-          throw new DesignEditError('MALFORMED_HTML', '幻灯片元素缺少源码位置');
+          throw new DesignEditError('MALFORMED_HTML', 'Slide element has no source location');
         }
         if (parsed.errors.some(error => error.startOffset >= span.start && error.startOffset < span.end)) {
-          throw new DesignEditError('MALFORMED_HTML', '幻灯片元素包含解析错误');
+          throw new DesignEditError('MALFORMED_HTML', 'Slide element contains parse errors');
         }
         hits.push({ element, path, span });
       }
@@ -130,7 +130,7 @@ function parseDeckInternal(source: string): ParsedDeck {
   walk(body, []);
 
   if (hits.length > MAX_SLIDES) {
-    throw new DesignEditError('STRUCTURE_NOT_ALLOWED', '幻灯片数量超过 60 页上限');
+    throw new DesignEditError('STRUCTURE_NOT_ALLOWED', 'Slides exceed the 60-page limit');
   }
 
   const slides: DeckSlide[] = hits.map(({ element, path, span }, index) => {
@@ -138,7 +138,7 @@ function parseDeckInternal(source: string): ParsedDeck {
     return {
       index,
       elementPath: path,
-      title: rawTitle ? rawTitle : `第 ${index + 1} 页`,
+      title: rawTitle ? rawTitle : `Page ${index + 1}`,
       notes: attrValue(element, NOTES_ATTRIBUTE) ?? '',
       tagName: element.tagName.toLowerCase(),
       span,
@@ -185,7 +185,7 @@ export function isDeck(source: string): boolean {
 function slideAt(info: DeckInfo, index: number): DeckSlide {
   const slide = Number.isSafeInteger(index) ? info.slides[index] : undefined;
   if (!slide) {
-    throw new DesignEditError('INVALID_VALUE', '幻灯片序号越界');
+    throw new DesignEditError('INVALID_VALUE', 'Slide index out of range');
   }
   return slide;
 }
@@ -200,14 +200,14 @@ export function reorderDeckSlides(source: string, from: number, to: number): str
   const fromSlide = slideAt(info, from);
   const toSlide = slideAt(info, to);
   if (!info.siblings) {
-    throw new DesignEditError('STRUCTURE_NOT_ALLOWED', '幻灯片不在同一父级，无法排序');
+    throw new DesignEditError('STRUCTURE_NOT_ALLOWED', 'Slides are not under the same parent and cannot be reordered');
   }
   if (from === to) return source;
   const fromSpan = fromSlide.span;
   const toSpan = toSlide.span;
   if (from < to) {
     if (toSpan.start < fromSpan.end) {
-      throw new DesignEditError('MALFORMED_HTML', '幻灯片元素源码范围异常重叠');
+      throw new DesignEditError('MALFORMED_HTML', 'Slide element source ranges overlap abnormally');
     }
     // 区间 [from.start, to.end) → 中间字节 + 目标块 + 来源块。
     return (
@@ -219,7 +219,7 @@ export function reorderDeckSlides(source: string, from: number, to: number): str
     );
   }
   if (fromSpan.start < toSpan.end) {
-    throw new DesignEditError('MALFORMED_HTML', '幻灯片元素源码范围异常重叠');
+    throw new DesignEditError('MALFORMED_HTML', 'Slide element source ranges overlap abnormally');
   }
   // 区间 [to.start, from.end) → 来源块 + 中间字节 + 目标块。
   return (
@@ -242,9 +242,9 @@ function indentOf(source: string, offset: number): string {
 function slideTemplate(indent: string): string {
   const childIndent = `${indent}  `;
   return [
-    `${indent}<section data-zclaudia-slide data-title="新页">`,
-    `${childIndent}<h2>新页标题</h2>`,
-    `${childIndent}<p>在此填写内容。</p>`,
+    `${indent}<section data-zclaudia-slide data-title="New page">`,
+    `${childIndent}<h2>New page title</h2>`,
+    `${childIndent}<p>Add content here.</p>`,
     `${indent}</section>`,
   ].join('\n');
 }
@@ -258,12 +258,12 @@ export function addDeckSlide(source: string): { source: string; index: number } 
   const deck = parseDeckInternal(source);
   const info = deck.info;
   if (info.slides.length >= MAX_SLIDES) {
-    throw new DesignEditError('STRUCTURE_NOT_ALLOWED', '幻灯片数量超过 60 页上限');
+    throw new DesignEditError('STRUCTURE_NOT_ALLOWED', 'Slides exceed the 60-page limit');
   }
   const body = deck.body;
   const bodySpan = elementSpan(body);
   if (!bodySpan) {
-    throw new DesignEditError('MALFORMED_HTML', 'body 元素缺少源码位置');
+    throw new DesignEditError('MALFORMED_HTML', 'body element has no source location');
   }
   const endTag = body.sourceCodeLocation?.endTag;
   let insertOffset = endTag ? endTag.startOffset : bodySpan.end;
@@ -314,17 +314,17 @@ function updateSlideAttribute(
   const deck = parseDeckInternal(source);
   slideAt(deck.info, index);
   if (typeof value !== 'string') {
-    throw new DesignEditError('INVALID_VALUE', `${label}必须是字符串`);
+    throw new DesignEditError('INVALID_VALUE', `${label} must be a string`);
   }
   if (value.length > maxLength) {
-    throw new DesignEditError('INVALID_VALUE', `${label}不能超过 ${maxLength} 字符`);
+    throw new DesignEditError('INVALID_VALUE', `${label} must be at most ${maxLength} characters`);
   }
   if (hasControlChars(value)) {
-    throw new DesignEditError('INVALID_VALUE', `${label}包含控制字符`);
+    throw new DesignEditError('INVALID_VALUE', `${label} contains control characters`);
   }
   const element = deck.elements[index];
   if (!element) {
-    throw new DesignEditError('MALFORMED_HTML', '幻灯片元素缺少源码位置');
+    throw new DesignEditError('MALFORMED_HTML', 'Slide element has no source location');
   }
   const replacement = `${name}="${escapeAttrValue(value)}"`;
   const existing = attributeSpan(element, name);
@@ -333,25 +333,25 @@ function updateSlideAttribute(
   }
   const at = newAttributeInsertOffset(source, element);
   if (at === null) {
-    throw new DesignEditError('MALFORMED_HTML', '幻灯片元素缺少源码位置');
+    throw new DesignEditError('MALFORMED_HTML', 'Slide element has no source location');
   }
   return source.slice(0, at) + ` ${replacement}` + source.slice(at);
 }
 
 /** 更新/写入 data-title（≤200 字符，校验与转义见 updateSlideAttribute）。 */
 export function updateDeckSlideTitle(source: string, index: number, title: string): string {
-  return updateSlideAttribute(source, index, TITLE_ATTRIBUTE, title, MAX_TITLE_LENGTH, '标题');
+  return updateSlideAttribute(source, index, TITLE_ATTRIBUTE, title, MAX_TITLE_LENGTH, 'Title');
 }
 
 /** 更新/写入 data-notes（≤2000 字符，校验与转义见 updateSlideAttribute）。 */
 export function updateDeckSlideNotes(source: string, index: number, notes: string): string {
-  return updateSlideAttribute(source, index, NOTES_ATTRIBUTE, notes, MAX_NOTES_LENGTH, '备注');
+  return updateSlideAttribute(source, index, NOTES_ATTRIBUTE, notes, MAX_NOTES_LENGTH, 'Notes');
 }
 
 /** body 写/改 data-zclaudia-deck-ratio（无 body 抛 MALFORMED_HTML，值非法抛 INVALID_VALUE）。 */
 export function setDeckRatio(source: string, ratio: DeckRatio): string {
   if (ratio !== '16:9' && ratio !== '4:3') {
-    throw new DesignEditError('INVALID_VALUE', '比例仅支持 16:9 或 4:3');
+    throw new DesignEditError('INVALID_VALUE', 'Aspect ratio must be 16:9 or 4:3');
   }
   const deck = parseDeckInternal(source);
   const body = deck.body;
@@ -362,7 +362,7 @@ export function setDeckRatio(source: string, ratio: DeckRatio): string {
   }
   const at = newAttributeInsertOffset(source, body);
   if (at === null) {
-    throw new DesignEditError('MALFORMED_HTML', 'body 元素缺少源码位置');
+    throw new DesignEditError('MALFORMED_HTML', 'body element has no source location');
   }
   return source.slice(0, at) + ` ${replacement}` + source.slice(at);
 }
@@ -381,7 +381,7 @@ export function filterSlideInPreviewHtml(previewHtml: string, index: number): st
   doc.querySelectorAll('script').forEach(script => script.remove());
   const slides = Array.from(doc.querySelectorAll('[data-zclaudia-slide]'));
   if (!Number.isSafeInteger(index) || index < 0 || index >= slides.length) {
-    throw new DesignEditError('INVALID_VALUE', '幻灯片序号越界');
+    throw new DesignEditError('INVALID_VALUE', 'Slide index out of range');
   }
   const style = doc.createElement('style');
   style.textContent = `${SLIDE_HIDE_RULE}\n${SLIDE_ACTIVE_RULE}`;

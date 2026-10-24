@@ -151,7 +151,7 @@ describe('buildImagePdf', () => {
   });
 
   it('rejects an empty page list with a Chinese message', () => {
-    expect(() => buildImagePdf([])).toThrow('至少需要一页内容');
+    expect(() => buildImagePdf([])).toThrow('at least one page is required');
   });
 
   it('rejects more than 200 pages', () => {
@@ -160,17 +160,17 @@ describe('buildImagePdf', () => {
       heightPx: 600,
       jpegBytes: PAGE_ONE_JPEG,
     }));
-    expect(() => buildImagePdf(pages)).toThrow('超过上限 200');
+    expect(() => buildImagePdf(pages)).toThrow('exceeds the limit of 200');
     expect(() => buildImagePdf(pages.slice(0, 200))).not.toThrow();
   });
 
   it('rejects out-of-range page dimensions', () => {
     expect(() =>
       buildImagePdf([{ widthPx: 0, heightPx: 600, jpegBytes: PAGE_ONE_JPEG }])
-    ).toThrow('尺寸超出范围');
+    ).toThrow('dimensions out of range');
     expect(() =>
       buildImagePdf([{ widthPx: 800, heightPx: 10001, jpegBytes: PAGE_ONE_JPEG }])
-    ).toThrow('尺寸超出范围');
+    ).toThrow('dimensions out of range');
   });
 
   it('rejects jpegBytes that do not start with 0xFF 0xD8', () => {
@@ -186,6 +186,6 @@ describe('buildImagePdf', () => {
       buildImagePdf([
         { widthPx: 800, heightPx: 600, jpegBytes: new Uint8Array([0xff, 0xd8, 0x00]) },
       ])
-    ).toThrow('长度不足');
+    ).toThrow('length too short');
   });
 });

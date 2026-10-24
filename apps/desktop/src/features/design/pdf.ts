@@ -35,13 +35,13 @@ function encodeLatin1(text: string): Uint8Array {
 }
 
 function validatePages(pages: readonly PdfJpegPage[]): void {
-  if (pages.length === 0) throw new Error('PDF 导出失败：至少需要一页内容');
+  if (pages.length === 0) throw new Error('PDF export failed: at least one page is required');
   if (pages.length > MAX_PDF_PAGES) {
-    throw new Error(`PDF 导出失败：页数 ${pages.length} 超过上限 ${MAX_PDF_PAGES} 页`);
+    throw new Error(`PDF export failed: page count ${pages.length} exceeds the limit of ${MAX_PDF_PAGES}`);
   }
   for (let index = 0; index < pages.length; index += 1) {
     const page = pages[index];
-    const label = `第 ${index + 1} 页`;
+    const label = `Page ${index + 1}`;
     if (
       !Number.isFinite(page.widthPx) ||
       page.widthPx < MIN_DIMENSION_PX ||
@@ -51,14 +51,14 @@ function validatePages(pages: readonly PdfJpegPage[]): void {
       page.heightPx > MAX_DIMENSION_PX
     ) {
       throw new Error(
-        `PDF 导出失败：${label}尺寸超出范围（${MIN_DIMENSION_PX}–${MAX_DIMENSION_PX}px）`
+        `PDF export failed: ${label} dimensions out of range (${MIN_DIMENSION_PX}–${MAX_DIMENSION_PX}px)`
       );
     }
     if (!(page.jpegBytes instanceof Uint8Array) || page.jpegBytes.length < MIN_JPEG_BYTES) {
-      throw new Error(`PDF 导出失败：${label}的 JPEG 数据无效（长度不足 ${MIN_JPEG_BYTES} 字节）`);
+      throw new Error(`PDF export failed: ${label} has invalid JPEG data (length too short: fewer than ${MIN_JPEG_BYTES} bytes)`);
     }
     if (page.jpegBytes[0] !== JPEG_SOI_0 || page.jpegBytes[1] !== JPEG_SOI_1) {
-      throw new Error(`PDF 导出失败：${label}的数据不是有效的 JPEG（缺少 SOI 标记）`);
+      throw new Error(`PDF export failed: ${label} data is not a valid JPEG (missing SOI marker)`);
     }
   }
 }
@@ -72,7 +72,7 @@ function validatePages(pages: readonly PdfJpegPage[]): void {
 export function buildImagePdf(pages: readonly PdfJpegPage[], options?: BuildImagePdfOptions): Uint8Array {
   validatePages(pages);
   const dpi = options?.dpi ?? 96;
-  if (!Number.isFinite(dpi) || dpi <= 0) throw new Error('PDF 导出失败：dpi 必须为正数');
+  if (!Number.isFinite(dpi) || dpi <= 0) throw new Error('PDF export failed: dpi must be a positive number');
 
   const pageObjectNumber = (index: number): number => 3 + index * 3;
   const totalObjects = 2 + pages.length * 3;

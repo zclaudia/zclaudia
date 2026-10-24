@@ -8,16 +8,16 @@ import type { DesignEditOperation } from '../types';
 import { readFileAsBase64 } from '../../../services/fileUpload';
 
 const THUMBNAIL_LIMIT = 50;
-const TRUNCATED_LABEL = '…（仅显示前 50 项）';
+const TRUNCATED_LABEL = '… (first 50 shown)';
 const IMAGE_ACCEPT = '.png,.jpg,.jpeg,.gif,.webp,.svg,.ico,.avif';
 const FONT_ACCEPT = '.woff,.woff2,.ttf,.otf';
-const LOADING_LABEL = '正在加载素材…';
-const EMPTY_LABEL = '工作区暂无素材';
-const IMPORTING_LABEL = '正在导入素材…';
-const REPLACE_NEEDS_IMG = '需要先在预览中选中一个图片元素';
-const REPLACE_NEEDS_DOC = '当前没有活动页面';
-const VIDEO_IMPORT_HINT = '视频由媒体生成任务产生，不支持导入';
-const VIDEO_SIZE_UNKNOWN = '体积未知';
+const LOADING_LABEL = 'Loading assets…';
+const EMPTY_LABEL = 'No assets in the workspace yet';
+const IMPORTING_LABEL = 'Importing assets…';
+const REPLACE_NEEDS_IMG = 'Select an image element in the preview first';
+const REPLACE_NEEDS_DOC = 'No active page';
+const VIDEO_IMPORT_HINT = 'Videos come from media generation tasks and cannot be imported';
+const VIDEO_SIZE_UNKNOWN = 'Unknown size';
 
 type Tab = 'image' | 'font' | 'video';
 
@@ -184,13 +184,13 @@ export function AssetLibrary({
         });
         const savedName = baseName(path);
         if (savedName !== file.name) {
-          setNotices(prev => [...prev, { kind: 'info', text: `${file.name} 已保存为 ${savedName}` }]);
+          setNotices(prev => [...prev, { kind: 'info', text: `${file.name} saved as ${savedName}` }]);
         }
         onImported(path);
       } catch (error) {
         setNotices(prev => [
           ...prev,
-          { kind: 'error', text: `${file.name} 导入失败：${errorText(error)}` },
+          { kind: 'error', text: `${file.name} failed to import: ${errorText(error)}` },
         ]);
       }
     }
@@ -208,7 +208,7 @@ export function AssetLibrary({
 
   const canReplace = selection?.tagName === 'img' && activeDocPath !== null;
   const replaceTitle = canReplace
-    ? '把选中图片的 src 替换为该素材的相对引用'
+    ? "Replace the selected image's src with a relative reference to this asset"
     : selection?.tagName !== 'img'
       ? REPLACE_NEEDS_IMG
       : REPLACE_NEEDS_DOC;
@@ -219,20 +219,20 @@ export function AssetLibrary({
     <Modal
       open={open}
       onClose={onClose}
-      ariaLabel="素材库"
-      title="素材库"
+      ariaLabel="Asset library"
+      title="Asset library"
       size="2xl"
       footer={
         <div className="flex justify-end">
           <Button size="sm" onClick={onClose}>
-            关闭
+            Close
           </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-3 p-4 text-xs">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex w-fit gap-0.5 rounded-md bg-secondary p-0.5" role="tablist" aria-label="素材类型">
+          <div className="flex w-fit gap-0.5 rounded-md bg-secondary p-0.5" role="tablist" aria-label="Asset type">
             <button
               type="button"
               role="tab"
@@ -244,7 +244,7 @@ export function AssetLibrary({
               }`}
               onClick={() => setTab('image')}
             >
-              图片
+              Image
             </button>
             <button
               type="button"
@@ -257,7 +257,7 @@ export function AssetLibrary({
               }`}
               onClick={() => setTab('font')}
             >
-              字体
+              Font
             </button>
             <button
               type="button"
@@ -270,7 +270,7 @@ export function AssetLibrary({
               }`}
               onClick={() => setTab('video')}
             >
-              视频
+              Video
             </button>
           </div>
           {tab === 'video' ? (
@@ -278,7 +278,7 @@ export function AssetLibrary({
           ) : (
             <>
               <Button size="sm" variant="outline" disabled={importing} onClick={pickFiles}>
-                {importing ? '导入中…' : '导入'}
+                {importing ? 'Importing…' : 'Import'}
               </Button>
               <input
                 ref={inputRef}
@@ -286,7 +286,7 @@ export function AssetLibrary({
                 hidden
                 multiple
                 accept={tab === 'image' ? IMAGE_ACCEPT : FONT_ACCEPT}
-                aria-label="选择要导入的素材文件"
+                aria-label="Choose asset files to import"
                 onChange={onInputChange}
               />
             </>
@@ -312,7 +312,7 @@ export function AssetLibrary({
               {loadError}
             </span>
             <Button size="sm" onClick={load}>
-              重试
+              Retry
             </Button>
           </div>
         )}
@@ -356,7 +356,7 @@ export function AssetLibrary({
                     {file}
                   </span>
                   {tab === 'font' && (
-                    <span className="text-[11px] text-muted-foreground">字体不支持预览</span>
+                    <span className="text-[11px] text-muted-foreground">Fonts cannot be previewed</span>
                   )}
                   {tab === 'video' && (
                     <span className="text-[11px] text-muted-foreground">
@@ -365,7 +365,7 @@ export function AssetLibrary({
                   )}
                   {isReferenced(file, openPages, referencedAssets) && (
                     <span className="rounded-full border border-border bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      已引用
+                      In use
                     </span>
                   )}
                 </div>
@@ -376,7 +376,7 @@ export function AssetLibrary({
                     className="shrink-0"
                     disabled={!canReplace}
                     title={replaceTitle}
-                    aria-label={`替换选中图片 ${baseName(file)}`}
+                    aria-label={`Replace selected image ${baseName(file)}`}
                     onClick={() =>
                       onApply([
                         {
@@ -387,7 +387,7 @@ export function AssetLibrary({
                       ])
                     }
                   >
-                    替换选中图片
+                    Replace selected image
                   </Button>
                 )}
               </li>

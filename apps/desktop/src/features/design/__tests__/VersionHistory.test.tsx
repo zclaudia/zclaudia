@@ -88,11 +88,11 @@ describe('VersionHistory', () => {
     await waitFor(() =>
       expect(api.listDesignSnapshots).toHaveBeenCalledWith('remote-1', 's1', 'design/index.html')
     );
-    expect(await screen.findByText('保存')).toBeInTheDocument();
-    expect(screen.getByText('手动')).toBeInTheDocument();
+    expect(await screen.findByText('Saved')).toBeInTheDocument();
+    expect(screen.getByText('Manual')).toBeInTheDocument();
     expect(screen.getByText('首版')).toBeInTheDocument();
-    expect(screen.getByText('2 个文件 · 2.0 KB')).toBeInTheDocument();
-    expect(screen.getByText('2 个文件 · 4.0 KB')).toBeInTheDocument();
+    expect(screen.getByText('2 files · 2.0 KB')).toBeInTheDocument();
+    expect(screen.getByText('2 files · 4.0 KB')).toBeInTheDocument();
     expect(screen.getByText(formatTime(first.createdAt))).toBeInTheDocument();
     expect(screen.getByText(formatTime(second.createdAt))).toBeInTheDocument();
   });
@@ -102,20 +102,20 @@ describe('VersionHistory', () => {
       summary({ complete: false, incompleteReasons: ['design/logo.png: 超出大小限制'] }),
     ]);
     mount();
-    expect(await screen.findByText('不完整')).toBeInTheDocument();
+    expect(await screen.findByText('Incomplete')).toBeInTheDocument();
     expect(screen.queryByText(/design\/logo.png/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '不完整原因 ds-1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Incomplete reasons ds-1' }));
     expect(await screen.findByText('design/logo.png: 超出大小限制')).toBeInTheDocument();
   });
 
   it('captures a manual snapshot from the save button, with the label input', async () => {
     vi.mocked(api.listDesignSnapshots).mockResolvedValue([]);
     mount();
-    await screen.findByText(/暂无版本快照/);
-    fireEvent.change(screen.getByRole('textbox', { name: '版本备注' }), {
+    await screen.findByText(/No version snapshots yet/);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Version note' }), {
       target: { value: '手工备份' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '保存版本' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save version' }));
     await waitFor(() =>
       expect(api.createDesignSnapshot).toHaveBeenCalledWith('remote-1', {
         sessionId: 's1',
@@ -124,26 +124,26 @@ describe('VersionHistory', () => {
         label: '手工备份',
       })
     );
-    expect(await screen.findByRole('status')).toHaveTextContent('已创建版本快照');
+    expect(await screen.findByRole('status')).toHaveTextContent('Version snapshot created');
     await waitFor(() => expect(api.listDesignSnapshots).toHaveBeenCalledTimes(2));
   });
 
   it('disables manual capture while the draft is dirty', async () => {
     vi.mocked(api.listDesignSnapshots).mockResolvedValue([]);
     mount({ dirty: true });
-    await screen.findByText(/暂无版本快照/);
-    expect(screen.getByRole('button', { name: '保存版本' })).toBeDisabled();
+    await screen.findByText(/No version snapshots yet/);
+    expect(screen.getByRole('button', { name: 'Save version' })).toBeDisabled();
     expect(api.createDesignSnapshot).not.toHaveBeenCalled();
   });
 
   it('runs the restore confirmation flow with the file manifest', async () => {
     vi.mocked(api.listDesignSnapshots).mockResolvedValue([summary()]);
     const { restore, onRestored } = mount();
-    fireEvent.click(await screen.findByRole('button', { name: '恢复此版本' }));
-    expect(await screen.findByRole('dialog', { name: '恢复此版本' })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Restore this version' }));
+    expect(await screen.findByRole('dialog', { name: 'Restore this version' })).toBeInTheDocument();
     expect(await screen.findByText('design/style.css')).toBeInTheDocument();
-    expect(screen.getByText(/将写入 2 个文件/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '确认恢复' }));
+    expect(screen.getByText(/2 files will be written/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm restore' }));
     await waitFor(() =>
       expect(restore).toHaveBeenCalledWith(
         'ds-1',
@@ -155,8 +155,8 @@ describe('VersionHistory', () => {
       )
     );
     expect(onRestored).toHaveBeenCalledTimes(1);
-    expect(await screen.findByRole('status')).toHaveTextContent('已恢复到所选版本');
-    expect(screen.queryByRole('dialog', { name: '恢复此版本' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent('Restored to the selected version');
+    expect(screen.queryByRole('dialog', { name: 'Restore this version' })).not.toBeInTheDocument();
   });
 
   it('shows the conflict file list with reload guidance on RESTORE_CONFLICT', async () => {
@@ -168,17 +168,17 @@ describe('VersionHistory', () => {
         conflictFiles: [conflictFile('design/index.html', '内容已变化'), conflictFile('design/style.css')],
       }),
     });
-    fireEvent.click(await screen.findByRole('button', { name: '恢复此版本' }));
-    fireEvent.click(await screen.findByRole('button', { name: '确认恢复' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('恢复已取消');
+    fireEvent.click(await screen.findByRole('button', { name: 'Restore this version' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm restore' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('the restore was canceled');
     expect(screen.getByText('design/index.html')).toBeInTheDocument();
     expect(screen.getByText(/内容已变化/)).toBeInTheDocument();
     expect(screen.getByText('design/style.css')).toBeInTheDocument();
     expect(onRestored).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: '重新载入' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
     expect(onReload).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('dialog', { name: '恢复此版本' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Restore this version' })).not.toBeInTheDocument();
   });
 
   it('requires a second confirmation before restoring an incomplete snapshot', async () => {
@@ -187,16 +187,16 @@ describe('VersionHistory', () => {
       detail({ summary: { complete: false, incompleteReasons: ['design/bg.png: 超出大小限制'] } })
     );
     const { restore } = mount();
-    fireEvent.click(await screen.findByRole('button', { name: '恢复此版本' }));
-    const dialog = await screen.findByRole('dialog', { name: '恢复此版本' });
-    expect(dialog).toHaveTextContent('此快照不完整');
+    fireEvent.click(await screen.findByRole('button', { name: 'Restore this version' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Restore this version' });
+    expect(dialog).toHaveTextContent('This snapshot is incomplete');
     expect(dialog).toHaveTextContent('design/bg.png: 超出大小限制');
 
-    fireEvent.click(screen.getByRole('button', { name: '确认恢复' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm restore' }));
     expect(restore).not.toHaveBeenCalled();
-    expect(dialog).toHaveTextContent('仍要恢复请再次点击「仍要恢复」');
+    expect(dialog).toHaveTextContent('to restore anyway, click "Restore anyway" again');
 
-    fireEvent.click(screen.getByRole('button', { name: '仍要恢复' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore anyway' }));
     await waitFor(() =>
       expect(restore).toHaveBeenCalledWith(
         'ds-1',
@@ -210,7 +210,7 @@ describe('VersionHistory', () => {
     vi.mocked(api.listDesignSnapshots).mockResolvedValue([summary()]);
     vi.mocked(api.getDesignSnapshotDetail).mockRejectedValue(new Error('snapshot not found'));
     mount();
-    fireEvent.click(await screen.findByRole('button', { name: '恢复此版本' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Restore this version' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('snapshot not found');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

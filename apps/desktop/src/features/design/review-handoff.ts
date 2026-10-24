@@ -39,20 +39,20 @@ function formatTime(ts: number): string {
 
 /** 失效原因中文短语（match.reason 理论上恒有，兜底防 undefined）。 */
 function reasonText(reason: string | undefined): string {
-  return (reason && LOCATOR_REASON_TEXT[reason as keyof typeof LOCATOR_REASON_TEXT]) || '未知原因';
+  return (reason && LOCATOR_REASON_TEXT[reason as keyof typeof LOCATOR_REASON_TEXT]) || 'Unknown reason';
 }
 
 /** 「快照中的目标元素」段：快照源码 / 整页评论 / 命中切片 / 罕见失效如实写原因。 */
 function snapshotTargetBody(comment: DesignShareComment, snapshotSource: string | null): string {
-  if (snapshotSource === null) return '快照源码不可用。';
-  if (comment.target === null) return '整页评论（未定位到具体元素）。';
+  if (snapshotSource === null) return 'Snapshot source unavailable.';
+  if (comment.target === null) return 'Whole-page comment (not anchored to a specific element).';
   const match = matchCommentTarget(snapshotSource, comment.target);
   if (!match.matched) {
-    return `未能在快照源码中定位目标元素（${reasonText(match.reason)}）。`;
+    return `Could not locate the target element in the snapshot source (${reasonText(match.reason)}).`;
   }
-  const lines = [`- 元素：<${comment.target.tagName}>`];
-  if (match.text !== undefined) lines.push(`- 折叠文本：${match.text}`);
-  if (match.snippet !== undefined) lines.push('- 快照源码片段：', match.snippet);
+  const lines = [`- Element: <${comment.target.tagName}>`];
+  if (match.text !== undefined) lines.push(`- Collapsed text: ${match.text}`);
+  if (match.snippet !== undefined) lines.push('- Snapshot source snippet:', match.snippet);
   return lines.join('\n');
 }
 
@@ -62,21 +62,21 @@ function currentTargetBody(
   currentSource: string | null,
   currentDocPath: string | null
 ): string {
-  if (currentSource === null) return '当前源码不可用。';
-  const path = currentDocPath ?? '（未知路径）';
+  if (currentSource === null) return 'Current source unavailable.';
+  const path = currentDocPath ?? '(unknown path)';
   if (comment.target === null) {
-    return [`- 页面：${path}`, '整页评论（未定位到具体元素）。'].join('\n');
+    return [`- Page: ${path}`, 'Whole-page comment (not anchored to a specific element).'].join('\n');
   }
   const match = matchCommentTarget(currentSource, comment.target);
   if (!match.matched) {
     return (
-      `元素定位已失效（${reasonText(match.reason)}）。` +
-      '请依据评论描述与分享版本对比自行定位目标元素，修改前在回复中说明你定位到的元素。'
+      `The element anchor is no longer valid (${reasonText(match.reason)}). ` +
+      'Locate the target element yourself using the comment description and the shared version, and state which element you located in your reply before making changes.'
     );
   }
-  const lines = [`- 页面：${path}`, `- 元素：<${comment.target.tagName}>`];
-  if (match.text !== undefined) lines.push(`- 折叠文本：${match.text}`);
-  if (match.snippet !== undefined) lines.push('- 当前源码片段：', match.snippet);
+  const lines = [`- Page: ${path}`, `- Element: <${comment.target.tagName}>`];
+  if (match.text !== undefined) lines.push(`- Collapsed text: ${match.text}`);
+  if (match.snippet !== undefined) lines.push('- Current source snippet:', match.snippet);
   return lines.join('\n');
 }
 
@@ -92,28 +92,28 @@ export function buildReviewHandoff(input: ReviewHandoffInput): {
   const { comment, snapshot, snapshotSource, currentSource, currentDocPath } = input;
   const candidate: ReviewHandoffSection[] = [
     {
-      title: '审阅反馈',
+      title: 'Review feedback',
       body: [
-        `- 作者：${comment.author}`,
-        `- 时间：${formatTime(comment.createdAt)}`,
-        '- 评论原文：',
+        `- Author: ${comment.author}`,
+        `- Time: ${formatTime(comment.createdAt)}`,
+        '- Comment:',
         truncateText(comment.body, COMMENT_BODY_LIMIT),
       ].join('\n'),
     },
     {
-      title: '分享版本',
+      title: 'Shared version',
       body: [
-        `- 标签：${snapshot.label ?? '无标签'}`,
-        `- 快照时间：${formatTime(snapshot.createdAt)}`,
-        `- 入口文件：${snapshot.entryPath}`,
-        '- 旧分享仍显示此版本，不会因本次修改变化。',
+        `- Label: ${snapshot.label ?? 'No label'}`,
+        `- Snapshot time: ${formatTime(snapshot.createdAt)}`,
+        `- Entry file: ${snapshot.entryPath}`,
+        '- Existing shares still show this version; they will not change with this edit.',
       ].join('\n'),
     },
-    { title: '快照中的目标元素', body: snapshotTargetBody(comment, snapshotSource) },
-    { title: '当前版本定位', body: currentTargetBody(comment, currentSource, currentDocPath) },
+    { title: 'Target element in the snapshot', body: snapshotTargetBody(comment, snapshotSource) },
+    { title: 'Location in the current version', body: currentTargetBody(comment, currentSource, currentDocPath) },
     {
-      title: '任务指令',
-      body: `请根据以上审阅反馈修改当前页面 ${currentDocPath ?? '（未知路径）'}。保持与反馈无关的内容不变。`,
+      title: 'Instruction',
+      body: `Please update the current page ${currentDocPath ?? '(unknown path)'} based on the review feedback above. Keep everything unrelated to the feedback unchanged.`,
     },
   ];
 

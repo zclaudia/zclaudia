@@ -206,7 +206,7 @@ function encoderProcessFromChild(
     settle({
       code: null,
       stdout: Buffer.alloc(0),
-      stderrTail: `spawn 失败：${err.message}`,
+      stderrTail: `spawn failed: ${err.message}`,
     });
   });
   child.once('close', code => finish(code ?? null));
@@ -371,7 +371,7 @@ function defaultLaunchBrowser(): Promise<RenderBrowser> {
     if (!chromePath) {
       throw new MediaTaskRunError(
         'RUNTIME_MISSING',
-        '未找到可用的 Chrome/Chromium。请在设置中安装浏览器引擎，或设置 ZCLAUDIA_CHROME_PATH 指向已有的 Chrome 可执行文件后重试。'
+        'No usable Chrome/Chromium found. Install a browser engine in Settings, or set ZCLAUDIA_CHROME_PATH to an existing Chrome executable and retry.'
       );
     }
     const puppeteer = (await import('puppeteer-core')).default;
@@ -412,7 +412,7 @@ export function assertOutputWithinLimit(
   if (bytes.length > limit) {
     throw new MediaTaskRunError(
       'ENCODE_FAILED',
-      `输出超过大小上限（${limit} 字节），已终止编码。`
+      `Output exceeded the size limit (${limit} bytes); encoding was terminated.`
     );
   }
 }
@@ -420,7 +420,7 @@ export function assertOutputWithinLimit(
 function assertVideoParams(execution: MediaTaskExecution): DesignMediaTaskParamsVideoRender {
   const params = execution.params;
   if (params.type !== 'video-render') {
-    throw new MediaTaskRunError('INTERNAL', '任务参数与 video-render 执行器不匹配');
+    throw new MediaTaskRunError('INTERNAL', 'Task parameters do not match the video-render executor');
   }
   const evenDimensions =
     Number.isInteger(params.width) &&
@@ -434,7 +434,7 @@ function assertVideoParams(execution: MediaTaskExecution): DesignMediaTaskParams
   if (!evenDimensions) {
     throw new MediaTaskRunError(
       'RENDER_FAILED',
-      `视频参数不合法：宽高须为 ${MEDIA_VIDEO_MIN_WIDTH}..${MEDIA_VIDEO_MAX_WIDTH} 的偶数（当前 ${params.width}x${params.height}）。`
+      `Invalid video parameters: width and height must be even numbers between ${MEDIA_VIDEO_MIN_WIDTH} and ${MEDIA_VIDEO_MAX_WIDTH} (got ${params.width}x${params.height}).`
     );
   }
   if (
@@ -444,7 +444,7 @@ function assertVideoParams(execution: MediaTaskExecution): DesignMediaTaskParams
   ) {
     throw new MediaTaskRunError(
       'RENDER_FAILED',
-      `视频参数不合法：帧率须为 ${MEDIA_VIDEO_MIN_FPS}..${MEDIA_VIDEO_MAX_FPS}（当前 ${params.fps}）。`
+      `Invalid video parameters: frame rate must be between ${MEDIA_VIDEO_MIN_FPS} and ${MEDIA_VIDEO_MAX_FPS} (got ${params.fps}).`
     );
   }
   if (
@@ -454,11 +454,11 @@ function assertVideoParams(execution: MediaTaskExecution): DesignMediaTaskParams
   ) {
     throw new MediaTaskRunError(
       'RENDER_FAILED',
-      `视频参数不合法：时长须为 ${MEDIA_VIDEO_MIN_DURATION_MS}..${MEDIA_VIDEO_MAX_DURATION_MS} 毫秒（当前 ${params.durationMs}）。`
+      `Invalid video parameters: duration must be between ${MEDIA_VIDEO_MIN_DURATION_MS} and ${MEDIA_VIDEO_MAX_DURATION_MS} ms (got ${params.durationMs}).`
     );
   }
   if (typeof params.entryPath !== 'string' || params.entryPath.trim().length === 0) {
-    throw new MediaTaskRunError('RENDER_FAILED', '视频参数不合法：缺少入口文件路径。');
+    throw new MediaTaskRunError('RENDER_FAILED', 'Invalid video parameters: missing entry file path.');
   }
   return params;
 }
@@ -466,12 +466,12 @@ function assertVideoParams(execution: MediaTaskExecution): DesignMediaTaskParams
 function wrapRuntimeError(err: unknown, prefix: string): MediaTaskRunError {
   if (err instanceof MediaTaskRunError) return err;
   const message = err instanceof Error ? err.message : String(err);
-  return new MediaTaskRunError('RENDER_FAILED', `${prefix}：${message}`);
+  return new MediaTaskRunError('RENDER_FAILED', `${prefix}: ${message}`);
 }
 
 function summarizeStderr(stderrTail: string): string {
   const condensed = stderrTail.replace(/\s+/g, ' ').trim();
-  if (condensed.length === 0) return '（无 stderr 输出）';
+  if (condensed.length === 0) return ' (no stderr output)';
   return condensed.length > 200 ? `${condensed.slice(0, 200)}…` : condensed;
 }
 
@@ -517,7 +517,7 @@ export function createVideoRenderExecutor(deps: VideoRenderDeps): MediaTaskExecu
     };
 
     const ensureNotAborted = (): void => {
-      if (ctx.signal.aborted) throw new MediaTaskRunError('ABORTED', '已取消');
+      if (ctx.signal.aborted) throw new MediaTaskRunError('ABORTED', 'Canceled');
     };
 
     // 帧回调：按目标帧率开时隙（密帧丢弃到槽率），串行写入链（背压安全）。
@@ -569,13 +569,13 @@ export function createVideoRenderExecutor(deps: VideoRenderDeps): MediaTaskExecu
       } catch {
         throw new MediaTaskRunError(
           'ENTRY_UNREADABLE',
-          `视频入口不存在或不可读：${params.entryPath}`
+          `Video entry does not exist or is not readable: ${params.entryPath}`
         );
       }
       if (!entryStat.isFile()) {
         throw new MediaTaskRunError(
           'ENTRY_UNREADABLE',
-          `视频入口不是常规文件：${params.entryPath}`
+          `Video entry is not a regular file: ${params.entryPath}`
         );
       }
       ensureNotAborted();
@@ -584,7 +584,7 @@ export function createVideoRenderExecutor(deps: VideoRenderDeps): MediaTaskExecu
       if (!ffmpegPath) {
         throw new MediaTaskRunError(
           'RUNTIME_MISSING',
-          '未找到 ffmpeg。请安装 ffmpeg（如 brew install ffmpeg）或设置 FFMPEG_PATH 后重试。'
+          'ffmpeg not found. Install ffmpeg (e.g. brew install ffmpeg) or set FFMPEG_PATH, then retry.'
         );
       }
       ensureNotAborted();
@@ -595,7 +595,7 @@ export function createVideoRenderExecutor(deps: VideoRenderDeps): MediaTaskExecu
       try {
         browser = await deps.launchBrowser();
       } catch (err) {
-        throw wrapRuntimeError(err, '浏览器启动失败');
+        throw wrapRuntimeError(err, 'Failed to launch the browser');
       }
       ensureNotAborted();
 
@@ -603,7 +603,7 @@ export function createVideoRenderExecutor(deps: VideoRenderDeps): MediaTaskExecu
       try {
         page = await browser.openPage(pageUrl, { width: params.width, height: params.height });
       } catch (err) {
-        throw wrapRuntimeError(err, '页面加载失败');
+        throw wrapRuntimeError(err, 'Failed to load the page');
       }
       ensureNotAborted();
 
@@ -623,7 +623,7 @@ export function createVideoRenderExecutor(deps: VideoRenderDeps): MediaTaskExecu
 
       await closeQuietly(() => page!.stopScreencast());
       if (written === 0) {
-        throw new MediaTaskRunError('RENDER_FAILED', '页面没有产生任何画面帧');
+        throw new MediaTaskRunError('RENDER_FAILED', 'The page produced no video frames');
       }
       // 稀疏补齐：不足目标帧数时以尾帧填充剩余时隙（时长 = 请求值）。
       while (!targetReached && written < targetFrames && lastFrame) {
@@ -645,11 +645,11 @@ export function createVideoRenderExecutor(deps: VideoRenderDeps): MediaTaskExecu
       if (encoded.code !== 0) {
         throw new MediaTaskRunError(
           'ENCODE_FAILED',
-          `ffmpeg 编码失败（退出码 ${encoded.code}）：${summarizeStderr(encoded.stderrTail)}`
+          `ffmpeg encoding failed (exit code ${encoded.code}): ${summarizeStderr(encoded.stderrTail)}`
         );
       }
       if (encoded.stdout.length === 0) {
-        throw new MediaTaskRunError('ENCODE_FAILED', 'ffmpeg 未产生任何输出数据');
+        throw new MediaTaskRunError('ENCODE_FAILED', 'ffmpeg produced no output data');
       }
 
       await report({ phase: 'saving' });
@@ -659,13 +659,13 @@ export function createVideoRenderExecutor(deps: VideoRenderDeps): MediaTaskExecu
       } catch (err) {
         if (err instanceof MediaTaskRunError) throw err;
         const message = err instanceof Error ? err.message : String(err);
-        throw new MediaTaskRunError('ASSET_WRITE_FAILED', `视频产物写入失败：${message}`);
+        throw new MediaTaskRunError('ASSET_WRITE_FAILED', `Failed to write the video artifact: ${message}`);
       }
       return { path: saved.path, bytes: saved.bytes, mime: 'video/mp4', usage: null };
     } catch (err) {
       await cleanup();
       if (err instanceof MediaTaskRunError && err.code === 'ABORTED') throw err;
-      if (ctx.signal.aborted) throw new MediaTaskRunError('ABORTED', '已取消');
+      if (ctx.signal.aborted) throw new MediaTaskRunError('ABORTED', 'Canceled');
       throw err;
     }
   };

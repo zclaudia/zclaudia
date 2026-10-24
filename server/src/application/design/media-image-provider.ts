@@ -75,10 +75,10 @@ function toProviderError(
   timedOut: boolean,
   action: string
 ): MediaProviderError {
-  if (external.aborted) return new MediaProviderError('provider-aborted', '请求已取消');
-  if (timedOut) return new MediaProviderError('provider-timeout', `${action}超时`);
+  if (external.aborted) return new MediaProviderError('provider-aborted', 'Request canceled');
+  if (timedOut) return new MediaProviderError('provider-timeout', `${action} timed out`);
   const message = err instanceof Error ? err.message : String(err);
-  return new MediaProviderError('provider-error', `${action}失败：${message}`);
+  return new MediaProviderError('provider-error', `${action} failed: ${message}`);
 }
 
 function normalizeUsage(raw: unknown): DesignMediaUsage | null {
@@ -126,7 +126,7 @@ function detectImageMime(bytes: Buffer): 'image/png' | 'image/jpeg' | 'image/web
 function finishImage(bytes: Buffer, usage: DesignMediaUsage | null): MediaImageResult {
   const mime = detectImageMime(bytes);
   if (!mime) {
-    throw new MediaProviderError('provider-error', '服务返回了无法识别的图片格式');
+    throw new MediaProviderError('provider-error', 'The service returned an unrecognized image format');
   }
   return { bytes, mime, usage };
 }
@@ -135,9 +135,9 @@ function finishImage(bytes: Buffer, usage: DesignMediaUsage | null): MediaImageR
 function assertPublicHost(hostname: string): void {
   const host = hostname.toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
   const deny = (reason: string) => {
-    throw new MediaProviderError('provider-error', `图片下载地址不允许${reason}（${hostname}）`);
+    throw new MediaProviderError('provider-error', `Image download URL is not allowed: ${reason} (${hostname})`);
   };
-  if (host === 'localhost' || host.endsWith('.local')) deny('指向内网主机');
+  if (host === 'localhost' || host.endsWith('.local')) deny('points to an internal network host');
   const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
   if (ipv4) {
     const first = Number(ipv4[1]);
@@ -149,17 +149,17 @@ function assertPublicHost(hostname: string): void {
       (first === 192 && second === 168) ||
       (first === 169 && second === 254) ||
       (first === 172 && second >= 16 && second <= 31);
-    if (private4) deny('指向私网地址');
+    if (private4) deny('points to a private network address');
     return;
   }
-  if (host === '::1' || host === '0:0:0:0:0:0:0:1') deny('指向回环地址');
+  if (host === '::1' || host === '0:0:0:0:0:0:0:1') deny('points to a loopback address');
 }
 
 /** 读取响应体，超过 maxBytes 立即中止并报错。 */
 async function readBoundedBody(res: Response, maxBytes: number): Promise<Buffer> {
   const reader = res.body?.getReader();
   if (!reader) {
-    throw new MediaProviderError('provider-error', '下载响应没有可读内容');
+    throw new MediaProviderError('provider-error', 'The download response has no readable content');
   }
   const chunks: Buffer[] = [];
   let total = 0;
@@ -172,7 +172,7 @@ async function readBoundedBody(res: Response, maxBytes: number): Promise<Buffer>
       await reader.cancel().catch(() => undefined);
       throw new MediaProviderError(
         'provider-error',
-        `下载的图片超过 ${Math.floor(maxBytes / 1024 / 1024)} MiB 上限`
+        `The downloaded image exceeds the ${Math.floor(maxBytes / 1024 / 1024)} MiB limit`
       );
     }
     chunks.push(Buffer.from(value));
@@ -192,10 +192,10 @@ async function downloadImage(url: string, ctx: ParseContext): Promise<Buffer> {
   try {
     parsed = new URL(url);
   } catch {
-    throw new MediaProviderError('provider-error', '图片下载地址无效');
+    throw new MediaProviderError('provider-error', 'Invalid image download URL');
   }
   if (parsed.protocol !== 'https:') {
-    throw new MediaProviderError('provider-error', '图片下载地址必须为 https');
+    throw new MediaProviderError('provider-error', 'The image download URL must be https');
   }
   assertPublicHost(parsed.hostname);
   const composed = composeSignal(ctx.externalSignal, DOWNLOAD_TIMEOUT_MS);
@@ -204,19 +204,19 @@ async function downloadImage(url: string, ctx: ParseContext): Promise<Buffer> {
     if (!res.ok) {
       throw new MediaProviderError(
         'provider-error',
-        `下载图片失败：服务返回 ${res.status}`,
+        `Failed to download the image: service returned ${res.status}`,
         res.status
       );
     }
     return await readBoundedBody(res, DOWNLOAD_MAX_BYTES);
   } catch (err) {
     if (ctx.externalSignal.aborted) {
-      throw new MediaProviderError('provider-aborted', '请求已取消');
+      throw new MediaProviderError('provider-aborted', 'Request canceled');
     }
     if (err instanceof MediaProviderError) throw err;
     // 用下载自身的超时标志：60s 下载超时应映射 provider-timeout，而非
     // 携带原生 AbortError 消息的 provider-error（外部中止已在上方优先收口）。
-    throw toProviderError(err, ctx.externalSignal, composed.timedOut, '下载图片');
+    throw toProviderError(err, ctx.externalSignal, composed.timedOut, 'downloading the image');
   } finally {
     composed.cleanup();
   }
@@ -226,11 +226,11 @@ async function parseImageResponse(res: Response, ctx: ParseContext): Promise<Med
   if (!res.ok) {
     const snippet = (await res.text().catch(() => '')).slice(0, ERROR_BODY_SNIPPET_CHARS);
     if (ctx.editEndpoint && (res.status === 404 || res.status === 405)) {
-      throw new MediaProviderError('provider-unsupported', '当前服务不支持图片编辑', res.status);
+      throw new MediaProviderError('provider-unsupported', 'The current service does not support image editing', res.status);
     }
     throw new MediaProviderError(
       'provider-error',
-      `图片服务返回 ${res.status}${snippet ? `：${snippet}` : ''}`,
+      `The image service returned ${res.status}${snippet ? `: ${snippet}` : ''}`,
       res.status
     );
   }
@@ -238,7 +238,7 @@ async function parseImageResponse(res: Response, ctx: ParseContext): Promise<Med
   try {
     payload = await res.json();
   } catch (err) {
-    throw toProviderError(err, ctx.externalSignal, ctx.timedOut(), '解析图片服务响应');
+    throw toProviderError(err, ctx.externalSignal, ctx.timedOut(), 'parsing the image service response');
   }
   const record = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
   const data = Array.isArray(record.data) ? record.data : [];
@@ -250,7 +250,7 @@ async function parseImageResponse(res: Response, ctx: ParseContext): Promise<Med
   if (!row) {
     throw new MediaProviderError(
       'provider-error',
-      '服务响应缺少图片数据（data[0]）',
+      'Service response is missing image data (data[0])',
       res.status
     );
   }
@@ -262,7 +262,7 @@ async function parseImageResponse(res: Response, ctx: ParseContext): Promise<Med
   }
   throw new MediaProviderError(
     'provider-error',
-    '服务响应未包含图片数据（b64_json/url 均缺失）',
+    'Service response contains no image data (both b64_json and url are missing)',
     res.status
   );
 }
@@ -277,13 +277,13 @@ export function createOpenAiImagesProvider(config: OpenAiImagesProviderConfig): 
   const provider: MediaImageProvider = {
     info: {
       id: 'openai-images',
-      label: 'OpenAI 兼容图片服务',
+      label: 'OpenAI-compatible image service',
       capabilities: ['generate', 'edit'],
     },
 
     async generate(input) {
       if (input.signal.aborted) {
-        throw new MediaProviderError('provider-aborted', '请求已取消');
+        throw new MediaProviderError('provider-aborted', 'Request canceled');
       }
       const composed = composeSignal(input.signal, timeoutMs);
       try {
@@ -307,7 +307,7 @@ export function createOpenAiImagesProvider(config: OpenAiImagesProviderConfig): 
         });
       } catch (err) {
         if (err instanceof MediaProviderError) throw err;
-        throw toProviderError(err, input.signal, composed.timedOut, '请求图片服务');
+        throw toProviderError(err, input.signal, composed.timedOut, 'requesting the image service');
       } finally {
         composed.cleanup();
       }
@@ -315,7 +315,7 @@ export function createOpenAiImagesProvider(config: OpenAiImagesProviderConfig): 
 
     async edit(input) {
       if (input.signal.aborted) {
-        throw new MediaProviderError('provider-aborted', '请求已取消');
+        throw new MediaProviderError('provider-aborted', 'Request canceled');
       }
       const composed = composeSignal(input.signal, timeoutMs);
       try {
@@ -347,7 +347,7 @@ export function createOpenAiImagesProvider(config: OpenAiImagesProviderConfig): 
         });
       } catch (err) {
         if (err instanceof MediaProviderError) throw err;
-        throw toProviderError(err, input.signal, composed.timedOut, '请求图片服务');
+        throw toProviderError(err, input.signal, composed.timedOut, 'requesting the image service');
       } finally {
         composed.cleanup();
       }

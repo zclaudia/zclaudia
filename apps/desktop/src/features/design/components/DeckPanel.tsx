@@ -28,11 +28,11 @@ const DISPLAY_W = 160;
 const THUMB_SCALE = DISPLAY_W / FRAME_W;
 const DISPLAY_H = Math.round(FRAME_H * THUMB_SCALE);
 
-const SIBLINGS_HINT = '幻灯片不在同一父级，无法排序';
-const FIRST_HINT = '已是第一页';
-const LAST_HINT = '已是最后一页';
-const LIMIT_HINT = '已达 60 页上限';
-const COMMIT_FAILED = '提交未生效：页面忙碌或内容未变化。';
+const SIBLINGS_HINT = 'Slides are not under the same parent and cannot be reordered';
+const FIRST_HINT = 'Already the first page';
+const LAST_HINT = 'Already the last page';
+const LIMIT_HINT = 'Reached the 60-page limit';
+const COMMIT_FAILED = 'The change did not take effect: the page is busy or the content did not change.';
 
 export interface DeckPanelProps {
   open: boolean;
@@ -121,9 +121,9 @@ export function DeckPanel({
     const n = slide.index + 1;
     const upDisabled = busy || !siblings || slide.index === 0;
     const downDisabled = busy || !siblings || slide.index === slides.length - 1;
-    const upTitle = !siblings ? SIBLINGS_HINT : slide.index === 0 ? FIRST_HINT : `上移第 ${n} 页`;
+    const upTitle = !siblings ? SIBLINGS_HINT : slide.index === 0 ? FIRST_HINT : `Move page ${n} up`;
     const downTitle =
-      !siblings ? SIBLINGS_HINT : slide.index === slides.length - 1 ? LAST_HINT : `下移第 ${n} 页`;
+      !siblings ? SIBLINGS_HINT : slide.index === slides.length - 1 ? LAST_HINT : `Move page ${n} down`;
     let thumb: string | null = null;
     if (previewHtml) {
       try {
@@ -140,7 +140,7 @@ export function DeckPanel({
         >
           {thumb ? (
             <iframe
-              title={`第 ${n} 页缩略图`}
+              title={`Thumbnail of page ${n}`}
               sandbox="allow-scripts"
               srcDoc={thumb}
               aria-hidden
@@ -158,20 +158,20 @@ export function DeckPanel({
               data-testid={`deck-thumb-placeholder-${slide.index}`}
               className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground"
             >
-              预览构建中…
+              Building preview…
             </div>
           )}
         </div>
         <div className="flex items-center gap-1">
           <span className="text-[11px] text-muted-foreground">{n}</span>
           <Input
-            aria-label={`第 ${n} 页标题`}
+            aria-label={`Title of page ${n}`}
             value={slide.title}
             disabled={busy}
             onChange={event =>
               void run(
                 base => updateDeckSlideTitle(base, slide.index, event.target.value),
-                `修改第 ${n} 页标题`
+                `Edit title of page ${n}`
               )
             }
             className="h-6 flex-1 px-1.5 py-0 text-[11px]"
@@ -180,58 +180,58 @@ export function DeckPanel({
         <div className="flex items-center gap-1">
           <Button
             size="sm"
-            aria-label={`上移第 ${n} 页`}
+            aria-label={`Move page ${n} up`}
             title={upTitle}
             disabled={upDisabled}
             onClick={() =>
-              void run(base => reorderDeckSlides(base, slide.index, slide.index - 1), `上移第 ${n} 页`)
+              void run(base => reorderDeckSlides(base, slide.index, slide.index - 1), `Move page ${n} up`)
             }
           >
-            上移
+            Move up
           </Button>
           <Button
             size="sm"
-            aria-label={`下移第 ${n} 页`}
+            aria-label={`Move page ${n} down`}
             title={downTitle}
             disabled={downDisabled}
             onClick={() =>
-              void run(base => reorderDeckSlides(base, slide.index, slide.index + 1), `下移第 ${n} 页`)
+              void run(base => reorderDeckSlides(base, slide.index, slide.index + 1), `Move page ${n} down`)
             }
           >
-            下移
+            Move down
           </Button>
           <Button
             size="sm"
-            aria-label={`删除第 ${n} 页`}
-            title={`删除第 ${n} 页`}
+            aria-label={`Delete page ${n}`}
+            title={`Delete page ${n}`}
             disabled={busy}
             onClick={() => setPendingDelete(slide.index)}
           >
-            删除
+            Delete
           </Button>
           <Button
             size="sm"
-            aria-label={`演示第 ${n} 页`}
-            title={`从第 ${n} 页开始演示`}
+            aria-label={`Present page ${n}`}
+            title={`Present from page ${n}`}
             disabled={busy}
             onClick={() => onPresent(slide.index)}
           >
-            演示
+            Present
           </Button>
           <Button
             size="sm"
-            aria-label={`第 ${n} 页备注`}
-            title="演讲者备注"
+            aria-label={`Notes of page ${n}`}
+            title="Speaker notes"
             disabled={busy}
             onClick={() => toggleNotes(slide)}
           >
-            {expanded === slide.index ? '收起' : '备注'}
+            {expanded === slide.index ? 'Collapse' : 'Notes'}
           </Button>
         </div>
         {expanded === slide.index && (
           <div className="flex flex-col gap-1">
             <textarea
-              aria-label={`第 ${n} 页备注内容`}
+              aria-label={`Notes content of page ${n}`}
               value={notesDraft}
               rows={3}
               disabled={busy}
@@ -249,16 +249,16 @@ export function DeckPanel({
               <Button
                 size="sm"
                 variant="primary"
-                aria-label={`保存第 ${n} 页备注`}
+                aria-label={`Save notes of page ${n}`}
                 disabled={busy || notesDraft.length > MAX_NOTES_LENGTH}
                 onClick={() =>
                   void run(
                     base => updateDeckSlideNotes(base, slide.index, notesDraft),
-                    `修改第 ${n} 页备注`
+                    `Edit notes of page ${n}`
                   )
                 }
               >
-                保存
+                Save
               </Button>
             </div>
           </div>
@@ -273,30 +273,30 @@ export function DeckPanel({
       <Modal
         open
         onClose={() => setPendingDelete(null)}
-        ariaLabel="删除幻灯片"
-        title="删除幻灯片"
+        ariaLabel="Delete slide"
+        title="Delete slide"
         size="md"
         footer={
           <div className="flex justify-end gap-2">
             <Button size="sm" onClick={() => setPendingDelete(null)}>
-              取消
+              Cancel
             </Button>
             <Button
               size="sm"
               variant="primary"
-              aria-label={`确认删除第 ${n} 页`}
+              aria-label={`Confirm deleting page ${n}`}
               onClick={() => {
                 setPendingDelete(null);
-                void run(base => deleteDeckSlide(base, index), `删除第 ${n} 页`);
+                void run(base => deleteDeckSlide(base, index), `Delete page ${n}`);
               }}
             >
-              确认删除
+              Confirm delete
             </Button>
           </div>
         }
       >
         <div className="p-4 text-xs text-muted-foreground">
-          确认删除第 {n} 页？删除后可通过撤销恢复。
+          Delete page {n}? It can be restored via undo.
         </div>
       </Modal>
     );
@@ -306,31 +306,31 @@ export function DeckPanel({
     <Modal
       open
       onClose={onClose}
-      ariaLabel="幻灯片"
-      title="幻灯片"
+      ariaLabel="Slides"
+      title="Slides"
       size="2xl"
       footer={
         <div className="flex items-center gap-2">
           <Button
             size="sm"
-            aria-label="新增页"
-            title={slides.length >= MAX_SLIDES ? LIMIT_HINT : '在末尾追加一页'}
+            aria-label="Add page"
+            title={slides.length >= MAX_SLIDES ? LIMIT_HINT : 'Append a page at the end'}
             disabled={busy || slides.length >= MAX_SLIDES}
-            onClick={() => void run(base => addDeckSlide(base).source, '新增幻灯片')}
+            onClick={() => void run(base => addDeckSlide(base).source, 'Add slide')}
           >
-            新增页
+            Add page
           </Button>
           <Select
             value={ratio}
             onChange={next =>
-              void run(base => setDeckRatio(base, next), `设置幻灯片比例 ${next}`)
+              void run(base => setDeckRatio(base, next), `Set slide aspect ratio to ${next}`)
             }
             options={[
               { value: '16:9', label: '16:9' },
               { value: '4:3', label: '4:3' },
             ]}
-            ariaLabel="幻灯片比例"
-            title="幻灯片比例"
+            ariaLabel="Slide aspect ratio"
+            title="Slide aspect ratio"
             disabled={busy}
             size="sm"
             className="w-24 shrink-0"
@@ -348,7 +348,7 @@ export function DeckPanel({
           </div>
         )}
         {slides.length === 0 ? (
-          <p className="text-muted-foreground">此页面没有幻灯片标记；「新增页」将写入第一页。</p>
+          <p className="text-muted-foreground">This page has no slide markers; "Add page" will write the first slide.</p>
         ) : (
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(168px,1fr))] gap-2">
             {slides.map(renderCard)}

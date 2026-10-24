@@ -278,7 +278,7 @@ describe('createVideoRenderExecutor', () => {
       const world = makeWorld();
       const { ctx } = makeCtx(root);
       await expect(createVideoRenderExecutor(world.deps)(makeExecution(override), ctx)).rejects.toThrow(
-        /视频参数不合法/
+        /Invalid video parameters/
       );
       expect(world.spawnArgSets).toEqual([]);
       expect(world.launchCount()).toBe(0);
@@ -432,7 +432,7 @@ describe('createVideoRenderExecutor', () => {
       (e: unknown) => e
     );
     expect(errorCode(err)).toBe('RENDER_FAILED');
-    expect((err as MediaTaskRunError).message).toContain('页面没有产生任何画面帧');
+    expect((err as MediaTaskRunError).message).toContain('no video frames');
     // 零帧也要收尾：killTree 被调（cleanup 路径），产物不落库。
     expect(world.killedPids).toEqual([4242]);
     expect(world.saved).toHaveLength(0);
@@ -454,7 +454,7 @@ describe('createVideoRenderExecutor', () => {
       (e: unknown) => e
     );
     expect(errorCode(err)).toBe('ENCODE_FAILED');
-    expect((err as MediaTaskRunError).message).toContain('退出码 1');
+    expect((err as MediaTaskRunError).message).toContain('exit code 1');
     expect((err as MediaTaskRunError).message).toContain('Unknown encoder libx264');
     expect(world.saved).toHaveLength(0);
   });
@@ -469,7 +469,7 @@ describe('createVideoRenderExecutor', () => {
       (e: unknown) => e
     );
     expect(errorCode(err)).toBe('ENCODE_FAILED');
-    expect((err as MediaTaskRunError).message).toContain('未产生任何输出');
+    expect((err as MediaTaskRunError).message).toContain('no output data');
     expect(world.saved).toHaveLength(0);
   });
 
@@ -485,16 +485,16 @@ describe('createVideoRenderExecutor', () => {
       (e: unknown) => e
     );
     expect(errorCode(err)).toBe('ENCODE_FAILED');
-    expect((err as MediaTaskRunError).message).toContain('输出超过大小上限');
+    expect((err as MediaTaskRunError).message).toContain('Output exceeded the size limit');
     expect(world.saved).toHaveLength(0);
   });
 
   it('assertOutputWithinLimit is the reusable limit gate', () => {
-    expect(() => assertOutputWithinLimit(Buffer.alloc(4), 2)).toThrow(/输出超过大小上限/);
+    expect(() => assertOutputWithinLimit(Buffer.alloc(4), 2)).toThrow(/Output exceeded the size limit/);
     expect(() => assertOutputWithinLimit(Buffer.alloc(2), 2)).not.toThrow();
     expect(() =>
       assertOutputWithinLimit(Buffer.alloc(MEDIA_GENERATED_VIDEO_MAX_BYTES + 1))
-    ).toThrow(/输出超过大小上限/);
+    ).toThrow(/Output exceeded the size limit/);
     expect(() => assertOutputWithinLimit(FAKE_MP4)).not.toThrow();
   });
 
@@ -509,7 +509,7 @@ describe('createVideoRenderExecutor', () => {
     controller.abort();
     const err = await running.catch((e: unknown) => e);
     expect(errorCode(err)).toBe('ABORTED');
-    expect((err as MediaTaskRunError).message).toBe('已取消');
+    expect((err as MediaTaskRunError).message).toBe('Canceled');
     expect(world.killedPids).toEqual([4242]);
     expect(world.page.stopCount).toBeGreaterThanOrEqual(1);
     expect(world.browser.closeCount).toBeGreaterThanOrEqual(1);

@@ -326,7 +326,7 @@ describe('DesignWorkspaceController', () => {
     await c.undo();
     expect(h.gets.length).toBe(getsBefore + 1);
     expect(pageOf(c, 'p1.html')).toMatchObject({
-      error: '编辑历史已失效，已重新载入',
+      error: 'Edit history is stale; the file was reloaded',
       source: pageSource('A'),
       status: 'clean',
       canUndo: false,

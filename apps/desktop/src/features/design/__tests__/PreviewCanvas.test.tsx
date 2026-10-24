@@ -18,7 +18,7 @@ describe('PreviewCanvas', () => {
         zoom={{ mode: 'manual', value: 0.5 }}
       />
     );
-    const frame = screen.getByTitle('设计预览') as HTMLIFrameElement;
+    const frame = screen.getByTitle('Design preview') as HTMLIFrameElement;
     expect(frame.getAttribute('sandbox')).toBe('allow-scripts');
     expect(frame.getAttribute('srcdoc')).toBe('<html><body>p</body></html>');
     expect(frame.style.width).toBe('390px');
@@ -37,7 +37,7 @@ describe('PreviewCanvas', () => {
         zoom={{ mode: 'manual', value: 1.5 }}
       />
     );
-    const frame = screen.getByTitle('设计预览') as HTMLIFrameElement;
+    const frame = screen.getByTitle('Design preview') as HTMLIFrameElement;
     expect(frame.style.width).toBe('100%');
     expect(frame.style.transform).toContain('scale(1)');
     // 空预览串回退到空文档占位。
@@ -60,7 +60,7 @@ describe('PreviewCanvas', () => {
     render(
       <PreviewCanvas srcDoc="" viewport={mobileViewport} zoom={{ mode: 'fit', value: 1 }} />
     );
-    const frame = screen.getByTitle('设计预览') as HTMLIFrameElement;
+    const frame = screen.getByTitle('Design preview') as HTMLIFrameElement;
     // fit = min(1, 容器 195 / frame 390) = 0.5。
     expect(frame.style.transform).toContain('scale(0.5)');
     expect(screen.getByTestId('design-canvas-placeholder').style.width).toBe('195px');
@@ -70,7 +70,7 @@ describe('PreviewCanvas', () => {
     render(
       <PreviewCanvas srcDoc="" viewport={mobileViewport} zoom={{ mode: 'fit', value: 1 }} />
     );
-    const frame = screen.getByTitle('设计预览') as HTMLIFrameElement;
+    const frame = screen.getByTitle('Design preview') as HTMLIFrameElement;
     expect(frame.style.width).toBe('390px');
     expect(frame.style.transform).toContain('scale(1)');
   });
@@ -88,7 +88,7 @@ describe('PreviewCanvas', () => {
       />
     );
     expect(frameRef.current).not.toBeNull();
-    const frame = screen.getByTitle('设计预览');
+    const frame = screen.getByTitle('Design preview');
     fireEvent.load(frame);
     expect(onFrameLoad).toHaveBeenCalledTimes(1);
   });

@@ -28,8 +28,8 @@ vi.mock('../api', () => {
 const TEMPLATES = [
   {
     id: 'landing',
-    name: '落地页',
-    description: '单屏 hero 加特性与 CTA 的落地页骨架。',
+    name: 'Landing page',
+    description: 'A single-page marketing landing page with a hero section, feature grid, testimonials, and a call to action.',
     entry: 'design/landing/index.html',
     files: ['design/landing/index.html', 'design/landing/styles.css'],
     version: '1.0.0',
@@ -37,8 +37,8 @@ const TEMPLATES = [
   },
   {
     id: 'dashboard',
-    name: '仪表盘',
-    description: '侧栏加卡片网格的仪表盘骨架。',
+    name: 'Dashboard',
+    description: 'An admin dashboard with sidebar navigation, a metric card grid, and pure-CSS bar charts.',
     entry: 'design/dashboard/index.html',
     files: ['design/dashboard/index.html', 'design/dashboard/styles.css'],
     version: '1.0.0',
@@ -81,23 +81,25 @@ describe('TemplateDialog（P4 §2.4）', () => {
       () => new Promise(resolve => (resolveList = resolve))
     );
     mount();
-    expect(screen.getByRole('status')).toHaveTextContent('正在加载模板…');
+    expect(screen.getByRole('status')).toHaveTextContent('Loading templates…');
     await act(async () => {
       resolveList({ templates: TEMPLATES });
     });
-    const dialog = screen.getByRole('dialog', { name: '模板' });
-    expect(dialog).toHaveTextContent('落地页');
-    expect(dialog).toHaveTextContent('单屏 hero 加特性与 CTA 的落地页骨架。');
+    const dialog = screen.getByRole('dialog', { name: 'Templates' });
+    expect(dialog).toHaveTextContent('Landing page');
+    expect(dialog).toHaveTextContent(
+      'A single-page marketing landing page with a hero section, feature grid, testimonials, and a call to action.'
+    );
     expect(dialog).toHaveTextContent('design/landing/index.html');
-    expect(dialog).toHaveTextContent('2 个文件');
-    expect(dialog).toHaveTextContent('仪表盘');
+    expect(dialog).toHaveTextContent('2 files');
+    expect(dialog).toHaveTextContent('Dashboard');
     expect(listDesignTemplates).toHaveBeenCalledWith('remote-1');
   });
 
   it('目录为空时显示空态', async () => {
     vi.mocked(listDesignTemplates).mockResolvedValue({ templates: [] });
     mount();
-    expect(await screen.findByText('暂无内置模板。')).toBeInTheDocument();
+    expect(await screen.findByText('No built-in templates.')).toBeInTheDocument();
   });
 
   it('目录加载失败显示 message 并可重试', async () => {
@@ -105,32 +107,32 @@ describe('TemplateDialog（P4 §2.4）', () => {
     vi.mocked(listDesignTemplates).mockResolvedValue({ templates: TEMPLATES });
     mount();
     expect(await screen.findByRole('alert')).toHaveTextContent('网络中断');
-    fireEvent.click(screen.getByRole('button', { name: '重试' }));
-    expect(await screen.findByText('落地页')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Landing page')).toBeInTheDocument();
     expect(listDesignTemplates).toHaveBeenCalledTimes(2);
   });
 
   it('安装成功：列出全部已写入文件与入口，「打开页面」上抛 entry', async () => {
     const { onInstalled, onClose } = mount();
-    fireEvent.click(await screen.findByRole('button', { name: '安装 落地页' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Install Landing page' }));
     await waitFor(() =>
       expect(installDesignTemplate).toHaveBeenCalledWith('remote-1', {
         sessionId: 's1',
         templateId: 'landing',
       })
     );
-    expect(await screen.findByText('安装完成，已写入以下文件：')).toBeInTheDocument();
+    expect(await screen.findByText('Installation finished; the following files were written:')).toBeInTheDocument();
     const installed = screen.getByTestId('installed-files');
     expect(installed).toHaveTextContent('design/landing/index.html');
     expect(installed).toHaveTextContent('design/landing/styles.css');
     expect(installed).toHaveTextContent('design/landing/TEMPLATE.json');
-    expect(screen.getByText(/入口：/)).toHaveTextContent('design/landing/index.html');
+    expect(screen.getByText(/Entry:/)).toHaveTextContent('design/landing/index.html');
     // 成功态替换列表视图，仅显示结果与「打开页面」/「关闭」
-    expect(screen.queryByText('仪表盘')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '打开页面' })).toBeInTheDocument();
+    expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open page' })).toBeInTheDocument();
     expect(onInstalled).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: '打开页面' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open page' }));
     expect(onInstalled).toHaveBeenCalledTimes(1);
     expect(onInstalled).toHaveBeenCalledWith('design/landing/index.html');
     expect(onClose).not.toHaveBeenCalled();
@@ -149,20 +151,20 @@ describe('TemplateDialog（P4 §2.4）', () => {
         entry: 'design/landing/index.html',
       });
     mount();
-    fireEvent.click(await screen.findByRole('button', { name: '安装 落地页' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Install Landing page' }));
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('这些文件已存在：');
+    expect(alert).toHaveTextContent('These files already exist:');
     expect(alert).toHaveTextContent('design/landing/index.html');
     expect(alert).toHaveTextContent('design/landing/styles.css');
-    expect(screen.getByText('重新安装会替换以上文件。')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '覆盖以上文件重新安装' }));
+    expect(screen.getByText('Reinstalling will replace the files above.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reinstall and overwrite the files above' }));
     await waitFor(() => expect(installDesignTemplate).toHaveBeenCalledTimes(2));
     expect(installDesignTemplate).toHaveBeenLastCalledWith('remote-1', {
       sessionId: 's1',
       templateId: 'landing',
       overwrite: true,
     });
-    expect(await screen.findByText('安装完成，已写入以下文件：')).toBeInTheDocument();
+    expect(await screen.findByText('Installation finished; the following files were written:')).toBeInTheDocument();
   });
 
   it('其余安装错误显示 message，「重试」重发同一模板安装', async () => {
@@ -170,15 +172,15 @@ describe('TemplateDialog（P4 §2.4）', () => {
       .mockRejectedValueOnce(new Error('会话不存在'))
       .mockResolvedValue({ installed: ['design/landing/index.html'], entry: 'design/landing/index.html' });
     mount();
-    fireEvent.click(await screen.findByRole('button', { name: '安装 落地页' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Install Landing page' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('会话不存在');
-    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(installDesignTemplate).toHaveBeenCalledTimes(2));
     expect(installDesignTemplate).toHaveBeenLastCalledWith('remote-1', {
       sessionId: 's1',
       templateId: 'landing',
     });
-    expect(await screen.findByText('安装完成，已写入以下文件：')).toBeInTheDocument();
+    expect(await screen.findByText('Installation finished; the following files were written:')).toBeInTheDocument();
   });
 
   it('安装中禁用安装按钮并显示「安装中…」', async () => {
@@ -187,15 +189,15 @@ describe('TemplateDialog（P4 §2.4）', () => {
       () => new Promise(resolve => (resolveInstall = resolve))
     );
     mount();
-    const button = await screen.findByRole('button', { name: '安装 落地页' });
+    const button = await screen.findByRole('button', { name: 'Install Landing page' });
     fireEvent.click(button);
-    const installing = screen.getByRole('button', { name: '安装 落地页' });
-    expect(installing).toHaveTextContent('安装中…');
-    expect(screen.getByRole('button', { name: '安装 仪表盘' })).toBeDisabled();
+    const installing = screen.getByRole('button', { name: 'Install Landing page' });
+    expect(installing).toHaveTextContent('Installing…');
+    expect(screen.getByRole('button', { name: 'Install Dashboard' })).toBeDisabled();
     await act(async () => {
       resolveInstall({ installed: ['design/landing/index.html'], entry: 'design/landing/index.html' });
     });
-    expect(await screen.findByText('安装完成，已写入以下文件：')).toBeInTheDocument();
+    expect(await screen.findByText('Installation finished; the following files were written:')).toBeInTheDocument();
   });
 
   it('open false→true 重新拉取目录', async () => {
@@ -207,10 +209,10 @@ describe('TemplateDialog（P4 §2.4）', () => {
       onInstalled: vi.fn(),
     };
     const view = render(<TemplateDialog {...props} />);
-    await screen.findByText('落地页');
+    await screen.findByText('Landing page');
     view.rerender(<TemplateDialog {...props} open={false} />);
     view.rerender(<TemplateDialog {...props} open={true} />);
     await waitFor(() => expect(listDesignTemplates).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText('落地页')).toBeInTheDocument();
+    expect(await screen.findByText('Landing page')).toBeInTheDocument();
   });
 });

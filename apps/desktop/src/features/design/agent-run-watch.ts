@@ -44,8 +44,10 @@ export function diffDesignWatchState(before: DesignWatchState, after: DesignWatc
 export function agentRunStatusText(diff: AgentRunDiff, runErrored: boolean): string {
   const changedCount = new Set([...diff.addedFiles, ...diff.changedPages]).size;
   const base =
-    changedCount > 0 ? `Agent 已写入 ${changedCount} 个文件` : 'Agent 运行结束，未检测到设计文件变化';
-  return runErrored ? `${base}。运行报告了错误，详情见聊天。` : base;
+    changedCount > 0
+      ? `Agent wrote ${changedCount} files`
+      : 'Agent run finished; no design file changes detected';
+  return runErrored ? `${base}. The run reported errors — see the chat for details.` : base;
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +176,8 @@ export function useAgentRunFeedback(options: AgentRunFeedbackOptions): {
             })
           )
         );
-        if (results.some(result => result.status === 'rejected')) suffix = '（恢复点创建失败）';
+        if (results.some(result => result.status === 'rejected'))
+          suffix = ' (restore point creation failed)';
       }
 
       // 评估期间切了会话：结果作废，不写 status。

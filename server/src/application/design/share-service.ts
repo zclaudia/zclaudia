@@ -32,7 +32,7 @@ import {
 
 const DAY_MS = 86_400_000;
 /** 评审者未自报姓名时的默认作者（§0：无账号体系，自报姓名）。 */
-const DEFAULT_COMMENT_AUTHOR = '匿名';
+const DEFAULT_COMMENT_AUTHOR = 'Anonymous';
 
 /**
  * 公开侧统一入口：resolveByToken 的产物。share 携带 workspaceRoot（内部使用，

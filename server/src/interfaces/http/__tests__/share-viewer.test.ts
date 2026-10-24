@@ -176,8 +176,8 @@ describe('design share viewer routes', () => {
     expect(res.text).not.toMatch(/<script[^>]*\ssrc=/);
     // 姓名持久化键与中文文案就位。
     expect(res.text).toContain('zclaudia-share-name');
-    expect(res.text).toContain('清除定位（评论整页）');
-    expect(res.text).toContain('分享为静态快照，链接跳转已停用');
+    expect(res.text).toContain('Clear anchor (comment on the whole page)');
+    expect(res.text).toContain('Shared as a static snapshot; link navigation is disabled');
   });
 
   // ---------------------------------------------------------------------------
@@ -394,7 +394,7 @@ describe('design share viewer routes', () => {
     const posted = await request(app).post(url).send({ body: '  这里有问题  ', target });
     expect(posted.status).toBe(201);
     expect(posted.body.comment).toMatchObject({
-      author: '匿名',
+      author: 'Anonymous',
       body: '这里有问题',
       target,
       resolvedAt: null,

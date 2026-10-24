@@ -72,37 +72,37 @@ async function advance(ms: number) {
 
 describe('媒体文案与输入校验纯函数（P6 §8.1）', () => {
   it('mediaPhaseLabel：全阶段中文；rendering 可带帧数', () => {
-    expect(mediaPhaseLabel('submitting')).toBe('提交中');
-    expect(mediaPhaseLabel('generating')).toBe('生成中');
-    expect(mediaPhaseLabel('downloading')).toBe('下载中');
-    expect(mediaPhaseLabel('saving')).toBe('保存中');
-    expect(mediaPhaseLabel('launching')).toBe('启动渲染');
-    expect(mediaPhaseLabel('rendering')).toBe('渲染中');
-    expect(mediaPhaseLabel('rendering', 42)).toBe('渲染中（42 帧）');
-    expect(mediaPhaseLabel('encoding')).toBe('编码中');
+    expect(mediaPhaseLabel('submitting')).toBe('Submitting');
+    expect(mediaPhaseLabel('generating')).toBe('Generating');
+    expect(mediaPhaseLabel('downloading')).toBe('Downloading');
+    expect(mediaPhaseLabel('saving')).toBe('Saving');
+    expect(mediaPhaseLabel('launching')).toBe('Starting render');
+    expect(mediaPhaseLabel('rendering')).toBe('Rendering');
+    expect(mediaPhaseLabel('rendering', 42)).toBe('Rendering (42 frames)');
+    expect(mediaPhaseLabel('encoding')).toBe('Encoding');
   });
 
   it('mediaStatusBadge / mediaKindLabel：全枚举中文', () => {
-    expect(mediaStatusBadge('queued')).toBe('排队中');
-    expect(mediaStatusBadge('running')).toBe('进行中');
-    expect(mediaStatusBadge('completed')).toBe('已完成');
-    expect(mediaStatusBadge('failed')).toBe('失败');
-    expect(mediaStatusBadge('cancelled')).toBe('已取消');
-    expect(mediaKindLabel('image-generate')).toBe('图片生成');
-    expect(mediaKindLabel('image-edit')).toBe('图片编辑');
-    expect(mediaKindLabel('video-render')).toBe('动效视频');
+    expect(mediaStatusBadge('queued')).toBe('Queued');
+    expect(mediaStatusBadge('running')).toBe('In progress');
+    expect(mediaStatusBadge('completed')).toBe('Completed');
+    expect(mediaStatusBadge('failed')).toBe('Failed');
+    expect(mediaStatusBadge('cancelled')).toBe('Canceled');
+    expect(mediaKindLabel('image-generate')).toBe('Image generation');
+    expect(mediaKindLabel('image-edit')).toBe('Image edit');
+    expect(mediaKindLabel('video-render')).toBe('Motion video');
   });
 
   it('mediaUsageLabel：null/无键 → 费用未知；cost 优先；tokens 次之', () => {
-    expect(mediaUsageLabel(null)).toBe('费用未知（服务未返回用量）');
-    expect(mediaUsageLabel({})).toBe('费用未知（服务未返回用量）');
-    expect(mediaUsageLabel({ totalCostUsd: 0.012345 })).toBe('费用 $0.0123');
+    expect(mediaUsageLabel(null)).toBe('Cost unknown (service returned no usage)');
+    expect(mediaUsageLabel({})).toBe('Cost unknown (service returned no usage)');
+    expect(mediaUsageLabel({ totalCostUsd: 0.012345 })).toBe('Cost $0.0123');
     expect(mediaUsageLabel({ inputTokens: 12, outputTokens: 34 })).toBe(
-      '用量：输入 12 / 输出 34 tokens'
+      'Usage: 12 input / 34 output tokens'
     );
-    expect(mediaUsageLabel({ inputTokens: 12 })).toBe('用量：输入 12 / 输出 0 tokens');
+    expect(mediaUsageLabel({ inputTokens: 12 })).toBe('Usage: 12 input / 0 output tokens');
     expect(mediaUsageLabel({ inputTokens: 1, outputTokens: 2, totalCostUsd: 1 })).toBe(
-      '费用 $1.0000'
+      'Cost $1.0000'
     );
   });
 
@@ -131,21 +131,21 @@ describe('媒体文案与输入校验纯函数（P6 §8.1）', () => {
       size: '1024x1024',
     });
     expect(buildImageCreateInput({ kind: 'image-generate', provider, prompt: '   ' })).toEqual({
-      error: '请输入生成描述',
+      error: 'Enter a prompt',
     });
     expect(
       buildImageCreateInput({ kind: 'image-generate', provider, prompt: '长'.repeat(4001) })
-    ).toEqual({ error: '生成描述不能超过 4000 字符' });
+    ).toEqual({ error: 'Prompt must be at most 4000 characters' });
     expect(
       buildImageCreateInput({ kind: 'image-generate', provider: null, prompt: '海报' })
-    ).toEqual({ error: '请选择图片服务' });
+    ).toEqual({ error: 'Choose an image service' });
     expect(
       buildImageCreateInput({
         kind: 'image-generate',
         provider: { profileId: 'p1', model: '  ' },
         prompt: '海报',
       })
-    ).toEqual({ error: '请输入模型名称' });
+    ).toEqual({ error: 'Enter a model name' });
     expect(
       buildImageCreateInput({
         kind: 'image-generate',
@@ -153,9 +153,9 @@ describe('媒体文案与输入校验纯函数（P6 §8.1）', () => {
         prompt: '海报',
         size: '1024X1024',
       })
-    ).toEqual({ error: '尺寸格式应为 宽x高（如 1024x1024）' });
+    ).toEqual({ error: 'Size must be width x height (e.g. 1024x1024)' });
     expect(buildImageCreateInput({ kind: 'image-edit', provider, prompt: '海报' })).toEqual({
-      error: '请选择源图片',
+      error: 'Choose a source image',
     });
     expect(
       buildImageCreateInput({
@@ -208,7 +208,7 @@ describe('媒体文案与输入校验纯函数（P6 §8.1）', () => {
         fps: '30',
         durationSeconds: '5',
       })
-    ).toEqual({ error: '请填写视频入口 HTML 路径' });
+    ).toEqual({ error: 'Enter the video entry HTML path' });
     expect(
       buildVideoCreateInput({
         entryPath: 'a.html',
@@ -217,7 +217,7 @@ describe('媒体文案与输入校验纯函数（P6 §8.1）', () => {
         fps: '30',
         durationSeconds: '5',
       })
-    ).toEqual({ error: '宽需在 320–1920 之间' });
+    ).toEqual({ error: 'Viewport width must be between 320 and 1920' });
     expect(
       buildVideoCreateInput({
         entryPath: 'a.html',
@@ -226,7 +226,7 @@ describe('媒体文案与输入校验纯函数（P6 §8.1）', () => {
         fps: '30',
         durationSeconds: '5',
       })
-    ).toEqual({ error: '宽需在 320–1920 之间' });
+    ).toEqual({ error: 'Viewport width must be between 320 and 1920' });
     expect(
       buildVideoCreateInput({
         entryPath: 'a.html',
@@ -235,7 +235,7 @@ describe('媒体文案与输入校验纯函数（P6 §8.1）', () => {
         fps: '30',
         durationSeconds: '5',
       })
-    ).toEqual({ error: '宽需为偶数' });
+    ).toEqual({ error: 'Viewport width must be even' });
     expect(
       buildVideoCreateInput({
         entryPath: 'a.html',
@@ -244,7 +244,7 @@ describe('媒体文案与输入校验纯函数（P6 §8.1）', () => {
         fps: '30',
         durationSeconds: '5',
       })
-    ).toEqual({ error: '请输入高（整数像素）' });
+    ).toEqual({ error: 'Enter Viewport height (integer pixels)' });
     expect(
       buildVideoCreateInput({
         entryPath: 'a.html',
@@ -253,7 +253,7 @@ describe('媒体文案与输入校验纯函数（P6 §8.1）', () => {
         fps: '30',
         durationSeconds: '5',
       })
-    ).toEqual({ error: '高需为偶数' });
+    ).toEqual({ error: 'Viewport height must be even' });
     expect(
       buildVideoCreateInput({
         entryPath: 'a.html',
@@ -262,7 +262,7 @@ describe('媒体文案与输入校验纯函数（P6 §8.1）', () => {
         fps: '7',
         durationSeconds: '5',
       })
-    ).toEqual({ error: '帧率需在 8–60 之间' });
+    ).toEqual({ error: 'Frame rate must be between 8 and 60' });
     expect(
       buildVideoCreateInput({
         entryPath: 'a.html',
@@ -271,7 +271,7 @@ describe('媒体文案与输入校验纯函数（P6 §8.1）', () => {
         fps: '29.5',
         durationSeconds: '5',
       })
-    ).toEqual({ error: '请输入帧率（整数）' });
+    ).toEqual({ error: 'Enter a frame rate (integer)' });
     expect(
       buildVideoCreateInput({
         entryPath: 'a.html',
@@ -280,7 +280,7 @@ describe('媒体文案与输入校验纯函数（P6 §8.1）', () => {
         fps: '30',
         durationSeconds: '0.4',
       })
-    ).toEqual({ error: '时长需在 0.5–60 秒之间' });
+    ).toEqual({ error: 'Duration must be between 0.5 and 60 seconds' });
     expect(
       buildVideoCreateInput({
         entryPath: 'a.html',
@@ -289,7 +289,7 @@ describe('媒体文案与输入校验纯函数（P6 §8.1）', () => {
         fps: '30',
         durationSeconds: '60.1',
       })
-    ).toEqual({ error: '时长需在 0.5–60 秒之间' });
+    ).toEqual({ error: 'Duration must be between 0.5 and 60 seconds' });
   });
 });
 
@@ -413,16 +413,16 @@ describe('useMediaTasks（P6 §8.1 轮询/提交/取消）', () => {
     await act(async () => {
       conflict = await result.current.submit(IMAGE_INPUT);
     });
-    expect(conflict).toEqual({ error: '已有相同任务在进行中' });
+    expect(conflict).toEqual({ error: 'An identical task is already in progress' });
 
     vi.mocked(createDesignMediaTask).mockRejectedValueOnce(
-      new DesignHttpError('服务配置不存在', 'MEDIA_VALIDATION')
+      new DesignHttpError('The specified service profile does not exist', 'MEDIA_VALIDATION')
     );
     let invalid: unknown;
     await act(async () => {
       invalid = await result.current.submit(IMAGE_INPUT);
     });
-    expect(invalid).toEqual({ error: '服务配置不存在' });
+    expect(invalid).toEqual({ error: 'The specified service profile does not exist' });
 
     vi.mocked(createDesignMediaTask).mockRejectedValueOnce(new ApiError('没有权限', 'FORBIDDEN'));
     let apiErr: unknown;

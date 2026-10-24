@@ -5,9 +5,9 @@ import { saveBlobToFile } from '../../../services/fileDownload';
 import { exportDesignZip, isDesignHttpError } from '../api';
 import type { DesignExportRequest } from '../types';
 
-const CONFLICT_NOTICE = '文件已变化，正在刷新。';
-const SAVE_FAILED_NOTICE = '保存失败，已停止导出；请先解决保存问题再试。';
-const INCOMPLETE_RETRY_LABEL = '仍要导出（包内清单会标注缺失）';
+const CONFLICT_NOTICE = 'The file has changed; refreshing.';
+const SAVE_FAILED_NOTICE = 'Save failed, so the export was stopped; resolve the save problem and try again.';
+const INCOMPLETE_RETRY_LABEL = 'Export anyway (the manifest will note missing files)';
 
 /** 一次导出请求中除 confirmIncomplete 外的参数（重试时复用）。 */
 type ExportBase =
@@ -66,7 +66,7 @@ export function ExportDialog({
   onClose,
 }: ExportDialogProps) {
   const [stage, setStage] = useState<Stage>(() =>
-    dirty ? { kind: 'choose' } : { kind: 'working', label: '正在导出…', from: 'direct' }
+    dirty ? { kind: 'choose' } : { kind: 'working', label: 'Exporting…', from: 'direct' }
   );
   const baseRef = useRef<ExportBase | null>(null);
   const startedRef = useRef(false);
@@ -87,7 +87,7 @@ export function ExportDialog({
       if (options?.from) fromRef.current = options.from;
       setStage({
         kind: 'working',
-        label: base.mode === 'draft' ? '正在导出草稿…' : '正在导出…',
+        label: base.mode === 'draft' ? 'Exporting draft…' : 'Exporting…',
         from: fromRef.current,
       });
       const request: DesignExportRequest = {
@@ -137,7 +137,7 @@ export function ExportDialog({
 
   /** 保存并导出：先 controller.save（面板包装），成功后以新磁盘修订走 disk 导出。 */
   const saveThenExport = () => {
-    setStage({ kind: 'working', label: '正在保存…', from: 'choose' });
+    setStage({ kind: 'working', label: 'Saving…', from: 'choose' });
     void (async () => {
       const revision = await onSave();
       if (revision === null) {
@@ -170,8 +170,8 @@ export function ExportDialog({
     <Modal
       open={open}
       onClose={onClose}
-      ariaLabel="导出"
-      title="导出"
+      ariaLabel="Export"
+      title="Export"
       size="md"
       footer={
         <div className="flex justify-end gap-2">
@@ -181,7 +181,7 @@ export function ExportDialog({
                 {INCOMPLETE_RETRY_LABEL}
               </Button>
               <Button size="sm" onClick={onClose}>
-                取消
+                Cancel
               </Button>
             </>
           ) : stage.kind === 'choose' || (working && stage.from === 'choose') ? (
@@ -191,38 +191,38 @@ export function ExportDialog({
                 variant="primary"
                 onClick={saveThenExport}
                 disabled={working}
-                aria-label="保存并导出"
+                aria-label="Save and export"
               >
-                保存并导出
+                Save and export
               </Button>
               <Button size="sm" onClick={() => void runExport({ mode: 'draft', draftSource })} disabled={working}>
-                导出草稿
+                Export draft
               </Button>
               <Button size="sm" onClick={onClose} disabled={working}>
-                取消
+                Cancel
               </Button>
             </>
           ) : stage.kind === 'error' && stage.retryable ? (
             <>
               <Button size="sm" onClick={retry}>
-                重试
+                Retry
               </Button>
               <Button size="sm" onClick={onClose}>
-                关闭
+                Close
               </Button>
             </>
           ) : stage.kind === 'conflict' ? (
             <>
               <Button size="sm" onClick={retry}>
-                重试
+                Retry
               </Button>
               <Button size="sm" onClick={onClose}>
-                关闭
+                Close
               </Button>
             </>
           ) : (
             <Button size="sm" onClick={onClose} disabled={working}>
-              关闭
+              Close
             </Button>
           )}
         </div>
@@ -231,7 +231,7 @@ export function ExportDialog({
       <div className="flex flex-col gap-3 p-4 text-xs">
         {stage.kind === 'choose' && (
           <div className="text-muted-foreground">
-            「{path}」有未保存的修改；请选择导出方式。
+            "{path}" has unsaved changes; choose how to export.
           </div>
         )}
         {stage.kind === 'working' && (
@@ -241,7 +241,7 @@ export function ExportDialog({
         )}
         {stage.kind === 'incomplete' && (
           <>
-            <div className="text-warning">以下引用的资源在工作区中缺失，默认已拒绝导出：</div>
+            <div className="text-warning">The following referenced assets are missing from the workspace; the export was refused by default:</div>
             <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border border-border px-2 py-1.5">
               {stage.files.map(file => (
                 <li key={file} className="font-mono text-[11px]">
@@ -250,7 +250,7 @@ export function ExportDialog({
               ))}
             </ul>
             {stage.files.length === 0 && (
-              <div className="text-muted-foreground">服务端未返回缺失清单。</div>
+              <div className="text-muted-foreground">The server did not return a missing-asset list.</div>
             )}
           </>
         )}
@@ -261,7 +261,7 @@ export function ExportDialog({
         )}
         {stage.kind === 'done' && (
           <div role="status" className="text-success">
-            已导出：{stage.filename}
+            Exported: {stage.filename}
           </div>
         )}
         {stage.kind === 'error' && (

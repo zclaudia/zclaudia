@@ -47,26 +47,26 @@ const SHARE_URL_DISPLAY_LIMIT = 48;
 /** 定位 chip 的 target.text 摘要长度。 */
 const TARGET_TEXT_LIMIT = 30;
 const COPIED_RESET_MS = 1500;
-const EMPTY_HINT = '先打开一个页面再管理分享';
-const REVOKE_CONFIRM_TEXT = '撤销后链接立即失效且不可恢复，确认撤销？';
-const LAN_NOTE = '局域网地址（需服务端开启 LAN 监听）';
+const EMPTY_HINT = 'Open a page before managing shares';
+const REVOKE_CONFIRM_TEXT = 'Once revoked, the link stops working immediately and cannot be recovered. Revoke?';
+const LAN_NOTE = 'LAN address (requires the server to listen on LAN)';
 
 const SCOPE_OPTIONS: Array<{ value: DesignShareScope; label: string }> = [
-  { value: 'link', label: '任何持有链接的人' },
-  { value: 'local', label: '仅本机' },
+  { value: 'link', label: 'Anyone with the link' },
+  { value: 'local', label: 'Local only' },
 ];
 
 const EXPIRY_OPTIONS: Array<{ value: ExpiryChoice; label: string }> = [
-  { value: 'forever', label: '永久' },
-  { value: '1', label: '1 天' },
-  { value: '7', label: '7 天' },
-  { value: '30', label: '30 天' },
+  { value: 'forever', label: 'Never' },
+  { value: '1', label: '1 day' },
+  { value: '7', label: '7 days' },
+  { value: '30', label: '30 days' },
 ];
 
 const SHARE_STATUS_LABEL: Record<ShareStatus, string> = {
-  active: '进行中',
-  revoked: '已撤销',
-  expired: '已过期',
+  active: 'Active',
+  revoked: 'Revoked',
+  expired: 'Expired',
 };
 
 const SHARE_STATUS_CLASS: Record<ShareStatus, string> = {
@@ -260,7 +260,7 @@ export function SharePanel({
       window.setTimeout(() => setCopiedKey(prev => (prev === key ? null : prev)), COPIED_RESET_MS);
     } catch {
       // clipboard 不可用/失败：退回手动复制提示。
-      window.prompt('复制失败，请手动复制该链接', text);
+      window.prompt('Copy failed; copy the link manually', text);
     }
   }, []);
 
@@ -370,7 +370,7 @@ export function SharePanel({
     .filter(share => share.revokedAt === null)
     .map(share => ({
       value: share.id,
-      label: `${share.title ?? '（未命名分享）'} · ${formatTime(share.createdAt)}`,
+      label: `${share.title ?? '(Untitled share)'} · ${formatTime(share.createdAt)}`,
     }));
   const selectedShare = shares?.find(share => share.id === selectedShareId) ?? null;
   const commentsLoading = comments === null && commentsError === null && selectedShareId !== '';
@@ -397,10 +397,10 @@ export function SharePanel({
       href={url}
       target="_blank"
       rel="noreferrer"
-      aria-label={`打开分享 ${id}`}
+      aria-label={`Open share ${id}`}
       className="inline-flex h-6 max-md:h-9 items-center rounded-md border border-border px-2 text-[11px] font-medium text-foreground transition-colors hover:bg-secondary"
     >
-      打开
+      Open
     </a>
   );
 
@@ -412,7 +412,7 @@ export function SharePanel({
         data-testid="share-created-result"
         className="flex flex-col gap-1.5 rounded-md border border-border bg-secondary/60 p-2"
       >
-        <div className="text-[11px] text-foreground">分享链接已创建：</div>
+        <div className="text-[11px] text-foreground">Share link created:</div>
         <div className="flex items-center gap-2">
           <span
             className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground"
@@ -423,16 +423,16 @@ export function SharePanel({
           <Button
             size="sm"
             variant="outline"
-            aria-label="复制新分享链接"
+            aria-label="Copy new share link"
             onClick={() => void copyText(created.shareUrl, copyKey)}
           >
-            {copiedKey === copyKey ? '已复制' : '复制'}
+            {copiedKey === copyKey ? 'Copied' : 'Copy'}
           </Button>
           {renderOpenLink(created.shareUrl, 'created')}
         </div>
         {created.lanUrls.length > 0 && (
           <div className="text-[10px] text-muted-foreground">
-            {LAN_NOTE}：{created.lanUrls.join('、')}
+            {LAN_NOTE}: {created.lanUrls.join(', ')}
           </div>
         )}
       </div>
@@ -458,7 +458,7 @@ export function SharePanel({
             {SHARE_STATUS_LABEL[status]}
           </span>
           <span className="truncate text-[11px] text-foreground">
-            {share.title ?? '（未命名分享）'}
+            {share.title ?? '(Untitled share)'}
           </span>
           <span className="ml-auto shrink-0 truncate font-mono text-[10px] text-muted-foreground">
             {share.entryPath}
@@ -474,10 +474,10 @@ export function SharePanel({
           <Button
             size="sm"
             variant="outline"
-            aria-label={`复制链接 ${share.id}`}
+            aria-label={`Copy link ${share.id}`}
             onClick={() => void copyText(url, copyKey)}
           >
-            {copiedKey === copyKey ? '已复制' : '复制'}
+            {copiedKey === copyKey ? 'Copied' : 'Copy'}
           </Button>
           {renderOpenLink(url, share.id)}
           {share.revokedAt === null && (
@@ -485,16 +485,16 @@ export function SharePanel({
               size="sm"
               variant="destructive"
               disabled={revokingId !== null}
-              aria-label={`撤销分享 ${share.id}`}
+              aria-label={`Revoke share ${share.id}`}
               onClick={() => void handleRevoke(share)}
             >
-              {revokingId === share.id ? '撤销中…' : '撤销'}
+              {revokingId === share.id ? 'Revoking…' : 'Revoke'}
             </Button>
           )}
         </div>
         <div className="text-[10px] text-muted-foreground">
-          {share.commentCount} 条评论 ·{' '}
-          {share.lastAccessAt === null ? '未访问' : `最近访问 ${formatTime(share.lastAccessAt)}`}
+          {share.commentCount} comments ·{' '}
+          {share.lastAccessAt === null ? 'Not visited' : `Last visited ${formatTime(share.lastAccessAt)}`}
         </div>
         {lanUrls.length > 0 && (
           <div className="flex flex-col gap-1">
@@ -504,7 +504,7 @@ export function SharePanel({
               className="w-fit rounded text-2xs text-muted-foreground underline underline-offset-2"
               onClick={() => setLanOpenId(prev => (prev === share.id ? null : share.id))}
             >
-              局域网地址（{lanUrls.length}）
+              LAN address ({lanUrls.length})
             </button>
             {lanOpenId === share.id && (
               <div className="flex flex-col gap-0.5 rounded bg-secondary/60 px-2 py-1 text-[10px] text-muted-foreground">
@@ -540,7 +540,7 @@ export function SharePanel({
           <span className="text-muted-foreground">{formatTime(comment.createdAt)}</span>
           {resolved && (
             <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[10px] text-success">
-              已解决
+              Resolved
             </span>
           )}
         </div>
@@ -550,7 +550,7 @@ export function SharePanel({
         <div className="flex flex-wrap items-center gap-1.5">
           {comment.target === null ? (
             <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
-              整页评论
+              Whole-page comment
             </span>
           ) : (
             <button
@@ -558,12 +558,12 @@ export function SharePanel({
               title={comment.target.text}
               className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground"
             >
-              {`定位：${comment.target.tagName} ${truncateText(comment.target.text, TARGET_TEXT_LIMIT)}`}
+              {`Anchor: ${comment.target.tagName} ${truncateText(comment.target.text, TARGET_TEXT_LIMIT)}`}
             </button>
           )}
           {stale !== null && !stale.matched && stale.reason !== undefined && (
             <span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] text-destructive">
-              {`定位失效：${LOCATOR_REASON_TEXT[stale.reason]}`}
+              {`Anchor lost: ${LOCATOR_REASON_TEXT[stale.reason]}`}
             </span>
           )}
           <span className="ml-auto flex items-center gap-1">
@@ -571,20 +571,20 @@ export function SharePanel({
               size="sm"
               variant="outline"
               disabled={resolvingId !== null}
-              aria-label={resolved ? `取消解决 ${comment.id}` : `标记解决 ${comment.id}`}
+              aria-label={resolved ? `Unresolve ${comment.id}` : `Mark resolved ${comment.id}`}
               onClick={() => void handleToggleResolved(comment)}
             >
-              {resolvingId === comment.id ? '处理中…' : resolved ? '取消解决' : '标记解决'}
+              {resolvingId === comment.id ? 'Working…' : resolved ? 'Unresolve' : 'Mark resolved'}
             </Button>
             {!resolved && selectedShare !== null && (
               <Button
                 size="sm"
                 variant="primary"
                 disabled={handoffBusyId !== null}
-                aria-label={`交给 Agent 修改 ${comment.id}`}
+                aria-label={`Hand off to Agent ${comment.id}`}
                 onClick={() => void handleHandoff(comment, selectedShare)}
               >
-                {handoffBusyId === comment.id ? '组指令中…' : '交给 Agent 修改'}
+                {handoffBusyId === comment.id ? 'Composing instruction…' : 'Hand off to Agent'}
               </Button>
             )}
           </span>
@@ -597,13 +597,13 @@ export function SharePanel({
     <Modal
       open
       onClose={onClose}
-      ariaLabel="分享"
-      title="分享"
+      ariaLabel="Share"
+      title="Share"
       size="2xl"
       footer={
         <div className="flex justify-end">
           <Button size="sm" onClick={onClose}>
-            关闭
+            Close
           </Button>
         </div>
       }
@@ -616,10 +616,10 @@ export function SharePanel({
             <div
               className="flex w-fit gap-0.5 rounded-md bg-secondary p-0.5"
               role="tablist"
-              aria-label="分享管理"
+              aria-label="Share management"
             >
-              {renderTabButton('links', '分享链接')}
-              {renderTabButton('comments', '审阅评论')}
+              {renderTabButton('links', 'Share links')}
+              {renderTabButton('comments', 'Review comments')}
             </div>
             {tab === 'links' ? (
               <>
@@ -631,10 +631,10 @@ export function SharePanel({
                       </span>
                     ) : snapshots === null ? (
                       <span role="status" className="text-muted-foreground">
-                        正在加载版本列表…
+                        Loading versions…
                       </span>
                     ) : snapshots.length === 0 ? (
-                      <span className="text-muted-foreground">暂无版本快照，先创建版本再分享</span>
+                      <span className="text-muted-foreground">No version snapshots yet; create a version before sharing</span>
                     ) : (
                       <Select
                         value={formSnapshotId}
@@ -643,8 +643,8 @@ export function SharePanel({
                           value: snapshot.id,
                           label: snapshot.label ?? formatTime(snapshot.createdAt),
                         }))}
-                        placeholder="选择版本"
-                        ariaLabel="分享版本"
+                        placeholder="Choose version"
+                        ariaLabel="Share version"
                         className="w-56 shrink-0"
                       />
                     )}
@@ -652,23 +652,23 @@ export function SharePanel({
                       value={scope}
                       onChange={setScope}
                       options={SCOPE_OPTIONS}
-                      placeholder="访问范围"
-                      ariaLabel="访问范围"
+                      placeholder="Access scope"
+                      ariaLabel="Access scope"
                       className="w-44 shrink-0"
                     />
                     <Select
                       value={expiry}
                       onChange={setExpiry}
                       options={EXPIRY_OPTIONS}
-                      placeholder="有效期"
-                      ariaLabel="有效期"
+                      placeholder="Expiry"
+                      ariaLabel="Expiry"
                       className="w-28 shrink-0"
                     />
                     <Input
-                      aria-label="分享标题"
+                      aria-label="Share title"
                       value={title}
                       maxLength={TITLE_MAX}
-                      placeholder="标题（可选）"
+                      placeholder="Title (optional)"
                       className="h-6 w-44 px-1.5 py-0 text-[11px]"
                       onChange={event => setTitle(event.target.value)}
                     />
@@ -678,7 +678,7 @@ export function SharePanel({
                       disabled={creating || formSnapshotId === ''}
                       onClick={() => void handleCreate()}
                     >
-                      {creating ? '创建中…' : '创建分享'}
+                      {creating ? 'Creating…' : 'Create share'}
                     </Button>
                   </div>
                   {createError !== null && (
@@ -689,7 +689,7 @@ export function SharePanel({
                 </div>
                 {renderCreatedResult()}
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-muted-foreground">分享列表</span>
+                  <span className="text-[11px] text-muted-foreground">Share list</span>
                 </div>
                 {sharesError !== null && (
                   <div role="alert" className="text-destructive">
@@ -698,10 +698,10 @@ export function SharePanel({
                 )}
                 {shares === null && sharesError === null ? (
                   <p role="status" className="text-muted-foreground">
-                    正在加载分享列表…
+                    Loading shares…
                   </p>
                 ) : shares !== null && shares.length === 0 ? (
-                  <p className="text-muted-foreground">暂无分享。</p>
+                  <p className="text-muted-foreground">No shares yet.</p>
                 ) : (
                   <ul className="flex flex-col gap-2">{shares?.map(renderShare)}</ul>
                 )}
@@ -711,17 +711,17 @@ export function SharePanel({
                 <div className="flex items-center gap-2">
                   {shares === null ? (
                     <span role="status" className="text-muted-foreground">
-                      正在加载分享列表…
+                      Loading shares…
                     </span>
                   ) : activeShareOptions.length === 0 ? (
-                    <span className="text-muted-foreground">暂无进行中的分享</span>
+                    <span className="text-muted-foreground">No active shares</span>
                   ) : (
                     <Select
                       value={selectedShareId}
                       onChange={setSelectedShareId}
                       options={activeShareOptions}
-                      placeholder="选择分享"
-                      ariaLabel="选择分享"
+                      placeholder="Choose share"
+                      ariaLabel="Choose share"
                       className="w-72 shrink-0"
                     />
                   )}
@@ -732,7 +732,7 @@ export function SharePanel({
                       if (selectedShareId !== '') void loadComments(selectedShareId);
                     }}
                   >
-                    刷新
+                    Refresh
                   </Button>
                 </div>
                 {commentsError !== null && (
@@ -742,11 +742,11 @@ export function SharePanel({
                 )}
                 {commentsLoading && (
                   <p role="status" className="text-muted-foreground">
-                    正在加载评论…
+                    Loading comments…
                   </p>
                 )}
                 {comments !== null && comments.length === 0 && (
-                  <p className="text-muted-foreground">该分享暂无评论。</p>
+                  <p className="text-muted-foreground">No comments on this share yet.</p>
                 )}
                 {comments !== null && comments.length > 0 && (
                   <ul className="flex flex-col gap-2">{comments.map(renderComment)}</ul>

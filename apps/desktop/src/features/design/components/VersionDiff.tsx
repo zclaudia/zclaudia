@@ -9,12 +9,12 @@ import type { DiffLine } from '../diff';
 import type { DesignSnapshotFile } from '../types';
 
 const KIND_LABEL: Record<DesignSnapshotFile['kind'], string> = {
-  entry: '入口',
+  entry: 'Entry',
   css: 'CSS',
-  image: '图片',
-  font: '字体',
-  video: '视频',
-  other: '文件',
+  image: 'Image',
+  font: 'Font',
+  video: 'Video',
+  other: 'File',
 };
 
 function decodeBase64Utf8(data: string): string {
@@ -176,24 +176,24 @@ export function VersionDiff({
     <Modal
       open={open}
       onClose={onClose}
-      ariaLabel="版本差异"
-      title={`版本差异${detail?.summary.label ? ` · ${detail.summary.label}` : ''}`}
+      ariaLabel="Version diff"
+      title={`Version diff${detail?.summary.label ? ` · ${detail.summary.label}` : ''}`}
       size="lg"
       footer={
         <Button size="sm" onClick={onClose}>
-          关闭
+          Close
         </Button>
       }
     >
       <div className="flex flex-col gap-4 p-4">
         {error && (
           <div role="alert" className="text-xs text-destructive">
-            差异加载失败：{error}
+            Failed to load diff: {error}
           </div>
         )}
-        {!detail && !error && <div className="text-xs text-muted-foreground">正在加载差异…</div>}
+        {!detail && !error && <div className="text-xs text-muted-foreground">Loading diff…</div>}
         {detail && !views && !error && (
-          <div className="text-xs text-muted-foreground">正在读取文件内容…</div>
+          <div className="text-xs text-muted-foreground">Reading file contents…</div>
         )}
         {views?.map(view => (
           <FileDiffSection key={view.file.path} view={view} />
@@ -223,7 +223,7 @@ export function LineDiffView({ lines, truncated = false }: LineDiffViewProps) {
           <div key={hunkIndex} className="flex flex-col">
             {hunk.omittedBefore > 0 && (
               <div className="bg-secondary/60 px-2 py-0.5 text-center font-mono text-[10px] text-muted-foreground">
-                ⋯ 省略 {hunk.omittedBefore} 行相同 ⋯
+                ⋯ {hunk.omittedBefore} identical lines omitted ⋯
               </div>
             )}
             {hunk.lines.map((line, lineIndex) => (
@@ -253,7 +253,7 @@ export function LineDiffView({ lines, truncated = false }: LineDiffViewProps) {
         ))}
       </div>
       {truncated && (
-        <div className="text-[10px] text-muted-foreground">差异超过 5000 行，已截断。</div>
+        <div className="text-[10px] text-muted-foreground">Diff exceeds 5000 lines and was truncated.</div>
       )}
     </>
   );
@@ -261,7 +261,7 @@ export function LineDiffView({ lines, truncated = false }: LineDiffViewProps) {
 
 function FileDiffSection({ view }: { view: FileDiffView }) {
   return (
-    <section aria-label={`差异 ${view.file.path}`} className="flex flex-col gap-1">
+    <section aria-label={`Diff ${view.file.path}`} className="flex flex-col gap-1">
       <div className="flex items-center gap-2 text-xs">
         <span className="truncate font-mono text-foreground">{view.file.path}</span>
         <Badge label={KIND_LABEL[view.file.kind]} />
@@ -269,26 +269,26 @@ function FileDiffSection({ view }: { view: FileDiffView }) {
       </div>
       {view.error && (
         <div role="alert" className="text-xs text-destructive">
-          读取失败：{view.error}
+          Read failed: {view.error}
         </div>
       )}
       {view.binary ? (
         <div className="text-xs text-muted-foreground">
-          二进制文件 · {formatBytes(view.file.bytes)} ·{' '}
+          Binary file · {formatBytes(view.file.bytes)} ·{' '}
           {view.missing
-            ? '当前已删除'
+            ? 'Currently deleted'
             : view.binarySame === undefined
-              ? '无法比较（当前文件读取失败）'
+              ? 'Cannot compare (failed to read the current file)'
               : view.binarySame
-                ? '与当前相同'
-                : '与当前不同'}
+                ? 'Same as current'
+                : 'Differs from current'}
         </div>
       ) : !view.hasChanges ? (
-        <div className="text-xs text-muted-foreground">与当前版本相同</div>
+        <div className="text-xs text-muted-foreground">Same as the current version</div>
       ) : (
         <>
           {view.missing && (
-            <div className="text-xs text-warning">当前文件已不存在，以下为快照中的内容。</div>
+            <div className="text-xs text-warning">The current file no longer exists; below is the snapshot content.</div>
           )}
           <LineDiffView lines={view.lines ?? []} truncated={view.truncated} />
         </>

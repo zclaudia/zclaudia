@@ -11,9 +11,9 @@ const MAX_CLASSES = 3;
 const MAX_TEXT_PREVIEW_LENGTH = 40;
 
 /** 非 editable 能力的中文原因。 */
-const REASON_SVG = 'SVG 内容仅支持文字、样式与结构调整';
-const REASON_IMPLICIT = '源码中无显式标签';
-const REASON_DEEP = '层级超出预览桥接上限';
+const REASON_SVG = 'SVG content supports only text, style, and structure changes';
+const REASON_IMPLICIT = 'No explicit tag in the source';
+const REASON_DEEP = 'Nesting exceeds the preview bridge limit';
 
 export interface ElementTreeNode {
   /** 从 body 子元素起的元素序号路径（与桥接 select-path 一致）。 */

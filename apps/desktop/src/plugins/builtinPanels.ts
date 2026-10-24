@@ -37,7 +37,7 @@ export function initBuiltinPanels() {
     pluginId: 'com.zclaudia.design',
     builtin: true,
     type: 'panel',
-    label: '设计',
+    label: 'Design',
     icon: 'Paintbrush',
     component: DesignPanel,
     order: 9,

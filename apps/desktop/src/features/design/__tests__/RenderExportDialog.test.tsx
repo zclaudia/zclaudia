@@ -106,7 +106,7 @@ describe('RenderExportDialog（P5 §6.3）', () => {
   it('deck PDF：逐页 jpeg 捕获后一次 buildImagePdf，以 <base>.pdf 落盘', async () => {
     okCapture();
     mount();
-    fireEvent.click(screen.getByRole('button', { name: '导出 PDF（3 页 · 整页图片）' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export PDF (3 pages · full-page image)' }));
     await waitFor(() => expect(captureHtmlImage).toHaveBeenCalledTimes(3));
     for (let index = 0; index < 3; index += 1) {
       expect(captureHtmlImage).toHaveBeenNthCalledWith(index + 1, {
@@ -131,13 +131,13 @@ describe('RenderExportDialog（P5 §6.3）', () => {
       (byte, i) => byte === 0xff && bytes[i + 1] === 0xd8 && bytes[i + 2] === 0xff
     );
     expect(soi).toBeGreaterThan(0); // JPEG 字节直通进 PDF 流
-    expect(await screen.findByText('已导出：deck.pdf（成功 3/3 页）')).toBeInTheDocument();
+    expect(await screen.findByText('Exported: deck.pdf (3/3 pages succeeded)')).toBeInTheDocument();
   });
 
   it('deck PNG：逐页 image/png 捕获并逐页下载 <base>-slide-0N.png', async () => {
     okCapture();
     mount();
-    fireEvent.click(screen.getByRole('button', { name: '导出 PNG（逐页下载）' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export PNG (one download per page)' }));
     await waitFor(() => expect(saveBlobToFile).toHaveBeenCalledTimes(3));
     for (let index = 0; index < 3; index += 1) {
       expect(captureHtmlImage).toHaveBeenNthCalledWith(index + 1, {
@@ -153,16 +153,16 @@ describe('RenderExportDialog（P5 §6.3）', () => {
         buildRenderExportFilename(ENTRY_PATH, 'png', index)
       );
     }
-    expect(await screen.findByText('导出完成：成功 3/3 页。')).toBeInTheDocument();
+    expect(await screen.findByText('Export finished: 3/3 pages succeeded.')).toBeInTheDocument();
   });
 
   it('非 deck：以 buildPageCaptureRequest 的视口请求捕获，单张 <base>.png 落盘', async () => {
     okCapture();
     const viewport = { preset: 'tablet', width: 768 };
     mount({ deck: null, viewport });
-    expect(screen.queryByRole('button', { name: /导出 PDF/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '导出 PNG（逐页下载）' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '导出 PNG（视口区域）' }));
+    expect(screen.queryByRole('button', { name: /Export PDF/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export PNG (one download per page)' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Export PNG (viewport area)' }));
     await waitFor(() => expect(saveBlobToFile).toHaveBeenCalledTimes(1));
     expect(captureHtmlImage).toHaveBeenCalledTimes(1);
     expect(captureHtmlImage).toHaveBeenCalledWith(buildPageCaptureRequest(PREVIEW_HTML, viewport));
@@ -170,13 +170,13 @@ describe('RenderExportDialog（P5 §6.3）', () => {
       expect.any(Blob),
       buildRenderExportFilename(ENTRY_PATH, 'png')
     );
-    expect(await screen.findByText('导出完成：成功 1/1 页。')).toBeInTheDocument();
+    expect(await screen.findByText('Export finished: 1/1 pages succeeded.')).toBeInTheDocument();
   });
 
   it('非 deck：fill 视口（width null）回退 1280×900', async () => {
     okCapture();
     mount({ deck: null, viewport: { preset: 'fill', width: null } });
-    fireEvent.click(screen.getByRole('button', { name: '导出 PNG（视口区域）' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export PNG (viewport area)' }));
     await waitFor(() => expect(saveBlobToFile).toHaveBeenCalledTimes(1));
     expect(captureHtmlImage).toHaveBeenCalledWith(
       buildPageCaptureRequest(PREVIEW_HTML, { preset: 'fill', width: null })
@@ -186,40 +186,40 @@ describe('RenderExportDialog（P5 §6.3）', () => {
   it('固定说明文案恒定展示', () => {
     mount();
     expect(
-      screen.getByText('导出内容为当前预览（含未保存修改）；PDF 为整页图片，不可编辑文字。')
+      screen.getByText('The export contains the current preview (including unsaved changes); the PDF is a full-page image with non-editable text.')
     ).toBeInTheDocument();
   });
 
   it('单页失败进错误列表且其余页继续（RenderCaptureError 中文映射 + 其余 Error 用 message）', async () => {
     mount();
     vi.mocked(captureHtmlImage)
-      .mockRejectedValueOnce(new Error('磁盘已满'))
-      .mockRejectedValueOnce(new RenderCaptureError('capture-failed', '页面捕获失败：预览图片加载失败'))
+      .mockRejectedValueOnce(new Error('Disk full'))
+      .mockRejectedValueOnce(new RenderCaptureError('capture-failed', 'Page capture failed: preview image failed to load'))
       .mockImplementationOnce(async request => ({
         blob: new Blob([JPEG_BYTES], { type: request.mime }),
         width: request.width,
         height: request.height,
       }));
-    fireEvent.click(screen.getByRole('button', { name: '导出 PNG（逐页下载）' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export PNG (one download per page)' }));
     await waitFor(() => expect(saveBlobToFile).toHaveBeenCalledTimes(1));
     expect(captureHtmlImage).toHaveBeenCalledTimes(3);
     expect(saveBlobToFile).toHaveBeenNthCalledWith(1, expect.any(Blob), 'deck-slide-02.png');
-    expect(await screen.findByText('导出完成：成功 1/3 页。')).toBeInTheDocument();
-    expect(screen.getByText('以下页面导出失败：')).toBeInTheDocument();
-    expect(screen.getByText('第 1 页：磁盘已满')).toBeInTheDocument();
-    expect(screen.getByText('第 2 页：页面捕获失败')).toBeInTheDocument();
-    expect(screen.queryByText(/^第 3 页/)).not.toBeInTheDocument();
+    expect(await screen.findByText('Export finished: 1/3 pages succeeded.')).toBeInTheDocument();
+    expect(screen.getByText('The following pages failed to export:')).toBeInTheDocument();
+    expect(screen.getByText('Page 1: Disk full')).toBeInTheDocument();
+    expect(screen.getByText('Page 2: Page capture failed')).toBeInTheDocument();
+    expect(screen.queryByText(/^Page 3/)).not.toBeInTheDocument();
   });
 
   it('全部失败：alert 汇总且不落盘', async () => {
     vi.mocked(captureHtmlImage).mockRejectedValue(
-      new RenderCaptureError('capture-unsupported', '当前环境不支持页面捕获（无 Canvas 2D）')
+      new RenderCaptureError('capture-unsupported', 'Page capture is not supported in this environment (no Canvas 2D)')
     );
     mount();
-    fireEvent.click(screen.getByRole('button', { name: '导出 PNG（逐页下载）' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('导出失败：3 页全部失败。');
-    expect(screen.getByText('第 1 页：当前环境不支持页面捕获')).toBeInTheDocument();
-    expect(screen.getByText('第 3 页：当前环境不支持页面捕获')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Export PNG (one download per page)' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Export failed: all 3 pages failed.');
+    expect(screen.getByText('Page 1: Page capture is not supported in this environment')).toBeInTheDocument();
+    expect(screen.getByText('Page 3: Page capture is not supported in this environment')).toBeInTheDocument();
     expect(saveBlobToFile).not.toHaveBeenCalled();
     expect(captureHtmlImage).toHaveBeenCalledTimes(3);
   });
@@ -227,42 +227,42 @@ describe('RenderExportDialog（P5 §6.3）', () => {
   it('取消：立即汇总已收集结果；当前页捕获完成后不再落盘、不再捕获后续页', async () => {
     const queue = queueCaptures();
     mount();
-    fireEvent.click(screen.getByRole('button', { name: '导出 PNG（逐页下载）' }));
-    expect(await screen.findByText('正在导出 1/3…')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '取消导出' }));
-    expect(await screen.findByText('已取消：成功 0/3 页，已下载文件保留。')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Export PNG (one download per page)' }));
+    expect(await screen.findByText('Exporting 1/3…')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel export' }));
+    expect(await screen.findByText('Canceled: 0/3 pages succeeded; downloaded files are kept.')).toBeInTheDocument();
     await act(async () => {
       queue[0].resolve({ blob: new Blob([JPEG_BYTES], { type: 'image/png' }), width: 1600, height: 900 });
     });
     expect(captureHtmlImage).toHaveBeenCalledTimes(1);
     expect(saveBlobToFile).not.toHaveBeenCalled();
-    expect(screen.getByText('已取消：成功 0/3 页，已下载文件保留。')).toBeInTheDocument();
+    expect(screen.getByText('Canceled: 0/3 pages succeeded; downloaded files are kept.')).toBeInTheDocument();
   });
 
   it('进度文案：正在导出 i/N… 逐页推进直至成功汇总', async () => {
     const queue = queueCaptures();
     mount();
-    fireEvent.click(screen.getByRole('button', { name: '导出 PDF（3 页 · 整页图片）' }));
-    expect(await screen.findByText('正在导出 1/3…')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Export PDF (3 pages · full-page image)' }));
+    expect(await screen.findByText('Exporting 1/3…')).toBeInTheDocument();
     await act(async () => {
       queue[0].resolve({ blob: new Blob([JPEG_BYTES], { type: 'image/jpeg' }), width: 1600, height: 900 });
     });
-    expect(await screen.findByText('正在导出 2/3…')).toBeInTheDocument();
+    expect(await screen.findByText('Exporting 2/3…')).toBeInTheDocument();
     await act(async () => {
       queue[1].resolve({ blob: new Blob([JPEG_BYTES], { type: 'image/jpeg' }), width: 1600, height: 900 });
     });
-    expect(await screen.findByText('正在导出 3/3…')).toBeInTheDocument();
+    expect(await screen.findByText('Exporting 3/3…')).toBeInTheDocument();
     await act(async () => {
       queue[2].resolve({ blob: new Blob([JPEG_BYTES], { type: 'image/jpeg' }), width: 1600, height: 900 });
     });
-    expect(await screen.findByText('已导出：deck.pdf（成功 3/3 页）')).toBeInTheDocument();
+    expect(await screen.findByText('Exported: deck.pdf (3/3 pages succeeded)')).toBeInTheDocument();
   });
 
   it('previewHtml 为 null：显示「正在构建预览…」并禁用导出按钮', () => {
     mount({ previewHtml: null });
-    expect(screen.getByText('正在构建预览…')).toBeInTheDocument();
-    const pdf = screen.getByRole('button', { name: '导出 PDF（3 页 · 整页图片）' });
-    const png = screen.getByRole('button', { name: '导出 PNG（逐页下载）' });
+    expect(screen.getByText('Building preview…')).toBeInTheDocument();
+    const pdf = screen.getByRole('button', { name: 'Export PDF (3 pages · full-page image)' });
+    const png = screen.getByRole('button', { name: 'Export PNG (one download per page)' });
     expect(pdf).toBeDisabled();
     expect(png).toBeDisabled();
     fireEvent.click(pdf);
@@ -273,12 +273,12 @@ describe('RenderExportDialog（P5 §6.3）', () => {
   it('open 切换重置全部状态：完成后关闭再打开回到初始态，不自动导出', async () => {
     okCapture();
     const { rerender } = mount();
-    fireEvent.click(screen.getByRole('button', { name: '导出 PNG（逐页下载）' }));
-    expect(await screen.findByText('导出完成：成功 3/3 页。')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Export PNG (one download per page)' }));
+    expect(await screen.findByText('Export finished: 3/3 pages succeeded.')).toBeInTheDocument();
     rerender({ open: false });
     rerender({ open: true });
-    expect(screen.queryByText('导出完成：成功 3/3 页。')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '导出 PDF（3 页 · 整页图片）' })).toBeEnabled();
+    expect(screen.queryByText('Export finished: 3/3 pages succeeded.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export PDF (3 pages · full-page image)' })).toBeEnabled();
     expect(captureHtmlImage).toHaveBeenCalledTimes(3);
   });
 });

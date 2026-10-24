@@ -67,8 +67,8 @@ function defineTemplate(
 
 const landing = defineTemplate(
   'landing',
-  '落地页',
-  '含 Hero 首屏、特性网格、用户声音与行动号召的单页营销落地页。',
+  'Landing page',
+  'A single-page marketing landing page with a hero section, feature grid, testimonials, and a call to action.',
   `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -289,8 +289,8 @@ svg { vertical-align: middle; }
 
 const dashboard = defineTemplate(
   'dashboard',
-  '仪表盘',
-  '含侧边导航、指标卡片网格与纯 CSS 柱状图的后台数据看板。',
+  'Dashboard',
+  'An admin dashboard with sidebar navigation, a metric card grid, and pure-CSS bar charts.',
   `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -509,8 +509,8 @@ main { padding: 32px; display: flex; flex-direction: column; gap: 24px; }
 
 const mobile = defineTemplate(
   'mobile',
-  '移动原型',
-  '390px 单列布局的移动端待办清单原型，含进度卡、任务列表与底部标签栏。',
+  'Mobile prototype',
+  'A 390px single-column mobile to-do list prototype with a progress card, task list, and bottom tab bar.',
   `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -717,8 +717,8 @@ main { flex: 1; padding: 8px 20px 96px; display: flex; flex-direction: column; g
 
 const showcase = defineTemplate(
   'showcase',
-  '静态展示页',
-  '含图文作品网格与关于板块的个人作品集展示页，图片为内联 SVG 插画。',
+  'Portfolio page',
+  'A personal portfolio page with a work grid and about section; images are inline SVG illustrations.',
   `<!doctype html>
 <html lang="zh-CN">
 <head>

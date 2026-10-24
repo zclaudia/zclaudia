@@ -415,7 +415,7 @@ export class DesignService {
         return { path: [dirRelative.split(path.sep).join('/'), candidate].join('/') };
       }
       if (taken >= MAX_IMPORT_NAME_CANDIDATES)
-        throw new DesignError(400, 'ASSET_INVALID', `目标目录同名文件过多，无法为 ${name} 生成新文件名`);
+        throw new DesignError(400, 'ASSET_INVALID', `Too many files with the same name in the target directory; cannot generate a new name for ${name}`);
       candidate = `${stem}-${taken + 2}${extension}`;
     }
   }
@@ -423,17 +423,17 @@ export class DesignService {
   /** File-name rules for imports; every violation is a readable ASSET_INVALID. */
   private static validateAssetFileName(fileName: unknown): string {
     if (typeof fileName !== 'string' || !fileName || fileName.length > MAX_IMPORT_NAME_LENGTH)
-      throw new DesignError(400, 'ASSET_INVALID', '文件名必须是非空且不超过 200 个字符的字符串');
+      throw new DesignError(400, 'ASSET_INVALID', 'Filename must be a non-empty string of at most 200 characters');
     if (/[/\\]/.test(fileName) || path.basename(fileName) !== fileName)
-      throw new DesignError(400, 'ASSET_INVALID', '文件名不能包含路径分隔符');
+      throw new DesignError(400, 'ASSET_INVALID', 'Filename must not contain path separators');
     if (/[\u0000-\u001f\u007f]/.test(fileName))
-      throw new DesignError(400, 'ASSET_INVALID', '文件名不能包含控制字符');
+      throw new DesignError(400, 'ASSET_INVALID', 'Filename must not contain control characters');
     const extension = path.extname(fileName).toLowerCase();
     if (!IMPORTABLE_EXTENSIONS.has(extension))
       throw new DesignError(
         400,
         'ASSET_INVALID',
-        `不支持的文件扩展名「${extension || '（无）'}」，仅允许图片与字体文件`
+        `Unsupported file extension ${extension || '(none)'}; only image and font files are allowed`
       );
     return fileName;
   }
@@ -441,12 +441,12 @@ export class DesignService {
   /** base64 payload rules: strict syntax, decoded size 1 B–10 MiB. */
   private static decodeAssetDataBase64(dataBase64: unknown): Buffer {
     if (typeof dataBase64 !== 'string' || dataBase64.length === 0)
-      throw new DesignError(400, 'ASSET_INVALID', 'dataBase64 必须是非空字符串');
+      throw new DesignError(400, 'ASSET_INVALID', 'dataBase64 must be a non-empty string');
     if (dataBase64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(dataBase64))
-      throw new DesignError(400, 'ASSET_INVALID', 'dataBase64 不是有效的 base64 编码');
+      throw new DesignError(400, 'ASSET_INVALID', 'dataBase64 is not valid base64');
     const bytes = Buffer.from(dataBase64, 'base64');
     if (bytes.length < 1 || bytes.length > MAX_ASSET_BYTES)
-      throw new DesignError(400, 'ASSET_INVALID', '素材解码后大小必须在 1 字节到 10 MiB 之间');
+      throw new DesignError(400, 'ASSET_INVALID', 'Decoded asset size must be between 1 byte and 10 MiB');
     return bytes;
   }
 }

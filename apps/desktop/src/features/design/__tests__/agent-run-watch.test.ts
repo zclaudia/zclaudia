@@ -126,19 +126,25 @@ describe('agentRunStatusText（P4 §6.1 中文状态文案）', () => {
   };
 
   it('有变化：Agent 已写入 N 个文件（added + changed 去重计数）', () => {
-    expect(agentRunStatusText(CHANGED, false)).toBe('Agent 已写入 2 个文件');
+    expect(agentRunStatusText(CHANGED, false)).toBe('Agent wrote 2 files');
     expect(agentRunStatusText({ addedFiles: ['a', 'b'], changedPages: ['b', 'c'] }, false)).toBe(
-      'Agent 已写入 3 个文件'
+      'Agent wrote 3 files'
     );
   });
 
   it('无变化：未检测到设计文件变化', () => {
-    expect(agentRunStatusText(EMPTY, false)).toBe('Agent 运行结束，未检测到设计文件变化');
+    expect(agentRunStatusText(EMPTY, false)).toBe(
+      'Agent run finished; no design file changes detected'
+    );
   });
 
   it('runErrored=true 追加错误提示', () => {
-    expect(agentRunStatusText(CHANGED, true)).toBe('Agent 已写入 2 个文件。运行报告了错误，详情见聊天。');
-    expect(agentRunStatusText(EMPTY, true)).toBe('Agent 运行结束，未检测到设计文件变化。运行报告了错误，详情见聊天。');
+    expect(agentRunStatusText(CHANGED, true)).toBe(
+      'Agent wrote 2 files. The run reported errors — see the chat for details.'
+    );
+    expect(agentRunStatusText(EMPTY, true)).toBe(
+      'Agent run finished; no design file changes detected. The run reported errors — see the chat for details.'
+    );
   });
 });
 
@@ -248,7 +254,7 @@ describe('useAgentRunFeedback（P4 §6.2）', () => {
       source: 'manual',
     });
     expect(result.current.status).toEqual({
-      text: 'Agent 已写入 2 个文件。运行报告了错误，详情见聊天。',
+      text: 'Agent wrote 2 files. The run reported errors — see the chat for details.',
       diff: { addedFiles: ['design/new.html'], changedPages: ['design/index.html'] },
     });
 
@@ -268,7 +274,7 @@ describe('useAgentRunFeedback（P4 §6.2）', () => {
     await settleDebounce();
 
     expect(result.current.status).toEqual({
-      text: 'Agent 运行结束，未检测到设计文件变化',
+      text: 'Agent run finished; no design file changes detected',
       diff: { addedFiles: [], changedPages: [] },
     });
     expect(refreshNow).toHaveBeenCalledTimes(1);
@@ -300,7 +306,7 @@ describe('useAgentRunFeedback（P4 §6.2）', () => {
       addedFiles: [],
       changedPages: ['design/index.html'],
     });
-    expect(result.current.status?.text).toBe('Agent 已写入 1 个文件');
+    expect(result.current.status?.text).toBe('Agent wrote 1 files');
   });
 
   it('任一快照 rejected 时文案追加「（恢复点创建失败）」', async () => {
@@ -327,7 +333,7 @@ describe('useAgentRunFeedback（P4 §6.2）', () => {
     await settleDebounce();
 
     expect(createDesignSnapshot).toHaveBeenCalledTimes(2);
-    expect(result.current.status?.text).toBe('Agent 已写入 2 个文件（恢复点创建失败）');
+    expect(result.current.status?.text).toBe('Agent wrote 2 files (restore point creation failed)');
   });
 
   it('enabled=false 时过渡被忽略且不补触发；之后的新过渡正常触发', async () => {

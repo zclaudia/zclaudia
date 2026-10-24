@@ -60,47 +60,47 @@ describe('buildReviewHandoff（P7 §6.2 审阅进聊天交接）', () => {
   it('五 section 齐全且顺序固定：审阅反馈 / 分享版本 / 快照中的目标元素 / 当前版本定位 / 任务指令', () => {
     const { sections } = buildReviewHandoff(FULL_INPUT);
     expect(sections.map(section => section.title)).toEqual([
-      '审阅反馈',
-      '分享版本',
-      '快照中的目标元素',
-      '当前版本定位',
-      '任务指令',
+      'Review feedback',
+      'Shared version',
+      'Target element in the snapshot',
+      'Location in the current version',
+      'Instruction',
     ]);
   });
 
   it('审阅反馈：作者 + zh-CN 24 小时制本地时间 + 评论原文', () => {
     const { sections } = buildReviewHandoff(FULL_INPUT);
-    expect(sectionByTitle(sections, '审阅反馈')?.body).toBe(
-      ['- 作者：林一', `- 时间：${formatTime(COMMENT_TS)}`, '- 评论原文：', '请把这段标题换成蓝色，谢谢。'].join('\n')
+    expect(sectionByTitle(sections, 'Review feedback')?.body).toBe(
+      ['- Author: 林一', `- Time: ${formatTime(COMMENT_TS)}`, '- Comment:', '请把这段标题换成蓝色，谢谢。'].join('\n')
     );
   });
 
   it('分享版本：label / 快照时间 / 入口 + 旧分享不变说明；label 为 null 写「无标签」', () => {
     const { sections } = buildReviewHandoff(FULL_INPUT);
-    expect(sectionByTitle(sections, '分享版本')?.body).toBe(
+    expect(sectionByTitle(sections, 'Shared version')?.body).toBe(
       [
-        '- 标签：v3 定稿',
-        `- 快照时间：${formatTime(SNAPSHOT_TS)}`,
-        '- 入口文件：design/index.html',
-        '- 旧分享仍显示此版本，不会因本次修改变化。',
+        '- Label: v3 定稿',
+        `- Snapshot time: ${formatTime(SNAPSHOT_TS)}`,
+        '- Entry file: design/index.html',
+        '- Existing shares still show this version; they will not change with this edit.',
       ].join('\n')
     );
     const unlabeled = buildReviewHandoff(makeInput({ snapshot: { ...SNAPSHOT, label: null } }));
-    expect(sectionByTitle(unlabeled.sections, '分享版本')?.body).toContain('- 标签：无标签');
+    expect(sectionByTitle(unlabeled.sections, 'Shared version')?.body).toContain('- Label: No label');
   });
 
   it('命中：快照段与当前段都贴元素、折叠文本与源码片段', () => {
     const { sections } = buildReviewHandoff(FULL_INPUT);
     const snippet = '<p id="intro">你好 世界</p>';
-    expect(sectionByTitle(sections, '快照中的目标元素')?.body).toBe(
-      ['- 元素：<p>', '- 折叠文本：你好 世界', '- 快照源码片段：', snippet].join('\n')
+    expect(sectionByTitle(sections, 'Target element in the snapshot')?.body).toBe(
+      ['- Element: <p>', '- Collapsed text: 你好 世界', '- Snapshot source snippet:', snippet].join('\n')
     );
-    expect(sectionByTitle(sections, '当前版本定位')?.body).toBe(
+    expect(sectionByTitle(sections, 'Location in the current version')?.body).toBe(
       [
-        '- 页面：design/index.html',
-        '- 元素：<p>',
-        '- 折叠文本：你好 世界',
-        '- 当前源码片段：',
+        '- Page: design/index.html',
+        '- Element: <p>',
+        '- Collapsed text: 你好 世界',
+        '- Current source snippet:',
         snippet,
       ].join('\n')
     );
@@ -108,37 +108,37 @@ describe('buildReviewHandoff（P7 §6.2 审阅进聊天交接）', () => {
 
   it('当前版本定位失效：三种原因逐字文案（路径越界 / 标签已变化 / 文本已变化）', () => {
     const expected = (reason: string) =>
-      `元素定位已失效（${reason}）。请依据评论描述与分享版本对比自行定位目标元素，修改前在回复中说明你定位到的元素。`;
+      `The element anchor is no longer valid (${reason}). Locate the target element yourself using the comment description and the shared version, and state which element you located in your reply before making changes.`;
 
     const pathMissing = buildReviewHandoff(
       makeInput({ currentSource: '<body><div>其他内容</div></body>' })
     );
-    expect(sectionByTitle(pathMissing.sections, '当前版本定位')?.body).toBe(expected('路径越界'));
+    expect(sectionByTitle(pathMissing.sections, 'Location in the current version')?.body).toBe(expected('Path out of range'));
 
     const tagMismatch = buildReviewHandoff(
       makeInput({ currentSource: '<body><section><span>你好 世界</span></section></body>' })
     );
-    expect(sectionByTitle(tagMismatch.sections, '当前版本定位')?.body).toBe(expected('标签已变化'));
+    expect(sectionByTitle(tagMismatch.sections, 'Location in the current version')?.body).toBe(expected('Tag changed'));
 
     const textMismatch = buildReviewHandoff(
       makeInput({ currentSource: '<body><main><p id="intro">换成别的文本</p></main></body>' })
     );
-    expect(sectionByTitle(textMismatch.sections, '当前版本定位')?.body).toBe(expected('文本已变化'));
+    expect(sectionByTitle(textMismatch.sections, 'Location in the current version')?.body).toBe(expected('Text changed'));
   });
 
   it('快照源码不可用 / 当前源码不可用分支', () => {
     const noSnapshot = buildReviewHandoff(makeInput({ snapshotSource: null }));
-    expect(sectionByTitle(noSnapshot.sections, '快照中的目标元素')?.body).toBe('快照源码不可用。');
+    expect(sectionByTitle(noSnapshot.sections, 'Target element in the snapshot')?.body).toBe('Snapshot source unavailable.');
 
     const noCurrent = buildReviewHandoff(makeInput({ currentSource: null }));
-    expect(sectionByTitle(noCurrent.sections, '当前版本定位')?.body).toBe('当前源码不可用。');
+    expect(sectionByTitle(noCurrent.sections, 'Location in the current version')?.body).toBe('Current source unavailable.');
   });
 
   it('整页评论（target null）：两段都写整页评论，当前段仍给页面路径', () => {
     const { sections } = buildReviewHandoff(makeInput({ comment: { ...COMMENT, target: null } }));
-    expect(sectionByTitle(sections, '快照中的目标元素')?.body).toBe('整页评论（未定位到具体元素）。');
-    expect(sectionByTitle(sections, '当前版本定位')?.body).toBe(
-      ['- 页面：design/index.html', '整页评论（未定位到具体元素）。'].join('\n')
+    expect(sectionByTitle(sections, 'Target element in the snapshot')?.body).toBe('Whole-page comment (not anchored to a specific element).');
+    expect(sectionByTitle(sections, 'Location in the current version')?.body).toBe(
+      ['- Page: design/index.html', 'Whole-page comment (not anchored to a specific element).'].join('\n')
     );
   });
 
@@ -146,28 +146,28 @@ describe('buildReviewHandoff（P7 §6.2 审阅进聊天交接）', () => {
     const { sections } = buildReviewHandoff(
       makeInput({ snapshotSource: '<body><section><span>你好 世界</span></section></body>' })
     );
-    expect(sectionByTitle(sections, '快照中的目标元素')?.body).toBe(
-      '未能在快照源码中定位目标元素（标签已变化）。'
+    expect(sectionByTitle(sections, 'Target element in the snapshot')?.body).toBe(
+      'Could not locate the target element in the snapshot source (Tag changed).'
     );
   });
 
   it('任务指令：当前路径；currentDocPath 为 null 回退「（未知路径）」', () => {
     const { sections } = buildReviewHandoff(FULL_INPUT);
-    expect(sectionByTitle(sections, '任务指令')?.body).toBe(
-      '请根据以上审阅反馈修改当前页面 design/index.html。保持与反馈无关的内容不变。'
+    expect(sectionByTitle(sections, 'Instruction')?.body).toBe(
+      'Please update the current page design/index.html based on the review feedback above. Keep everything unrelated to the feedback unchanged.'
     );
     const noPath = buildReviewHandoff(makeInput({ currentDocPath: null }));
-    expect(sectionByTitle(noPath.sections, '任务指令')?.body).toBe(
-      '请根据以上审阅反馈修改当前页面 （未知路径）。保持与反馈无关的内容不变。'
+    expect(sectionByTitle(noPath.sections, 'Instruction')?.body).toBe(
+      'Please update the current page (unknown path) based on the review feedback above. Keep everything unrelated to the feedback unchanged.'
     );
-    expect(sectionByTitle(noPath.sections, '当前版本定位')?.body).toContain('- 页面：（未知路径）');
+    expect(sectionByTitle(noPath.sections, 'Location in the current version')?.body).toContain('- Page: (unknown path)');
   });
 
   it('prompt 格式：## 前缀块按 sections 顺序空行拼接', () => {
     const { sections, prompt } = buildReviewHandoff(FULL_INPUT);
     expect(prompt).toBe(sections.map(section => `## ${section.title}\n${section.body}`).join('\n\n'));
-    expect(prompt.startsWith('## 审阅反馈\n')).toBe(true);
-    const titles = ['审阅反馈', '分享版本', '快照中的目标元素', '当前版本定位', '任务指令'];
+    expect(prompt.startsWith('## Review feedback\n')).toBe(true);
+    const titles = ['Review feedback', 'Shared version', 'Target element in the snapshot', 'Location in the current version', 'Instruction'];
     let cursor = -1;
     for (const title of titles) {
       const at = prompt.indexOf(`## ${title}`);
@@ -181,7 +181,7 @@ describe('buildReviewHandoff（P7 §6.2 审阅进聊天交接）', () => {
     const { sections, prompt } = buildReviewHandoff(
       makeInput({ comment: { ...COMMENT, body: long } })
     );
-    const body = sectionByTitle(sections, '审阅反馈')?.body ?? '';
+    const body = sectionByTitle(sections, 'Review feedback')?.body ?? '';
     const lastLine = body.split('\n').at(-1) ?? '';
     expect(lastLine).toBe('x'.repeat(3999) + '…');
     expect(lastLine).toHaveLength(4000);

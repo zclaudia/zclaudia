@@ -8,13 +8,13 @@ import {
 } from '../api';
 import type { DesignTemplateSummary } from '../api';
 
-const LOADING_LABEL = '正在加载模板…';
-const EMPTY_LABEL = '暂无内置模板。';
-const CONFLICT_TITLE = '这些文件已存在：';
-const CONFLICT_HINT = '重新安装会替换以上文件。';
-const OVERWRITE_LABEL = '覆盖以上文件重新安装';
-const INSTALL_DONE_LABEL = '安装完成，已写入以下文件：';
-const OPEN_PAGE_LABEL = '打开页面';
+const LOADING_LABEL = 'Loading templates…';
+const EMPTY_LABEL = 'No built-in templates.';
+const CONFLICT_TITLE = 'These files already exist:';
+const CONFLICT_HINT = 'Reinstalling will replace the files above.';
+const OVERWRITE_LABEL = 'Reinstall and overwrite the files above';
+const INSTALL_DONE_LABEL = 'Installation finished; the following files were written:';
+const OPEN_PAGE_LABEL = 'Open page';
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -116,7 +116,7 @@ export function TemplateDialog({
             {template.entry}
           </span>
           <span className="text-[11px] text-muted-foreground">
-            {template.files.length} 个文件 · v{template.version}
+            {template.files.length} files · v{template.version}
           </span>
         </div>
         <Button
@@ -124,10 +124,10 @@ export function TemplateDialog({
           variant="outline"
           className="shrink-0"
           disabled={busy}
-          aria-label={`安装 ${template.name}`}
+          aria-label={`Install ${template.name}`}
           onClick={() => install(template.id)}
         >
-          {installing ? '安装中…' : '安装'}
+          {installing ? 'Installing…' : 'Install'}
         </Button>
       </li>
     );
@@ -137,8 +137,8 @@ export function TemplateDialog({
     <Modal
       open={open}
       onClose={onClose}
-      ariaLabel="模板"
-      title="模板"
+      ariaLabel="Templates"
+      title="Templates"
       size="lg"
       footer={
         result ? (
@@ -147,13 +147,13 @@ export function TemplateDialog({
               {OPEN_PAGE_LABEL}
             </Button>
             <Button size="sm" onClick={onClose}>
-              关闭
+              Close
             </Button>
           </div>
         ) : (
           <div className="flex justify-end">
             <Button size="sm" onClick={onClose}>
-              关闭
+              Close
             </Button>
           </div>
         )
@@ -166,7 +166,7 @@ export function TemplateDialog({
               {loadError}
             </span>
             <Button size="sm" onClick={load}>
-              重试
+              Retry
             </Button>
           </div>
         )}
@@ -191,7 +191,7 @@ export function TemplateDialog({
               ))}
             </ul>
             <div className="text-muted-foreground">
-              入口：<span className="font-mono text-[11px]">{result.entry}</span>
+              Entry: <span className="font-mono text-[11px]">{result.entry}</span>
             </div>
           </div>
         )}
@@ -226,7 +226,7 @@ export function TemplateDialog({
                   {installError.message}
                 </span>
                 <Button size="sm" disabled={busy} onClick={() => install(installError.templateId)}>
-                  重试
+                  Retry
                 </Button>
               </div>
             )}

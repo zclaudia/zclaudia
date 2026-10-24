@@ -13,14 +13,16 @@ import { relativeAssetRef } from '../asset-ref';
 import { renderDesignMd, renderTokensCss, validateBrandSpec } from '../brand';
 import type { BrandSpec } from '../brand';
 
-const FORM_HINT = '生成 design/DESIGN.md 与 design/tokens.css 两个品牌文件；Agent 修改页面时会读取它们。';
-const TEXT_HINT = '直接编辑品牌文件；保存前会校验文件未被外部修改。';
-const LOADING_LABEL = '正在加载品牌文件…';
-const CREATE_DONE_LABEL = '品牌文件已创建：design/DESIGN.md、design/tokens.css';
-const SAVED_LABEL = '已保存';
-const CONFLICT_LABEL = '文件已在其他位置更新，请重新加载';
-const ASSET_EMPTY = '工作区暂无素材';
-const ASSET_LOAD_ERROR = '素材清单加载失败';
+const FORM_HINT =
+  'Generates two brand files, design/DESIGN.md and design/tokens.css; the Agent reads them when editing pages.';
+const TEXT_HINT =
+  'Edit the brand files directly; saving checks that they were not modified externally.';
+const LOADING_LABEL = 'Loading brand files…';
+const CREATE_DONE_LABEL = 'Brand files created: design/DESIGN.md, design/tokens.css';
+const SAVED_LABEL = 'Saved';
+const CONFLICT_LABEL = 'The file was updated elsewhere; reload it';
+const ASSET_EMPTY = 'No assets in the workspace yet';
+const ASSET_LOAD_ERROR = 'Failed to load the asset list';
 
 /** 与 brand.ts 的颜色语法同口径，仅用于色块预览（真校验走 validateBrandSpec）。 */
 const COLOR_PREVIEW =
@@ -40,17 +42,17 @@ const DEFAULT_SPEC: BrandSpec = {
 };
 
 const COLOR_FIELDS: { key: 'primary' | 'secondary' | 'background' | 'text'; label: string }[] = [
-  { key: 'primary', label: '主色' },
-  { key: 'secondary', label: '辅色' },
-  { key: 'background', label: '背景' },
-  { key: 'text', label: '文字' },
+  { key: 'primary', label: 'Primary' },
+  { key: 'secondary', label: 'Secondary' },
+  { key: 'background', label: 'Background' },
+  { key: 'text', label: 'Text' },
 ];
 
 const RADIUS_OPTIONS: { value: BrandSpec['radius']; label: string }[] = [
-  { value: 'none', label: '无' },
-  { value: 'sm', label: '小 4px' },
-  { value: 'md', label: '中 8px' },
-  { value: 'lg', label: '大 16px' },
+  { value: 'none', label: 'None' },
+  { value: 'sm', label: 'Small 4px' },
+  { value: 'md', label: 'Medium 8px' },
+  { value: 'lg', label: 'Large 16px' },
 ];
 
 type AssetPanelState = 'closed' | 'loading' | 'ready' | 'error';
@@ -226,7 +228,7 @@ export function BrandPanel({ open, backendId, sessionId, onClose, onSaved }: Bra
     <>
       {state.status === 'saving' && (
         <div role="status" className="text-muted-foreground">
-          保存中…
+          Saving…
         </div>
       )}
       {state.status === 'saved' && (
@@ -239,8 +241,8 @@ export function BrandPanel({ open, backendId, sessionId, onClose, onSaved }: Bra
           <span role="alert" className="text-warning">
             {CONFLICT_LABEL}
           </span>
-          <Button size="sm" aria-label={`重新加载 ${fileLabel}`} onClick={load}>
-            重新加载
+          <Button size="sm" aria-label={`Reload ${fileLabel}`} onClick={load}>
+            Reload
           </Button>
         </div>
       )}
@@ -256,18 +258,18 @@ export function BrandPanel({ open, backendId, sessionId, onClose, onSaved }: Bra
     <Modal
       open={open}
       onClose={onClose}
-      ariaLabel="品牌"
-      title="品牌"
+      ariaLabel="Brand"
+      title="Brand"
       size="lg"
       footer={
         <div className="flex justify-end gap-2">
           {!textMode && brand !== null && (
             <Button size="sm" variant="primary" disabled={formSaving} onClick={submitForm}>
-              生成品牌文件
+              Generate brand files
             </Button>
           )}
           <Button size="sm" onClick={onClose}>
-            关闭
+            Close
           </Button>
         </div>
       }
@@ -284,7 +286,7 @@ export function BrandPanel({ open, backendId, sessionId, onClose, onSaved }: Bra
               {loadError}
             </span>
             <Button size="sm" onClick={load}>
-              重试
+              Retry
             </Button>
           </div>
         )}
@@ -343,7 +345,7 @@ export function BrandPanel({ open, backendId, sessionId, onClose, onSaved }: Bra
             {(['fontBody', 'fontHeading'] as const).map(key => (
               <div key={key} className="grid grid-cols-[4.5rem_1fr] items-center gap-2">
                 <label htmlFor={`brand-${key}`} className="text-muted-foreground">
-                  {key === 'fontBody' ? '正文字体' : '标题字体'}
+                  {key === 'fontBody' ? 'Body font' : 'Heading font'}
                 </label>
                 <Input
                   id={`brand-${key}`}
@@ -354,7 +356,7 @@ export function BrandPanel({ open, backendId, sessionId, onClose, onSaved }: Bra
             ))}
             <div className="grid grid-cols-[4.5rem_1fr] items-center gap-2">
               <label htmlFor="brand-spacing" className="text-muted-foreground">
-                间距基准
+                Spacing base
               </label>
               <select
                 id="brand-spacing"
@@ -370,7 +372,7 @@ export function BrandPanel({ open, backendId, sessionId, onClose, onSaved }: Bra
             </div>
             <div className="grid grid-cols-[4.5rem_1fr] items-center gap-2">
               <label htmlFor="brand-radius" className="text-muted-foreground">
-                圆角
+                Corner radius
               </label>
               <select
                 id="brand-radius"
@@ -389,16 +391,16 @@ export function BrandPanel({ open, backendId, sessionId, onClose, onSaved }: Bra
             </div>
             <div className="grid grid-cols-[4.5rem_1fr_auto] items-center gap-2">
               <label htmlFor="brand-logoPath" className="text-muted-foreground">
-                Logo 路径
+                Logo path
               </label>
               <Input
                 id="brand-logoPath"
                 value={form.logoPath}
-                placeholder="assets/logo.svg（相对 design/）"
+                placeholder="assets/logo.svg (relative to design/)"
                 onChange={event => setForm(prev => ({ ...prev, logoPath: event.target.value }))}
               />
               <Button size="sm" variant="outline" className="shrink-0" onClick={toggleAssets}>
-                从素材库选择…
+                Choose from asset library…
               </Button>
             </div>
             {assetPanel !== 'closed' && (
@@ -408,14 +410,14 @@ export function BrandPanel({ open, backendId, sessionId, onClose, onSaved }: Bra
               >
                 {assetPanel === 'loading' && (
                   <div className="px-1 py-0.5 text-[11px] text-muted-foreground">
-                    正在加载素材…
+                    Loading assets…
                   </div>
                 )}
                 {assetPanel === 'error' && (
                   <div className="flex items-center gap-1 px-1 py-0.5 text-[11px] text-destructive">
                     <span role="alert">{ASSET_LOAD_ERROR}</span>
                     <Button size="sm" onClick={loadAssets}>
-                      重试
+                      Retry
                     </Button>
                   </div>
                 )}
@@ -437,12 +439,12 @@ export function BrandPanel({ open, backendId, sessionId, onClose, onSaved }: Bra
             )}
             <div className="flex flex-col gap-1">
               <label htmlFor="brand-notes" className="text-muted-foreground">
-                使用规则
+                Usage rules
               </label>
               <textarea
                 id="brand-notes"
                 className={`${FIELD_CLASS} min-h-20`}
-                placeholder="写入 DESIGN.md 的使用规则，例如色彩对比、留白与字重约束。"
+                placeholder="Usage rules written to DESIGN.md, e.g. color contrast, whitespace, and font-weight constraints."
                 value={form.notes}
                 onChange={event => setForm(prev => ({ ...prev, notes: event.target.value }))}
               />
@@ -459,14 +461,14 @@ export function BrandPanel({ open, backendId, sessionId, onClose, onSaved }: Bra
                   size="sm"
                   variant="outline"
                   disabled={mdSave.status === 'saving'}
-                  aria-label="保存 DESIGN.md"
+                  aria-label="Save DESIGN.md"
                   onClick={() => saveFile('designMd')}
                 >
-                  保存
+                  Save
                 </Button>
               </div>
               <textarea
-                aria-label="DESIGN.md 内容"
+                aria-label="DESIGN.md content"
                 value={designMdText}
                 spellCheck={false}
                 onChange={event => setDesignMdText(event.target.value)}
@@ -482,14 +484,14 @@ export function BrandPanel({ open, backendId, sessionId, onClose, onSaved }: Bra
                   size="sm"
                   variant="outline"
                   disabled={cssSave.status === 'saving'}
-                  aria-label="保存 tokens.css"
+                  aria-label="Save tokens.css"
                   onClick={() => saveFile('tokensCss')}
                 >
-                  保存
+                  Save
                 </Button>
               </div>
               <textarea
-                aria-label="tokens.css 内容"
+                aria-label="tokens.css content"
                 value={tokensCssText}
                 spellCheck={false}
                 onChange={event => setTokensCssText(event.target.value)}

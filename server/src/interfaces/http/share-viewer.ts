@@ -21,7 +21,7 @@ export const SHARE_VIEWER_HTML = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>设计分享</title>
+<title>Design share</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #1f2328; height: 100vh; display: flex; flex-direction: column; }
@@ -61,26 +61,26 @@ export const SHARE_VIEWER_HTML = `<!doctype html>
 <body>
 <header>
   <div style="min-width:0">
-    <div id="title">加载中…</div>
+    <div id="title">Loading…</div>
     <div id="subline"><span id="snapMeta"></span><span id="completeBadge" class="badge hidden"></span></div>
     <div id="expireNote" class="hidden"></div>
   </div>
-  <label class="name-box">姓名（可选）<input id="authorName" placeholder="匿名" maxlength="60"></label>
+  <label class="name-box">Name (optional)<input id="authorName" placeholder="Anonymous" maxlength="60"></label>
 </header>
 <main>
   <section class="stage">
-    <iframe id="stageFrame" title="分享页面预览" sandbox="allow-same-origin"></iframe>
+    <iframe id="stageFrame" title="Shared page preview" sandbox="allow-same-origin"></iframe>
   </section>
   <aside class="comments">
-    <h2>评论（<span id="commentCount">0</span>）</h2>
-    <ul id="commentList"><li class="empty">加载中…</li></ul>
+    <h2>Comments (<span id="commentCount">0</span>)</h2>
+    <ul id="commentList"><li class="empty">Loading…</li></ul>
     <form id="commentForm">
       <div id="targetSummary" class="hidden">
         <span id="targetText"></span>
-        <button type="button" id="clearTarget">清除定位（评论整页）</button>
+        <button type="button" id="clearTarget">Clear anchor (comment on the whole page)</button>
       </div>
-      <textarea id="commentBody" placeholder="写下你的审阅反馈…" required></textarea>
-      <button type="submit">发表评论</button>
+      <textarea id="commentBody" placeholder="Write your review feedback…" required></textarea>
+      <button type="submit">Post comment</button>
       <p id="formMessage" class="hidden"></p>
     </form>
   </aside>
@@ -162,7 +162,7 @@ export const SHARE_VIEWER_HTML = `<!doctype html>
 
   function targetLabel(target, limit) {
     var text = collapse(target.text).slice(0, limit);
-    return '定位：' + target.tagName + (text ? ' ' + text : '（无文本）');
+    return 'Anchor: ' + target.tagName + (text ? ' ' + text : '(no text)');
   }
 
   function selectElement(el) {
@@ -186,7 +186,7 @@ export const SHARE_VIEWER_HTML = `<!doctype html>
       var node = event.target;
       if (node && node.closest) {
         var link = node.closest('a');
-        if (link) toast('分享为静态快照，链接跳转已停用：' + link.href);
+        if (link) toast('Shared as a static snapshot; link navigation is disabled: ' + link.href);
       }
       if (node && node.nodeType === 1) selectElement(node);
     }, true);
@@ -196,7 +196,7 @@ export const SHARE_VIEWER_HTML = `<!doctype html>
 
   function markChipDead(chip) {
     chip.classList.add('chip-dead');
-    chip.textContent = '定位已失效';
+    chip.textContent = 'Anchor lost';
   }
 
   function commentItem(comment) {
@@ -213,7 +213,7 @@ export const SHARE_VIEWER_HTML = `<!doctype html>
     if (comment.resolvedAt !== null && comment.resolvedAt !== undefined) {
       var done = document.createElement('span');
       done.className = 'badge badge-done';
-      done.textContent = '已解决';
+      done.textContent = 'Resolved';
       head.appendChild(done);
     }
     li.appendChild(head);
@@ -238,7 +238,7 @@ export const SHARE_VIEWER_HTML = `<!doctype html>
 
   function refreshComments() {
     return fetch(base + '/comments').then(function (res) {
-      if (!res.ok) throw new Error('评论加载失败（HTTP ' + res.status + '）');
+      if (!res.ok) throw new Error('Failed to load comments (HTTP ' + res.status + ')');
       return res.json();
     }).then(function (payload) {
       var comments = payload.comments || [];
@@ -248,7 +248,7 @@ export const SHARE_VIEWER_HTML = `<!doctype html>
       if (!comments.length) {
         var empty = document.createElement('li');
         empty.className = 'empty';
-        empty.textContent = '还没有评论，来发表第一条吧。';
+        empty.textContent = 'No comments yet — be the first.';
         list.appendChild(empty);
         return;
       }
@@ -259,23 +259,23 @@ export const SHARE_VIEWER_HTML = `<!doctype html>
   // ---- 清单与初始化 ----
 
   function applyManifest(manifest) {
-    document.title = manifest.title + ' · 设计分享';
+    document.title = manifest.title + ' · Design share';
     $('title').textContent = manifest.title;
     var meta = manifest.snapshotLabel
-      ? '快照：' + manifest.snapshotLabel + ' · ' + formatTime(manifest.snapshotCreatedAt)
-      : '快照时间：' + formatTime(manifest.snapshotCreatedAt);
+      ? 'Snapshot: ' + manifest.snapshotLabel + ' · ' + formatTime(manifest.snapshotCreatedAt)
+      : 'Snapshot time: ' + formatTime(manifest.snapshotCreatedAt);
     $('snapMeta').textContent = meta;
     var badge = $('completeBadge');
     if (manifest.complete) {
-      badge.textContent = '完整';
+      badge.textContent = 'Complete';
       badge.className = 'badge badge-ok';
     } else {
-      badge.textContent = '不完整：' + (manifest.incompleteReasons || []).join('、');
+      badge.textContent = 'Incomplete: ' + (manifest.incompleteReasons || []).join(', ');
       badge.className = 'badge badge-warn';
     }
     badge.classList.remove('hidden');
     if (manifest.expiresAt !== null && manifest.expiresAt !== undefined) {
-      $('expireNote').textContent = '链接将于 ' + formatTime(manifest.expiresAt) + ' 过期';
+      $('expireNote').textContent = 'The link expires at ' + formatTime(manifest.expiresAt);
       $('expireNote').classList.remove('hidden');
     }
     frame.src = base + '/f/' + manifest.entryPath.split('/').map(encodeURIComponent).join('/');
@@ -302,22 +302,22 @@ export const SHARE_VIEWER_HTML = `<!doctype html>
       return res.json().then(function (payload) { return { ok: res.ok, payload: payload }; });
     }).then(function (result) {
       if (!result.ok || !result.payload.comment) {
-        showFormError((result.payload.error && result.payload.error.message) || '发表失败，请重试');
+        showFormError((result.payload.error && result.payload.error.message) || 'Failed to post; try again');
         return;
       }
       $('commentBody').value = '';
       refreshComments().catch(function (err) { showFormError(err.message); });
-    }).catch(function () { showFormError('发表失败，请检查网络后重试'); });
+    }).catch(function () { showFormError('Failed to post; check your network and try again'); });
   });
 
   fetch(base + '/manifest.json').then(function (res) {
-    if (!res.ok) throw new Error('清单加载失败（HTTP ' + res.status + '）');
+    if (!res.ok) throw new Error('Failed to load the manifest (HTTP ' + res.status + ')');
     return res.json();
   }).then(function (manifest) {
     applyManifest(manifest);
     return refreshComments();
   }).catch(function (err) {
-    $('title').textContent = '分享视图加载失败';
+    $('title').textContent = 'Failed to load the share view';
     showFormError(err.message);
   });
 })();

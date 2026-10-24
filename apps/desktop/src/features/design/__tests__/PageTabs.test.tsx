@@ -42,7 +42,7 @@ function mount(overrides: Partial<PageTabsProps> = {}) {
 }
 
 async function pickOpenOption(label: string) {
-  fireEvent.click(screen.getByRole('button', { name: '打开页面' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Open page' }));
   const option = await screen.findByRole('option', { name: label });
   fireEvent.click(option);
 }
@@ -80,13 +80,13 @@ describe('PageTabs', () => {
     const h = mount();
     fireEvent.click(screen.getByRole('tab', { name: /about\.html/ }));
     expect(h.onActivate).toHaveBeenCalledWith('pages/about.html');
-    fireEvent.click(screen.getByRole('button', { name: '关闭 design/index.html' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close design/index.html' }));
     expect(h.onClose).toHaveBeenCalledWith('design/index.html');
   });
 
   it('lists unopened files in the 打开页面 dropdown and reports success silently', async () => {
     const h = mount();
-    fireEvent.click(screen.getByRole('button', { name: '打开页面' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open page' }));
     // 已打开的文件不出现在下拉里。
     expect(screen.queryByRole('option', { name: 'design/index.html' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'pages/about.html' })).not.toBeInTheDocument();
@@ -99,7 +99,7 @@ describe('PageTabs', () => {
   it('hints 先关闭未保存的页面 when open is rejected at the page limit', async () => {
     mount({ onOpen: vi.fn().mockResolvedValue({ ok: false, reason: 'limit' }) });
     await pickOpenOption('pages/new.html');
-    expect(await screen.findByRole('status')).toHaveTextContent('先关闭未保存的页面');
+    expect(await screen.findByRole('status')).toHaveTextContent('Close unsaved pages first');
   });
 
   it('surfaces the controller message when a page fails to load', async () => {

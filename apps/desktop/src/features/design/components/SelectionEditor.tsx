@@ -18,14 +18,14 @@ import type {
 } from '../types';
 
 const OVERRIDE_WARNING =
-  '修改已写入源码，但计算样式仍被外部样式覆盖（如 !important）；已按内联声明写入，未提高优先级。';
-const LINE_OFFSET_HINT = '文件查看器显示已保存版本，行号以草稿计算可能有偏移';
-const LOCATE_ERROR = '无法定位源码位置';
-const INVALID_PREFIX = '值无效：';
-const ASSET_LOADING = '正在加载图片清单…';
-const ASSET_LOAD_ERROR = '图片清单加载失败';
-const ASSET_EMPTY = '工作区没有图片文件';
-const DELETE_CONFIRM_LABEL = '再次点击确认删除';
+  'Changes were written to the source, but the computed style is overridden by external styles (e.g. !important); written as an inline declaration without raising specificity.';
+const LINE_OFFSET_HINT = 'The file viewer shows the saved version; line numbers may be offset relative to the draft';
+const LOCATE_ERROR = 'Cannot locate the source position';
+const INVALID_PREFIX = 'Invalid value: ';
+const ASSET_LOADING = 'Loading image list…';
+const ASSET_LOAD_ERROR = 'Failed to load the image list';
+const ASSET_EMPTY = 'No image files in the workspace';
+const DELETE_CONFIRM_LABEL = 'Click again to confirm delete';
 /** 删除按钮的内联确认窗口（毫秒）。 */
 const DELETE_CONFIRM_TIMEOUT = 3000;
 
@@ -53,27 +53,27 @@ interface StyleFieldDef {
 }
 
 const TYPOGRAPHY_FIELDS: StyleFieldDef[] = [
-  { property: 'font-family', label: '字体', kind: 'input', placeholder: 'sans-serif' },
-  { property: 'font-size', label: '字号', kind: 'input', placeholder: '16px' },
-  { property: 'line-height', label: '行高', kind: 'input', placeholder: '1.5' },
-  { property: 'font-weight', label: '字重', kind: 'input', placeholder: 'normal / bold / 400' },
-  { property: 'text-align', label: '对齐', kind: 'select', options: TEXT_ALIGN_OPTIONS },
+  { property: 'font-family', label: 'Font', kind: 'input', placeholder: 'sans-serif' },
+  { property: 'font-size', label: 'Font size', kind: 'input', placeholder: '16px' },
+  { property: 'line-height', label: 'Line height', kind: 'input', placeholder: '1.5' },
+  { property: 'font-weight', label: 'Weight', kind: 'input', placeholder: 'normal / bold / 400' },
+  { property: 'text-align', label: 'Align', kind: 'select', options: TEXT_ALIGN_OPTIONS },
 ];
 
 const SIZE_FIELDS: StyleFieldDef[] = [
-  { property: 'width', label: '宽度', kind: 'input', placeholder: 'auto' },
-  { property: 'height', label: '高度', kind: 'input', placeholder: 'auto' },
-  { property: 'margin', label: '外边距', kind: 'input', placeholder: '8px 12px' },
-  { property: 'padding', label: '内边距', kind: 'input', placeholder: '8px 12px' },
+  { property: 'width', label: 'Width', kind: 'input', placeholder: 'auto' },
+  { property: 'height', label: 'Height', kind: 'input', placeholder: 'auto' },
+  { property: 'margin', label: 'Margin', kind: 'input', placeholder: '8px 12px' },
+  { property: 'padding', label: 'Padding', kind: 'input', placeholder: '8px 12px' },
 ];
 
 const BORDER_FIELDS: StyleFieldDef[] = [
-  { property: 'border-width', label: '边框宽度', kind: 'input', placeholder: '1px' },
-  { property: 'border-color', label: '边框颜色', kind: 'input', placeholder: '#000000' },
-  { property: 'border-radius', label: '圆角', kind: 'input', placeholder: '4px' },
+  { property: 'border-width', label: 'Border width', kind: 'input', placeholder: '1px' },
+  { property: 'border-color', label: 'Border color', kind: 'input', placeholder: '#000000' },
+  { property: 'border-radius', label: 'Radius', kind: 'input', placeholder: '4px' },
   {
     property: 'border-style',
-    label: '边框样式',
+    label: 'Border style',
     kind: 'select',
     options: BORDER_STYLE_OPTIONS,
   },
@@ -81,7 +81,7 @@ const BORDER_FIELDS: StyleFieldDef[] = [
 
 const OBJECT_FIT_FIELD: StyleFieldDef = {
   property: 'object-fit',
-  label: '显示方式',
+  label: 'Fit',
   kind: 'select',
   options: OBJECT_FIT_OPTIONS,
 };
@@ -127,10 +127,10 @@ function InlineBadge({ testId }: { testId: string }) {
   return (
     <span
       data-testid={testId}
-      title="该属性来自元素 style 属性（内联声明）"
+      title="This property comes from the element's style attribute (inline declaration)"
       className="rounded bg-muted px-1 text-[9px] font-medium text-muted-foreground"
     >
-      内联
+      Inline
     </span>
   );
 }
@@ -170,7 +170,7 @@ function StyleFieldRow({ field, value, invalid, inline, busy, onChange, onClear 
             className={FIELD_CLASS}
             onChange={event => onChange(event.target.value)}
           >
-            <option value="">不修改</option>
+            <option value="">No change</option>
             {field.options?.map(option => (
               <option key={option} value={option}>
                 {option}
@@ -182,7 +182,7 @@ function StyleFieldRow({ field, value, invalid, inline, busy, onChange, onClear 
           size="sm"
           className="shrink-0"
           disabled={busy}
-          aria-label={`清除${field.label}`}
+          aria-label={`Clear ${field.label}`}
           onClick={onClear}
         >
           ×
@@ -296,11 +296,11 @@ export function SelectionEditor({
 
   if (!selection) {
     return (
-      <section className="flex flex-col gap-3" aria-label="选中元素">
-        <div className="text-[11px] font-medium text-muted-foreground">选中元素</div>
+      <section className="flex flex-col gap-3" aria-label="Selected element">
+        <div className="text-[11px] font-medium text-muted-foreground">Selected element</div>
         <p className="text-xs text-muted-foreground">
-          点击预览中的元素进行编辑。预览面向静态 HTML/CSS；请勿依赖 JavaScript 渲染或 CDN
-          外链资源。
+          Click an element in the preview to edit it. The preview targets static HTML/CSS; do not
+          rely on JavaScript rendering or CDN resources.
         </p>
       </section>
     );
@@ -351,12 +351,12 @@ export function SelectionEditor({
     const attributeFields: Array<{ name: DesignAttributeName; label: string; value: string }> = [];
     if (selection.tagName === 'img') {
       attributeFields.push(
-        { name: 'src', label: '图片地址', value: srcValue },
-        { name: 'alt', label: '替代文本', value: altValue }
+        { name: 'src', label: 'Image URL', value: srcValue },
+        { name: 'alt', label: 'Alt text', value: altValue }
       );
     }
     if (selection.tagName === 'a') {
-      attributeFields.push({ name: 'href', label: '链接地址', value: hrefValue });
+      attributeFields.push({ name: 'href', label: 'Link URL', value: hrefValue });
     }
     for (const field of attributeFields) {
       if (!field.value.trim() || field.value === (selection.attrs?.[field.name] ?? '')) continue;
@@ -477,8 +477,8 @@ export function SelectionEditor({
   );
 
   return (
-    <section className="flex flex-col gap-3" aria-label="选中元素">
-      <div className="text-[11px] font-medium text-muted-foreground">选中元素</div>
+    <section className="flex flex-col gap-3" aria-label="Selected element">
+      <div className="text-[11px] font-medium text-muted-foreground">Selected element</div>
       <div className="flex items-center justify-between font-mono text-xs text-muted-foreground">
         <span>
           &lt;{selection.tagName}&gt; · {selection.elementPath.join('.')}
@@ -486,21 +486,21 @@ export function SelectionEditor({
         <span className="flex items-center gap-1">
           <Button
             size="sm"
-            aria-label="父级"
+            aria-label="Parent"
             disabled={!onSelectPath || elementPathEmpty}
             onClick={() => onSelectPath?.(selection.elementPath.slice(0, -1))}
           >
-            父级
+            Parent
           </Button>
           <Button
             size="sm"
-            aria-label="子级"
+            aria-label="Child"
             disabled={!onSelectPath || docSource === null || childPath === null}
             onClick={() => {
               if (childPath) onSelectPath?.(childPath);
             }}
           >
-            子级
+            Child
           </Button>
         </span>
       </div>
@@ -510,9 +510,9 @@ export function SelectionEditor({
         </div>
       )}
       <label className="grid gap-1 text-xs">
-        文字
+        Text
         <textarea
-          aria-label="元素文字"
+          aria-label="Element text"
           className={`${FIELD_CLASS} resize-y`}
           rows={2}
           value={textValue}
@@ -522,12 +522,12 @@ export function SelectionEditor({
       <div className="grid grid-cols-2 gap-2">
         <div className="grid gap-1 text-xs">
           <span className="flex items-center gap-1">
-            文字颜色
+            Text color
             {inlineNames.has('color') && <InlineBadge testId="inline-badge-color" />}
           </span>
           <div className="flex items-center gap-1">
             <Input
-              aria-label="文字颜色"
+              aria-label="Text color"
               value={colorValue}
               placeholder="#000000"
               disabled={busy}
@@ -537,21 +537,21 @@ export function SelectionEditor({
               size="sm"
               className="shrink-0"
               disabled={busy}
-              aria-label="清除文字颜色"
+              aria-label="Clear text color"
               onClick={() => onApply([{ kind: 'style', property: 'color', value: null }])}
             >
-              清除文字颜色
+              Clear text color
             </Button>
           </div>
         </div>
         <div className="grid gap-1 text-xs">
           <span className="flex items-center gap-1">
-            背景颜色
+            Background color
             {inlineNames.has('background-color') && <InlineBadge testId="inline-badge-background-color" />}
           </span>
           <div className="flex items-center gap-1">
             <Input
-              aria-label="背景颜色"
+              aria-label="Background color"
               value={backgroundValue}
               placeholder="transparent"
               disabled={busy}
@@ -561,60 +561,60 @@ export function SelectionEditor({
               size="sm"
               className="shrink-0"
               disabled={busy}
-              aria-label="清除背景颜色"
+              aria-label="Clear background color"
               onClick={() => onApply([{ kind: 'style', property: 'background-color', value: null }])}
             >
-              清除背景颜色
+              Clear background color
             </Button>
           </div>
         </div>
       </div>
       <div className="grid gap-2">
-        <GroupTitle>排版</GroupTitle>
+        <GroupTitle>Typography</GroupTitle>
         <div className="grid grid-cols-2 gap-2">
           {TYPOGRAPHY_FIELDS.map(renderStyleField)}
         </div>
       </div>
       <div className="grid gap-2">
-        <GroupTitle>尺寸与间距</GroupTitle>
+        <GroupTitle>Size &amp; spacing</GroupTitle>
         <div className="grid grid-cols-2 gap-2">{SIZE_FIELDS.map(renderStyleField)}</div>
       </div>
       <div className="grid gap-2">
-        <GroupTitle>边框</GroupTitle>
+        <GroupTitle>Border</GroupTitle>
         <div className="grid grid-cols-2 gap-2">{BORDER_FIELDS.map(renderStyleField)}</div>
       </div>
       {selection.tagName === 'img' && (
         <div className="grid gap-2">
-          <GroupTitle>图片</GroupTitle>
+          <GroupTitle>Image</GroupTitle>
           <div className="grid grid-cols-2 gap-2">
             <div className="col-span-2 grid gap-1 text-xs">
-              <span>图片地址</span>
+              <span>Image URL</span>
               <span className="flex items-center gap-1">
                 <Input
-                  aria-label="图片地址"
+                  aria-label="Image URL"
                   value={srcValue}
                   placeholder="assets/photo.png"
                   disabled={busy}
-                  aria-invalid={invalidLabels.includes('图片地址') || undefined}
+                  aria-invalid={invalidLabels.includes('Image URL') || undefined}
                   onChange={e => setSrcValue(e.target.value)}
                 />
                 <Button
                   size="sm"
                   className="shrink-0"
                   disabled={busy || !sessionId}
-                  aria-label="选择图片"
+                  aria-label="Choose image"
                   onClick={toggleAssetPanel}
                 >
-                  选择…
+                  Browse…
                 </Button>
                 <Button
                   size="sm"
                   className="shrink-0"
                   disabled={busy}
-                  aria-label="清除图片地址"
+                  aria-label="Clear image URL"
                   onClick={() => clearAttribute('src')}
                 >
-                  清除
+                  Clear
                 </Button>
               </span>
               {assetPanelOpen && (
@@ -629,7 +629,7 @@ export function SelectionEditor({
                     <div className="flex items-center gap-1 px-1 py-0.5 text-[11px] text-destructive">
                       <span role="alert">{ASSET_LOAD_ERROR}</span>
                       <Button size="sm" onClick={() => fetchAssets(true)}>
-                        重试
+                        Retry
                       </Button>
                     </div>
                   )}
@@ -651,20 +651,20 @@ export function SelectionEditor({
               )}
             </div>
             <div className="grid gap-1 text-xs">
-              <span>替代文本</span>
+              <span>Alt text</span>
               <span className="flex items-center gap-1">
                 <Input
-                  aria-label="替代文本"
+                  aria-label="Alt text"
                   value={altValue}
                   disabled={busy}
-                  aria-invalid={invalidLabels.includes('替代文本') || undefined}
+                  aria-invalid={invalidLabels.includes('Alt text') || undefined}
                   onChange={e => setAltValue(e.target.value)}
                 />
                 <Button
                   size="sm"
                   className="shrink-0"
                   disabled={busy}
-                  aria-label="清除替代文本"
+                  aria-label="Clear alt text"
                   onClick={() => clearAttribute('alt')}
                 >
                   ×
@@ -677,24 +677,24 @@ export function SelectionEditor({
       )}
       {selection.tagName === 'a' && (
         <div className="grid gap-2">
-          <GroupTitle>链接</GroupTitle>
+          <GroupTitle>Link</GroupTitle>
           <div className="grid grid-cols-2 gap-2">
             <div className="col-span-2 grid gap-1 text-xs">
-              <span>链接地址</span>
+              <span>Link URL</span>
               <span className="flex items-center gap-1">
                 <Input
-                  aria-label="链接地址"
+                  aria-label="Link URL"
                   value={hrefValue}
-                  placeholder="page.html 或 https://…"
+                  placeholder="page.html or https://…"
                   disabled={busy}
-                  aria-invalid={invalidLabels.includes('链接地址') || undefined}
+                  aria-invalid={invalidLabels.includes('Link URL') || undefined}
                   onChange={e => setHrefValue(e.target.value)}
                 />
                 <Button
                   size="sm"
                   className="shrink-0"
                   disabled={busy}
-                  aria-label="清除链接地址"
+                  aria-label="Clear link URL"
                   onClick={() => clearAttribute('href')}
                 >
                   ×
@@ -706,15 +706,15 @@ export function SelectionEditor({
       )}
       <div className="flex items-center gap-2">
         <Button size="sm" variant="primary" onClick={applyChanges} disabled={busy}>
-          应用修改
+          Apply changes
         </Button>
         <Button
           size="sm"
           onClick={viewSource}
           disabled={busy || !docSource || !docPath}
-          aria-label="查看源码"
+          aria-label="View source"
         >
-          查看源码
+          View source
         </Button>
       </div>
       {invalidLabels.length > 0 && (
@@ -728,24 +728,24 @@ export function SelectionEditor({
         </div>
       )}
       <div className="flex items-center gap-1 border-t border-border pt-2">
-        <span className="text-[11px] font-medium text-muted-foreground">结构</span>
+        <span className="text-[11px] font-medium text-muted-foreground">Structure</span>
         <Button size="sm" disabled={structureDisabled} onClick={() => submitStructure('duplicate')}>
-          复制
+          Copy
         </Button>
         <Button
           size="sm"
           variant={confirmDelete ? 'destructive' : 'ghost'}
           disabled={structureDisabled}
-          aria-label="删除元素"
+          aria-label="Delete element"
           onClick={handleDeleteClick}
         >
-          {confirmDelete ? DELETE_CONFIRM_LABEL : '删除'}
+          {confirmDelete ? DELETE_CONFIRM_LABEL : 'Delete'}
         </Button>
         <Button size="sm" disabled={!canMoveUp} onClick={() => submitStructure('move-up')}>
-          上移
+          Move up
         </Button>
         <Button size="sm" disabled={!canMoveDown} onClick={() => submitStructure('move-down')}>
-          下移
+          Move down
         </Button>
       </div>
       {locateFailed === selection && (

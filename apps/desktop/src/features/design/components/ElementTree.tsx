@@ -3,8 +3,9 @@ import { buildElementTree } from '../element-tree';
 import type { ElementTreeNode } from '../element-tree';
 
 /** 能力边界说明（P3 §7.1）：树由草稿源码构建，伪元素与脚本生成的内容不出现。 */
-const TREE_HELP = '结构树由页面源码构建；伪元素与脚本生成的内容不会出现在这里。';
-const EMPTY_TEXT = '此页面没有可显示的元素。';
+const TREE_HELP =
+  'The structure tree is built from the page source; pseudo-elements and script-generated content do not appear here.';
+const EMPTY_TEXT = 'This page has no displayable elements.';
 /** 默认展开前两层（path 长度 ≤2 的节点处于展开状态）。 */
 const DEFAULT_EXPAND_DEPTH = 2;
 
@@ -47,7 +48,7 @@ export function ElementTree({ source, selectionPath, onSelectPath }: ElementTree
     selectionPath !== null && pathsEqual(selectionPath, node.path);
 
   return (
-    <section aria-label="结构树" className="flex min-h-0 flex-col">
+    <section aria-label="Structure tree" className="flex min-h-0 flex-col">
       <p className="border-b border-border px-2 py-1 text-[10px] leading-4 text-muted-foreground">
         {TREE_HELP}
       </p>
@@ -92,7 +93,7 @@ function TreeBranch({ node, depth, isSelected, isExpanded, onToggle, onSelect }:
           {hasChildren && (
             <button
               type="button"
-              aria-label={`${expanded ? '收起' : '展开'} ${key}`}
+              aria-label={`${expanded ? 'Collapse' : 'Expand'} ${key}`}
               aria-expanded={expanded}
               onClick={() => onToggle(node)}
               className="text-[9px] leading-3 text-muted-foreground transition-colors hover:text-foreground"
@@ -103,7 +104,7 @@ function TreeBranch({ node, depth, isSelected, isExpanded, onToggle, onSelect }:
         </span>
         <button
           type="button"
-          aria-label={`选中 ${node.tagName} ${key}`}
+          aria-label={`Select ${node.tagName} ${key}`}
           aria-current={isSelected(node) || undefined}
           onClick={() => onSelect(node.path)}
           className={`flex min-w-0 flex-1 items-baseline gap-1 overflow-hidden rounded px-1 text-left text-[11px] leading-4 transition-colors hover:bg-muted/60 ${
@@ -127,7 +128,7 @@ function TreeBranch({ node, depth, isSelected, isExpanded, onToggle, onSelect }:
             </span>
           )}
           {node.truncated && (
-            <span className="shrink-0 pl-1 text-[10px] text-muted-foreground/70">…（已截断）</span>
+            <span className="shrink-0 pl-1 text-[10px] text-muted-foreground/70">… (truncated)</span>
           )}
         </button>
       </div>

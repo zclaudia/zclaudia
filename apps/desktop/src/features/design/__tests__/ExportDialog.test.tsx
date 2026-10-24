@@ -72,17 +72,17 @@ describe('ExportDialog（P2 §6.4）', () => {
       })
     );
     expect(saveBlobToFile).toHaveBeenCalledWith(expect.any(Blob), 'index-20261023.zip');
-    expect(await screen.findByText('已导出：index-20261023.zip')).toBeInTheDocument();
+    expect(await screen.findByText('Exported: index-20261023.zip')).toBeInTheDocument();
   });
 
   it('dirty 页三选：不自动导出，取消直接关闭', () => {
     const { onClose } = mount({ dirty: true });
-    const dialog = screen.getByRole('dialog', { name: '导出' });
-    expect(within(dialog).getByText(/有未保存的修改/)).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: '保存并导出' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: '导出草稿' })).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Export' });
+    expect(within(dialog).getByText(/has unsaved changes/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Save and export' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Export draft' })).toBeInTheDocument();
     expect(exportDesignZip).not.toHaveBeenCalled();
-    fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -92,7 +92,7 @@ describe('ExportDialog（P2 §6.4）', () => {
       filename: 'draft.zip',
     });
     mount({ dirty: true });
-    fireEvent.click(screen.getByRole('button', { name: '导出草稿' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export draft' }));
     await waitFor(() =>
       expect(exportDesignZip).toHaveBeenCalledWith('remote-1', {
         sessionId: 's1',
@@ -104,7 +104,7 @@ describe('ExportDialog（P2 §6.4）', () => {
     const request = vi.mocked(exportDesignZip).mock.calls[0][1];
     expect(request).not.toHaveProperty('expectedRevision');
     expect(request).not.toHaveProperty('confirmIncomplete');
-    expect(await screen.findByText('已导出：draft.zip')).toBeInTheDocument();
+    expect(await screen.findByText('Exported: draft.zip')).toBeInTheDocument();
   });
 
   it('保存并导出：先保存，成功后以新磁盘修订走 disk 导出', async () => {
@@ -117,8 +117,8 @@ describe('ExportDialog（P2 §6.4）', () => {
       filename: 'saved.zip',
     });
     mount({ dirty: true, onSave });
-    fireEvent.click(screen.getByRole('button', { name: '保存并导出' }));
-    expect(await screen.findByText('正在保存…')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save and export' }));
+    expect(await screen.findByText('Saving…')).toBeInTheDocument();
     expect(exportDesignZip).not.toHaveBeenCalled();
     await act(async () => {
       resolveSave('rev-new');
@@ -131,15 +131,15 @@ describe('ExportDialog（P2 §6.4）', () => {
         expectedRevision: 'rev-new',
       })
     );
-    expect(await screen.findByText('已导出：saved.zip')).toBeInTheDocument();
+    expect(await screen.findByText('Exported: saved.zip')).toBeInTheDocument();
   });
 
   it('保存并导出：save 失败时停留对话框并显示错误，不发起导出', async () => {
     const onSave = vi.fn().mockResolvedValue(null);
     const { onClose } = mount({ dirty: true, onSave });
-    fireEvent.click(screen.getByRole('button', { name: '保存并导出' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save and export' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      '保存失败，已停止导出；请先解决保存问题再试。'
+      'Save failed, so the export was stopped; resolve the save problem and try again.'
     );
     expect(exportDesignZip).not.toHaveBeenCalled();
     expect(saveBlobToFile).not.toHaveBeenCalled();
@@ -155,7 +155,7 @@ describe('ExportDialog（P2 §6.4）', () => {
     mount();
     expect(await screen.findByText('assets/gone.png')).toBeInTheDocument();
     expect(screen.getByText('assets/x.css')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '仍要导出（包内清单会标注缺失）' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export anyway (the manifest will note missing files)' }));
     await waitFor(() => expect(exportDesignZip).toHaveBeenCalledTimes(2));
     expect(exportDesignZip).toHaveBeenLastCalledWith('remote-1', {
       sessionId: 's1',
@@ -164,7 +164,7 @@ describe('ExportDialog（P2 §6.4）', () => {
       expectedRevision: 'rev-disk',
       confirmIncomplete: true,
     });
-    expect(await screen.findByText('已导出：ok.zip')).toBeInTheDocument();
+    expect(await screen.findByText('Exported: ok.zip')).toBeInTheDocument();
   });
 
   it('REVISION_CONFLICT：提示正在刷新并触发一次面板 refreshNow', async () => {
@@ -172,21 +172,21 @@ describe('ExportDialog（P2 §6.4）', () => {
       new DesignHttpError('版本冲突', 'REVISION_CONFLICT')
     );
     const { onRefresh } = mount();
-    expect(await screen.findByText('文件已变化，正在刷新。')).toBeInTheDocument();
+    expect(await screen.findByText('The file has changed; refreshing.')).toBeInTheDocument();
     expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(saveBlobToFile).not.toHaveBeenCalled();
   });
 
   it('其余错误显示 message，可重试同一请求', async () => {
-    vi.mocked(exportDesignZip).mockRejectedValue(new Error('网络中断'));
+    vi.mocked(exportDesignZip).mockRejectedValue(new Error('Network interrupted'));
     mount();
-    expect(await screen.findByRole('alert')).toHaveTextContent('网络中断');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Network interrupted');
     vi.mocked(exportDesignZip).mockResolvedValue({
       blob: new Blob(['zip-bytes']),
       filename: 'retry.zip',
     });
-    fireEvent.click(screen.getByRole('button', { name: '重试' }));
-    expect(await screen.findByText('已导出：retry.zip')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Exported: retry.zip')).toBeInTheDocument();
     expect(exportDesignZip).toHaveBeenCalledTimes(2);
   });
 
@@ -199,12 +199,16 @@ describe('ExportDialog（P2 §6.4）', () => {
         })
     );
     mount();
-    expect(await screen.findByText('正在导出…')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '关闭' })).toBeDisabled();
+    expect(await screen.findByText('Exporting…')).toBeInTheDocument();
+    // Modal 右上角 X 与页脚按钮都叫 "Close"，页脚按钮带可见文本，按此区分。
+    const footerClose = screen
+      .getAllByRole('button', { name: 'Close' })
+      .find(button => button.textContent?.trim() === 'Close')!;
+    expect(footerClose).toBeDisabled();
     await act(async () => {
       resolveExport({ blob: new Blob(['zip-bytes']), filename: 'done.zip' });
     });
-    expect(await screen.findByText('已导出：done.zip')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '关闭' })).toBeEnabled();
+    expect(await screen.findByText('Exported: done.zip')).toBeInTheDocument();
+    expect(footerClose).toBeEnabled();
   });
 });

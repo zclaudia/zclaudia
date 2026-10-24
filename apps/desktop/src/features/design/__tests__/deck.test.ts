@@ -86,7 +86,7 @@ describe('parseDeck', () => {
   it('pairs marked slides correctly with nested plain sections', () => {
     const info = parseDeck(NESTED_DECK);
     expect(info.slides).toHaveLength(3);
-    expect(info.slides.map(slide => slide.title)).toEqual(['第一页', '第 2 页', '第三页']);
+    expect(info.slides.map(slide => slide.title)).toEqual(['第一页', 'Page 2', '第三页']);
     expect(info.slides.map(slide => slide.tagName)).toEqual(['section', 'section', 'section']);
     expect(info.slides[0]?.notes).toBe('备注 A');
     expect(info.slides[1]?.notes).toBe('');
@@ -315,14 +315,14 @@ describe('addDeckSlide', () => {
     expect(result.index).toBe(1);
     expect(result.source).toBe(
       '<!doctype html>\n<html><body>\n  <section data-zclaudia-slide data-title="A">A</section>\n' +
-        '  <section data-zclaudia-slide data-title="新页">\n' +
-        '    <h2>新页标题</h2>\n' +
-        '    <p>在此填写内容。</p>\n' +
+        '  <section data-zclaudia-slide data-title="New page">\n' +
+        '    <h2>New page title</h2>\n' +
+        '    <p>Add content here.</p>\n' +
         '  </section>\n</body></html>'
     );
     const info = parseDeck(result.source);
     expect(info.slides).toHaveLength(2);
-    expect(info.slides[1]!.title).toBe('新页');
+    expect(info.slides[1]!.title).toBe('New page');
     expect(info.slides[1]!.notes).toBe('');
     expect(info.siblings).toBe(true);
   });
@@ -331,15 +331,15 @@ describe('addDeckSlide', () => {
     const source = '<body>\n    <section data-zclaudia-slide>A</section>\n</body>';
     const result = addDeckSlide(source);
     expect(result.index).toBe(1);
-    expect(result.source).toContain('\n    <section data-zclaudia-slide data-title="新页">');
-    expect(result.source).toContain('\n      <h2>新页标题</h2>');
+    expect(result.source).toContain('\n    <section data-zclaudia-slide data-title="New page">');
+    expect(result.source).toContain('\n      <h2>New page title</h2>');
   });
 
   it('uses two-space indent when the page has no slides yet', () => {
     const source = '<body>\n  <p>普通页</p>\n</body>';
     const result = addDeckSlide(source);
     expect(result.index).toBe(0);
-    expect(result.source).toContain('\n  <section data-zclaudia-slide data-title="新页">');
+    expect(result.source).toContain('\n  <section data-zclaudia-slide data-title="New page">');
     expect(parseDeck(result.source).slides).toHaveLength(1);
   });
 

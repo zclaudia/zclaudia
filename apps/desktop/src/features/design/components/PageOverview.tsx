@@ -66,7 +66,7 @@ export function PageOverview({
             <div
               role="button"
               tabIndex={0}
-              aria-label={`激活 ${page.path}`}
+              aria-label={`Activate ${page.path}`}
               aria-pressed={page.path === activePath}
               onClick={() => onActivate(page.path)}
               onKeyDown={event => {
@@ -83,7 +83,7 @@ export function PageOverview({
                 style={{ width: DISPLAY_W, height: DISPLAY_H }}
               >
                 <iframe
-                  title={`页面缩略图 ${page.path}`}
+                  title={`Page thumbnail ${page.path}`}
                   sandbox="allow-scripts"
                   srcDoc={previews[page.path] || EMPTY_HTML}
                   aria-hidden
@@ -101,22 +101,24 @@ export function PageOverview({
                 <span className="min-w-0 flex-1 truncate text-[11px]" title={page.path}>
                   {basename(page.path)}
                 </span>
-                {page.status === 'dirty' && <Badge label="未保存" tone="accent" />}
-                {page.missing && <Badge label="缺失" tone="neutral" />}
+                {page.status === 'dirty' && <Badge label="Unsaved" tone="accent" />}
+                {page.missing && <Badge label="Missing" tone="neutral" />}
               </div>
               <Button
                 size="sm"
-                aria-label={`在查看器中打开 ${page.path}`}
+                aria-label={`Open in viewer ${page.path}`}
                 onClick={() => openInViewer(page.path)}
               >
-                在查看器中打开
+                Open in viewer
               </Button>
             </div>
           </li>
         ))}
       </ul>
       {pages.length === 0 && (
-        <p className="text-xs text-muted-foreground">尚无打开的页面；先从「打开页面」选择文件。</p>
+        <p className="text-xs text-muted-foreground">
+          No page open yet; choose a file from "Open page" first.
+        </p>
       )}
     </div>
   );

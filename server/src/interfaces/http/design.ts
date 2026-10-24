@@ -63,7 +63,7 @@ function handleError(res: Response, error: unknown): void {
 /** 与 L30 createOpenAiImagesProvider().info 一致的静态清单（本批唯一 provider）。 */
 const MEDIA_IMAGE_PROVIDER_INFO: MediaImageProviderInfo = {
   id: 'openai-images',
-  label: 'OpenAI 兼容图片服务',
+  label: 'OpenAI-compatible image service',
   capabilities: ['generate', 'edit'],
 };
 
@@ -114,10 +114,10 @@ function defaultMakeImageProvider(
   return async ref => {
     const profile = profilesRepo.findById(ref.profileId);
     if (!profile || profile.providerType !== 'openai') {
-      throw new DesignError(400, 'MEDIA_VALIDATION', '指定的服务配置不存在或不支持图片生成');
+      throw new DesignError(400, 'MEDIA_VALIDATION', 'The specified service profile does not exist or does not support image generation');
     }
     if (!profile.apiKey) {
-      throw new DesignError(400, 'MEDIA_VALIDATION', '所选服务配置缺少 API Key');
+      throw new DesignError(400, 'MEDIA_VALIDATION', 'The selected service profile has no API key');
     }
     return createOpenAiImagesProvider({
       baseUrl: profile.baseUrl,

@@ -37,15 +37,19 @@ describe('AgentContextPreview（P4 §5.2 检视模态）', () => {
 
   it('标题按 task 区分：generate 与 modify', () => {
     const first = mount({ task: 'generate' });
-    expect(screen.getByRole('dialog', { name: '生成页面 · 设计上下文' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Generate page · design context' })).toBeInTheDocument();
     first.unmount();
     mount({ task: 'modify' });
-    expect(screen.getByRole('dialog', { name: '交给 Agent 修改 · 设计上下文' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Hand off to Agent · design context' })).toBeInTheDocument();
   });
 
   it('顶部说明 + sections 逐项渲染（标题 + 行内容，Brand 原文照展示）', () => {
     mount();
-    expect(screen.getByText('以下内容将随指令进入当前聊天，可在输入框继续补充。')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'The following content will be sent with your instruction in the current chat; you can add more in the input box.'
+      )
+    ).toBeInTheDocument();
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('Workspace')).toBeInTheDocument();
     expect(within(dialog).getByText('Pages')).toBeInTheDocument();
@@ -63,7 +67,7 @@ describe('AgentContextPreview（P4 §5.2 检视模态）', () => {
 
   it('prompt 全文在「将填入聊天的指令」区可见', () => {
     mount();
-    expect(screen.getByText('将填入聊天的指令')).toBeInTheDocument();
+    expect(screen.getByText('Instruction to be filled into the chat')).toBeInTheDocument();
     expect(
       screen.getByText(/## Workspace[\s\S]*Create or update a page\./)
     ).toBeInTheDocument();
@@ -71,9 +75,9 @@ describe('AgentContextPreview（P4 §5.2 检视模态）', () => {
 
   it('「填入聊天」触发 onConfirm，「取消」触发 onClose', () => {
     const { onConfirm, onClose } = mount();
-    fireEvent.click(screen.getByRole('button', { name: '填入聊天' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Fill into chat' }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

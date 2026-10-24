@@ -65,7 +65,7 @@ describe('buildElementTree', () => {
     const tbody = table?.children.find(child => child.tagName === 'tbody');
     expect(tbody).toBeDefined();
     expect(tbody?.capability).toBe('implicit');
-    expect(tbody?.reason).toBe('源码中无显式标签');
+    expect(tbody?.reason).toBe('No explicit tag in the source');
     // Implicit nodes still expand their subtree for navigation.
     expect(tbody?.children.map(child => child.tagName)).toEqual(['tr']);
   });
@@ -76,7 +76,7 @@ describe('buildElementTree', () => {
     );
     const svg = findNode(tree, [0]);
     expect(svg?.capability).toBe('svg-subtree');
-    expect(svg?.reason).toBe('SVG 内容仅支持文字、样式与结构调整');
+    expect(svg?.reason).toBe('SVG content supports only text, style, and structure changes');
     expect(findNode(tree, [0, 0])?.capability).toBe('svg-subtree');
     expect(findNode(tree, [0, 0, 0])?.capability).toBe('svg-subtree');
     expect(findNode(tree, [1])?.capability).toBe('editable');
@@ -90,7 +90,7 @@ describe('buildElementTree', () => {
     expect(shallow?.capability).toBe('editable');
     const deep = findNode(tree, Array(64).fill(0));
     expect(deep?.capability).toBe('deep');
-    expect(deep?.reason).toBe('层级超出预览桥接上限');
+    expect(deep?.reason).toBe('Nesting exceeds the preview bridge limit');
     expect(deep?.children).toEqual([]);
     // Nothing beyond the bridge limit appears in the tree.
     expect(findNode(tree, Array(65).fill(0))).toBeNull();

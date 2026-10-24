@@ -53,15 +53,15 @@ describe('AssetLibrary（P4 §4.2）', () => {
     mount();
     await waitFor(() => expect(listDesignAssets).toHaveBeenCalledWith('remote-1', 's1', 'image'));
     expect(await screen.findByText('assets/logo.png')).toBeInTheDocument();
-    expect(screen.getByLabelText('选择要导入的素材文件')).toHaveAttribute(
+    expect(screen.getByLabelText('Choose asset files to import')).toHaveAttribute(
       'accept',
       '.png,.jpg,.jpeg,.gif,.webp,.svg,.ico,.avif'
     );
-    fireEvent.click(screen.getByRole('tab', { name: '字体' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Font' }));
     await waitFor(() => expect(listDesignAssets).toHaveBeenCalledWith('remote-1', 's1', 'font'));
     expect(await screen.findByText('design/assets/hero.svg')).toBeInTheDocument();
-    expect(screen.getAllByText('字体不支持预览')).toHaveLength(2);
-    expect(screen.getByLabelText('选择要导入的素材文件')).toHaveAttribute(
+    expect(screen.getAllByText('Fonts cannot be previewed')).toHaveLength(2);
+    expect(screen.getByLabelText('Choose asset files to import')).toHaveAttribute(
       'accept',
       '.woff,.woff2,.ttf,.otf'
     );
@@ -76,8 +76,8 @@ describe('AssetLibrary（P4 §4.2）', () => {
       )
     );
     expect(getDesignAsset).toHaveBeenCalledWith('remote-1', 's1', 'assets/logo.png');
-    fireEvent.click(screen.getByRole('tab', { name: '字体' }));
-    expect(await screen.findAllByText('字体不支持预览')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('tab', { name: 'Font' }));
+    expect(await screen.findAllByText('Fonts cannot be previewed')).toHaveLength(2);
     expect(getDesignAsset).toHaveBeenCalledTimes(IMAGES.length);
   });
 
@@ -91,7 +91,7 @@ describe('AssetLibrary（P4 §4.2）', () => {
         },
       ],
     });
-    const badges = await screen.findAllByText('已引用');
+    const badges = await screen.findAllByText('In use');
     expect(badges).toHaveLength(2);
   });
 
@@ -101,22 +101,22 @@ describe('AssetLibrary（P4 §4.2）', () => {
     mount();
     expect(await screen.findByText('assets/a-50.png')).toBeInTheDocument();
     expect(screen.queryByText('assets/a-51.png')).not.toBeInTheDocument();
-    expect(screen.getByText('…（仅显示前 50 项）')).toBeInTheDocument();
+    expect(screen.getByText('… (first 50 shown)')).toBeInTheDocument();
     await waitFor(() => expect(getDesignAsset).toHaveBeenCalledTimes(50));
   });
 
   it('「替换选中图片」未选中 img 时禁用并带说明 title', async () => {
     mount({ activeDocPath: 'design/index.html', selection: null });
-    const button = await screen.findByRole('button', { name: '替换选中图片 logo.png' });
+    const button = await screen.findByRole('button', { name: 'Replace selected image logo.png' });
     expect(button).toBeDisabled();
-    expect(button).toHaveAttribute('title', '需要先在预览中选中一个图片元素');
+    expect(button).toHaveAttribute('title', 'Select an image element in the preview first');
   });
 
   it('「替换选中图片」无活动页时禁用并带说明 title', async () => {
     mount({ activeDocPath: null, selection: { tagName: 'img' } });
-    const button = await screen.findByRole('button', { name: '替换选中图片 logo.png' });
+    const button = await screen.findByRole('button', { name: 'Replace selected image logo.png' });
     expect(button).toBeDisabled();
-    expect(button).toHaveAttribute('title', '当前没有活动页面');
+    expect(button).toHaveAttribute('title', 'No active page');
   });
 
   it('「替换选中图片」可用时上抛 attribute 操作（相对活动页的引用）且弹窗保持打开', async () => {
@@ -124,7 +124,7 @@ describe('AssetLibrary（P4 §4.2）', () => {
       activeDocPath: 'design/index.html',
       selection: { tagName: 'img' },
     });
-    const enabled = await screen.findByRole('button', { name: '替换选中图片 logo.png' });
+    const enabled = await screen.findByRole('button', { name: 'Replace selected image logo.png' });
     expect(enabled).toBeEnabled();
     fireEvent.click(enabled);
     expect(onApply).toHaveBeenCalledWith([
@@ -145,7 +145,7 @@ describe('AssetLibrary（P4 §4.2）', () => {
     await screen.findByText('assets/logo.png');
     const logo = new File(['bytes'], 'logo.png', { type: 'image/png' });
     const banner = new File(['bytes'], 'banner.png', { type: 'image/png' });
-    fireEvent.change(screen.getByLabelText('选择要导入的素材文件'), {
+    fireEvent.change(screen.getByLabelText('Choose asset files to import'), {
       target: { files: [logo, banner] },
     });
     await waitFor(() => expect(readFileAsBase64).toHaveBeenCalledTimes(2));
@@ -156,8 +156,8 @@ describe('AssetLibrary（P4 §4.2）', () => {
       fileName: 'logo.png',
       dataBase64: 'QUJD',
     });
-    expect(await screen.findByText('logo.png 已保存为 logo-2.png')).toBeInTheDocument();
-    expect(screen.queryByText('banner.png 已保存为 banner.png')).not.toBeInTheDocument();
+    expect(await screen.findByText('logo.png saved as logo-2.png')).toBeInTheDocument();
+    expect(screen.queryByText('banner.png saved as banner.png')).not.toBeInTheDocument();
     expect(onImported).toHaveBeenCalledTimes(2);
     expect(onImported).toHaveBeenNthCalledWith(1, 'design/assets/logo-2.png');
     expect(onImported).toHaveBeenNthCalledWith(2, 'design/assets/banner.png');
@@ -170,7 +170,7 @@ describe('AssetLibrary（P4 §4.2）', () => {
       .mockResolvedValueOnce({ path: 'design/assets/b.png' });
     const { onImported } = mount();
     await screen.findByText('assets/logo.png');
-    fireEvent.change(screen.getByLabelText('选择要导入的素材文件'), {
+    fireEvent.change(screen.getByLabelText('Choose asset files to import'), {
       target: {
         files: [
           new File(['x'], 'bad.exe', { type: 'application/octet-stream' }),
@@ -179,7 +179,7 @@ describe('AssetLibrary（P4 §4.2）', () => {
       },
     });
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'bad.exe 导入失败：扩展名不在白名单'
+      'bad.exe failed to import: 扩展名不在白名单'
     );
     await waitFor(() => expect(onImported).toHaveBeenCalledTimes(1));
     expect(onImported).toHaveBeenCalledWith('design/assets/b.png');
@@ -191,8 +191,8 @@ describe('AssetLibrary（P4 §4.2）', () => {
     mount();
     expect(await screen.findByRole('alert')).toHaveTextContent('网络中断');
     vi.mocked(listDesignAssets).mockResolvedValue({ files: [] });
-    fireEvent.click(screen.getByRole('button', { name: '重试' }));
-    expect(await screen.findByText('工作区暂无素材')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('No assets in the workspace yet')).toBeInTheDocument();
     expect(listDesignAssets).toHaveBeenCalledTimes(2);
   });
 
@@ -200,7 +200,7 @@ describe('AssetLibrary（P4 §4.2）', () => {
     const videos = ['design/assets/clip.mp4', 'media/demo.webm'];
     vi.mocked(listDesignAssets).mockResolvedValue({ files: videos });
     mount();
-    fireEvent.click(screen.getByRole('tab', { name: '视频' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Video' }));
     await waitFor(() => expect(listDesignAssets).toHaveBeenCalledWith('remote-1', 's1', 'video'));
     expect(await screen.findByText('design/assets/clip.mp4')).toBeInTheDocument();
     expect(screen.getByText('media/demo.webm')).toBeInTheDocument();
@@ -210,22 +210,22 @@ describe('AssetLibrary（P4 §4.2）', () => {
     );
     expect((await screen.findAllByText('3 B')).length).toBe(2);
     expect(document.querySelectorAll('img')).toHaveLength(0);
-    expect(screen.queryByRole('button', { name: /替换选中图片/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '导入' })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('选择要导入的素材文件')).not.toBeInTheDocument();
-    expect(screen.getByText('视频由媒体生成任务产生，不支持导入')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Replace selected image/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Choose asset files to import')).not.toBeInTheDocument();
+    expect(screen.getByText('Videos come from media generation tasks and cannot be imported')).toBeInTheDocument();
     // 切回图片 tab：导入与替换按钮照常回归。
-    fireEvent.click(screen.getByRole('tab', { name: '图片' }));
-    expect(await screen.findByRole('button', { name: '导入' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '替换选中图片 clip.mp4' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Image' }));
+    expect(await screen.findByRole('button', { name: 'Import' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replace selected image clip.mp4' })).toBeInTheDocument();
   });
 
   it('视频体积读取失败（如 >10 MiB）显示「体积未知」', async () => {
     vi.mocked(listDesignAssets).mockResolvedValue({ files: ['media/big.mp4'] });
     vi.mocked(getDesignAsset).mockRejectedValue(new Error('FILE_TOO_LARGE'));
     mount();
-    fireEvent.click(screen.getByRole('tab', { name: '视频' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Video' }));
     expect(await screen.findByText('media/big.mp4')).toBeInTheDocument();
-    expect(await screen.findByText('体积未知')).toBeInTheDocument();
+    expect(await screen.findByText('Unknown size')).toBeInTheDocument();
   });
 });

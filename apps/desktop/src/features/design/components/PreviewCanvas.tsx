@@ -75,7 +75,7 @@ export function PreviewCanvas({
       >
         <iframe
           ref={frameRef}
-          title="设计预览"
+          title="Design preview"
           sandbox="allow-scripts"
           srcDoc={srcDoc || EMPTY_HTML}
           onLoad={onFrameLoad}

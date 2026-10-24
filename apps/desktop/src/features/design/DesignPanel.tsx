@@ -214,7 +214,7 @@ export function DesignPanel() {
   if (!tool?.sessionId || !tool.backendId)
     return (
       <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-        请连接当前会话后端，再打开设计面板。
+        Connect the session backend before opening the design panel.
       </div>
     );
   const key = [
@@ -480,10 +480,10 @@ function DesignPanelSession({
           !hasControlChars(raw) &&
           !SCHEME_LIKE.test(raw);
         if (valid && filesRef.current.includes(raw)) {
-          setRunNotice({ text: `已打开 ${raw}` });
+          setRunNotice({ text: `Opened ${raw}` });
           void controller.open(raw);
         } else {
-          setRunNotice({ text: `目标页面不在工作区：${raw}` });
+          setRunNotice({ text: `Target page is not in the workspace: ${raw}` });
         }
         return;
       }
@@ -491,8 +491,8 @@ function DesignPanelSession({
         setRunNotice({
           text:
             data.reason === 'external'
-              ? '已阻止打开外部链接'
-              : '已阻止非页面链接（仅支持工作区内 HTML 跳转）',
+              ? 'Blocked opening an external link'
+              : 'Blocked a non-page link (only in-workspace HTML navigation is supported)',
         });
         return;
       }
@@ -606,7 +606,7 @@ function DesignPanelSession({
                   : `struct:${operation.action}`
           )
           .join('+')}`;
-    const applied = await controller.apply(operations, `编辑元素 ${pathKey}`, mergeKey);
+    const applied = await controller.apply(operations, `Edit element ${pathKey}`, mergeKey);
     if (!applied) return;
     // 应用后重选（§6.1/§6.3）：attribute/structure/非颜色 style 需要 iframe 回发 select
     // 消息刷新计算样式并核对 override；纯颜色沿用既有 verify 回路，不动。
@@ -861,7 +861,7 @@ function DesignPanelSession({
           role="status"
           className="border-b border-border px-3 py-1.5 text-xs text-muted-foreground"
         >
-          已填入当前聊天，补充需求后发送。
+          Prefilled into the current chat — add your requirements and send.
         </div>
       )}
       {activePage?.status === 'dirty' && (
@@ -869,7 +869,7 @@ function DesignPanelSession({
           role="status"
           className="border-b border-border px-3 py-1.5 text-xs text-muted-foreground"
         >
-          有未保存的修改；请先保存后再交给 Agent 修改。
+          There are unsaved changes; save them before handing off to the Agent.
         </div>
       )}
       {runFeedback.status && (
@@ -892,7 +892,7 @@ function DesignPanelSession({
           )}
           <button
             type="button"
-            aria-label="关闭运行反馈"
+            aria-label="Close run feedback"
             onClick={runFeedback.dismiss}
             className="ml-auto rounded-md px-1 text-muted-foreground transition-colors hover:text-foreground"
           >
@@ -902,12 +902,12 @@ function DesignPanelSession({
       )}
       {activePage?.externalChange && (
         <div role="status" className="border-b border-border px-3 py-1.5 text-xs text-warning">
-          此文件已在其他位置更新。你的草稿仍保留；重新载入可载入最新版本。
+          This file was updated elsewhere. Your draft is preserved; reload to load the latest version.
         </div>
       )}
       {activePage?.missing && (
         <div role="status" className="border-b border-border px-3 py-1.5 text-xs text-warning">
-          此文件已从工作区消失；可保存以重建文件，或关闭页面。
+          This file no longer exists in the workspace; save to recreate it, or close the page.
         </div>
       )}
       {activePage?.error && (
@@ -920,10 +920,10 @@ function DesignPanelSession({
           role="status"
           className="flex flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5 text-xs text-muted-foreground"
         >
-          <span>运行模式：仅供交互体验，编辑请切回编辑模式</span>
+          <span>Run mode: interaction only — switch back to Edit mode to make changes</span>
           {runBlocked && runBlocked.scripts + runBlocked.links > 0 && (
             <span>
-              {`已移除 ${runBlocked.scripts} 个外部脚本、${runBlocked.links} 个外部链接`}
+              {`Removed ${runBlocked.scripts} external script(s) and ${runBlocked.links} external link(s)`}
             </span>
           )}
         </div>
@@ -936,7 +936,7 @@ function DesignPanelSession({
           <span>{runNotice.text}</span>
           <button
             type="button"
-            aria-label="关闭导航提示"
+            aria-label="Close navigation notice"
             onClick={() => setRunNotice(null)}
             className="ml-auto rounded-md px-1 text-muted-foreground transition-colors hover:text-foreground"
           >
@@ -994,7 +994,7 @@ function DesignPanelSession({
           <button
             type="button"
             aria-expanded={versionsOpen}
-            aria-label="版本历史"
+            aria-label="Version history"
             onClick={() => setVersionsOpen(value => !value)}
             className="flex w-full items-center gap-1 px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
@@ -1002,7 +1002,7 @@ function DesignPanelSession({
               size={12}
               className={`transition-transform ${versionsOpen ? '' : '-rotate-90'}`}
             />
-            版本历史
+            Version history
           </button>
           {versionsOpen && (
             <div className="max-h-72 overflow-y-auto px-3 pb-3">
@@ -1157,25 +1157,25 @@ function DesignPanelSession({
         <Modal
           open
           onClose={() => setConfirmClosePath(null)}
-          ariaLabel="关闭前保存"
-          title="关闭前保存"
+          ariaLabel="Save before closing"
+          title="Save before closing"
           size="md"
           footer={
             <div className="flex justify-end gap-2">
               <Button size="sm" variant="primary" onClick={() => void saveAndClose()}>
-                保存
+                Save
               </Button>
               <Button size="sm" variant="destructive" onClick={discardAndClose}>
-                放弃修改
+                Discard changes
               </Button>
               <Button size="sm" onClick={() => setConfirmClosePath(null)}>
-                取消
+                Cancel
               </Button>
             </div>
           }
         >
           <div className="p-4 text-xs text-muted-foreground">
-            「{confirmClosePath}」有未保存的修改。关闭前要保存这些修改吗？
+            "{confirmClosePath}" has unsaved changes. Save them before closing?
           </div>
         </Modal>
       )}
@@ -1232,26 +1232,26 @@ function DraftDiffModal({
     <Modal
       open={open}
       onClose={onClose}
-      ariaLabel="未保存差异"
-      title={`未保存差异 · ${baseName(path)}`}
+      ariaLabel="Unsaved changes"
+      title={`Unsaved changes · ${baseName(path)}`}
       size="lg"
       footer={
         <Button size="sm" onClick={onClose}>
-          关闭
+          Close
         </Button>
       }
     >
       <div className="flex flex-col gap-3 p-4">
         {error && (
           <div role="alert" className="text-xs text-destructive">
-            差异加载失败：{error}
+            Failed to load diff: {error}
           </div>
         )}
         {diskSource === null && !error && (
-          <div className="text-xs text-muted-foreground">正在加载差异…</div>
+          <div className="text-xs text-muted-foreground">Loading diff…</div>
         )}
         {diff !== null && !hasChanges && (
-          <div className="text-xs text-muted-foreground">草稿与已保存版本相同。</div>
+          <div className="text-xs text-muted-foreground">The draft matches the saved version.</div>
         )}
         {diff !== null && hasChanges && <LineDiffView lines={diff.lines} truncated={diff.truncated} />}
       </div>

@@ -297,7 +297,7 @@ export async function exportDesignZip(
     body: JSON.stringify(request),
   });
   if (!response.ok) {
-    let message = `导出失败（${response.status}）`;
+    let message = `Export failed (${response.status})`;
     let code: string | undefined;
     let files: string[] = [];
     try {
@@ -618,7 +618,7 @@ export async function downloadDesignMediaTaskResult(
     { headers: { ...getAuthHeadersForBackend(backendId) } }
   );
   if (!response.ok) {
-    let message = `下载失败（${response.status}）`;
+    let message = `Download failed (${response.status})`;
     let code: string | undefined;
     try {
       const body = (await response.json()) as { error?: { message?: string; code?: string } };

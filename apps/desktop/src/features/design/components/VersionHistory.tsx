@@ -11,19 +11,19 @@ import type { DesignSnapshotFile } from '../types';
 import { VersionDiff } from './VersionDiff';
 
 const SOURCE_LABEL: Record<DesignSnapshotSummary['source'], string> = {
-  save: '保存',
-  manual: '手动',
-  'pre-restore': '恢复前',
-  restore: '恢复后',
+  save: 'Saved',
+  manual: 'Manual',
+  'pre-restore': 'Before restore',
+  restore: 'After restore',
 };
 
 const KIND_LABEL: Record<DesignSnapshotFile['kind'], string> = {
-  entry: '入口',
+  entry: 'Entry',
   css: 'CSS',
-  image: '图片',
-  font: '字体',
-  video: '视频',
-  other: '文件',
+  image: 'Image',
+  font: 'Font',
+  video: 'Video',
+  other: 'File',
 };
 
 function message(error: unknown): string {
@@ -123,11 +123,11 @@ export function VersionHistory({
       });
       setLabelValue('');
       setNotice(
-        summary.complete ? '已创建版本快照。' : '已创建版本快照（不完整：部分资源未捕获）。'
+        summary.complete ? 'Version snapshot created.' : 'Version snapshot created (incomplete: some assets were not captured).'
       );
       await refresh();
     } catch (e) {
-      setError(`快照创建失败：${message(e)}`);
+      setError(`Failed to create snapshot: ${message(e)}`);
     } finally {
       setCapturing(false);
     }
@@ -173,7 +173,7 @@ export function VersionHistory({
         setConfirm(null);
         setConflictFiles(null);
         setConfirmStage('review');
-        setNotice('已恢复到所选版本。');
+        setNotice('Restored to the selected version.');
         onRestored();
         void refresh();
         return;
@@ -186,7 +186,7 @@ export function VersionHistory({
         setConfirmStage('incomplete');
         return;
       }
-      setError(outcome.errorCode ? `恢复失败：${outcome.errorCode}` : '恢复失败。');
+      setError(outcome.errorCode ? `Restore failed: ${outcome.errorCode}` : 'Restore failed.');
     } finally {
       setRestoring(false);
     }
@@ -206,16 +206,16 @@ export function VersionHistory({
   const detail = confirm;
 
   return (
-    <section aria-label="版本历史" className="flex flex-col gap-2">
+    <section aria-label="Version history" className="flex flex-col gap-2">
       <div className="flex items-center gap-1">
-        <span className="text-[11px] font-medium text-muted-foreground">版本历史</span>
-        <IconButton size="sm" aria-label="刷新版本列表" onClick={() => void refresh()}>
+        <span className="text-[11px] font-medium text-muted-foreground">Version history</span>
+        <IconButton size="sm" aria-label="Refresh version list" onClick={() => void refresh()}>
           <RefreshCw size={12} />
         </IconButton>
         <div className="flex-1" />
         <Input
-          aria-label="版本备注"
-          placeholder="版本备注（可选）"
+          aria-label="Version note"
+          placeholder="Version note (optional)"
           value={labelValue}
           onChange={e => setLabelValue(e.target.value)}
           disabled={!docPath}
@@ -225,9 +225,9 @@ export function VersionHistory({
           size="sm"
           onClick={() => void saveVersion()}
           disabled={!docPath || busy || dirty || capturing}
-          title={dirty ? '请先保存修改，再创建版本快照' : '把当前磁盘内容保存为一个版本'}
+          title={dirty ? 'Save your changes before creating a version snapshot' : 'Save the current on-disk content as a version'}
         >
-          保存版本
+          Save version
         </Button>
       </div>
       {notice && (
@@ -241,11 +241,11 @@ export function VersionHistory({
         </div>
       )}
       {!docPath ? (
-        <p className="text-xs text-muted-foreground">请先选择一个 HTML 文件。</p>
+        <p className="text-xs text-muted-foreground">Select an HTML file first.</p>
       ) : summaries === null && !error ? (
-        <p className="text-xs text-muted-foreground">正在加载版本列表…</p>
+        <p className="text-xs text-muted-foreground">Loading versions…</p>
       ) : summaries !== null && summaries.length === 0 ? (
-        <p className="text-xs text-muted-foreground">暂无版本快照；保存或手动创建后显示。</p>
+        <p className="text-xs text-muted-foreground">No version snapshots yet; they appear after saving or creating one manually.</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {summaries?.map(summary => (
@@ -258,26 +258,26 @@ export function VersionHistory({
                 <Badge label={SOURCE_LABEL[summary.source]} tone="neutral" />
                 {summary.label && <span className="truncate text-foreground">{summary.label}</span>}
                 {summary.complete ? (
-                  <Badge label="完整" tone="success" />
+                  <Badge label="Complete" tone="success" />
                 ) : (
                   <button
                     type="button"
                     aria-expanded={expandedId === summary.id}
-                    aria-label={`不完整原因 ${summary.id}`}
+                    aria-label={`Incomplete reasons ${summary.id}`}
                     onClick={() => setExpandedId(expandedId === summary.id ? null : summary.id)}
                     className="rounded text-2xs text-warning underline underline-offset-2"
                   >
-                    不完整
+                    Incomplete
                   </button>
                 )}
                 <span className="ml-auto text-muted-foreground">
-                  {summary.fileCount} 个文件 · {formatBytes(summary.totalBytes)}
+                  {summary.fileCount} files · {formatBytes(summary.totalBytes)}
                 </span>
               </div>
               {!summary.complete && expandedId === summary.id && (
                 <ul className="flex flex-col gap-0.5 rounded bg-secondary/60 px-2 py-1 text-[10px] text-warning">
                   {summary.incompleteReasons.length === 0 ? (
-                    <li>部分资源未捕获</li>
+                    <li>some assets not captured</li>
                   ) : (
                     summary.incompleteReasons.map(reason => <li key={reason}>{reason}</li>)
                   )}
@@ -285,14 +285,14 @@ export function VersionHistory({
               )}
               <div className="flex items-center gap-1">
                 <Button size="sm" onClick={() => setDiffId(summary.id)}>
-                  查看差异
+                  View diff
                 </Button>
                 <Button
                   size="sm"
                   onClick={() => void startRestore(summary)}
                   disabled={busy || loadingDetailId !== null || restoring}
                 >
-                  {loadingDetailId === summary.id ? '加载中…' : '恢复此版本'}
+                  {loadingDetailId === summary.id ? 'Loading…' : 'Restore this version'}
                 </Button>
               </div>
             </li>
@@ -313,8 +313,8 @@ export function VersionHistory({
         <Modal
           open
           onClose={closeConfirm}
-          ariaLabel="恢复此版本"
-          title="恢复此版本"
+          ariaLabel="Restore this version"
+          title="Restore this version"
           size="md"
           footer={
             conflictFiles ? (
@@ -328,16 +328,16 @@ export function VersionHistory({
                     onReload();
                   }}
                 >
-                  重新载入
+                  Reload
                 </Button>
                 <Button size="sm" onClick={closeConfirm}>
-                  取消
+                  Cancel
                 </Button>
               </div>
             ) : (
               <div className="flex justify-end gap-2">
                 <Button size="sm" onClick={closeConfirm}>
-                  取消
+                  Cancel
                 </Button>
                 <Button
                   size="sm"
@@ -346,10 +346,10 @@ export function VersionHistory({
                   disabled={restoring}
                 >
                   {restoring
-                    ? '正在恢复…'
+                    ? 'Restoring…'
                     : confirmStage === 'incomplete'
-                      ? '仍要恢复'
-                      : '确认恢复'}
+                      ? 'Restore anyway'
+                      : 'Confirm restore'}
                 </Button>
               </div>
             )
@@ -359,7 +359,7 @@ export function VersionHistory({
             {conflictFiles ? (
               <>
                 <div role="alert" className="text-destructive">
-                  以下文件在快照之后发生了变化，恢复已取消。请重新载入最新内容后再试。
+                  The following files changed after the snapshot; the restore was canceled. Reload the latest content and try again.
                 </div>
                 <ul className="flex flex-col gap-1 rounded-md border border-border px-2 py-1.5">
                   {conflictFiles.map(file => (
@@ -373,30 +373,29 @@ export function VersionHistory({
             ) : (
               <>
                 <div className="text-muted-foreground">
-                  将把工作区文件恢复到 {formatTime(detail.summary.createdAt)} 的版本（
-                  {SOURCE_LABEL[detail.summary.source]}
-                  {detail.summary.label ? ` · ${detail.summary.label}` : ''}）。清单外文件不会被改动。
+                  Workspace files will be restored to the version of {formatTime(detail.summary.createdAt)} ({SOURCE_LABEL[detail.summary.source]}
+                  {detail.summary.label ? ` · ${detail.summary.label}` : ''}). Files outside the manifest will not be touched.
                 </div>
                 {dirty && (
-                  <div className="text-warning">当前有未保存的修改，恢复将丢弃这些修改。</div>
+                  <div className="text-warning">There are unsaved changes; restoring will discard them.</div>
                 )}
                 {!detail.summary.complete && (
                   <div className="rounded-md border border-border bg-secondary/60 px-2 py-1.5 text-warning">
-                    此快照不完整，以下资源未被捕获：
+                    This snapshot is incomplete; the following assets were not captured:
                     <ul className="mt-1 flex flex-col gap-0.5">
                       {detail.summary.incompleteReasons.length === 0 ? (
-                        <li>部分资源未捕获</li>
+                        <li>some assets not captured</li>
                       ) : (
                         detail.summary.incompleteReasons.map(reason => <li key={reason}>{reason}</li>)
                       )}
                     </ul>
                     {confirmStage === 'incomplete' && (
-                      <div className="mt-1">已知悉以上未捕获资源；仍要恢复请再次点击「仍要恢复」。</div>
+                      <div className="mt-1">Acknowledged the uncaptured assets above; to restore anyway, click "Restore anyway" again.</div>
                     )}
                   </div>
                 )}
                 <div className="text-muted-foreground">
-                  将写入 {detail.files.length} 个文件：
+                  {detail.files.length} files will be written:
                 </div>
                 <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border border-border px-2 py-1.5">
                   {detail.files.map(file => (

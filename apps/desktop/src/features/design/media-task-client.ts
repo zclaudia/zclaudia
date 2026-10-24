@@ -51,7 +51,7 @@ function errorText(error: unknown): string {
 function describeSubmitError(error: unknown): string {
   const code =
     error instanceof DesignHttpError || error instanceof ApiError ? error.code : undefined;
-  if (code === 'MEDIA_TASK_ACTIVE_EXISTS') return '已有相同任务在进行中';
+  if (code === 'MEDIA_TASK_ACTIVE_EXISTS') return 'An identical task is already in progress';
   return errorText(error);
 }
 
@@ -176,19 +176,19 @@ export function useMediaTasks(options: UseMediaTasksOptions): UseMediaTasksResul
 export function mediaPhaseLabel(phase: DesignMediaPhase, frames?: number): string {
   switch (phase) {
     case 'submitting':
-      return '提交中';
+      return 'Submitting';
     case 'generating':
-      return '生成中';
+      return 'Generating';
     case 'downloading':
-      return '下载中';
+      return 'Downloading';
     case 'saving':
-      return '保存中';
+      return 'Saving';
     case 'launching':
-      return '启动渲染';
+      return 'Starting render';
     case 'rendering':
-      return typeof frames === 'number' ? `渲染中（${frames} 帧）` : '渲染中';
+      return typeof frames === 'number' ? `Rendering (${frames} frames)` : 'Rendering';
     case 'encoding':
-      return '编码中';
+      return 'Encoding';
   }
 }
 
@@ -196,15 +196,15 @@ export function mediaPhaseLabel(phase: DesignMediaPhase, frames?: number): strin
 export function mediaStatusBadge(status: DesignMediaTaskStatus): string {
   switch (status) {
     case 'queued':
-      return '排队中';
+      return 'Queued';
     case 'running':
-      return '进行中';
+      return 'In progress';
     case 'completed':
-      return '已完成';
+      return 'Completed';
     case 'failed':
-      return '失败';
+      return 'Failed';
     case 'cancelled':
-      return '已取消';
+      return 'Canceled';
   }
 }
 
@@ -214,11 +214,11 @@ export function mediaStatusBadge(status: DesignMediaTaskStatus): string {
  * 全无已知键 → 同 null 文案。
  */
 export function mediaUsageLabel(usage: DesignMediaUsage | null): string {
-  const unknown = '费用未知（服务未返回用量）';
+  const unknown = 'Cost unknown (service returned no usage)';
   if (usage === null) return unknown;
-  if (typeof usage.totalCostUsd === 'number') return `费用 $${usage.totalCostUsd.toFixed(4)}`;
+  if (typeof usage.totalCostUsd === 'number') return `Cost $${usage.totalCostUsd.toFixed(4)}`;
   if (typeof usage.inputTokens === 'number' || typeof usage.outputTokens === 'number') {
-    return `用量：输入 ${usage.inputTokens ?? 0} / 输出 ${usage.outputTokens ?? 0} tokens`;
+    return `Usage: ${usage.inputTokens ?? 0} input / ${usage.outputTokens ?? 0} output tokens`;
   }
   return unknown;
 }
@@ -227,11 +227,11 @@ export function mediaUsageLabel(usage: DesignMediaUsage | null): string {
 export function mediaKindLabel(kind: DesignMediaTaskKind): string {
   switch (kind) {
     case 'image-generate':
-      return '图片生成';
+      return 'Image generation';
     case 'image-edit':
-      return '图片编辑';
+      return 'Image edit';
     case 'video-render':
-      return '动效视频';
+      return 'Motion video';
   }
 }
 
@@ -256,19 +256,19 @@ export function buildImageCreateInput(
   args: BuildImageCreateInputArgs
 ): DesignMediaCreateInput | { error: string } {
   const prompt = args.prompt.trim();
-  if (prompt.length === 0) return { error: '请输入生成描述' };
-  if (prompt.length > PROMPT_MAX) return { error: `生成描述不能超过 ${PROMPT_MAX} 字符` };
+  if (prompt.length === 0) return { error: 'Enter a prompt' };
+  if (prompt.length > PROMPT_MAX) return { error: `Prompt must be at most ${PROMPT_MAX} characters` };
   const profileId = args.provider?.profileId.trim() ?? '';
   const model = args.provider?.model.trim() ?? '';
-  if (profileId === '') return { error: '请选择图片服务' };
-  if (model === '') return { error: '请输入模型名称' };
+  if (profileId === '') return { error: 'Choose an image service' };
+  if (model === '') return { error: 'Enter a model name' };
   const size = args.size?.trim() ?? '';
   if (size !== '' && !SIZE_PATTERN.test(size)) {
-    return { error: '尺寸格式应为 宽x高（如 1024x1024）' };
+    return { error: 'Size must be width x height (e.g. 1024x1024)' };
   }
   if (args.kind === 'image-edit') {
     const sourcePath = args.sourcePath?.trim() ?? '';
-    if (sourcePath === '') return { error: '请选择源图片' };
+    if (sourcePath === '') return { error: 'Choose a source image' };
     return {
       sessionId: '',
       kind: 'image-edit',
@@ -308,9 +308,9 @@ function parseNumber(raw: string): number | null {
 /** 尺寸校验：320..1920 的偶数（yuv420p 要求）。 */
 function parseDimension(raw: string, label: string): number | { error: string } {
   const value = parseInteger(raw);
-  if (value === null) return { error: `请输入${label}（整数像素）` };
-  if (value < 320 || value > 1920) return { error: `${label}需在 320–1920 之间` };
-  if (value % 2 !== 0) return { error: `${label}需为偶数` };
+  if (value === null) return { error: `Enter ${label} (integer pixels)` };
+  if (value < 320 || value > 1920) return { error: `${label} must be between 320 and 1920` };
+  if (value % 2 !== 0) return { error: `${label} must be even` };
   return value;
 }
 
@@ -323,17 +323,17 @@ export function buildVideoCreateInput(
   args: BuildVideoCreateInputArgs
 ): DesignMediaCreateInput | { error: string } {
   const entryPath = args.entryPath?.trim() ?? '';
-  if (entryPath === '') return { error: '请填写视频入口 HTML 路径' };
-  const width = parseDimension(args.width, '宽');
+  if (entryPath === '') return { error: 'Enter the video entry HTML path' };
+  const width = parseDimension(args.width, 'Viewport width');
   if (typeof width !== 'number') return width;
-  const height = parseDimension(args.height, '高');
+  const height = parseDimension(args.height, 'Viewport height');
   if (typeof height !== 'number') return height;
   const fps = parseInteger(args.fps);
-  if (fps === null) return { error: '请输入帧率（整数）' };
-  if (fps < 8 || fps > 60) return { error: '帧率需在 8–60 之间' };
+  if (fps === null) return { error: 'Enter a frame rate (integer)' };
+  if (fps < 8 || fps > 60) return { error: 'Frame rate must be between 8 and 60' };
   const seconds = parseNumber(args.durationSeconds);
-  if (seconds === null) return { error: '请输入时长（秒）' };
-  if (seconds < 0.5 || seconds > 60) return { error: '时长需在 0.5–60 秒之间' };
+  if (seconds === null) return { error: 'Enter a duration (seconds)' };
+  if (seconds < 0.5 || seconds > 60) return { error: 'Duration must be between 0.5 and 60 seconds' };
   return {
     sessionId: '',
     kind: 'video-render',

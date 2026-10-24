@@ -36,9 +36,9 @@ const SNIPPET_LIMIT = 1200;
 
 /** 失效原因 → 中文短语（review-handoff 失效文案复用）。 */
 export const LOCATOR_REASON_TEXT: Record<CommentLocatorMissReason, string> = {
-  'path-missing': '路径越界',
-  'tag-mismatch': '标签已变化',
-  'text-mismatch': '文本已变化',
+  'path-missing': 'Path out of range',
+  'tag-mismatch': 'Tag changed',
+  'text-mismatch': 'Text changed',
 };
 
 /** 折叠全部空白（\s+ → 单空格）并去首尾空白；比较与展示共用。 */

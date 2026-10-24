@@ -218,7 +218,7 @@ describe('MediaTaskService', () => {
       [imageInput({ targetDir: '../escape' }), 'targetDir'],
       [videoInput({ entryPath: '' }), 'entryPath'],
       [videoInput({ width: 319 }), 'width'],
-      [videoInput({ width: 1281 }), '偶数'],
+      [videoInput({ width: 1281 }), 'even number'],
       [videoInput({ height: 100 }), 'height'],
       [videoInput({ height: 1921 }), 'height'],
       [videoInput({ fps: 7 }), 'fps'],
@@ -244,7 +244,7 @@ describe('MediaTaskService', () => {
     await expect(missing.create('sa', imageInput())).rejects.toMatchObject({
       status: 400,
       code: 'MEDIA_VALIDATION',
-      message: '指定的服务配置不存在',
+      message: 'The specified service profile does not exist',
     });
 
     const { executor, gates } = gatedExecutor();
@@ -259,7 +259,7 @@ describe('MediaTaskService', () => {
 
     await expect(
       service.create('sa', imageInput({ provider: { profileId: 'absent', model: 'm' } }))
-    ).rejects.toMatchObject({ code: 'MEDIA_VALIDATION', message: '指定的服务配置不存在' });
+    ).rejects.toMatchObject({ code: 'MEDIA_VALIDATION', message: 'The specified service profile does not exist' });
   });
 
   it('normalizes params (trim, default targetDir) and stores provider-less video params', async () => {
@@ -302,7 +302,7 @@ describe('MediaTaskService', () => {
     await expect(service.create('sa', imageInput())).rejects.toMatchObject({
       status: 409,
       code: 'MEDIA_TASK_ACTIVE_EXISTS',
-      message: '已有相同任务在进行中',
+      message: 'An identical task is already in progress',
     });
     // 其他工作区不受影响；第一个完成后允许重新提交。
     const other = await service.create('sb', imageInput());
@@ -395,10 +395,10 @@ describe('MediaTaskService', () => {
 
   it('marks failures with run codes, provider codes and INTERNAL fallback', async () => {
     const runErrorExecutor: MediaTaskExecutor = async () => {
-      throw new MediaTaskRunError('RUNTIME_MISSING', '未找到 ffmpeg');
+      throw new MediaTaskRunError('RUNTIME_MISSING', 'ffmpeg not found');
     };
     const providerErrorExecutor: MediaTaskExecutor = async () => {
-      throw new MediaProviderError('provider-timeout', '请求超时');
+      throw new MediaProviderError('provider-timeout', 'Request timed out');
     };
     const internalExecutor: MediaTaskExecutor = async () => {
       throw new Error('boom');
@@ -422,15 +422,15 @@ describe('MediaTaskService', () => {
     await waitFor(() => rawTask(t3.id)?.status === 'failed');
     expect(rawTask(t1.id)).toMatchObject({
       errorCode: 'RUNTIME_MISSING',
-      errorMessage: '未找到 ffmpeg',
+      errorMessage: 'ffmpeg not found',
     });
-    expect(rawTask(t2.id)).toMatchObject({ errorCode: 'PROVIDER_TIMEOUT', errorMessage: '请求超时' });
+    expect(rawTask(t2.id)).toMatchObject({ errorCode: 'PROVIDER_TIMEOUT', errorMessage: 'Request timed out' });
     expect(rawTask(t3.id)).toMatchObject({ errorCode: 'INTERNAL', errorMessage: 'boom' });
 
     const listed = await service.list('sa');
     expect(listed.find(entry => entry.id === t2.id)?.error).toEqual({
       code: 'PROVIDER_TIMEOUT',
-      message: '请求超时',
+      message: 'Request timed out',
     });
   });
 
@@ -440,13 +440,13 @@ describe('MediaTaskService', () => {
     await waitFor(() => rawTask(task.id)?.status === 'failed');
     expect(rawTask(task.id)).toMatchObject({
       errorCode: 'INTERNAL',
-      errorMessage: '该任务类型未配置执行器',
+      errorMessage: 'No executor is configured for this task type',
     });
   });
 
   it('persists executor progress via onProgress and keeps it through completion', async () => {
     const executor: MediaTaskExecutor = async (_execution, ctx) => {
-      await ctx.onProgress({ phase: 'generating', detail: '等待服务返回' });
+      await ctx.onProgress({ phase: 'generating', detail: 'Waiting for the service to respond' });
       return IMAGE_RESULT;
     };
     const service = makeService({ 'image-generate': executor }, { resolveProfileName: () => 'P' });
@@ -456,7 +456,7 @@ describe('MediaTaskService', () => {
     );
     const summary = (await service.list('sa')).find(entry => entry.id === task.id);
     expect(summary?.status).toBe('completed');
-    expect(summary?.progress).toEqual({ phase: 'generating', detail: '等待服务返回' });
+    expect(summary?.progress).toEqual({ phase: 'generating', detail: 'Waiting for the service to respond' });
   });
 
   it('cancels queued tasks directly without invoking the executor', async () => {
@@ -491,7 +491,7 @@ describe('MediaTaskService', () => {
 
     const cancelPromise = service.cancel('sa', task.id);
     await waitFor(() => gates[0].ctx.signal.aborted);
-    gates[0].reject(new MediaTaskRunError('ABORTED', '已取消'));
+    gates[0].reject(new MediaTaskRunError('ABORTED', 'Canceled'));
     const cancelled = await cancelPromise;
     expect(cancelled.status).toBe('cancelled');
     expect(rawTask(task.id)?.status).toBe('cancelled');
@@ -537,7 +537,7 @@ describe('MediaTaskService', () => {
 
     const cancelPromise = service.cancel('sa2', task.id);
     await waitFor(() => gates[0].ctx.signal.aborted);
-    gates[0].reject(new MediaTaskRunError('ABORTED', '已取消'));
+    gates[0].reject(new MediaTaskRunError('ABORTED', 'Canceled'));
     const cancelled = await cancelPromise;
     expect(cancelled.status).toBe('cancelled');
   });
@@ -564,13 +564,13 @@ describe('MediaTaskService', () => {
         id: 'legacy-1',
         status: 'failed',
         errorCode: 'INTERRUPTED',
-        errorMessage: '服务重启导致任务中断',
+        errorMessage: 'Task interrupted by a service restart',
       },
       {
         id: 'legacy-2',
         status: 'failed',
         errorCode: 'INTERRUPTED',
-        errorMessage: '服务重启导致任务中断',
+        errorMessage: 'Task interrupted by a service restart',
       },
     ]);
     expect(db.prepare('SELECT status FROM design_media_tasks WHERE id = ?').get('done')).toMatchObject(
@@ -794,7 +794,7 @@ describe('createImageTaskExecutor', () => {
     await expect(brokenExecutor(editExecution('edit'), ctx)).rejects.toMatchObject({
       name: 'MediaTaskRunError',
       code: 'ENTRY_UNREADABLE',
-      message: '源图不可读：missing file',
+      message: 'Source image is not readable: missing file',
     });
 
     const oversizedExecutor = createImageTaskExecutor({
@@ -821,12 +821,12 @@ describe('createImageTaskExecutor', () => {
         fakeProvider({ bytes: PNG_BYTES, mime: 'image/png', usage: null }).provider,
       readSourceImage: async () => ({ mime: 'image/png', bytes: SOURCE_PNG_BYTES }),
       importGeneratedImage: async () => {
-        throw new DesignError(400, 'ASSET_INVALID', '不支持的文件扩展名');
+        throw new DesignError(400, 'ASSET_INVALID', 'Unsupported file extension');
       },
     });
     await expect(writeFails(generateExecution('x'), ctx)).rejects.toMatchObject({
       code: 'ASSET_WRITE_FAILED',
-      message: '不支持的文件扩展名',
+      message: 'Unsupported file extension',
     });
 
     const noProvider = createImageTaskExecutor({

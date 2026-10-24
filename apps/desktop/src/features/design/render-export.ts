@@ -53,7 +53,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
       reject(error);
     };
     const timer = setTimeout(
-      () => fail(new RenderCaptureError('capture-failed', '页面捕获失败：预览图片加载超时')),
+      () => fail(new RenderCaptureError('capture-failed', 'Page capture failed: preview image load timed out')),
       IMAGE_LOAD_TIMEOUT_MS
     );
     image.onload = () => {
@@ -61,7 +61,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
       resolve(image);
     };
     image.onerror = () =>
-      fail(new RenderCaptureError('capture-failed', '页面捕获失败：预览图片加载失败'));
+      fail(new RenderCaptureError('capture-failed', 'Page capture failed: preview image failed to load'));
     image.src = url;
   });
 }
@@ -98,7 +98,7 @@ export async function captureHtmlImage(
   canvas.height = request.height;
   const context = canvas.getContext('2d');
   if (!context) {
-    throw new RenderCaptureError('capture-unsupported', '当前环境不支持页面捕获（无 Canvas 2D）');
+    throw new RenderCaptureError('capture-unsupported', 'Page capture is not supported in this environment (no Canvas 2D)');
   }
   context.fillStyle = '#ffffff';
   context.fillRect(0, 0, request.width, request.height);
@@ -107,7 +107,7 @@ export async function captureHtmlImage(
   const quality = request.quality ?? (request.mime === 'image/jpeg' ? DEFAULT_JPEG_QUALITY : undefined);
   const blob = await canvasToBlob(canvas, request.mime, quality);
   if (!blob) {
-    throw new RenderCaptureError('capture-unsupported', '当前环境不支持页面捕获（图片编码失败）');
+    throw new RenderCaptureError('capture-unsupported', 'Page capture is not supported in this environment (image encoding failed)');
   }
   return { blob, width: request.width, height: request.height };
 }

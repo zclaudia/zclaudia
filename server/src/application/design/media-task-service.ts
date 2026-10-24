@@ -135,37 +135,37 @@ function parseJsonOrNull<T>(text: string | null): T | null {
 }
 
 function normalizePrompt(value: unknown): string {
-  if (typeof value !== 'string') throw mediaValidation('prompt 必须是非空字符串');
+  if (typeof value !== 'string') throw mediaValidation('prompt must be a non-empty string');
   const prompt = value.trim();
   if (!prompt || prompt.length > MEDIA_IMAGE_MAX_PROMPT_LENGTH)
-    throw mediaValidation(`prompt 必须是 1..${MEDIA_IMAGE_MAX_PROMPT_LENGTH} 字符`);
+    throw mediaValidation(`prompt must be 1..${MEDIA_IMAGE_MAX_PROMPT_LENGTH} characters`);
   return prompt;
 }
 
 function normalizeSize(value: unknown): string | undefined {
   if (value === undefined) return undefined;
   if (typeof value !== 'string' || !MEDIA_IMAGE_SIZE_PATTERN.test(value))
-    throw mediaValidation('size 格式必须为「宽x高」，例如 1024x1024');
+    throw mediaValidation('size must be in width x height format, e.g. 1024x1024');
   return value;
 }
 
 function normalizeTargetDir(value: unknown): string {
   if (value === undefined) return DEFAULT_ASSETS_DIR;
-  if (typeof value !== 'string' || !value) throw mediaValidation('targetDir 必须是工作区相对路径');
+  if (typeof value !== 'string' || !value) throw mediaValidation('targetDir must be a workspace-relative path');
   try {
     validateRelativePath(value);
   } catch {
-    throw mediaValidation('targetDir 必须是工作区相对路径');
+    throw mediaValidation('targetDir must be a workspace-relative path');
   }
   return value;
 }
 
 function requireRelativeField(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !value) throw mediaValidation(`${field} 必须是工作区相对路径`);
+  if (typeof value !== 'string' || !value) throw mediaValidation(`${field} must be a workspace-relative path`);
   try {
     validateRelativePath(value);
   } catch {
-    throw mediaValidation(`${field} 必须是工作区相对路径`);
+    throw mediaValidation(`${field} must be a workspace-relative path`);
   }
   return value;
 }
@@ -179,7 +179,7 @@ function requireVideoDimension(value: unknown, field: 'width' | 'height'): numbe
     value % 2 !== 0
   ) {
     throw mediaValidation(
-      `${field} 必须是 ${MEDIA_VIDEO_MIN_WIDTH}..${MEDIA_VIDEO_MAX_WIDTH} 之间的偶数`
+      `${field} must be an even number between ${MEDIA_VIDEO_MIN_WIDTH} and ${MEDIA_VIDEO_MAX_WIDTH}`
     );
   }
   return value;
@@ -192,7 +192,7 @@ function requireVideoFps(value: unknown): number {
     value < MEDIA_VIDEO_MIN_FPS ||
     value > MEDIA_VIDEO_MAX_FPS
   ) {
-    throw mediaValidation(`fps 必须是 ${MEDIA_VIDEO_MIN_FPS}..${MEDIA_VIDEO_MAX_FPS} 之间的整数`);
+    throw mediaValidation(`fps must be an integer between ${MEDIA_VIDEO_MIN_FPS} and ${MEDIA_VIDEO_MAX_FPS}`);
   }
   return value;
 }
@@ -205,7 +205,7 @@ function requireVideoDuration(value: unknown): number {
     value > MEDIA_VIDEO_MAX_DURATION_MS
   ) {
     throw mediaValidation(
-      `durationMs 必须是 ${MEDIA_VIDEO_MIN_DURATION_MS}..${MEDIA_VIDEO_MAX_DURATION_MS} 之间的整数`
+      `durationMs must be an integer between ${MEDIA_VIDEO_MIN_DURATION_MS} and ${MEDIA_VIDEO_MAX_DURATION_MS}`
     );
   }
   return value;
@@ -213,26 +213,26 @@ function requireVideoDuration(value: unknown): number {
 
 /** §1.3 参数校验与规范化（服务端权威；规范化形写入 params_json 并参与 dedup_key）。 */
 function normalizeCreateInput(input: unknown): NormalizedCreate {
-  if (!isRecord(input)) throw mediaValidation('请求体必须是对象');
+  if (!isRecord(input)) throw mediaValidation('Request body must be an object');
   const kind = input.kind;
   if (!isDesignMediaTaskKind(kind))
-    throw mediaValidation('kind 必须是 image-generate、image-edit 或 video-render');
+    throw mediaValidation('kind must be image-generate, image-edit, or video-render');
 
   if (kind === 'image-generate' || kind === 'image-edit') {
     const prompt = normalizePrompt(input.prompt);
     const size = normalizeSize(input.size);
     const targetDir = normalizeTargetDir(input.targetDir);
     const provider = input.provider;
-    if (!isRecord(provider)) throw mediaValidation('provider 必须包含 profileId 与 model');
+    if (!isRecord(provider)) throw mediaValidation('provider must include profileId and model');
     if (typeof provider.profileId !== 'string' || !provider.profileId.trim())
-      throw mediaValidation('provider.profileId 必须是非空字符串');
+      throw mediaValidation('provider.profileId must be a non-empty string');
     const profileId = provider.profileId.trim();
     if (
       typeof provider.model !== 'string' ||
       !provider.model.trim() ||
       provider.model.trim().length > 100
     )
-      throw mediaValidation('provider.model 必须是 1..100 字符的字符串');
+      throw mediaValidation('provider.model must be a string of 1..100 characters');
     const model = provider.model.trim();
 
     const params: DesignMediaTaskParams =
@@ -302,7 +302,7 @@ export class MediaTaskService {
       .prepare(
         `UPDATE design_media_tasks
          SET status = 'failed', error_code = 'INTERRUPTED',
-             error_message = '服务重启导致任务中断', updated_at = ?
+             error_message = 'Task interrupted by a service restart', updated_at = ?
          WHERE status IN ('queued', 'running')`
       )
       .run(Date.now());
@@ -315,7 +315,7 @@ export class MediaTaskService {
     let provider: DesignMediaProviderRef | null = null;
     if (normalized.profileId !== null) {
       const profileName = this.deps.resolveProfileName?.(normalized.profileId) ?? null;
-      if (!profileName) throw mediaValidation('指定的服务配置不存在');
+      if (!profileName) throw mediaValidation('The specified service profile does not exist');
       provider = {
         providerId: MEDIA_IMAGE_PROVIDER_ID,
         profileId: normalized.profileId,
@@ -338,7 +338,7 @@ export class MediaTaskService {
          LIMIT 1`
       )
       .get(workspaceRoot, dedupKey);
-    if (duplicate) throw new DesignError(409, 'MEDIA_TASK_ACTIVE_EXISTS', '已有相同任务在进行中');
+    if (duplicate) throw new DesignError(409, 'MEDIA_TASK_ACTIVE_EXISTS', 'An identical task is already in progress');
 
     const now = Date.now();
     const id = randomUUID();
@@ -379,14 +379,14 @@ export class MediaTaskService {
   async cancel(sessionId: unknown, taskId: unknown): Promise<DesignMediaTaskSummary> {
     const workspaceRoot = await this.designService.workspace(sessionId);
     if (typeof taskId !== 'string' || !taskId)
-      throw new DesignError(404, 'MEDIA_TASK_NOT_FOUND', '任务不存在');
+      throw new DesignError(404, 'MEDIA_TASK_NOT_FOUND', 'Task not found');
     const row = this.requireRow(taskId, workspaceRoot);
     if (row.status === 'queued') {
       this.finalizeStatus(taskId, 'cancelled', null, null, null);
       return toSummary(this.requireRow(taskId, workspaceRoot));
     }
     if (row.status !== 'running')
-      throw new DesignError(409, 'MEDIA_TASK_INVALID_STATE', '任务已结束，无法取消');
+      throw new DesignError(409, 'MEDIA_TASK_INVALID_STATE', 'The task has already finished and cannot be canceled');
     const run = this.active.get(taskId);
     if (!run) {
       // 防御：运行中行缺失活动记录（仅可能来自异常外部改写）——直接落 cancelled。
@@ -404,14 +404,14 @@ export class MediaTaskService {
   ): Promise<{ absolutePath: string; fileName: string; mime: string; bytes: number }> {
     const workspaceRoot = await this.designService.workspace(sessionId);
     if (typeof taskId !== 'string' || !taskId)
-      throw new DesignError(404, 'MEDIA_TASK_NOT_FOUND', '任务不存在');
+      throw new DesignError(404, 'MEDIA_TASK_NOT_FOUND', 'Task not found');
     const row = this.requireRow(taskId, workspaceRoot);
     const result =
       row.status === 'completed'
         ? parseJsonOrNull<DesignMediaTaskResult>(row.result_json)
         : null;
     if (!result)
-      throw new DesignError(409, 'MEDIA_TASK_INVALID_STATE', '任务尚未完成或没有产物');
+      throw new DesignError(409, 'MEDIA_TASK_INVALID_STATE', 'The task is not finished yet or has no artifact');
     // 经 design resolve() containment：越界/私有问题在授权与符号链接层被拒绝。
     const resolved = await this.designService.resolveFile(sessionId, result.path);
     return {
@@ -473,10 +473,10 @@ export class MediaTaskService {
 
       let result: DesignMediaTaskResult | null = null;
       let errorCode: MediaTaskErrorCode = 'INTERNAL';
-      let errorMessage = '任务执行失败';
+      let errorMessage = 'Task execution failed';
       try {
         const executor = this.executors[row.kind];
-        if (!executor) throw new MediaTaskRunError('INTERNAL', '该任务类型未配置执行器');
+        if (!executor) throw new MediaTaskRunError('INTERNAL', 'No executor is configured for this task type');
         const execution: MediaTaskExecution = {
           id: row.id,
           kind: row.kind,
@@ -495,7 +495,7 @@ export class MediaTaskService {
           errorMessage = error.message;
         } else {
           errorCode = 'INTERNAL';
-          errorMessage = error instanceof Error && error.message ? error.message : '任务执行失败';
+          errorMessage = error instanceof Error && error.message ? error.message : 'Task execution failed';
         }
       }
 
@@ -568,7 +568,7 @@ export class MediaTaskService {
 
   private requireRow(id: string, workspaceRoot: string): MediaTaskRow {
     const row = this.getRow(id, workspaceRoot);
-    if (!row) throw new DesignError(404, 'MEDIA_TASK_NOT_FOUND', '任务不存在');
+    if (!row) throw new DesignError(404, 'MEDIA_TASK_NOT_FOUND', 'Task not found');
     return row;
   }
 }
@@ -627,8 +627,8 @@ export function createImageTaskExecutor(deps: ImageTaskExecutorDeps): MediaTaskE
   return async (execution, ctx) => {
     const params = execution.params;
     if (params.type !== 'image-generate' && params.type !== 'image-edit')
-      throw new MediaTaskRunError('INTERNAL', '图片执行器收到了非图片任务');
-    if (!execution.provider) throw new MediaTaskRunError('INTERNAL', '图片任务缺少服务配置');
+      throw new MediaTaskRunError('INTERNAL', 'The image executor received a non-image task');
+    if (!execution.provider) throw new MediaTaskRunError('INTERNAL', 'The image task is missing its service profile');
 
     await ctx.onProgress({ phase: 'submitting' });
 
@@ -637,12 +637,12 @@ export function createImageTaskExecutor(deps: ImageTaskExecutorDeps): MediaTaskE
       try {
         const loaded = await deps.readSourceImage(execution.sessionId ?? '', params.sourcePath);
         if (loaded.bytes.length > MEDIA_IMAGE_SOURCE_MAX_BYTES)
-          throw new Error(`源图超过 ${MEDIA_IMAGE_SOURCE_MAX_BYTES} 字节上限`);
+          throw new Error(`Source image exceeds the ${MEDIA_IMAGE_SOURCE_MAX_BYTES}-byte limit`);
         source = { path: params.sourcePath, mime: loaded.mime, bytes: loaded.bytes };
       } catch (error) {
         throw new MediaTaskRunError(
           'ENTRY_UNREADABLE',
-          error instanceof Error && error.message ? `源图不可读：${error.message}` : '源图不可读'
+          error instanceof Error && error.message ? `Source image is not readable: ${error.message}` : 'Source image is not readable'
         );
       }
     }
@@ -672,7 +672,7 @@ export function createImageTaskExecutor(deps: ImageTaskExecutorDeps): MediaTaskE
     } catch (error) {
       throw new MediaTaskRunError(
         'ASSET_WRITE_FAILED',
-        error instanceof Error && error.message ? error.message : '产物写入素材库失败'
+        error instanceof Error && error.message ? error.message : 'Failed to write the artifact to the asset library'
       );
     }
     return {
@@ -695,17 +695,17 @@ const MAX_GENERATED_NAME_CANDIDATES = 100;
 /** 文件名规则与 DesignService.validateAssetFileName 同口径，白名单限 .mp4/.webm/.mov。 */
 function validateGeneratedAssetFileName(fileName: unknown): string {
   if (typeof fileName !== 'string' || !fileName || fileName.length > MAX_GENERATED_NAME_LENGTH)
-    throw new DesignError(400, 'ASSET_INVALID', '文件名必须是非空且不超过 200 个字符的字符串');
+    throw new DesignError(400, 'ASSET_INVALID', 'Filename must be a non-empty string of at most 200 characters');
   if (/[/\\]/.test(fileName) || path.basename(fileName) !== fileName)
-    throw new DesignError(400, 'ASSET_INVALID', '文件名不能包含路径分隔符');
+    throw new DesignError(400, 'ASSET_INVALID', 'Filename must not contain path separators');
   if (/[\u0000-\u001f\u007f]/.test(fileName))
-    throw new DesignError(400, 'ASSET_INVALID', '文件名不能包含控制字符');
+    throw new DesignError(400, 'ASSET_INVALID', 'Filename must not contain control characters');
   const extension = path.extname(fileName).toLowerCase();
   if (!GENERATED_ASSET_EXTENSIONS.has(extension))
     throw new DesignError(
       400,
       'ASSET_INVALID',
-      `不支持的文件扩展名「${extension || '（无）'}」，仅允许 .mp4/.webm/.mov 视频`
+      `Unsupported file extension ${extension || '(none)'}; only .mp4/.webm/.mov videos are allowed`
     );
   return fileName;
 }
@@ -754,7 +754,7 @@ export function createGeneratedAssetWriter(
         throw new DesignError(
           400,
           'ASSET_INVALID',
-          `目标目录同名文件过多，无法为 ${fileName} 生成新文件名`
+          `Too many files with the same name in the target directory; cannot generate a new name for ${fileName}`
         );
       candidate = `${stem}-${taken + 2}${extension}`;
     }

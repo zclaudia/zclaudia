@@ -25,12 +25,12 @@ type Tab = 'image-generate' | 'image-edit' | 'video-render';
 
 /** 模型建议（datalist）：覆盖 CogView 与 OpenAI 常用图片模型。 */
 const MODEL_SUGGESTIONS = ['cogview-4', 'gpt-image-1', 'dall-e-3'];
-const NO_PROFILE_HINT = '先在设置中配置 OpenAI 兼容服务';
-const RETRY_CONFIRM_TEXT = '将重新提交生成请求，可能产生费用。继续？';
-const REPLACE_READY_TITLE = '把选中图片的 src 替换为该产物';
-const REPLACE_NEEDS_IMG = '需要先在预览中选中一个图片元素';
+const NO_PROFILE_HINT = 'Configure an OpenAI-compatible service in Settings first';
+const RETRY_CONFIRM_TEXT = 'This will resubmit the generation request and may incur costs. Continue?';
+const REPLACE_READY_TITLE = "Replace the selected image's src with this artifact";
+const REPLACE_NEEDS_IMG = 'Select an image element in the preview first';
 
-const VIDEO_TAB_NOTE = '动效渲染（近似实时采集）；当前不支持声音（成片无音轨）。';
+const VIDEO_TAB_NOTE = 'Motion rendering (near-real-time capture); audio is not supported (no soundtrack).';
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -419,7 +419,7 @@ export function MediaGenPanel({
         </span>
       ) : profiles === null ? (
         <span role="status" className="text-muted-foreground">
-          正在加载服务配置…
+          Loading service profiles…
         </span>
       ) : profiles.length === 0 ? (
         <span role="alert" className="text-muted-foreground">
@@ -430,17 +430,17 @@ export function MediaGenPanel({
           value={profileId}
           onChange={setProfileId}
           options={profiles.map(profile => ({ value: profile.id, label: profile.name }))}
-          placeholder="选择图片服务"
-          ariaLabel="图片服务"
+          placeholder="Choose an image service"
+          ariaLabel="Image service"
           size="sm"
           className="w-44 shrink-0"
         />
       )}
       <Input
-        aria-label="模型名称"
+        aria-label="Model name"
         value={model}
         list="media-model-suggestions"
-        placeholder="模型（如 cogview-4）"
+        placeholder="Model (e.g. cogview-4)"
         className="h-6 w-40 flex-1 px-1.5 py-0 text-[11px]"
         onChange={event => setModel(event.target.value)}
       />
@@ -450,7 +450,7 @@ export function MediaGenPanel({
         ))}
       </datalist>
       <Input
-        aria-label="尺寸（可选）"
+        aria-label="Size (optional)"
         value={size}
         placeholder="1024x1024"
         className="h-6 w-28 px-1.5 py-0 text-[11px]"
@@ -488,27 +488,27 @@ export function MediaGenPanel({
               <Button
                 size="sm"
                 disabled={busyCancel}
-                aria-label={`取消${kind}任务`}
+                aria-label={`Cancel ${kind} task`}
                 onClick={() => void handleCancelTask(task.id)}
               >
-                {busyCancel ? '取消中…' : '取消'}
+                {busyCancel ? 'Canceling…' : 'Cancel'}
               </Button>
             )}
             {task.status === 'failed' && (
               <Button
                 size="sm"
                 disabled={submitBusy}
-                aria-label={`重试${kind}任务`}
+                aria-label={`Retry ${kind} task`}
                 onClick={() => setRetryTaskId(task.id)}
               >
-                重试
+                Retry
               </Button>
             )}
           </span>
         </div>
         {task.provider !== null && (
           <div className="text-[11px] text-muted-foreground">
-            {`服务：${task.provider.profileName} · ${task.provider.model}`}
+            {`Service: ${task.provider.profileName} · ${task.provider.model}`}
           </div>
         )}
         {result !== null && (
@@ -552,10 +552,10 @@ export function MediaGenPanel({
                     variant="outline"
                     disabled={!imageSelectionReady}
                     title={imageSelectionReady ? REPLACE_READY_TITLE : REPLACE_NEEDS_IMG}
-                    aria-label={`替换选中图片 ${result.path}`}
+                    aria-label={`Replace selected image ${result.path}`}
                     onClick={() => onReplaceSelectionSrc(result.path)}
                   >
-                    替换选中图片
+                    Replace selected image
                   </Button>
                 )}
                 {isVideoResult && (
@@ -563,20 +563,20 @@ export function MediaGenPanel({
                     size="sm"
                     variant="outline"
                     disabled={busyPreview}
-                    aria-label={`预览 ${result.path}`}
+                    aria-label={`Preview ${result.path}`}
                     onClick={() => void handlePreview(task)}
                   >
-                    {previewing ? '收起' : '预览'}
+                    {previewing ? 'Collapse' : 'Preview'}
                   </Button>
                 )}
                 <Button
                   size="sm"
                   variant="outline"
                   disabled={busyDownload}
-                  aria-label={`下载 ${result.path}`}
+                  aria-label={`Download ${result.path}`}
                   onClick={() => void handleDownload(task)}
                 >
-                  {busyDownload ? '下载中…' : '下载'}
+                  {busyDownload ? 'Downloading…' : 'Download'}
                 </Button>
               </span>
             </div>
@@ -595,16 +595,16 @@ export function MediaGenPanel({
             <div className="text-[11px] text-foreground">{RETRY_CONFIRM_TEXT}</div>
             <div className="flex justify-end gap-2">
               <Button size="sm" onClick={() => setRetryTaskId(null)}>
-                取消
+                Cancel
               </Button>
               <Button
                 size="sm"
                 variant="primary"
-                aria-label="确认重试"
+                aria-label="Confirm retry"
                 disabled={submitBusy}
                 onClick={() => void handleRetryConfirm(task)}
               >
-                确认重试
+                Confirm retry
               </Button>
             </div>
           </div>
@@ -617,17 +617,17 @@ export function MediaGenPanel({
     <Modal
       open
       onClose={onClose}
-      ariaLabel="媒体生成"
-      title="媒体生成"
+      ariaLabel="Media generation"
+      title="Media generation"
       size="2xl"
       footer={
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={() => void refresh()} disabled={loading}>
-            刷新任务
+            Refresh tasks
           </Button>
           <span className="ml-auto" />
           <Button size="sm" onClick={onClose}>
-            关闭
+            Close
           </Button>
         </div>
       }
@@ -636,11 +636,11 @@ export function MediaGenPanel({
         <div
           className="flex w-fit gap-0.5 rounded-md bg-secondary p-0.5"
           role="tablist"
-          aria-label="媒体类型"
+          aria-label="Media type"
         >
-          {renderTabButton('image-generate', '图片生成')}
-          {renderTabButton('image-edit', '图片编辑')}
-          {renderTabButton('video-render', '动效视频')}
+          {renderTabButton('image-generate', 'Image generation')}
+          {renderTabButton('image-edit', 'Image edit')}
+          {renderTabButton('video-render', 'Motion video')}
         </div>
         {(error !== null || submitError !== null) && (
           <div role="alert" className="text-destructive">
@@ -651,7 +651,7 @@ export function MediaGenPanel({
           {tab === 'video-render' ? (
             <>
               <Input
-                aria-label="视频入口路径"
+                aria-label="Video entry path"
                 value={entryPath}
                 placeholder="design/index.html"
                 className={FIELD_CLASS}
@@ -659,28 +659,28 @@ export function MediaGenPanel({
               />
               <div className="flex items-center gap-2">
                 <Input
-                  aria-label="视口宽度"
+                  aria-label="Viewport width"
                   type="number"
                   value={width}
                   className="h-6 w-24 px-1.5 py-0 text-[11px]"
                   onChange={event => setWidth(event.target.value)}
                 />
                 <Input
-                  aria-label="视口高度"
+                  aria-label="Viewport height"
                   type="number"
                   value={height}
                   className="h-6 w-24 px-1.5 py-0 text-[11px]"
                   onChange={event => setHeight(event.target.value)}
                 />
                 <Input
-                  aria-label="帧率"
+                  aria-label="Frame rate"
                   type="number"
                   value={fps}
                   className="h-6 w-20 px-1.5 py-0 text-[11px]"
                   onChange={event => setFps(event.target.value)}
                 />
                 <Input
-                  aria-label="时长（秒）"
+                  aria-label="Duration (s)"
                   type="number"
                   value={duration}
                   className="h-6 w-20 px-1.5 py-0 text-[11px]"
@@ -692,10 +692,10 @@ export function MediaGenPanel({
           ) : (
             <>
               <textarea
-                aria-label="生成描述"
+                aria-label="Prompt"
                 value={prompt}
                 rows={3}
-                placeholder="描述要生成的画面…"
+                placeholder="Describe what to generate…"
                 className={`${FIELD_CLASS} resize-y`}
                 onChange={event => setPrompt(event.target.value)}
               />
@@ -708,17 +708,17 @@ export function MediaGenPanel({
                     </span>
                   ) : assets === null ? (
                     <span role="status" className="text-muted-foreground">
-                      正在加载素材…
+                      Loading assets…
                     </span>
                   ) : assets.length === 0 ? (
-                    <span className="text-muted-foreground">工作区暂无图片素材</span>
+                    <span className="text-muted-foreground">No image assets in the workspace yet</span>
                   ) : (
                     <Select
                       value={sourcePath}
                       onChange={setSourcePath}
                       options={assets.map(asset => ({ value: asset, label: asset }))}
-                      placeholder="选择源图片"
-                      ariaLabel="源图片"
+                      placeholder="Choose source image"
+                      ariaLabel="Source image"
                       size="sm"
                       className="w-64 shrink-0"
                     />
@@ -731,7 +731,7 @@ export function MediaGenPanel({
             {validationError !== null && (
               <span className="text-destructive">{validationError}</span>
             )}
-            {sessionId === null && <span className="text-muted-foreground">当前没有可用会话</span>}
+            {sessionId === null && <span className="text-muted-foreground">No session available</span>}
             <span className="ml-auto" />
             <Button
               size="sm"
@@ -739,16 +739,16 @@ export function MediaGenPanel({
               disabled={submitDisabled}
               onClick={() => void handleSubmit()}
             >
-              {submitBusy ? '提交中…' : tab === 'video-render' ? '开始渲染' : '提交生成'}
+              {submitBusy ? 'Submitting…' : tab === 'video-render' ? 'Start rendering' : 'Submit'}
             </Button>
           </div>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-muted-foreground">任务记录</span>
-          {loading && <span className="text-[11px] text-muted-foreground">刷新中…</span>}
+          <span className="text-[11px] text-muted-foreground">Task history</span>
+          {loading && <span className="text-[11px] text-muted-foreground">Refreshing…</span>}
         </div>
         {tasks.length === 0 ? (
-          <p className="text-muted-foreground">暂无生成任务。</p>
+          <p className="text-muted-foreground">No generation tasks yet.</p>
         ) : (
           <ul className="flex flex-col gap-2">{tasks.map(renderTask)}</ul>
         )}

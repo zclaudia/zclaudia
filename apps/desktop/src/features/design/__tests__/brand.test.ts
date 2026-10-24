@@ -31,10 +31,14 @@ describe('validateBrandSpec（P4 §3.2 品牌表单预检）', () => {
   });
 
   it('颜色：空值 / 超长 / 非法语法逐项报错', () => {
-    expect(errorsFor({ primary: '' })).toEqual(['主色不能为空']);
-    expect(errorsFor({ primary: '   ' })).toEqual(['主色不能为空']);
-    expect(errorsFor({ secondary: 'a'.repeat(41) })).toEqual(['辅色过长（最多 40 字符）']);
-    expect(errorsFor({ background: '#12345' })).toEqual(['背景色不是合法的 CSS 颜色（支持 #hex、rgb()/rgba()/hsl() 或英文命名色）']);
+    expect(errorsFor({ primary: '' })).toEqual(['Primary must not be empty']);
+    expect(errorsFor({ primary: '   ' })).toEqual(['Primary must not be empty']);
+    expect(errorsFor({ secondary: 'a'.repeat(41) })).toEqual([
+      'Secondary is too long (max 40 characters)',
+    ]);
+    expect(errorsFor({ background: '#12345' })).toEqual([
+      'Background is not a valid CSS color (supports #hex, rgb()/rgba()/hsl(), or named colors)',
+    ]);
     expect(errorsFor({ background: '#1234567' })).toHaveLength(1);
     expect(errorsFor({ background: 'rgb(255, 0, 0' })).toHaveLength(1);
     expect(errorsFor({ background: 'red blue' })).toHaveLength(1);
@@ -43,9 +47,13 @@ describe('validateBrandSpec（P4 §3.2 品牌表单预检）', () => {
 
   it('字体：≤120 合法；空值/超长/注入字符报错', () => {
     expect(errorsFor({ fontBody: 'a'.repeat(120) })).toEqual([]);
-    expect(errorsFor({ fontHeading: 'a'.repeat(121) })).toEqual(['标题字体过长（最多 120 字符）']);
-    expect(errorsFor({ fontBody: '' })).toEqual(['正文字体不能为空']);
-    expect(errorsFor({ fontBody: 'Inter; }' })).toEqual([expect.stringContaining('不允许的字符')]);
+    expect(errorsFor({ fontHeading: 'a'.repeat(121) })).toEqual([
+      'Heading font is too long (max 120 characters)',
+    ]);
+    expect(errorsFor({ fontBody: '' })).toEqual(['Body font must not be empty']);
+    expect(errorsFor({ fontBody: 'Inter; }' })).toEqual([
+      expect.stringContaining('contains disallowed characters'),
+    ]);
     expect(errorsFor({ fontBody: '{Inter}' })).toHaveLength(1);
     expect(errorsFor({ fontBody: '<Inter>' })).toHaveLength(1);
     expect(errorsFor({ fontBody: 'Inter\\' })).toHaveLength(1);
@@ -58,29 +66,35 @@ describe('validateBrandSpec（P4 §3.2 品牌表单预检）', () => {
   it('spacingUnit / radius 只接受字面量联合成员', () => {
     expect(
       validateBrandSpec({ ...VALID_SPEC, spacingUnit: '3px' as BrandSpec['spacingUnit'] })
-    ).toEqual(['间距基准只能是 4px 或 8px']);
+    ).toEqual(['Spacing base must be 4px or 8px']);
     expect(
       validateBrandSpec({ ...VALID_SPEC, radius: 'xl' as BrandSpec['radius'] })
-    ).toEqual(['圆角档位只能是 none / sm / md / lg']);
+    ).toEqual(['Radius tier must be none / sm / md / lg']);
   });
 
   it('logoPath：空串合法；超长 / scheme / // 开头 / 反斜杠 / 控制字符报错', () => {
     expect(errorsFor({ logoPath: '' })).toEqual([]);
     expect(errorsFor({ logoPath: 'design/assets/logo.svg' })).toEqual([]);
     expect(errorsFor({ logoPath: 'a'.repeat(500) })).toEqual([]);
-    expect(errorsFor({ logoPath: 'a'.repeat(501) })).toEqual(['Logo 路径过长（最多 500 字符）']);
+    expect(errorsFor({ logoPath: 'a'.repeat(501) })).toEqual([
+      'Logo path is too long (max 500 characters)',
+    ]);
     expect(errorsFor({ logoPath: 'http://cdn.example.com/logo.png' })).toEqual([
-      'Logo 路径必须是工作区相对路径（禁协议前缀与 // 开头）',
+      'Logo path must be workspace-relative (no protocol prefix or leading //)',
     ]);
     expect(errorsFor({ logoPath: 'HTTPS://example.com/l.png' })).toHaveLength(1);
     expect(errorsFor({ logoPath: '//example.com/logo.png' })).toHaveLength(1);
-    expect(errorsFor({ logoPath: 'design\\logo.png' })).toEqual(['Logo 路径不能包含反斜杠或控制字符']);
+    expect(errorsFor({ logoPath: 'design\\logo.png' })).toEqual([
+      'Logo path must not contain backslashes or control characters',
+    ]);
     expect(errorsFor({ logoPath: 'logo\n.png' })).toHaveLength(1);
   });
 
   it('notes ≤2000', () => {
     expect(errorsFor({ notes: 'a'.repeat(2000) })).toEqual([]);
-    expect(errorsFor({ notes: 'a'.repeat(2001) })).toEqual(['使用规则过长（最多 2000 字符）']);
+    expect(errorsFor({ notes: 'a'.repeat(2001) })).toEqual([
+      'Usage rules are too long (max 2000 characters)',
+    ]);
   });
 
   it('多个字段违规时逐项列出', () => {
@@ -97,29 +111,31 @@ describe('validateBrandSpec（P4 §3.2 品牌表单预检）', () => {
 describe('renderDesignMd（P4 §3.1 DESIGN.md 文件形态）', () => {
   it('包含全部令牌与章节结构', () => {
     const md = renderDesignMd({ ...VALID_SPEC, logoPath: 'assets/logo.svg', notes: '按钮一律用主色。' });
-    expect(md).toContain('# 品牌与设计系统');
-    expect(md).toContain('> 由 ZClaudia 设计工作台生成。');
-    expect(md).toContain('## 色彩');
-    expect(md).toContain('| 主色 | --color-primary | #4f46e5 |');
-    expect(md).toContain('| 辅色 | --color-secondary | rgb(14, 165, 233) |');
-    expect(md).toContain('| 背景 | --color-background | #f8fafc |');
-    expect(md).toContain('| 文字 | --color-text | #0f172a |');
-    expect(md).toContain('## 字体');
-    expect(md).toContain('- 正文："Inter", system-ui, sans-serif');
-    expect(md).toContain('- 标题："Noto Sans SC", sans-serif');
-    expect(md).toContain('## 间距与圆角');
-    expect(md).toContain('- 间距基准：8px（--space-unit）');
-    expect(md).toContain('- 圆角：md（--radius-md = 8px）');
+    expect(md).toContain('# Brand & Design System');
+    expect(md).toContain('> Generated by the ZClaudia design workbench.');
+    expect(md).toContain('## Colors');
+    expect(md).toContain('| Primary | --color-primary | #4f46e5 |');
+    expect(md).toContain('| Secondary | --color-secondary | rgb(14, 165, 233) |');
+    expect(md).toContain('| Background | --color-background | #f8fafc |');
+    expect(md).toContain('| Text | --color-text | #0f172a |');
+    expect(md).toContain('## Fonts');
+    expect(md).toContain('- Body: "Inter", system-ui, sans-serif');
+    expect(md).toContain('- Heading: "Noto Sans SC", sans-serif');
+    expect(md).toContain('## Spacing & Radius');
+    expect(md).toContain('- Spacing base: 8px (--space-unit)');
+    expect(md).toContain('- Radius: md (--radius-md = 8px)');
     expect(md).toContain('## Logo');
-    expect(md).toContain('- 引用：assets/logo.svg（相对 design/ 的路径，素材需已在素材库中）');
-    expect(md).toContain('## 使用规则');
+    expect(md).toContain(
+      '- Reference: assets/logo.svg (path relative to design/; the asset must already be in the asset library)'
+    );
+    expect(md).toContain('## Usage Rules');
     expect(md).toContain('按钮一律用主色。');
   });
 
   it('logoPath 为空写「未指定」；notes 为空写默认文案', () => {
     const md = renderDesignMd(VALID_SPEC);
-    expect(md).toContain('- 引用：未指定');
-    expect(md).toContain('遵循上表令牌，保持一致性与克制。');
+    expect(md).toContain('- Reference: not specified');
+    expect(md).toContain('Follow the tokens above; stay consistent and restrained.');
   });
 
   it('同输入两次渲染输出一致（确定性）', () => {
@@ -130,7 +146,7 @@ describe('renderDesignMd（P4 §3.1 DESIGN.md 文件形态）', () => {
 describe('renderTokensCss（P4 §3.1 tokens.css 文件形态）', () => {
   it('包含顶部注释、:root 全部键名与 radius 档位注释', () => {
     const css = renderTokensCss(VALID_SPEC);
-    expect(css).toContain('/* ZClaudia design tokens — 与 DESIGN.md 对应，可手动编辑 */');
+    expect(css).toContain('/* ZClaudia design tokens — corresponds to DESIGN.md, safe to edit by hand */');
     expect(css).toContain(':root {');
     expect(css).toContain('  --color-primary: #4f46e5;');
     expect(css).toContain('  --color-secondary: rgb(14, 165, 233);');
@@ -139,7 +155,7 @@ describe('renderTokensCss（P4 §3.1 tokens.css 文件形态）', () => {
     expect(css).toContain('  --font-body: "Inter", system-ui, sans-serif;');
     expect(css).toContain('  --font-heading: "Noto Sans SC", sans-serif;');
     expect(css).toContain('  --space-unit: 8px;');
-    expect(css).toContain('  --radius-md: 8px;   /* radius 档位：none=0 / sm=4px / md=8px / lg=16px */');
+    expect(css).toContain('  --radius-md: 8px;   /* radius tiers: none=0 / sm=4px / md=8px / lg=16px */');
     expect(css.trimEnd().endsWith('}')).toBe(true);
   });
 

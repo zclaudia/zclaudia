@@ -41,7 +41,7 @@ const SUBTITLES = {
   lineage: 'Session branch graph',
   git: 'Status, branches, history & sync',
   browser: 'Preview local servers',
-  design: '预览与编辑 HTML 作品',
+  design: 'Preview and edit HTML works',
 } satisfies Record<Exclude<EmptyTile['iconKey'], 'changes'>, string>;
 
 /**

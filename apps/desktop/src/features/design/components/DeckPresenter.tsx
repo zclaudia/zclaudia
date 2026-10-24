@@ -149,7 +149,7 @@ export function DeckPresenter({
             }}
           >
             <iframe
-              title={`幻灯片 ${index + 1}`}
+              title={`Slide ${index + 1}`}
               sandbox="allow-scripts"
               srcDoc={slideHtml}
               style={{ width: dims.width, height: dims.height, border: '0' }}
@@ -158,7 +158,7 @@ export function DeckPresenter({
           </div>
         ) : (
           <div role="status" className="text-sm text-muted-foreground">
-            正在构建预览…
+            Building preview…
           </div>
         )}
       </div>
@@ -167,7 +167,7 @@ export function DeckPresenter({
           data-testid="deck-notes"
           className="max-h-40 overflow-y-auto border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground"
         >
-          {current.notes || '无备注'}
+          {current.notes || 'No notes'}
         </div>
       )}
       <div className="flex items-center gap-2 border-t border-border bg-card px-3 py-2">
@@ -175,29 +175,29 @@ export function DeckPresenter({
           data-testid="deck-page-label"
           className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
         >
-          {`第 ${index + 1}/${slides.length} 页 · ${current?.title ?? ''}`}
+          {`Page ${index + 1}/${slides.length} · ${current?.title ?? ''}`}
         </span>
         <Button
           size="sm"
-          aria-label="上一页"
+          aria-label="Previous"
           disabled={index <= 0}
           onClick={() => setIndex(value => Math.max(value - 1, 0))}
         >
-          上一页
+          Previous
         </Button>
         <Button
           size="sm"
-          aria-label="下一页"
+          aria-label="Next"
           disabled={index >= lastIndex}
           onClick={() => setIndex(value => Math.min(value + 1, lastIndex))}
         >
-          下一页
+          Next
         </Button>
-        <Button size="sm" aria-label="备注开关" aria-pressed={notesOpen} onClick={() => setNotesOpen(value => !value)}>
-          备注
+        <Button size="sm" aria-label="Notes toggle" aria-pressed={notesOpen} onClick={() => setNotesOpen(value => !value)}>
+          Notes
         </Button>
-        <Button size="sm" aria-label="关闭演示" onClick={onClose}>
-          关闭
+        <Button size="sm" aria-label="Close presentation" onClick={onClose}>
+          Close
         </Button>
       </div>
     </div>

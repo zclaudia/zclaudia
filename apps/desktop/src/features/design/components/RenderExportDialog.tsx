@@ -45,8 +45,8 @@ export interface RenderExportDialogProps {
   viewport: { preset: string; width: number | null };
 }
 
-const CAPTURE_UNSUPPORTED_NOTICE = '当前环境不支持页面捕获';
-const CAPTURE_FAILED_NOTICE = '页面捕获失败';
+const CAPTURE_UNSUPPORTED_NOTICE = 'Page capture is not supported in this environment';
+const CAPTURE_FAILED_NOTICE = 'Page capture failed';
 
 /** RenderCaptureError 中文映射；其余 Error 用 message，非 Error 用 String。 */
 function describeCaptureError(error: unknown): string {
@@ -243,25 +243,25 @@ export function RenderExportDialog({
     <Modal
       open={open}
       onClose={onClose}
-      ariaLabel="渲染导出"
-      title="渲染导出"
+      ariaLabel="Render export"
+      title="Render export"
       size="md"
       footer={
         <div className="flex justify-end gap-2">
           {stage.kind === 'running' ? (
             <>
-              <Button size="sm" onClick={cancel} aria-label="取消导出">
-                取消
+              <Button size="sm" onClick={cancel} aria-label="Cancel export">
+                Cancel
               </Button>
               <Button size="sm" onClick={onClose} disabled>
-                关闭
+                Close
               </Button>
             </>
           ) : stage.kind === 'idle' ? (
             <>
               {deck !== null && (
                 <Button size="sm" onClick={() => startDeckExport('png')} disabled={exportDisabled}>
-                  导出 PNG（逐页下载）
+                  Export PNG (one download per page)
                 </Button>
               )}
               {deck !== null ? (
@@ -271,20 +271,20 @@ export function RenderExportDialog({
                   onClick={() => startDeckExport('pdf')}
                   disabled={exportDisabled}
                 >
-                  导出 PDF（{deck.slides.length} 页 · 整页图片）
+                  Export PDF ({deck.slides.length} pages · full-page image)
                 </Button>
               ) : (
                 <Button size="sm" variant="primary" onClick={startPageExport} disabled={exportDisabled}>
-                  导出 PNG（视口区域）
+                  Export PNG (viewport area)
                 </Button>
               )}
               <Button size="sm" onClick={onClose}>
-                关闭
+                Close
               </Button>
             </>
           ) : (
             <Button size="sm" onClick={onClose}>
-              关闭
+              Close
             </Button>
           )}
         </div>
@@ -292,44 +292,44 @@ export function RenderExportDialog({
     >
       <div className="flex flex-col gap-3 p-4 text-xs">
         <div className="text-muted-foreground">
-          导出内容为当前预览（含未保存修改）；PDF 为整页图片，不可编辑文字。
+          The export contains the current preview (including unsaved changes); the PDF is a full-page image with non-editable text.
         </div>
         {stage.kind === 'idle' && previewHtml === null && (
           <div role="status" className="text-muted-foreground">
-            正在构建预览…
+            Building preview…
           </div>
         )}
         {stage.kind === 'running' && (
           <div role="status" className="text-muted-foreground">
-            正在导出 {stage.current}/{stage.total}…
+            Exporting {stage.current}/{stage.total}…
           </div>
         )}
         {stage.kind === 'done' && (
           <>
             {stage.cancelled ? (
               <div role="status" className="text-muted-foreground">
-                已取消：成功 {stage.succeeded}/{stage.total} 页，已下载文件保留。
+                Canceled: {stage.succeeded}/{stage.total} pages succeeded; downloaded files are kept.
               </div>
             ) : stage.succeeded === 0 ? (
               <div role="alert" className="text-destructive">
-                导出失败：{stage.total} 页全部失败。
+                Export failed: all {stage.total} pages failed.
               </div>
             ) : stage.pdfName !== null ? (
               <div role="status" className="text-success">
-                已导出：{stage.pdfName}（成功 {stage.succeeded}/{stage.total} 页）
+                Exported: {stage.pdfName} ({stage.succeeded}/{stage.total} pages succeeded)
               </div>
             ) : (
               <div role="status" className="text-success">
-                导出完成：成功 {stage.succeeded}/{stage.total} 页。
+                Export finished: {stage.succeeded}/{stage.total} pages succeeded.
               </div>
             )}
             {stage.errors.length > 0 && (
               <>
-                <div className="text-warning">以下页面导出失败：</div>
+                <div className="text-warning">The following pages failed to export:</div>
                 <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border border-border px-2 py-1.5">
                   {stage.errors.map((error, index) => (
                     <li key={`${error.page ?? 'pdf'}-${index}`} className="text-destructive">
-                      {error.page === null ? error.message : `第 ${error.page} 页：${error.message}`}
+                      {error.page === null ? error.message : `Page ${error.page}: ${error.message}`}
                     </li>
                   ))}
                 </ul>

@@ -545,14 +545,14 @@ describe('ShareService', () => {
       const access = await accessOf(share);
 
       const anonymous = await shares.addComment(access, { body: '  这里有问题  ' });
-      expect(anonymous.author).toBe('匿名');
+      expect(anonymous.author).toBe('Anonymous');
       expect(anonymous.body).toBe('这里有问题');
       expect(anonymous.target).toBeNull();
       expect(anonymous.resolvedAt).toBeNull();
       expect(anonymous.id).toMatch(/^sc[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
       expect(anonymous.createdAt).toBeLessThanOrEqual(Date.now());
 
-      expect((await shares.addComment(access, { author: '   ', body: 'x' })).author).toBe('匿名');
+      expect((await shares.addComment(access, { author: '   ', body: 'x' })).author).toBe('Anonymous');
       expect((await shares.addComment(access, { author: ' 小明 ', body: 'x' })).author).toBe('小明');
 
       const target = { elementPath: [0, 2, 1], tagName: 'p', text: 'hello share' };

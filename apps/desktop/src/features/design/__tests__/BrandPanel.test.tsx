@@ -38,7 +38,7 @@ const EMPTY_BRAND: DesignBrand = {
 };
 
 const EXISTING_BRAND: DesignBrand = {
-  designMd: '# 品牌与设计系统\n\n（磁盘内容）\n',
+  designMd: '# Brand & Design System\n\n(disk content)\n',
   tokensCss: ':root {\n  --color-primary: #4f46e5;\n}\n',
   designMdRevision: 'rev-md',
   tokensCssRevision: 'rev-css',
@@ -58,7 +58,7 @@ const SPEC: BrandSpec = {
   notes: '保持克制。',
 };
 
-const COLOR_LABELS = { primary: '主色', secondary: '辅色', background: '背景', text: '文字' } as const;
+const COLOR_LABELS = { primary: 'Primary', secondary: 'Secondary', background: 'Background', text: 'Text' } as const;
 
 function fillSpec(overrides: Partial<BrandSpec> = {}) {
   const spec = { ...SPEC, ...overrides };
@@ -67,11 +67,11 @@ function fillSpec(overrides: Partial<BrandSpec> = {}) {
       target: { value: spec[key] },
     });
   }
-  fireEvent.change(screen.getByLabelText('正文字体'), { target: { value: spec.fontBody } });
-  fireEvent.change(screen.getByLabelText('标题字体'), { target: { value: spec.fontHeading } });
-  fireEvent.change(screen.getByLabelText('间距基准'), { target: { value: spec.spacingUnit } });
-  fireEvent.change(screen.getByLabelText('圆角'), { target: { value: spec.radius } });
-  fireEvent.change(screen.getByLabelText('使用规则'), { target: { value: spec.notes } });
+  fireEvent.change(screen.getByLabelText('Body font'), { target: { value: spec.fontBody } });
+  fireEvent.change(screen.getByLabelText('Heading font'), { target: { value: spec.fontHeading } });
+  fireEvent.change(screen.getByLabelText('Spacing base'), { target: { value: spec.spacingUnit } });
+  fireEvent.change(screen.getByLabelText('Corner radius'), { target: { value: spec.radius } });
+  fireEvent.change(screen.getByLabelText('Usage rules'), { target: { value: spec.notes } });
   return spec;
 }
 
@@ -108,45 +108,53 @@ describe('BrandPanel（P4 §3.4）', () => {
       () => new Promise(resolve => (resolveBrand = resolve))
     );
     mount();
-    expect(screen.getByRole('status')).toHaveTextContent('正在加载品牌文件…');
+    expect(screen.getByRole('status')).toHaveTextContent('Loading brand files…');
     await act(async () => {
       resolveBrand(EMPTY_BRAND);
     });
-    expect(await screen.findByText('生成 design/DESIGN.md 与 design/tokens.css 两个品牌文件；Agent 修改页面时会读取它们。')).toBeInTheDocument();
-    expect(screen.getByLabelText('主色')).toBeInTheDocument();
-    expect(screen.getByLabelText('标题字体')).toBeInTheDocument();
-    expect(screen.getByLabelText('圆角')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '生成品牌文件' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('DESIGN.md 内容')).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Generates two brand files, design/DESIGN.md and design/tokens.css; the Agent reads them when editing pages.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Primary')).toBeInTheDocument();
+    expect(screen.getByLabelText('Heading font')).toBeInTheDocument();
+    expect(screen.getByLabelText('Corner radius')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Generate brand files' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('DESIGN.md content')).not.toBeInTheDocument();
     expect(getDesignBrand).toHaveBeenCalledWith('remote-1', 's1');
   });
 
   it('任一文件存在时进入文本模式，textarea 以 GET 内容初始化', async () => {
     vi.mocked(getDesignBrand).mockResolvedValue(EXISTING_BRAND);
     const { onSaved } = mount();
-    expect(await screen.findByText('直接编辑品牌文件；保存前会校验文件未被外部修改。')).toBeInTheDocument();
-    expect(screen.getByLabelText('DESIGN.md 内容')).toHaveValue(EXISTING_BRAND.designMd);
-    expect(screen.getByLabelText('tokens.css 内容')).toHaveValue(EXISTING_BRAND.tokensCss);
-    expect(screen.queryByLabelText('主色')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '生成品牌文件' })).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Edit the brand files directly; saving checks that they were not modified externally.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('DESIGN.md content')).toHaveValue(EXISTING_BRAND.designMd);
+    expect(screen.getByLabelText('tokens.css content')).toHaveValue(EXISTING_BRAND.tokensCss);
+    expect(screen.queryByLabelText('Primary')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate brand files' })).not.toBeInTheDocument();
     expect(onSaved).not.toHaveBeenCalled();
   });
 
   it('表单校验失败：逐条显示中文错误，不发起 PUT', async () => {
     mount();
-    await screen.findByLabelText('主色');
+    await screen.findByLabelText('Primary');
     fillSpec({ primary: 'not a color!!' });
-    fireEvent.click(screen.getByRole('button', { name: '生成品牌文件' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate brand files' }));
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('主色不是合法的 CSS 颜色');
+    expect(alert).toHaveTextContent('Primary is not a valid CSS color');
     expect(putDesignBrand).not.toHaveBeenCalled();
   });
 
   it('表单成功创建：PUT 携带渲染结果与空修订，显示成功文案并触发 onSaved', async () => {
     const { onSaved } = mount();
-    await screen.findByLabelText('主色');
+    await screen.findByLabelText('Primary');
     const spec = fillSpec();
-    fireEvent.click(screen.getByRole('button', { name: '生成品牌文件' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate brand files' }));
     await waitFor(() =>
       expect(putDesignBrand).toHaveBeenCalledWith('remote-1', {
         sessionId: 's1',
@@ -157,7 +165,7 @@ describe('BrandPanel（P4 §3.4）', () => {
       })
     );
     expect(
-      await screen.findByText('品牌文件已创建：design/DESIGN.md、design/tokens.css')
+      await screen.findByText('Brand files created: design/DESIGN.md, design/tokens.css')
     ).toBeInTheDocument();
     expect(onSaved).toHaveBeenCalledTimes(1);
   });
@@ -165,11 +173,11 @@ describe('BrandPanel（P4 §3.4）', () => {
   it('文本模式保存：只提交该文件键 + GET 修订，成功显示已保存并触发 onSaved', async () => {
     vi.mocked(getDesignBrand).mockResolvedValue(EXISTING_BRAND);
     const { onSaved } = mount();
-    await screen.findByLabelText('tokens.css 内容');
-    fireEvent.change(screen.getByLabelText('tokens.css 内容'), {
+    await screen.findByLabelText('tokens.css content');
+    fireEvent.change(screen.getByLabelText('tokens.css content'), {
       target: { value: ':root {\n  --color-primary: #000000;\n}\n' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '保存 tokens.css' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save tokens.css' }));
     await waitFor(() => expect(putDesignBrand).toHaveBeenCalledTimes(1));
     expect(putDesignBrand).toHaveBeenCalledWith('remote-1', {
       sessionId: 's1',
@@ -179,7 +187,7 @@ describe('BrandPanel（P4 §3.4）', () => {
     const payload = vi.mocked(putDesignBrand).mock.calls[0][1];
     expect(payload).not.toHaveProperty('designMd');
     expect(payload).not.toHaveProperty('designMdRevision');
-    expect(await screen.findByText('已保存')).toBeInTheDocument();
+    expect(await screen.findByText('Saved')).toBeInTheDocument();
     expect(onSaved).toHaveBeenCalledTimes(1);
   });
 
@@ -189,20 +197,20 @@ describe('BrandPanel（P4 §3.4）', () => {
       new DesignHttpError('修订不匹配', 'REVISION_CONFLICT')
     );
     mount();
-    await screen.findByLabelText('DESIGN.md 内容');
-    fireEvent.change(screen.getByLabelText('DESIGN.md 内容'), {
+    await screen.findByLabelText('DESIGN.md content');
+    fireEvent.change(screen.getByLabelText('DESIGN.md content'), {
       target: { value: '# 改过的新内容\n' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '保存 DESIGN.md' }));
-    expect(await screen.findByText('文件已在其他位置更新，请重新加载')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save DESIGN.md' }));
+    expect(await screen.findByText('The file was updated elsewhere; reload it')).toBeInTheDocument();
     expect(getDesignBrand).toHaveBeenCalledTimes(1);
     vi.mocked(getDesignBrand).mockResolvedValue({
       ...EXISTING_BRAND,
       designMd: '# 其他位置的更新\n',
     });
-    fireEvent.click(screen.getByRole('button', { name: '重新加载 DESIGN.md' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reload DESIGN.md' }));
     await waitFor(() => expect(getDesignBrand).toHaveBeenCalledTimes(2));
-    expect(await screen.findByLabelText('DESIGN.md 内容')).toHaveValue('# 其他位置的更新\n');
+    expect(await screen.findByLabelText('DESIGN.md content')).toHaveValue('# 其他位置的更新\n');
   });
 
   it('Logo 从素材库选择：all 清单、以 design/ 为基准换算相对引用', async () => {
@@ -210,29 +218,29 @@ describe('BrandPanel（P4 §3.4）', () => {
       files: ['design/assets/logo.svg', 'assets/logo.png'],
     });
     mount();
-    await screen.findByLabelText('Logo 路径');
-    fireEvent.click(screen.getByRole('button', { name: '从素材库选择…' }));
+    await screen.findByLabelText('Logo path');
+    fireEvent.click(screen.getByRole('button', { name: 'Choose from asset library…' }));
     expect(listDesignAssets).toHaveBeenCalledWith('remote-1', 's1', 'all');
     fireEvent.click(await screen.findByText('design/assets/logo.svg'));
-    expect(screen.getByLabelText('Logo 路径')).toHaveValue(
+    expect(screen.getByLabelText('Logo path')).toHaveValue(
       relativeAssetRef('design/index.html', 'design/assets/logo.svg')
     );
-    expect(screen.getByLabelText('Logo 路径')).toHaveValue('assets/logo.svg');
+    expect(screen.getByLabelText('Logo path')).toHaveValue('assets/logo.svg');
     // 清单收起后再次打开；选择工作区其它目录的素材得到 ../ 前缀引用
-    fireEvent.click(screen.getByRole('button', { name: '从素材库选择…' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose from asset library…' }));
     fireEvent.click(await screen.findByText('assets/logo.png'));
-    expect(screen.getByLabelText('Logo 路径')).toHaveValue('../assets/logo.png');
+    expect(screen.getByLabelText('Logo path')).toHaveValue('../assets/logo.png');
   });
 
   it('素材清单为空显示空态；加载失败可重试', async () => {
     mount();
-    await screen.findByLabelText('Logo 路径');
+    await screen.findByLabelText('Logo path');
     vi.mocked(listDesignAssets).mockRejectedValueOnce(new Error('网络中断'));
-    fireEvent.click(screen.getByRole('button', { name: '从素材库选择…' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('素材清单加载失败');
+    fireEvent.click(screen.getByRole('button', { name: 'Choose from asset library…' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Failed to load the asset list');
     vi.mocked(listDesignAssets).mockResolvedValue({ files: [] });
-    fireEvent.click(screen.getByRole('button', { name: '重试' }));
-    expect(await screen.findByText('工作区暂无素材')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('No assets in the workspace yet')).toBeInTheDocument();
     expect(listDesignAssets).toHaveBeenCalledTimes(2);
   });
 });

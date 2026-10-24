@@ -101,7 +101,7 @@ describe('createOpenAiImagesProvider', () => {
     const { fetch: impl } = recordingFetch(() => jsonResponse({ data: [] }));
     expect(makeProvider(impl).info).toEqual({
       id: 'openai-images',
-      label: 'OpenAI 兼容图片服务',
+      label: 'OpenAI-compatible image service',
       capabilities: ['generate', 'edit'],
     });
   });
@@ -236,7 +236,7 @@ describe('createOpenAiImagesProvider', () => {
       );
       await expectProviderError(makeProvider(impl).generate({ prompt: 'p', signal: IDLE_SIGNAL }), {
         code: 'provider-error',
-        message: '无法识别的图片格式',
+        message: 'unrecognized image format',
       });
     });
 
@@ -244,7 +244,7 @@ describe('createOpenAiImagesProvider', () => {
       const { fetch: impl } = recordingFetch(() => jsonResponse({}));
       await expectProviderError(makeProvider(impl).generate({ prompt: 'p', signal: IDLE_SIGNAL }), {
         code: 'provider-error',
-        message: '缺少图片数据',
+        message: 'missing image data',
       });
     });
 
@@ -252,7 +252,7 @@ describe('createOpenAiImagesProvider', () => {
       const { fetch: impl } = recordingFetch(() => jsonResponse({ data: [{ revised_prompt: 'x' }] }));
       await expectProviderError(makeProvider(impl).generate({ prompt: 'p', signal: IDLE_SIGNAL }), {
         code: 'provider-error',
-        message: '未包含图片数据',
+        message: 'contains no image data',
       });
     });
 
@@ -260,7 +260,7 @@ describe('createOpenAiImagesProvider', () => {
       const { fetch: impl } = recordingFetch(() => new Response('<html>oops</html>', { status: 200 }));
       await expectProviderError(makeProvider(impl).generate({ prompt: 'p', signal: IDLE_SIGNAL }), {
         code: 'provider-error',
-        message: '解析图片服务响应失败',
+        message: 'parsing the image service response failed',
       });
     });
   });
@@ -305,7 +305,7 @@ describe('createOpenAiImagesProvider', () => {
       const provider = makeProvider(impl);
       await expectProviderError(provider.generate({ prompt: 'p', signal: IDLE_SIGNAL }), {
         code: 'provider-error',
-        message: '必须为 https',
+        message: 'must be https',
       });
       expect(calls).toHaveLength(1);
     });
@@ -320,7 +320,7 @@ describe('createOpenAiImagesProvider', () => {
       });
       await expectProviderError(makeProvider(impl).generate({ prompt: 'p', signal: IDLE_SIGNAL }), {
         code: 'provider-error',
-        message: '上限',
+        message: 'MiB limit',
       });
     });
 
@@ -333,7 +333,7 @@ describe('createOpenAiImagesProvider', () => {
       });
       await expectProviderError(makeProvider(impl).generate({ prompt: 'p', signal: IDLE_SIGNAL }), {
         code: 'provider-error',
-        message: '下载图片失败：fetch failed',
+        message: 'downloading the image failed: fetch failed',
       });
     });
   });
@@ -347,7 +347,7 @@ describe('createOpenAiImagesProvider', () => {
         makeProvider(impl).generate({ prompt: 'p', signal: IDLE_SIGNAL }),
         { code: 'provider-error', status: 502 }
       );
-      expect(err.message).toContain('图片服务返回 502');
+      expect(err.message).toContain('The image service returned 502');
       expect(err.message).toContain('A'.repeat(200));
       expect(err.message).not.toContain('TAIL-MARKER');
       expect(err.message).not.toContain('sk-test-key');
@@ -359,7 +359,7 @@ describe('createOpenAiImagesProvider', () => {
       });
       await expectProviderError(makeProvider(impl).generate({ prompt: 'p', signal: IDLE_SIGNAL }), {
         code: 'provider-error',
-        message: '请求图片服务失败：fetch failed',
+        message: 'requesting the image service failed: fetch failed',
       });
     });
 
@@ -367,7 +367,7 @@ describe('createOpenAiImagesProvider', () => {
       const provider = makeProvider(hangingFetch(), { timeoutMs: 20 });
       await expectProviderError(provider.generate({ prompt: 'p', signal: IDLE_SIGNAL }), {
         code: 'provider-timeout',
-        message: '请求图片服务超时',
+        message: 'requesting the image service timed out',
       });
     });
 
@@ -440,7 +440,7 @@ describe('createOpenAiImagesProvider', () => {
       const provider = makeProvider(impl);
       const err = await expectProviderError(
         provider.edit({ prompt: 'p', source: EDIT_SOURCE, signal: IDLE_SIGNAL }),
-        { code: 'provider-unsupported', status, message: '当前服务不支持图片编辑' }
+        { code: 'provider-unsupported', status, message: 'The current service does not support image editing' }
       );
       expect(err.status).toBe(status);
     });
