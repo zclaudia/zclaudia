@@ -239,7 +239,7 @@ describe('useAgentRunFeedback（P4 §6.2）', () => {
     startRun('s1', 'run-1');
     expect(result.current.status).toBeNull();
     endRun('s1');
-    expect(getWatchState).toHaveBeenCalledTimes(1); // before 在过渡时即捕获
+    expect(getWatchState).toHaveBeenCalledTimes(1); // before 在 run 开始（空→非空）即捕获
     expect(listDesignFiles).not.toHaveBeenCalled(); // 防抖窗口内不动磁盘
     await settleDebounce();
 
@@ -259,6 +259,50 @@ describe('useAgentRunFeedback（P4 §6.2）', () => {
     });
 
     act(() => result.current.dismiss());
+    expect(result.current.status).toBeNull();
+  });
+
+  it('run 期间轮询收编磁盘写入不再掩盖 diff（before 在 run 开始捕获，e2e 验收缺陷修复）', async () => {
+    const startBefore: DesignWatchState = {
+      files: ['design/index.html'],
+      openPages: [{ path: 'design/index.html', docRevision: REV_A }],
+    };
+    // run 开始时面板已知 REV_A；run 期间 2s 轮询把磁盘 REV_B 静默收编进面板状态——
+    // 旧实现结束时才取 before（已是 REV_B）→ diff 恒空 → 横幅误报且不建恢复点。
+    const getWatchState = vi
+      .fn()
+      .mockReturnValueOnce(startBefore)
+      .mockReturnValue({
+        files: ['design/index.html'],
+        openPages: [{ path: 'design/index.html', docRevision: REV_B }],
+      });
+    vi.mocked(getDesignDocument).mockResolvedValue({
+      path: 'design/index.html',
+      source: '',
+      revision: REV_B,
+    });
+    const { result } = mountFeedback(startBefore, { getWatchState });
+
+    startRun('s1', 'run-1');
+    endRun('s1');
+    await settleDebounce();
+
+    expect(result.current.status?.diff).toEqual({
+      addedFiles: [],
+      changedPages: ['design/index.html'],
+    });
+    expect(result.current.status?.text).toBe('Agent wrote 1 files');
+    expect(createDesignSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('面板挂载于 run 进行中（未观察开始过渡）：结束时无可靠 before，放弃评估', async () => {
+    hookHarness.state.runIds['s1'] = 'run-already'; // 挂载前 run 已在跑
+    const { result, refreshNow } = mountFeedback(BEFORE);
+    endRun('s1');
+    await settleDebounce();
+
+    expect(listDesignFiles).not.toHaveBeenCalled();
+    expect(refreshNow).not.toHaveBeenCalled();
     expect(result.current.status).toBeNull();
   });
 

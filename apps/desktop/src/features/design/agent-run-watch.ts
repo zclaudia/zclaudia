@@ -104,13 +104,18 @@ function readRunErrored(sessionId: string): boolean {
 }
 
 /**
- * run 结束监视（P4 §6.2）：订阅 useRunStore，观察到本会话 runId「非空 → 空」
- * 且 enabled 时捕获 before（getWatchState + 错误标记），防抖 500 ms 后自取
- * after（listDesignFiles 过滤 HTML + 逐打开页 getDesignDocument，单页失败静默
- * 跳过；清单失败则整轮放弃），diff 后触发 refreshNow 并对 changedPages 逐页
- * 创建恢复点快照（allSettled，任一失败在文案后追加「（恢复点创建失败）」）。
- * 过渡时 enabled=false 的那次不补触发；sessionId 切换清 status 与计时器；
- * 卸载清理订阅与计时器。只读订阅，不改 runStore / chatMessageStore。
+ * run 结束监视（P4 §6.2）：订阅 useRunStore，在 runId「空 → 非空」（run 开始）
+ * 且 enabled 时捕获 before（getWatchState）——面板的 2s 文档轮询会在 run 期间
+ * 把磁盘写入收编进打开页修订（干净页静默 adopt），结束时再取 before 会恒等于
+ * after（e2e 真实验收定位的缺陷：横幅误报零变更、恢复点缺失）；错误标记只在
+ * 结束时可知，评估时补读。观察到本会话 runId「非空 → 空」且 enabled 时防抖
+ * 500 ms 后自取 after（listDesignFiles 过滤 HTML + 逐打开页 getDesignDocument，
+ * 单页失败静默跳过；清单失败则整轮放弃），diff 后触发 refreshNow 并对
+ * changedPages 逐页创建恢复点快照（allSettled，任一失败在文案后追加
+ * 「（恢复点创建失败）」）。挂载于 run 进行中或开始时 enabled=false 的 run
+ * 没有可靠 before，结束时放弃评估、不补触发；sessionId 切换清 status、
+ * 挂起态与计时器；卸载清理订阅与计时器。只读订阅，不改 runStore /
+ * chatMessageStore。
  */
 export function useAgentRunFeedback(options: AgentRunFeedbackOptions): {
   status: AgentRunFeedbackStatus | null;
@@ -197,19 +202,30 @@ export function useAgentRunFeedback(options: AgentRunFeedbackOptions): {
       const runId = useRunStore.getState().getSessionRunId(current.sessionId);
       const previous = lastRunIdRef.current;
       lastRunIdRef.current = runId;
-      if (previous === null || runId !== null) return; // 只关心「非空 → 空」
-      if (!current.enabled) return; // 过渡时未启用：忽略本次，不补触发
-      // 捕获 before 与错误标记后防抖；新的过渡到来会重置计时器与捕获值。
-      pendingRef.current = {
-        sessionId: current.sessionId,
-        before: current.getWatchState(),
-        runErrored: readRunErrored(current.sessionId),
-      };
-      clearTimer();
+      const runStarted = previous === null && runId !== null;
+      const runFinished = previous !== null && runId === null;
+
+      // run 开始即捕获 before（错误标记结束时再补）：此时面板修订尚未被
+      // run 期间的 2s 轮询收编，diff 基线才是发送时刻的真实磁盘态。
+      if (runStarted) {
+        if (!current.enabled) return;
+        pendingRef.current = {
+          sessionId: current.sessionId,
+          before: current.getWatchState(),
+          runErrored: false,
+        };
+        return;
+      }
+      if (!runFinished) return;
       const pending = pendingRef.current;
+      pendingRef.current = null;
+      if (!current.enabled) return; // 结束时未启用：本次不评估，不补触发（既有口径）
+      // 无开始态（挂载于 run 进行中、开始时未启用或跨会话）：没有可靠 before，放弃。
+      if (!pending || pending.sessionId !== current.sessionId) return;
+      clearTimer();
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
-        void evaluate(pending);
+        void evaluate({ ...pending, runErrored: readRunErrored(current.sessionId) });
       }, RUN_SETTLE_DEBOUNCE_MS);
     });
 
@@ -219,12 +235,13 @@ export function useAgentRunFeedback(options: AgentRunFeedbackOptions): {
     };
   }, []);
 
-  // sessionId 切换：清计时器并重置新会话的 runId 基线（status 已在渲染期清零）。
+  // sessionId 切换：清计时器与挂起捕获并重置新会话的 runId 基线（status 已在渲染期清零）。
   useEffect(() => {
     if (timerRef.current !== null) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+    pendingRef.current = null;
     lastRunIdRef.current = useRunStore.getState().getSessionRunId(sessionId);
     return () => {
       if (timerRef.current !== null) {
