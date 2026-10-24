@@ -106,6 +106,14 @@ export function toDesignError(error: unknown): unknown {
 function hash(source: Buffer | string): string {
   return createHash('sha256').update(source).digest('hex');
 }
+/**
+ * Editable source whitelist (P3.5 §6): HTML/HTM entry pages plus external .css
+ * stylesheets share the document read/write pipeline. `list()` still
+ * enumerates HTML entries only.
+ */
+function isEditableDocument(relativePath: string): boolean {
+  return /\.html?$/i.test(relativePath) || /\.css$/i.test(relativePath);
+}
 /** Asset listing filters (P4.3): image (P3 default), font, video (P6 §5.3), or their union. */
 export type DesignAssetKind = 'image' | 'font' | 'video' | 'all';
 
@@ -309,9 +317,9 @@ export class DesignService {
   async readDocument(sessionId: unknown, filePath: unknown) {
     const root = await this.workspace(sessionId);
     const file = await this.resolve(root, filePath);
-    if (!/\.html?$/i.test(file.relative))
-      throw new DesignError(400, 'UNSUPPORTED_FILE', 'Only HTML documents can be edited');
-    const { bytes } = await this.readBounded(file.absolute, MAX_SOURCE_BYTES, 'HTML document');
+    if (!isEditableDocument(file.relative))
+      throw new DesignError(400, 'UNSUPPORTED_FILE', 'Only HTML and CSS documents can be edited');
+    const { bytes } = await this.readBounded(file.absolute, MAX_SOURCE_BYTES, 'Document');
     const source = bytes.toString('utf8');
     return { path: file.relative, source, revision: hash(bytes) };
   }
@@ -327,7 +335,7 @@ export class DesignService {
       throw new DesignError(400, 'VALIDATION_ERROR', 'source must be a string');
     const bytes = Buffer.from(source, 'utf8');
     if (bytes.length > MAX_SOURCE_BYTES)
-      throw new DesignError(413, 'FILE_TOO_LARGE', 'HTML document exceeds the 2 MiB limit');
+      throw new DesignError(413, 'FILE_TOO_LARGE', 'Document exceeds the 2 MiB limit');
     if (allowCreate !== undefined && typeof allowCreate !== 'boolean')
       throw new DesignError(400, 'VALIDATION_ERROR', 'allowCreate must be a boolean');
     const create = allowCreate === true;
@@ -338,7 +346,7 @@ export class DesignService {
     if (!revisionIsHash && !revisionForCreate)
       throw new DesignError(400, 'VALIDATION_ERROR', 'expectedRevision must be a SHA-256 revision');
     const file = await this.resolveFile(sessionId, filePath, { allowMissingLeaf: create });
-    if (!/\.html?$/i.test(file.relative))
+    if (!isEditableDocument(file.relative))
       throw new DesignError(400, 'UNSUPPORTED_FILE', 'Only existing HTML documents can be edited');
     try {
       await safeWriteFile(file.absolute, bytes, {

@@ -4,7 +4,7 @@ import request from 'supertest';
 import Database from 'better-sqlite3';
 import JSZip from 'jszip';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createDesignRoutes, type DesignMediaRoutesDeps } from '../design.js';
@@ -32,6 +32,9 @@ describe('design routes', () => {
   let temp: string;
   let rootA: string;
   let rootB: string;
+
+  const sha256 = (source: string | Buffer): string =>
+    createHash('sha256').update(source).digest('hex');
 
   beforeEach(async () => {
     temp = await mkdtemp(path.join(os.tmpdir(), 'design-api-'));
@@ -198,6 +201,152 @@ describe('design routes', () => {
       .query({ sessionId: 'sa', path: 'folder.png' });
     expect(large.status).toBe(413);
     expect(directory.status).toBe(400);
+  });
+
+  it('reads and updates external css documents under the same revision contract (P3.5 §6)', async () => {
+    const file = path.join(rootA, 'assets', 'site.css');
+    await mkdir(path.join(rootA, 'assets'));
+    await writeFile(file, 'p { color: red; }');
+    const loaded = await request(app)
+      .get('/api/design/document')
+      .query({ sessionId: 'sa', path: 'assets/site.css' });
+    expect(loaded.status).toBe(200);
+    expect(loaded.body.data).toEqual({
+      path: 'assets/site.css',
+      source: 'p { color: red; }',
+      revision: sha256('p { color: red; }'),
+    });
+
+    const saved = await request(app)
+      .put('/api/design/document')
+      .send({
+        sessionId: 'sa',
+        path: 'assets/site.css',
+        source: 'p { color: blue; }',
+        expectedRevision: loaded.body.data.revision,
+      });
+    expect(saved.status).toBe(200);
+    expect(saved.body.data).toEqual({
+      path: 'assets/site.css',
+      source: 'p { color: blue; }',
+      revision: sha256('p { color: blue; }'),
+    });
+    expect(await readFile(file, 'utf8')).toBe('p { color: blue; }');
+    // Atomic rename leaves no temp residue beside the replaced file.
+    const residue = (await readdir(path.join(rootA, 'assets'))).filter(name =>
+      name.startsWith('.tmp-')
+    );
+    expect(residue).toEqual([]);
+
+    const stale = await request(app)
+      .put('/api/design/document')
+      .send({
+        sessionId: 'sa',
+        path: 'assets/site.css',
+        source: 'p { color: lost; }',
+        expectedRevision: loaded.body.data.revision,
+      });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe('REVISION_CONFLICT');
+    expect(await readFile(file, 'utf8')).toBe('p { color: blue; }');
+
+    // Extension matching is case-insensitive, exactly like the HTML whitelist.
+    await writeFile(path.join(rootA, 'styles.CSS'), 'h1 { color: green; }');
+    const upper = await request(app)
+      .get('/api/design/document')
+      .query({ sessionId: 'sa', path: 'styles.CSS' });
+    expect(upper.status).toBe(200);
+    expect(upper.body.data.revision).toBe(sha256('h1 { color: green; }'));
+  });
+
+  it('applies the document path guards to css paths on read and write', async () => {
+    await writeFile(path.join(temp, 'outside.css'), 'outside');
+    await symlink(path.join(temp, 'outside.css'), path.join(rootA, 'escape.css'));
+    for (const target of ['../outside.css', '/etc/evil.css', '.hidden/style.css']) {
+      const read = await request(app)
+        .get('/api/design/document')
+        .query({ sessionId: 'sa', path: target });
+      expect(read.status, target).toBe(400);
+      expect(read.body.error.code, target).toBe('VALIDATION_ERROR');
+      const write = await request(app)
+        .put('/api/design/document')
+        .send({ sessionId: 'sa', path: target, source: 'x', expectedRevision: 'a'.repeat(64) });
+      expect(write.status, target).toBe(400);
+      expect(write.body.error.code, target).toBe('VALIDATION_ERROR');
+    }
+    const escape = await request(app)
+      .get('/api/design/document')
+      .query({ sessionId: 'sa', path: 'escape.css' });
+    expect(escape.status).toBe(403);
+    expect(escape.body.error.code).toBe('PATH_FORBIDDEN');
+
+    // A missing css target keeps the existing FILE_NOT_FOUND semantics.
+    const missing = await request(app)
+      .put('/api/design/document')
+      .send({ sessionId: 'sa', path: 'absent.css', source: 'x', expectedRevision: 'a'.repeat(64) });
+    expect(missing.status).toBe(404);
+    expect(missing.body.error.code).toBe('FILE_NOT_FOUND');
+  });
+
+  it('rejects oversized css documents with the existing size-limit errors', async () => {
+    await mkdir(path.join(rootA, 'assets'));
+    await writeFile(path.join(rootA, 'assets', 'big.css'), Buffer.alloc(2 * 1024 * 1024 + 1, 65));
+    const read = await request(app)
+      .get('/api/design/document')
+      .query({ sessionId: 'sa', path: 'assets/big.css' });
+    expect(read.status).toBe(413);
+    expect(read.body.error.code).toBe('FILE_TOO_LARGE');
+
+    const write = await request(app)
+      .put('/api/design/document')
+      .send({
+        sessionId: 'sa',
+        path: 'assets/big.css',
+        source: 'x'.repeat(2 * 1024 * 1024 + 1),
+        expectedRevision: 'a'.repeat(64),
+      });
+    expect(write.status).toBe(413);
+    expect(write.body.error.code).toBe('FILE_TOO_LARGE');
+  });
+
+  it('still rejects non-document extensions for the document endpoints', async () => {
+    await writeFile(path.join(rootA, 'script.js'), 'console.log(1)');
+    await writeFile(path.join(rootA, 'notes.md'), '# notes');
+    await writeFile(path.join(rootA, 'image.png'), Buffer.from([1]));
+    for (const target of ['script.js', 'notes.md', 'image.png']) {
+      const read = await request(app)
+        .get('/api/design/document')
+        .query({ sessionId: 'sa', path: target });
+      expect(read.status, target).toBe(400);
+      expect(read.body.error.code, target).toBe('UNSUPPORTED_FILE');
+      const write = await request(app)
+        .put('/api/design/document')
+        .send({ sessionId: 'sa', path: target, source: 'x', expectedRevision: 'a'.repeat(64) });
+      expect(write.status, target).toBe(400);
+      expect(write.body.error.code, target).toBe('UNSUPPORTED_FILE');
+    }
+  });
+
+  it('keeps the html document behavior and the html-only files listing unchanged', async () => {
+    await writeFile(path.join(rootA, 'index.html'), '<p>old</p>');
+    await writeFile(path.join(rootA, 'theme.css'), 'p { margin: 0; }');
+    const listed = await request(app).get('/api/design/files').query({ sessionId: 'sa' });
+    expect(listed.body.data.files).toEqual(['index.html']);
+
+    const loaded = await request(app)
+      .get('/api/design/document')
+      .query({ sessionId: 'sa', path: 'index.html' });
+    expect(loaded.status).toBe(200);
+    const saved = await request(app)
+      .put('/api/design/document')
+      .send({
+        sessionId: 'sa',
+        path: 'index.html',
+        source: '<p>new</p>',
+        expectedRevision: loaded.body.data.revision,
+      });
+    expect(saved.status).toBe(200);
+    expect(await readFile(path.join(rootA, 'index.html'), 'utf8')).toBe('<p>new</p>');
   });
 
   it('bounds recursive listing depth', async () => {
