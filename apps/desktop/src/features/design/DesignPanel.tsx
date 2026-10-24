@@ -43,7 +43,19 @@ import { buildDesignPreview } from './preview';
 import { ElementTree } from './components/ElementTree';
 import { colorsEquivalent, compareCssValues } from './html/style-compare';
 import { useDesignWorkspace } from './useDesignWorkspace';
-import type { DesignComputedStyles, DesignEditOperation, DesignSelection } from './types';
+import {
+  STYLE_IMPORTANT_PROPS_MAX,
+  STYLE_RULES_MAX,
+  STYLE_RULE_SELECTOR_MAX,
+  STYLE_SPECIFICITY_MAX,
+} from './types';
+import type {
+  DesignComputedStyles,
+  DesignEditOperation,
+  DesignMatchedRule,
+  DesignRulesMessage,
+  DesignSelection,
+} from './types';
 import type { DesignPageSnapshot } from './workspace/controller';
 
 /** 面板级预览缓存上限（LRU；键 path → {key, html, blocked?}）。 */
@@ -111,6 +123,50 @@ const isValidSelectionAttrs = (attrs: unknown): boolean => {
       (key === 'src' || key === 'alt' || key === 'href') &&
       typeof v === 'string' &&
       v.length <= 500
+  );
+};
+
+/** P3.5 §2：单条匹配规则的字段形状与上限校验（上限常量与桥内裁剪同源 types.ts）。 */
+const isValidMatchedRule = (value: unknown): value is DesignMatchedRule => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const v = value as Partial<DesignMatchedRule>;
+  return (
+    typeof v.origin === 'string' &&
+    v.origin.length > 0 &&
+    v.origin.length <= 500 &&
+    Array.isArray(v.rulePath) &&
+    v.rulePath.length > 0 &&
+    v.rulePath.length <= 64 &&
+    v.rulePath.every(step => Number.isInteger(step) && step >= 0 && step < 10000) &&
+    typeof v.selectorText === 'string' &&
+    v.selectorText.length > 0 &&
+    v.selectorText.length <= STYLE_RULE_SELECTOR_MAX &&
+    Array.isArray(v.specificity) &&
+    v.specificity.length === 3 &&
+    v.specificity.every(part => Number.isInteger(part) && part >= 0 && part <= STYLE_SPECIFICITY_MAX) &&
+    Array.isArray(v.importantProps) &&
+    v.importantProps.length <= STYLE_IMPORTANT_PROPS_MAX &&
+    v.importantProps.every(prop => typeof prop === 'string' && prop.length > 0 && prop.length <= 200)
+  );
+};
+
+/**
+ * P3.5 §2：design-rules 消息载荷校验（形状 + 上限，违规整体丢弃）。
+ * 与当前选区 elementPath 的一致性由消息处理处核对（迟到消息不污染新选区）。
+ * 导出仅供 C1 测试直接覆盖校验矩阵；C4 面板渲染前样式规则不消费。
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- 校验器按卡面钉死落在 DesignPanel 消息处理旁；导出仅供测试矩阵使用
+export const isValidRulesMessage = (value: unknown): value is DesignRulesMessage => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const v = value as Partial<DesignRulesMessage>;
+  return (
+    Array.isArray(v.elementPath) &&
+    v.elementPath.length <= 64 &&
+    v.elementPath.every(step => Number.isInteger(step) && step >= 0 && step < 10000) &&
+    Array.isArray(v.rules) &&
+    v.rules.length <= STYLE_RULES_MAX &&
+    (v.truncated === undefined || typeof v.truncated === 'boolean') &&
+    v.rules.every(isValidMatchedRule)
   );
 };
 
@@ -282,6 +338,8 @@ function DesignPanelSession({
   const reselectRef = useRef<ReselectExpectation | null>(null);
   const [overrideWarning, setOverrideWarning] = useState(false);
   const [treeOpen, setTreeOpen] = useState(false);
+  // P3.5 §2：校验通过的生效规则载荷（样式来源区渲染属 C4 卡，本卡仅接收与校验；setter-only 避免未读变量）。
+  const [, setStyleRules] = useState<DesignRulesMessage | null>(null);
 
   // files 经 ref 每渲染同步，避免闭包过期（P4.5 run 反馈与 P5 navigate 消息共用）。
   const filesRef = useRef(files);
@@ -407,6 +465,8 @@ function DesignPanelSession({
         backgroundColor?: unknown;
         path?: unknown;
         reason?: unknown;
+        rules?: unknown;
+        truncated?: unknown;
       } | null;
       if (!data || data.channel !== channel) return;
       // P5 运行模式导航（§2.4）：仅运行预览的桥接会发这两类消息，编辑模式不响应。
@@ -451,6 +511,31 @@ function DesignPanelSession({
           reselectRef.current = null;
         }
         controller.handleSelectionMessage(data.selection);
+        // P3.5 §2：选区落地后请求生效规则（桥内枚举 CSSOM，回发 zclaudia:design-rules 消息）。
+        frame.contentWindow.postMessage(
+          { type: 'zclaudia:design-rules-request', channel, elementPath: data.selection.elementPath },
+          '*'
+        );
+        return;
+      }
+      if (data.type === 'zclaudia:design-rules') {
+        const path = Array.isArray(data.elementPath) ? data.elementPath : null;
+        // 当前选区取控制器快照（消息闭包外最新值，不随渲染闭包过期）。
+        const snapshot = controller.getSnapshot();
+        const currentPath = snapshot.activePath
+          ? (snapshot.pages.find(page => page.path === snapshot.activePath)?.selection
+              ?.elementPath ?? null)
+          : null;
+        // 迟到/错位消息不污染新选区：elementPath 与当前选区不一致即静默丢弃（口径同 select 路径核对）。
+        if (!path || !currentPath || !pathsEqual(path, currentPath)) return;
+        const payload: unknown = {
+          elementPath: path,
+          rules: data.rules,
+          truncated: data.truncated,
+        };
+        // 载荷形状/上限违规整体丢弃（§2：不告警、不清选区）。
+        if (!isValidRulesMessage(payload)) return;
+        setStyleRules(payload);
         return;
       }
       if (data.type === 'zclaudia:design-select-failed') {

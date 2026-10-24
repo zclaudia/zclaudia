@@ -1,5 +1,10 @@
 /** P5.2 交互运行预览：构建可执行页面的沙箱 srcdoc。本地脚本内联执行、on* 保留；远程引用移除并计数；导航经桥接上报宿主。 */
-import { createAssetInlineLoader, decodeBase64Utf8, workspaceSourceDir } from './preview';
+import {
+  createAssetInlineLoader,
+  decodeBase64Utf8,
+  inlineStyleSources,
+  workspaceSourceDir,
+} from './preview';
 
 /** 运行模式脚本内联上限：本地脚本数、单脚本与总内联体积，超限移除并计入 blocked.scripts。 */
 const MAX_RUN_SCRIPTS = 12;
@@ -93,39 +98,8 @@ export async function buildDesignRunPreview(options: RunPreviewOptions): Promise
     }
   }
 
-  for (const link of Array.from(doc.querySelectorAll('link[rel~="stylesheet"][href]'))) {
-    const href = link.getAttribute('href') ?? '';
-    const cssData = await loader.resolveAsset(href, sourceDir);
-    if (!cssData) {
-      link.remove();
-      continue;
-    }
-    const [, mime, base64] = cssData.match(/^data:([^;]+);base64,(.*)$/s) ?? [];
-    if (!mime || !base64) {
-      link.remove();
-      continue;
-    }
-    const css = decodeBase64Utf8(base64);
-    const cssPath = resolveWorkspaceRef(href, sourceDir);
-    const cssDir = cssPath.slice(0, cssPath.lastIndexOf('/') + 1);
-    const style = doc.createElement('style');
-    style.textContent = await rewriteCssUrls(css, cssDir, loader.loadInlineAsset);
-    link.replaceWith(style);
-  }
-
-  for (const style of Array.from(doc.querySelectorAll('style'))) {
-    style.textContent = await rewriteCssUrls(
-      style.textContent ?? '',
-      sourceDir,
-      loader.loadInlineAsset
-    );
-  }
-  for (const element of Array.from(doc.querySelectorAll('[style]'))) {
-    element.setAttribute(
-      'style',
-      await rewriteCssUrls(element.getAttribute('style') ?? '', sourceDir, loader.loadInlineAsset)
-    );
-  }
+  // 样式来源内联与打标（P3.5 §1）：与静态预览共用同一函数（link→style + url() 改写）。
+  await inlineStyleSources(doc, sourceDir, loader);
 
   // 导航标记与 blocked.links 统计（构建期分类，须在远程剥离前计数）：
   // 相对 .html/.htm（可带 #hash/?query）→ data-zclaudia-nav；# 锚点不动；
@@ -176,29 +150,6 @@ function normalizeRunPath(path: string): string {
 function resolveWorkspaceRef(raw: string, fromDir: string): string {
   const path = raw.split(/[?#]/, 1)[0];
   return normalizeRunPath(path.startsWith('/') ? path : `${fromDir}${path}`);
-}
-
-async function rewriteCssUrls(
-  css: string,
-  fromDir: string,
-  loadAsset: (relativeWorkspacePath: string) => Promise<string | null>
-): Promise<string> {
-  const matches = [...css.matchAll(/url\(\s*(['"]?)([^)'"\s]+)\1\s*\)/gi)];
-  let result = css;
-  for (const match of matches.reverse()) {
-    const raw = match[2];
-    const index = match.index;
-    if (index === undefined) continue;
-    if (/^(?:data:|blob:|#)/i.test(raw)) continue;
-    if (REMOTE_REFERENCE.test(raw)) {
-      result = result.slice(0, index) + 'url("")' + result.slice(index + match[0].length);
-      continue;
-    }
-    const dataUrl = await loadAsset(resolveWorkspaceRef(raw, fromDir));
-    const replacement = dataUrl ? `url("${dataUrl}")` : 'url("")';
-    result = result.slice(0, index) + replacement + result.slice(index + match[0].length);
-  }
-  return result;
 }
 
 /** 运行桥接：存储 shim + submit/click 拦截 + design-navigate / design-nav-blocked 上报（无选区消息）。 */

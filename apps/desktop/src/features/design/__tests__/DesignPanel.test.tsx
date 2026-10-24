@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { DesignPanel } from '../DesignPanel';
+import { DesignPanel, isValidRulesMessage } from '../DesignPanel';
 import { WorkspaceToolProvider } from '../../../components/workspace/WorkspaceToolContext';
 import { useComposerStore } from '../../../stores/composerStore';
 import { useChatMessageStore } from '../../../stores/chatMessageStore';
@@ -1927,6 +1927,114 @@ describe('DesignPanel', () => {
     expect(await screen.findByRole('dialog', { name: 'Share' })).toBeInTheDocument();
     await openPage('p2.html');
     expect(screen.queryByRole('dialog', { name: 'Share' })).not.toBeInTheDocument();
+  });
+
+  // ---- P3.5（C1）样式来源桥接：rules-request 发送 / design-rules 校验与存入 ----
+
+  it('P3.5：选区消息到达后向 iframe 发送 zclaudia:design-rules-request（elementPath 取当前选区）', async () => {
+    mount();
+    const frame = (await screen.findByTitle('Design preview')) as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    await selectElement();
+    expect(postMessage).toHaveBeenCalledWith(
+      { type: 'zclaudia:design-rules-request', channel: latestChannel(), elementPath: [0] },
+      '*'
+    );
+  });
+
+  it('P3.5：design-rules 与当前选区一致的载荷不告警不崩溃；迟到路径与形状违规静默丢弃', async () => {
+    mount();
+    const frame = await selectElementForFrame();
+    const validRule = {
+      origin: '@inline/0',
+      rulePath: [0],
+      selectorText: 'h1',
+      specificity: [0, 0, 1],
+      importantProps: [],
+    };
+    const send = (payload: Record<string, unknown>) =>
+      fireEvent(
+        window,
+        new MessageEvent('message', {
+          source: frame.contentWindow,
+          data: { type: 'zclaudia:design-rules', channel: latestChannel(), ...payload },
+        })
+      );
+    // 校验通过且路径与当前选区一致：静默存入（C4 才渲染），选区编辑器不受影响。
+    send({ elementPath: [0], rules: [validRule] });
+    expect(screen.getByRole('textbox', { name: 'Element text' })).toBeInTheDocument();
+    // 迟到/错位路径（与当前选区不一致）静默丢弃。
+    send({ elementPath: [1, 2], rules: [validRule] });
+    // 形状违规（选择器超 STYLE_RULE_SELECTOR_MAX）整体丢弃。
+    send({ elementPath: [0], rules: [{ ...validRule, selectorText: 'x'.repeat(301) }] });
+    // 规则条数超上限同样丢弃。
+    send({ elementPath: [0], rules: Array.from({ length: 201 }, () => validRule) });
+    expect(screen.getByRole('textbox', { name: 'Element text' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+// ---- P3.5 §2：design-rules 载荷校验矩阵（isValidRulesMessage） ----
+
+describe('isValidRulesMessage', () => {
+  const validRule = {
+    origin: '@inline/0',
+    rulePath: [0],
+    selectorText: 'h1',
+    specificity: [0, 0, 1],
+    importantProps: [],
+  };
+  const valid = { elementPath: [0], rules: [validRule] };
+
+  it('接受合法载荷（空规则、truncated、恰好 200 条）', () => {
+    expect(isValidRulesMessage(valid)).toBe(true);
+    expect(isValidRulesMessage({ ...valid, truncated: true })).toBe(true);
+    expect(isValidRulesMessage({ elementPath: [], rules: [] })).toBe(true);
+    expect(
+      isValidRulesMessage({ elementPath: [0], rules: Array.from({ length: 200 }, () => validRule) })
+    ).toBe(true);
+  });
+
+  it('拒绝非对象载荷与形状/上限违规（整体丢弃口径）', () => {
+    expect(isValidRulesMessage(null)).toBe(false);
+    expect(isValidRulesMessage('x')).toBe(false);
+    expect(isValidRulesMessage([])).toBe(false);
+    expect(isValidRulesMessage({ ...valid, elementPath: '0' })).toBe(false);
+    expect(isValidRulesMessage({ ...valid, elementPath: [-1] })).toBe(false);
+    expect(isValidRulesMessage({ ...valid, elementPath: [0.5] })).toBe(false);
+    expect(isValidRulesMessage({ ...valid, rules: 'x' })).toBe(false);
+    expect(isValidRulesMessage({ ...valid, truncated: 'yes' })).toBe(false);
+    expect(
+      isValidRulesMessage({ elementPath: [0], rules: Array.from({ length: 201 }, () => validRule) })
+    ).toBe(false);
+  });
+
+  it('拒绝单条规则的字段违规（origin/rulePath/selectorText/specificity/importantProps）', () => {
+    expect(isValidRulesMessage({ ...valid, rules: [{ ...validRule, origin: '' }] })).toBe(false);
+    expect(isValidRulesMessage({ ...valid, rules: [{ ...validRule, origin: 1 }] })).toBe(false);
+    expect(isValidRulesMessage({ ...valid, rules: [{ ...validRule, rulePath: [] }] })).toBe(false);
+    expect(isValidRulesMessage({ ...valid, rules: [{ ...validRule, rulePath: [1.5] }] })).toBe(false);
+    expect(
+      isValidRulesMessage({ ...valid, rules: [{ ...validRule, selectorText: '' }] })
+    ).toBe(false);
+    expect(
+      isValidRulesMessage({ ...valid, rules: [{ ...validRule, selectorText: 'x'.repeat(301) }] })
+    ).toBe(false);
+    expect(
+      isValidRulesMessage({ ...valid, rules: [{ ...validRule, specificity: [0, 0] }] })
+    ).toBe(false);
+    expect(
+      isValidRulesMessage({ ...valid, rules: [{ ...validRule, specificity: [0, 0, 10000] }] })
+    ).toBe(false);
+    expect(
+      isValidRulesMessage({ ...valid, rules: [{ ...validRule, importantProps: [''] }] })
+    ).toBe(false);
+    expect(
+      isValidRulesMessage({
+        ...valid,
+        rules: [{ ...validRule, importantProps: Array.from({ length: 65 }, () => 'color') }],
+      })
+    ).toBe(false);
   });
 });
 

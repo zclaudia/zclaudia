@@ -317,4 +317,26 @@ describe('buildDesignRunPreview', () => {
     expect(loadAsset).toHaveBeenCalledWith('images/a.png');
     expect(loadAsset).toHaveBeenCalledWith('css/site.css');
   });
+
+  it('marks link-derived styles with the css path and own style blocks with @inline ordinals like the static preview', async () => {
+    const { html } = await buildDesignRunPreview({
+      source:
+        '<head><link rel="stylesheet" href="css/site.css"><style>a { color: blue }</style></head>' +
+        '<body><p>x</p></body>',
+      filePath: 'index.html',
+      loadAsset: async path => {
+        if (path === 'css/site.css') return { mimeType: 'text/css', data: btoa('b { color: red }') };
+        throw new Error('missing');
+      },
+      channel: 'mark-ch',
+    });
+    const doc = parseRunHtml(html);
+    const styles = Array.from(doc.querySelectorAll('style'));
+    // P3.5 §1：与静态预览同款来源标记（运行模式本批不消费，仅为两构建器行为一致）。
+    expect(styles.map(style => style.getAttribute('data-zclaudia-style-origin'))).toEqual([
+      'css/site.css',
+      '@inline/0',
+    ]);
+    expect(styles[0]?.textContent).toBe('b { color: red }');
+  });
 });

@@ -333,3 +333,203 @@ describe('buildDesignPreview', () => {
     harness.close();
   });
 });
+
+// ---- P3.5 §1 样式来源标记（C1） ----
+
+describe('P3.5 style origin marking', () => {
+  beforeEach(() => {
+    vi.stubGlobal('crypto', {
+      getRandomValues: (bytes: Uint8Array) => bytes.fill(23),
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('marks link-derived styles with the workspace-relative css path and own style blocks with @inline ordinals', async () => {
+    const loadAsset = vi.fn(async (path: string) => {
+      if (path === 'css/site.css')
+        return { mimeType: 'text/css', data: btoa('a { color: green; background: url(bg.png) }') };
+      if (path === 'theme.css') return { mimeType: 'text/css', data: btoa('b {}') };
+      // css 内 url() 相对 CSS 文件目录解析（css/bg.png），行内样式相对入口页（bg.png）。
+      if (path === 'css/bg.png' || path === 'bg.png')
+        return { mimeType: 'image/png', data: 'YWJj' };
+      throw new Error('missing');
+    });
+    const html = await buildDesignPreview(
+      '<html><head><link rel="stylesheet" href="css/site.css"><style>p { color: red }</style>' +
+        '<link rel="stylesheet" href="theme.css"><style>a { color: blue }</style></head>' +
+        '<body><p style="background: url(bg.png)">x</p></body></html>',
+      'index.html',
+      loadAsset,
+      'origin-ch',
+      'origin-rev'
+    );
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const styles = Array.from(doc.querySelectorAll('style'));
+    expect(styles).toHaveLength(4);
+    // link 内联块打工作区相对路径；入口自有块按文档序 @inline/0、@inline/1（link 替换不占用序号）。
+    expect(styles.map(style => style.getAttribute('data-zclaudia-style-origin'))).toEqual([
+      'css/site.css',
+      '@inline/0',
+      'theme.css',
+      '@inline/1',
+    ]);
+    expect(doc.querySelectorAll('link[rel~="stylesheet"]')).toHaveLength(0);
+    // url() 改写行为不变：link 块内相对背景图与行内样式都换成 data URL。
+    expect(styles[0].textContent).toContain('url("data:image/png;base64,YWJj")');
+    expect(doc.querySelector('p')?.getAttribute('style')).toContain(
+      'url("data:image/png;base64,YWJj")'
+    );
+  });
+});
+
+// ---- P3.5 §2 桥接生效规则枚举（C1） ----
+
+describe('design-rules bridge', () => {
+  beforeEach(() => {
+    vi.stubGlobal('crypto', {
+      getRandomValues: (bytes: Uint8Array) => bytes.fill(23),
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('answers rules-request with matched rules in document order, origins, selector-group hits and specificity', async () => {
+    const harness = await openBridge(
+      '<head><link rel="stylesheet" href="theme.css">' +
+        '<style>#wrap p, .card { color: red } li:not(.skip) + li { color: green }' +
+        '@media (min-width: 1px) { h1 { font-size: 32px !important; color: blue !important } }</style></head>' +
+        '<body><div id="wrap"><p class="note card" data-k="v">Hit</p></div>' +
+        '<ul><li>first</li><li class="skip">second</li><li>third</li></ul><h1>H</h1></body>',
+      'rules-ch',
+      async path => {
+        if (path === 'theme.css')
+          return {
+            mimeType: 'text/css',
+            data: btoa('p { margin: 0 } p[data-k="v"]:first-child { color: pink } [hidden] { display: none }'),
+          };
+        throw new Error('missing');
+      }
+    );
+
+    // p.note：theme.css 两条 + 自有块选择器组两个命中选择器（#wrap p 与 .card 都命中 → 各上报一条）。
+    harness.post({ type: 'zclaudia:design-rules-request', channel: 'rules-ch', elementPath: [0, 0] });
+    expect(harness.sent).toHaveLength(1);
+    expect(harness.sent[0]).toMatchObject({
+      type: 'zclaudia:design-rules',
+      channel: 'rules-ch',
+      elementPath: [0, 0],
+    });
+    expect((harness.sent[0] as { truncated?: boolean }).truncated).toBeUndefined();
+    expect((harness.sent[0] as { rules: unknown[] }).rules).toEqual([
+      {
+        origin: 'theme.css',
+        rulePath: [0],
+        selectorText: 'p',
+        specificity: [0, 0, 1],
+        importantProps: [],
+      },
+      {
+        origin: 'theme.css',
+        rulePath: [1],
+        selectorText: 'p[data-k="v"]:first-child',
+        specificity: [0, 2, 1],
+        importantProps: [],
+      },
+      {
+        origin: '@inline/0',
+        rulePath: [0],
+        selectorText: '#wrap p',
+        specificity: [1, 0, 1],
+        importantProps: [],
+      },
+      {
+        origin: '@inline/0',
+        rulePath: [0],
+        selectorText: '.card',
+        specificity: [0, 1, 0],
+        importantProps: [],
+      },
+    ]);
+
+    // li.skip：:not() 参数递归计入特异性（li + .skip + li → [0,1,2]）；组外选择器不命中不上报。
+    harness.post({ type: 'zclaudia:design-rules-request', channel: 'rules-ch', elementPath: [1, 1] });
+    expect((harness.sent[1] as { rules: unknown[] }).rules).toEqual([
+      {
+        origin: '@inline/0',
+        rulePath: [1],
+        selectorText: 'li:not(.skip) + li',
+        specificity: [0, 1, 2],
+        importantProps: [],
+      },
+    ]);
+
+    // h1：@media 分组规则嵌套索引 rulePath [2,0]，!important 属性名随规则上报。
+    harness.post({ type: 'zclaudia:design-rules-request', channel: 'rules-ch', elementPath: [2] });
+    expect((harness.sent[2] as { rules: unknown[] }).rules).toEqual([
+      {
+        origin: '@inline/0',
+        rulePath: [2, 0],
+        selectorText: 'h1',
+        specificity: [0, 0, 1],
+        importantProps: ['font-size', 'color'],
+      },
+    ]);
+    harness.close();
+  });
+
+  it('caps matched rules at 200 with the truncated flag and truncates long selector text', async () => {
+    const classes = Array.from({ length: 210 }, (_, index) => `c${index}`).join(' ');
+    const longSelector = '.c0'.repeat(110); // 330 字符 > 300 上限
+    const css =
+      `${longSelector} { color: red }` +
+      Array.from({ length: 209 }, (_, index) => `.c${index + 1} { color: red }`).join('');
+    const harness = await openBridge(
+      `<head><style>${css}</style></head><body><div class="${classes}">x</div></body>`,
+      'cap-ch'
+    );
+
+    harness.post({ type: 'zclaudia:design-rules-request', channel: 'cap-ch', elementPath: [0] });
+    expect(harness.sent).toHaveLength(1);
+    const message = harness.sent[0] as {
+      rules: Array<{ selectorText: string; specificity: number[] }>;
+      truncated?: boolean;
+    };
+    expect(message.truncated).toBe(true);
+    expect(message.rules).toHaveLength(200);
+    // 首条：超长选择器截断到 300，特异性仍按完整命中选择器计算（110 个 class）。
+    expect(message.rules[0]!.selectorText).toHaveLength(300);
+    expect(message.rules[0]!.selectorText.startsWith('.c0.c0')).toBe(true);
+    expect(message.rules[0]!.specificity).toEqual([0, 110, 0]);
+    expect(message.rules[1]!.selectorText).toBe('.c1');
+    harness.close();
+  });
+
+  it('stays silent for foreign or malformed requests and skips sheets without an origin marker', async () => {
+    const harness = await openBridge(
+      '<body><style>p { margin: 0 }</style><p>x</p></body>',
+      'quiet-ch'
+    );
+
+    // 错误 channel、畸形路径、解析不到元素：全部静默（不回发 select-failed 同款失败消息）。
+    harness.post({ type: 'zclaudia:design-rules-request', channel: 'other', elementPath: [0] });
+    harness.post({ type: 'zclaudia:design-rules-request', channel: 'quiet-ch', elementPath: 'nope' });
+    harness.post({ type: 'zclaudia:design-rules-request', channel: 'quiet-ch', elementPath: [-1] });
+    harness.post({ type: 'zclaudia:design-rules-request', channel: 'quiet-ch', elementPath: [9] });
+    expect(harness.sent).toHaveLength(0);
+
+    // 防御：ownerNode 缺来源标记的 sheet 跳过（harness 摘除标记模拟）→ 命中规则为空但仍回发空消息。
+    harness.document
+      .querySelector('style')
+      ?.removeAttribute('data-zclaudia-style-origin');
+    harness.post({ type: 'zclaudia:design-rules-request', channel: 'quiet-ch', elementPath: [0] });
+    expect(harness.sent).toHaveLength(1);
+    expect(harness.sent[0]).toEqual({
+      type: 'zclaudia:design-rules',
+      channel: 'quiet-ch',
+      elementPath: [0],
+      rules: [],
+    });
+    harness.close();
+  });
+});
