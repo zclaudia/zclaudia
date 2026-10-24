@@ -1,6 +1,6 @@
 # P3.5 CSS 来源编辑 — 实现设计
 
-日期：2026-10-24。状态：第一批（规则展示 + `<style>` 块声明写回）已实现并通过主代理逐卡验收（2026-10-24，见 §11；desktop 844 用例全绿）；第二批（外部 `.css` 写回）未开始。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P3.5 条目；P3.1–P3.4 基线见 [P3 实现设计](2026-10-23-design-workbench-p3-implementation.md)。
+日期：2026-10-24。状态：两批均已实现并通过主代理逐卡验收与终验收（2026-10-24，见 §11；desktop 885 用例、server 272+1 skipped、双端 tsc 0 错、eslint 0 error/37 warning 基线）；macOS Tauri 真实冒烟待补（§10）。上游计划：[分阶段实施计划](2026-10-23-design-workbench-implementation-plan.md) 的 P3.5 条目；P3.1–P3.4 基线见 [P3 实现设计](2026-10-23-design-workbench-p3-implementation.md)。
 
 本批分两批交付（用户 2026-10-24 确认）：
 
@@ -206,4 +206,9 @@ fnm exec --using 22.20.0 pnpm --filter @zclaudia/server exec tsc --noEmit
 - **C4 面板与接线**（`28548795`）：`StyleSourcePanel.tsx`（规则卡分组/来源与 Active/Overridden/只读四原因徽标/改值/删除/新增/截断提示/空态；同 rulePath 去重合并）；DesignPanel 接线（styleRules 取值侧 + buildStyleRules memo + 挂载于 SelectionEditor 下方、runMode 随编辑区隐藏、切页清空；改值→重建→重选→rules 刷新链路有用例钉住）。裁决接受：空值输入就地拒绝（safeSourceCssValue('') 会放行导致写出 `prop: ;`）；重建期以 busy 禁用 + 陈旧载荷抑制实现，无独立 loading 态；inline 声明提示仅空态文案（props 未携带 inlineStyle）。+31 用例。
 - **小终验（2026-10-24，主代理）**：desktop design **844 通过（45 文件；基线 723 + T0 3 + C1 10 + C2 18 + C3 62 + C4 31）**；tsc 0 错；eslint 0 error / **37 warning 与基线逐条一致（零新增）**；git 范围核对全部变更落在 design 模块与本文档。真实 Agent + macOS Tauri 冒烟并入 §10 清单待用户配合。
 
-（待续：第二批 C5–C7 记录与终验收。）
+### C5–C7 第二批与终验收（2026-10-24，主代理逐卡验收通过）
+
+- **C5 服务端 .css 读写**（`4e245415`）：`design-service.ts` 提取 `isEditableDocument`（`.html?/|.css`，大小写不敏感），readDocument/writeDocument 白名单放宽；safeWriteFile 链路/错误码/信封零变化，list 仍只列 HTML，路由层零改动（校验本就全在 service）。主代理修正：三处用户可见错误消息去「HTML」限定（"Only HTML and CSS documents can be edited" 等）。+5 用例（读写往返/409/越界/超限/其他扩展仍拒/HTML 回归）。
+- **C6 CSS 草稿与预览内联**（`9d288dd6`）：`css-drafts.ts`（identity+路径的进程内草稿表、有界历史、cssDraftEpoch；额外导出 undo/redo/discard/subscribe 供测试与面板）、`patchCssText` 抽取（edit-engine 的 validate/splice 构造迁至 css-source 共享，公开行为与 62 条既有用例零改动）、css-source 增 `cssSources` 输入（外部 origin 指纹对齐产出可编辑行，偏移为 css 文件内偏移）、DesignPanel 分流（@inline 走事务 / 外部走草稿）、loadAsset 草稿拦截 + 缓存键 `+cssDraftEpoch`、「Save styles」保存与 409「保留草稿/重新载入」、ExportDialog 脏草稿提示。luna 并修复一处既有 bug（磁盘 css 缓存生成守卫首写不落表，重载路径暴露）。裁决接受：cssDraftEpoch 在草稿采纳/丢弃时自增、保存不自增（内容未变）；winning 级联序外部 origin 取文件内偏移（跨源宿主序不存在，计算值核对兜底）。+41 用例。
+- **C7 文档与勾选**：design-workbench.md 新增 P3.5 小节 + 模块边界/验证补记；主计划 P3.5 勾选与基线段追加收官句。luna 核实修正两处口径（winning 键集 20+2；24 属性面板）。
+- **终验收（2026-10-24，主代理）**：desktop design **885 通过（46 文件）**；server design **272 通过 + 1 skipped（14 文件）**；双端 `tsc --noEmit` 0 错；desktop eslint **0 error / 37 warning 与基线逐条一致（零新增）**；prettier：design-workbench.md 干净、主计划仅既有表格差异（HEAD 本如此，未越权）；git 范围核对全部变更落在 design 模块、两份文档与本文档。真实 Agent + macOS Tauri 冒烟（§10 清单：规则来源查看 → `<style>` 块与外部 `.css` 各改一处 → 撤销 → 保存重载 → 外部改文件后 409）待用户配合补做。

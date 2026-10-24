@@ -57,6 +57,17 @@
 - **覆盖提示扩展**：应用后自动重选并按属性对比表核对计算样式（颜色等价、关键字、纯 px 数值、font-weight 归一；无可靠口径的键跳过），失配显示既有 override 提示；纯颜色应用沿用 verify 回路。
 - 错误码新增 `ATTRIBUTE_NOT_ALLOWED`/`STRUCTURE_NOT_ALLOWED`/`ANCHOR_REFERENCED`；P3.5（CSS 来源编辑）为独立后续批次。
 
+## P3.5 CSS 来源编辑（2026-10-24）
+
+选中元素的「样式来源」区展示命中的样式表规则与覆盖原因，并支持受控的声明级修改，分两批交付（第一批规则展示与页面内 `<style>` 块写回，第二批外部 `.css` 写回），设计与验收细节见 [P3.5 实现设计](plans/2026-10-24-design-workbench-p3.5-implementation.md)：
+
+- **规则来源与生效徽标**：命中规则按来源分组——入口 `<style>` 块（`@inline/<n>`）与工作区相对 CSS 路径；Active/Overridden 生效徽标仅按计算样式键口径展示（20 键 + `color`/`background-color`，与重选对比同口径），`!important` 只作标记、不做完整级联模拟。
+- **匹配仲裁在浏览器**：预览 iframe 内枚举 CSSOM 并对选择器逐个 `matches()`，宿主只做 origin + rulePath + selectorText 的源码指纹对齐（postcss 为既有依赖，零新增），对不上即只读、不猜测定位；只读四原因 `parse-error`/`align-mismatch`/`external-css-readonly`/`oversize`（外部 `.css` 编辑已在第二批放开，该原因仅作外部文件获取失败的兜底），另有规则数超上限的截断提示。
+- **页面内 `<style>` 块编辑**：声明改值/删除/新增走 P1 事务管线（撤销/合并/保存/冲突/快照全部继承，无关字节逐字保持）。
+- **外部 `.css` 编辑**：per-file CSS 草稿（进程内存活、有界撤销，`cssDraftEpoch` 自增驱动预览即时内联），「Save styles」显式保存走 SHA-256 修订校验，409 时提供「保留草稿/重新载入」两选项；ZIP 导出不包含未保存的 CSS 草稿，导出对话框明示。
+- **能力边界**：`@import` 嵌套文件只读；远程样式表在预览构建时移除、不出现；不做规则增删/选择器编辑/CSS 重排；内联 style 属性不经来源区编辑（沿用 P3.1 的 24 属性 inline 面板）；`.css` 不进标签页/多页控制器。
+- 待补验证（手工门槛）：真实 Agent + macOS Tauri 冒烟（选卡片查看规则来源 → `<style>` 块与外部 `.css` 各改一处 → 撤销 → 保存重载一致 → 外部改文件后保存被 409 拒绝）。
+
 ## P4 模板与品牌体系（2026-10-23）
 
 模板、品牌、素材与「发送前可见」的 Agent 上下文组合，设计与验收细节见 [P4 实现设计](plans/2026-10-23-design-workbench-p4-implementation.md)：
@@ -104,9 +115,9 @@
 
 ## 模块边界
 
-- `apps/desktop/src/features/design/`：面板与组件（多页标签/视口/总览/导出对话框/元素结构树/模板对话框/品牌面板/素材库/上下文检视，以及 P5 的幻灯片面板/播放器/渲染导出对话框与 P6 的媒体生成面板 `components/MediaGenPanel.tsx` + 媒体任务 hook `media-task-client.ts`）、静态预览（含选区导航桥接）、交互运行预览（`interactive.ts`：运行 CSP/桥接/存储 shim/脚本内联）、deck 纯逻辑（`deck.ts`：解析/排序/增删/备注/比例/播放过滤）、客户端渲染导出（`render-export.ts`、`pdf.ts`）、精确编辑引擎（`html/`：样式/属性/结构操作与值校验）、撤销历史（`history/`）、行差异（`diff.ts`）、多页工作台核心（`workspace/`：controller/storage/ports/source-lines）、元素树（`element-tree.ts`）、图片相对引用（`asset-ref.ts`）、品牌渲染与校验（`brand.ts`）、Agent 上下文组装（`agent-context.ts`）、run 结束监视（`agent-run-watch.ts`）、backend-aware API 客户端。
+- `apps/desktop/src/features/design/`：面板与组件（多页标签/视口/总览/导出对话框/元素结构树/模板对话框/品牌面板/素材库/上下文检视，以及 P5 的幻灯片面板/播放器/渲染导出对话框、P6 的媒体生成面板 `components/MediaGenPanel.tsx` + 媒体任务 hook `media-task-client.ts` 与 P3.5 的样式来源面板 `components/StyleSourcePanel.tsx`）、静态预览（含选区导航桥接）、交互运行预览（`interactive.ts`：运行 CSP/桥接/存储 shim/脚本内联）、deck 纯逻辑（`deck.ts`：解析/排序/增删/备注/比例/播放过滤）、客户端渲染导出（`render-export.ts`、`pdf.ts`）、精确编辑引擎（`html/`：样式/属性/结构操作与值校验）、样式来源对齐（`css-source.ts`）与 CSS 草稿（`css-drafts.ts`）、撤销历史（`history/`）、行差异（`diff.ts`）、多页工作台核心（`workspace/`：controller/storage/ports/source-lines）、元素树（`element-tree.ts`）、图片相对引用（`asset-ref.ts`）、品牌渲染与校验（`brand.ts`）、Agent 上下文组装（`agent-context.ts`）、run 结束监视（`agent-run-watch.ts`）、backend-aware API 客户端。
 - `apps/desktop/src/plugins/builtinPanels.ts`：原生内置面板注册。
-- `server/src/application/design/design-service.ts`：从会话解析工作目录、限定文件访问、版本校验和保存（含 allowCreate 重建）。
+- `server/src/application/design/design-service.ts`：从会话解析工作目录、限定文件访问、版本校验和保存（含 allowCreate 重建），并含 `.css` 文档读写（P3.5）。
 - `server/src/application/design/snapshot-service.ts`、`restore-service.ts`、`resource-graph.ts`：快照捕获/清单、分阶段恢复、HTML/CSS 资源引用图。
 - `server/src/application/design/deps-service.ts`、`export-service.ts`：资源 stat 轮询与 ZIP 导出。
 - `server/src/application/design/media-types.ts`、`media-task-service.ts`、`media-image-provider.ts`、`video-render-service.ts`（P6）：媒体任务契约与服务（自建表、状态机、去重、并发调度、取消与重启收尾、产物永不覆盖写入）、openai-images provider、视频渲染执行器。
@@ -132,6 +143,8 @@ P1 单元/接口测试覆盖：逐字节源码保留、重复节点与过期选�
 P2 测试覆盖（desktop 220 + server 69 + fileDownload 30，全绿；双端 tsc/eslint 与 react-lifecycle/radius 约束检查通过）：多页打开/编辑/保存互不串扰、8 页上限与 LRU 淘汰、身份隔离与 dispose 陈旧防护、missing/allowCreate 重建、deps stat 变化触发预览重建、可见门控与消息指纹去抖轮询、视口与缩放互不干预、导出解包相对路径原位与清单一致、缺资源 409 与 confirmIncomplete 放行、draft/disk 模式与版本钉（证据见 [P2 实现设计 §10](plans/2026-10-23-design-workbench-p2-implementation.md)）。
 
 P3 测试覆盖（desktop 435 + server 72 + fileDownload 30，全绿；双端 tsc 0 错、eslint 0 error、lifecycle/radius 通过）：24 属性校验逐类合法/非法样本、简写/长写共存与清除语义、无关字节逐字节保持、属性标签匹配拒绝、duplicate 的 id 去重与内部锚点重写、delete 锚点引用拒绝与选父级、move 交换公式与首末拒绝、结构操作混用/根元素拒绝、桥接 select 载荷与 select-path/select-failed 回路、树 capability/truncated/childElementPath、表单分组渲染与预检拦截、图片清单选择与相对路径换算、应用后重选对比（含混合事务颜色失配锁定用例）、纯颜色 verify 回路回归（证据见 [P3 实现设计 §10](plans/2026-10-23-design-workbench-p3-implementation.md)）。
+
+P3.5 测试覆盖（desktop 885 用例全绿、server 272 通过 + 1 skipped；双端 tsc 0 错、eslint 0 error / 37 warning 基线）：预览来源标记与规则枚举桥接、源码指纹对齐与只读原因、`styleBlock` 事务逐字节保持、样式来源面板与「Save styles」冲突两选项、服务端 `.css` 读写与 409 冲突、CSS 草稿与预览即时内联（证据见 [P3.5 实现设计 §11](plans/2026-10-24-design-workbench-p3.5-implementation.md)）。
 
 P4 测试覆盖（desktop 524 + server 115，全绿；双端 tsc 0 错、eslint 0 error、lifecycle/radius 通过）：模板目录不变量（骨架/无脚本/无外链/大小/语义分区）与安装全链路（409 files/覆盖重装/symlink 403/并发 403）、品牌读写修订语义与两文件独立写入、素材导入白名单/上限/重名去重/越界拒绝、kinds 向后兼容、品牌渲染器与校验、上下文组装快照与截断、run 反馈 diff/文案/快照失败附注/防抖与清理、三对话框与检视模态、面板接线（生成/续改经检视、横幅 chip、品牌缓存与最近导入入上下文）（证据见 [P4 实现设计 §9](plans/2026-10-23-design-workbench-p4-implementation.md)）。
 
