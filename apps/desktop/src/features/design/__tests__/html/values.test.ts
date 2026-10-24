@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { escapeAttr, escapeText, safeAttrValue, safeColor, safeStyleValue } from '../../html/values';
+import { escapeAttr, escapeText, safeAttrValue, safeColor, safeSourceCssValue, safeStyleValue } from '../../html/values';
+import { STYLE_SOURCE_VALUE_MAX } from '../../types';
 
 describe('safeColor', () => {
   it.each([
@@ -235,6 +236,56 @@ describe('safeStyleValue', () => {
     expect(safeStyleValue('border-style', '   ')).toBeNull();
     expect(safeStyleValue('font-family', 'a'.repeat(120))).toBe('a'.repeat(120));
     expect(safeStyleValue('font-family', 'a'.repeat(121))).toBeNull();
+  });
+});
+
+describe('safeSourceCssValue', () => {
+  it.each([
+    'red',
+    '#ff0000',
+    'rgb(1, 2, 3)',
+    '1px solid #ccc',
+    '10px 20px 30px 40px',
+    'bold italic 12px/1.5 serif',
+    'calc(100% - 2em)',
+    '"Helvetica Neue", Arial, sans-serif',
+    'inherit',
+    'auto',
+    'scale-down',
+  ])('accepts %s and returns the original string', value => {
+    expect(safeSourceCssValue(value)).toBe(value);
+  });
+
+  it.each([
+    'red;', // would terminate the declaration early
+    'a{b',
+    'a}b',
+    '/* note */ red', // comment open
+    'red /*', // unterminated comment open
+    'url(x)', // exfiltration / data vector
+    'URL(x)',
+    'background:url(a.png)',
+    'expression(alert(1))',
+    'EXPRESSION(X)',
+    '@media', // at-rule injection
+    'a@b',
+    'a\nb', // C0 control characters
+    'a\tb',
+    'a\u0000b',
+    'a\u0007b',
+    'a\u001fb',
+  ])('rejects %s', value => {
+    expect(safeSourceCssValue(value)).toBeNull();
+  });
+
+  it('rejects values over STYLE_SOURCE_VALUE_MAX and accepts the boundary', () => {
+    expect(safeSourceCssValue('a'.repeat(STYLE_SOURCE_VALUE_MAX))).toBe('a'.repeat(STYLE_SOURCE_VALUE_MAX));
+    expect(safeSourceCssValue('a'.repeat(STYLE_SOURCE_VALUE_MAX + 1))).toBeNull();
+  });
+
+  it('passes values through verbatim (no trim, empty string stays legal)', () => {
+    expect(safeSourceCssValue('  red  ')).toBe('  red  ');
+    expect(safeSourceCssValue('')).toBe('');
   });
 });
 

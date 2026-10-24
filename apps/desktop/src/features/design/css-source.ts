@@ -146,7 +146,8 @@ export function buildStyleRules(input: {
 // 入口 `<style>` 块枚举（parse5）
 // ---------------------------------------------------------------------------
 
-interface StyleBlock {
+/** 入口 `<style>` 块（htmlSource 原文切片）。写回引擎（edit-engine）复用同一枚举与偏移口径。 */
+export interface StyleBlock {
   ordinal: number;
   /** 块文本（htmlSource 原文切片）；无法定位或无文本时为 null，其规则一律 align-mismatch。 */
   text: string | null;
@@ -155,7 +156,7 @@ interface StyleBlock {
 }
 
 /** 按文档序枚举入口 `<style>` 元素，序号即预览标记的 `@inline/<n>`。 */
-function enumerateStyleBlocks(htmlSource: string): Map<number, StyleBlock> {
+export function enumerateStyleBlocks(htmlSource: string): Map<number, StyleBlock> {
   const blocks = new Map<number, StyleBlock>();
   const { document } = parseDocument(htmlSource);
   let ordinal = 0;
@@ -187,7 +188,7 @@ function blockOf(source: string, ordinal: number, el: P5Element): StyleBlock {
 // postcss 解析与 (line, column) → 绝对偏移换算
 // ---------------------------------------------------------------------------
 
-interface BlockParse {
+export interface BlockParse {
   root: postcss.Root;
   /** 块文本（BOM 剥离后）每行首偏移：postcss 节点只有 1 起的 line/column，据此换算块内偏移。 */
   lineStarts: number[];
@@ -195,10 +196,10 @@ interface BlockParse {
   bomLength: number;
 }
 
-type BlockParseResult = BlockParse | { error: true };
+export type BlockParseResult = BlockParse | { error: true };
 
 /** 每块至多解析一次（同一块可能被多条命中规则引用）。 */
-function parseBlock(block: StyleBlock, cache: Map<number, BlockParseResult>): BlockParseResult {
+export function parseBlock(block: StyleBlock, cache: Map<number, BlockParseResult>): BlockParseResult {
   const cached = cache.get(block.ordinal);
   if (cached) return cached;
   let result: BlockParseResult;
@@ -225,7 +226,7 @@ function lineStartsOf(css: string): number[] {
 }
 
 /** 块内 (line, column)（1 起，postcss 口径，与 Input 的行表同为按 \n 切分）→ htmlSource 绝对偏移。 */
-function absOffset(block: StyleBlock, parse: BlockParse, pos: postcss.Position): number {
+export function absOffset(block: StyleBlock, parse: BlockParse, pos: postcss.Position): number {
   const lineStart = parse.lineStarts[pos.line - 1] ?? 0;
   return block.textStartOffset + parse.bomLength + lineStart + pos.column - 1;
 }
@@ -247,6 +248,8 @@ function resolveOrigin(
 }
 
 const byteLength = (text: string): number => new TextEncoder().encode(text).length;
+/** UTF-8 字节数（§3 的 STYLE_BLOCK_MAX_BYTES 上限口径，写回引擎复用）。 */
+export { byteLength };
 
 // ---------------------------------------------------------------------------
 // rulePath 索引对齐与选择器指纹
@@ -258,7 +261,7 @@ const byteLength = (text: string): number => new TextEncoder().encode(text).leng
  * 差异由选择器指纹兜住）。中间级必须是 AtRule 分组，末级必须是 Rule；
  * 越界或类型不符返回 null（对不上即 align-mismatch，不猜）。
  */
-function resolveRulePath(root: postcss.Root, rulePath: number[]): postcss.Rule | null {
+export function resolveRulePath(root: postcss.Root, rulePath: number[]): postcss.Rule | null {
   let container: postcss.Root | postcss.AtRule = root;
   for (let depth = 0; depth < rulePath.length; depth += 1) {
     const index = rulePath[depth];

@@ -616,7 +616,7 @@ function DesignPanelSession({
     const selection = activePage?.selection;
     if (!selection) return;
     const pathKey = selection.elementPath.join('.');
-    // 结构操作不设 mergeKey：每次操作独立成一条撤销记录；其余按 属性/文字 归并。
+    // 结构操作不设 mergeKey：每次操作独立成一条撤销记录；其余按 属性/文字/来源声明 归并。
     const mergeKey = operations.some(operation => operation.kind === 'structure')
       ? undefined
       : `${pathKey}:${operations
@@ -627,17 +627,20 @@ function DesignPanelSession({
                 ? `style:${operation.property}`
                 : operation.kind === 'attribute'
                   ? `attr:${operation.name}`
-                  : `struct:${operation.action}`
+                  : operation.kind === 'styleBlock'
+                    ? `style:${operation.styleOrdinal}:${operation.rulePath.join('.')}:${operation.property}`
+                    : `struct:${operation.action}`
           )
           .join('+')}`;
     const applied = await controller.apply(operations, `Edit element ${pathKey}`, mergeKey);
     if (!applied) return;
-    // 应用后重选（§6.1/§6.3）：attribute/structure/非颜色 style 需要 iframe 回发 select
-    // 消息刷新计算样式并核对 override；纯颜色沿用既有 verify 回路，不动。
+    // 应用后重选（§6.1/§6.3）：attribute/structure/非颜色 style/styleBlock 需要 iframe
+    // 回发 select 消息刷新计算样式并核对 override；纯颜色沿用既有 verify 回路，不动。
     const needsReselect = operations.some(
       operation =>
         operation.kind === 'structure' ||
         operation.kind === 'attribute' ||
+        operation.kind === 'styleBlock' ||
         (operation.kind === 'style' &&
           operation.property !== 'color' &&
           operation.property !== 'background-color')

@@ -96,7 +96,8 @@ export type DesignEditOperation =
   | { kind: 'text'; value: string }
   | { kind: 'style'; property: DesignStyleProperty; value: string | null }
   | { kind: 'attribute'; name: DesignAttributeName; value: string | null }
-  | { kind: 'structure'; action: DesignStructureAction };
+  | { kind: 'structure'; action: DesignStructureAction }
+  | DesignStyleBlockOperation;
 
 export interface DesignEditTransaction {
   /** Must equal the SHA-256 revision of the draft the transaction applies to. */
@@ -169,8 +170,8 @@ export interface DesignRulesMessage {
 }
 
 /**
- * 声明级样式来源修改 op（§4）。T0 仅定义契约；C3 并入 DesignEditOperation
- * 联合并实现引擎（并入需与 DesignPanel 的 mergeKey/needsReselect 接线同卡落地）。
+ * 声明级样式来源修改 op（§4）。已并入 DesignEditOperation 联合；
+ * 引擎实现见 html/edit-engine.ts（C3），值/属性名校验见 html/values.ts。
  */
 export interface DesignStyleBlockOperation {
   kind: 'styleBlock';

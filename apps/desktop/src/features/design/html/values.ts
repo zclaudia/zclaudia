@@ -1,4 +1,5 @@
 import type { DesignAttributeName, DesignStyleProperty } from '../types';
+import { STYLE_SOURCE_VALUE_MAX } from '../types';
 
 const SAFE_COLOR_NAMES = new Set([
   'transparent',
@@ -150,6 +151,38 @@ export function safeStyleValue(property: DesignStyleProperty, value: string): st
   const options = LENGTH_OPTIONS[property];
   if (options) return safeLengthValue(trimmed, options);
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// P3.5 CSS 来源值黑名单（§4）
+// ---------------------------------------------------------------------------
+
+/**
+ * 校验一个来源区（`<style>` 块声明）的值。返回原值或 null（非法）。
+ *
+ * 与 safeStyleValue 的白名单相反：来源编辑的价值正在 23 属性之外的属性，
+ * 这里只拒绝能破坏声明边界的 token（设计文档 §4 黑名单）——`;`（提前结束
+ * 声明）、`{`/`}`（逃出规则块）、注释 `/*`、`url(`（外链/数据向量，大小写
+ * 不敏感）、`expression(`、`@`（at-rule 注入）、C0 控制字符、>500 字符。
+ * 合法值原样透传（不 trim、不改写），非法返回 null（引擎侧 → INVALID_VALUE）。
+ */
+export function safeSourceCssValue(value: string): string | null {
+  if (value.length > STYLE_SOURCE_VALUE_MAX) return null;
+  const lowered = value.toLowerCase();
+  if (
+    lowered.includes(';') ||
+    lowered.includes('{') ||
+    lowered.includes('}') ||
+    lowered.includes('/*') ||
+    lowered.includes('url(') ||
+    lowered.includes('expression(') ||
+    lowered.includes('@')
+  )
+    return null;
+  for (let i = 0; i < value.length; i += 1) {
+    if (value.charCodeAt(i) < 0x20) return null; // C0 control characters
+  }
+  return value;
 }
 
 // ---------------------------------------------------------------------------

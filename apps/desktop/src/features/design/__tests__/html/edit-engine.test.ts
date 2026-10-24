@@ -8,11 +8,13 @@ import { sha256HexSync } from '../../html/hash';
 import type {
   DesignAttributeName,
   DesignEditErrorCode,
+  DesignEditOperation,
   DesignEditTransaction,
   DesignSelection,
   DesignStyleProperty,
   DesignStructureAction,
 } from '../../types';
+import { STYLE_BLOCK_MAX_BYTES } from '../../types';
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
 const load = (name: string): string => readFileSync(join(fixtureDir, name), 'utf8');
@@ -1040,6 +1042,404 @@ describe('applyEditTransaction — structure guards', () => {
     await expectErrorCode(
       () => applyEditTransaction(NAV, structureTxn(NAV, plainLocator([], 'body'), 'delete')),
       'STRUCTURE_NOT_ALLOWED'
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P3.5 (C3): styleBlock operations — declaration-level edits inside <style> blocks
+// ---------------------------------------------------------------------------
+
+type StyleBlockOp = Extract<DesignEditOperation, { kind: 'styleBlock' }>;
+
+const styleBlockOp = (
+  overrides: Partial<StyleBlockOp> & Pick<StyleBlockOp, 'styleOrdinal' | 'rulePath' | 'property' | 'value'>
+): DesignEditOperation => ({ kind: 'styleBlock', create: false, ...overrides });
+
+/**
+ * 两个 <style> 块：块 0 顶层节点 [0]=body 规则、[1]=注释、[2]=.card、[3]=@media
+ * （嵌套 .card 为 [3,0]）；块 1 为 [0]=.card、[1]=.dup（同名重复声明）、
+ * [2]=.empty（空规则）、[3]=.spaced（`;` 前带空格）、[4]=.wrap（多行、末声明无分号）。
+ */
+const STYLE_DOC = [
+  '<!doctype html>',
+  '<html>',
+  '<head>',
+  '  <style>',
+  '    body { margin-top: 0; }',
+  '    /* card comment */',
+  '    .card { color: #f00; padding-top: 8px; font-weight: bold !important; }',
+  '    @media (min-width: 600px) {',
+  '      .card { color: #00f }',
+  '    }',
+  '  </style>',
+  '  <style>',
+  '    .card { line-height: 1.5; }',
+  '    .dup { margin-top: 4px; margin-top: 8px; }',
+  '    .empty {}',
+  '    .spaced { color: red ; margin-top: 0; }',
+  '    .wrap {',
+  '      border-width: 1px;',
+  '      border-style: solid',
+  '    }',
+  '  </style>',
+  '</head>',
+  '<body><main><p>hi</p></main></body>',
+  '</html>',
+].join('\n');
+
+const mainLocator: DesignSelection = { elementPath: [0], tagName: 'main', text: 'hi', sourceText: 'hi' };
+
+const styleBlockTxn = (source: string, operations: DesignEditOperation[]): DesignEditTransaction => ({
+  baseRevision: sha(source),
+  locator: mainLocator,
+  operations,
+});
+
+describe('applyEditTransaction — styleBlock: change value', () => {
+  it('rewrites only the value token, byte-preserving the rest of the document', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value: '#ff0000' })])
+    );
+    expect(result.source).toBe(STYLE_DOC.replace('color: #f00;', 'color: #ff0000;'));
+    expect(result.revision).toBe(sha(result.source));
+    expect(result.selection.base).toBe(result.revision);
+    expect(result.selection.elementPath).toEqual([0]);
+    expect(result.selection.tagName).toBe('main');
+  });
+
+  it('edits a rule nested in @media (rulePath [3, 0]) whose declaration has no trailing semicolon', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [styleBlockOp({ styleOrdinal: 0, rulePath: [3, 0], property: 'color', value: 'blue' })])
+    );
+    expect(result.source).toBe(STYLE_DOC.replace('color: #00f', 'color: blue'));
+  });
+
+  it('keeps the !important suffix verbatim outside the value range', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'font-weight', value: '700' }),
+      ])
+    );
+    expect(result.source).toBe(STYLE_DOC.replace('font-weight: bold !important;', 'font-weight: 700 !important;'));
+  });
+
+  it('operates on the LAST declaration when the same property repeats in one rule', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [styleBlockOp({ styleOrdinal: 1, rulePath: [1], property: 'margin-top', value: '6px' })])
+    );
+    expect(result.source).toBe(STYLE_DOC.replace('margin-top: 8px;', 'margin-top: 6px;'));
+  });
+
+  it('folds same-target operations so the last one wins (property match is case-insensitive)', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value: 'green' }),
+        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'COLOR', value: 'blue' }),
+      ])
+    );
+    expect(result.source).toBe(STYLE_DOC.replace('color: #f00;', 'color: blue;'));
+    expect(result.source).not.toContain('green');
+  });
+
+  it('rejects setting the identical value as a no-op (EMPTY_TRANSACTION)', async () => {
+    await expectErrorCode(
+      () =>
+        applyEditTransaction(
+          STYLE_DOC,
+          styleBlockTxn(STYLE_DOC, [styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value: '#f00' })])
+        ),
+      'EMPTY_TRANSACTION'
+    );
+  });
+});
+
+describe('applyEditTransaction — styleBlock: delete declaration', () => {
+  it('removes a mid-rule declaration with its leading whitespace and semicolon', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'padding-top', value: null }),
+      ])
+    );
+    expect(result.source).toBe(STYLE_DOC.replace(' padding-top: 8px;', ''));
+  });
+
+  it('removes an unterminated trailing declaration without leaving an orphan semicolon', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 0, rulePath: [3, 0], property: 'color', value: null }),
+      ])
+    );
+    expect(result.source).toBe(STYLE_DOC.replace(' color: #00f', ''));
+  });
+
+  it('removes a multi-line declaration by its leading indentation, byte-exactly', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 1, rulePath: [4], property: 'border-style', value: null }),
+      ])
+    );
+    expect(result.source).toBe(STYLE_DOC.replace('\n      border-style: solid', ''));
+  });
+
+  it('removes a declaration whose semicolon is preceded by a space, byte-exactly', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [styleBlockOp({ styleOrdinal: 1, rulePath: [3], property: 'color', value: null })])
+    );
+    expect(result.source).toBe(STYLE_DOC.replace(' color: red ;', ''));
+  });
+});
+
+describe('applyEditTransaction — styleBlock: create declaration', () => {
+  it('inserts before the closing brace using the last declaration rawBefore style', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'border-radius', value: '4px', create: true }),
+      ])
+    );
+    expect(result.source).toBe(
+      STYLE_DOC.replace(
+        'font-weight: bold !important; }',
+        'font-weight: bold !important;  border-radius: 4px;}'
+      )
+    );
+  });
+
+  it('inserts into a multi-line rule on its own indented line', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 1, rulePath: [4], property: 'margin-top', value: '4px', create: true }),
+      ])
+    );
+    // The repaired ';' lands at the insertion point (before '}') and still
+    // terminates the previously unterminated declaration after re-parsing.
+    expect(result.source).toBe(
+      STYLE_DOC.replace(
+        '      border-style: solid\n    }',
+        '      border-style: solid\n    ;\n      margin-top: 4px;}'
+      )
+    );
+  });
+
+  it('inserts into an empty rule with the selector-line indentation plus two spaces', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 1, rulePath: [2], property: 'color', value: 'red', create: true }),
+      ])
+    );
+    expect(result.source).toBe(STYLE_DOC.replace('.empty {}', '.empty {\n      color: red;}'));
+  });
+
+  it('adds the missing semicolon on an unterminated last declaration before inserting', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 0, rulePath: [3, 0], property: 'margin-top', value: '4px', create: true }),
+      ])
+    );
+    expect(result.source).toBe(
+      STYLE_DOC.replace('.card { color: #00f }', '.card { color: #00f ; margin-top: 4px;}')
+    );
+  });
+
+  it('inserts several declarations in one rule in operation order', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'border-radius', value: '4px', create: true }),
+        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'width', value: 'auto', create: true }),
+      ])
+    );
+    expect(result.source).toBe(
+      STYLE_DOC.replace(
+        'font-weight: bold !important; }',
+        'font-weight: bold !important;  border-radius: 4px; width: auto;}'
+      )
+    );
+  });
+
+  it('rejects create when the property already exists (INVALID_VALUE)', async () => {
+    await expectErrorCode(
+      () =>
+        applyEditTransaction(
+          STYLE_DOC,
+          styleBlockTxn(STYLE_DOC, [
+            styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value: 'blue', create: true }),
+          ])
+        ),
+      'INVALID_VALUE'
+    );
+  });
+
+  it('rejects the contradictory delete+create combination (INVALID_VALUE)', async () => {
+    await expectErrorCode(
+      () =>
+        applyEditTransaction(
+          STYLE_DOC,
+          styleBlockTxn(STYLE_DOC, [
+            styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'display', value: null, create: true }),
+          ])
+        ),
+      'INVALID_VALUE'
+    );
+  });
+});
+
+describe('applyEditTransaction — styleBlock: multiple operations', () => {
+  it('applies edits across blocks and offsets in one transaction, byte-exactly', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'padding-top', value: '12px' }),
+        styleBlockOp({ styleOrdinal: 1, rulePath: [0], property: 'line-height', value: '2' }),
+      ])
+    );
+    expect(result.source).toBe(
+      STYLE_DOC.replace('padding-top: 8px;', 'padding-top: 12px;').replace('line-height: 1.5;', 'line-height: 2;')
+    );
+  });
+
+  it('applies two edits inside the same rule in one transaction', async () => {
+    const result = await applyEditTransaction(
+      STYLE_DOC,
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'font-weight', value: '700' }),
+        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value: 'blue' }),
+      ])
+    );
+    expect(result.source).toBe(
+      STYLE_DOC.replace('color: #f00;', 'color: blue;').replace('font-weight: bold !important;', 'font-weight: 700 !important;')
+    );
+  });
+
+  it('rejects styleBlock mixed with a structure operation (STRUCTURE_NOT_ALLOWED)', async () => {
+    await expectErrorCode(
+      () =>
+        applyEditTransaction(
+          STYLE_DOC,
+          styleBlockTxn(STYLE_DOC, [
+            styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value: 'blue' }),
+            { kind: 'structure', action: 'duplicate' },
+          ])
+        ),
+      'STRUCTURE_NOT_ALLOWED'
+    );
+    await expectErrorCode(
+      () =>
+        applyEditTransaction(
+          STYLE_DOC,
+          styleBlockTxn(STYLE_DOC, [
+            { kind: 'structure', action: 'duplicate' },
+            styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value: 'blue' }),
+          ])
+        ),
+      'STRUCTURE_NOT_ALLOWED'
+    );
+  });
+
+  it('rejects a transaction with an unconsumed operation kind (INVALID_VALUE)', async () => {
+    await expectErrorCode(
+      () =>
+        applyEditTransaction(
+          STYLE_DOC,
+          styleBlockTxn(STYLE_DOC, [{ kind: 'bogus' } as unknown as DesignEditOperation])
+        ),
+      'INVALID_VALUE'
+    );
+  });
+});
+
+describe('applyEditTransaction — styleBlock: STYLE_SOURCE_NOT_FOUND matrix', () => {
+  const expectNotFound = (operation: DesignEditOperation, source: string = STYLE_DOC): Promise<void> =>
+    expectErrorCode(() => applyEditTransaction(source, styleBlockTxn(source, [operation])), 'STYLE_SOURCE_NOT_FOUND');
+
+  it('rejects an out-of-range style block ordinal', async () => {
+    await expectNotFound(styleBlockOp({ styleOrdinal: 9, rulePath: [0], property: 'color', value: 'blue' }));
+  });
+
+  it('rejects out-of-range, empty and comment-indexed rule paths', async () => {
+    await expectNotFound(styleBlockOp({ styleOrdinal: 0, rulePath: [9], property: 'color', value: 'blue' }));
+    await expectNotFound(styleBlockOp({ styleOrdinal: 0, rulePath: [3, 9], property: 'color', value: 'blue' }));
+    await expectNotFound(styleBlockOp({ styleOrdinal: 0, rulePath: [], property: 'color', value: 'blue' }));
+    await expectNotFound(styleBlockOp({ styleOrdinal: 0, rulePath: [1], property: 'color', value: 'blue' }));
+  });
+
+  it('rejects a missing property for change and for delete', async () => {
+    await expectNotFound(styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'display', value: 'flex' }));
+    await expectNotFound(styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'display', value: null }));
+  });
+
+  it('rejects a block that does not parse as CSS', async () => {
+    const broken = '<style>\n  .card { color: red;\n</style>\n<body><main>hi</main></body>';
+    await expectNotFound(
+      styleBlockOp({ styleOrdinal: 0, rulePath: [0], property: 'color', value: 'blue' }),
+      broken
+    );
+  });
+
+  it('rejects a block over STYLE_BLOCK_MAX_BYTES', async () => {
+    const big = `<style>.big{color:red;${' '.repeat(STYLE_BLOCK_MAX_BYTES)}}</style>`;
+    const source = `${big}\n<body><main>hi</main></body>`;
+    await expectNotFound(
+      styleBlockOp({ styleOrdinal: 0, rulePath: [0], property: 'color', value: 'blue' }),
+      source
+    );
+  });
+});
+
+describe('applyEditTransaction — styleBlock: entry validation (INVALID_VALUE)', () => {
+  it.each([
+    'blue; color: red', // declaration boundary escape
+    'url(x)',
+    'expression(alert(1))',
+    '@media',
+    'a{b}',
+  ])('rejects blacklisted value %s through the engine', async value => {
+    await expectErrorCode(
+      () =>
+        applyEditTransaction(
+          STYLE_DOC,
+          styleBlockTxn(STYLE_DOC, [styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value })])
+        ),
+      'INVALID_VALUE'
+    );
+  });
+
+  it('rejects property names failing STYLE_SOURCE_PROPERTY_PATTERN or the length cap', async () => {
+    for (const property of ['color;', '9color', 'color red', 'a'.repeat(65)]) {
+      await expectErrorCode(
+        () =>
+          applyEditTransaction(
+            STYLE_DOC,
+            styleBlockTxn(STYLE_DOC, [
+              styleBlockOp({ styleOrdinal: 0, rulePath: [2], property, value: 'blue' }),
+            ])
+          ),
+        'INVALID_VALUE'
+      );
+    }
+    // A 64-char name passes validation and fails later on positioning instead.
+    await expectErrorCode(
+      () =>
+        applyEditTransaction(
+          STYLE_DOC,
+          styleBlockTxn(STYLE_DOC, [
+            styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'a'.repeat(64), value: 'blue' }),
+          ])
+        ),
+      'STYLE_SOURCE_NOT_FOUND'
     );
   });
 });
