@@ -1,13 +1,12 @@
 import { parseFragment, type DefaultTreeAdapterMap } from 'parse5';
-import type postcss from 'postcss';
 import {
-  absOffset,
+  buildCssEditSplice,
   byteLength,
   enumerateStyleBlocks,
   parseBlock,
-  resolveRulePath,
-  type BlockParse,
+  validateCssSourceEdit,
   type BlockParseResult,
+  type CssEditSplice,
   type StyleBlock,
 } from '../css-source';
 import type {
@@ -19,11 +18,7 @@ import type {
   DesignStyleProperty,
   DesignEditTransaction,
 } from '../types';
-import {
-  STYLE_BLOCK_MAX_BYTES,
-  STYLE_SOURCE_PROPERTY_MAX,
-  STYLE_SOURCE_PROPERTY_PATTERN,
-} from '../types';
+import { STYLE_BLOCK_MAX_BYTES } from '../types';
 import { DesignEditError } from '../types';
 import { sha256Hex } from './hash';
 import {
@@ -42,7 +37,7 @@ import {
   type Span,
 } from './parse';
 import { setDeclaration } from './style-declarations';
-import { escapeAttr, escapeText, safeAttrValue, safeSourceCssValue, safeStyleValue } from './values';
+import { escapeAttr, escapeText, safeAttrValue, safeStyleValue } from './values';
 
 type TextOperation = Extract<DesignEditOperation, { kind: 'text' }>;
 type StyleOperation = Extract<DesignEditOperation, { kind: 'style' }>;
@@ -51,11 +46,8 @@ type StructureOperation = Extract<DesignEditOperation, { kind: 'structure' }>;
 type StyleBlockOperation = Extract<DesignEditOperation, { kind: 'styleBlock' }>;
 type P5Fragment = DefaultTreeAdapterMap['documentFragment'];
 
-interface Splice {
-  start: number;
-  end: number;
-  replacement: string;
-}
+/** P3.5 C6：Splice 构造迁至 css-source.ts 共享补丁引擎（css-drafts 同口径），此处保留别名。 */
+type Splice = CssEditSplice;
 
 /** Map a CSS property name to the matching DesignSelection field (colors only; P3). */
 const SELECTION_STYLE_KEYS: Partial<Record<DesignStyleProperty, 'color' | 'backgroundColor'>> = {
@@ -234,28 +226,6 @@ function buildAttributeSplice(
 const styleBlockFoldKey = (operation: StyleBlockOperation): string =>
   `${operation.styleOrdinal}|${operation.rulePath.join('.')}|${operation.property.toLowerCase()}`;
 
-/** Engine-side entry validation (values/property names come from the UI, never trusted). */
-function validateStyleBlockOperation(operation: StyleBlockOperation): void {
-  if (operation.value === null && operation.create) {
-    throw new DesignEditError(
-      'INVALID_VALUE',
-      'A styleBlock operation cannot delete the declaration and create it at the same time.'
-    );
-  }
-  if (
-    !STYLE_SOURCE_PROPERTY_PATTERN.test(operation.property) ||
-    operation.property.length > STYLE_SOURCE_PROPERTY_MAX
-  ) {
-    throw new DesignEditError(
-      'INVALID_VALUE',
-      `Invalid style source property name: ${operation.property}`
-    );
-  }
-  if (operation.value !== null && safeSourceCssValue(operation.value) === null) {
-    throw new DesignEditError('INVALID_VALUE', `Invalid style source value: ${operation.value}`);
-  }
-}
-
 /** One splice per folded operation; same-target operations were folded to their last one. */
 function buildStyleBlockSplices(source: string, operations: StyleBlockOperation[]): Splice[] {
   if (operations.length === 0) return [];
@@ -268,13 +238,18 @@ function buildStyleBlockSplices(source: string, operations: StyleBlockOperation[
   );
 }
 
+/**
+ * Entry-side validation runs before block resolution (C3 check order preserved);
+ * the declaration-level splice itself comes from the shared patch engine in
+ * css-source.ts (P3.5 C6: same engine also backs standalone .css drafts).
+ */
 function buildStyleBlockSplice(
   source: string,
   operation: StyleBlockOperation,
   blocks: Map<number, StyleBlock>,
   parses: Map<number, BlockParseResult>
 ): Splice {
-  validateStyleBlockOperation(operation);
+  validateCssSourceEdit(operation);
 
   const block = blocks.get(operation.styleOrdinal);
   // Unknown ordinal or a block without source location: there is nothing to align against.
@@ -297,114 +272,7 @@ function buildStyleBlockSplice(
       `Style block #${operation.styleOrdinal} does not parse as CSS.`
     );
   }
-  const rule = resolveRulePath(parsed.root, operation.rulePath);
-  if (!rule) {
-    throw new DesignEditError(
-      'STYLE_SOURCE_NOT_FOUND',
-      `The rule path [${operation.rulePath.join(', ')}] does not resolve in style block #${operation.styleOrdinal}.`
-    );
-  }
-  const ruleEnd = rule.source?.end;
-  if (!ruleEnd) {
-    throw new DesignEditError('STYLE_SOURCE_NOT_FOUND', 'The rule has no source location.');
-  }
-  const closeOffset = absOffset(block, parsed, ruleEnd); // position of the closing '}'
-
-  const declarations: postcss.Declaration[] = [];
-  let target: postcss.Declaration | null = null;
-  for (const node of rule.nodes ?? []) {
-    if (node.type !== 'decl') continue;
-    declarations.push(node);
-    // Same-name declarations: operate on the LAST one (setDeclaration semantics).
-    if (node.prop.toLowerCase() === operation.property.toLowerCase()) target = node;
-  }
-
-  if (!target) {
-    if (!operation.create) {
-      throw new DesignEditError(
-        'STYLE_SOURCE_NOT_FOUND',
-        `The rule has no ${operation.property} declaration to modify.`
-      );
-    }
-    return createStyleDeclarationSplice(source, operation, rule, closeOffset, declarations, block, parsed);
-  }
-  if (operation.create) {
-    throw new DesignEditError(
-      'INVALID_VALUE',
-      `The rule already has a ${operation.property} declaration.`
-    );
-  }
-  const declStart = target.source?.start;
-  const declEnd = target.source?.end;
-  if (!declStart || !declEnd) {
-    throw new DesignEditError('STYLE_SOURCE_NOT_FOUND', 'The declaration has no source location.');
-  }
-  const start = absOffset(block, parsed, declStart);
-  const end = absOffset(block, parsed, declEnd);
-
-  if (operation.value === null) {
-    return deleteStyleDeclarationSplice(source, target, start, end);
-  }
-  // Change the value sub-range only: separators, whitespace and !important stay verbatim.
-  const between = typeof target.raws.between === 'string' ? target.raws.between : '';
-  const valueStart = start + target.prop.length + between.length;
-  return { start: valueStart, end: valueStart + target.value.length, replacement: operation.value };
-}
-
-/** Remove the whole declaration plus its leading whitespace (raws.before) and its ';'. */
-function deleteStyleDeclarationSplice(
-  source: string,
-  target: postcss.Declaration,
-  start: number,
-  end: number
-): Splice {
-  // postcss ends the node span on the ';' itself when one directly follows.
-  let removeEnd = end + 1;
-  if (source[end] !== ';') {
-    // Unterminated trailing declaration: still eat an immediately following ';'
-    // so no orphan delimiter is left behind.
-    let cursor = removeEnd;
-    while (source[cursor] === ' ' || source[cursor] === '\t') cursor += 1;
-    if (source[cursor] === ';') removeEnd = cursor + 1;
-  }
-  const rawsBefore = typeof target.raws.before === 'string' ? target.raws.before : '';
-  return { start: start - rawsBefore.length, end: removeEnd, replacement: '' };
-}
-
-/** Insert `prop: value;` right before the rule's closing '}', keeping the block's style. */
-function createStyleDeclarationSplice(
-  source: string,
-  operation: StyleBlockOperation,
-  rule: postcss.Rule,
-  closeOffset: number,
-  declarations: postcss.Declaration[],
-  block: StyleBlock,
-  parsed: BlockParse
-): Splice {
-  const declaration = `${operation.property}: ${operation.value};`;
-  if (declarations.length === 0) {
-    // Empty rule: selector-line indentation + two spaces.
-    const ruleBefore = typeof rule.raws.before === 'string' ? rule.raws.before : '';
-    const newlineAt = ruleBefore.lastIndexOf('\n');
-    const lineIndent = newlineAt >= 0 ? ruleBefore.slice(newlineAt + 1) : ruleBefore;
-    const lineBreak = newlineAt >= 0 ? '\n' : '';
-    return {
-      start: closeOffset,
-      end: closeOffset,
-      replacement: `${lineBreak}${lineIndent}  ${declaration}`,
-    };
-  }
-  const last = declarations[declarations.length - 1];
-  const rawsBefore = typeof last.raws.before === 'string' ? last.raws.before : '';
-  // When the last declaration carries no ';' of its own, add one: the insertion
-  // would otherwise be swallowed into that declaration's value.
-  const lastEnd = last.source?.end ? absOffset(block, parsed, last.source.end) : null;
-  const needsSemicolon = lastEnd !== null && source[lastEnd] !== ';';
-  return {
-    start: closeOffset,
-    end: closeOffset,
-    replacement: `${needsSemicolon ? ';' : ''}${rawsBefore}${declaration}`,
-  };
+  return buildCssEditSplice(source, operation, block, parsed, `style block #${operation.styleOrdinal}`);
 }
 
 /**

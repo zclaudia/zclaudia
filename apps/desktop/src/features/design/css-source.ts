@@ -13,7 +13,15 @@
 import postcss from 'postcss';
 import { childElements, isTextNode, parseDocument, type P5Element, type P5ParentNode } from './html/parse';
 import { compareCssValues } from './html/style-compare';
-import { STYLE_BLOCK_MAX_BYTES, type DesignComputedStyles, type DesignMatchedRule } from './types';
+import { safeSourceCssValue } from './html/values';
+import {
+  STYLE_BLOCK_MAX_BYTES,
+  STYLE_SOURCE_PROPERTY_MAX,
+  STYLE_SOURCE_PROPERTY_PATTERN,
+  DesignEditError,
+  type DesignComputedStyles,
+  type DesignMatchedRule,
+} from './types';
 
 /** 单条声明行（宿主侧源码解析所得，非 CSSOM 序列化文本）。 */
 export interface CssDeclarationRow {
@@ -25,7 +33,10 @@ export interface CssDeclarationRow {
   winning: boolean | null;
   /** 对齐成功的规则内恒为 true；只读规则的声明行为 false。 */
   editable: boolean;
-  /** 声明整体（属性起到 !important 止）在 htmlSource 中的 [start, end)。 */
+  /**
+   * 声明整体（属性起到 !important 止）的 [start, end) 偏移，相对 origin 的宿主
+   * 源文本：`@inline/n` 行为 htmlSource 绝对偏移，外部 .css 行为该文件内偏移（第二批）。
+   */
   start: number;
   end: number;
   /** 值子区间（不含 !important 后缀）的 [start, end)。 */
@@ -94,9 +105,16 @@ export function buildStyleRules(input: {
   matched: DesignMatchedRule[];
   computed: Partial<Record<string, string>>;
   inlineStyle: string | null;
+  /**
+   * P3.5 第二批（C6）：外部 `.css` 来源（工作区相对路径 → 文本；草稿优先于磁盘）。
+   * 命中路径按 `@inline` 同款指纹口径对齐为可编辑声明行；缺省或路径未提供时
+   * 维持第一批 `external-css-readonly` 只读口径。
+   */
+  cssSources?: Record<string, { source: string; revision: string }>;
 }): CssRuleRow[] {
   const blocks = enumerateStyleBlocks(input.htmlSource);
   const parses = new Map<number, BlockParseResult>();
+  const externalParses = new Map<string, Map<number, BlockParseResult>>();
   const rows: CssRuleRow[] = [];
   const candidates: WinningCandidate[] = [];
 
@@ -110,7 +128,9 @@ export function buildStyleRules(input: {
       declarations: [],
     };
     rows.push(row);
-    const target = resolveOrigin(rule.origin, blocks, parses);
+    const target = rule.origin.startsWith(INLINE_ORIGIN_PREFIX)
+      ? resolveInlineOrigin(rule.origin, blocks, parses)
+      : resolveExternalOrigin(rule.origin, input.cssSources, externalParses);
     if (typeof target === 'string') {
       row.readOnly = { reason: target };
       continue;
@@ -231,18 +251,42 @@ export function absOffset(block: StyleBlock, parse: BlockParse, pos: postcss.Pos
   return block.textStartOffset + parse.bomLength + lineStart + pos.column - 1;
 }
 
-function resolveOrigin(
+function resolveInlineOrigin(
   origin: string,
   blocks: Map<number, StyleBlock>,
   parses: Map<number, BlockParseResult>
 ): AlignedBlock | ReadOnlyReason {
-  // 第一批口径：非 @inline 的 origin（外部 .css 路径）一律只读展示（§6 第二批放开）。
-  if (!origin.startsWith(INLINE_ORIGIN_PREFIX)) return 'external-css-readonly';
   const ordinal = Number(origin.slice(INLINE_ORIGIN_PREFIX.length));
   const block = Number.isInteger(ordinal) ? blocks.get(ordinal) : undefined;
   if (!block || block.text === null) return 'align-mismatch';
   if (byteLength(block.text) > STYLE_BLOCK_MAX_BYTES) return 'oversize';
   const parse = parseBlock(block, parses);
+  if ('error' in parse) return 'parse-error';
+  return { block, parse };
+}
+
+/**
+ * 外部 `.css` origin（P3.5 第二批 §6）：cssSources 命中的路径按 `@inline` 同款
+ * 口径对齐（postcss 解析整个文件、rulePath 逐级、选择器归一比对）；伪 StyleBlock
+ * 的 textStartOffset = 0，声明偏移即该 css 文件内偏移。未提供该路径（尚未取到 /
+ * 取不到）维持第一批 `external-css-readonly` 只读口径。
+ */
+function resolveExternalOrigin(
+  origin: string,
+  cssSources: Record<string, { source: string; revision: string }> | undefined,
+  parses: Map<string, Map<number, BlockParseResult>>
+): AlignedBlock | ReadOnlyReason {
+  const entry = cssSources?.[origin];
+  if (!entry) return 'external-css-readonly';
+  const block: StyleBlock = { ordinal: 0, text: entry.source, textStartOffset: 0 };
+  if (byteLength(entry.source) > STYLE_BLOCK_MAX_BYTES) return 'oversize';
+  // parseBlock 以 ordinal 为缓存键：每个 origin 独立缓存，避免伪块 ordinal 冲突。
+  let originCache = parses.get(origin);
+  if (!originCache) {
+    originCache = new Map<number, BlockParseResult>();
+    parses.set(origin, originCache);
+  }
+  const parse = parseBlock(block, originCache);
   if ('error' in parse) return 'parse-error';
   return { block, parse };
 }
@@ -316,7 +360,10 @@ interface WinningCandidate {
   /** inline 声明在级联序中恒排规则声明之后（inline 属性优先）。 */
   inline: boolean;
   specificity: [number, number, number];
-  /** htmlSource 绝对偏移：同特异性时后写胜。 */
+  /**
+   * 源码偏移：`@inline` 行为 htmlSource 绝对偏移，外部 .css 行为文件内偏移
+   * （跨来源的同特异性时序无宿主侧可靠口径，最终仍以计算值等值判定兜底）。
+   */
   order: number;
   /** 归属的声明行；inline 候选为 null（不产生行）。 */
   declaration: CssDeclarationRow | null;
@@ -374,4 +421,203 @@ function inlineDeclarations(inlineStyle: string | null): { property: string; val
     if (property && value) byProperty.set(property, value);
   }
   return [...byProperty].map(([property, value]) => ({ property, value }));
+}
+
+// ---------------------------------------------------------------------------
+// 声明级补丁引擎（P3.5 第二批 C6 自 edit-engine.ts 内部函数迁出的共享口径）：
+// `<style>` 块事务（edit-engine.buildStyleBlockSplice）与独立 .css 文件草稿
+// （css-drafts.applyCssEdit → patchCssText）共用同一 postcss 定位与 splice 构造。
+// ---------------------------------------------------------------------------
+
+/** 一条声明级来源编辑（styleBlock op 去 styleOrdinal 的同构字段，§4）。 */
+export interface CssSourceEdit {
+  /** 与 DesignMatchedRule.rulePath 同构的规则索引路径。 */
+  rulePath: number[];
+  /** 须匹配 STYLE_SOURCE_PROPERTY_PATTERN 且 ≤ STYLE_SOURCE_PROPERTY_MAX。 */
+  property: string;
+  /** null = 删除声明；否则为经 safeSourceCssValue 校验的新值。 */
+  value: string | null;
+  /** true 且属性不存在时在规则末尾新增声明。 */
+  create: boolean;
+}
+
+/** 文本区间替换（edit-engine 内部 Splice 的共享形态）。 */
+export interface CssEditSplice {
+  start: number;
+  end: number;
+  replacement: string;
+}
+
+/** 引擎侧入口校验（值/属性名来自 UI，不可信任；与 C3 validateStyleBlockOperation 同口径）。 */
+export function validateCssSourceEdit(edit: CssSourceEdit): void {
+  if (edit.value === null && edit.create) {
+    throw new DesignEditError(
+      'INVALID_VALUE',
+      'A styleBlock operation cannot delete the declaration and create it at the same time.'
+    );
+  }
+  if (
+    !STYLE_SOURCE_PROPERTY_PATTERN.test(edit.property) ||
+    edit.property.length > STYLE_SOURCE_PROPERTY_MAX
+  ) {
+    throw new DesignEditError(
+      'INVALID_VALUE',
+      `Invalid style source property name: ${edit.property}`
+    );
+  }
+  if (edit.value !== null && safeSourceCssValue(edit.value) === null) {
+    throw new DesignEditError('INVALID_VALUE', `Invalid style source value: ${edit.value}`);
+  }
+}
+
+/** 删除声明：连同其前导空白（raws.before）与分号整体移除，不留孤立分号。 */
+function deleteDeclarationSplice(
+  container: string,
+  target: postcss.Declaration,
+  start: number,
+  end: number
+): CssEditSplice {
+  // postcss ends the node span on the ';' itself when one directly follows.
+  let removeEnd = end + 1;
+  if (container[end] !== ';') {
+    // Unterminated trailing declaration: still eat an immediately following ';'
+    // so no orphan delimiter is left behind.
+    let cursor = removeEnd;
+    while (container[cursor] === ' ' || container[cursor] === '\t') cursor += 1;
+    if (container[cursor] === ';') removeEnd = cursor + 1;
+  }
+  const rawsBefore = typeof target.raws.before === 'string' ? target.raws.before : '';
+  return { start: start - rawsBefore.length, end: removeEnd, replacement: '' };
+}
+
+/** 在规则闭合 `}` 前插入 `prop: value;`，缩进与分号修复沿用块内既有声明样式。 */
+function createDeclarationSplice(
+  container: string,
+  property: string,
+  value: string,
+  rule: postcss.Rule,
+  closeOffset: number,
+  declarations: postcss.Declaration[],
+  block: StyleBlock,
+  parse: BlockParse
+): CssEditSplice {
+  const declaration = `${property}: ${value};`;
+  if (declarations.length === 0) {
+    // Empty rule: selector-line indentation + two spaces.
+    const ruleBefore = typeof rule.raws.before === 'string' ? rule.raws.before : '';
+    const newlineAt = ruleBefore.lastIndexOf('\n');
+    const lineIndent = newlineAt >= 0 ? ruleBefore.slice(newlineAt + 1) : ruleBefore;
+    const lineBreak = newlineAt >= 0 ? '\n' : '';
+    return {
+      start: closeOffset,
+      end: closeOffset,
+      replacement: `${lineBreak}${lineIndent}  ${declaration}`,
+    };
+  }
+  const last = declarations[declarations.length - 1];
+  const rawsBefore = typeof last.raws.before === 'string' ? last.raws.before : '';
+  // When the last declaration carries no ';' of its own, add one: the insertion
+  // would otherwise be swallowed into that declaration's value.
+  const lastEnd = last.source?.end ? absOffset(block, parse, last.source.end) : null;
+  const needsSemicolon = lastEnd !== null && container[lastEnd] !== ';';
+  return {
+    start: closeOffset,
+    end: closeOffset,
+    replacement: `${needsSemicolon ? ';' : ''}${rawsBefore}${declaration}`,
+  };
+}
+
+/**
+ * 在已解析的样式块内定位 edit 的声明并构造逐字节保持的 splice（§4）：
+ * 改值仅替换值子区间；删除连带前导空白与分号；新增在闭合 `}` 前按既有样式插入。
+ * 偏移相对 container（block 被切片自的宿主文本：htmlSource 或完整 .css 文件）；
+ * label 仅用于错误消息。失败抛 DesignEditError（INVALID_VALUE / STYLE_SOURCE_NOT_FOUND）。
+ */
+export function buildCssEditSplice(
+  container: string,
+  edit: CssSourceEdit,
+  block: StyleBlock,
+  parse: BlockParse,
+  label: string
+): CssEditSplice {
+  validateCssSourceEdit(edit);
+  const rule = resolveRulePath(parse.root, edit.rulePath);
+  if (!rule) {
+    throw new DesignEditError(
+      'STYLE_SOURCE_NOT_FOUND',
+      `The rule path [${edit.rulePath.join(', ')}] does not resolve in ${label}.`
+    );
+  }
+  const ruleEnd = rule.source?.end;
+  if (!ruleEnd) {
+    throw new DesignEditError('STYLE_SOURCE_NOT_FOUND', 'The rule has no source location.');
+  }
+  const closeOffset = absOffset(block, parse, ruleEnd); // position of the closing '}'
+
+  const declarations: postcss.Declaration[] = [];
+  let target: postcss.Declaration | null = null;
+  for (const node of rule.nodes ?? []) {
+    if (node.type !== 'decl') continue;
+    declarations.push(node);
+    // Same-name declarations: operate on the LAST one (setDeclaration semantics).
+    if (node.prop.toLowerCase() === edit.property.toLowerCase()) target = node;
+  }
+
+  if (!target) {
+    if (!edit.create) {
+      throw new DesignEditError(
+        'STYLE_SOURCE_NOT_FOUND',
+        `The rule has no ${edit.property} declaration to modify.`
+      );
+    }
+    return createDeclarationSplice(
+      container,
+      edit.property,
+      edit.value ?? '',
+      rule,
+      closeOffset,
+      declarations,
+      block,
+      parse
+    );
+  }
+  if (edit.create) {
+    throw new DesignEditError(
+      'INVALID_VALUE',
+      `The rule already has a ${edit.property} declaration.`
+    );
+  }
+  const declStart = target.source?.start;
+  const declEnd = target.source?.end;
+  if (!declStart || !declEnd) {
+    throw new DesignEditError('STYLE_SOURCE_NOT_FOUND', 'The declaration has no source location.');
+  }
+  const start = absOffset(block, parse, declStart);
+  const end = absOffset(block, parse, declEnd);
+
+  if (edit.value === null) {
+    return deleteDeclarationSplice(container, target, start, end);
+  }
+  // Change the value sub-range only: separators, whitespace and !important stay verbatim.
+  const between = typeof target.raws.between === 'string' ? target.raws.between : '';
+  const valueStart = start + target.prop.length + between.length;
+  return { start: valueStart, end: valueStart + target.value.length, replacement: edit.value };
+}
+
+/**
+ * 对独立 CSS 文本应用一条声明编辑并返回补丁后的全文（css-drafts 入口；§6）。
+ * 整个文件视作一个样式块（textStartOffset = 0），与 `<style>` 块共用同一偏移
+ * 引擎；超限/解析失败/定位失败一律抛 DesignEditError、原文不动。
+ */
+export function patchCssText(cssSource: string, edit: CssSourceEdit): string {
+  const block: StyleBlock = { ordinal: 0, text: cssSource, textStartOffset: 0 };
+  if (byteLength(cssSource) > STYLE_BLOCK_MAX_BYTES) {
+    throw new DesignEditError('STYLE_SOURCE_NOT_FOUND', 'The stylesheet exceeds the editable size limit.');
+  }
+  const parse = parseBlock(block, new Map<number, BlockParseResult>());
+  if ('error' in parse) {
+    throw new DesignEditError('STYLE_SOURCE_NOT_FOUND', 'The stylesheet does not parse as CSS.');
+  }
+  const splice = buildCssEditSplice(cssSource, edit, block, parse, 'the stylesheet');
+  return cssSource.slice(0, splice.start) + splice.replacement + cssSource.slice(splice.end);
 }

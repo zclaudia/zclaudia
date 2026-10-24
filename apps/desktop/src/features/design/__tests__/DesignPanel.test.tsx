@@ -4,8 +4,10 @@ import { DesignPanel, isValidRulesMessage } from '../DesignPanel';
 import { WorkspaceToolProvider } from '../../../components/workspace/WorkspaceToolContext';
 import { useComposerStore } from '../../../stores/composerStore';
 import { useChatMessageStore } from '../../../stores/chatMessageStore';
+import { ApiError } from '../../../services/api/unwrap';
 import { acquireWorkspaceController } from '../workspace/controller';
 import { createWorkspacePorts } from '../workspace/api-adapter';
+import { discardAllCssDrafts } from '../css-drafts';
 import * as api from '../api';
 import * as preview from '../preview';
 import * as interactive from '../interactive';
@@ -238,6 +240,8 @@ function resetWorkspace() {
     lease.controller.close(page.path, { discardDraft: true });
   }
   lease.release();
+  // P3.5 第二批：CSS 草稿表按同一 identity 进程内存活，测试间一并清空。
+  discardAllCssDrafts();
   localStorage.clear();
   useChatMessageStore.setState({ messages: {} });
 }
@@ -2106,6 +2110,197 @@ describe('DesignPanel', () => {
     await openPage('p2.html');
     expect(screen.queryByTestId('rule-@inline/0-0')).not.toBeInTheDocument();
     expect(screen.getByText(EMPTY_NOTICE)).toBeInTheDocument();
+  });
+
+  // ---- P3.5 第二批（C6）外部 .css：草稿编辑 / 预览内联 / 保存与冲突 / 导出提示 ----
+
+  const CSS_FILE = 'h1 {\n  color: #ff0000;\n}';
+  const LINK_PAGE =
+    '<html><head><link rel="stylesheet" href="css/main.css"></head><body><h1>Hello</h1></body></html>';
+  const CSS_RULE = {
+    origin: 'design/css/main.css',
+    rulePath: [0],
+    selectorText: 'h1',
+    specificity: [0, 0, 1],
+    importantProps: [],
+  };
+  const EXPORT_NOTICE =
+    'Unsaved style changes are not included in exports — save styles first.';
+
+  /** 打开引用外部 css 的页面并让选区落地（computed color 与磁盘 css 源值等值）。 */
+  async function mountExternalStylePage() {
+    disk.set('design/index.html', { source: LINK_PAGE, revision: 'revision-1' });
+    disk.set('design/css/main.css', { source: CSS_FILE, revision: 'rev-css-1' });
+    mount();
+    const frame = (await screen.findByTitle('Design preview')) as HTMLIFrameElement;
+    await sendSelection(frame, {
+      elementPath: [0],
+      tagName: 'h1',
+      text: 'Rendered',
+      sourceText: 'Hello',
+      color: 'rgb(255, 0, 0)',
+      backgroundColor: 'rgba(0, 0, 0, 0)',
+      base: sha(LINK_PAGE),
+    });
+    await screen.findByRole('textbox', { name: 'Element text' });
+    return frame;
+  }
+
+  /** 发外部规则载荷并等来源区出现可编辑声明行（磁盘 css 取回并打开草稿后）。 */
+  async function openExternalRuleRow(frame: HTMLIFrameElement) {
+    sendRules(frame, [CSS_RULE]);
+    await screen.findByTestId('rule-design/css/main.css-0');
+    const input = await screen.findByRole('textbox', { name: 'Value for color' });
+    expect(input).toHaveValue('#ff0000');
+    return input;
+  }
+
+  const applyExternalValue = (input: HTMLInputElement, value: string) => {
+    fireEvent.change(input, { target: { value } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply value for color' }));
+  };
+
+  it('P3.5 第二批：外部 origin 行可编辑，改值入 CSS 草稿（不发 styleBlock 事务、页面不脏）', async () => {
+    const frame = await mountExternalStylePage();
+    const input = await openExternalRuleRow(frame);
+    // 来源区不再显示第一批只读文案。
+    expect(screen.queryByText('External stylesheet editing arrives in a later batch')).not.toBeInTheDocument();
+    applyExternalValue(input, '#00ff00');
+    // 草稿优先进 cssSources：来源区行立即显示新值。
+    expect(await screen.findByText('#00ff00')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled());
+    // CSS 草稿不脏 HTML 页面草稿：工具栏页面保存保持禁用，也无 putDesignDocument 调用。
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(api.putDesignDocument).not.toHaveBeenCalled();
+  });
+
+  it('P3.5 第二批：CSS 草稿变更触发预览重建，loadAsset 对草稿路径返回草稿文本（拦截在 getDesignAsset 之前）', async () => {
+    const frame = await mountExternalStylePage();
+    await openExternalRuleRow(frame);
+    const callsBefore = vi.mocked(preview.buildDesignPreview).mock.calls.length;
+    applyExternalValue(screen.getByRole('textbox', { name: 'Value for color' }), '#00ff00');
+    // draftRevision/assetEpoch/mode 均未变，仅 cssDraftEpoch 变化即触发重建（缓存键含它）。
+    await waitFor(() =>
+      expect(vi.mocked(preview.buildDesignPreview).mock.calls.length).toBeGreaterThan(callsBefore)
+    );
+    const lastCall = vi.mocked(preview.buildDesignPreview).mock.calls.at(-1)!;
+    expect(lastCall[0]).toBe(LINK_PAGE); // 页面草稿未变
+    const loader = lastCall[2];
+    // 草稿路径：草稿文本 utf8 → base64，mime text/css；磁盘 asset 端点未被调用。
+    await expect(loader('design/css/main.css')).resolves.toEqual({
+      mimeType: 'text/css',
+      data: btoa(CSS_FILE.replace('#ff0000', '#00ff00')),
+    });
+    expect(
+      vi.mocked(api.getDesignAsset).mock.calls.some(call => call[2] === 'design/css/main.css')
+    ).toBe(false);
+    // 非草稿路径仍走 getDesignAsset。
+    await expect(loader('assets/logo.png')).resolves.toEqual({ mimeType: 'image/png', data: '' });
+    expect(
+      vi.mocked(api.getDesignAsset).mock.calls.some(call => call[2] === 'assets/logo.png')
+    ).toBe(true);
+  });
+
+  it('P3.5 第二批：Save styles 逐文件提交（expectedRevision=草稿基线），成功后清 dirty', async () => {
+    const frame = await mountExternalStylePage();
+    await openExternalRuleRow(frame);
+    applyExternalValue(screen.getByRole('textbox', { name: 'Value for color' }), '#00ff00');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Save styles' }));
+    await waitFor(() => expect(api.putDesignDocument).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(api.putDesignDocument).mock.calls[0]?.[1]).toMatchObject({
+      path: 'design/css/main.css',
+      source: CSS_FILE.replace('#ff0000', '#00ff00'),
+      expectedRevision: 'rev-css-1',
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save styles' })).toBeDisabled());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('P3.5 第二批：保存 409 → 冲突横幅两动作（Keep draft 保留 / Reload from disk 确认后丢弃重取）', async () => {
+    const frame = await mountExternalStylePage();
+    const input = await openExternalRuleRow(frame);
+    // 外部已改文件：磁盘修订前进，保存必 409。
+    disk.set('design/css/main.css', { source: CSS_FILE, revision: 'rev-css-2' });
+    const rejectConflictOnce = () =>
+      vi
+        .mocked(api.putDesignDocument)
+        .mockImplementationOnce((_backendId, put) =>
+          Promise.reject(new ApiError(`revision conflict on ${put.path}`, 'REVISION_CONFLICT'))
+        );
+    rejectConflictOnce();
+    applyExternalValue(input, '#00ff00');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Save styles' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'A style file was changed outside the panel'
+    );
+    // Reload from disk：确认对话框防误丢；Cancel 后草稿保留、横幅仍在。
+    fireEvent.click(screen.getByRole('button', { name: 'Reload from disk design/css/main.css' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Reload style file' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Reload style file' })).not.toBeInTheDocument()
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('A style file was changed outside the panel');
+    expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled();
+    // Keep draft：横幅收起，草稿保留（之后重试仍会 409，可重新载入解决）。
+    fireEvent.click(screen.getByRole('button', { name: 'Keep draft' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled();
+    // 重试保存再次 409 → Reload from disk 确认后：草稿丢弃、磁盘新修订取回并重开干净草稿。
+    rejectConflictOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Save styles' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'A style file was changed outside the panel'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reload from disk design/css/main.css' }));
+    const dialog2 = await screen.findByRole('dialog', { name: 'Reload style file' });
+    fireEvent.click(within(dialog2).getByRole('button', { name: 'Reload' }));
+    // 丢弃草稿 → 重取磁盘 rev-css-2 → 重开干净草稿：行按磁盘源重新对齐，Save styles 禁用。
+    await waitFor(() => {
+      const reloaded = screen.getByTestId('rule-design/css/main.css-0');
+      expect(within(reloaded).getByTestId('declaration-color')).toHaveTextContent('#ff0000');
+    });
+    expect(screen.getByRole('button', { name: 'Save styles' })).toBeDisabled();
+  });
+
+  it('P3.5 第二批：保存非 409 失败显示服务端 message，不出现冲突横幅', async () => {
+    const frame = await mountExternalStylePage();
+    const input = await openExternalRuleRow(frame);
+    vi.mocked(api.putDesignDocument).mockImplementationOnce(() =>
+      Promise.reject(new ApiError('disk on fire', 'IO_ERROR'))
+    );
+    applyExternalValue(input, '#00ff00');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Save styles' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('disk on fire');
+    expect(screen.queryByText('A style file was changed outside the panel')).not.toBeInTheDocument();
+    // 草稿保留：Save styles 仍可用。
+    expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled();
+  });
+
+  it('P3.5 第二批：导出对话框——存在 CSS 脏草稿时提示未保存样式不入导出，无草稿零差异', async () => {
+    vi.mocked(api.exportDesignZip).mockResolvedValue({
+      blob: new Blob(['zip']),
+      filename: 'export.zip',
+    });
+    const frame = await mountExternalStylePage();
+    await openExternalRuleRow(frame);
+    // 无 CSS 草稿：打开导出对话框无该提示。
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Export' });
+    expect(within(dialog).queryByText(EXPORT_NOTICE)).not.toBeInTheDocument();
+    await waitFor(() => expect(within(dialog).getByText('Exported: export.zip')).toBeInTheDocument());
+    // Modal 自带 X（aria-label Close）与 footer Close 同名：点 footer 的（最后一个）。
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Close' }).at(-1)!);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Export' })).not.toBeInTheDocument());
+    // 产生 CSS 脏草稿后：顶部提示出现。
+    applyExternalValue(screen.getByRole('textbox', { name: 'Value for color' }), '#00ff00');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    const dialog2 = await screen.findByRole('dialog', { name: 'Export' });
+    expect(within(dialog2).getByText(EXPORT_NOTICE)).toBeInTheDocument();
   });
 });
 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
-import type { CssDeclarationRow, CssRuleRow } from '../css-source';
+import type { CssDeclarationRow, CssRuleRow, CssSourceEdit } from '../css-source';
 import { safeSourceCssValue } from '../html/values';
 import {
   STYLE_RULES_MAX,
@@ -16,6 +16,10 @@ const TRUNCATED_NOTICE = `More than ${STYLE_RULES_MAX} rules match this element;
 const INVALID_PROPERTY_NOTICE = 'Invalid property name';
 const INVALID_VALUE_NOTICE = 'Invalid value';
 const REQUIRED_VALUE_NOTICE = 'Enter a value';
+const CONFLICT_NOTICE = 'A style file was changed outside the panel';
+const KEEP_DRAFT_LABEL = 'Keep draft';
+const RELOAD_DRAFT_LABEL = 'Reload from disk';
+const SAVE_STYLES_LABEL = 'Save styles';
 
 /** 只读原因文案（§5 四类明示，绝不猜测定位）。 */
 const READ_ONLY_NOTICES: Record<NonNullable<CssRuleRow['readOnly']>['reason'], string> = {
@@ -94,54 +98,61 @@ function validateSourceInput(property: string, value: string): string | null {
   return null;
 }
 
+/**
+ * 声明编辑目标（P3.5 §5 + 第二批 §6）：`@inline` 走 styleBlock 事务（onApply），
+ * 外部 .css 走草稿编辑（onApplyExternal）；两者皆无 → 行只读。
+ */
+type EditTarget = { kind: 'inline'; ordinal: number } | { kind: 'external'; origin: string };
+
 interface DeclarationRowProps {
   declaration: CssDeclarationRow;
-  /** 入口 `<style>` 块序号（null = 非 @inline 来源，不提供编辑控件）。 */
-  ordinal: number | null;
+  /** 编辑目标；null = 无编辑入口（只读）。 */
+  target: EditTarget | null;
   rulePath: number[];
   busy: boolean;
   onApply: (operations: DesignEditOperation[]) => void;
+  onApplyExternal: ((origin: string, edit: CssSourceEdit) => void) | undefined;
 }
 
 /** 单条声明行：属性名、源码值与生效徽标；可编辑时提供改值（input + apply）与删除（走撤销）。 */
-function DeclarationRow({ declaration, ordinal, rulePath, busy, onApply }: DeclarationRowProps) {
+function DeclarationRow({ declaration, target, rulePath, busy, onApply, onApplyExternal }: DeclarationRowProps) {
   const [draft, setDraft] = useState(declaration.value);
   const [error, setError] = useState<string | null>(null);
-  const editable = declaration.editable && ordinal !== null;
+  const editable = declaration.editable && target !== null;
+
+  const submitEdit = (value: string | null) => {
+    if (!target) return;
+    if (target.kind === 'inline') {
+      onApply([
+        {
+          kind: 'styleBlock',
+          styleOrdinal: target.ordinal,
+          rulePath,
+          property: declaration.property,
+          value,
+          create: false,
+        },
+      ]);
+    } else {
+      onApplyExternal?.(target.origin, { rulePath, property: declaration.property, value, create: false });
+    }
+  };
 
   const submitValue = () => {
-    if (ordinal === null) return;
+    if (!target) return;
     const invalid = validateSourceInput(declaration.property, draft);
     if (invalid) {
       setError(invalid);
       return;
     }
     setError(null);
-    onApply([
-      {
-        kind: 'styleBlock',
-        styleOrdinal: ordinal,
-        rulePath,
-        property: declaration.property,
-        value: draft,
-        create: false,
-      },
-    ]);
+    submitEdit(draft);
   };
 
   const remove = () => {
-    if (ordinal === null) return;
+    if (!target) return;
     setError(null);
-    onApply([
-      {
-        kind: 'styleBlock',
-        styleOrdinal: ordinal,
-        rulePath,
-        property: declaration.property,
-        value: null,
-        create: false,
-      },
-    ]);
+    submitEdit(null);
   };
 
   return (
@@ -204,14 +215,15 @@ function DeclarationRow({ declaration, ordinal, rulePath, busy, onApply }: Decla
 }
 
 interface AddDeclarationFormProps {
-  ordinal: number;
+  target: EditTarget;
   rulePath: number[];
   busy: boolean;
   onApply: (operations: DesignEditOperation[]) => void;
+  onApplyExternal: ((origin: string, edit: CssSourceEdit) => void) | undefined;
 }
 
 /** 新增声明表单（§4：create=true，属性不存在才生效；非法就地提示，不发事务）。 */
-function AddDeclarationForm({ ordinal, rulePath, busy, onApply }: AddDeclarationFormProps) {
+function AddDeclarationForm({ target, rulePath, busy, onApply, onApplyExternal }: AddDeclarationFormProps) {
   const [property, setProperty] = useState('');
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -226,9 +238,13 @@ function AddDeclarationForm({ ordinal, rulePath, busy, onApply }: AddDeclaration
     setError(null);
     setProperty('');
     setValue('');
-    onApply([
-      { kind: 'styleBlock', styleOrdinal: ordinal, rulePath, property: name, value, create: true },
-    ]);
+    if (target.kind === 'inline') {
+      onApply([
+        { kind: 'styleBlock', styleOrdinal: target.ordinal, rulePath, property: name, value, create: true },
+      ]);
+    } else {
+      onApplyExternal?.(target.origin, { rulePath, property: name, value, create: true });
+    }
   };
 
   return (
@@ -282,12 +298,21 @@ interface RuleCardProps {
   card: RuleCardModel;
   busy: boolean;
   onApply: (operations: DesignEditOperation[]) => void;
+  onApplyExternal: ((origin: string, edit: CssSourceEdit) => void) | undefined;
 }
 
 /** 单张规则卡：选择器（等宽）、来源/important 徽标、只读原因或声明行 + 新增表单。 */
-function RuleCard({ card, busy, onApply }: RuleCardProps) {
+function RuleCard({ card, busy, onApply, onApplyExternal }: RuleCardProps) {
   const ordinal = styleOrdinalOf(card.origin);
-  const editable = card.readOnly === null && ordinal !== null;
+  // 编辑分流（§5/§6）：@inline → styleBlock 事务；外部 .css 且已接线 → 草稿编辑；
+  // 只读规则或未接线的外部行不提供控件。
+  const target: EditTarget | null =
+    ordinal !== null
+      ? { kind: 'inline', ordinal }
+      : card.readOnly === null && onApplyExternal
+        ? { kind: 'external', origin: card.origin }
+        : null;
+  const editable = card.readOnly === null && target !== null;
   const important = card.declarations.some(declaration => declaration.important);
   return (
     <div
@@ -314,21 +339,23 @@ function RuleCard({ card, busy, onApply }: RuleCardProps) {
                   // key 含值与偏移：应用后 rules 刷新重建行对象时输入随 key 重挂载复位。
                   key={`${declaration.start}:${declaration.property}:${declaration.value}`}
                   declaration={declaration}
-                  ordinal={ordinal}
+                  target={target}
                   rulePath={card.rulePath}
                   busy={busy}
                   onApply={onApply}
+                  onApplyExternal={onApplyExternal}
                 />
               ))}
             </div>
           )}
-          {editable && ordinal !== null && (
+          {editable && target && (
             <div className="mt-2 border-t border-border pt-2">
               <AddDeclarationForm
-                ordinal={ordinal}
+                target={target}
                 rulePath={card.rulePath}
                 busy={busy}
                 onApply={onApply}
+                onApplyExternal={onApplyExternal}
               />
             </div>
           )}
@@ -347,18 +374,64 @@ export interface StyleSourcePanelProps {
   onApply: (operations: DesignEditOperation[]) => void;
   /** 桥内规则数超上限（payload truncated），列表不完整时提示。 */
   truncated: boolean;
+  /**
+   * P3.5 第二批（§6）：外部 .css 来源的编辑分流回调。缺省（未接线）时外部行
+   * 保持只读——即使行本身对齐可编辑。
+   */
+  onApplyExternal?: (origin: string, edit: CssSourceEdit) => void;
+  /** 存在任一 CSS 脏草稿 → 「Save styles」可用（需同时提供 onSaveStyles）。 */
+  cssDirty?: boolean;
+  /** 保存进行中：按钮禁用。 */
+  savingStyles?: boolean;
+  /** 保存样式入口；缺省不渲染按钮。 */
+  onSaveStyles?: () => void;
+  /** 409 REVISION_CONFLICT 的文件路径（保存被拒时由面板置位）→ 冲突横幅。 */
+  conflictPath?: string | null;
+  /** applyCssEdit 的就地错误提示（补丁定位/校验失败等）。 */
+  editError?: string | null;
+  /** 冲突动作一：保留草稿（横幅收起，之后重试仍会 409，可重新载入解决）。 */
+  onKeepDraft?: () => void;
+  /** 冲突动作二：重新载入（面板层弹确认对话框防误丢，确认后丢弃草稿重取）。 */
+  onReloadDraft?: (path: string) => void;
 }
 
 /**
  * 样式来源区（P3.5 §5）：按预览 DOM 序展示选中元素命中的样式表规则，
- * 声明级编辑（改值/删除/新增）经 onApply 提交 styleBlock 事务；只读规则
+ * 声明级编辑（改值/删除/新增）按来源分流：`@inline` 经 onApply 提交 styleBlock
+ * 事务，外部 .css 经 onApplyExternal 写入进程内草稿（第二批 §6）；只读规则
  * 明示原因。组件为纯展示：对齐与校验分别由 css-source/values 完成。
  */
-export function StyleSourcePanel({ rules, rows, busy, onApply, truncated }: StyleSourcePanelProps) {
+export function StyleSourcePanel({
+  rules,
+  rows,
+  busy,
+  onApply,
+  truncated,
+  onApplyExternal,
+  cssDirty = false,
+  savingStyles = false,
+  onSaveStyles,
+  conflictPath = null,
+  editError = null,
+  onKeepDraft,
+  onReloadDraft,
+}: StyleSourcePanelProps) {
   const cards = useMemo(() => groupRows(rows), [rows]);
   return (
     <section className="flex flex-col gap-2" aria-label="Style sources">
-      <div className="text-[11px] font-medium text-muted-foreground">Style sources</div>
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] font-medium text-muted-foreground">Style sources</div>
+        {onSaveStyles && (
+          <Button
+            size="sm"
+            disabled={!cssDirty || savingStyles}
+            aria-label={SAVE_STYLES_LABEL}
+            onClick={onSaveStyles}
+          >
+            {SAVE_STYLES_LABEL}
+          </Button>
+        )}
+      </div>
       {(rules === null || rows.length === 0) && (
         <p className="text-xs text-muted-foreground">{EMPTY_NOTICE}</p>
       )}
@@ -367,8 +440,38 @@ export function StyleSourcePanel({ rules, rows, busy, onApply, truncated }: Styl
           {TRUNCATED_NOTICE}
         </div>
       )}
+      {conflictPath && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-[11px] text-warning"
+        >
+          <span>{CONFLICT_NOTICE}</span>
+          <Button size="sm" className="shrink-0" onClick={onKeepDraft}>
+            {KEEP_DRAFT_LABEL}
+          </Button>
+          <Button
+            size="sm"
+            className="shrink-0"
+            onClick={() => onReloadDraft?.(conflictPath)}
+            aria-label={`${RELOAD_DRAFT_LABEL} ${conflictPath}`}
+          >
+            {RELOAD_DRAFT_LABEL}
+          </Button>
+        </div>
+      )}
+      {editError !== null && editError !== '' && (
+        <div role="alert" className="text-[11px] text-destructive">
+          {editError}
+        </div>
+      )}
       {cards.map(card => (
-        <RuleCard key={card.key} card={card} busy={busy} onApply={onApply} />
+        <RuleCard
+          key={card.key}
+          card={card}
+          busy={busy}
+          onApply={onApply}
+          onApplyExternal={onApplyExternal}
+        />
       ))}
     </section>
   );

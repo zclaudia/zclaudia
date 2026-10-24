@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { StyleSourcePanel } from '../components/StyleSourcePanel';
 import type { StyleSourcePanelProps } from '../components/StyleSourcePanel';
 import type { CssDeclarationRow, CssRuleRow } from '../css-source';
@@ -371,6 +371,100 @@ describe('StyleSourcePanel（P3.5 C4：样式来源区）', () => {
       expect(screen.getByRole('textbox', { name: 'New property' })).toBeDisabled();
       expect(screen.getByRole('textbox', { name: 'New value' })).toBeDisabled();
       expect(screen.getByRole('button', { name: 'Add declaration' })).toBeDisabled();
+    });
+  });
+
+  describe('外部 origin 编辑分流与保存/冲突 UI（P3.5 第二批 C6）', () => {
+    const externalRow = ruleRow({ origin: 'design/css/main.css', declarations: [declaration()] });
+    const EXTERNAL_ORIGIN = 'design/css/main.css';
+
+    it('提供 onApplyExternal 时外部对齐行可编辑：改值/删除/新增分流到草稿回调（不走 styleBlock 事务）', () => {
+      const onApply = vi.fn();
+      const onApplyExternal = vi.fn();
+      mount({ onApply, onApplyExternal, rows: [externalRow] });
+      const input = screen.getByRole('textbox', { name: 'Value for color' });
+      expect(input).toHaveValue('#f00');
+      fireEvent.change(input, { target: { value: '#00ff00' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Apply value for color' }));
+      expect(onApply).not.toHaveBeenCalled();
+      expect(onApplyExternal).toHaveBeenCalledTimes(1);
+      expect(onApplyExternal).toHaveBeenCalledWith(EXTERNAL_ORIGIN, {
+        rulePath: [2],
+        property: 'color',
+        value: '#00ff00',
+        create: false,
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Delete declaration color' }));
+      expect(onApplyExternal).toHaveBeenLastCalledWith(EXTERNAL_ORIGIN, {
+        rulePath: [2],
+        property: 'color',
+        value: null,
+        create: false,
+      });
+      fireEvent.change(screen.getByRole('textbox', { name: 'New property' }), {
+        target: { value: 'display' },
+      });
+      fireEvent.change(screen.getByRole('textbox', { name: 'New value' }), {
+        target: { value: 'flex' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Add declaration' }));
+      expect(onApply).not.toHaveBeenCalled();
+      expect(onApplyExternal).toHaveBeenLastCalledWith(EXTERNAL_ORIGIN, {
+        rulePath: [2],
+        property: 'display',
+        value: 'flex',
+        create: true,
+      });
+    });
+
+    it('外部行同样执行就地输入校验（黑名单值提示且不回调）与 busy 禁用', () => {
+      const onApplyExternal = vi.fn();
+      mount({ onApplyExternal, busy: true, rows: [externalRow] });
+      expect(screen.getByRole('textbox', { name: 'Value for color' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Delete declaration color' })).toBeDisabled();
+      cleanup();
+      mount({ onApplyExternal, rows: [externalRow] });
+      fireEvent.change(screen.getByRole('textbox', { name: 'Value for color' }), {
+        target: { value: 'url(evil.png)' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Apply value for color' }));
+      expect(screen.getByRole('alert')).toHaveTextContent('Invalid value');
+      expect(onApplyExternal).not.toHaveBeenCalled();
+    });
+
+    it('Save styles 按钮：未提供 onSaveStyles 不渲染；cssDirty=false 禁用、true 可用、savingStyles 禁用', () => {
+      const onSaveStyles = vi.fn();
+      mount({ rows: [externalRow] });
+      expect(screen.queryByRole('button', { name: 'Save styles' })).not.toBeInTheDocument();
+      cleanup();
+      mount({ rows: [externalRow], onSaveStyles, cssDirty: false });
+      expect(screen.getByRole('button', { name: 'Save styles' })).toBeDisabled();
+      cleanup();
+      mount({ rows: [externalRow], onSaveStyles, cssDirty: true });
+      fireEvent.click(screen.getByRole('button', { name: 'Save styles' }));
+      expect(onSaveStyles).toHaveBeenCalledTimes(1);
+      cleanup();
+      mount({ rows: [externalRow], onSaveStyles, cssDirty: true, savingStyles: true });
+      expect(screen.getByRole('button', { name: 'Save styles' })).toBeDisabled();
+    });
+
+    it('冲突横幅：提示与保留/重新载入两动作接线；无 conflictPath 不渲染', () => {
+      const onKeepDraft = vi.fn();
+      const onReloadDraft = vi.fn();
+      mount({ rows: [externalRow] });
+      expect(screen.queryByText('A style file was changed outside the panel')).not.toBeInTheDocument();
+      cleanup();
+      mount({ rows: [externalRow], conflictPath: EXTERNAL_ORIGIN, onKeepDraft, onReloadDraft });
+      expect(screen.getByRole('alert')).toHaveTextContent('A style file was changed outside the panel');
+      fireEvent.click(screen.getByRole('button', { name: 'Keep draft' }));
+      expect(onKeepDraft).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole('button', { name: `Reload from disk ${EXTERNAL_ORIGIN}` }));
+      expect(onReloadDraft).toHaveBeenCalledWith(EXTERNAL_ORIGIN);
+    });
+
+    it('editError 以 alert 呈现（applyCssEdit 就地错误）', () => {
+      mount({ rows: [externalRow], editError: 'The stylesheet does not parse as CSS.' });
+      expect(screen.getByRole('alert')).toHaveTextContent('The stylesheet does not parse as CSS.');
     });
   });
 });

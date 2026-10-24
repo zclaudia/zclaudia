@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildStyleRules, type CssRuleRow } from '../css-source';
-import { STYLE_BLOCK_MAX_BYTES, type DesignMatchedRule } from '../types';
+import { buildStyleRules, patchCssText, type CssRuleRow, type CssSourceEdit } from '../css-source';
+import { STYLE_BLOCK_MAX_BYTES, DesignEditError, type DesignMatchedRule } from '../types';
 
 const matchedRule = (
   overrides: Partial<DesignMatchedRule> & Pick<DesignMatchedRule, 'origin' | 'rulePath' | 'selectorText'>
@@ -285,6 +285,165 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
       expect(rows[0].declarations[1].winning).toBeNull();
       expect(rows[0].declarations[2].winning).toBeNull();
       expect(declSource(rows[0], 0)).toBe('color: #f00');
+    });
+  });
+
+  describe('外部 cssSources 对齐（P3.5 第二批 C6）', () => {
+    const CSS_FILE = [
+      'h1 {',
+      '  color: #ff0000;',
+      '  padding-top: 8px;',
+      '}',
+      '@media (min-width: 600px) {',
+      '  .card { color: #00f }',
+      '}',
+    ].join('\n');
+
+    const buildExternal = (
+      matched: DesignMatchedRule[],
+      cssSources?: Record<string, { source: string; revision: string }>,
+      computed: Partial<Record<string, string>> = {}
+    ): CssRuleRow[] =>
+      buildStyleRules({
+        htmlSource: '<html><body><div class="card"><p>hi</p></div></body></html>',
+        matched,
+        computed,
+        inlineStyle: null,
+        ...(cssSources ? { cssSources } : {}),
+      });
+
+    const cssSource = (source: string): Record<string, { source: string; revision: string }> => ({
+      'design/css/main.css': { source, revision: 'rev-css-1' },
+    });
+
+    it('cssSources 命中的外部 origin 按同款指纹对齐，产出可编辑声明行', () => {
+      const rows = buildExternal(
+        [matchedRule({ origin: 'design/css/main.css', rulePath: [0], selectorText: 'h1' })],
+        cssSource(CSS_FILE)
+      );
+      expect(rows[0].readOnly).toBeNull();
+      expect(rows[0].declarations.map(d => d.property)).toEqual(['color', 'padding-top']);
+      expect(rows[0].declarations.every(d => d.editable)).toBe(true);
+      expect(rows[0].declarations[0]).toMatchObject({ value: '#ff0000', important: false });
+    });
+
+    it('外部声明行偏移为该 css 文件内偏移（切片还原声明原文）', () => {
+      const rows = buildExternal(
+        [matchedRule({ origin: 'design/css/main.css', rulePath: [0], selectorText: 'h1' })],
+        cssSource(CSS_FILE)
+      );
+      const [color, padding] = rows[0].declarations;
+      expect(CSS_FILE.slice(color.start, color.end)).toBe('color: #ff0000');
+      expect(CSS_FILE.slice(color.valueStart, color.valueEnd)).toBe('#ff0000');
+      expect(CSS_FILE.slice(padding.start, padding.end)).toBe('padding-top: 8px');
+    });
+
+    it('@media 嵌套 rulePath 与选择器归一比对同口径', () => {
+      const rows = buildExternal(
+        [
+          matchedRule({ origin: 'design/css/main.css', rulePath: [1, 0], selectorText: '.card' }),
+          matchedRule({ origin: 'design/css/main.css', rulePath: [0], selectorText: '  h1  ' }),
+        ],
+        cssSource(CSS_FILE)
+      );
+      expect(rows.every(row => row.readOnly === null)).toBe(true);
+      expect(rows[0].declarations[0]).toMatchObject({ property: 'color', value: '#00f' });
+      expect(rows[1].declarations.map(d => d.property)).toEqual(['color', 'padding-top']);
+    });
+
+    it('cssSources 未提供 → external-css-readonly；提供但缺该路径同样只读', () => {
+      const rule = matchedRule({ origin: 'design/css/main.css', rulePath: [0], selectorText: 'h1' });
+      expect(buildExternal([rule])[0].readOnly).toEqual({ reason: 'external-css-readonly' });
+      expect(buildExternal([rule], cssSource(CSS_FILE), {})[0].readOnly).toBeNull();
+      expect(
+        buildExternal([rule], { 'design/css/other.css': { source: CSS_FILE, revision: 'r' } })[0].readOnly
+      ).toEqual({ reason: 'external-css-readonly' });
+    });
+
+    it('css 文本解析失败 → parse-error（该文件规则全部只读）', () => {
+      const rows = buildExternal(
+        [matchedRule({ origin: 'design/css/main.css', rulePath: [0], selectorText: 'h1' })],
+        cssSource('h1 { color: red;')
+      );
+      expect(rows[0].readOnly).toEqual({ reason: 'parse-error' });
+      expect(rows[0].declarations).toEqual([]);
+    });
+
+    it('选择器指纹不符 → align-mismatch', () => {
+      const rows = buildExternal(
+        [matchedRule({ origin: 'design/css/main.css', rulePath: [0], selectorText: 'h2' })],
+        cssSource(CSS_FILE)
+      );
+      expect(rows[0].readOnly).toEqual({ reason: 'align-mismatch' });
+      expect(rows[0].declarations).toEqual([]);
+    });
+
+    it('rulePath 越界 → align-mismatch；css 文本超 STYLE_BLOCK_MAX_BYTES → oversize', () => {
+      const rows = buildExternal(
+        [matchedRule({ origin: 'design/css/main.css', rulePath: [9], selectorText: 'h1' })],
+        cssSource(CSS_FILE)
+      );
+      expect(rows[0].readOnly).toEqual({ reason: 'align-mismatch' });
+      const big = `h1 { color: red;${' '.repeat(STYLE_BLOCK_MAX_BYTES)} }`;
+      const oversize = buildExternal(
+        [matchedRule({ origin: 'design/css/main.css', rulePath: [0], selectorText: 'h1' })],
+        cssSource(big)
+      );
+      expect(oversize[0].readOnly).toEqual({ reason: 'oversize' });
+    });
+
+    it('外部 origin 与 @inline 混合：各自对齐互不影响', () => {
+      const rows = buildStyleRules({
+        htmlSource: '<style>.card { color: #f00; }</style>',
+        matched: [
+          matchedRule({ origin: 'design/css/main.css', rulePath: [0], selectorText: 'h1' }),
+          matchedRule({ origin: '@inline/0', rulePath: [0], selectorText: '.card' }),
+        ],
+        computed: {},
+        inlineStyle: null,
+        cssSources: cssSource(CSS_FILE),
+      });
+      expect(rows[0].readOnly).toBeNull();
+      expect(rows[1].readOnly).toBeNull();
+      expect(rows[1].declarations[0]).toMatchObject({ property: 'color', value: '#f00' });
+    });
+  });
+
+  describe('patchCssText（P3.5 第二批 C6：独立 CSS 补丁引擎）', () => {
+    const CSS_FILE = [
+      'h1 {',
+      '  color: #f00;',
+      '  padding-top: 8px;',
+      '}',
+      '.wrap {',
+      '  border-style: solid',
+      '}',
+    ].join('\n');
+
+    const patch = (edit: CssSourceEdit, source = CSS_FILE): string => patchCssText(source, edit);
+
+    it('改值 / 删除 / 新增逐字节保持（与 `<style>` 块 splice 同一引擎）', () => {
+      expect(patch({ rulePath: [0], property: 'color', value: '#ff0000', create: false })).toBe(
+        CSS_FILE.replace('color: #f00;', 'color: #ff0000;')
+      );
+      expect(patch({ rulePath: [0], property: 'padding-top', value: null, create: false })).toBe(
+        CSS_FILE.replace('\n  padding-top: 8px;', '')
+      );
+      expect(patch({ rulePath: [1], property: 'margin-top', value: '4px', create: true })).toBe(
+        CSS_FILE.replace('  border-style: solid\n}', '  border-style: solid\n;\n  margin-top: 4px;}')
+      );
+    });
+
+    it('非法值 / 定位失败抛 DesignEditError 且原文不动（纯函数不落盘）', () => {
+      expect(() =>
+        patch({ rulePath: [0], property: 'color', value: 'a;b', create: false })
+      ).toThrowError(DesignEditError);
+      expect(() =>
+        patch({ rulePath: [7], property: 'color', value: 'blue', create: false })
+      ).toThrowError(DesignEditError);
+      expect(() => patch({ rulePath: [0], property: 'display', value: null, create: false })).toThrowError(
+        DesignEditError
+      );
     });
   });
 });

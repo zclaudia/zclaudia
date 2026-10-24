@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useWorkspaceTool } from '../../components/workspace/WorkspaceToolContext';
 import { useWorkspaceVisible } from '../../components/workspace/WorkspaceContext';
 import { useComposerStore } from '../../stores/composerStore';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { ApiError } from '../../services/api/unwrap';
 import {
   DesignSnapshotError,
   getDesignAsset,
   getDesignBrand,
   getDesignDocument,
+  putDesignDocument,
   restoreDesignSnapshot,
 } from './api';
 import type { DesignBrand, DesignConflictFile } from './api';
@@ -39,8 +41,20 @@ import { LineDiffView } from './components/VersionDiff';
 import { ViewportControls } from './components/ViewportControls';
 import { isDeck, parseDeck } from './deck';
 import type { DeckInfo } from './deck';
+import {
+  applyCssEdit,
+  commitCssDraft,
+  dirtyCssPaths,
+  discardCssDraft,
+  encodeBase64Utf8,
+  getCssDraft,
+  getCssDraftTable,
+  openCssDraft,
+  subscribeCssDrafts,
+} from './css-drafts';
+import type { CssDraftIdentity, CssDraftTableSnapshot } from './css-drafts';
 import { buildStyleRules } from './css-source';
-import type { CssRuleRow } from './css-source';
+import type { CssRuleRow, CssSourceEdit } from './css-source';
 import { buildDesignRunPreview } from './interactive';
 import { buildDesignPreview } from './preview';
 import { ElementTree } from './components/ElementTree';
@@ -70,6 +84,9 @@ const PREVIEW_MAX_CONCURRENT = 2;
 const RUN_NAV_PATH_MAX = 500;
 /** scheme 形态引用（运行 navigate path 与外部链接同口径）。 */
 const SCHEME_LIKE = /^[a-z][a-z\d+.-]*:/i;
+
+/** assetEpoch 分代磁盘 css 缓存的空代表（epoch 不符时 cssDocsForEpoch 退回此值）。 */
+const EMPTY_CSS_DOCS: Record<string, { source: string; revision: string }> = {};
 
 /** C0 控制字符与 DEL（码点比较，规避 no-control-regex；对齐 deck.ts）。 */
 function hasControlChars(value: string): boolean {
@@ -272,10 +289,85 @@ function DesignPanelSession({
   // P3.5 §5：校验通过的生效规则载荷；样式来源区按当前选区即时对齐渲染（下方 memo）。
   const [styleRules, setStyleRules] = useState<DesignRulesMessage | null>(null);
 
+  // ---- P3.5 第二批（§6）：外部 .css 草稿表（进程内，per identity+path） ----
+  const identity = useMemo<CssDraftIdentity>(
+    () => ({ backendId, projectId, workingDirectory }),
+    [backendId, projectId, workingDirectory]
+  );
+  const subscribeCssTable = useCallback((listener: () => void) => subscribeCssDrafts(listener), []);
+  const getCssTable = useCallback(() => getCssDraftTable(identity), [identity]);
+  const cssTable: CssDraftTableSnapshot = useSyncExternalStore(subscribeCssTable, getCssTable);
+  /** 任一文件存在脏草稿（「Save styles」可用性与导出提示）。 */
+  const cssDraftDirty = Object.values(cssTable.drafts).some(draft => draft.dirty);
+
+  /**
+   * 外部 origin 的磁盘源缓存（按 assetEpoch 分代：deps 轮询发现磁盘 css 变化即
+   * 整体失效重取）。草稿存在时样式来源区优先用草稿文本（cssSources 装配处）。
+   */
+  const [cssDocs, setCssDocs] = useState<{
+    epoch: number;
+    docs: Record<string, { source: string; revision: string }>;
+  }>({ epoch: -1, docs: {} });
+  const cssDocsForEpoch = cssDocs.epoch === state.assetEpoch ? cssDocs.docs : EMPTY_CSS_DOCS;
+  const cssDocsInflightRef = useRef(new Set<string>());
+
+  /** 样式来源区的编辑/保存反馈（就地提示与冲突横幅状态）。 */
+  const [savingStyles, setSavingStyles] = useState(false);
+  const [styleConflictPath, setStyleConflictPath] = useState<string | null>(null);
+  const [styleEditError, setStyleEditError] = useState<string | null>(null);
+  /** 「Reload from disk」的确认对话框（防误丢草稿）。 */
+  const [confirmCssReloadPath, setConfirmCssReloadPath] = useState<string | null>(null);
+
+  /** 规则载荷里的外部 .css origin 路径（去重、保序）。 */
+  const externalCssPaths = useMemo(() => {
+    const paths: string[] = [];
+    for (const rule of styleRules?.rules ?? []) {
+      if (!rule.origin.startsWith('@inline/') && !paths.includes(rule.origin)) paths.push(rule.origin);
+    }
+    return paths;
+  }, [styleRules]);
+
+  // 外部 origin 的磁盘源拉取：缺缓存即取（getDesignDocument 支持 .css，C5），
+  // 取回后顺手打开干净草稿（后续编辑的宿主）；失败静默——来源区按只读展示。
+  useEffect(() => {
+    const epoch = state.assetEpoch;
+    let cancelled = false;
+    for (const path of externalCssPaths) {
+      if (cssDocsForEpoch[path] || cssDocsInflightRef.current.has(path)) continue;
+      cssDocsInflightRef.current.add(path);
+      void (async () => {
+        try {
+          const doc = await getDesignDocument(backendId, sessionId, path);
+          if (!cancelled) {
+            setCssDocs(prev =>
+              prev.epoch === epoch
+                ? {
+                    epoch: prev.epoch,
+                    docs: { ...prev.docs, [path]: { source: doc.source, revision: doc.revision } },
+                  }
+                : // 首写或代际重建：以本轮 epoch 建缓存（代际前移会重跑 effect 并 cancel 本轮）。
+                  { epoch, docs: { [path]: { source: doc.source, revision: doc.revision } } }
+            );
+            openCssDraft(identity, path, { source: doc.source, revision: doc.revision });
+          }
+        } catch {
+          // 拉取失败：该 origin 维持 external-css-readonly；下轮 rules 到达重试。
+        } finally {
+          cssDocsInflightRef.current.delete(path);
+        }
+      })();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [externalCssPaths, cssDocsForEpoch, state.assetEpoch, backendId, sessionId, identity]);
+
   /**
    * P3.5 §5：样式来源区数据（选区或规则载荷变化即重算）。elementPath 与当前
    * 选区不一致（切页/换选区、迟到载荷）一律清空；computed 取 selection.styles
    * 与顶层 color/backgroundColor 合成（与 reselectMismatch 同一口径）。
+   * 第二批：外部 origin 的源文本装配 cssSources——草稿优先（未保存改动即时
+   * 可见），否则磁盘缓存；两者皆无的 origin 维持只读。
    */
   const styleSource = useMemo<{ rows: CssRuleRow[]; truncated: boolean }>(() => {
     const selection = activePage?.selection ?? null;
@@ -286,16 +378,27 @@ function DesignPanelSession({
     if (typeof selection.color === 'string') computed.color = selection.color;
     if (typeof selection.backgroundColor === 'string')
       computed['background-color'] = selection.backgroundColor;
+    const cssSources: Record<string, { source: string; revision: string }> = {};
+    for (const rule of styleRules.rules) {
+      if (rule.origin.startsWith('@inline/') || cssSources[rule.origin]) continue;
+      const draft = cssTable.drafts[rule.origin];
+      if (draft) cssSources[rule.origin] = { source: draft.source, revision: draft.revision };
+      else {
+        const disk = cssDocsForEpoch[rule.origin];
+        if (disk) cssSources[rule.origin] = disk;
+      }
+    }
     return {
       rows: buildStyleRules({
         htmlSource: activePage?.source ?? '',
         matched: styleRules.rules,
         computed,
         inlineStyle: selection.inlineStyle ?? null,
+        ...(Object.keys(cssSources).length > 0 ? { cssSources } : {}),
       }),
       truncated: styleRules.truncated ?? false,
     };
-  }, [activePage, styleRules]);
+  }, [activePage, styleRules, cssTable, cssDocsForEpoch]);
 
   // 切页时关闭幻灯片面板/播放器、渲染导出对话框、媒体生成面板与分享面板，避免陈旧页数据展示；会话切换经 key 重挂载自然复位。
   const activePath = state.activePath;
@@ -307,6 +410,10 @@ function DesignPanelSession({
     setShareOpen(false);
     // P3.5 §5：切页一并清空样式来源区，旧页规则不污染新选区（选区回落由 rules-request 重新拉取）。
     setStyleRules(null);
+    // P3.5 第二批：切页不清 CSS 草稿（进程内存活），但清编辑/保存反馈与确认框。
+    setStyleEditError(null);
+    setStyleConflictPath(null);
+    setConfirmCssReloadPath(null);
   }, [activePath]);
 
   /** deck 检测与结构解析：按活动页快照 memo（页对象仅在自身 rev 变化时更换，含草稿修订推进）。 */
@@ -411,10 +518,24 @@ function DesignPanelSession({
     }
   }, []);
 
-  /** 构建（或复用）一页的预览串；front=true 时插队（活动页优先）。缓存键含模式（P5 §2.4）。 */
+  /**
+   * P3.5 第二批（§6）：预览资产装载包装——路径存在 CSS 草稿时直接返回草稿文本
+   * （utf8 → base64，mime text/css），在 getDesignAsset（磁盘版）之前拦截；
+   * 预览构建器经 loadInlineAsset/resolveAsset 走到这里的路径即被草稿替换。
+   */
+  const loadPreviewAsset = useCallback(
+    async (assetPath: string) => {
+      const draft = getCssDraft(identity, assetPath);
+      if (draft) return { mimeType: 'text/css', data: encodeBase64Utf8(draft.source) };
+      return getDesignAsset(backendId, sessionId, assetPath);
+    },
+    [backendId, identity, sessionId]
+  );
+
+  /** 构建（或复用）一页的预览串；front=true 时插队（活动页优先）。缓存键含模式（P5 §2.4）与 CSS 草稿纪元（P3.5 第二批）。 */
   const ensurePreview = useCallback(
     (page: DesignPageSnapshot, front = false) => {
-      const key = `${page.draftRevision}:${state.assetEpoch}:${previewMode}`;
+      const key = `${page.draftRevision}:${state.assetEpoch}:${previewMode}:${cssTable.epoch}`;
       const cached = previewCacheRef.current.get(page.path);
       if (cached && cached.key === key) return;
       if (previewPendingRef.current.get(page.path) === key) return;
@@ -426,7 +547,7 @@ function DesignPanelSession({
             const result = await buildDesignRunPreview({
               source: page.source,
               filePath: page.path,
-              loadAsset: assetPath => getDesignAsset(backendId, sessionId, assetPath),
+              loadAsset: loadPreviewAsset,
               channel,
             });
             cachePreview(page.path, key, result.html, result.blocked);
@@ -434,7 +555,7 @@ function DesignPanelSession({
             const html = await buildDesignPreview(
               page.source,
               page.path,
-              assetPath => getDesignAsset(backendId, sessionId, assetPath),
+              loadPreviewAsset,
               channel,
               page.draftRevision
             );
@@ -450,12 +571,20 @@ function DesignPanelSession({
       else previewQueueRef.current.push(job);
       pumpPreviews();
     },
-    [backendId, channel, cachePreview, pumpPreviews, previewMode, sessionId, state.assetEpoch]
+    [
+      cachePreview,
+      channel,
+      cssTable.epoch,
+      loadPreviewAsset,
+      previewMode,
+      pumpPreviews,
+      state.assetEpoch,
+    ]
   );
 
-  // 活动页预览：effect 依赖 (activePath, draftRevision, assetEpoch, mode)；缓存命中直接用。
+  // 活动页预览：effect 依赖 (activePath, draftRevision, assetEpoch, mode, cssDraftEpoch)；缓存命中直接用。
   const activePreviewKey = activePage
-    ? `${activePage.draftRevision}:${state.assetEpoch}:${previewMode}`
+    ? `${activePage.draftRevision}:${state.assetEpoch}:${previewMode}:${cssTable.epoch}`
     : null;
   const cachedActive = activePage ? previewCacheRef.current.get(activePage.path) : undefined;
   const activePreview =
@@ -476,7 +605,7 @@ function DesignPanelSession({
   // 总览用的预览表（本次渲染时从共享缓存读取；构建完成经 previewTick 触发重渲染）。
   const previews: Record<string, string> = {};
   for (const page of state.pages) {
-    const key = `${page.draftRevision}:${state.assetEpoch}:${previewMode}`;
+    const key = `${page.draftRevision}:${state.assetEpoch}:${previewMode}:${cssTable.epoch}`;
     const cached = previewCacheRef.current.get(page.path);
     if (cached && cached.key === key) previews[page.path] = cached.html;
   }
@@ -703,6 +832,86 @@ function DesignPanelSession({
     void handleApply([
       { kind: 'attribute', name: 'src', value: relativeAssetRef(activePage?.path ?? '', assetPath) },
     ]);
+  };
+
+  /**
+   * P3.5 第二批（§6）：外部 .css 来源的声明编辑——applyCssEdit 写入进程内草稿
+   * （不经 HTML 事务/页面脏点），预览缓存键随 cssDraftEpoch 变化自动重建，
+   * 草稿经 loadPreviewAsset 内联即时可见。错误就地提示（来源区 alert）。
+   */
+  const handleApplyExternal = (origin: string, edit: CssSourceEdit) => {
+    const draft = getCssDraft(identity, origin);
+    if (!draft) {
+      setStyleEditError(`The style source ${origin} is not loaded yet; try again after the rules refresh.`);
+      return;
+    }
+    try {
+      applyCssEdit(identity, origin, draft.revision, edit);
+      setStyleEditError(null);
+      // 预览重建后经 frame load 补发 select-path → 新 select → rules-request，
+      // 规则区按草稿刷新（同 styleBlock 的 needsReselect 口径；expected 置空不作告警核对）。
+      const selection = activePage?.selection;
+      if (selection) reselectRef.current = { elementPath: selection.elementPath, expected: new Map() };
+    } catch (error) {
+      setStyleEditError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  /**
+   * P3.5 第二批（§6 保存与冲突）：逐文件保存脏 CSS 草稿
+   * （putDesignDocument(.css)，expectedRevision = 草稿 baseRevision）。
+   * 409 REVISION_CONFLICT → 来源区横幅 + 保留/重新载入两动作；
+   * 其余失败显示服务端 message；成功清 dirty 并刷新 baseRevision。
+   */
+  const saveStyles = async () => {
+    if (savingStyles) return;
+    const paths = dirtyCssPaths(identity);
+    if (paths.length === 0) return;
+    setSavingStyles(true);
+    setStyleConflictPath(null);
+    setStyleEditError(null);
+    try {
+      for (const path of paths) {
+        const draft = getCssDraft(identity, path);
+        if (!draft || !draft.dirty) continue;
+        try {
+          const saved = await putDesignDocument(backendId, {
+            sessionId,
+            path,
+            source: draft.source,
+            expectedRevision: draft.baseRevision,
+          });
+          commitCssDraft(identity, path, { source: saved.source, revision: saved.revision });
+          // 磁盘 mtime 变化经 deps 轮询 → assetEpoch 自增；主动刷一轮加快切换到磁盘版。
+          refreshNow();
+        } catch (error) {
+          if (error instanceof ApiError && error.code === 'REVISION_CONFLICT') {
+            setStyleConflictPath(path);
+          } else {
+            setStyleEditError(error instanceof Error ? error.message : String(error));
+          }
+          break;
+        }
+      }
+    } finally {
+      setSavingStyles(false);
+    }
+  };
+
+  /** 冲突动作二（确认后）：丢弃草稿 → 清该路径磁盘缓存 → 拉取 effect 重取并重开干净草稿。 */
+  const reloadCssDraftFromDisk = (path: string) => {
+    setConfirmCssReloadPath(null);
+    setStyleConflictPath(null);
+    setStyleEditError(null);
+    discardCssDraft(identity, path);
+    setCssDocs(prev =>
+      prev.epoch === state.assetEpoch
+        ? {
+            epoch: prev.epoch,
+            docs: Object.fromEntries(Object.entries(prev.docs).filter(([key]) => key !== path)),
+          }
+        : prev
+    );
   };
 
   // ---- 页面关闭确认（dirty 页：保存 / 放弃修改 / 取消） ----
@@ -1044,8 +1253,9 @@ function DesignPanelSession({
               onSelectPath={selectPath}
               onApply={handleApply}
             />
-            {/* P3.5 §5：样式来源区挂于选区编辑器下方；应用走同一 handleApply，
-                改值后的刷新链路为 预览重建 → 帧载入补发 select-path → 新 select → rules-request → 新 rules。 */}
+            {/* P3.5 §5：样式来源区挂于选区编辑器下方；@inline 应用走同一 handleApply，
+                改值后的刷新链路为 预览重建 → 帧载入补发 select-path → 新 select → rules-request → 新 rules。
+                P3.5 第二批（§6）：外部 .css 行经 handleApplyExternal 写草稿，保存/冲突入口在来源区头部。 */}
             <div className="mt-3 border-t border-border pt-3">
               <StyleSourcePanel
                 rules={styleRules}
@@ -1053,6 +1263,14 @@ function DesignPanelSession({
                 truncated={styleSource.truncated}
                 busy={activePage?.busy ?? false}
                 onApply={handleApply}
+                onApplyExternal={handleApplyExternal}
+                cssDirty={cssDraftDirty}
+                savingStyles={savingStyles}
+                onSaveStyles={() => void saveStyles()}
+                conflictPath={styleConflictPath}
+                editError={styleEditError}
+                onKeepDraft={() => setStyleConflictPath(null)}
+                onReloadDraft={path => setConfirmCssReloadPath(path)}
               />
             </div>
           </div>
@@ -1187,6 +1405,7 @@ function DesignPanelSession({
           onSave={saveForExport}
           onRefresh={refreshNow}
           onClose={() => setExportOpen(false)}
+          cssDirty={cssDraftDirty}
         />
       )}
       {/* ---- P5 幻灯片面板 / 播放器 / 渲染导出（§5/§6.3）；切页由上方 effect 统一关闭 ---- */}
@@ -1243,6 +1462,35 @@ function DesignPanelSession({
         >
           <div className="p-4 text-xs text-muted-foreground">
             "{confirmClosePath}" has unsaved changes. Save them before closing?
+          </div>
+        </Modal>
+      )}
+      {/* P3.5 第二批（§6）：「Reload from disk」确认对话框——草稿丢弃防误丢。 */}
+      {confirmCssReloadPath && (
+        <Modal
+          open
+          onClose={() => setConfirmCssReloadPath(null)}
+          ariaLabel="Reload style file"
+          title="Reload style file"
+          size="md"
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => reloadCssDraftFromDisk(confirmCssReloadPath)}
+              >
+                Reload
+              </Button>
+              <Button size="sm" onClick={() => setConfirmCssReloadPath(null)}>
+                Cancel
+              </Button>
+            </div>
+          }
+        >
+          <div className="p-4 text-xs text-muted-foreground">
+            Reload "{confirmCssReloadPath}" from disk? Unsaved style edits in this file will be
+            lost.
           </div>
         </Modal>
       )}

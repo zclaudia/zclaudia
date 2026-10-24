@@ -45,6 +45,11 @@ export interface ExportDialogProps {
   /** REVISION_CONFLICT 时触发一次面板立即刷新。 */
   onRefresh: () => void;
   onClose: () => void;
+  /**
+   * P3.5 第二批（§6 导出边界）：存在未保存 CSS 草稿时置位——ZIP 导出（disk/draft
+   * 两模式）不含 CSS 草稿，对话框顶部诚实提示。缺省 false（零渲染差异）。
+   */
+  cssDirty?: boolean;
 }
 
 /**
@@ -64,6 +69,7 @@ export function ExportDialog({
   onSave,
   onRefresh,
   onClose,
+  cssDirty = false,
 }: ExportDialogProps) {
   const [stage, setStage] = useState<Stage>(() =>
     dirty ? { kind: 'choose' } : { kind: 'working', label: 'Exporting…', from: 'direct' }
@@ -229,6 +235,11 @@ export function ExportDialog({
       }
     >
       <div className="flex flex-col gap-3 p-4 text-xs">
+        {cssDirty && (
+          <div role="status" className="text-warning">
+            Unsaved style changes are not included in exports — save styles first.
+          </div>
+        )}
         {stage.kind === 'choose' && (
           <div className="text-muted-foreground">
             "{path}" has unsaved changes; choose how to export.
