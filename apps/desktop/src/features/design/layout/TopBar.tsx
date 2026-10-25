@@ -1,9 +1,7 @@
-import { MousePointer2, PanelLeft, Play, Presentation, Redo2, Undo2 } from 'lucide-react';
+import { MousePointer2, PanelLeft, Play, Redo2, Undo2 } from 'lucide-react';
 import { Button, IconButton } from '../../../components/ui/Button';
 import { Tooltip } from '../../../components/ui/Tooltip';
 import { PageTabs } from './PageTabs';
-import { ViewportBar } from './ViewportBar';
-import { ZOOM_MAX, ZOOM_MIN, clampZoom, stepZoom, zoomAnchor } from './zoom';
 import { MoreMenu } from './MoreMenu';
 import type { DropdownMenuEntry } from '../../../components/ui/DropdownMenu';
 import type { DesignTier } from './tiers';
@@ -16,6 +14,7 @@ export interface TopBarProps {
   pages: DesignPageSnapshot[];
   activePath: string | null;
   files: string[];
+  /** 以下视口/缩放 props 保留以维持既有调用兼容性；顶栏不再消费，改由 CanvasToolbar 使用。 */
   viewport: DesignViewport;
   zoom: { mode: 'fit' | 'manual'; value: number };
   actualScale: number | null;
@@ -56,8 +55,10 @@ export interface TopBarProps {
 }
 
 /**
- * 单行顶栏（P1 §4.1）：页签 / 视口与缩放 / 模式 / 撤销重做 / Save / ⋯。
- * 一行只有一个实心按钮（Save）；窄档把视口、缩放、撤销重做收进 ⋯ 菜单。
+ * 单行顶栏（P1 §4.1）：页签 / 模式 / 撤销重做 / Save / ⋯。
+ * 视口与缩放已移到画布上方的 CanvasToolbar，这里不再消费对应 props
+ * （字段保留以维持既有调用兼容性）。一行只有一个实心按钮（Save）；
+ * 窄档把撤销重做收进 ⋯ 菜单，Slides 只从 ⋯ 菜单/左栏进入。
  */
 export function TopBar({
   tier,
@@ -65,9 +66,6 @@ export function TopBar({
   pages,
   activePath,
   files,
-  viewport,
-  zoom,
-  actualScale,
   previewMode,
   deckAvailable,
   canUndo,
@@ -82,8 +80,6 @@ export function TopBar({
   onActivate,
   onClose,
   onOpen,
-  onViewportChange,
-  onZoomChange,
   onPreviewModeChange,
   onSlides,
   onUndo,
@@ -105,7 +101,6 @@ export function TopBar({
 }: TopBarProps) {
   const narrow = tier === 'narrow';
   const showModeLabels = !compact && !narrow;
-  const anchor = zoomAnchor(zoom, actualScale);
 
   const narrowEntries: DropdownMenuEntry[] = [
     ...(compact
@@ -120,12 +115,6 @@ export function TopBar({
             key: 'run-compact',
             label: 'Run mode',
             onSelect: () => onPreviewModeChange('run'),
-          },
-          {
-            key: 'slides-compact',
-            label: 'Slides',
-            onSelect: onSlides,
-            disabled: !deckAvailable,
           },
         ] as DropdownMenuEntry[])
       : []),
@@ -143,51 +132,6 @@ export function TopBar({
             label: 'Redo',
             onSelect: onRedo,
             disabled: !canRedo || busy,
-          },
-          'separator',
-          {
-            key: 'viewport-desktop',
-            label: 'Desktop 1280',
-            onSelect: () => onViewportChange({ preset: 'desktop', width: 1280 }),
-          },
-          {
-            key: 'viewport-tablet',
-            label: 'Tablet 768',
-            onSelect: () => onViewportChange({ preset: 'tablet', width: 768 }),
-          },
-          {
-            key: 'viewport-mobile',
-            label: 'Mobile 390',
-            onSelect: () => onViewportChange({ preset: 'mobile', width: 390 }),
-          },
-          {
-            key: 'viewport-fill',
-            label: 'Fill',
-            onSelect: () => onViewportChange({ preset: 'fill', width: null }),
-          },
-          'separator',
-          {
-            key: 'zoom-out-narrow',
-            label: 'Zoom out',
-            onSelect: () => onZoomChange(stepZoom(zoom, actualScale, -1)),
-            disabled: viewport.preset === 'fill' || anchor <= ZOOM_MIN,
-          },
-          {
-            key: 'zoom-in-narrow',
-            label: 'Zoom in',
-            onSelect: () => onZoomChange(stepZoom(zoom, actualScale, 1)),
-            disabled: viewport.preset === 'fill' || anchor >= ZOOM_MAX,
-          },
-          {
-            key: 'zoom-fit-narrow',
-            label: 'Fit width',
-            onSelect: () =>
-              onZoomChange(
-                zoom.mode === 'fit'
-                  ? { mode: 'manual', value: clampZoom(anchor) }
-                  : { mode: 'fit', value: zoom.value }
-              ),
-            disabled: viewport.preset === 'fill',
           },
         ] as DropdownMenuEntry[])
       : []),
@@ -218,16 +162,6 @@ export function TopBar({
         onOpen={onOpen}
         showOnlyActive={narrow}
       />
-      <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
-      {!narrow && (
-        <ViewportBar
-          viewport={viewport}
-          zoom={zoom}
-          actualScale={actualScale}
-          onViewportChange={onViewportChange}
-          onZoomChange={onZoomChange}
-        />
-      )}
       <div className="flex-1" />
       {!compact && (
       <div
@@ -242,7 +176,7 @@ export function TopBar({
           onClick={() => onPreviewModeChange('edit')}
           className={`flex h-6 items-center gap-1 rounded px-1.5 text-[11px] transition-colors ${
             previewMode === 'edit'
-              ? 'bg-background font-medium text-foreground shadow-apple-sm'
+              ? 'bg-card font-medium text-foreground shadow-apple-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -256,31 +190,13 @@ export function TopBar({
           onClick={() => onPreviewModeChange('run')}
           className={`flex h-6 items-center gap-1 rounded px-1.5 text-[11px] transition-colors ${
             previewMode === 'run'
-              ? 'bg-background font-medium text-foreground shadow-apple-sm'
+              ? 'bg-card font-medium text-foreground shadow-apple-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <Play size={12} strokeWidth={1.75} />
           {showModeLabels && 'Run'}
         </button>
-        <Tooltip
-          content={
-            deckAvailable
-              ? 'Open the slides panel'
-              : 'This page has no slide markers (data-zclaudia-slide)'
-          }
-        >
-          <button
-            type="button"
-            aria-label="Slides"
-            disabled={!deckAvailable}
-            onClick={onSlides}
-            className="flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
-          >
-            <Presentation size={12} strokeWidth={1.75} />
-            {showModeLabels && 'Slides'}
-          </button>
-        </Tooltip>
       </div>
       )}
       {!narrow && (

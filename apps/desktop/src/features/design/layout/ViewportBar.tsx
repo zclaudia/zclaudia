@@ -13,6 +13,8 @@ export interface ViewportBarProps {
   actualScale?: number | null;
   onViewportChange: (viewport: DesignViewport) => void;
   onZoomChange: (zoom: { mode: 'fit' | 'manual'; value: number }) => void;
+  /** 极窄容器（画布工具栏）下隐藏 Custom width，避免两组控件溢出；设备与缩放能力保留。 */
+  compact?: boolean;
 }
 
 const WIDTH_MIN = 240;
@@ -36,9 +38,9 @@ const DEVICES: Array<{
 ];
 
 /**
- * 顶栏中部视口/缩放（P1 §4.1）：设备图标（aria-pressed）+ 宽度输入 +
- * 缩放 −/百分比/＋。百分比在 fit 模式显示「Fit · 实际%」，单击在 fit/manual
- * 间切换，双击回 100%；fill 预设下缩放控件禁用（沿用）。
+ * 画布工具栏里的视口/缩放组（P1 §4.1）：左侧设备图标（aria-pressed）+
+ * 宽度输入，右侧缩放 −/百分比/＋/Fit。百分比在 fit 模式显示「Fit · 实际%」，
+ * 单击在 fit/manual 间切换，双击回 100%；fill 预设下缩放控件禁用（沿用）。
  * 宽度校验与持久化语义不变（240–3840 整数，非法回退，提交即 custom）。
  */
 export function ViewportBar({
@@ -47,6 +49,7 @@ export function ViewportBar({
   actualScale,
   onViewportChange,
   onZoomChange,
+  compact = false,
 }: ViewportBarProps) {
   const fill = viewport.preset === 'fill';
   const [widthText, setWidthText] = useState(() => String(viewport.width ?? ''));
@@ -90,92 +93,97 @@ export function ViewportBar({
   });
 
   return (
-    <div className="flex min-w-0 items-center gap-0.5">
-      {DEVICES.map(({ preset, label, title, Icon }) => (
-        <Tooltip key={preset} content={title}>
+    <div className="flex min-w-0 flex-1 items-center gap-0.5">
+      <div className="flex min-w-0 items-center gap-0.5">
+        {DEVICES.map(({ preset, label, title, Icon }) => (
+          <Tooltip key={preset} content={title}>
+            <IconButton
+              size="sm"
+              aria-label={label}
+              aria-pressed={viewport.preset === preset}
+              onClick={() => choosePreset(preset)}
+              className={viewport.preset === preset ? 'bg-secondary text-foreground' : ''}
+            >
+              <Icon size={14} strokeWidth={1.75} />
+            </IconButton>
+          </Tooltip>
+        ))}
+        <Tooltip content="Fill the canvas width">
           <IconButton
             size="sm"
-            aria-label={label}
-            aria-pressed={viewport.preset === preset}
-            onClick={() => choosePreset(preset)}
-            className={viewport.preset === preset ? 'bg-secondary text-foreground' : ''}
+            aria-label="Fill viewport"
+            aria-pressed={viewport.preset === 'fill'}
+            onClick={() => choosePreset('fill')}
+            className={viewport.preset === 'fill' ? 'bg-secondary text-foreground' : ''}
           >
-            <Icon size={14} strokeWidth={1.75} />
+            <Maximize2 size={14} strokeWidth={1.75} />
           </IconButton>
         </Tooltip>
-      ))}
-      <Tooltip content="Fill the canvas width">
-        <IconButton
-          size="sm"
-          aria-label="Fill viewport"
-          aria-pressed={viewport.preset === 'fill'}
-          onClick={() => choosePreset('fill')}
-          className={viewport.preset === 'fill' ? 'bg-secondary text-foreground' : ''}
-        >
-          <Maximize2 size={14} strokeWidth={1.75} />
-        </IconButton>
-      </Tooltip>
-      {!fill && (
-        <Input
-          aria-label="Custom width"
-          inputMode="numeric"
-          value={widthText}
-          onChange={event => setWidthText(event.target.value)}
-          onBlur={commitWidth}
-          onKeyDown={event => {
-            if (event.key === 'Enter') commitWidth();
-          }}
-          className="h-6 w-[62px] px-1.5 py-0 text-center text-[11px]"
-          placeholder="240–3840"
-        />
-      )}
-      <span className="mx-1 h-4 w-px bg-border" aria-hidden />
-      <Tooltip content="Zoom out">
-        <IconButton
-          size="sm"
-          aria-label="Zoom out"
-          disabled={fill || anchor <= ZOOM_MIN}
-          onClick={() => onZoomChange(stepZoom(zoom, actualScale, -1))}
-        >
-          <Minus size={13} strokeWidth={1.75} />
-        </IconButton>
-      </Tooltip>
-      <button
-        type="button"
-        aria-label={`Zoom ${zoomLabel}, double-click to reset`}
-        disabled={fill}
-        onDoubleClick={() => onZoomChange({ mode: 'manual', value: 1 })}
-        onClick={() =>
-          onZoomChange(zoom.mode === 'fit' ? leaveFit() : { mode: 'fit', value: zoom.value })
-        }
-        className="h-6 min-w-[58px] rounded-md px-1 text-center text-[11px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
-      >
-        {zoomLabel}
-      </button>
-      <Tooltip content="Zoom in">
-        <IconButton
-          size="sm"
-          aria-label="Zoom in"
-          disabled={fill || anchor >= ZOOM_MAX}
-          onClick={() => onZoomChange(stepZoom(zoom, actualScale, 1))}
-        >
-          <Plus size={13} strokeWidth={1.75} />
-        </IconButton>
-      </Tooltip>
-      <Tooltip content="Fit to width">
-        <IconButton
-          size="sm"
-          aria-label="Fit width"
-          aria-pressed={zoom.mode === 'fit'}
+        {!fill && !compact && (
+          <Input
+            aria-label="Custom width"
+            inputMode="numeric"
+            value={widthText}
+            onChange={event => setWidthText(event.target.value)}
+            onBlur={commitWidth}
+            onKeyDown={event => {
+              if (event.key === 'Enter') commitWidth();
+            }}
+            className="h-6 w-[62px] px-1.5 py-0 text-center text-[11px]"
+            placeholder="240–3840"
+          />
+        )}
+      </div>
+      <span className="min-w-2 flex-1" />
+      <div className="flex items-center gap-0.5">
+        <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+        <Tooltip content="Zoom out">
+          <IconButton
+            size="sm"
+            aria-label="Zoom out"
+            disabled={fill || anchor <= ZOOM_MIN}
+            onClick={() => onZoomChange(stepZoom(zoom, actualScale, -1))}
+          >
+            <Minus size={13} strokeWidth={1.75} />
+          </IconButton>
+        </Tooltip>
+        <button
+          type="button"
+          aria-label={`Zoom ${zoomLabel}, double-click to reset`}
           disabled={fill}
+          onDoubleClick={() => onZoomChange({ mode: 'manual', value: 1 })}
           onClick={() =>
             onZoomChange(zoom.mode === 'fit' ? leaveFit() : { mode: 'fit', value: zoom.value })
           }
-          className={zoom.mode === 'fit' ? 'bg-secondary text-foreground' : ''}
+          className="h-6 min-w-[58px] rounded-md px-1 text-center text-2xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
         >
-          <Maximize2 size={13} strokeWidth={1.75} className="rotate-45" />
-        </IconButton>
-      </Tooltip>
+          {zoomLabel}
+        </button>
+        <Tooltip content="Zoom in">
+          <IconButton
+            size="sm"
+            aria-label="Zoom in"
+            disabled={fill || anchor >= ZOOM_MAX}
+            onClick={() => onZoomChange(stepZoom(zoom, actualScale, 1))}
+          >
+            <Plus size={13} strokeWidth={1.75} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip content="Fit to width">
+          <IconButton
+            size="sm"
+            aria-label="Fit width"
+            aria-pressed={zoom.mode === 'fit'}
+            disabled={fill}
+            onClick={() =>
+              onZoomChange(zoom.mode === 'fit' ? leaveFit() : { mode: 'fit', value: zoom.value })
+            }
+            className={zoom.mode === 'fit' ? 'bg-secondary text-foreground' : ''}
+          >
+            <Maximize2 size={13} strokeWidth={1.75} className="rotate-45" />
+          </IconButton>
+        </Tooltip>
+      </div>
     </div>
   );
 }

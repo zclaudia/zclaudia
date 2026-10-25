@@ -29,6 +29,45 @@ describe('PreviewCanvas', () => {
     expect(placeholder.style.width).toBe('195px');
   });
 
+  it('applies tier stage padding and centers the fixed-width page card', () => {
+    const { rerender } = render(
+      <PreviewCanvas
+        srcDoc="<html><body>p</body></html>"
+        viewport={mobileViewport}
+        zoom={{ mode: 'manual', value: 1 }}
+      />
+    );
+    const canvas = screen.getByTestId('design-canvas');
+    const placeholder = screen.getByTestId('design-canvas-placeholder');
+    // 默认 wide：24px 舞台留白；占位宽度由视口决定并水平居中（不再被 minWidth 拉满）。
+    expect(canvas).toHaveClass('px-6', 'pt-6');
+    expect(placeholder).toHaveClass('mx-auto');
+    expect(placeholder.style.minWidth).toBe('');
+    expect(placeholder.style.width).toBe('390px');
+
+    rerender(
+      <PreviewCanvas
+        srcDoc="<html><body>p</body></html>"
+        viewport={mobileViewport}
+        zoom={{ mode: 'manual', value: 1 }}
+        tier="medium"
+      />
+    );
+    expect(canvas).toHaveClass('px-4', 'pt-4');
+    expect(canvas).not.toHaveClass('px-6');
+
+    rerender(
+      <PreviewCanvas
+        srcDoc="<html><body>p</body></html>"
+        viewport={mobileViewport}
+        zoom={{ mode: 'manual', value: 1 }}
+        tier="narrow"
+      />
+    );
+    expect(canvas).toHaveClass('px-3', 'pt-3');
+    expect(screen.getByTestId('design-canvas-placeholder')).toHaveClass('mx-auto');
+  });
+
   it('keeps the fill preset at full width with scale 1 regardless of the zoom value', () => {
     render(
       <PreviewCanvas

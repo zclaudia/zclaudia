@@ -53,11 +53,14 @@ describe('Inspector（P2 检查器骨架）', () => {
     expect(screen.getByTestId('pane-design')).toBeInTheDocument();
   });
 
-  it('页签切换只隐藏非当前页签（内容保持挂载）', () => {
+  it('页签可见名为 Element / CSS / History，切换只隐藏非当前页签（内容保持挂载）', () => {
     const h = mount();
+    expect(screen.getByRole('tab', { name: 'Element' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'CSS' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'History' })).toBeInTheDocument();
     expect(screen.getByTestId('pane-design')).toBeVisible();
     expect(screen.getByTestId('pane-styles')).not.toBeVisible();
-    fireEvent.click(screen.getByRole('tab', { name: 'Styles' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'CSS' }));
     expect(h.onRightTabChange).toHaveBeenCalledWith('styles');
   });
 

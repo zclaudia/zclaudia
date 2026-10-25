@@ -73,8 +73,8 @@ interface StyleFieldRowProps {
 
 function StyleFieldRow({ field, value, invalid, inline, busy, onChange, onClear }: StyleFieldRowProps) {
   return (
-    <div className="grid min-w-0 gap-1 text-xs">
-      <span className="flex items-center gap-1">
+    <div className="grid min-w-0 gap-1">
+      <span className="flex items-center gap-1 text-3xs text-muted-foreground">
         {field.label}
         {inline && <InlineBadge testId={`inline-badge-${field.property}`} />}
       </span>
@@ -425,6 +425,9 @@ export function SelectionEditor({
     />
   );
 
+  const [fontFamilyField, fontSizeField, lineHeightField, fontWeightField, alignField] =
+    TYPOGRAPHY_FIELDS;
+
   const isOpen = (id: InspectorSectionId): boolean =>
     !(collapsedMap[id] ?? !DEFAULT_SECTION_OPEN[id]);
 
@@ -597,21 +600,36 @@ export function SelectionEditor({
       {section(
         'typography',
         'Typography',
-        <div className="grid grid-cols-2 gap-2">{TYPOGRAPHY_FIELDS.map(renderStyleField)}</div>
+        <div className="grid gap-2">
+          {renderStyleField(fontFamilyField)}
+          <div className="grid grid-cols-2 gap-2">
+            {renderStyleField(fontSizeField)}
+            {renderStyleField(lineHeightField)}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {renderStyleField(fontWeightField)}
+            {renderStyleField(alignField)}
+          </div>
+        </div>
       )}
 
       {section(
         'fill-border',
         'Fill & border',
         <>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-2">
             {selection.tagName !== 'img' && (
-            <div className="grid gap-1 text-xs">
-              <span className="flex items-center gap-1">
+            <div className="grid gap-1">
+              <span className="flex items-center gap-1 text-3xs text-muted-foreground">
                 Text color
                 {inlineNames.has('color') && <InlineBadge testId="inline-badge-color" />}
               </span>
               <div className="flex items-center gap-1">
+                <span
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0 rounded border border-border"
+                  style={{ backgroundColor: colorValue || 'transparent' }}
+                />
                 <Input
                   aria-label="Text color"
                   value={colorValue}
@@ -631,14 +649,19 @@ export function SelectionEditor({
               </div>
             </div>
             )}
-            <div className="grid gap-1 text-xs">
-              <span className="flex items-center gap-1">
+            <div className="grid gap-1">
+              <span className="flex items-center gap-1 text-3xs text-muted-foreground">
                 Background color
                 {inlineNames.has('background-color') && (
                   <InlineBadge testId="inline-badge-background-color" />
                 )}
               </span>
               <div className="flex items-center gap-1">
+                <span
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0 rounded border border-border"
+                  style={{ backgroundColor: backgroundValue || 'transparent' }}
+                />
                 <Input
                   aria-label="Background color"
                   value={backgroundValue}

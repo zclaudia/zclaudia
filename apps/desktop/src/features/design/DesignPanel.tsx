@@ -40,6 +40,7 @@ import { Inspector } from './inspector/Inspector';
 import { CanvasBanner } from './layout/CanvasBanner';
 import type { CanvasBannerItem } from './layout/CanvasBanner';
 import { CanvasEmptyState } from './layout/CanvasEmptyState';
+import { CanvasToolbar } from './layout/CanvasToolbar';
 import { DesignWorkbench } from './layout/DesignWorkbench';
 import { LeftRail } from './layout/LeftRail';
 import { NoticeStack } from './layout/NoticeStack';
@@ -662,6 +663,14 @@ function DesignPanelSession({
         canvas={
           <div className="relative isolate flex min-h-0 flex-1 flex-col">
             <CanvasBanner items={bannerItems} />
+            <CanvasToolbar
+              compact={compact}
+              viewport={state.ui.viewport}
+              zoom={state.ui.zoom}
+              actualScale={actualScale}
+              onViewportChange={viewport => controller.setViewport(viewport)}
+              onZoomChange={zoom => controller.setZoom(zoom)}
+            />
             <div className="relative flex min-h-0 flex-1 flex-col">
               {showEmptyState ? (
                 <CanvasEmptyState
@@ -679,6 +688,7 @@ function DesignPanelSession({
                       srcDoc={pipeline.activePreview}
                       viewport={state.ui.viewport}
                       zoom={state.ui.zoom}
+                      tier={tier}
                       frameRef={bridge.iframeRef}
                       onFrameLoad={bridge.handleFrameLoad}
                       onScaleChange={setActualScale}

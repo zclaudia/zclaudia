@@ -37,6 +37,7 @@ function Harness({
             srcDoc="<html><body>p</body></html>"
             viewport={{ preset: 'desktop', width: 1280 }}
             zoom={{ mode: 'manual', value: 1 }}
+            tier={tier}
             onFrameLoad={() => setLoads(value => value + 1)}
             className="h-full"
           />

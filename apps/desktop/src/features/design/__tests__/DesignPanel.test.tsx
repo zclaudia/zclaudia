@@ -305,7 +305,7 @@ async function moreMenuItem(name: string) {
 }
 
 /** 检查器页签。 */
-function openInspectorTab(name: 'Design' | 'Styles' | 'History') {
+function openInspectorTab(name: 'Element' | 'CSS' | 'History') {
   fireEvent.click(screen.getByRole('tab', { name }));
 }
 
@@ -1577,7 +1577,7 @@ describe('DesignPanel', () => {
 
   // ---- P5（L25）面板接线：模式切换 / 运行桥接消息 / deck 三组件 / 渲染导出 ----
 
-  it('P5：工具栏提供编辑/运行分段按钮（aria-pressed），非 deck 页幻灯片禁用', async () => {
+  it('P5：工具栏提供编辑/运行分段按钮（aria-pressed），非 deck 页 Slides 从 More actions 打开且禁用', async () => {
     mount();
     await screen.findByTitle('Design preview');
     const edit = screen.getByRole('button', { name: 'Edit mode' });
@@ -1589,8 +1589,11 @@ describe('DesignPanel', () => {
     expect(screen.getByRole('button', { name: 'Run mode' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Edit mode' }));
     expect(screen.getByRole('button', { name: 'Edit mode' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Slides' })).toBeDisabled();
-    expect(await moreMenuItem('Render export')).toBeEnabled();
+    // Slides 不再是顶栏第三种模式：唯一入口是 More actions 菜单。
+    expect(screen.queryByRole('button', { name: 'Slides' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    expect(await screen.findByRole('menuitem', { name: 'Slides' })).toBeDisabled();
+    expect(screen.getByRole('menuitem', { name: 'Render export' })).toBeEnabled();
     fireEvent.keyDown(document, { key: 'Escape' });
   });
 
@@ -1722,7 +1725,7 @@ describe('DesignPanel', () => {
     });
     mount();
     await screen.findByTitle('Design preview');
-    const deckButton = screen.getByRole('button', { name: 'Slides' });
+    const deckButton = await moreMenuItem('Slides');
     expect(deckButton).toBeEnabled();
     fireEvent.click(deckButton);
     expect(screen.getByTestId('deck-panel')).toBeInTheDocument();
@@ -1747,7 +1750,7 @@ describe('DesignPanel', () => {
     disk.set('design/index.html', { source: DECK_SOURCE, revision: 'revision-1' });
     mount();
     await screen.findByTitle('Design preview');
-    fireEvent.click(screen.getByRole('button', { name: 'Slides' }));
+    fireEvent.click(await moreMenuItem('Slides'));
     fireEvent.click(screen.getByRole('button', { name: 'mock-present' }));
     expect(screen.getByTestId('deck-presenter')).toBeInTheDocument();
     expect(screen.getByTestId('deck-presenter-start')).toHaveTextContent('1');
@@ -2034,7 +2037,7 @@ describe('DesignPanel', () => {
       base: sha(STYLE_SOURCE_PAGE),
     });
     await screen.findByRole('textbox', { name: 'Element text' });
-    openInspectorTab('Styles');
+    openInspectorTab('CSS');
     return frame;
   }
 
@@ -2173,7 +2176,7 @@ describe('DesignPanel', () => {
       base: sha(LINK_PAGE),
     });
     await screen.findByRole('textbox', { name: 'Element text' });
-    openInspectorTab('Styles');
+    openInspectorTab('CSS');
     return frame;
   }
 

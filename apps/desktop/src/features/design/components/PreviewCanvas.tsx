@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Ref } from 'react';
+import type { DesignTier } from '../layout/tiers';
 import type { DesignViewport, DesignZoom } from '../types';
 
 export interface PreviewCanvasProps {
@@ -7,6 +8,8 @@ export interface PreviewCanvasProps {
   srcDoc: string;
   viewport: DesignViewport;
   zoom: DesignZoom;
+  /** 响应式档位：只决定预览舞台留白，不参与缩放计算。 */
+  tier?: DesignTier;
   /** 面板持有 iframe 引用：message 事件按 event.source 校验、onLoad 发 verify。 */
   frameRef?: Ref<HTMLIFrameElement>;
   /** iframe load 回调（面板在此发送 verify 请求，保证到达重建后的预览）。 */
@@ -18,16 +21,25 @@ export interface PreviewCanvasProps {
 
 const EMPTY_HTML = '<!doctype html><html><body></body></html>';
 
+/** 舞台水平/顶部留白（底部 pb-20 由面板沿用给 AgentBar）。 */
+const STAGE_PADDING: Record<DesignTier, string> = {
+  wide: 'px-6 pt-6',
+  medium: 'px-4 pt-4',
+  narrow: 'px-3 pt-3',
+};
+
 /**
  * 受视口/缩放控制的预览画布（P2 §3）。iframe 布局宽度只由视口决定；
  * scale 是纯显示变换（fit 模式 = min(1, 容器宽 / frameW)），经外层占位
  * div 撑开滚动尺寸。preset 'fill' 时 iframe 铺满容器且恒定 scale 1。
- * P1：画布区背景用 bg-sidebar，页面卡片加 shadow；实际缩放经 onScaleChange 回报。
+ * 画布区背景用 bg-sidebar，页面在带档位留白的舞台上水平居中；
+ * iframe 加 bg-card/shadow 与 radius，实际缩放经 onScaleChange 回报。
  */
 export function PreviewCanvas({
   srcDoc,
   viewport,
   zoom,
+  tier = 'wide',
   frameRef,
   onFrameLoad,
   onScaleChange,
@@ -76,16 +88,15 @@ export function PreviewCanvas({
     <div
       ref={containerRef}
       data-testid="design-canvas"
-      className={`min-h-0 flex-1 overflow-auto bg-sidebar ${className}`.trim()}
+      className={`min-h-0 flex-1 overflow-auto bg-sidebar ${STAGE_PADDING[tier]} ${className}`.trim()}
     >
       <div
         data-testid="design-canvas-placeholder"
         style={{
           width: placeholderW,
           height: '100%',
-          minWidth: '100%',
         }}
-        className={srcDoc ? 'shadow-apple-md' : ''}
+        className={`mx-auto rounded bg-card ${srcDoc ? 'shadow-apple-md' : ''}`.trim()}
       >
         <iframe
           ref={frameRef}
@@ -100,7 +111,7 @@ export function PreviewCanvas({
             transformOrigin: 'top left',
             border: '0',
           }}
-          className="block bg-white"
+          className="block rounded bg-white"
         />
       </div>
     </div>

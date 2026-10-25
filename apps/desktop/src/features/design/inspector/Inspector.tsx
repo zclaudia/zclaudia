@@ -29,14 +29,15 @@ export interface InspectorProps {
 }
 
 const TABS: Array<{ id: DesignRightTab; label: string }> = [
-  { id: 'design', label: 'Design' },
-  { id: 'styles', label: 'Styles' },
+  { id: 'design', label: 'Element' },
+  { id: 'styles', label: 'CSS' },
   { id: 'history', label: 'History' },
 ];
 
 /**
- * 右侧检查器（P1 §4.5）：面包屑头部 + Design / Styles / History 页签 +
- * 滚动体。三个页签内容都保持挂载（非当前页签 hidden），切页签不丢表单值；
+ * 右侧检查器（P1 §4.5）：面包屑头部 + Element / CSS / History 页签 +
+ * 滚动体。内部 id 仍沿用 store 的 design/styles/history 持久化值。
+ * 三个页签内容都保持挂载（非当前页签 hidden），切页签不丢表单值；
  * History 首次访问后才挂载（避免未使用时的版本列表请求）。
  * 运行模式下整个检查器只显示一句只读说明。
  */
@@ -128,11 +129,6 @@ export function Inspector({
               ) : null}
               <div className="mt-1.5 flex items-center gap-1.5">
                 <span className="min-w-0 truncate text-[13px] font-semibold">{title}</span>
-                {selection && (
-                  <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
-                    {selection.elementPath.join('.')}
-                  </span>
-                )}
               </div>
             </div>
             <Button
@@ -173,7 +169,7 @@ export function Inspector({
                     role="tab"
                     aria-selected={active}
                     onClick={() => onRightTabChange(tab.id)}
-                    className={`-mb-px inline-flex h-7 items-center gap-1 border-b-2 px-2 text-[12px] transition-colors ${
+                    className={`-mb-px inline-flex h-7 items-center gap-1 border-b-2 px-2 text-2xs transition-colors ${
                       active
                         ? 'border-foreground font-medium text-foreground'
                         : 'border-transparent text-muted-foreground hover:text-foreground'

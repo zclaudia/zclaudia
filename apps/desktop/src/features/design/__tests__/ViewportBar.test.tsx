@@ -19,7 +19,7 @@ function mount(overrides: Partial<ViewportBarProps> = {}) {
   };
 }
 
-describe('ViewportBar（P1 顶栏视口/缩放）', () => {
+describe('ViewportBar（画布工具栏视口/缩放）', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -120,5 +120,15 @@ describe('ViewportBar（P1 顶栏视口/缩放）', () => {
     expect(screen.getByRole('button', { name: 'Zoom in' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Fit width' })).toBeDisabled();
     expect(screen.queryByLabelText('Custom width')).not.toBeInTheDocument();
+  });
+
+  it('compact 只隐藏 Custom width，设备与缩放能力保留', () => {
+    mount({ compact: true });
+    expect(screen.queryByLabelText('Custom width')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Desktop viewport' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fill viewport' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zoom out' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Zoom in' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Fit width' })).toBeInTheDocument();
   });
 });
