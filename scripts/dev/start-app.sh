@@ -278,6 +278,85 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # ============================================================
+# Rust build-cache self-heal
+# ============================================================
+# Cargo build scripts record absolute paths in their output
+# (build/<pkg>-<hash>/root-output), and tauri-build reads permission manifests
+# that list absolute paths too. If the checkout is moved or copied with
+# target/ intact, Cargo still treats that output as fresh and the app build
+# dies with:
+#   failed to read plugin permissions: ... No such file or directory
+# Detect the mismatch and clean the cache so the scripts regenerate it.
+
+rust_target_dir() {
+  if [[ -n "${CARGO_TARGET_DIR:-}" ]]; then
+    printf '%s\n' "$CARGO_TARGET_DIR"
+  else
+    printf '%s\n' "$PROJECT_ROOT/apps/desktop/src-tauri/target"
+  fi
+}
+
+# Prints the reason the cache is stale and returns 0 when it is; returns 1 when
+# the cache is usable (or absent).
+stale_rust_cache_reason() {
+  local target_dir target_real build_dir root_output recorded
+  local permission_list content entry
+
+  target_dir="$(rust_target_dir)"
+  [[ -d "$target_dir" ]] || return 1
+  target_real="$(cd "$target_dir" && pwd -P)"
+
+  # No build-script OUT_DIR may live outside this target dir. find also covers
+  # cross-compiled (--target) layouts: target/<triple>/<profile>/build.
+  while IFS= read -r build_dir; do
+    [[ -d "$build_dir" ]] || continue
+
+    while IFS= read -r root_output; do
+      IFS= read -r recorded < "$root_output" || true
+      [[ -n "$recorded" ]] || continue
+      case "$recorded/" in
+        "$target_dir/"*|"$target_real/"*) ;;
+        *)
+          printf '%s\n' "build-script output points at $recorded"
+          return 0
+          ;;
+      esac
+    done < <(find "$build_dir" -mindepth 2 -maxdepth 2 -type f -name root-output 2>/dev/null)
+
+    # Permission manifests list absolute paths that must exist when
+    # tauri-build reads them; a deleted $OUT_DIR triggers the same failure.
+    while IFS= read -r permission_list; do
+      [[ -r "$permission_list" ]] || continue
+      content="$(<"$permission_list")"
+      while IFS= read -r entry; do
+        [[ -n "$entry" ]] || continue
+        if [[ ! -e "$entry" ]]; then
+          printf '%s\n' "permission manifest references missing $entry"
+          return 0
+        fi
+      done < <(printf '%s' "$content" | grep -o '"[^"]*"' | tr -d '"')
+    done < <(find "$build_dir" -mindepth 3 -maxdepth 4 -type f -name '*-permission-files' 2>/dev/null)
+  done < <(find "$target_real" -maxdepth 3 -type d -name build 2>/dev/null)
+
+  return 1
+}
+
+ensure_rust_build_cache() {
+  local reason
+  if ! reason="$(stale_rust_cache_reason)"; then
+    return 0
+  fi
+
+  warn "Stale Rust build cache detected ($reason)."
+  warn "Cargo is reusing build-script output from a previous checkout location;"
+  warn "cleaning it so the build scripts regenerate their absolute paths."
+  if ! (cd "$PROJECT_ROOT/apps/desktop/src-tauri" && cargo clean); then
+    die "cargo clean failed — delete apps/desktop/src-tauri/target and retry"
+  fi
+  ok "Rust build cache cleaned (next build is a full rebuild)."
+}
+
+# ============================================================
 # Tauri dev mode
 # ============================================================
 start_tauri() {
@@ -286,6 +365,7 @@ start_tauri() {
   wait_port_free 1420
   wait_port_free 3100
 
+  ensure_rust_build_cache
   build
 
   # Pre-start the server so the Tauri app reuses it via health check,

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import path from 'node:path';
@@ -40,7 +40,7 @@ function expandEnvPlaceholders(env) {
 
 // Runs the host's actual stdio proxy. No bridge URL, credential, or generated
 // config is copied to the test report.
-export async function exerciseMcp(runtime, args, cwd, prompt, inlineConfig) {
+export async function exerciseMcp(runtime, args, cwd, prompt, inlineConfig, exercise) {
   assert.ok(prompt, 'The fixture must inspect the actual turn input');
   for (const section of [
     '[System Context]',
@@ -120,7 +120,7 @@ export async function exerciseMcp(runtime, args, cwd, prompt, inlineConfig) {
       const timeout = setTimeout(() => {
         pending.delete(id);
         reject(new Error(`MCP ${method} timed out`));
-      }, 5000);
+      }, params.name === 'design_workbench' ? 15000 : 5000);
       pending.set(id, message => {
         clearTimeout(timeout);
         pending.delete(id);
@@ -137,6 +137,10 @@ export async function exerciseMcp(runtime, args, cwd, prompt, inlineConfig) {
     });
     assert.equal(initialized.serverInfo.name, 'agent-tool-bridge');
     const listed = await request('tools/list');
+    if (exercise) {
+      await exercise(request, listed);
+      return;
+    }
     assert.ok(listed.tools.some(tool => tool.name === 'e2e_session_probe'));
     const pushFile = listed.tools.find(tool => tool.name === 'push_file');
     assert.ok(pushFile, 'push_file must be discoverable without a system prompt');
@@ -182,4 +186,36 @@ export async function exerciseMcp(runtime, args, cwd, prompt, inlineConfig) {
     clearTimeout(timeout);
     lines.close();
   }
+}
+
+/** Real MCP → server → originating client → Design preview round trip. */
+export async function exerciseDesignMcp(args, cwd, prompt) {
+  await exerciseMcp('claude', args, cwd, prompt, undefined, async (request, listed) => {
+    assert.ok(listed.tools.some(tool => tool.name === 'design_workbench'));
+    const call = async input => {
+      const result = await request('tools/call', { name: 'design_workbench', arguments: input });
+      return JSON.parse(result.content[0].text);
+    };
+    const before = await call({ action: 'get_context' });
+    assert.equal(before.ok, true);
+    const target = 'design/settings-mockup.html';
+    const refine = prompt.includes('E2E_DESIGN_CHAT_REFINE');
+    if (refine) {
+      assert.equal(before.ui.ok, true, JSON.stringify(before.ui));
+      assert.equal(before.ui.context.activePage.path, target);
+      assert.equal(before.ui.context.activePage.selection.text, 'New settings');
+      assert.equal(before.ui.context.activePage.dirty, false);
+    }
+    mkdirSync(path.join(cwd, 'design'), { recursive: true });
+    const html = refine
+      ? readFileSync(path.join(cwd, target), 'utf8').replace('New settings', 'Refined settings')
+      : '<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:sans-serif;padding:40px}</style></head><body><h1>New settings</h1><p>Created from chat</p></body></html>';
+    writeFileSync(path.join(cwd, target), html);
+    const presented = await call({ action: 'present', path: target });
+    appendFileSync(process.env.E2E_RUNTIME_AUDIT, JSON.stringify({ designTool: 'present', result: presented }) + '\n');
+    writeFileSync(path.join(cwd, 'design-agent-result.json'), JSON.stringify({ before, presented }));
+    assert.equal(presented.ok, true, JSON.stringify(presented));
+    assert.equal(presented.displayed, true);
+    assert.equal(presented.path, target);
+  });
 }

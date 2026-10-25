@@ -672,7 +672,7 @@ describe('DesignPanel', () => {
   it('flags an override warning when the computed color differs from the written inline value', async () => {
     mount();
     await screen.findByTitle('Design preview');
-    const { frame } = { frame: (await selectElementForFrame()) as HTMLIFrameElement };
+    let frame = (await selectElementForFrame()) as HTMLIFrameElement;
     fireEvent.change(screen.getByRole('textbox', { name: 'Text color' }), {
       target: { value: '#123456' },
     });
@@ -687,6 +687,7 @@ describe('DesignPanel', () => {
       ).toBe(true)
     );
     // The rebuilt preview triggers the verify request on iframe load.
+    frame = (await screen.findByTitle('Design preview')) as HTMLIFrameElement;
     const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
     fireEvent.load(frame);
     expect(postMessage).toHaveBeenCalledWith(
@@ -1185,7 +1186,7 @@ describe('DesignPanel', () => {
 
   it('reselects after a font-size apply and compares computed styles on the reply', async () => {
     mount();
-    const frame = await selectElementForFrame();
+    let frame = await selectElementForFrame();
     fireEvent.change(screen.getByRole('textbox', { name: 'Font size' }), {
       target: { value: '20px' },
     });
@@ -1197,6 +1198,7 @@ describe('DesignPanel', () => {
       ).toBe(true)
     );
     // 帧重建后补发 select-path（不是颜色 verify）。
+    frame = (await screen.findByTitle('Design preview')) as HTMLIFrameElement;
     const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
     fireEvent.load(frame);
     expect(postMessage).toHaveBeenCalledWith(
@@ -1241,7 +1243,7 @@ describe('DesignPanel', () => {
 
   it('compares top-level color fields on the reselect reply for mixed color+style applies', async () => {
     mount();
-    const frame = await selectElementForFrame();
+    let frame = await selectElementForFrame();
     fireEvent.change(screen.getByRole('textbox', { name: 'Font size' }), {
       target: { value: '20px' },
     });
@@ -1256,6 +1258,7 @@ describe('DesignPanel', () => {
         true
       )
     );
+    frame = (await screen.findByTitle('Design preview')) as HTMLIFrameElement;
     fireEvent.load(frame);
     const reply = (color: string) => {
       fireEvent(
@@ -1291,7 +1294,7 @@ describe('DesignPanel', () => {
 
   it('a pure color edit keeps the legacy verify loop and never sends select-path', async () => {
     mount();
-    const frame = await selectElementForFrame();
+    let frame = await selectElementForFrame();
     fireEvent.change(screen.getByRole('textbox', { name: 'Text color' }), {
       target: { value: '#123456' },
     });
@@ -1307,6 +1310,7 @@ describe('DesignPanel', () => {
           )
       ).toBe(true)
     );
+    frame = (await screen.findByTitle('Design preview')) as HTMLIFrameElement;
     const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
     fireEvent.load(frame);
     expect(postMessage).toHaveBeenCalledWith(
@@ -1484,20 +1488,64 @@ describe('DesignPanel', () => {
     expect(screen.getByTestId('media-view')).toBeInTheDocument();
   });
 
-  it('generate：上下文 popover 可检查，发送后填入聊天（含工作区路径与品牌遵循句）', async () => {
+  it('generate：上下文 popover 可检查，活动页指令发送后填入聊天（含工作区路径与品牌遵循句）', async () => {
     mount();
     await screen.findByTitle('Design preview');
     const dialog = await openAgentContext();
     expect(useComposerStore.getState().pendingPrefills['session-1']).toBeUndefined();
-    const promptEl = within(dialog).getByText(/Create or update a polished static HTML/);
+    const promptEl = within(dialog).getByText(/Update the current page at design\/index\.html/);
     expect(promptEl.textContent).toContain('Working directory: /work');
+    expect(promptEl.textContent).toContain('according to the request; preserve unrelated content');
     expect(promptEl.textContent).toContain('Follow the brand rules and tokens above when present');
     fireEvent.click(screen.getByRole('button', { name: 'Send to chat' }));
     const content = useComposerStore.getState().pendingPrefills['session-1']?.content ?? '';
-    expect(content).toContain('design/index.html');
+    expect(content).toContain('Update the current page at design/index.html');
     expect(content).toContain('Follow the brand rules and tokens above when present');
     expect(await screen.findByText('Prefilled into the current chat — add your requirements and send.')).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Agent context' })).not.toBeInTheDocument();
+  });
+
+  it('generate：无选区且活动页非 index 时预填当前页指令与用户 request', async () => {
+    disk.set('design/about.html', { source: pageSource('About'), revision: 'revision-about' });
+    vi.mocked(api.listDesignFiles).mockResolvedValue({
+      files: ['design/index.html', 'design/about.html'],
+    });
+    mount();
+    await screen.findByTitle('Design preview');
+    await openPage('design/about.html');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Send to chat' })).toBeEnabled());
+
+    const dialog = await openAgentContext('Make the hero bolder');
+    const promptEl = within(dialog).getByText(/Update the current page at design\/about\.html/);
+    expect(promptEl.textContent).toContain(
+      'according to the request; preserve unrelated content'
+    );
+    expect(promptEl.textContent).toContain('## Request\n\nMake the hero bolder');
+    expect(promptEl.textContent).not.toContain('Update the current page at design/index.html');
+    fireEvent.click(screen.getByRole('button', { name: 'Send to chat' }));
+
+    const content = useComposerStore.getState().pendingPrefills['session-1']?.content ?? '';
+    expect(content).toContain('Update the current page at design/about.html');
+    expect(content).toContain('Make the hero bolder');
+    expect(content).not.toContain('Update the current page at design/index.html');
+  });
+
+  it('generate：真正空白工作台无活动页时默认设计入口 design/index.html', async () => {
+    disk.clear();
+    vi.mocked(api.listDesignFiles).mockResolvedValue({ files: [] });
+    mount();
+    expect(await screen.findByText(/The canvas is empty\./)).toBeInTheDocument();
+
+    const dialog = await openAgentContext();
+    expect(dialog.textContent).toContain(
+      'Create or update a polished static HTML/CSS page at design/index.html'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Send to chat' }));
+
+    const content = useComposerStore.getState().pendingPrefills['session-1']?.content ?? '';
+    expect(content).toContain(
+      'Create or update a polished static HTML/CSS page at design/index.html'
+    );
   });
 
   it('generate：上下文 popover 收起则不填入聊天', async () => {
@@ -2263,7 +2311,7 @@ describe('DesignPanel', () => {
   });
 
   it('P3.5 C4：应用后 reselect 刷新链路——帧载入补发 select-path、新选区重发 rules-request、新规则重渲染', async () => {
-    const frame = await mountStyleSourcePage();
+    let frame = await mountStyleSourcePage();
     sendRules(frame, [H1_RULE]);
     await screen.findByTestId('rule-@inline/0-0');
     fireEvent.change(screen.getByRole('textbox', { name: 'Value for color' }), {
@@ -2276,6 +2324,7 @@ describe('DesignPanel', () => {
         true
       )
     );
+    frame = (await screen.findByTitle('Design preview')) as HTMLIFrameElement;
     const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
     fireEvent.load(frame);
     expect(postMessage).toHaveBeenCalledWith(

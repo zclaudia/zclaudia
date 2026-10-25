@@ -23,6 +23,7 @@ import { VersionHistory } from './components/VersionHistory';
 import { isDeck, parseDeck } from './deck';
 import type { DeckInfo } from './deck';
 import { useAgentHandoff } from './hooks/useAgentHandoff';
+import { useDesignAgentBridge } from './hooks/useDesignAgentBridge';
 import type { AgentContextPayload } from './hooks/useAgentHandoff';
 import { useDesignNotices } from './hooks/useDesignNotices';
 import { useDesignShortcuts } from './hooks/useDesignShortcuts';
@@ -213,6 +214,23 @@ function DesignPanelSession({
     activePage,
     viewport: state.ui.viewport,
     refreshNow,
+  });
+
+  const reportAgentFrameLoad = useDesignAgentBridge({
+    backendId,
+    sessionId,
+    identity,
+    controller,
+    visible,
+    previewHtml: pipeline.activePreview,
+    previewMode,
+    overviewOpen,
+    channel,
+    iframeRef: bridge.iframeRef,
+    showCanvas: () => {
+      setOverviewOpen(false);
+      setPreviewMode('edit');
+    },
   });
 
   // 切页时关闭幻灯片播放器、Export & Share 对话框与媒体生成面板，避免陈旧页数据展示；会话切换经 key 重挂载自然复位。
@@ -447,7 +465,7 @@ function DesignPanelSession({
     [controller, notices]
   );
 
-  /** Agent 上下文：有选区 → modify，无选区 → generate；request 追加到 prompt 末尾。 */
+  /** Agent 上下文：有选区 → modify；无选区 → generate（有活动页指向该页，空工作台回退 index）；request 追加到 prompt 末尾。 */
   const buildAgentContext = useCallback(
     (request: string): AgentContextPayload => {
       const input = agent.buildContextInput();
@@ -765,7 +783,10 @@ function DesignPanelSession({
                       zoom={state.ui.zoom}
                       tier={tier}
                       frameRef={bridge.iframeRef}
-                      onFrameLoad={bridge.handleFrameLoad}
+                      onFrameLoad={() => {
+                        bridge.handleFrameLoad();
+                        reportAgentFrameLoad();
+                      }}
                       onScaleChange={setActualScale}
                       className="min-h-0 flex-1 pb-20"
                     />

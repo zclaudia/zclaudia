@@ -16,7 +16,7 @@ import { useOwnershipStore } from '../../stores/ownershipStore';
 import {
   AdditionalDirectoriesField,
   cleanAdditionalPaths,
-} from '../sidebar/AdditionalDirectoriesField';
+} from '../sidebar';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';

@@ -68,10 +68,25 @@ describe('PreviewCanvas', () => {
     expect(screen.getByTestId('design-canvas-placeholder')).toHaveClass('mx-auto');
   });
 
+  it('waits for a built preview before mounting the browsing context', () => {
+    const props = { viewport: mobileViewport, zoom: { mode: 'fit' as const, value: 1 } };
+    const { rerender } = render(<PreviewCanvas {...props} srcDoc="" />);
+    expect(screen.queryByTitle('Design preview')).not.toBeInTheDocument();
+    expect(screen.getByTestId('design-canvas-placeholder')).toBeInTheDocument();
+    rerender(<PreviewCanvas {...props} srcDoc="<html><body>Ready</body></html>" />);
+    expect(screen.getByTitle('Design preview')).toHaveAttribute(
+      'srcdoc',
+      '<html><body>Ready</body></html>'
+    );
+    const firstFrame = screen.getByTitle('Design preview');
+    rerender(<PreviewCanvas {...props} srcDoc="<html><body>Updated</body></html>" />);
+    expect(screen.getByTitle('Design preview')).not.toBe(firstFrame);
+  });
+
   it('keeps the fill preset at full width with scale 1 regardless of the zoom value', () => {
     render(
       <PreviewCanvas
-        srcDoc=""
+        srcDoc="<html><body>preview</body></html>"
         viewport={{ preset: 'fill', width: null }}
         zoom={{ mode: 'manual', value: 1.5 }}
       />
@@ -79,8 +94,6 @@ describe('PreviewCanvas', () => {
     const frame = screen.getByTitle('Design preview') as HTMLIFrameElement;
     expect(frame.style.width).toBe('100%');
     expect(frame.style.transform).toContain('scale(1)');
-    // 空预览串回退到空文档占位。
-    expect(frame.getAttribute('srcdoc')).toContain('<body></body>');
   });
 
   it('computes the fit scale from the measured container width', () => {
@@ -97,7 +110,11 @@ describe('PreviewCanvas', () => {
     }
     vi.stubGlobal('ResizeObserver', ResizeObserverStub);
     render(
-      <PreviewCanvas srcDoc="" viewport={mobileViewport} zoom={{ mode: 'fit', value: 1 }} />
+      <PreviewCanvas
+        srcDoc="<html><body>preview</body></html>"
+        viewport={mobileViewport}
+        zoom={{ mode: 'fit', value: 1 }}
+      />
     );
     const frame = screen.getByTitle('Design preview') as HTMLIFrameElement;
     // fit = min(1, 容器 195 / frame 390) = 0.5。
@@ -107,7 +124,11 @@ describe('PreviewCanvas', () => {
 
   it('skips container measurement when ResizeObserver is unavailable (jsdom default)', () => {
     render(
-      <PreviewCanvas srcDoc="" viewport={mobileViewport} zoom={{ mode: 'fit', value: 1 }} />
+      <PreviewCanvas
+        srcDoc="<html><body>preview</body></html>"
+        viewport={mobileViewport}
+        zoom={{ mode: 'fit', value: 1 }}
+      />
     );
     const frame = screen.getByTitle('Design preview') as HTMLIFrameElement;
     expect(frame.style.width).toBe('390px');

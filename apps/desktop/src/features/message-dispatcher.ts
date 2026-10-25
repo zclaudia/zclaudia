@@ -7,6 +7,7 @@ import { handleAttachmentMessage } from './attachments/handlers';
 import { handleMetaWorkflowMessage } from './meta-workflow/handlers.js';
 import { handleOpenSpecMessage } from './openspec/handlers';
 import { handleBrowserMessage } from './browser/handlers';
+import { handleDesignMessage } from './design/agent-bridge';
 
 export type FeatureMessageHandler = (msg: ServerMessage, backendId?: string) => boolean;
 
@@ -19,6 +20,7 @@ const featureMessageHandlers: FeatureMessageHandler[] = [
   handleMetaWorkflowMessage,
   handleOpenSpecMessage,
   handleBrowserMessage,
+  handleDesignMessage,
 ];
 
 export function dispatchFeatureMessage(msg: ServerMessage, backendId?: string): boolean {

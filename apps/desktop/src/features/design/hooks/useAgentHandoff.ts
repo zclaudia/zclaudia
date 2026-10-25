@@ -32,9 +32,9 @@ export interface UseAgentHandoffResult {
   handleAssetImported: (path: string) => void;
   /** 组装 §5.1 上下文输入（面板已知页面与修订、活动页选区、品牌、素材、视口）。 */
   buildContextInput: () => AgentContextInput;
-  /** 「生成页面」上下文（无选区也可用）。 */
+  /** 页面上下文：有活动页时指向该页，真正空白工作台回退 design/index.html。 */
   generate: () => AgentContextPayload;
-  /** 「交给 Agent 修改」上下文；无选区或 dirty 时返回 null（沿用既有禁用规则）。 */
+  /** 「交给 Agent 修改」上下文（选中元素）；无选区或 dirty 时返回 null（沿用既有禁用规则）。 */
   handoff: () => AgentContextPayload | null;
   /** 把完整指令预填进当前聊天（保留用户确认后发送的语义）。 */
   prefill: (content: string) => void;

@@ -814,3 +814,19 @@ describe('DesignWorkspaceController', () => {
     expect(await c.applySource('<html></html>', 'orphan')).toBe(false);
   });
 });
+
+describe('agent presentation cancellation', () => {
+  it('does not leave a loading page or activate it after the request expires', async () => {
+    const harness = createHarness();
+    const controller = new DesignWorkspaceController('agent-cancel-test', harness.getPorts);
+    const gate = harness.gate('design/new.html');
+    let active = true;
+    const pending = controller.open('design/new.html', () => active);
+    active = false;
+    gate.resolve({ path: 'design/new.html', source: pageSource('New'), revision: 'r1' });
+    expect((await pending).ok).toBe(false);
+    expect(controller.getSnapshot().pages).toEqual([]);
+    expect(controller.getSnapshot().activePath).not.toBe('design/new.html');
+    controller.dispose();
+  });
+});

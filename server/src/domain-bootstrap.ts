@@ -19,6 +19,8 @@ import { createCommandsRoutes } from './interfaces/http/commands.js';
 import { createAgentRoutes } from './interfaces/http/agent.js';
 import { createClaudiaRoutes } from './interfaces/http/claudia.js';
 import { createDesignRoutes } from './interfaces/http/design.js';
+import { registerDesignWorkbenchTool } from './application/design/agent-tool.js';
+import { designAgentBridge } from './application/design/agent-bridge.js';
 import { createDesignShareRoutes } from './interfaces/http/share-viewer.js';
 import { createDelegationRoutes } from './interfaces/http/delegation.js';
 import type { NotificationService } from './domains/notification-feed/index.js';
@@ -264,6 +266,17 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
   registerInteractionTools({
     getServerPort,
   });
+
+  designAgentBridge.configure(sessionId => {
+    const run = [...activeRuns.values()].find(item => item.sessionId === sessionId);
+    if (!run || !run.client.authenticated || run.client.ws.readyState !== 1) return undefined;
+    return {
+      clientId: run.clientId,
+      signal: run.abortController?.signal,
+      send: message => sendMessage(run.client.ws, message),
+    };
+  });
+  registerDesignWorkbenchTool(db);
 
   registerAgentTools({
     getDb: () => db,

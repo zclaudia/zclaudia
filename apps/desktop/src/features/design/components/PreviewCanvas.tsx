@@ -4,7 +4,7 @@ import type { DesignTier } from '../layout/tiers';
 import type { DesignViewport, DesignZoom } from '../types';
 
 export interface PreviewCanvasProps {
-  /** 构建好的预览 srcdoc（空串时显示空文档占位）。 */
+  /** 构建好的预览 srcdoc（空串时仅显示舞台占位，不启动 iframe 导航）。 */
   srcDoc: string;
   viewport: DesignViewport;
   zoom: DesignZoom;
@@ -18,8 +18,6 @@ export interface PreviewCanvasProps {
   onScaleChange?: (scale: number) => void;
   className?: string;
 }
-
-const EMPTY_HTML = '<!doctype html><html><body></body></html>';
 
 /** 舞台水平/顶部留白（底部 pb-20 由面板沿用给 AgentBar）。 */
 const STAGE_PADDING: Record<DesignTier, string> = {
@@ -70,9 +68,7 @@ export function PreviewCanvas({
         ? Math.min(1, containerSize.width / frameWidthPx)
         : 1;
   const frameW = fill ? '100%' : `${frameWidthPx}px`;
-  const placeholderW = fill
-    ? '100%'
-    : `${Math.round((frameWidthPx ?? 0) * scale * 100) / 100}px`;
+  const placeholderW = fill ? '100%' : `${Math.round((frameWidthPx ?? 0) * scale * 100) / 100}px`;
   const frameH = '100%';
 
   const onScaleChangeRef = useRef(onScaleChange);
@@ -98,21 +94,25 @@ export function PreviewCanvas({
         }}
         className={`mx-auto rounded bg-card ${srcDoc ? 'shadow-apple-md' : ''}`.trim()}
       >
-        <iframe
-          ref={frameRef}
-          title="Design preview"
-          sandbox="allow-scripts"
-          srcDoc={srcDoc || EMPTY_HTML}
-          onLoad={onFrameLoad}
-          style={{
-            width: frameW,
-            height: frameH,
-            transform: `scale(${scale})`,
-            transformOrigin: 'top left',
-            border: '0',
-          }}
-          className="block rounded bg-white"
-        />
+        {/* 等构建完成再挂载，避免空白 srcdoc 与真实文档的导航竞争。 */}
+        {srcDoc && (
+          <iframe
+            key={srcDoc}
+            ref={frameRef}
+            title="Design preview"
+            sandbox="allow-scripts"
+            srcDoc={srcDoc}
+            onLoad={onFrameLoad}
+            style={{
+              width: frameW,
+              height: frameH,
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+              border: '0',
+            }}
+            className="block rounded bg-white"
+          />
+        )}
       </div>
     </div>
   );

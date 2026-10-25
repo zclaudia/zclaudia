@@ -567,6 +567,11 @@ function makeBridge(channel: string, baseRevision: string): string {
     document.addEventListener('submit', event => event.preventDefault(), true);
     window.addEventListener('message', event => {
       const data = event.data;
+      if (event.source === parent && data && data.channel === channel &&
+          data.type === 'zclaudia:design-ping' && typeof data.token === 'string' && data.token.length <= 100) {
+        parent.postMessage({ type:'zclaudia:design-ready', channel, base, token:data.token }, '*');
+        return;
+      }
       if (
         !data ||
         (data.type !== 'zclaudia:design-verify' &&

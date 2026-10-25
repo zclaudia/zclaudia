@@ -60,6 +60,15 @@ async function openBridge(
 }
 
 describe('buildDesignPreview', () => {
+  it('acknowledges a parent readiness probe with its own revision and token', async () => {
+    const bridge = await openBridge('<h1>Ready</h1>', 'ready-channel');
+    const data = { type: 'zclaudia:design-ping', channel: 'ready-channel', token: 'probe-1' };
+    bridge.post(data);
+    expect(bridge.sent).toHaveLength(0);
+    bridge.window.dispatchEvent(new bridge.window.MessageEvent('message', { data, source: bridge.window.parent }));
+    expect(bridge.sent).toEqual([{ type: 'zclaudia:design-ready', channel: 'ready-channel', base: 'bridge-rev', token: 'probe-1' }]);
+    bridge.close();
+  });
   beforeEach(() => {
     vi.stubGlobal('crypto', {
       getRandomValues: (bytes: Uint8Array) => bytes.fill(23),

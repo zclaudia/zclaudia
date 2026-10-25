@@ -16,6 +16,7 @@ import type { NotificationService } from '../../../domains/notification-feed/ind
 import type { TaskCoordinationPort } from '../../../application/conversation/task-coordination-port.js';
 import type { ProviderRegistryPort } from '../../../infra/providers/registry.js';
 import { sendMessage } from './broadcast.js';
+import { designAgentBridge } from '../../design/agent-bridge.js';
 import { resolveReservedInvocation } from '../../invocations/gateway.js';
 import {
   getSessionInvocableSnapshot,
@@ -117,6 +118,10 @@ export async function handleClientMessage(
   ctx: MessageHandlerContext,
   termMgr?: TerminalManager
 ): Promise<void> {
+  if (message.type === 'design_workbench_response') {
+    if (client.authenticated) designAgentBridge.respond(client.id, message);
+    return;
+  }
   if (ctx.browserManager && message.type.startsWith('browser_')) {
     const handled = handleBrowserMessage(
       client,

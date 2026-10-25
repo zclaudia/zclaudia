@@ -227,8 +227,8 @@ export class DesignWorkspaceController {
   // 页面组织：open / activate / close
   // -------------------------------------------------------------------------
 
-  async open(path: string): Promise<OpenPageResult> {
-    if (this.disposed)
+  async open(path: string, canActivate: () => boolean = () => true): Promise<OpenPageResult> {
+    if (this.disposed || !canActivate())
       return {
         ok: false,
         reason: 'load-failed',
@@ -257,20 +257,23 @@ export class DesignWorkspaceController {
       if (this.pages.get(path) === page && page.requestId === request) this.removePage(path);
       return { ok: false, reason: 'load-failed', message: errorMessage(error) };
     }
-    if (this.disposed || page.requestId !== request || this.pages.get(path) !== page) {
+    if (this.disposed || page.requestId !== request || this.pages.get(path) !== page || !canActivate()) {
+      if (!canActivate() && this.pages.get(path) === page && page.requestId === request) this.removePage(path);
       return {
         ok: false,
         reason: 'load-failed',
         message: 'The design workbench has been released; loading was cancelled',
       };
     }
-    await this.adoptDocument(page, next);
-    if (this.disposed)
+    await this.adoptDocument(page, next, canActivate);
+    if (this.disposed || !canActivate()) {
+      if (!canActivate() && this.pages.get(path) === page && page.doc === null) this.removePage(path);
       return {
         ok: false,
         reason: 'load-failed',
         message: 'The design workbench has been released',
       };
+    }
     this.activate(path);
     return { ok: true };
   }
@@ -519,7 +522,7 @@ export class DesignWorkspaceController {
   }
 
   /** 文档轮询结果：仅当 next.path 为活动页且页非 busy 才处理（P1 checkExternal）。 */
-  async handleExternalDoc(next: DesignDocument): Promise<void> {
+  async handleExternalDoc(next: DesignDocument, canAdopt: () => boolean = () => true): Promise<void> {
     const page = this.activePage();
     if (!page || page.busy || !page.doc || next.path !== page.path) return;
     // 使该页 in-flight 载入/保存结果失效：随后到期的旧响应不得覆盖本轮处理。
@@ -535,7 +538,7 @@ export class DesignWorkspaceController {
       return;
     }
     if (unchanged) return;
-    await this.adoptDocument(page, next);
+    await this.adoptDocument(page, next, canAdopt);
   }
 
   /** 依赖 stat 轮询结果：与该页缓存深比较（路径集+size+mtimeMs+missing），有差异 assetEpoch++。 */
@@ -661,9 +664,9 @@ export class DesignWorkspaceController {
   }
 
   /** 无条件以新文档接管页面状态（重算草稿修订、rebuild 历史、清 selection）。 */
-  private async adoptDocument(page: WorkspacePage, next: DesignDocument): Promise<void> {
+  private async adoptDocument(page: WorkspacePage, next: DesignDocument, canAdopt: () => boolean = () => true): Promise<void> {
     const revision = await this.getPorts(this.sessionId).sha256(next.source);
-    if (this.disposed) return;
+    if (this.disposed || !canAdopt()) return;
     page.doc = next;
     page.draft = next.source;
     page.draftRevision = revision;

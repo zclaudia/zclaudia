@@ -25,9 +25,9 @@ export interface AgentBarProps {
 
 /**
  * 画布底部 Agent 输入条（P3 §4.7）：选区 chip + 输入框 + Context popover +
- * 发送。有选区 → modify，无选区 → generate；dirty 时禁用并就地提示保存；
- * 运行模式整条隐藏。空输入允许发送（等价原 Generate page 的默认提示词）。
- * 仍然只预填、不自动发送。
+ * 发送。有选区 → modify；无选区 → generate，有活动页时指向该页、空白工作台
+ * 才回退 design/index.html。dirty 时禁用并就地提示保存；运行模式整条隐藏。
+ * 空输入允许发送（页面指令）；仍然只预填、不自动发送。
  */
 export function AgentBar({
   selection,

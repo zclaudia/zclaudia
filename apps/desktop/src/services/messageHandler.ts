@@ -282,6 +282,8 @@ const messageDispatcher = createMessageDispatcher<ServerMessage, MessageDispatch
       'browser_network',
       'browser_element_picked',
       'browser_agent_activity',
+      'design_workbench_request',
+      'design_workbench_cancel',
     ],
     handle: (msg, ctx) => dispatchFeatureMessage(msg, ctx.backendId ?? ctx.serverId),
   },

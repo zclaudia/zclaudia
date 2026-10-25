@@ -28,7 +28,7 @@ function viewportPlacement(panelId: string): 'bottom' | 'right' {
 /**
  * Resolve current session context for workspace routing.
  */
-function currentSessionCtx() {
+export function currentSessionCtx() {
   const { selectedSessionId } = useSelectionStore.getState();
   const { sessions } = useProjectStore.getState();
   const route = !isMobileViewport() ? useWorkspaceRoutingStore.getState().active : null;

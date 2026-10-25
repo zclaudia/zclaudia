@@ -42,7 +42,7 @@ exports[`buildDesignAgentContext（P4 §5.1 上下文组装） > 完整样例：
 - Preset: mobile
 - Width: 390px
 
-Create or update a polished static HTML/CSS page at design/index.html in this workspace (/Users/dev/demo-site). Use local files in the design/ folder with relative paths; do not use JavaScript to render the page or depend on CDN/external resources. Save the page so it appears in the Design panel. Keep the existing project context for project proj-42. Follow the brand rules and tokens above when present and keep using local files with relative paths.",
+Update the current page at design/index.html in this workspace (/Users/dev/demo-site) according to the request; preserve unrelated content. Use local files in the design/ folder with relative paths; do not use JavaScript to render the page or depend on CDN/external resources. Save the page so it appears in the Design panel. Keep the existing project context for project proj-42. Follow the brand rules and tokens above when present and keep using local files with relative paths.",
   "sections": [
     {
       "lines": [

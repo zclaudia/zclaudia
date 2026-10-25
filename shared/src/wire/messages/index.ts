@@ -15,6 +15,13 @@ export * from './meta-workflow.js';
 export * from './openspec.js';
 export * from './goal.js';
 export * from './browser.js';
+export * from './design.js';
+
+import type {
+  DesignWorkbenchRequest,
+  DesignWorkbenchResponse,
+  DesignWorkbenchCancel,
+} from './design.js';
 
 import type {
   ApprovalInteractionMessage,
@@ -49,6 +56,7 @@ export type { InteractionResponseMessage };
 // ============================================
 
 export type ClientMessage =
+  | DesignWorkbenchResponse
   | CoreClientMessage
   | RunClientMessage
   | CrudClientMessage
@@ -70,6 +78,8 @@ export type ClientMessage =
 // ============================================
 
 export type ServerMessage =
+  | DesignWorkbenchCancel
+  | DesignWorkbenchRequest
   | CoreServerMessage
   | RunServerMessage
   | CrudServerMessage

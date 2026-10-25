@@ -232,10 +232,10 @@ describe('buildDesignAgentContext prompt（§5.1 结尾任务段）', () => {
   const BRAND_SENTENCE =
     'Follow the brand rules and tokens above when present and keep using local files with relative paths.';
 
-  it('generate：与 DesignPanel 既有措辞同源 + brand/本地路径收尾', () => {
+  it('generate：有活动页时按当前页更新 + brand/本地路径收尾', () => {
     const { prompt } = buildDesignAgentContext(FULL_INPUT, 'generate');
     expect(prompt).toContain(
-      'Create or update a polished static HTML/CSS page at design/index.html in this workspace (/Users/dev/demo-site).'
+      'Update the current page at design/index.html in this workspace (/Users/dev/demo-site) according to the request; preserve unrelated content.'
     );
     expect(prompt).toContain(
       'Use local files in the design/ folder with relative paths; do not use JavaScript to render the page or depend on CDN/external resources.'
@@ -244,7 +244,23 @@ describe('buildDesignAgentContext prompt（§5.1 结尾任务段）', () => {
     expect(prompt.endsWith(BRAND_SENTENCE)).toBe(true);
   });
 
-  it('generate：无 workingDirectory/projectId 时省略对应插值', () => {
+  it('generate：非 index 活动页指向当前页，不误写 design/index.html', () => {
+    const input: AgentContextInput = {
+      ...MINIMAL_INPUT,
+      workingDirectory: '/work/site',
+      pages: [{ path: 'design/about.html', docRevision: REV_ABOUT, dirty: false }],
+      active: { path: 'design/about.html', docRevision: REV_ABOUT, dirty: false, selection: null },
+    };
+    const { prompt } = buildDesignAgentContext(input, 'generate', { request: 'Make the hero bolder' });
+    expect(prompt).toContain(
+      'Update the current page at design/about.html in this workspace (/work/site) according to the request; preserve unrelated content.'
+    );
+    expect(prompt).not.toContain('design/index.html');
+    expect(prompt).not.toContain('Modify the selected element');
+    expect(prompt).toContain('## Request\n\nMake the hero bolder');
+  });
+
+  it('generate：空白工作台无 workingDirectory/projectId 时回退 index 并省略插值', () => {
     const { prompt } = buildDesignAgentContext(MINIMAL_INPUT, 'generate');
     expect(prompt).toContain('Create or update a polished static HTML/CSS page at design/index.html in this workspace.');
     expect(prompt).toContain('Keep the existing project context.');

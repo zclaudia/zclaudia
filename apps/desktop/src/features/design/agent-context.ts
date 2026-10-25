@@ -5,9 +5,10 @@
  * 品牌规则全文 / 素材引用 / 视口」组装为固定顺序的 sections 与最终英文 prompt。
  * 纯函数、无 IO、确定性（同输入必同输出，快照测试锁定）。
  *
- * 结尾任务段与 DesignPanel 既有 generate/handoff 措辞同源，并在末尾追加
- * brand 遵循 + 本地相对路径两点；L19 接线后面板的 generate/handoff 不再
- * 自行拼模板文本。
+ * 结尾任务段与 DesignPanel 既有 generate/handoff 措辞同源：generate 有活动页时
+ * 指向该页、仅在真正空白工作台默认 design/index.html；modify 保留选中元素语义。
+ * 末尾追加 brand 遵循 + 本地相对路径两点；L19 接线后面板的 generate/handoff
+ * 不再自行拼模板文本。
  */
 
 export interface AgentContextSection {
@@ -79,10 +80,14 @@ function buildTaskParagraph(input: AgentContextInput, task: AgentContextTask): s
     'Follow the brand rules and tokens above when present and keep using local files with relative paths.';
 
   if (task === 'generate') {
-    // 与 DesignPanel 既有 generate 模板同源
+    // 有活动页时按当前页续改；真正空白工作台才回退默认入口。
+    const target = input.active?.path ?? 'design/index.html';
+    const workspaceSuffix = input.workingDirectory ? ` (${input.workingDirectory})` : '';
+    const intro = input.active
+      ? `Update the current page at ${target} in this workspace${workspaceSuffix} according to the request; preserve unrelated content. `
+      : `Create or update a polished static HTML/CSS page at ${target} in this workspace${workspaceSuffix}. `;
     return (
-      `Create or update a polished static HTML/CSS page at design/index.html in this workspace` +
-      `${input.workingDirectory ? ` (${input.workingDirectory})` : ''}. ` +
+      intro +
       'Use local files in the design/ folder with relative paths; do not use JavaScript to render the page or depend on CDN/external resources. ' +
       'Save the page so it appears in the Design panel. ' +
       `Keep the existing project context${input.projectId ? ` for project ${input.projectId}` : ''}. ` +
