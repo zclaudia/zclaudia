@@ -9,7 +9,7 @@
 
 1. 打开一个有工作目录的会话，在右侧工具区或工具添加菜单选择 **设计**。
 2. 顶栏一行承载高频操作：页面标签（脏点/缺失/关闭）、设备视口与缩放、Edit/Run/Slides、撤销/重做、**Save**，其余动作收进 `⋯`（Export / Render export / Share / Unsaved changes / Reload / Refresh design files / Templates / Brand / Assets / Media / Overview / Structure）。
-3. 左栏 **Pages / Layers / Library**：Pages 是已打开页的缩略图行（Grid 开关切总览、`+` 进模板），Layers 是源码结构树，Library 是 Assets / Templates / Brand / Media 的入口。宽档常驻可拖宽，中档只留图标条、面板抽屉覆盖画布，窄档经左上角按钮打开整栏抽屉。
+3. 左栏 **Pages / Layers / Library**：Pages 是已打开页的缩略图行（Grid 开关切总览、`+` 进模板），Layers 是源码结构树；Library 内嵌 Assets / Templates，Brand / Media 暂经原对话框打开。模板在内嵌视图安装成功后自动切回 Pages 并打开入口页。宽档常驻可拖宽，中档只留图标条、面板抽屉覆盖画布，窄档经左上角按钮打开整栏抽屉。
 4. 画布是主区域：点击元素后右侧检查器显示 **Design / Styles / History** 三个页签。Design 按元素类型分组（Text / Link / Image / Typography / Fill & border / Size & spacing / Structure），可折叠并记住状态；修改后底部吸底条显示 pending 数量，**Apply changes** 一次提交（保留一条撤销记录），**Discard** 复位。
 5. Agent 交接收敛为画布底部的输入条：有选区 → 修改该元素，无选区 → 生成页面；`Context` 打开发送前预览，发送后把完整上下文**预填**到当前聊天（不自动发送）。页面有未保存修改时输入条禁用并就地提供 Save。
 6. 保存成功后自动创建版本快照；**History** 页签可查看版本列表、保存手动版本、对比差异，并把工作区恢复到所选版本（恢复前会自动保存当前状态）。
@@ -120,14 +120,14 @@
 
 - **单行顶栏 + 三栏骨架**：`layout/DesignWorkbench` 固定 `topbar / rail / canvas / inspector / status` 五个同级节点，只用 CSS Grid 模板与定位切换宽（≥960）/中（640–959）/窄（<640）三档；画布 iframe 不因切档、开合面板或切页签重挂载（有节点身份与 load 计数测试）。
 - **检查器**：Design 页签按元素类型分组（`inspector/section-matrix.ts`），折叠用 grid-rows + `inert` 不卸载表单状态；统一吸底应用条（pending 计数 / Discard / Apply changes，批量提交语义不变）；Styles 与 History 成为同层页签，Head 为可点击面包屑（`inspector/breadcrumb.ts`）。
-- **左栏**：Pages（`rail/PageThumbnail` 可见性门控 + `PagesView` 未打开文件分组）、Layers（`ElementTree` 去高度上限 + 帮助 Tooltip）、Library（Assets / Templates / Brand / Media 入口；内容仍以既有对话框承载，内嵌视图为后续批次）、可拖宽 200–420。
+- **左栏**：Pages（`rail/PageThumbnail` 可见性门控 + `PagesView` 未打开文件分组）、Layers（`ElementTree` 去高度上限 + 帮助 Tooltip）、Library（P4b 内嵌 `AssetLibraryView` / `TemplateView`，原对话框保留为薄壳；Brand / Media 待 P4c 内嵌）、可拖宽 200–420。
 - **Agent 输入条**：`agent/AgentBar` 取代 Generate page / Hand off to Agent 两个按钮；`buildDesignAgentContext` 新增可选 `request` 参数（缺省输出与旧快照逐字节一致），发送后仍只预填到聊天。
 - **通知模型**：`hooks/useDesignNotices` + `layout/NoticeStack` 取代六种整行横幅的瞬时部分；外部变更 / 缺失 / 页面错误等阻断信息留在画布顶部 `CanvasBanner`，保存态、运行模式计数与视口/缩放移入 26px 状态条。
 - **布局持久化**：`stores/designLayoutStore`（`zclaudia-design-layout-v1`，全局）保存左右开合、页签、左栏宽度与检查器分组折叠；抽屉开合是临时态。
 - **快捷键**：面板内 `⌘S` / `⌘Z` / `⇧⌘Z`（`hooks/useDesignShortcuts`），Tooltip 在接线后才显示快捷键。
 - 测试：`DesignPanel` 用例改为经 `⋯` 菜单 / 左栏 / Agent 条进入；新增 `useElementTier`、`designLayoutStore`、`DesignWorkbench`（不重挂载）、`TopBar` 相关、`section-matrix`、`collect-operations`、`breadcrumb`、`Inspector`、`AgentBar`、`NoticeStack`、`StatusBar`、`PagesView`、`ViewportBar`、`PageTabs`、`useDesignShortcuts` 等用例。
 - **真实应用走查修复（2026-10-25）**：画布 flex 链未撑满导致预览只有 150px 高；Tailwind 缺 `sidebar` 语义色映射使 `bg-sidebar` 透明；medium 档面板的 `hidden` 属性被 `flex` 类覆盖而无法收起；窄档底部面板固定 260px 下限在矮工具面板中挤占画布并压住状态条（改为按实测高度收敛，至少给画布留 96px）；AgentBar 在零高画布上覆盖顶栏（窄档贴底紧凑形态）；Context popover 超出画布（限高 + 内部滚动）；吸底 Apply 与 Version history 头部在 300px 检查器内换行（nowrap/分行）。
-- 剩余批次（未在本轮落地）：P4b/P4c 把 Assets / Templates / Brand / Media 内容抽成 `*View` 内嵌左栏（当前经 Library 入口打开原对话框），P5a 合并 Export & Share 为三页签对话框、P5b 把 DeckPanel 内容搬进左栏 Slides 页签（当前打开原面板）。
+- 剩余批次（未在本轮落地）：P4c 把 Brand / Media 内容抽成 `*View` 内嵌左栏（当前经 Library 入口打开原对话框），P5a 合并 Export & Share 为三页签对话框、P5b 把 DeckPanel 内容搬进左栏 Slides 页签（当前打开原面板）。
 
 ## 模块边界
 

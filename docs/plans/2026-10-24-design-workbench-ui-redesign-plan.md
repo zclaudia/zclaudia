@@ -1,6 +1,6 @@
 # 设计工作台 UI 重构实现方案
 
-日期：2026-10-24。状态：P0–P4a 与 P6 键盘/文档已落地（2026-10-24），并完成真实应用三档截图走查与缺陷修复（2026-10-25）；P4b/c 与 P5 待后续批次。
+日期：2026-10-24。状态：P0–P4b 与 P6 键盘/文档已落地（2026-10-24），并完成真实应用三档截图走查与缺陷修复（2026-10-25）；P4c 与 P5 待后续批次。
 
 范围：`apps/desktop/src/features/design/` 的**视图层**。目标是把当前「纵向堆叠的工具栏 + 256px 长表单」重构为
 [`docs/mockups/design-workbench-layout.html`](../mockups/design-workbench-layout.html) 所示的自适应工作台：
@@ -293,7 +293,7 @@ features/design/
 ### P4 左栏（L）
 
 - [x] 4a：`LeftRail`（图标条、拖拽改宽、抽屉）、`PagesView` + `PageThumbnail`、`LayersView`，移除 Design 页签里的临时 `ElementTree` 与 Open page 菜单。
-- [ ] 4b：`LibraryView` 的 Assets / Templates（抽 `AssetLibraryView` / `TemplateView`，Modal 变薄壳）。
+- [x] 4b：`LibraryView` 的 Assets / Templates（抽 `AssetLibraryView` / `TemplateView`，Modal 变薄壳）。
 - [ ] 4c：Brand / Media 内嵌（含 Expand / Open in dialog 兜底）。
 - 验收：缩略图仅在可见时挂 iframe，同时构建上限仍为 2；Templates 安装后自动切到 Pages 并打开入口页；窄/中档抽屉的焦点与 Esc 行为正确。
 

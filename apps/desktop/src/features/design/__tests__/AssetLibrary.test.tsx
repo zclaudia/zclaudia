@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AssetLibrary } from '../components/AssetLibrary';
 import type { AssetLibraryProps } from '../components/AssetLibrary';
+import { AssetLibraryView } from '../rail/AssetLibraryView';
+import type { AssetLibraryViewProps } from '../rail/AssetLibraryView';
 import { getDesignAsset, importDesignAsset, listDesignAssets } from '../api';
 import { readFileAsBase64 } from '../../../services/fileUpload';
 import { relativeAssetRef } from '../asset-ref';
@@ -227,5 +229,31 @@ describe('AssetLibrary（P4 §4.2）', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Video' }));
     expect(await screen.findByText('media/big.mp4')).toBeInTheDocument();
     expect(await screen.findByText('Unknown size')).toBeInTheDocument();
+  });
+
+  it('P4b：内嵌视图仅在可见时加载，隐藏后不保留列表内容', async () => {
+    const props: AssetLibraryViewProps = {
+      active: false,
+      compact: true,
+      backendId: 'remote-1',
+      sessionId: 's1',
+      openPages: [],
+      referencedAssets: [],
+      activeDocPath: null,
+      selection: null,
+      onApply: vi.fn(),
+      onImported: vi.fn(),
+    };
+    const view = render(<AssetLibraryView {...props} />);
+    expect(listDesignAssets).not.toHaveBeenCalled();
+    expect(view.container).toBeEmptyDOMElement();
+
+    view.rerender(<AssetLibraryView {...props} active />);
+    expect(await screen.findByText('assets/logo.png')).toBeInTheDocument();
+    expect(listDesignAssets).toHaveBeenCalledWith('remote-1', 's1', 'image');
+
+    view.rerender(<AssetLibraryView {...props} active={false} />);
+    expect(view.container).toBeEmptyDOMElement();
+    expect(listDesignAssets).toHaveBeenCalledTimes(1);
   });
 });

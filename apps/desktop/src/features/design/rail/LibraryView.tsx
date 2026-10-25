@@ -1,12 +1,13 @@
-import { Image, Palette, Presentation, Sparkles, Wand2 } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Image, Palette, Presentation, Wand2 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import type { DesignLibraryTab } from '../stores/designLayoutStore';
 
 export interface LibraryViewProps {
   libraryTab: DesignLibraryTab;
   onLibraryTabChange: (tab: DesignLibraryTab) => void;
-  onOpenAssets: () => void;
-  onOpenTemplates: () => void;
+  assets: ReactNode;
+  templates: ReactNode;
   onOpenBrand: () => void;
   onOpenMedia: () => void;
 }
@@ -18,24 +19,7 @@ const TABS: Array<{ id: DesignLibraryTab; label: string }> = [
   { id: 'media', label: 'Media' },
 ];
 
-const COPY: Record<
-  DesignLibraryTab,
-  { title: string; body: string; action: string; aria: string; icon: typeof Image }
-> = {
-  assets: {
-    title: 'Workspace assets',
-    body: 'Browse images and fonts in the workspace, or import new files.',
-    action: 'Open assets',
-    aria: 'Open assets library',
-    icon: Image,
-  },
-  templates: {
-    title: 'Templates',
-    body: 'Start a page from a built-in template; installed files land in design/.',
-    action: 'Browse templates',
-    aria: 'Open templates',
-    icon: Sparkles,
-  },
+const LAUNCHER_COPY = {
   brand: {
     title: 'Brand',
     body: 'Edit DESIGN.md and design tokens so the Agent follows your system.',
@@ -50,36 +34,28 @@ const COPY: Record<
     aria: 'Open media generator',
     icon: Wand2,
   },
-};
+} as const;
 
-/**
- * 左栏 Library（P4 §4.6 的过渡形态）：Assets / Templates / Brand / Media
- * 分组；P4b/P4c 之前各视图以对话框承载（内容抽取后再内嵌），入口与名称
- * 保持不变，避免能力回退。
- */
+/** P4b: Assets/Templates stay mounted inline; Brand/Media keep their dialog launchers until P4c. */
 export function LibraryView({
   libraryTab,
   onLibraryTabChange,
-  onOpenAssets,
-  onOpenTemplates,
+  assets,
+  templates,
   onOpenBrand,
   onOpenMedia,
 }: LibraryViewProps) {
-  const handlers: Record<DesignLibraryTab, () => void> = {
-    assets: onOpenAssets,
-    templates: onOpenTemplates,
-    brand: onOpenBrand,
-    media: onOpenMedia,
-  };
-  const copy = COPY[libraryTab];
-  const Icon = copy.icon;
+  const launcherTab = libraryTab === 'brand' || libraryTab === 'media' ? libraryTab : null;
+  const copy = launcherTab === null ? null : LAUNCHER_COPY[launcherTab];
+  const Icon = copy?.icon ?? Image;
+  const openLauncher = launcherTab === 'brand' ? onOpenBrand : onOpenMedia;
 
   return (
-    <div className="flex flex-col gap-2 p-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
       <div
         role="tablist"
         aria-label="Library sections"
-        className="grid grid-cols-4 gap-0.5 rounded-md border border-border p-0.5"
+        className="grid shrink-0 grid-cols-4 gap-0.5 rounded-md border border-border p-0.5"
       >
         {TABS.map(tab => {
           const active = tab.id === libraryTab;
@@ -101,16 +77,20 @@ export function LibraryView({
           );
         })}
       </div>
-      <div className="flex flex-col gap-2 rounded-md border border-border p-3">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
-          <Icon size={15} strokeWidth={1.75} />
-        </span>
-        <div className="text-xs font-medium">{copy.title}</div>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">{copy.body}</p>
-        <Button size="sm" variant="outline" aria-label={copy.aria} onClick={handlers[libraryTab]}>
-          {copy.action}
-        </Button>
-      </div>
+      <div hidden={libraryTab !== 'assets'}>{assets}</div>
+      <div hidden={libraryTab !== 'templates'}>{templates}</div>
+      {copy !== null && launcherTab !== null && (
+        <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+            <Icon size={15} strokeWidth={1.75} />
+          </span>
+          <div className="text-xs font-medium">{copy.title}</div>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">{copy.body}</p>
+          <Button size="sm" variant="outline" aria-label={copy.aria} onClick={openLauncher}>
+            {copy.action}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

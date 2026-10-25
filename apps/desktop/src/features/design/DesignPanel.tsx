@@ -10,7 +10,6 @@ import { buildDesignAgentContext } from './agent-context';
 import { AgentBar } from './agent/AgentBar';
 import { relativeAssetRef } from './asset-ref';
 import { useAgentRunFeedback } from './agent-run-watch';
-import { AssetLibrary } from './components/AssetLibrary';
 import { BrandPanel } from './components/BrandPanel';
 import { DeckPanel } from './components/DeckPanel';
 import { DeckPresenter } from './components/DeckPresenter';
@@ -19,7 +18,6 @@ import { ExportDialog } from './components/ExportDialog';
 import { MediaGenPanel } from './components/MediaGenPanel';
 import { RenderExportDialog } from './components/RenderExportDialog';
 import { SharePanel } from './components/SharePanel';
-import { TemplateDialog } from './components/TemplateDialog';
 import { PageOverview } from './components/PageOverview';
 import { PreviewCanvas } from './components/PreviewCanvas';
 import { SelectionEditor } from './components/SelectionEditor';
@@ -46,9 +44,11 @@ import { LeftRail } from './layout/LeftRail';
 import { NoticeStack } from './layout/NoticeStack';
 import { StatusBar } from './layout/StatusBar';
 import { TopBar } from './layout/TopBar';
+import { AssetLibraryView } from './rail/AssetLibraryView';
 import { LayersView } from './rail/LayersView';
 import { LibraryView, SlidesView } from './rail/LibraryView';
 import { PagesView } from './rail/PagesView';
+import { TemplateView } from './rail/TemplateView';
 import { useDesignLayoutStore } from './stores/designLayoutStore';
 import { useDesignWorkspace } from './useDesignWorkspace';
 import { isValidRulesMessage } from './validators';
@@ -155,10 +155,8 @@ function DesignPanelSession({
   const [mediaOpen, setMediaOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
-  // ---- P4.6 模板 / 品牌 / 素材对话框 ----
-  const [templatesOpen, setTemplatesOpen] = useState(false);
+  // ---- P4 Library 对话框：Brand / Media 待 P4c 内嵌 ----
   const [brandOpen, setBrandOpen] = useState(false);
-  const [assetsOpen, setAssetsOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [draftDiffOpen, setDraftDiffOpen] = useState(false);
@@ -486,6 +484,15 @@ function DesignPanelSession({
     } else setDrawerOpen(true);
   };
   const openLayers = () => selectRailTab('layers');
+  const openLibrary = (tab: typeof libraryTab) => {
+    setLibraryTab(tab);
+    selectRailTab('library');
+  };
+  const handleTemplateInstalled = (entry: string) => {
+    selectRailTab('pages');
+    refreshNow();
+    void openPage(entry);
+  };
 
   // ---- run 反馈 / 运行导航 / 阻断横幅（§4.3） ----
   const feedbackFiles = runFeedback.status
@@ -595,9 +602,9 @@ function DesignPanelSession({
             onDiff={() => setDraftDiffOpen(true)}
             onReload={() => void controller.reload()}
             onRefresh={refreshNow}
-            onTemplates={() => setTemplatesOpen(true)}
+            onTemplates={() => openLibrary('templates')}
             onBrand={() => setBrandOpen(true)}
-            onAssets={() => setAssetsOpen(true)}
+            onAssets={() => openLibrary('assets')}
             onMedia={() => setMediaOpen(true)}
             onToggleOverview={() => setOverviewOpen(value => !value)}
             onToggleTree={openLayers}
@@ -624,7 +631,7 @@ function DesignPanelSession({
                 onActivate={path => controller.activate(path)}
                 onClose={handleCloseRequest}
                 onOpen={path => void openPage(path)}
-                onOpenTemplates={() => setTemplatesOpen(true)}
+                onOpenTemplates={() => openLibrary('templates')}
                 onToggleOverview={() => setOverviewOpen(value => !value)}
                 onOpenInViewer={path =>
                   useFileViewerStore
@@ -645,8 +652,32 @@ function DesignPanelSession({
               <LibraryView
                 libraryTab={libraryTab}
                 onLibraryTabChange={setLibraryTab}
-                onOpenAssets={() => setAssetsOpen(true)}
-                onOpenTemplates={() => setTemplatesOpen(true)}
+                assets={
+                  <AssetLibraryView
+                    active={visible && railPanelOpen && leftTab === 'library' && libraryTab === 'assets'}
+                    compact
+                    backendId={backendId}
+                    sessionId={sessionId}
+                    openPages={state.pages.map(page => ({ path: page.path, source: page.source }))}
+                    referencedAssets={(activePage?.deps ?? []).map(dep => dep.path)}
+                    activeDocPath={activePage?.path ?? null}
+                    selection={activePage?.selection ? { tagName: activePage.selection.tagName } : null}
+                    onApply={handleApply}
+                    onImported={agent.handleAssetImported}
+                  />
+                }
+                templates={
+                  <TemplateView
+                    active={
+                      visible && railPanelOpen && leftTab === 'library' && libraryTab === 'templates'
+                    }
+                    compact
+                    openEntryOnInstall
+                    backendId={backendId}
+                    sessionId={sessionId}
+                    onInstalled={handleTemplateInstalled}
+                  />
+                }
                 onOpenBrand={() => setBrandOpen(true)}
                 onOpenMedia={() => setMediaOpen(true)}
               />
@@ -679,7 +710,7 @@ function DesignPanelSession({
                       .querySelector<HTMLInputElement>('[data-testid="design-agent-bar"] input')
                       ?.focus();
                   }}
-                  onTemplate={() => setTemplatesOpen(true)}
+                  onTemplate={() => openLibrary('templates')}
                 />
               ) : (
                 <>
@@ -759,7 +790,7 @@ function DesignPanelSession({
                     .querySelector<HTMLInputElement>('[data-testid="design-agent-bar"] input')
                     ?.focus();
                 }}
-                onTemplate={() => setTemplatesOpen(true)}
+                onTemplate={() => openLibrary('templates')}
                 pageInfo={{
                   fileName: activePage ? basename(activePage.path) : null,
                   depCount: activePage?.deps?.length ?? 0,
@@ -827,20 +858,6 @@ function DesignPanelSession({
         }
       />
 
-      {templatesOpen && (
-        <TemplateDialog
-          open
-          backendId={backendId}
-          sessionId={sessionId}
-          onClose={() => setTemplatesOpen(false)}
-          onInstalled={entry => {
-            // 安装即刷新文件清单并打开入口页；open 失败由页面 error 呈现（结果忽略）。
-            refreshNow();
-            void controller.open(entry);
-            setTemplatesOpen(false);
-          }}
-        />
-      )}
       {brandOpen && (
         <BrandPanel
           open
@@ -848,20 +865,6 @@ function DesignPanelSession({
           sessionId={sessionId}
           onClose={() => setBrandOpen(false)}
           onSaved={agent.reloadBrand}
-        />
-      )}
-      {assetsOpen && (
-        <AssetLibrary
-          open
-          backendId={backendId}
-          sessionId={sessionId}
-          openPages={state.pages.map(page => ({ path: page.path, source: page.source }))}
-          referencedAssets={(activePage?.deps ?? []).map(dep => dep.path)}
-          activeDocPath={activePage?.path ?? null}
-          selection={activePage?.selection ? { tagName: activePage.selection.tagName } : null}
-          onApply={handleApply}
-          onImported={agent.handleAssetImported}
-          onClose={() => setAssetsOpen(false)}
         />
       )}
       {mediaOpen && (

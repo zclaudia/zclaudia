@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { TemplateDialog } from '../components/TemplateDialog';
 import type { TemplateDialogProps } from '../components/TemplateDialog';
+import { TemplateView } from '../rail/TemplateView';
 import { DesignHttpError, installDesignTemplate, listDesignTemplates } from '../api';
 
 vi.mock('../api', () => {
@@ -214,5 +215,35 @@ describe('TemplateDialog（P4 §2.4）', () => {
     view.rerender(<TemplateDialog {...props} open={true} />);
     await waitFor(() => expect(listDesignTemplates).toHaveBeenCalledTimes(2));
     expect(await screen.findByText('Landing page')).toBeInTheDocument();
+  });
+
+  it('P4b：内嵌视图隐藏时不加载，安装成功后立即上抛入口页', async () => {
+    const onInstalled = vi.fn();
+    const view = render(
+      <TemplateView
+        active={false}
+        compact
+        openEntryOnInstall
+        backendId="remote-1"
+        sessionId="s1"
+        onInstalled={onInstalled}
+      />
+    );
+    expect(listDesignTemplates).not.toHaveBeenCalled();
+
+    view.rerender(
+      <TemplateView
+        active
+        compact
+        openEntryOnInstall
+        backendId="remote-1"
+        sessionId="s1"
+        onInstalled={onInstalled}
+      />
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Install Landing page' }));
+    await waitFor(() => expect(onInstalled).toHaveBeenCalledWith('design/landing/index.html'));
+    expect(onInstalled).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Open page' })).not.toBeInTheDocument();
   });
 });

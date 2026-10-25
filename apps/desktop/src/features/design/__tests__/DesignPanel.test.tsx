@@ -74,15 +74,14 @@ vi.mock('../agent-run-watch', () => ({
   useAgentRunFeedback: vi.fn(() => runFeedbackMock),
 }));
 
-/** L17 三个对话框按既有 mock 风格打桩：只验证接线（open/回调），内部行为有专属测试文件。 */
-vi.mock('../components/TemplateDialog', () => ({
-  TemplateDialog: (props: { open: boolean; onClose: () => void; onInstalled: (entry: string) => void }) =>
-    props.open ? (
-      <div data-testid="template-dialog">
+/** P4b 内嵌视图与 Brand 对话框打桩：只验证接线，内部行为由专属测试覆盖。 */
+vi.mock('../rail/TemplateView', () => ({
+  TemplateView: (props: { active: boolean; onInstalled: (entry: string) => void }) =>
+    props.active ? (
+      <div data-testid="template-view">
         <button type="button" onClick={() => props.onInstalled('design/landing/index.html')}>
           mock-install and open entry
         </button>
-        <button type="button" onClick={props.onClose}>mock-close templates</button>
       </div>
     ) : null,
 }));
@@ -95,14 +94,13 @@ vi.mock('../components/BrandPanel', () => ({
       </div>
     ) : null,
 }));
-vi.mock('../components/AssetLibrary', () => ({
-  AssetLibrary: (props: { open: boolean; onClose: () => void; onImported: (path: string) => void }) =>
-    props.open ? (
-      <div data-testid="asset-library">
+vi.mock('../rail/AssetLibraryView', () => ({
+  AssetLibraryView: (props: { active: boolean; onImported: (path: string) => void }) =>
+    props.active ? (
+      <div data-testid="asset-library-view">
         <button type="button" onClick={() => props.onImported('assets/logo.png')}>
           mock-import asset
         </button>
-        <button type="button" onClick={props.onClose}>mock-close assets</button>
       </div>
     ) : null,
 }));
@@ -1387,13 +1385,14 @@ describe('DesignPanel', () => {
 
   // ---- P4（L19）面板接线：三对话框 / 上下文检视 / run 反馈横幅 ----
 
-  it('工具栏模板/品牌/素材按钮打开对应对话框并可关闭', async () => {
+  it('P4b：模板/素材入口打开对应左栏视图，品牌仍打开对话框并可关闭', async () => {
     mount();
     await screen.findByTitle('Design preview');
     await openMoreMenu('Templates');
-    expect(screen.getByTestId('template-dialog')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'mock-close templates' }));
-    expect(screen.queryByTestId('template-dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('template-view')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Templates' })).not.toBeInTheDocument();
+    expect(useDesignLayoutStore.getState().leftTab).toBe('library');
+    expect(useDesignLayoutStore.getState().libraryTab).toBe('templates');
 
     await openMoreMenu('Brand');
     expect(screen.getByTestId('brand-panel')).toBeInTheDocument();
@@ -1401,9 +1400,10 @@ describe('DesignPanel', () => {
     expect(screen.queryByTestId('brand-panel')).not.toBeInTheDocument();
 
     await openMoreMenu('Assets');
-    expect(screen.getByTestId('asset-library')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'mock-close assets' }));
-    expect(screen.queryByTestId('asset-library')).not.toBeInTheDocument();
+    expect(screen.getByTestId('asset-library-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('template-view')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Asset library' })).not.toBeInTheDocument();
+    expect(useDesignLayoutStore.getState().libraryTab).toBe('assets');
   });
 
   it('generate：上下文 popover 可检查，发送后填入聊天（含工作区路径与品牌遵循句）', async () => {
@@ -1525,14 +1525,12 @@ describe('DesignPanel', () => {
     expect(screen.queryByRole('button', { name: 'design/new.html' })).not.toBeInTheDocument();
   });
 
-  it('素材导入回调：导入路径进入下一次生成的上下文', async () => {
+  it('素材导入回调：内嵌素材库的导入路径进入下一次生成的上下文', async () => {
     mount();
     await screen.findByTitle('Design preview');
     await openMoreMenu('Assets');
-    expect(screen.getByTestId('asset-library')).toBeInTheDocument();
+    expect(screen.getByTestId('asset-library-view')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'mock-import asset' }));
-    fireEvent.click(screen.getByRole('button', { name: 'mock-close assets' }));
-    expect(screen.queryByTestId('asset-library')).not.toBeInTheDocument();
     const dialog = await openAgentContext();
     expect(dialog.textContent).toContain('assets/logo.png (imported recently)');
     // 活动页 deps 只有 css（kind 过滤只留 image/font），不出现在素材 section。
@@ -1548,7 +1546,16 @@ describe('DesignPanel', () => {
     await waitFor(() => expect(api.getDesignBrand).toHaveBeenCalledTimes(2));
   });
 
-  it('模板安装回调：刷新清单、打开入口页并关闭对话框', async () => {
+  it('P4b：Pages 的模板入口打开 Library/Templates 内嵌视图', async () => {
+    mount();
+    await screen.findByTitle('Design preview');
+    fireEvent.click(screen.getByRole('button', { name: 'New page from template' }));
+    expect(screen.getByTestId('template-view')).toBeInTheDocument();
+    expect(useDesignLayoutStore.getState().leftTab).toBe('library');
+    expect(useDesignLayoutStore.getState().libraryTab).toBe('templates');
+  });
+
+  it('模板安装回调：刷新清单、打开入口页并自动切回 Pages', async () => {
     disk.set('design/landing/index.html', { source: SOURCE, revision: 'rev-landing' });
     vi.mocked(api.listDesignFiles).mockResolvedValue({
       files: ['design/index.html', 'design/landing/index.html'],
@@ -1557,6 +1564,7 @@ describe('DesignPanel', () => {
     await screen.findByTitle('Design preview');
     const callsBefore = vi.mocked(api.listDesignFiles).mock.calls.length;
     await openMoreMenu('Templates');
+    expect(useDesignLayoutStore.getState().leftTab).toBe('library');
     fireEvent.click(screen.getByRole('button', { name: 'mock-install and open entry' }));
     await waitFor(() =>
       expect(vi.mocked(api.listDesignFiles).mock.calls.length).toBeGreaterThan(callsBefore)
@@ -1572,7 +1580,9 @@ describe('DesignPanel', () => {
     await waitFor(() =>
       expect(screen.getAllByRole('tab', { name: /index\.html/ })).toHaveLength(2)
     );
-    expect(screen.queryByTestId('template-dialog')).not.toBeInTheDocument();
+    expect(useDesignLayoutStore.getState().leftTab).toBe('pages');
+    expect(useDesignLayoutStore.getState().leftOpen).toBe(true);
+    expect(screen.queryByTestId('template-view')).not.toBeInTheDocument();
   });
 
   // ---- P5（L25）面板接线：模式切换 / 运行桥接消息 / deck 三组件 / 渲染导出 ----
