@@ -45,8 +45,10 @@ import { NoticeStack } from './layout/NoticeStack';
 import { StatusBar } from './layout/StatusBar';
 import { TopBar } from './layout/TopBar';
 import { AssetLibraryView } from './rail/AssetLibraryView';
+import { BrandView } from './rail/BrandView';
 import { LayersView } from './rail/LayersView';
 import { LibraryView, SlidesView } from './rail/LibraryView';
+import { MediaGenView } from './rail/MediaGenView';
 import { PagesView } from './rail/PagesView';
 import { TemplateView } from './rail/TemplateView';
 import { useDesignLayoutStore } from './stores/designLayoutStore';
@@ -155,7 +157,7 @@ function DesignPanelSession({
   const [mediaOpen, setMediaOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
-  // ---- P4 Library 对话框：Brand / Media 待 P4c 内嵌 ----
+  // ---- P4c Library：Brand / Media 内嵌为主，原 Modal 仅留作工具行的兜底 ----
   const [brandOpen, setBrandOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -488,6 +490,21 @@ function DesignPanelSession({
     setLibraryTab(tab);
     selectRailTab('library');
   };
+  /** Brand / Media 的内嵌入口：切到 Library 页签并让对话框让位（只留一个活动面）。 */
+  const showBrand = () => {
+    setBrandOpen(false);
+    openLibrary('brand');
+  };
+  const showMedia = () => {
+    setMediaOpen(false);
+    openLibrary('media');
+  };
+  /** Expand：只抬高窄面板，已更宽的宽度保持不变。 */
+  const expandLibraryPanel = () => setLeftWidth(Math.max(leftWidth, 320));
+  /** 内嵌 Brand / Media 的唯一活动面：左栏可见且命中页签；对应对话框打开时让位。 */
+  const libraryPanelVisible = visible && railPanelOpen && leftTab === 'library';
+  const brandInlineActive = libraryPanelVisible && libraryTab === 'brand' && !brandOpen;
+  const mediaInlineActive = libraryPanelVisible && libraryTab === 'media' && !mediaOpen;
   const handleTemplateInstalled = (entry: string) => {
     selectRailTab('pages');
     refreshNow();
@@ -603,9 +620,9 @@ function DesignPanelSession({
             onReload={() => void controller.reload()}
             onRefresh={refreshNow}
             onTemplates={() => openLibrary('templates')}
-            onBrand={() => setBrandOpen(true)}
+            onBrand={showBrand}
             onAssets={() => openLibrary('assets')}
-            onMedia={() => setMediaOpen(true)}
+            onMedia={showMedia}
             onToggleOverview={() => setOverviewOpen(value => !value)}
             onToggleTree={openLayers}
           />
@@ -678,6 +695,28 @@ function DesignPanelSession({
                     onInstalled={handleTemplateInstalled}
                   />
                 }
+                brand={
+                  <BrandView
+                    active={brandInlineActive}
+                    compact
+                    backendId={backendId}
+                    sessionId={sessionId}
+                    onSaved={agent.reloadBrand}
+                  />
+                }
+                media={
+                  <MediaGenView
+                    active={mediaInlineActive}
+                    compact
+                    backendId={backendId}
+                    sessionId={sessionId}
+                    activeDocPath={activePage?.path ?? null}
+                    imageSelectionReady={activePage?.selection?.tagName === 'img'}
+                    onReplaceSelectionSrc={handleReplaceSelectionSrc}
+                    onAssetImported={agent.handleAssetImported}
+                  />
+                }
+                onExpand={expandLibraryPanel}
                 onOpenBrand={() => setBrandOpen(true)}
                 onOpenMedia={() => setMediaOpen(true)}
               />

@@ -1,6 +1,6 @@
 # 设计工作台 UI 重构实现方案
 
-日期：2026-10-24。状态：P0–P4b 与 P6 键盘/文档已落地（2026-10-24），并完成真实应用三档截图走查与缺陷修复（2026-10-25）；P4c 与 P5 待后续批次。
+日期：2026-10-24。状态：P0–P4c 与 P6 键盘/文档已落地（2026-10-24），并完成真实应用三档截图走查与缺陷修复（2026-10-25）；P5 待后续批次。
 
 范围：`apps/desktop/src/features/design/` 的**视图层**。目标是把当前「纵向堆叠的工具栏 + 256px 长表单」重构为
 [`docs/mockups/design-workbench-layout.html`](../mockups/design-workbench-layout.html) 所示的自适应工作台：
@@ -41,7 +41,7 @@
 | `ElementTree` + Structure 开关                                   | 左栏 Layers                                                             | 小改（去 `max-h-56`、说明文字改 tooltip）    |
 | `PageOverview`（画布替换式网格）                                 | 左栏 Pages（缩略图列表）；网格视图保留为 Pages 头部的「Grid」开关       | 抽出 `PageThumbnail`                         |
 | `TemplateDialog` / `AssetLibrary`                                | 左栏 Library 的 Templates / Assets 视图                                 | 抽 `*View` 内容，Modal 变成薄壳              |
-| `BrandPanel` / `MediaGenPanel`                                   | 左栏 Library 的 Brand / Media 视图（表单型，见 §6.4 的取舍）            | 同上，分批                                   |
+| `BrandPanel` / `MediaGenPanel`                                   | 左栏 Library 的 Brand / Media 视图（`BrandView` / `MediaGenView`，表单型；Modal 变薄壳，见 §6.4 的取舍） | P4c 已落地                                   |
 | `ExportDialog` / `RenderExportDialog` / `SharePanel`             | 单个「Export & Share」对话框（分页签）                                  | P5 抽内容合并，之前先从 `⋯` 菜单分别进入     |
 | `DeckPanel` / `DeckPresenter`                                    | 顶栏 Slides 入口 → 左栏 Slides 页签（检测到 deck 时出现）；播放器不变   | P5                                           |
 | `AgentContextPreview`（Modal）                                   | Agent 输入条上的「Context」popover                                      | P3 取代                                      |
@@ -240,7 +240,7 @@ features/design/
 - **Layers**：`ElementTree` 去掉 `max-h-56`，`TREE_HELP` 文案改为头部 info `Tooltip`。选中行高亮沿用。
 - **Library**：顶部 `Assets | Templates | Brand | Media` 分段控件（`libraryTab`）。
   - Assets / Templates：完整内嵌（浏览/挑选类任务正适合和画布并排）。
-  - Brand / Media：表单型，内嵌后若宽度 <300 会局促 → 面板内给「Expand」（把 `leftWidth` 临时拉到 320）与「Open in dialog」（走原 Modal 壳，作为兜底，P4 末再看是否可删）。
+  - Brand / Media：表单型，**P4c 已内嵌**；面板内顶部是一行安静的工具动作「Expand」（把 `leftWidth` 抬到至少 320，不缩小已更宽的面板）与「Open in dialog」（走原 Modal 薄壳，作为兜底）。`⋯` 菜单的 Brand / Media 与 Library 页签都进入内嵌视图，只有工具行动作打开对话框；对话框打开期间对应内嵌视图停用（不轮询、不重复请求），关闭后恢复。
 - 窄/中档：面板作为覆盖在画布上的抽屉（`z-dropdown` 层级，`Esc`/点击画布关闭，焦点返回触发按钮）。
 
 ### 4.7 Agent 输入条（`agent/AgentBar.tsx`）
@@ -294,7 +294,7 @@ features/design/
 
 - [x] 4a：`LeftRail`（图标条、拖拽改宽、抽屉）、`PagesView` + `PageThumbnail`、`LayersView`，移除 Design 页签里的临时 `ElementTree` 与 Open page 菜单。
 - [x] 4b：`LibraryView` 的 Assets / Templates（抽 `AssetLibraryView` / `TemplateView`，Modal 变薄壳）。
-- [ ] 4c：Brand / Media 内嵌（含 Expand / Open in dialog 兜底）。
+- [x] 4c：Brand / Media 内嵌（含 Expand / Open in dialog 兜底）。`BrandView` / `MediaGenView` 承载原完整状态机，`BrandPanel` / `MediaGenPanel` 变薄壳；生成/刷新动作移入视图内部。Brand 内嵌仅首次激活或 backend/session 变化时加载，切页签/收起左栏/打开对话框都保留未保存草稿且不重拉；Media 内嵌 `active=false` 时渲染 null 并暂停 `useMediaTasks` 轮询与服务/素材/缩略图请求。恰好一个媒体表面活动（内嵌与对话框互斥）。240px 栏下的紧凑布局：品牌色/字段网格、Logo 堆叠选择、媒体类型短标签、服务/尺寸纵向堆叠、视频参数两列网格、任务结果动作换行。
 - 验收：缩略图仅在可见时挂 iframe，同时构建上限仍为 2；Templates 安装后自动切到 Pages 并打开入口页；窄/中档抽屉的焦点与 Esc 行为正确。
 
 ### P5 对话框归并与 Slides（M）

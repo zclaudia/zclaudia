@@ -74,7 +74,7 @@ vi.mock('../agent-run-watch', () => ({
   useAgentRunFeedback: vi.fn(() => runFeedbackMock),
 }));
 
-/** P4b 内嵌视图与 Brand 对话框打桩：只验证接线，内部行为由专属测试覆盖。 */
+/** P4b/P4c 内嵌视图与兼容对话框打桩：只验证接线，内部行为由专属测试覆盖。 */
 vi.mock('../rail/TemplateView', () => ({
   TemplateView: (props: { active: boolean; onInstalled: (entry: string) => void }) =>
     props.active ? (
@@ -85,11 +85,42 @@ vi.mock('../rail/TemplateView', () => ({
       </div>
     ) : null,
 }));
+vi.mock('../rail/BrandView', () => ({
+  BrandView: (props: { active: boolean; onSaved: () => void }) =>
+    props.active ? (
+      <div data-testid="brand-view">
+        <button type="button" onClick={props.onSaved}>mock-save brand</button>
+      </div>
+    ) : null,
+}));
+vi.mock('../rail/MediaGenView', () => ({
+  MediaGenView: (props: {
+    active: boolean;
+    sessionId: string | null;
+    activeDocPath: string | null;
+    imageSelectionReady: boolean;
+    onReplaceSelectionSrc: (assetPath: string) => void;
+    onAssetImported: (path: string) => void;
+  }) =>
+    props.active ? (
+      <div data-testid="media-view">
+        <span data-testid="media-view-session">{props.sessionId ?? 'none'}</span>
+        <span data-testid="media-view-active-doc">{props.activeDocPath ?? 'none'}</span>
+        <span data-testid="media-view-image-ready">{props.imageSelectionReady ? 'yes' : 'no'}</span>
+        <button type="button" onClick={() => props.onReplaceSelectionSrc('assets/gen-1.png')}>
+          mock-replace selected image
+        </button>
+        <button type="button" onClick={() => props.onAssetImported('assets/gen-1.png')}>
+          mock-import generated asset
+        </button>
+      </div>
+    ) : null,
+}));
 vi.mock('../components/BrandPanel', () => ({
   BrandPanel: (props: { open: boolean; onClose: () => void; onSaved: () => void }) =>
     props.open ? (
-      <div data-testid="brand-panel">
-        <button type="button" onClick={props.onSaved}>mock-save brand</button>
+      <div data-testid="brand-dialog">
+        <button type="button" onClick={props.onSaved}>mock-save brand dialog</button>
         <button type="button" onClick={props.onClose}>mock-close brand</button>
       </div>
     ) : null,
@@ -191,15 +222,15 @@ vi.mock('../components/MediaGenPanel', () => ({
     onClose: () => void;
   }) =>
     props.open ? (
-      <div data-testid="media-gen-panel">
-        <span data-testid="media-gen-session">{props.sessionId ?? 'none'}</span>
-        <span data-testid="media-gen-active-doc">{props.activeDocPath ?? 'none'}</span>
-        <span data-testid="media-gen-image-ready">{props.imageSelectionReady ? 'yes' : 'no'}</span>
+      <div data-testid="media-dialog">
+        <span data-testid="media-dialog-session">{props.sessionId ?? 'none'}</span>
+        <span data-testid="media-dialog-active-doc">{props.activeDocPath ?? 'none'}</span>
+        <span data-testid="media-dialog-image-ready">{props.imageSelectionReady ? 'yes' : 'no'}</span>
         <button type="button" onClick={() => props.onReplaceSelectionSrc('assets/gen-1.png')}>
-          mock-replace selected image
+          mock-replace selected image dialog
         </button>
         <button type="button" onClick={() => props.onAssetImported('assets/gen-1.png')}>
-          mock-import generated asset
+          mock-import generated asset dialog
         </button>
         <button type="button" onClick={props.onClose}>mock-close media</button>
       </div>
@@ -1385,7 +1416,7 @@ describe('DesignPanel', () => {
 
   // ---- P4（L19）面板接线：三对话框 / 上下文检视 / run 反馈横幅 ----
 
-  it('P4b：模板/素材入口打开对应左栏视图，品牌仍打开对话框并可关闭', async () => {
+  it('P4b：模板/素材入口打开对应左栏视图（不弹对话框）', async () => {
     mount();
     await screen.findByTitle('Design preview');
     await openMoreMenu('Templates');
@@ -1394,16 +1425,69 @@ describe('DesignPanel', () => {
     expect(useDesignLayoutStore.getState().leftTab).toBe('library');
     expect(useDesignLayoutStore.getState().libraryTab).toBe('templates');
 
-    await openMoreMenu('Brand');
-    expect(screen.getByTestId('brand-panel')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'mock-close brand' }));
-    expect(screen.queryByTestId('brand-panel')).not.toBeInTheDocument();
-
     await openMoreMenu('Assets');
     expect(screen.getByTestId('asset-library-view')).toBeInTheDocument();
     expect(screen.queryByTestId('template-view')).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Asset library' })).not.toBeInTheDocument();
     expect(useDesignLayoutStore.getState().libraryTab).toBe('assets');
+  });
+
+  it('P4c：More actions 的 Brand / Media 打开左栏内嵌视图，不再直接弹对话框', async () => {
+    mount();
+    await screen.findByTitle('Design preview');
+
+    await openMoreMenu('Brand');
+    expect(screen.getByTestId('brand-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('brand-dialog')).not.toBeInTheDocument();
+    expect(useDesignLayoutStore.getState().leftTab).toBe('library');
+    expect(useDesignLayoutStore.getState().libraryTab).toBe('brand');
+
+    await openMoreMenu('Media');
+    expect(screen.getByTestId('media-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('media-dialog')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('brand-view')).not.toBeInTheDocument();
+    expect(useDesignLayoutStore.getState().libraryTab).toBe('media');
+  });
+
+  it('P4c：内嵌 Brand / Media 的 Expand 抬到 320px，不缩小已更宽的面板', async () => {
+    mount();
+    await screen.findByTitle('Design preview');
+    await openMoreMenu('Brand');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Brand view' }));
+    expect(useDesignLayoutStore.getState().leftWidth).toBe(320);
+
+    act(() => useDesignLayoutStore.getState().setLeftWidth(360));
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Brand view' }));
+    expect(useDesignLayoutStore.getState().leftWidth).toBe(360);
+
+    await openMoreMenu('Media');
+    act(() => useDesignLayoutStore.getState().setLeftWidth(240));
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Media view' }));
+    expect(useDesignLayoutStore.getState().leftWidth).toBe(320);
+  });
+
+  it('P4c：Open in dialog 打开原对话框并暂停内嵌活动面，关闭后恢复（Brand / Media 各只有一个活动面）', async () => {
+    mount();
+    await screen.findByTitle('Design preview');
+
+    await openMoreMenu('Brand');
+    expect(screen.getByTestId('brand-view')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Brand in dialog' }));
+    expect(screen.getByTestId('brand-dialog')).toBeInTheDocument();
+    expect(screen.queryByTestId('brand-view')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'mock-close brand' }));
+    expect(screen.queryByTestId('brand-dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('brand-view')).toBeInTheDocument();
+
+    await openMoreMenu('Media');
+    expect(screen.getByTestId('media-view')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Media in dialog' }));
+    expect(screen.getByTestId('media-dialog')).toBeInTheDocument();
+    expect(screen.queryByTestId('media-view')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'mock-close media' }));
+    expect(screen.queryByTestId('media-dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('media-view')).toBeInTheDocument();
   });
 
   it('generate：上下文 popover 可检查，发送后填入聊天（含工作区路径与品牌遵循句）', async () => {
@@ -1795,17 +1879,24 @@ describe('DesignPanel', () => {
 
   // ---- P6（L36）面板接线：媒体生成面板打开/props 透传/替换事务/落库刷新/切页关闭 ----
 
-  it('P6：媒体按钮打开媒体生成面板并透传会话与活动页，无选区时 imageSelectionReady 为否', async () => {
+  it('P4c/P6：媒体入口打开内嵌视图并透传会话与活动页，无选区时 imageSelectionReady 为否', async () => {
     mount();
     await screen.findByTitle('Design preview');
-    expect(screen.queryByTestId('media-gen-panel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('media-view')).not.toBeInTheDocument();
     await openMoreMenu('Media');
-    expect(screen.getByTestId('media-gen-panel')).toBeInTheDocument();
-    expect(screen.getByTestId('media-gen-session')).toHaveTextContent('session-1');
-    expect(screen.getByTestId('media-gen-active-doc')).toHaveTextContent('design/index.html');
-    expect(screen.getByTestId('media-gen-image-ready')).toHaveTextContent('no');
+    expect(screen.getByTestId('media-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('media-dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('media-view-session')).toHaveTextContent('session-1');
+    expect(screen.getByTestId('media-view-active-doc')).toHaveTextContent('design/index.html');
+    expect(screen.getByTestId('media-view-image-ready')).toHaveTextContent('no');
+
+    // 兜底对话框仍可打开，并暂停同一媒体内嵌面。
+    fireEvent.click(screen.getByRole('button', { name: 'Open Media in dialog' }));
+    expect(screen.getByTestId('media-dialog')).toBeInTheDocument();
+    expect(screen.queryByTestId('media-view')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'mock-close media' }));
-    expect(screen.queryByTestId('media-gen-panel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('media-dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('media-view')).toBeInTheDocument();
   });
 
   it('P6：img 选区 imageSelectionReady 为真，替换回调触发 src attribute 事务（相对引用换算）', async () => {
@@ -1824,7 +1915,7 @@ describe('DesignPanel', () => {
     });
     await screen.findByRole('textbox', { name: 'Image URL' });
     await openMoreMenu('Media');
-    expect(screen.getByTestId('media-gen-image-ready')).toHaveTextContent('yes');
+    expect(screen.getByTestId('media-view-image-ready')).toHaveTextContent('yes');
 
     fireEvent.click(screen.getByRole('button', { name: 'mock-replace selected image' }));
     // asset-ref 换算：design/index.html + assets/gen-1.png → ../assets/gen-1.png。
@@ -1850,15 +1941,21 @@ describe('DesignPanel', () => {
     );
   });
 
-  it('P6：切页时媒体生成面板一并关闭（deckOpen/renderExportOpen 同款 effect）', async () => {
+  it('P6/P4c：切页关闭媒体对话框，内嵌媒体视图随新活动页继续可用', async () => {
     disk.set('p2.html', { source: pageSource('B'), revision: 'rev-b' });
     vi.mocked(api.listDesignFiles).mockResolvedValue({ files: ['design/index.html', 'p2.html'] });
     mount();
     await screen.findByTitle('Design preview');
     await openMoreMenu('Media');
-    expect(screen.getByTestId('media-gen-panel')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Media in dialog' }));
+    expect(screen.getByTestId('media-dialog')).toBeInTheDocument();
+
     await openPage('p2.html');
-    expect(screen.queryByTestId('media-gen-panel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('media-dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('media-view')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('media-view-active-doc')).toHaveTextContent('p2.html')
+    );
   });
 
   // ---- P7（S7）面板接线：分享按钮 / 真实 SharePanel 挂载 / 交接 prefill / 切页关闭 ----

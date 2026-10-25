@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Image, Palette, Presentation, Wand2 } from 'lucide-react';
+import { ExternalLink, Maximize2, Presentation } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import type { DesignLibraryTab } from '../stores/designLayoutStore';
 
@@ -8,6 +8,11 @@ export interface LibraryViewProps {
   onLibraryTabChange: (tab: DesignLibraryTab) => void;
   assets: ReactNode;
   templates: ReactNode;
+  brand: ReactNode;
+  media: ReactNode;
+  /** Raise the left rail to at least 320px (never shrink a wider panel). */
+  onExpand: () => void;
+  /** Modal fallbacks for the form-shaped views. */
   onOpenBrand: () => void;
   onOpenMedia: () => void;
 }
@@ -19,36 +24,30 @@ const TABS: Array<{ id: DesignLibraryTab; label: string }> = [
   { id: 'media', label: 'Media' },
 ];
 
-const LAUNCHER_COPY = {
-  brand: {
-    title: 'Brand',
-    body: 'Edit DESIGN.md and design tokens so the Agent follows your system.',
-    action: 'Edit brand',
-    aria: 'Open brand editor',
-    icon: Palette,
-  },
-  media: {
-    title: 'Media',
-    body: 'Generate images or video from a prompt and drop the result into the page.',
-    action: 'Generate media',
-    aria: 'Open media generator',
-    icon: Wand2,
-  },
+const UTILITY_COPY = {
+  brand: { label: 'Brand', openInDialog: 'Open Brand in dialog' },
+  media: { label: 'Media', openInDialog: 'Open Media in dialog' },
 } as const;
 
-/** P4b: Assets/Templates stay mounted inline; Brand/Media keep their dialog launchers until P4c. */
+/**
+ * 左栏 Library（P4b/P4c §4.6）：四个页签全部内嵌，不再用启动卡片打断上下文。
+ * Brand / Media 是表单型视图，顶部给一行安静的工具动作：Expand 把左栏抬到
+ * 320px；Open in dialog 仍走原 Modal 薄壳（兼容与兜底，同时暂停内嵌实例）。
+ */
 export function LibraryView({
   libraryTab,
   onLibraryTabChange,
   assets,
   templates,
+  brand,
+  media,
+  onExpand,
   onOpenBrand,
   onOpenMedia,
 }: LibraryViewProps) {
-  const launcherTab = libraryTab === 'brand' || libraryTab === 'media' ? libraryTab : null;
-  const copy = launcherTab === null ? null : LAUNCHER_COPY[launcherTab];
-  const Icon = copy?.icon ?? Image;
-  const openLauncher = launcherTab === 'brand' ? onOpenBrand : onOpenMedia;
+  const utilityTab = libraryTab === 'brand' || libraryTab === 'media' ? libraryTab : null;
+  const utility = utilityTab === null ? null : UTILITY_COPY[utilityTab];
+  const openInDialog = utilityTab === 'brand' ? onOpenBrand : onOpenMedia;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
@@ -77,20 +76,32 @@ export function LibraryView({
           );
         })}
       </div>
-      <div hidden={libraryTab !== 'assets'}>{assets}</div>
-      <div hidden={libraryTab !== 'templates'}>{templates}</div>
-      {copy !== null && launcherTab !== null && (
-        <div className="flex flex-col gap-2 rounded-md border border-border p-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
-            <Icon size={15} strokeWidth={1.75} />
-          </span>
-          <div className="text-xs font-medium">{copy.title}</div>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">{copy.body}</p>
-          <Button size="sm" variant="outline" aria-label={copy.aria} onClick={openLauncher}>
-            {copy.action}
+      {utility !== null && utilityTab !== null && (
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label={`Expand ${utility.label} view`}
+            onClick={onExpand}
+          >
+            <Maximize2 size={12} strokeWidth={1.75} />
+            Expand
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label={utility.openInDialog}
+            onClick={openInDialog}
+          >
+            <ExternalLink size={12} strokeWidth={1.75} />
+            Open in dialog
           </Button>
         </div>
       )}
+      <div hidden={libraryTab !== 'assets'}>{assets}</div>
+      <div hidden={libraryTab !== 'templates'}>{templates}</div>
+      <div hidden={libraryTab !== 'brand'}>{brand}</div>
+      <div hidden={libraryTab !== 'media'}>{media}</div>
     </div>
   );
 }
