@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design workbench — layout mockup</title>
+<style>
+/* Real tokens, copied from apps/desktop/src/styles/index.css (light + dark neutral) */
+:root, [data-theme="light"] {
+  --background: 45 25% 97%; --foreground: 45 8% 10%; --card: 45 30% 99%; --sidebar: 45 15% 93%;
+  --secondary: 45 12% 90%; --muted: 45 12% 91%; --muted-foreground: 45 5% 40%; --accent: 45 12% 87%;
+  --border: 45 10% 86%; --primary: 214 70% 45%; --primary-foreground: 0 0% 100%;
+  --success: 150 48% 33%; --warning: 38 80% 44%; --destructive: 4 66% 45%;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / .04);
+  --shadow-md: 0 2px 8px -1px rgb(0 0 0 / .06), 0 1px 2px -1px rgb(0 0 0 / .04);
+  --shadow-lg: 0 12px 32px -8px rgb(0 0 0 / .18), 0 2px 6px rgb(0 0 0 / .06);
+  --page: 45 10% 88%;
+}
+[data-theme="dark"] {
+  --background: 35 6% 8.5%; --foreground: 35 10% 91%; --card: 35 6% 11.5%; --sidebar: 35 6% 6.5%;
+  --secondary: 35 5% 14%; --muted: 35 5% 14%; --muted-foreground: 35 6% 60%; --accent: 35 6% 17%;
+  --border: 35 6% 17.5%; --primary: 214 70% 60%; --primary-foreground: 220 20% 10%;
+  --success: 150 40% 52%; --warning: 40 70% 55%; --destructive: 4 62% 55%;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / .2);
+  --shadow-md: 0 2px 8px -1px rgb(0 0 0 / .3), 0 1px 2px -1px rgb(0 0 0 / .2);
+  --shadow-lg: 0 12px 32px -8px rgb(0 0 0 / .6), 0 2px 6px rgb(0 0 0 / .3);
+  --page: 35 6% 4%;
+}
+* { box-sizing: border-box; margin: 0; }
+body { font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; background: hsl(var(--page)); color: hsl(var(--foreground)); padding: 20px 24px 48px; }
+.wrap { max-width: 1500px; margin: 0 auto; }
+h1.t { font-size: 16px; font-weight: 600; }
+.sub { color: hsl(var(--muted-foreground)); font-size: 13px; margin: 2px 0 14px; }
+button { font: inherit; color: inherit; }
+svg.ic { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+svg.ic.sm { width: 13px; height: 13px; }
+.mut { color: hsl(var(--muted-foreground)); }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+/* ---------- mockup control bar (not part of the product UI) ---------- */
+.bar { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; margin-bottom: 14px; }
+.grp { display: flex; align-items: center; gap: 6px; }
+.grp > span { font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground)); }
+.seg { display: inline-flex; background: hsl(var(--secondary)); border-radius: 9px; padding: 2px; }
+.seg button { font-size: 12px; border: 0; background: transparent; color: hsl(var(--muted-foreground)); height: 24px; padding: 0 10px; border-radius: 7px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.seg button[aria-pressed="true"] { background: hsl(var(--card)); color: hsl(var(--foreground)); box-shadow: var(--shadow-sm); }
+.seg button:disabled { opacity: .45; cursor: not-allowed; }
+.hint { font-size: 12px; color: hsl(var(--muted-foreground)); margin-top: 10px; }
+
+/* ---------- stage: scaled window ---------- */
+.stage { position: relative; width: 100%; display: flex; justify-content: center; }
+.win {
+  transform-origin: top left;
+  position: absolute; left: 0; top: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: hsl(var(--background)); color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border)); border-radius: 14px; box-shadow: var(--shadow-md);
+  font-size: 12px; line-height: 1.4; user-select: none;
+}
+.win[data-layout="wide"] { width: 1440px; height: 880px; }
+.win[data-layout="narrow"] { width: 460px; height: 880px; }
+.win[data-layout="current"] { width: 1440px; height: 880px; }
+
+/* ---------- primitives ---------- */
+.btn { height: 28px; min-width: 28px; padding: 0 8px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: hsl(var(--muted-foreground)); display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 12px; cursor: pointer; white-space: nowrap; transition: background .12s, color .12s; }
+.btn:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+.btn[aria-pressed="true"] { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+.btn:disabled { opacity: .4; cursor: not-allowed; background: transparent; }
+.btn.fg { color: hsl(var(--foreground)); }
+.btn.primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-weight: 500; }
+.btn.primary:hover { background: hsl(var(--primary) / .9); color: hsl(var(--primary-foreground)); }
+.btn.outline { border-color: hsl(var(--border)); color: hsl(var(--foreground)); }
+.btn.xs { height: 24px; font-size: 11px; padding: 0 7px; }
+.sep { width: 1px; height: 16px; background: hsl(var(--border)); margin: 0 4px; flex: none; }
+.input { height: 28px; border-radius: 8px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); padding: 0 8px; font-size: 12px; color: hsl(var(--foreground)); width: 100%; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.input .u { color: hsl(var(--muted-foreground)); font-size: 11px; margin-left: auto; }
+.sw { width: 14px; height: 14px; border-radius: 4px; border: 1px solid hsl(var(--border)); flex: none; }
+.seg2 { display: inline-flex; border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 1px; gap: 1px; width: 100%; }
+.seg2 span { flex: 1; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; color: hsl(var(--muted-foreground)); font-size: 11px; cursor: pointer; }
+.seg2 span.on { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+.label { font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground)); }
+.kbd { font: 10px ui-monospace, Menlo, monospace; border: 1px solid hsl(var(--border)); border-radius: 4px; padding: 0 4px; color: hsl(var(--muted-foreground)); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: hsl(var(--warning)); flex: none; }
+.dot.ok { background: hsl(var(--success)); }
+
+/* ---------- top bar ---------- */
+.top { height: 44px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 8px; border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--background)); }
+.tabs { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.tab { height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 6px 0 9px; border-radius: 8px; color: hsl(var(--muted-foreground)); cursor: pointer; font-size: 12px; white-space: nowrap; }
+.tab:hover { background: hsl(var(--secondary)); }
+.tab.on { background: hsl(var(--secondary)); color: hsl(var(--foreground)); font-weight: 500; }
+.tab .x { opacity: 0; width: 16px; height: 16px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; }
+.tab:hover .x, .tab.on .x { opacity: .7; }
+.tab .x:hover { background: hsl(var(--accent)); opacity: 1; }
+.spacer { flex: 1; min-width: 8px; }
+.zoom { display: flex; align-items: center; gap: 0; }
+.zoom .pct { min-width: 54px; text-align: center; font-size: 11px; color: hsl(var(--muted-foreground)); }
+.wid { width: 62px; height: 24px; border-radius: 7px; border: 1px solid hsl(var(--border)); font-size: 11px; display: inline-flex; align-items: center; justify-content: center; color: hsl(var(--foreground)); background: hsl(var(--card)); }
+
+/* ---------- main area ---------- */
+.main { flex: 1; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) 300px; position: relative; }
+.rail { display: flex; border-right: 1px solid hsl(var(--border)); background: hsl(var(--sidebar)); }
+.rail-icons { width: 40px; display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; border-right: 1px solid hsl(var(--border) / .7); }
+.rail-icons .btn { width: 30px; height: 30px; padding: 0; }
+.rail-panel { width: 224px; display: flex; flex-direction: column; min-height: 0; }
+.panel-h { height: 36px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 12px; font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground)); }
+.panel-b { flex: 1; min-height: 0; overflow: auto; padding: 0 6px 8px; }
+.row { height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 8px; color: hsl(var(--muted-foreground)); cursor: pointer; font-size: 12px; white-space: nowrap; }
+.row:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+.row.on { background: hsl(var(--secondary)); color: hsl(var(--foreground)); font-weight: 500; }
+.row .tag { font-weight: 500; color: hsl(var(--foreground)); }
+.row .cls { opacity: .75; }
+.page-card { display: flex; gap: 8px; padding: 6px; border-radius: 10px; cursor: pointer; align-items: center; }
+.page-card:hover { background: hsl(var(--secondary)); }
+.page-card.on { background: hsl(var(--secondary)); }
+.thumb { width: 54px; height: 38px; border-radius: 6px; border: 1px solid hsl(var(--border)); background: linear-gradient(180deg, hsl(var(--card)) 0 22%, hsl(var(--muted)) 22% 58%, hsl(var(--card)) 58%); flex: none; position: relative; overflow: hidden; }
+.thumb::after { content: ""; position: absolute; left: 6px; top: 12px; width: 26px; height: 4px; border-radius: 2px; background: hsl(var(--foreground) / .5); }
+.libgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px 4px 0; }
+.asset { aspect-ratio: 1.2; border-radius: 8px; border: 1px solid hsl(var(--border)); position: relative; overflow: hidden; cursor: pointer; }
+.asset small { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 6px 3px; font-size: 10px; color: #fff; background: linear-gradient(transparent, rgb(0 0 0 / .55)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asset:hover { outline: 2px solid hsl(var(--primary) / .6); }
+
+/* ---------- canvas ---------- */
+.canvas-wrap { position: relative; background: hsl(var(--sidebar)); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.canvas { flex: 1; min-height: 0; overflow: hidden; position: relative; display: flex; justify-content: center; align-items: flex-start; padding: 24px 24px 0; }
+.page-holder { position: relative; flex: none; box-shadow: var(--shadow-md); border-radius: 4px; overflow: visible; }
+.page { transform-origin: top left; background: #fff; color: #1d1b16; font-family: "Inter", -apple-system, system-ui, sans-serif; position: relative; overflow: hidden; border-radius: 4px; }
+.win[data-mode="edit"] .page [data-sel]:hover:not(.selected) { outline: calc(1.5px / var(--s, 1)) solid hsl(var(--primary) / .55); outline-offset: calc(-1px / var(--s, 1)); cursor: pointer; }
+.page [data-sel].selected { outline: calc(2px / var(--s, 1)) solid hsl(var(--primary)); outline-offset: calc(-1px / var(--s, 1)); position: relative; }
+.sel-label { position: absolute; left: calc(-2px / var(--s, 1)); top: calc(-22px / var(--s, 1)); background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font: 500 calc(11px / var(--s, 1))/1 ui-monospace, Menlo, monospace; padding: calc(4px / var(--s, 1)) calc(7px / var(--s, 1)); border-radius: calc(4px / var(--s, 1)); white-space: nowrap; pointer-events: none; z-index: 5; }
+.win[data-mode="run"] .page [data-sel] { cursor: default; }
+
+/* mock page content */
+.nav { display: flex; align-items: center; padding: 28px 64px; gap: 40px; }
+.nav .logo { font-weight: 700; font-size: 22px; letter-spacing: -.02em; }
+.nav .links { display: flex; gap: 28px; font-size: 16px; color: #6b665b; margin-left: 12px; }
+.nav .sp { flex: 1; }
+.nav .cta { background: #1d1b16; color: #fff; padding: 11px 20px; border-radius: 999px; font-size: 15px; font-weight: 500; }
+.hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; padding: 40px 64px 56px; align-items: center; }
+.hero h1 { font-size: 64px; line-height: 1.05; letter-spacing: -.035em; font-weight: 700; margin: 0 0 20px; }
+.hero h1 em { font-style: normal; color: #2f6fe4; }
+.hero p { font-size: 19px; line-height: 1.55; color: #5e594e; margin: 0 0 30px; max-width: 480px; }
+.hero .ctas { display: flex; gap: 12px; }
+.hero .b1 { background: #2f6fe4; color: #fff; padding: 14px 26px; border-radius: 12px; font-weight: 600; font-size: 16px; }
+.hero .b2 { padding: 14px 22px; border-radius: 12px; font-weight: 500; font-size: 16px; border: 1px solid #d9d5c9; }
+.hero .art { aspect-ratio: 1.15; border-radius: 24px; background: radial-gradient(circle at 25% 20%, #ffd7a8 0 18%, transparent 19%), linear-gradient(135deg, #cfe0ff, #f4e3ff 60%, #ffe9d6); position: relative; overflow: hidden; }
+.hero .art::before { content: ""; position: absolute; left: 12%; right: 12%; bottom: 12%; height: 46%; background: #fff; border-radius: 16px; box-shadow: 0 16px 40px rgb(30 30 60 / .18); }
+.hero .art::after { content: ""; position: absolute; left: 18%; bottom: 22%; width: 38%; height: 8px; border-radius: 4px; background: #d9d5c9; box-shadow: 0 -22px 0 #d9d5c9, 0 -44px 0 #2f6fe4; }
+.feat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; padding: 24px 64px 64px; }
+.feat div { background: #f6f3ea; border-radius: 18px; padding: 28px; font-size: 15px; color: #5e594e; }
+.feat b { display: block; font-size: 19px; color: #1d1b16; margin-bottom: 8px; }
+.page.m .nav { padding: 18px 20px; gap: 12px; } .page.m .nav .links { display: none; } .page.m .nav .logo { font-size: 18px; } .page.m .nav .cta { padding: 8px 14px; font-size: 13px; }
+.page.m .hero { grid-template-columns: 1fr; gap: 24px; padding: 12px 20px 28px; }
+.page.m .hero h1 { font-size: 36px; } .page.m .hero p { font-size: 15px; margin-bottom: 20px; }
+.page.m .hero .b1, .page.m .hero .b2 { padding: 11px 18px; font-size: 14px; }
+.page.m .feat { grid-template-columns: 1fr; padding: 8px 20px 28px; gap: 12px; }
+
+/* floating agent bar */
+.agent { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(560px, calc(100% - 32px)); background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 16px; box-shadow: var(--shadow-lg); padding: 6px 6px 6px 8px; display: flex; align-items: center; gap: 6px; z-index: 20; }
+.agent .chip { height: 24px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 7px; background: hsl(var(--secondary)); color: hsl(var(--foreground)); font: 11px ui-monospace, Menlo, monospace; white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.agent .ph { flex: 1; color: hsl(var(--muted-foreground)); font-size: 13px; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent .send { width: 28px; height: 28px; border-radius: 9px; padding: 0; }
+.popover { position: absolute; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 14px; box-shadow: var(--shadow-lg); z-index: 40; padding: 6px; min-width: 220px; }
+.popover .mi { height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 8px; border-radius: 8px; font-size: 12px; cursor: pointer; color: hsl(var(--foreground)); }
+.popover .mi:hover { background: hsl(var(--secondary)); }
+.popover .mi .kbd { margin-left: auto; }
+.popover hr { border: 0; border-top: 1px solid hsl(var(--border)); margin: 4px 0; }
+.ctx-pop { left: 50%; bottom: 66px; transform: translateX(-50%); width: min(540px, calc(100% - 32px)); padding: 12px; }
+.ctx-pop h4 { font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground)); margin: 0 0 8px; }
+.ctx-sec { display: flex; gap: 8px; padding: 5px 0; font-size: 12px; align-items: baseline; border-top: 1px solid hsl(var(--border) / .7); }
+.ctx-sec:first-of-type { border-top: 0; }
+.ctx-sec b { width: 70px; flex: none; font-weight: 500; }
+.ctx-sec span { color: hsl(var(--muted-foreground)); }
+.toast { position: absolute; right: 14px; top: 12px; z-index: 60; background: hsl(var(--foreground)); color: hsl(var(--background)); border-radius: 12px; padding: 9px 12px; font-size: 12px; display: flex; gap: 10px; align-items: center; box-shadow: var(--shadow-lg); animation: tin .18s ease-out; }
+.toast u { text-decoration: none; opacity: .75; cursor: pointer; }
+@keyframes tin { from { opacity: 0; transform: translateY(-6px); } }
+
+/* ---------- inspector ---------- */
+.insp { border-left: 1px solid hsl(var(--border)); background: hsl(var(--background)); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.insp-h { padding: 10px 12px 8px; border-bottom: 1px solid hsl(var(--border)); }
+.crumb { display: flex; align-items: center; gap: 2px; font: 11px ui-monospace, Menlo, monospace; color: hsl(var(--muted-foreground)); flex-wrap: wrap; }
+.crumb i { font-style: normal; opacity: .5; padding: 0 1px; }
+.crumb b { font-weight: 500; color: hsl(var(--foreground)); }
+.insp-title { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; font-weight: 600; }
+.itabs { display: flex; gap: 2px; padding: 6px 8px 0; border-bottom: 1px solid hsl(var(--border)); }
+.itab { height: 28px; padding: 0 10px; font-size: 12px; color: hsl(var(--muted-foreground)); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; display: inline-flex; align-items: center; gap: 5px; }
+.itab:hover { color: hsl(var(--foreground)); }
+.itab.on { color: hsl(var(--foreground)); border-bottom-color: hsl(var(--foreground)); font-weight: 500; }
+.insp-b { flex: 1; min-height: 0; overflow: auto; }
+details.sec { border-bottom: 1px solid hsl(var(--border)); }
+details.sec > summary { list-style: none; height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 12px; font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground)); cursor: pointer; }
+details.sec > summary::-webkit-details-marker { display: none; }
+details.sec > summary:hover { color: hsl(var(--foreground)); }
+details.sec > summary .chev { transition: transform .12s; transform: rotate(-90deg); }
+details.sec[open] > summary .chev { transform: rotate(0); }
+details.sec > summary .act { margin-left: auto; opacity: 0; }
+details.sec > summary:hover .act { opacity: 1; }
+.sec-b { padding: 0 12px 12px; display: grid; gap: 8px; }
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.f { display: grid; gap: 4px; min-width: 0; }
+.ta { min-height: 52px; border-radius: 8px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); padding: 6px 8px; font-size: 12px; line-height: 1.45; }
+.empty { padding: 28px 18px; text-align: center; color: hsl(var(--muted-foreground)); }
+.empty .big { width: 36px; height: 36px; border-radius: 12px; background: hsl(var(--secondary)); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px; }
+.empty h5 { font-size: 13px; font-weight: 600; color: hsl(var(--foreground)); margin: 0 0 4px; }
+.stat { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 12px; }
+.rule { margin: 0 12px 10px; border: 1px solid hsl(var(--border)); border-radius: 10px; overflow: hidden; }
+.rule .rh { display: flex; justify-content: space-between; padding: 6px 10px; background: hsl(var(--muted)); font-size: 11px; }
+.rule .rb { padding: 6px 10px; font: 11.5px/1.7 ui-monospace, Menlo, monospace; }
+.rule s { color: hsl(var(--muted-foreground)); }
+.ver { display: flex; gap: 8px; padding: 8px 12px; border-bottom: 1px solid hsl(var(--border) / .7); align-items: flex-start; }
+.ver .vd { margin-top: 5px; }
+.ver b { font-weight: 500; font-size: 12px; display: block; }
+.ver span { font-size: 11px; color: hsl(var(--muted-foreground)); }
+.ver .btn { margin-left: auto; }
+
+/* ---------- status bar ---------- */
+.status { height: 26px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-top: 1px solid hsl(var(--border)); font-size: 11px; color: hsl(var(--muted-foreground)); background: hsl(var(--background)); }
+.status .sp { flex: 1; }
+.status .item { display: inline-flex; align-items: center; gap: 5px; }
+.status .warn { color: hsl(var(--warning)); }
+
+/* ---------- modal ---------- */
+.scrim { position: absolute; inset: 0; background: rgb(0 0 0 / .32); z-index: 80; display: flex; align-items: center; justify-content: center; }
+.modal { width: 520px; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 20px; box-shadow: var(--shadow-lg); overflow: hidden; }
+.modal-h { display: flex; align-items: center; padding: 12px 14px 0 16px; font-size: 14px; font-weight: 600; }
+.modal-h .btn { margin-left: auto; }
+.modal-b { padding: 14px 16px 16px; display: grid; gap: 10px; font-size: 12px; }
+.opt { display: flex; align-items: center; gap: 10px; border: 1px solid hsl(var(--border)); border-radius: 12px; padding: 10px 12px; }
+.opt b { font-weight: 500; display: block; font-size: 12px; } .opt span { color: hsl(var(--muted-foreground)); font-size: 11px; }
+.opt .btn { margin-left: auto; }
+
+/* ---------- drawer (narrow) ---------- */
+.menu-btn-narrow { display: none; }
+.win[data-layout="narrow"] .main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 330px; }
+.win[data-layout="narrow"] .rail { display: none; position: absolute; left: 0; top: 0; bottom: 0; z-index: 70; box-shadow: var(--shadow-lg); }
+.win[data-layout="narrow"][data-drawer="open"] .rail { display: flex; }
+.win[data-layout="narrow"] .rail .rail-icons { display: flex; }
+.win[data-layout="narrow"] .insp { border-left: 0; border-top: 1px solid hsl(var(--border)); border-radius: 14px 14px 0 0; box-shadow: 0 -4px 14px rgb(0 0 0 / .06); }
+.win[data-layout="narrow"] .menu-btn-narrow { display: inline-flex; }
+.win[data-layout="narrow"] .only-wide { display: none !important; }
+.win[data-layout="narrow"] .canvas { padding: 12px 0 0; }
+.win[data-layout="narrow"] .agent { bottom: 10px; width: calc(100% - 20px); }
+.win[data-layout="narrow"] .agent .chip { max-width: 90px; }
+.win[data-layout="narrow"] .tab:not(.on) { display: none; }
+.grab { display: none; width: 36px; height: 4px; border-radius: 2px; background: hsl(var(--border)); margin: 6px auto 0; }
+.win[data-layout="narrow"] .grab { display: block; }
+.win[data-layout="narrow"] .status .only-wide-s { display: none; }
+
+/* ---------- run mode ---------- */
+.win[data-mode="run"] .insp-b, .win[data-mode="run"] .itabs { display: none; }
+.win[data-mode="run"] .agent { display: none; }
+.runnote { display: none; padding: 24px 18px; text-align: center; color: hsl(var(--muted-foreground)); }
+.win[data-mode="run"] .runnote { display: block; }
+.win[data-mode="run"] .insp-h { display: none; }
+
+/* ---------- "current" (reference) rendition ---------- */
+.cur .cb { height: 24px; padding: 0 8px; border-radius: 8px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: hsl(var(--foreground)); white-space: nowrap; }
+.cur .cb.p { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: transparent; }
+.cur .cb.g { background: transparent; border-color: transparent; color: hsl(var(--muted-foreground)); }
+.cur .cb.d { opacity: .45; }
+.cur .r { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px 8px; border-bottom: 1px solid hsl(var(--border)); }
+.cur .banner { padding: 6px 12px; border-bottom: 1px solid hsl(var(--border)); font-size: 11px; color: hsl(var(--muted-foreground)); }
+.cur .banner.w { color: hsl(var(--warning)); }
+.cur .ctab { display: inline-flex; gap: 6px; align-items: center; font-size: 11px; padding: 2px 6px; border-radius: 8px; border: 1px solid transparent; }
+.cur .ctab.on { border-color: hsl(var(--primary) / .4); background: hsl(var(--primary) / .1); }
+.cur .edit { height: 256px; flex: none; overflow: hidden; border-top: 1px solid hsl(var(--border)); padding: 12px; position: relative; }
+.cur .edit::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 40px; background: linear-gradient(transparent, hsl(var(--background))); }
+.cur .gridf { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 12px; margin-top: 10px; }
+.cur .fl { font-size: 10px; color: hsl(var(--muted-foreground)); margin-bottom: 3px; }
+.note { position: absolute; z-index: 90; background: hsl(var(--destructive)); color: #fff; font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 999px; box-shadow: var(--shadow-md); white-space: nowrap; }
+.note::before { content: ""; position: absolute; left: 14px; top: -4px; width: 8px; height: 8px; background: inherit; transform: rotate(45deg); }
+body:not([data-notes="on"]) .note { display: none; }
+</style>
+</head>
+<body data-notes="on">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+    <symbol id="i-tablet" viewBox="0 0 24 24"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M12 18h.01"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5 5.5 5.5 0 0 0 9.5 20H13"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></symbol>
+    <symbol id="i-tree" viewBox="0 0 24 24"><path d="M21 12h-8"/><path d="M21 6H8"/><path d="M21 18h-8"/><path d="M3 6v4c0 1.1.9 2 2 2h3"/><path d="M3 10v6c0 1.1.9 2 2 2h3"/></symbol>
+    <symbol id="i-library" viewBox="0 0 24 24"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-chev-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+    <symbol id="i-pointer" viewBox="0 0 24 24"><path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+    <symbol id="i-present" viewBox="0 0 24 24"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></symbol>
+    <symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+    <symbol id="i-diff" viewBox="0 0 24 24"><path d="M12 3v14"/><path d="M5 10h14"/><path d="M5 21h14"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <h1 class="t">Design 工作台 — 布局 mockup(静态,仅供讨论)</h1>
+  <p class="sub">配色取自真实主题 token(<span class="mono">index.html</span> 里的内容是假数据)。页面里的元素、左栏 / 右栏页签、顶栏 <b>⋯</b> 菜单、Agent 输入条都可以点。</p>
+
+  <div class="bar">
+    <div class="grp"><span>布局</span>
+      <div class="seg" id="seg-layout">
+        <button data-v="wide" aria-pressed="true">新 · 宽(最大化)</button>
+        <button data-v="narrow" aria-pressed="false">新 · 窄(侧栏)</button>
+        <button data-v="current" aria-pressed="false">现状(对照)</button>
+      </div>
+    </div>
+    <div class="grp"><span>主题</span>
+      <div class="seg" id="seg-theme">
+        <button data-v="light" aria-pressed="true">Light</button>
+        <button data-v="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+    <div class="grp"><span>选中</span>
+      <div class="seg" id="seg-sel">
+        <button data-v="none" aria-pressed="false">无</button>
+        <button data-v="h1" aria-pressed="true">标题</button>
+        <button data-v="img" aria-pressed="false">图片</button>
+        <button data-v="btn" aria-pressed="false">按钮(链接)</button>
+      </div>
+    </div>
+    <div class="grp" id="notes-grp" style="display:none"><span>痛点标注</span>
+      <div class="seg" id="seg-notes">
+        <button data-v="on" aria-pressed="true">开</button>
+        <button data-v="off" aria-pressed="false">关</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage" id="stage"><div class="win" id="win" data-layout="wide" data-mode="edit" data-drawer="closed"></div></div>
+  <p class="hint" id="hint"></p>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const ic = (n, c = '') => `<svg class="ic ${c}"><use href="#i-${n}"/></svg>`;
+
+const S = { layout: 'wide', theme: 'light', sel: 'h1', mode: 'edit', left: 'pages', lib: 'assets', right: 'design', menu: false, ctx: false, modal: null, toast: null, drawer: false };
+
+const ELS = {
+  none: null,
+  nav:  { tag: 'header', cls: 'nav', crumbs: ['body', 'header.nav'], kind: 'box', title: 'Header' },
+  h1:   { tag: 'h1', cls: 'hero-title', crumbs: ['body', 'main.hero', 'h1.hero-title'], kind: 'text', title: 'Heading 1', text: 'Plan your week in focus' },
+  p:    { tag: 'p', cls: 'hero-sub', crumbs: ['body', 'main.hero', 'p.hero-sub'], kind: 'text', title: 'Paragraph', text: 'Lumen turns a messy to-do list into a calm, realistic plan.' },
+  btn:  { tag: 'a', cls: 'btn-primary', crumbs: ['body', 'main.hero', 'div.ctas', 'a.btn-primary'], kind: 'link', title: 'Link', text: 'Start free' },
+  img:  { tag: 'img', cls: 'hero-art', crumbs: ['body', 'main.hero', 'figure', 'img.hero-art'], kind: 'img', title: 'Image' },
+};
+
+/* ================= inspector ================= */
+const field = (l, v, u = '') => `<div class="f"><span class="label">${l}</span><div class="input"><span>${v}</span>${u ? `<span class="u">${u}</span>` : ''}</div></div>`;
+const colorField = (l, hex) => `<div class="f"><span class="label">${l}</span><div class="input"><i class="sw" style="background:${hex}"></i><span class="mono">${hex}</span><span class="u" title="clear">${ic('x', 'sm')}</span></div></div>`;
+const sec = (title, body, open = true, act = '') => `<details class="sec" ${open ? 'open' : ''}><summary>${ic('chev', 'sm chev')}${title}${act ? `<span class="act">${act}</span>` : ''}</summary><div class="sec-b">${body}</div></details>`;
+
+function designTab(el) {
+  if (!el) {
+    return `<div class="empty"><div class="big">${ic('pointer')}</div><h5>在画布上选择一个元素</h5><div style="font-size:12px">点击页面中的元素来编辑它;<br>或者直接让 Agent 帮你改。</div></div>
+      <div style="border-top:1px solid hsl(var(--border));padding:8px 0">
+        <div class="stat"><span class="mut">页面</span><span>index.html</span></div>
+        <div class="stat"><span class="mut">大小</span><span>4.2 KB</span></div>
+        <div class="stat"><span class="mut">依赖</span><span>1 样式表 · 3 素材</span></div>
+        <div class="stat"><span class="mut">视口</span><span>${S.layout === 'narrow' ? 'Fill' : 'Desktop 1280'}</span></div>
+      </div>
+      <div style="padding:8px 12px;display:grid;gap:6px">
+        <button class="btn outline fg" style="justify-content:flex-start">${ic('sparkles')} 让 Agent 生成新页面…</button>
+        <button class="btn outline fg" style="justify-content:flex-start">${ic('library')} 从模板开始…</button>
+      </div>`;
+  }
+  const out = [];
+  if (el.kind === 'text' || el.kind === 'link')
+    out.push(sec('Text', `<div class="ta">${el.text}</div>`));
+  if (el.kind === 'link')
+    out.push(sec('Link', `<div class="f"><span class="label">URL</span><div class="input">${ic('link', 'sm')}<span class="mono">/signup</span><span class="u">${ic('x', 'sm')}</span></div></div>
+      <div class="f"><span class="label">Opens in</span><div class="seg2"><span class="on">Same tab</span><span>New tab</span></div></div>`));
+  if (el.kind === 'img')
+    out.push(sec('Image', `<div style="border:1px solid hsl(var(--border));border-radius:10px;height:84px;background:linear-gradient(135deg,#cfe0ff,#f4e3ff 60%,#ffe9d6);position:relative"><span style="position:absolute;left:8px;bottom:6px;font:10px ui-monospace,monospace;background:rgb(255,255,255,.85);color:#222;padding:1px 6px;border-radius:5px">assets/hero-art.png</span></div>
+      <div style="display:flex;gap:6px"><button class="btn outline fg xs" style="flex:1">${ic('image', 'sm')} 从素材库选择</button><button class="btn outline fg xs" style="flex:1">${ic('sparkles', 'sm')} 生成</button></div>
+      <div class="f"><span class="label">Alt text</span><div class="input"><span>Planner app preview</span></div></div>`));
+  if (el.kind === 'text' || el.kind === 'link')
+    out.push(sec('Typography', `<div class="g2">${field('Size', el.tag === 'h1' ? '64' : el.tag === 'p' ? '19' : '16', 'px')}${field('Weight', el.tag === 'p' ? '400' : '700')}</div>
+      <div class="g2">${field('Line height', el.tag === 'h1' ? '1.05' : '1.55')}${field('Spacing', '-0.035', 'em')}</div>
+      <div class="seg2"><span class="on">Left</span><span>Center</span><span>Right</span></div>`));
+  out.push(sec('Fill & border', `<div class="g2">${colorField('Text color', el.kind === 'link' ? '#ffffff' : el.tag === 'p' ? '#5e594e' : '#1d1b16')}${colorField('Background', el.kind === 'link' ? '#2f6fe4' : 'none').replace('#none', 'none')}</div>
+      <div class="g2">${field('Radius', el.kind === 'link' ? '12' : el.kind === 'img' ? '24' : '0', 'px')}${field('Border', '0', 'px')}</div>`, el.kind !== 'text'));
+  out.push(sec('Size & spacing', `<div class="g2">${field('Width', 'auto')}${field('Height', 'auto')}</div>
+      <div class="g2">${field('Padding', el.kind === 'link' ? '14 26' : '0')}${field('Margin', el.tag === 'h1' ? '0 0 20' : '0')}</div>`, false));
+  out.push(`<div style="padding:8px 12px;display:flex;gap:4px;align-items:center"><button class="btn xs">${ic('file', 'sm')} View source</button><span class="spacer"></span><button class="btn xs" style="color:hsl(var(--destructive))">${ic('trash', 'sm')} Delete</button></div>`);
+  return out.join('');
+}
+
+function stylesTab(el) {
+  if (!el) return `<div class="empty"><h5>未选中元素</h5><div>选中元素后,这里显示生效的 CSS 规则与覆盖原因。</div></div>`;
+  return `<div style="padding:10px 12px 6px;display:flex;align-items:center"><span class="label">生效规则 · 3</span><span class="spacer"></span><button class="btn xs" disabled>${ic('check', 'sm')} Save styles</button></div>
+    <div class="rule"><div class="rh"><span class="mono">element.style</span><span class="mut">inline</span></div><div class="rb">color: #1d1b16;</div></div>
+    <div class="rule"><div class="rh"><span class="mono">.hero ${el.tag}</span><span class="mut">styles.css:42</span></div><div class="rb">font-size: 64px;<br>letter-spacing: -.035em;<br><s>margin: 0 0 12px;</s> <span class="mut">← 被覆盖</span></div></div>
+    <div class="rule"><div class="rh"><span class="mono">${el.tag}</span><span class="mut">@inline/style#1</span></div><div class="rb">font-weight: 700;</div></div>`;
+}
+
+function historyTab() {
+  return `<div class="ver"><span class="dot vd"></span><div><b>未保存的修改</b><span>刚刚 · 2 处改动</span></div><button class="btn xs">${ic('diff', 'sm')} Diff</button></div>
+    <div class="ver"><span class="dot ok vd"></span><div><b>Agent 完成一次运行</b><span>3 分钟前 · 自动保存点 · 1 页 2 素材</span></div><button class="btn xs">Restore</button></div>
+    <div class="ver"><span class="dot ok vd"></span><div><b>保存</b><span>12 分钟前 · 手动</span></div><button class="btn xs">Restore</button></div>
+    <div class="ver"><span class="dot ok vd"></span><div><b>从模板 “SaaS landing” 安装</b><span>今天 21:58</span></div><button class="btn xs">Restore</button></div>`;
+}
+
+function renderInspector() {
+  const el = ELS[S.sel];
+  const head = el
+    ? `<div class="crumb">${el.crumbs.map((c, i) => i === el.crumbs.length - 1 ? `<b>${c}</b>` : `${c}<i>›</i>`).join('')}</div>
+       <div class="insp-title">${el.title}<span class="spacer"></span><button class="btn xs" title="Parent">${ic('chev-up', 'sm')}</button></div>`
+    : `<div class="insp-title" style="margin-top:0">Inspector</div>`;
+  const body = S.right === 'design' ? designTab(el) : S.right === 'styles' ? stylesTab(el) : historyTab();
+  return `<div class="grab"></div>
+    <div class="insp-h">${head}</div>
+    <div class="itabs">
+      ${[['design', 'Design', 'pointer'], ['styles', 'Styles', 'tree'], ['history', 'History', 'history']].map(([k, l, i]) => `<span class="itab ${S.right === k ? 'on' : ''}" data-act="rtab" data-v="${k}">${l}${k === 'history' ? '<span class="dot" style="margin-left:2px"></span>' : ''}</span>`).join('')}
+    </div>
+    <div class="insp-b">${body}</div>
+    <div class="runnote"><div class="empty"><div class="big">${ic('play')}</div><h5>运行模式</h5><div style="font-size:12px">只做交互,不能编辑。<br>切回 Edit 继续修改。</div></div></div>`;
+}
+
+/* ================= left rail ================= */
+function leftPanel() {
+  if (S.left === 'pages') {
+    return `<div class="panel-h">Pages<button class="btn xs" style="margin-right:-4px">${ic('plus', 'sm')}</button></div>
+      <div class="panel-b">
+        ${[['index.html', true, true], ['pricing.html', false, false], ['about.html', false, false], ['deck.html', false, false]].map(([n, on, dirty]) => `<div class="page-card ${on ? 'on' : ''}"><div class="thumb"></div><div style="min-width:0"><div style="font-size:12px;font-weight:${on ? 500 : 400};display:flex;gap:5px;align-items:center">${n}${dirty ? '<span class="dot"></span>' : ''}</div><div class="mut" style="font-size:10px">${n === 'deck.html' ? '8 slides' : on ? '已打开' : '未打开'}</div></div></div>`).join('')}
+      </div>`;
+  }
+  if (S.left === 'layers') {
+    const r = (id, depth, tag, cls) => `<div class="row ${S.sel === id ? 'on' : ''}" style="padding-left:${8 + depth * 14}px" data-act="sel" data-v="${id}"><span class="mut" style="width:12px">${['nav', 'h1', 'p', 'btn', 'img'].includes(id) ? '' : ''}</span><span><span class="tag">${tag}</span><span class="cls">${cls}</span></span></div>`;
+    return `<div class="panel-h">Layers<span class="kbd">⌘ ⇧ L</span></div>
+      <div class="panel-b">
+        ${r('x0', 0, 'body', '')}
+        ${r('nav', 1, 'header', '.nav')}
+        ${r('x1', 1, 'main', '.hero')}
+        ${r('h1', 2, 'h1', '.hero-title')}
+        ${r('p', 2, 'p', '.hero-sub')}
+        ${r('x2', 2, 'div', '.ctas')}
+        ${r('btn', 3, 'a', '.btn-primary')}
+        ${r('x3', 3, 'a', '.btn-ghost')}
+        ${r('x4', 2, 'figure', '')}
+        ${r('img', 3, 'img', '.hero-art')}
+        ${r('x5', 1, 'section', '.features')}
+      </div>`;
+  }
+  const lib = { templates: ['SaaS landing', 'Portfolio', 'Pitch deck', 'Docs'], brand: null, assets: ['hero-art.png', 'logo.svg', 'team.jpg', 'inter.woff2'], media: null };
+  const grad = ['linear-gradient(135deg,#cfe0ff,#f4e3ff)', 'linear-gradient(135deg,#1d1b16,#5e594e)', 'linear-gradient(135deg,#ffd7a8,#ffe9d6)', 'linear-gradient(135deg,#d6f0e2,#cfe0ff)'];
+  let body = '';
+  if (S.lib === 'assets' || S.lib === 'templates') body = `<div class="libgrid">${lib[S.lib].map((n, i) => `<div class="asset" style="background:${grad[i]}"><small>${n}</small></div>`).join('')}</div>${S.lib === 'assets' ? `<div style="padding:8px 4px"><button class="btn outline fg xs" style="width:100%">${ic('plus', 'sm')} 导入素材</button></div>` : ''}`;
+  if (S.lib === 'brand') body = `<div style="padding:4px 6px;display:grid;gap:8px"><div class="f"><span class="label">DESIGN.md</span><div class="ta" style="min-height:70px;font-size:11px" >Tone: calm, focused…<br>Type: Inter / 4px scale</div></div><div class="f"><span class="label">tokens.css</span><div style="display:flex;gap:4px"><i class="sw" style="background:#2f6fe4;width:22px;height:22px"></i><i class="sw" style="background:#1d1b16;width:22px;height:22px"></i><i class="sw" style="background:#f6f3ea;width:22px;height:22px"></i><i class="sw" style="background:#ffd7a8;width:22px;height:22px"></i></div></div><button class="btn outline fg xs">保存</button></div>`;
+  if (S.lib === 'media') body = `<div style="padding:4px 6px;display:grid;gap:8px"><div class="seg2"><span class="on">图片</span><span>视频</span></div><div class="ta" style="min-height:70px;color:hsl(var(--muted-foreground))">描述想生成的图片…</div><button class="btn primary xs" disabled style="opacity:.5">生成</button></div>`;
+  return `<div class="panel-h">Library</div>
+    <div style="padding:0 8px 6px"><div class="seg2">${['assets', 'templates', 'brand', 'media'].map(k => `<span class="${S.lib === k ? 'on' : ''}" data-act="lib" data-v="${k}">${{ assets: 'Assets', templates: 'Templates', brand: 'Brand', media: 'Media' }[k]}</span>`).join('')}</div></div>
+    <div class="panel-b">${body}</div>`;
+}
+
+/* ================= menus / modal ================= */
+function menuPop() {
+  return `<div class="popover" style="right:8px;top:40px;width:230px">
+    <div class="mi" data-act="modal" data-v="export">${ic('download')} Export & Share…</div>
+    <div class="mi" data-act="modal" data-v="export">${ic('image')} Render PNG / PDF…</div>
+    <hr>
+    <div class="mi">${ic('diff')} Unsaved changes<span class="kbd">⌘ D</span></div>
+    <div class="mi">${ic('refresh')} Reload from disk</div>
+    <div class="mi">${ic('refresh')} Refresh file list</div>
+    <hr>
+    <div class="mi mut">${ic('present')} Slides 需要 deck 标记</div>
+  </div>`;
+}
+function ctxPop() {
+  const el = ELS[S.sel];
+  return `<div class="popover ctx-pop"><h4>将发送给 Agent 的上下文(点发送前可检查)</h4>
+    <div class="ctx-sec"><b>Task</b><span>${el ? `修改选中元素 <span class="mono">${el.tag}.${el.cls}</span>` : '生成 / 整体修改页面'}</span></div>
+    <div class="ctx-sec"><b>Page</b><span>index.html · rev a41f · 已保存 ✓</span></div>
+    <div class="ctx-sec"><b>Selection</b><span>${el ? `<span class="mono">${el.crumbs.join(' > ')}</span>` : '—'}</span></div>
+    <div class="ctx-sec"><b>Brand</b><span>DESIGN.md · tokens.css</span></div>
+    <div class="ctx-sec"><b>Assets</b><span>hero-art.png, logo.svg</span></div>
+    <div class="ctx-sec"><b>Viewport</b><span>Desktop 1280</span></div>
+  </div>`;
+}
+function modalHtml() {
+  return `<div class="scrim" data-act="closemodal"><div class="modal" data-stop="1">
+    <div class="modal-h">Export & Share<button class="btn" data-act="closemodal">${ic('x')}</button></div>
+    <div style="padding:8px 16px 0"><div class="seg2"><span class="on">Export</span><span>Render</span><span>Share</span></div></div>
+    <div class="modal-b">
+      <div class="opt">${ic('download')}<div><b>ZIP 打包</b><span>页面 + 本地素材,未保存修改会先提示保存</span></div><button class="btn outline fg xs">导出</button></div>
+      <div class="opt">${ic('image')}<div><b>渲染为 PNG / PDF</b><span>整页截图 · 使用当前视口宽度</span></div><button class="btn outline fg xs">渲染</button></div>
+      <div class="opt">${ic('share')}<div><b>创建分享链接</b><span>不可变快照 · 可撤销 · 仅本机 / 局域网</span></div><button class="btn outline fg xs">创建</button></div>
+    </div></div></div>`;
+}
+
+/* ================= wide / narrow ================= */
+function topbar() {
+  const n = S.layout === 'narrow';
+  return `<div class="top">
+    ${n ? `<button class="btn menu-btn-narrow" data-act="drawer" title="Pages / Layers / Library">${ic('panel')}</button>` : ''}
+    <div class="tabs">
+      <div class="tab on"><span class="dot"></span>index.html<span class="x">${ic('x', 'sm')}</span></div>
+      <div class="tab">pricing.html<span class="x">${ic('x', 'sm')}</span></div>
+      <button class="btn only-wide" style="width:26px;min-width:26px;padding:0" title="Open page">${ic('plus', 'sm')}</button>
+    </div>
+    <span class="sep only-wide"></span>
+    <div class="only-wide" style="display:flex;align-items:center;gap:2px">
+      <button class="btn" aria-pressed="true" title="Desktop">${ic('monitor')}</button>
+      <button class="btn" title="Tablet">${ic('tablet')}</button>
+      <button class="btn" title="Mobile">${ic('phone')}</button>
+      <span class="wid">1280</span>
+    </div>
+    <div class="zoom only-wide">
+      <button class="btn" style="width:26px;padding:0">${ic('minus', 'sm')}</button><span class="pct" id="zoom-pct">Fit · 64%</span><button class="btn" style="width:26px;padding:0">${ic('plus', 'sm')}</button>
+    </div>
+    <span class="spacer"></span>
+    <div class="seg" id="seg-mode" style="margin-right:2px">
+      <button data-act="mode" data-v="edit" aria-pressed="${S.mode === 'edit'}">${ic('pointer', 'sm')}<span class="only-wide">Edit</span></button>
+      <button data-act="mode" data-v="run" aria-pressed="${S.mode === 'run'}">${ic('play', 'sm')}<span class="only-wide">Run</span></button>
+      <button disabled class="only-wide" title="This page has no slide markers">${ic('present', 'sm')}Slides</button>
+    </div>
+    <span class="sep only-wide"></span>
+    <button class="btn only-wide" title="Undo ⌘Z">${ic('undo')}</button>
+    <button class="btn only-wide" title="Redo ⇧⌘Z">${ic('redo')}</button>
+    <button class="btn primary" title="Save ⌘S" style="margin-left:4px">Save</button>
+    <button class="btn" data-act="menu" aria-pressed="${S.menu}" title="More">${ic('more')}</button>
+  </div>`;
+}
+function statusbar() {
+  const run = S.mode === 'run';
+  return `<div class="status">
+    <span class="item"><span class="dot"></span>未保存 · 2 处修改</span>
+    <span class="item only-wide-s">v7 · 3 个保存点</span>
+    ${run ? `<span class="item warn">运行模式:已移除 2 个外部脚本、1 个外部链接</span>` : ''}
+    <span class="sp"></span>
+    <span class="item only-wide-s">Desktop 1280 × 800</span>
+    <span class="item only-wide-s mono" id="st-zoom">64%</span>
+  </div>`;
+}
+function agentBar() {
+  const el = ELS[S.sel];
+  return `<div class="agent">
+    <span class="chip" title="Context">${ic('pointer', 'sm')}${el ? `${el.tag}.${el.cls}` : 'Page'}</span>
+    <span class="ph">${el ? '描述想怎么改这个元素…' : '描述想生成或修改什么…'}</span>
+    <button class="btn xs" data-act="ctx" aria-pressed="${S.ctx}" title="Preview context">Context ${ic('chev', 'sm')}</button>
+    <button class="btn primary send" data-act="send" title="Prefill into chat">${ic('send')}</button>
+  </div>`;
+}
+function pageHtml(narrow) {
+  const s = k => `data-sel="${k}"${S.sel === k ? ' class="selected"' : ''}`;
+  const lab = k => S.sel === k && ELS[k] ? `<span class="sel-label">${ELS[k].tag}.${ELS[k].cls}</span>` : '';
+  const cl = (k, c) => `data-sel="${k}" class="${c}${S.sel === k ? ' selected' : ''}"`;
+  return `<div class="page${narrow ? ' m' : ''}" id="page">
+    <div ${cl('nav', 'nav')}>${lab('nav')}<div class="logo">Lumen</div><div class="links"><span>Product</span><span>Pricing</span><span>Docs</span></div><div class="sp"></div><div class="cta">Get the app</div></div>
+    <div class="hero">
+      <div>
+        <h1 ${cl('h1', '')}>${lab('h1')}Plan your week in <em>focus</em></h1>
+        <p ${cl('p', '')}>${lab('p')}Lumen turns a messy to-do list into a calm, realistic plan.</p>
+        <div class="ctas"><div ${cl('btn', 'b1')}>${lab('btn')}Start free</div><div class="b2">See how it works</div></div>
+      </div>
+      <div ${cl('img', 'art')}>${lab('img')}</div>
+    </div>
+    <div class="feat"><div><b>Focus blocks</b>Auto-schedule deep work around your meetings.</div><div><b>Gentle reviews</b>A two-minute Friday recap, not a report.</div><div><b>Sync anywhere</b>Mac, iPhone and the web, always in step.</div></div>
+  </div>`;
+}
+
+function buildWideNarrow() {
+  const n = S.layout === 'narrow';
+  const rail = `<div class="rail"><div class="rail-icons">
+      ${[['pages', 'file', 'Pages'], ['layers', 'tree', 'Layers'], ['lib', 'library', 'Library']].map(([k, i, t]) => `<button class="btn" data-act="ltab" data-v="${k}" aria-pressed="${S.left === k}" title="${t}">${ic(i)}</button>`).join('')}
+    </div><div class="rail-panel">${leftPanel()}</div></div>`;
+  return `${topbar()}
+    <div class="main">
+      ${rail}
+      <div class="canvas-wrap">
+        <div class="canvas" id="canvas"><div class="page-holder" id="holder">${pageHtml(n)}</div></div>
+        ${S.mode === 'edit' ? agentBar() : ''}
+        ${S.ctx && S.mode === 'edit' ? ctxPop() : ''}
+        ${S.toast ? `<div class="toast">${ic('check', 'sm')}已预填到当前聊天 — 补充要求后发送<u data-act="toastclose">打开聊天</u></div>` : ''}
+      </div>
+      <div class="insp">${renderInspector()}</div>
+      ${S.menu ? menuPop() : ''}
+    </div>
+    ${statusbar()}
+    ${S.modal ? modalHtml() : ''}`;
+}
+
+/* ================= current (reference) ================= */
+function buildCurrent() {
+  const b = (t, c = '') => `<span class="cb ${c}">${t}</span>`;
+  return `<div class="cur" style="display:flex;flex-direction:column;height:100%;position:relative">
+    <div class="r" id="n-toolbar">
+      ${['Templates', 'Brand', 'Assets', 'Media'].map(t => b(t)).join('')}${b(ic('refresh', 'sm'))}
+      ${b('Edit', 'p')}${b('Run', 'g')}${b('Undo')}${b('Redo')}${b('Generate page')}${b('Hand off to Agent')}${b('Save', 'p')}${b('Reload')}
+      ${b('Overview', 'g')}${b('Structure', 'g')}${b('Export')}${b('Slides', 'd')}${b('Render export')}${b('Unsaved changes')}${b(ic('share', 'sm') + 'Share')}
+    </div>
+    <div class="r" id="n-tabs"><span class="ctab on"><span style="color:hsl(var(--warning))">•</span>index.html <span class="mut">×</span></span><span class="ctab mut">pricing.html ×</span><span class="spacer"></span>${b('Open page ' + ic('chev', 'sm'))}</div>
+    <div class="r" id="n-vp">${b('Desktop 1280 ' + ic('chev', 'sm'))}${b('1280')}${b('−')}<span class="mut" style="font-size:11px;min-width:40px;text-align:center">64%</span>${b('+')}${b('Fit', 'p')}</div>
+    <div class="banner">Prefilled into the current chat — add your requirements and send.</div>
+    <div class="banner w">There are unsaved changes; save them before handing off to the Agent.</div>
+    <div class="banner">Agent finished: 1 page changed · <span class="mono">index.html</span> ×</div>
+    <div class="canvas-wrap" style="flex:1;min-height:0"><div class="canvas" id="canvas"><div class="page-holder" id="holder">${pageHtml(false)}</div></div></div>
+    <div class="edit" id="n-edit">
+      <div style="display:flex;justify-content:space-between" class="mono mut"><span>h1 · 0.0.1.0</span><span>Parent · Child</span></div>
+      <div class="fl" style="margin-top:8px">Element text</div><div class="ta">Plan your week in focus</div>
+      <div class="gridf">
+        <div><div class="fl">Text color</div><div class="input" style="height:24px"><i class="sw" style="background:#1d1b16"></i>#1d1b16</div></div>
+        <div><div class="fl">Background</div><div class="input" style="height:24px">—</div></div>
+        <div><div class="fl">Font size</div><div class="input" style="height:24px">64px</div></div>
+        <div><div class="fl">Weight</div><div class="input" style="height:24px">700</div></div>
+        <div><div class="fl">Line height</div><div class="input" style="height:24px">1.05</div></div>
+        <div><div class="fl">Letter spacing</div><div class="input" style="height:24px">-0.035em</div></div>
+        <div><div class="fl">Width</div><div class="input" style="height:24px">auto</div></div>
+        <div><div class="fl">Height</div><div class="input" style="height:24px">auto</div></div>
+        <div><div class="fl">Padding</div><div class="input" style="height:24px">0</div></div>
+        <div><div class="fl">Margin</div><div class="input" style="height:24px">0 0 20</div></div>
+        <div><div class="fl">Border</div><div class="input" style="height:24px">0</div></div>
+        <div><div class="fl">Radius</div><div class="input" style="height:24px">0</div></div>
+      </div>
+    </div>
+    <div style="height:30px;border-top:1px solid hsl(var(--border));padding:0 12px;display:flex;align-items:center;font-size:11px" class="mut">${ic('chev-up', 'sm')}&nbsp;Version history</div>
+    <span class="note" style="left:760px;top:44px">20 个同级按钮,换行成 2–3 行;Edit/Run、Save、Overview、Fit 多个实心强调色</span>
+    <span class="note" style="left:640px;top:156px">3 个整行横幅常驻,把画布往下推</span>
+    <span class="note" style="left:560px;top:410px">画布只剩 ~330px 高(含两条独立工具条)</span>
+    <span class="note" style="left:760px;top:600px">编辑区固定 256px:30+ 个字段挤进一张表单,几乎一直在滚动</span>
+  </div>`;
+}
+
+/* ================= render ================= */
+function fitStage() {
+  const win = $('#win'), stage = $('#stage');
+  const w = S.layout === 'narrow' ? 460 : 1440, h = 880;
+  const avail = Math.min(document.documentElement.clientWidth - 48, 1500);
+  const k = Math.min(1, avail / w);
+  win.style.transform = `scale(${k})`;
+  stage.style.height = `${h * k + 4}px`;
+  stage.style.width = `${w * k}px`;
+  stage.style.margin = '0 auto';
+  win.style.left = '0';
+}
+function fitPage() {
+  const holder = $('#holder'), page = $('#page'), canvas = $('#canvas');
+  if (!holder || !page || !canvas) return;
+  if (S.layout === 'narrow') {
+    const cw = canvas.clientWidth; // fill preset: scale 1
+    page.style.width = cw + 'px'; page.style.transform = 'none'; page.style.setProperty('--s', 1);
+    holder.style.width = cw + 'px'; holder.style.height = page.offsetHeight + 'px';
+    $('#zoom-pct') && ($('#zoom-pct').textContent = 'Fill');
+    return;
+  }
+  const cs = getComputedStyle(canvas);
+  const avail = canvas.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const k = Math.min(1, avail / 1280);
+  page.style.width = '1280px';
+  page.style.transform = `scale(${k})`; page.style.setProperty('--s', k);
+  holder.style.width = 1280 * k + 'px'; holder.style.height = page.offsetHeight * k + 'px';
+  const pct = Math.round(k * 100);
+  if ($('#zoom-pct')) $('#zoom-pct').textContent = `Fit · ${pct}%`;
+  if ($('#st-zoom')) $('#st-zoom').textContent = `${pct}%`;
+}
+function render() {
+  const win = $('#win');
+  document.body.dataset.theme = S.theme;
+  document.documentElement.dataset.theme = S.theme;
+  win.dataset.layout = S.layout; win.dataset.mode = S.mode; win.dataset.drawer = S.drawer ? 'open' : 'closed';
+  const scrollTop = ($('.insp-b') || {}).scrollTop || 0;
+  win.innerHTML = S.layout === 'current' ? buildCurrent() : buildWideNarrow();
+  const ib = $('.insp-b'); if (ib) ib.scrollTop = scrollTop;
+  fitStage(); fitPage();
+  // sync mockup control bar
+  for (const [id, key] of [['seg-layout', 'layout'], ['seg-theme', 'theme'], ['seg-sel', 'sel']])
+    $('#' + id).querySelectorAll('button').forEach(bn => bn.setAttribute('aria-pressed', String(bn.dataset.v === S[key])));
+  $('#notes-grp').style.display = S.layout === 'current' ? '' : 'none';
+  $('#hint').innerHTML = S.layout === 'current'
+    ? '现状(按代码还原):顶栏 20 个文字按钮 + 页签条 + 视口条 + 多条横幅,画布与 256px 的长表单编辑区上下争抢空间。'
+    : S.layout === 'narrow'
+      ? '窄面板(≈460px):顶栏只留核心图标;Pages/Layers/Library 变成左侧抽屉(点左上角图标);检查器变成画布下方的底部面板;Agent 输入条浮在画布底部。'
+      : '宽布局:顶栏一行 · 左栏(Pages / Layers / Library,可收起)· 画布 · 右侧检查器(Design / Styles / History)· 底部状态条。试试点页面里的标题、图片、按钮,以及右上角 ⋯。';
+}
+
+document.addEventListener('click', e => {
+  const stop = e.target.closest('[data-stop]');
+  const t = e.target.closest('[data-act],[data-sel],[data-v]');
+  const closeOutside = () => { if (S.menu || S.ctx) { S.menu = false; S.ctx = false; } };
+  // mockup control bar
+  const sg = e.target.closest('.bar .seg button');
+  if (sg) {
+    const id = sg.parentElement.id, v = sg.dataset.v;
+    if (id === 'seg-layout') { S.layout = v; S.drawer = false; S.menu = S.ctx = false; S.modal = null; }
+    if (id === 'seg-theme') S.theme = v;
+    if (id === 'seg-sel') { S.sel = v; S.mode = 'edit'; S.right = S.right === 'history' ? 'design' : S.right; }
+    if (id === 'seg-notes') { document.body.dataset.notes = v; return syncNotes(); }
+    return render();
+  }
+  if (!e.target.closest('#win')) return;
+  const selEl = e.target.closest('[data-sel]');
+  const actEl = e.target.closest('[data-act]');
+  if (actEl) {
+    const a = actEl.dataset.act, v = actEl.dataset.v;
+    if (a === 'closemodal') { if (actEl.classList.contains('scrim') && stop) return; S.modal = null; }
+    else if (a === 'mode') { S.mode = v; if (v === 'run') { S.menu = S.ctx = false; } }
+    else if (a === 'menu') { S.menu = !S.menu; S.ctx = false; }
+    else if (a === 'ctx') { S.ctx = !S.ctx; S.menu = false; }
+    else if (a === 'modal') { S.modal = v; S.menu = false; }
+    else if (a === 'rtab') S.right = v;
+    else if (a === 'ltab') { S.left = v === 'lib' ? 'lib' : v; }
+    else if (a === 'lib') S.lib = v;
+    else if (a === 'drawer') S.drawer = !S.drawer;
+    else if (a === 'send') { S.toast = true; S.ctx = false; setTimeout(() => { S.toast = null; render(); }, 3500); }
+    else if (a === 'toastclose') S.toast = null;
+    else if (a === 'sel') { if (v in ELS) S.sel = v; }
+    return render();
+  }
+  if (selEl && S.mode === 'edit' && S.layout !== 'current') {
+    S.sel = selEl.dataset.sel; S.menu = S.ctx = false; if (S.right === 'history') S.right = 'design';
+    return render();
+  }
+  if (e.target.closest('.canvas') && S.mode === 'edit' && S.layout !== 'current' && !e.target.closest('.agent')) { S.sel = 'none'; return render(); }
+  if (S.menu || S.ctx) { closeOutside(); render(); }
+});
+function syncNotes() {
+  document.querySelectorAll('#seg-notes button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === document.body.dataset.notes)));
+}
+window.addEventListener('resize', () => { fitStage(); fitPage(); });
+render();
+</script>
+</body>
+</html>

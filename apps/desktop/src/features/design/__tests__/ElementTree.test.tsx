@@ -33,11 +33,9 @@ beforeEach(() => {
 describe('ElementTree', () => {
   it('renders rows with tag, id, up to three classes and the truncated text preview', () => {
     render(<ElementTree source={TREE_SOURCE} selectionPath={null} onSelectPath={onSelect} />);
-    expect(
-      screen.getByText(
-        'The structure tree is built from the page source; pseudo-elements and script-generated content do not appear here.'
-      )
-    ).toBeInTheDocument();
+    // 能力边界说明已移到 Layers 面板头部的 Tooltip（P4）。
+    expect(screen.getByRole('region', { name: 'Structure tree' })).toBeInTheDocument();
+    expect(screen.queryByText(/The structure tree is built from the page source/)).not.toBeInTheDocument();
     expect(screen.getByText('<main>')).toBeInTheDocument();
     expect(screen.getByText('#root')).toBeInTheDocument();
     expect(screen.getByText('.layout')).toBeInTheDocument();

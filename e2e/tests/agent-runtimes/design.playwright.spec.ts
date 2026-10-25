@@ -18,8 +18,9 @@ test('design: existing agent generates, visual edits persist, and the same conve
   const panel = page.getByTestId('design-panel');
   await expect(panel).toBeVisible();
   const composer = page.getByTestId('message-input');
-  await composer.fill('Create a small landing page.');
-  await panel.getByRole('button', { name: 'Generate page', exact: true }).click();
+  // P3：交接收敛到画布底部 Agent 输入条（仍只预填、不自动发送）。
+  await panel.getByRole('textbox', { name: 'Ask Agent', exact: true }).fill('Create a small landing page.');
+  await panel.getByRole('button', { name: 'Send to chat', exact: true }).click();
   await expect(composer).toHaveValue(/Create a small landing page[\s\S]*design\/index.html/);
   await composer.fill(`${await composer.inputValue()}\nE2E_DESIGN_GENERATE`);
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
@@ -42,7 +43,7 @@ test('design: existing agent generates, visual edits persist, and the same conve
   await panel.getByRole('button', { name: 'Apply changes', exact: true }).click();
   await expect(frame.getByRole('heading')).toHaveText('Manually edited heading');
   await panel.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(panel.getByRole('status').filter({ hasText: 'There are unsaved changes' })).toHaveCount(0);
+  await expect(panel.getByText('Saved', { exact: true })).toBeVisible();
   await expect(panel.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
   expect(await readFile(path.join(cwd, 'design/index.html'), 'utf8')).toContain(
     'Manually edited heading'
@@ -52,7 +53,7 @@ test('design: existing agent generates, visual edits persist, and the same conve
   // Selection and draft must survive unchanged-file polling.
   await frame.getByText('Original subtitle', { exact: true }).click();
   await expect(panel.getByLabel('Element text', { exact: true })).toHaveValue('Original subtitle');
-  await panel.getByRole('button', { name: 'Hand off to Agent', exact: true }).click();
+  await panel.getByRole('button', { name: 'Send to chat', exact: true }).click();
   await expect(composer).toHaveValue(/Original subtitle/);
   await composer.fill(`${await composer.inputValue()}\nE2E_DESIGN_REFINE`);
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
@@ -77,7 +78,8 @@ test('design: existing agent generates, visual edits persist, and the same conve
   await expect(panel.getByRole('status').filter({ hasText: 'Your draft is preserved' })).toBeVisible();
   expect(await readFile(filename, 'utf8')).toBe(external);
   await expect(frame.getByRole('heading')).toHaveText('Unsaved local draft');
-  await panel.getByRole('button', { name: 'Reload', exact: true }).click();
+  await panel.getByRole('button', { name: 'More actions', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Reload', exact: true }).click();
   await expect(frame.getByRole('heading')).toHaveText('External heading');
 
   const audit = (await app.audit()).filter(event => event.design);

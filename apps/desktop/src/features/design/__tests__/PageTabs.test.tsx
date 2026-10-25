@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { PageTabs } from '../components/PageTabs';
-import type { PageTabsProps } from '../components/PageTabs';
+import { PageTabs } from '../layout/PageTabs';
+import type { PageTabsProps } from '../layout/PageTabs';
 import type { DesignPageSnapshot } from '../workspace/controller';
 
 const page = (overrides: Partial<DesignPageSnapshot> = {}): DesignPageSnapshot => ({
@@ -30,7 +30,7 @@ function mount(overrides: Partial<PageTabsProps> = {}) {
     files: ['design/index.html', 'pages/about.html', 'pages/new.html'],
     onActivate: vi.fn(),
     onClose: vi.fn(),
-    onOpen: vi.fn().mockResolvedValue({ ok: true }),
+    onOpen: vi.fn(),
     ...overrides,
   };
   render(<PageTabs {...props} />);
@@ -41,18 +41,12 @@ function mount(overrides: Partial<PageTabsProps> = {}) {
   };
 }
 
-async function pickOpenOption(label: string) {
-  fireEvent.click(screen.getByRole('button', { name: 'Open page' }));
-  const option = await screen.findByRole('option', { name: label });
-  fireEvent.click(option);
-}
-
-describe('PageTabs', () => {
+describe('PageTabs（P1 顶栏页签）', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders one tab per open page with the basename and full-path title', () => {
+  it('每个打开页一个标签：basename + 全路径 title + aria-selected', () => {
     mount();
     const tab = screen.getByRole('tab', { name: /index\.html/ });
     expect(tab).toHaveAttribute('title', 'design/index.html');
@@ -63,20 +57,17 @@ describe('PageTabs', () => {
     );
   });
 
-  it('marks dirty pages with • and missing pages with ⚠', () => {
+  it('脏点与 Missing 标记（TONE_DOT + lucide TriangleAlert）', () => {
     mount({
-      pages: [
-        page({ path: 'design/index.html', status: 'dirty', missing: true }),
-      ],
+      pages: [page({ path: 'design/index.html', status: 'dirty', missing: true })],
       activePath: 'design/index.html',
       files: ['design/index.html'],
     });
-    const tab = screen.getByRole('tab', { name: /index\.html/ });
-    expect(tab.textContent).toContain('•');
-    expect(tab.textContent).toContain('⚠');
+    expect(screen.getByTestId('dirty-dot-design/index.html')).toBeInTheDocument();
+    expect(screen.getByLabelText('Missing file design/index.html')).toBeInTheDocument();
   });
 
-  it('activates on tab click and requests close via the × button', () => {
+  it('点击激活、× 走关闭请求', () => {
     const h = mount();
     fireEvent.click(screen.getByRole('tab', { name: /about\.html/ }));
     expect(h.onActivate).toHaveBeenCalledWith('pages/about.html');
@@ -84,31 +75,23 @@ describe('PageTabs', () => {
     expect(h.onClose).toHaveBeenCalledWith('design/index.html');
   });
 
-  it('lists unopened files in the 打开页面 dropdown and reports success silently', async () => {
+  it('`+` 菜单只列未打开文件，点击即打开', async () => {
     const h = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Open page' }));
-    // 已打开的文件不出现在下拉里。
-    expect(screen.queryByRole('option', { name: 'design/index.html' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'pages/about.html' })).not.toBeInTheDocument();
-    const option = await screen.findByRole('option', { name: 'pages/new.html' });
-    fireEvent.click(option);
+    expect(screen.queryByRole('menuitem', { name: 'design/index.html' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'pages/about.html' })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'pages/new.html' }));
     await waitFor(() => expect(h.onOpen).toHaveBeenCalledWith('pages/new.html'));
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('hints 先关闭未保存的页面 when open is rejected at the page limit', async () => {
-    mount({ onOpen: vi.fn().mockResolvedValue({ ok: false, reason: 'limit' }) });
-    await pickOpenOption('pages/new.html');
-    expect(await screen.findByRole('status')).toHaveTextContent('Close unsaved pages first');
+  it('全部文件已打开时 `+` 禁用', () => {
+    mount({ files: ['design/index.html', 'pages/about.html'] });
+    expect(screen.getByRole('button', { name: 'Open page' })).toBeDisabled();
   });
 
-  it('surfaces the controller message when a page fails to load', async () => {
-    mount({
-      onOpen: vi
-        .fn()
-        .mockResolvedValue({ ok: false, reason: 'load-failed', message: 'FILE_NOT_FOUND: x' }),
-    });
-    await pickOpenOption('pages/new.html');
-    expect(await screen.findByRole('status')).toHaveTextContent('FILE_NOT_FOUND: x');
+  it('窄档只显示当前页签（showOnlyActive）', () => {
+    mount({ showOnlyActive: true });
+    expect(screen.getByRole('tab', { name: /index\.html/ })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /about\.html/ })).not.toBeInTheDocument();
   });
 });

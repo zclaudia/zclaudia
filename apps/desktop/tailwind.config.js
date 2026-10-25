@@ -8,6 +8,8 @@ export default {
         // Semantic colors using CSS variables (HSL format)
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        // Chrome surface below the canvas/panels (surface ladder: sidebar < background < card).
+        sidebar: 'hsl(var(--sidebar))',
         card: {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',

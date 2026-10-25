@@ -174,8 +174,9 @@ describe('SelectionEditor 初始值与内联徽标（P3 §2.3）', () => {
       attrs: { src: 'x.png', alt: '替代' },
     };
     mount({ selection: styled, docSource: IMG_DRAFT });
-    expect(screen.getByLabelText('Font size')).toHaveValue('14px');
-    expect(screen.getByLabelText('Align')).toHaveValue('center');
+    // P2 分组矩阵：img 隐藏 Typography（排版对图片无意义），其余字段照常预填。
+    expect(screen.queryByLabelText('Font size')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Align')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Width')).toHaveValue('auto');
     expect(screen.getByLabelText('Image URL')).toHaveValue('x.png');
     expect(screen.getByLabelText('Alt text')).toHaveValue('替代');
@@ -227,13 +228,12 @@ describe('SelectionEditor 应用修改（P3 §2.3）', () => {
     expect(screen.getByLabelText('Margin')).toHaveAttribute('aria-invalid', 'true');
   });
 
-  it('对齐选回空 = 不修改，不生成操作', () => {
+  it('对齐选回空 = 不修改，吸底应用条不出现', () => {
     const { onApply } = mount({ selection: { ...selection, styles: { 'text-align': 'center' } } });
     expect(screen.getByLabelText('Align')).toHaveValue('center');
     fireEvent.change(screen.getByLabelText('Align'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
-    expect(onApply).toHaveBeenCalledTimes(1);
-    expect(onApply).toHaveBeenCalledWith([]);
+    expect(screen.queryByRole('button', { name: 'Apply changes' })).not.toBeInTheDocument();
+    expect(onApply).not.toHaveBeenCalled();
   });
 
   it('属性值预检失败（src 非法扩展名）同样阻断提交', () => {

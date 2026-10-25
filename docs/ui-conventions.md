@@ -81,6 +81,11 @@ hand-rolling their recipes:
 - **Tone map** (`tone.ts`) — every status color. `TONE_TEXT` / `TONE_BADGE` /
   `TONE_DOT` keyed by semantic tone; never a raw palette badge map per feature.
 - **Select / Modal / Input (`FIELD_CLASS`) / Toggle / FormField** — as before.
+- **InspectorSection** (`features/design/inspector/InspectorSection.tsx`) — the
+  collapsible-group primitive for inspector panels: `<button>` summary with
+  `aria-expanded`, grid-rows collapse that keeps content mounted (`inert` when
+  closed), and a right-aligned action slot. Reuse it instead of a one-off
+  `<details>` or conditional render when form state must survive collapsing.
 
 ## 8. Desktop chrome details
 

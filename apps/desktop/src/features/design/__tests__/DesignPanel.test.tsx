@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { DesignPanel, isValidRulesMessage } from '../DesignPanel';
 import { WorkspaceToolProvider } from '../../../components/workspace/WorkspaceToolContext';
 import { useComposerStore } from '../../../stores/composerStore';
+import { useDesignLayoutStore } from '../stores/designLayoutStore';
 import { useChatMessageStore } from '../../../stores/chatMessageStore';
 import { ApiError } from '../../../services/api/unwrap';
 import { acquireWorkspaceController } from '../workspace/controller';
@@ -291,11 +292,42 @@ async function selectElement(source = SOURCE) {
   );
 }
 
-/** 通过「打开页面」下拉打开一个未打开的文件并等它的标签出现。 */
+/** 顶栏 `⋯` 菜单：打开后点条目（P1 起低频动作从工具栏移入）。 */
+async function openMoreMenu(name: string) {
+  fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name }));
+}
+
+/** 只取菜单条目（用于断言 disabled，不点击）。 */
+async function moreMenuItem(name: string) {
+  fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+  return screen.findByRole('menuitem', { name });
+}
+
+/** 检查器页签。 */
+function openInspectorTab(name: 'Design' | 'Styles' | 'History') {
+  fireEvent.click(screen.getByRole('tab', { name }));
+}
+
+/** Agent 输入条：发送（空输入等价原 Generate page 的默认提示词）。 */
+async function askAgent(request = '') {
+  const input = screen.getByRole('textbox', { name: 'Ask Agent' });
+  if (request) fireEvent.change(input, { target: { value: request } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send to chat' }));
+}
+
+/** Agent 输入条：打开上下文 popover。 */
+async function openAgentContext(request = '') {
+  const input = screen.getByRole('textbox', { name: 'Ask Agent' });
+  if (request) fireEvent.change(input, { target: { value: request } });
+  fireEvent.click(screen.getByRole('button', { name: 'Preview context' }));
+  return screen.findByRole('dialog', { name: 'Agent context' });
+}
+
+/** 通过 `+` 菜单打开一个未打开的文件并等它的标签出现。 */
 async function openPage(path: string) {
   fireEvent.click(screen.getByRole('button', { name: 'Open page' }));
-  const option = await screen.findByRole('option', { name: path });
-  fireEvent.click(option);
+  fireEvent.click(await screen.findByRole('menuitem', { name: path }));
   const name = path.slice(path.lastIndexOf('/') + 1);
   await waitFor(() =>
     expect(screen.getByRole('tab', { name: new RegExp(name.replace('.', '\\.')) })).toBeInTheDocument()
@@ -327,6 +359,17 @@ describe('DesignPanel', () => {
     vi.useRealTimers();
     vi.clearAllMocks();
     resetWorkspace();
+    // 布局偏好是全局持久化 store：每个用例复位，避免页签/折叠状态跨用例泄漏。
+    localStorage.clear();
+    useDesignLayoutStore.setState({
+      leftOpen: true,
+      leftTab: 'pages',
+      libraryTab: 'assets',
+      leftWidth: 240,
+      rightOpen: true,
+      rightTab: 'design',
+      collapsedSections: {},
+    });
     disk.clear();
     savedCounter = 0;
     useComposerStore.setState({ drafts: {}, pendingPrefills: {} });
@@ -410,13 +453,8 @@ describe('DesignPanel', () => {
         'design/index.html'
       )
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'Generate page' }));
-    // P4 §5.3：generate 先经上下文检视模态，确认后才填入聊天。
-    fireEvent.click(
-      await within(
-        await screen.findByRole('dialog', { name: 'Generate page · design context' })
-      ).getByRole('button', { name: 'Fill into chat' })
-    );
+    // P3：Agent 输入条发送后才预填（仍不自动发送）。
+    await askAgent();
     const state = useComposerStore.getState();
     expect(state.pendingPrefills['session-1']?.content).toContain('Existing request');
     expect(state.pendingPrefills['session-1']?.content).toContain('design/index.html');
@@ -553,7 +591,7 @@ describe('DesignPanel', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    await openMoreMenu('Reload');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled());
     expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
     expect(api.getDesignDocument).toHaveBeenCalledTimes(2);
@@ -686,7 +724,7 @@ describe('DesignPanel', () => {
     disk.set('pages/new.html', { source: SOURCE, revision: 'rev-new' });
     mount();
     await waitFor(() => expect(api.listDesignFiles).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh design files' }));
+    await openMoreMenu('Refresh design files');
     await waitFor(() =>
       expect(api.getDesignDocument).toHaveBeenCalledWith('remote-1', 'session-1', 'pages/new.html')
     );
@@ -740,22 +778,14 @@ describe('DesignPanel', () => {
   it('loads the version list when the version history section is expanded', async () => {
     mount();
     await screen.findByTitle('Design preview');
-    expect(screen.getByRole('button', { name: 'Version history' })).toHaveAttribute(
-      'aria-expanded',
-      'false'
-    );
     expect(api.listDesignSnapshots).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Version history' }));
+    openInspectorTab('History');
     await waitFor(() =>
       expect(api.listDesignSnapshots).toHaveBeenCalledWith(
         'remote-1',
         'session-1',
         'design/index.html'
       )
-    );
-    expect(screen.getByRole('button', { name: 'Version history' })).toHaveAttribute(
-      'aria-expanded',
-      'true'
     );
     expect(await screen.findByText(/No version snapshots yet/)).toBeInTheDocument();
   });
@@ -940,7 +970,7 @@ describe('DesignPanel', () => {
     await screen.findByTitle('Design preview');
     vi.mocked(api.listDesignFiles).mockResolvedValue({ files: [] });
     disk.delete('design/index.html');
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh design files' }));
+    await openMoreMenu('Refresh design files');
     await waitFor(() =>
       expect(screen.getByLabelText('Missing file design/index.html')).toBeInTheDocument()
     );
@@ -1002,9 +1032,9 @@ describe('DesignPanel', () => {
     saveBlobToFileMock.mockResolvedValue('/Downloads/index-20261023.zip');
     mount();
     await screen.findByTitle('Design preview');
-    expect(screen.getByRole('button', { name: 'Unsaved changes' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Export' })).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    expect(screen.queryByRole('button', { name: 'Unsaved changes' })).not.toBeInTheDocument();
+    expect(screen.getByText('Saved')).toBeInTheDocument();
+    await openMoreMenu('Export');
     await waitFor(() =>
       expect(api.exportDesignZip).toHaveBeenCalledWith('remote-1', {
         sessionId: 'session-1',
@@ -1028,7 +1058,7 @@ describe('DesignPanel', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
     expect(screen.getByRole('button', { name: 'Unsaved changes' })).toBeEnabled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    await openMoreMenu('Export');
     const dialog = await screen.findByRole('dialog', { name: 'Export' });
     expect(within(dialog).getByText(/has unsaved changes/)).toBeInTheDocument();
     expect(api.exportDesignZip).not.toHaveBeenCalled();
@@ -1058,7 +1088,8 @@ describe('DesignPanel', () => {
   it('未保存差异：dirty 时可打开草稿与磁盘的行级对比，干净页禁用', async () => {
     mount();
     await screen.findByTitle('Design preview');
-    expect(screen.getByRole('button', { name: 'Unsaved changes' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Unsaved changes' })).not.toBeInTheDocument();
+    expect(screen.getByText('Saved')).toBeInTheDocument();
 
     await selectElement();
     fireEvent.change(screen.getByRole('textbox', { name: 'Element text' }), {
@@ -1314,10 +1345,11 @@ describe('DesignPanel', () => {
   it('toggles the element tree and selects a tree node through the bridge', async () => {
     mount();
     await screen.findByTitle('Design preview');
-    fireEvent.click(screen.getByRole('button', { name: 'Structure' }));
-    expect(
-      screen.getByText('The structure tree is built from the page source; pseudo-elements and script-generated content do not appear here.')
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Layers panel' }));
+    fireEvent.focus(screen.getByRole('button', { name: 'Layers help' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Built from the page source; pseudo-elements and script-generated content do not appear here.'
+    );
     const frame = screen.getByTitle('Design preview') as HTMLIFrameElement;
     const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
     fireEvent.click(screen.getByRole('button', { name: 'Select h1 0' }));
@@ -1358,79 +1390,79 @@ describe('DesignPanel', () => {
   it('工具栏模板/品牌/素材按钮打开对应对话框并可关闭', async () => {
     mount();
     await screen.findByTitle('Design preview');
-    fireEvent.click(screen.getByRole('button', { name: 'Templates' }));
+    await openMoreMenu('Templates');
     expect(screen.getByTestId('template-dialog')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'mock-close templates' }));
     expect(screen.queryByTestId('template-dialog')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Brand' }));
+    await openMoreMenu('Brand');
     expect(screen.getByTestId('brand-panel')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'mock-close brand' }));
     expect(screen.queryByTestId('brand-panel')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Assets' }));
+    await openMoreMenu('Assets');
     expect(screen.getByTestId('asset-library')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'mock-close assets' }));
     expect(screen.queryByTestId('asset-library')).not.toBeInTheDocument();
   });
 
-  it('generate：先在检视模态确认，再填入聊天（含工作区路径与品牌遵循句）', async () => {
+  it('generate：上下文 popover 可检查，发送后填入聊天（含工作区路径与品牌遵循句）', async () => {
     mount();
     await screen.findByTitle('Design preview');
-    fireEvent.click(screen.getByRole('button', { name: 'Generate page' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Generate page · design context' });
+    const dialog = await openAgentContext();
     expect(useComposerStore.getState().pendingPrefills['session-1']).toBeUndefined();
     const promptEl = within(dialog).getByText(/Create or update a polished static HTML/);
     expect(promptEl.textContent).toContain('Working directory: /work');
     expect(promptEl.textContent).toContain('Follow the brand rules and tokens above when present');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Fill into chat' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send to chat' }));
     const content = useComposerStore.getState().pendingPrefills['session-1']?.content ?? '';
     expect(content).toContain('design/index.html');
     expect(content).toContain('Follow the brand rules and tokens above when present');
     expect(await screen.findByText('Prefilled into the current chat — add your requirements and send.')).toBeInTheDocument();
-    expect(screen.queryByRole('dialog', { name: 'Generate page · design context' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Agent context' })).not.toBeInTheDocument();
   });
 
-  it('generate：检视模态取消则不填入聊天', async () => {
+  it('generate：上下文 popover 收起则不填入聊天', async () => {
     mount();
     await screen.findByTitle('Design preview');
-    fireEvent.click(screen.getByRole('button', { name: 'Generate page' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Generate page · design context' });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await openAgentContext();
+    fireEvent.click(screen.getByRole('button', { name: 'Preview context' }));
     expect(useComposerStore.getState().pendingPrefills['session-1']).toBeUndefined();
-    expect(screen.queryByRole('dialog', { name: 'Generate page · design context' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Agent context' })).not.toBeInTheDocument();
     expect(screen.queryByText('Prefilled into the current chat — add your requirements and send.')).not.toBeInTheDocument();
   });
 
-  it('handoff：检视 prompt 含选中元素 tag/path，确认后填入聊天', async () => {
+  it('handoff：上下文 prompt 含选中元素 tag/path，发送后填入聊天', async () => {
     mount();
     await screen.findByTitle('Design preview');
     await selectElement();
-    fireEvent.click(screen.getByRole('button', { name: 'Hand off to Agent' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Hand off to Agent · design context' });
+    const dialog = await openAgentContext('Make it bold');
     const promptEl = within(dialog).getByText(/Modify the selected element in design\/index\.html/);
     expect(promptEl.textContent).toContain('Element: <h1>');
     expect(promptEl.textContent).toContain('element path: 0');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Fill into chat' }));
+    expect(promptEl.textContent).toContain('## Request\n\nMake it bold');
+    fireEvent.click(screen.getByRole('button', { name: 'Send to chat' }));
     const content = useComposerStore.getState().pendingPrefills['session-1']?.content ?? '';
     expect(content).toContain('Modify the selected element in design/index.html');
     expect(content).toContain('<h1>');
     expect(content).toContain('Follow the brand rules and tokens above when present');
+    expect(content).toContain('Make it bold');
   });
 
-  it('dirty 页仍禁用生成与交接按钮（既有禁用态不变）', async () => {
+  it('dirty 页禁用 Agent 交接并就地提示保存（既有禁用态不变）', async () => {
     mount();
     await screen.findByTitle('Design preview');
     await selectElement();
-    expect(screen.getByRole('button', { name: 'Generate page' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Hand off to Agent' })).toBeEnabled();
+    expect(screen.getByRole('textbox', { name: 'Ask Agent' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Send to chat' })).toBeEnabled();
     fireEvent.change(screen.getByRole('textbox', { name: 'Element text' }), {
       target: { value: 'Changed' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
-    expect(screen.getByRole('button', { name: 'Generate page' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Hand off to Agent' })).toBeDisabled();
+    expect(screen.getByText('Save first to hand off')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Ask Agent' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Send to chat' })).not.toBeInTheDocument();
   });
 
   it('品牌缓存进入上下文：检视 prompt 含 DESIGN.md 与 tokens.css 内容', async () => {
@@ -1446,8 +1478,7 @@ describe('DesignPanel', () => {
     await act(async () => {
       await new Promise(resolve => setTimeout(resolve, 0));
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate page' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Generate page · design context' });
+    const dialog = await openAgentContext();
     expect(dialog.textContent).toContain('Brand rules (design/DESIGN.md)');
     expect(dialog.textContent).toContain('Brand voice: calm and precise');
     expect(dialog.textContent).toContain('Brand tokens (design/tokens.css)');
@@ -1486,7 +1517,7 @@ describe('DesignPanel', () => {
     expect(await screen.findByRole('tab', { name: /new\.html/ })).toBeInTheDocument();
 
     // × 关闭走 hook 的 dismiss；status 清空 + rerender 后横幅消失。
-    fireEvent.click(screen.getByRole('button', { name: 'Close run feedback' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss notice: Agent wrote 2 files' }));
     expect(runFeedbackMock.dismiss).toHaveBeenCalledTimes(1);
     runFeedbackMock.status = null;
     view.rerender(renderTree());
@@ -1497,13 +1528,12 @@ describe('DesignPanel', () => {
   it('素材导入回调：导入路径进入下一次生成的上下文', async () => {
     mount();
     await screen.findByTitle('Design preview');
-    fireEvent.click(screen.getByRole('button', { name: 'Assets' }));
+    await openMoreMenu('Assets');
     expect(screen.getByTestId('asset-library')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'mock-import asset' }));
     fireEvent.click(screen.getByRole('button', { name: 'mock-close assets' }));
     expect(screen.queryByTestId('asset-library')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Generate page' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Generate page · design context' });
+    const dialog = await openAgentContext();
     expect(dialog.textContent).toContain('assets/logo.png (imported recently)');
     // 活动页 deps 只有 css（kind 过滤只留 image/font），不出现在素材 section。
     expect(dialog.textContent).not.toContain('assets/a.css');
@@ -1513,7 +1543,7 @@ describe('DesignPanel', () => {
     mount();
     await screen.findByTitle('Design preview');
     await waitFor(() => expect(api.getDesignBrand).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('button', { name: 'Brand' }));
+    await openMoreMenu('Brand');
     fireEvent.click(screen.getByRole('button', { name: 'mock-save brand' }));
     await waitFor(() => expect(api.getDesignBrand).toHaveBeenCalledTimes(2));
   });
@@ -1526,7 +1556,7 @@ describe('DesignPanel', () => {
     mount();
     await screen.findByTitle('Design preview');
     const callsBefore = vi.mocked(api.listDesignFiles).mock.calls.length;
-    fireEvent.click(screen.getByRole('button', { name: 'Templates' }));
+    await openMoreMenu('Templates');
     fireEvent.click(screen.getByRole('button', { name: 'mock-install and open entry' }));
     await waitFor(() =>
       expect(vi.mocked(api.listDesignFiles).mock.calls.length).toBeGreaterThan(callsBefore)
@@ -1560,7 +1590,8 @@ describe('DesignPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit mode' }));
     expect(screen.getByRole('button', { name: 'Edit mode' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Slides' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Render export' })).toBeEnabled();
+    expect(await moreMenuItem('Render export')).toBeEnabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
   });
 
   it('P5：切运行模式后隐藏编辑区、显示状态条与 blocked 计数，预览构建分叉且缓存键含模式', async () => {
@@ -1571,11 +1602,9 @@ describe('DesignPanel', () => {
     mount();
     await screen.findByTitle('Design preview');
     await selectElement();
-    expect(screen.getByRole('button', { name: 'Hand off to Agent' })).toBeEnabled();
+    expect(screen.getByRole('textbox', { name: 'Ask Agent' })).toBeEnabled();
     expect(preview.buildDesignPreview).toHaveBeenCalledTimes(1);
-    expect(
-      screen.queryByText('Run mode: interaction only — switch back to Edit mode to make changes')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Run mode: interaction only')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Run mode' }));
     await waitFor(() => expect(interactive.buildDesignRunPreview).toHaveBeenCalledTimes(1));
@@ -1587,11 +1616,9 @@ describe('DesignPanel', () => {
     expect(preview.buildDesignPreview).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('textbox', { name: 'Element text' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Click an element in the preview to edit it/)).not.toBeInTheDocument();
-    expect(
-      screen.getByText('Run mode: interaction only — switch back to Edit mode to make changes')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Run mode: interaction only')).toBeInTheDocument();
     expect(screen.getByText('Removed 2 external script(s) and 1 external link(s)')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Hand off to Agent' })).toBeDisabled();
+    expect(screen.queryByRole('textbox', { name: 'Ask Agent' })).not.toBeInTheDocument();
 
     // 切回编辑模式：状态条消失，静态预览按新模式键重建（缓存按 path 单槽替换），编辑区恢复。
     fireEvent.click(screen.getByRole('button', { name: 'Edit mode' }));
@@ -1667,7 +1694,7 @@ describe('DesignPanel', () => {
       })
     );
     expect(await screen.findByText('Blocked opening an external link')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Close navigation notice' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss notice: Blocked opening an external link' }));
     expect(screen.queryByText('Blocked opening an external link')).not.toBeInTheDocument();
 
     fireEvent(
@@ -1734,7 +1761,7 @@ describe('DesignPanel', () => {
     disk.set('design/index.html', { source: DECK_SOURCE, revision: 'revision-1' });
     mount();
     await screen.findByTitle('Design preview');
-    fireEvent.click(screen.getByRole('button', { name: 'Render export' }));
+    await openMoreMenu('Render export');
     expect(screen.getByTestId('render-export-dialog')).toBeInTheDocument();
     expect(screen.getByTestId('render-export-entry')).toHaveTextContent('design/index.html');
     expect(screen.getByTestId('render-export-deck')).toHaveTextContent('2:16:9');
@@ -1746,7 +1773,7 @@ describe('DesignPanel', () => {
   it('P5：非 deck 页渲染导出 deck=null（仅 PNG 视口区域模式）', async () => {
     mount();
     await screen.findByTitle('Design preview');
-    fireEvent.click(screen.getByRole('button', { name: 'Render export' }));
+    await openMoreMenu('Render export');
     expect(screen.getByTestId('render-export-dialog')).toBeInTheDocument();
     expect(screen.getByTestId('render-export-entry')).toHaveTextContent('design/index.html');
     expect(screen.getByTestId('render-export-deck')).toHaveTextContent('none');
@@ -1759,7 +1786,7 @@ describe('DesignPanel', () => {
     mount();
     await screen.findByTitle('Design preview');
     expect(screen.queryByTestId('media-gen-panel')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Media' }));
+    await openMoreMenu('Media');
     expect(screen.getByTestId('media-gen-panel')).toBeInTheDocument();
     expect(screen.getByTestId('media-gen-session')).toHaveTextContent('session-1');
     expect(screen.getByTestId('media-gen-active-doc')).toHaveTextContent('design/index.html');
@@ -1783,7 +1810,7 @@ describe('DesignPanel', () => {
       base: sha(source),
     });
     await screen.findByRole('textbox', { name: 'Image URL' });
-    fireEvent.click(screen.getByRole('button', { name: 'Media' }));
+    await openMoreMenu('Media');
     expect(screen.getByTestId('media-gen-image-ready')).toHaveTextContent('yes');
 
     fireEvent.click(screen.getByRole('button', { name: 'mock-replace selected image' }));
@@ -1803,7 +1830,7 @@ describe('DesignPanel', () => {
     mount();
     await screen.findByTitle('Design preview');
     const callsBefore = vi.mocked(api.listDesignFiles).mock.calls.length;
-    fireEvent.click(screen.getByRole('button', { name: 'Media' }));
+    await openMoreMenu('Media');
     fireEvent.click(screen.getByRole('button', { name: 'mock-import generated asset' }));
     await waitFor(() =>
       expect(vi.mocked(api.listDesignFiles).mock.calls.length).toBeGreaterThan(callsBefore)
@@ -1815,7 +1842,7 @@ describe('DesignPanel', () => {
     vi.mocked(api.listDesignFiles).mockResolvedValue({ files: ['design/index.html', 'p2.html'] });
     mount();
     await screen.findByTitle('Design preview');
-    fireEvent.click(screen.getByRole('button', { name: 'Media' }));
+    await openMoreMenu('Media');
     expect(screen.getByTestId('media-gen-panel')).toBeInTheDocument();
     await openPage('p2.html');
     expect(screen.queryByTestId('media-gen-panel')).not.toBeInTheDocument();
@@ -1827,14 +1854,15 @@ describe('DesignPanel', () => {
     vi.mocked(api.listDesignFiles).mockResolvedValue({ files: [] });
     const empty = mount();
     await waitFor(() => expect(api.listDesignFiles).toHaveBeenCalled());
-    expect(screen.getByRole('button', { name: 'Share' })).toBeDisabled();
+    const disabledShare = await moreMenuItem('Share');
+    expect(disabledShare).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
     empty.unmount();
 
     vi.mocked(api.listDesignFiles).mockResolvedValue({ files: ['design/index.html'] });
     mount();
     await screen.findByTitle('Design preview');
-    expect(screen.getByRole('button', { name: 'Share' })).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    await openMoreMenu('Share');
     const dialog = await screen.findByRole('dialog', { name: 'Share' });
     expect(within(dialog).getByRole('tab', { name: 'Share links' })).toHaveAttribute(
       'aria-selected',
@@ -1903,7 +1931,7 @@ describe('DesignPanel', () => {
     });
     mount();
     await screen.findByTitle('Design preview');
-    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    await openMoreMenu('Share');
     const dialog = await screen.findByRole('dialog', { name: 'Share' });
     fireEvent.click(within(dialog).getByRole('tab', { name: 'Review comments' }));
     const handoffButton = await within(dialog).findByRole('button', {
@@ -1927,7 +1955,7 @@ describe('DesignPanel', () => {
     vi.mocked(api.listDesignFiles).mockResolvedValue({ files: ['design/index.html', 'p2.html'] });
     mount();
     await screen.findByTitle('Design preview');
-    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    await openMoreMenu('Share');
     expect(await screen.findByRole('dialog', { name: 'Share' })).toBeInTheDocument();
     await openPage('p2.html');
     expect(screen.queryByRole('dialog', { name: 'Share' })).not.toBeInTheDocument();
@@ -2006,6 +2034,7 @@ describe('DesignPanel', () => {
       base: sha(STYLE_SOURCE_PAGE),
     });
     await screen.findByRole('textbox', { name: 'Element text' });
+    openInspectorTab('Styles');
     return frame;
   }
 
@@ -2143,6 +2172,7 @@ describe('DesignPanel', () => {
       base: sha(LINK_PAGE),
     });
     await screen.findByRole('textbox', { name: 'Element text' });
+    openInspectorTab('Styles');
     return frame;
   }
 
@@ -2288,7 +2318,7 @@ describe('DesignPanel', () => {
     const frame = await mountExternalStylePage();
     await openExternalRuleRow(frame);
     // 无 CSS 草稿：打开导出对话框无该提示。
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    await openMoreMenu('Export');
     const dialog = await screen.findByRole('dialog', { name: 'Export' });
     expect(within(dialog).queryByText(EXPORT_NOTICE)).not.toBeInTheDocument();
     await waitFor(() => expect(within(dialog).getByText('Exported: export.zip')).toBeInTheDocument());
@@ -2298,7 +2328,7 @@ describe('DesignPanel', () => {
     // 产生 CSS 脏草稿后：顶部提示出现。
     applyExternalValue(screen.getByRole('textbox', { name: 'Value for color' }), '#00ff00');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    await openMoreMenu('Export');
     const dialog2 = await screen.findByRole('dialog', { name: 'Export' });
     expect(within(dialog2).getByText(EXPORT_NOTICE)).toBeInTheDocument();
   });

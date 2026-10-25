@@ -58,7 +58,7 @@ export function PageOverview({
   return (
     <div
       data-testid="design-overview"
-      className="min-h-52 flex-1 overflow-y-auto bg-background p-3"
+      className="min-h-0 flex-1 overflow-y-auto bg-background p-3"
     >
       <ul className="grid grid-cols-[repeat(auto-fill,minmax(168px,1fr))] gap-2">
         {pages.map(page => (

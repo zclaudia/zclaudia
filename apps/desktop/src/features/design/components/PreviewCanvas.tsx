@@ -11,6 +11,8 @@ export interface PreviewCanvasProps {
   frameRef?: Ref<HTMLIFrameElement>;
   /** iframe load 回调（面板在此发送 verify 请求，保证到达重建后的预览）。 */
   onFrameLoad?: () => void;
+  /** 实际缩放回报（fit 模式下 zoom.value 是陈旧值，顶栏/状态条需要真实百分比）。 */
+  onScaleChange?: (scale: number) => void;
   className?: string;
 }
 
@@ -20,6 +22,7 @@ const EMPTY_HTML = '<!doctype html><html><body></body></html>';
  * 受视口/缩放控制的预览画布（P2 §3）。iframe 布局宽度只由视口决定；
  * scale 是纯显示变换（fit 模式 = min(1, 容器宽 / frameW)），经外层占位
  * div 撑开滚动尺寸。preset 'fill' 时 iframe 铺满容器且恒定 scale 1。
+ * P1：画布区背景用 bg-sidebar，页面卡片加 shadow；实际缩放经 onScaleChange 回报。
  */
 export function PreviewCanvas({
   srcDoc,
@@ -27,6 +30,7 @@ export function PreviewCanvas({
   zoom,
   frameRef,
   onFrameLoad,
+  onScaleChange,
   className = '',
 }: PreviewCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,11 +63,18 @@ export function PreviewCanvas({
     : `${Math.round((frameWidthPx ?? 0) * scale * 100) / 100}px`;
   const frameH = '100%';
 
+  const onScaleChangeRef = useRef(onScaleChange);
+  onScaleChangeRef.current = onScaleChange;
+
+  useEffect(() => {
+    onScaleChangeRef.current?.(scale);
+  }, [scale]);
+
   return (
     <div
       ref={containerRef}
       data-testid="design-canvas"
-      className={`min-h-52 flex-1 overflow-auto bg-background ${className}`.trim()}
+      className={`min-h-0 flex-1 overflow-auto bg-sidebar ${className}`.trim()}
     >
       <div
         data-testid="design-canvas-placeholder"
@@ -72,6 +83,7 @@ export function PreviewCanvas({
           height: '100%',
           minWidth: '100%',
         }}
+        className={srcDoc ? 'shadow-apple-md' : ''}
       >
         <iframe
           ref={frameRef}

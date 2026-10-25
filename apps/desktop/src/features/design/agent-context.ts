@@ -17,6 +17,11 @@ export interface AgentContextSection {
 
 export type AgentContextTask = 'generate' | 'modify';
 
+/** 可选请求文本：非空时在 prompt 末尾追加 `## Request` 段（缺省输出保持逐字节不变）。 */
+export interface AgentContextOptions {
+  request?: string;
+}
+
 export interface AgentContextInput {
   workingDirectory?: string;
   projectId?: string;
@@ -112,7 +117,8 @@ function buildTaskParagraph(input: AgentContextInput, task: AgentContextTask): s
  */
 export function buildDesignAgentContext(
   input: AgentContextInput,
-  task: AgentContextTask
+  task: AgentContextTask,
+  options?: AgentContextOptions
 ): { sections: AgentContextSection[]; prompt: string } {
   const sections: AgentContextSection[] = [];
 
@@ -182,6 +188,11 @@ export function buildDesignAgentContext(
   });
 
   const blocks = sections.map(section => ['## ' + section.title, ...section.lines].join('\n'));
-  const prompt = [...blocks, buildTaskParagraph(input, task)].join('\n\n');
+  const request = options?.request?.trim();
+  const prompt = [
+    ...blocks,
+    buildTaskParagraph(input, task),
+    ...(request ? ['## Request', request] : []),
+  ].join('\n\n');
   return { sections, prompt };
 }

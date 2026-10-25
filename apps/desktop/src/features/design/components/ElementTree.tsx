@@ -2,9 +2,6 @@ import { Fragment, useMemo, useState } from 'react';
 import { buildElementTree } from '../element-tree';
 import type { ElementTreeNode } from '../element-tree';
 
-/** 能力边界说明（P3 §7.1）：树由草稿源码构建，伪元素与脚本生成的内容不出现。 */
-const TREE_HELP =
-  'The structure tree is built from the page source; pseudo-elements and script-generated content do not appear here.';
 const EMPTY_TEXT = 'This page has no displayable elements.';
 /** 默认展开前两层（path 长度 ≤2 的节点处于展开状态）。 */
 const DEFAULT_EXPAND_DEPTH = 2;
@@ -49,13 +46,10 @@ export function ElementTree({ source, selectionPath, onSelectPath }: ElementTree
 
   return (
     <section aria-label="Structure tree" className="flex min-h-0 flex-col">
-      <p className="border-b border-border px-2 py-1 text-[10px] leading-4 text-muted-foreground">
-        {TREE_HELP}
-      </p>
       {tree.length === 0 ? (
         <p className="px-2 py-2 text-[11px] text-muted-foreground">{EMPTY_TEXT}</p>
       ) : (
-        <div className="max-h-56 overflow-y-auto p-1">
+        <div className="overflow-y-auto p-1">
           {tree.map(node => (
             <TreeBranch
               key={nodeKey(node)}

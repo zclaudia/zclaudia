@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { FIELD_CLASS, Input } from '../../../components/ui/Input';
 import { useFileViewerStore } from '../../../stores/fileViewerStore';
@@ -7,7 +8,6 @@ import { relativeAssetRef } from '../asset-ref';
 import { childElementPath } from '../element-tree';
 import { childElements, findElement, parseDocument } from '../html/parse';
 import { parseDeclarations } from '../html/style-declarations';
-import { safeAttrValue, safeStyleValue } from '../html/values';
 import { elementLineRange } from '../workspace/source-lines';
 import type {
   DesignAttributeName,
@@ -16,10 +16,23 @@ import type {
   DesignStyleProperty,
   DesignStructureAction,
 } from '../types';
+import {
+  BORDER_FIELDS,
+  OBJECT_FIT_FIELD,
+  SIZE_FIELDS,
+  TYPOGRAPHY_FIELDS,
+  collectOperations,
+  initialStyleValues,
+} from '../inspector/collect-operations';
+import type { StyleFieldDef, StyleValues } from '../inspector/collect-operations';
+import { DEFAULT_SECTION_OPEN, isSectionVisible } from '../inspector/section-matrix';
+import type { InspectorSectionId } from '../inspector/section-matrix';
+import { InspectorSection } from '../inspector/InspectorSection';
 
 const OVERRIDE_WARNING =
   'Changes were written to the source, but the computed style is overridden by external styles (e.g. !important); written as an inline declaration without raising specificity.';
-const LINE_OFFSET_HINT = 'The file viewer shows the saved version; line numbers may be offset relative to the draft';
+const LINE_OFFSET_HINT =
+  'The file viewer shows the saved version; line numbers may be offset relative to the draft';
 const LOCATE_ERROR = 'Cannot locate the source position';
 const INVALID_PREFIX = 'Invalid value: ';
 const ASSET_LOADING = 'Loading image list…';
@@ -29,98 +42,11 @@ const DELETE_CONFIRM_LABEL = 'Click again to confirm delete';
 /** 删除按钮的内联确认窗口（毫秒）。 */
 const DELETE_CONFIRM_TIMEOUT = 3000;
 
-const TEXT_ALIGN_OPTIONS: readonly string[] = ['left', 'center', 'right', 'justify', 'start', 'end'];
-const BORDER_STYLE_OPTIONS: readonly string[] = [
-  'none',
-  'hidden',
-  'solid',
-  'dashed',
-  'dotted',
-  'double',
-  'groove',
-  'ridge',
-  'inset',
-  'outset',
-];
-const OBJECT_FIT_OPTIONS: readonly string[] = ['fill', 'contain', 'cover', 'none', 'scale-down'];
-
-interface StyleFieldDef {
-  property: DesignStyleProperty;
-  label: string;
-  kind: 'input' | 'select';
-  options?: readonly string[];
-  placeholder?: string;
-}
-
-const TYPOGRAPHY_FIELDS: StyleFieldDef[] = [
-  { property: 'font-family', label: 'Font', kind: 'input', placeholder: 'sans-serif' },
-  { property: 'font-size', label: 'Font size', kind: 'input', placeholder: '16px' },
-  { property: 'line-height', label: 'Line height', kind: 'input', placeholder: '1.5' },
-  { property: 'font-weight', label: 'Weight', kind: 'input', placeholder: 'normal / bold / 400' },
-  { property: 'text-align', label: 'Align', kind: 'select', options: TEXT_ALIGN_OPTIONS },
-];
-
-const SIZE_FIELDS: StyleFieldDef[] = [
-  { property: 'width', label: 'Width', kind: 'input', placeholder: 'auto' },
-  { property: 'height', label: 'Height', kind: 'input', placeholder: 'auto' },
-  { property: 'margin', label: 'Margin', kind: 'input', placeholder: '8px 12px' },
-  { property: 'padding', label: 'Padding', kind: 'input', placeholder: '8px 12px' },
-];
-
-const BORDER_FIELDS: StyleFieldDef[] = [
-  { property: 'border-width', label: 'Border width', kind: 'input', placeholder: '1px' },
-  { property: 'border-color', label: 'Border color', kind: 'input', placeholder: '#000000' },
-  { property: 'border-radius', label: 'Radius', kind: 'input', placeholder: '4px' },
-  {
-    property: 'border-style',
-    label: 'Border style',
-    kind: 'select',
-    options: BORDER_STYLE_OPTIONS,
-  },
-];
-
-const OBJECT_FIT_FIELD: StyleFieldDef = {
-  property: 'object-fit',
-  label: 'Fit',
-  kind: 'select',
-  options: OBJECT_FIT_OPTIONS,
-};
-
-/** 参与应用预检的全部样式字段（margin/padding 简写无计算值键，读取时按 undefined 处理）。 */
-const APPLICABLE_STYLE_FIELDS: StyleFieldDef[] = [
-  ...TYPOGRAPHY_FIELDS,
-  ...SIZE_FIELDS,
-  ...BORDER_FIELDS,
-  OBJECT_FIT_FIELD,
-];
-
-type StyleValues = Partial<Record<DesignStyleProperty, string>>;
+type StyleComputed = Partial<Record<DesignStyleProperty, string>>;
 
 /** 计算样式读取口径：margin/padding 等简写属性无计算键，统一按 undefined → 空串。 */
-function computedStylesOf(selection: DesignSelection | null): Partial<Record<DesignStyleProperty, string>> | undefined {
-  return selection?.styles as Partial<Record<DesignStyleProperty, string>> | undefined;
-}
-
-/** 字段初始值：select 型仅当计算值命中选项时选中（大小写不敏感），否则空 = 不修改。 */
-function initialStyleValue(field: StyleFieldDef, selection: DesignSelection | null): string {
-  const raw = computedStylesOf(selection)?.[field.property] ?? '';
-  if (field.kind === 'select') {
-    const keyword = raw.toLowerCase();
-    return field.options?.includes(keyword) ? keyword : '';
-  }
-  return raw;
-}
-
-function initialStyleValues(selection: DesignSelection | null): StyleValues {
-  const values: StyleValues = {};
-  for (const field of APPLICABLE_STYLE_FIELDS) {
-    values[field.property] = initialStyleValue(field, selection);
-  }
-  return values;
-}
-
-function GroupTitle({ children }: { children: ReactNode }) {
-  return <div className="text-[11px] font-medium text-muted-foreground">{children}</div>;
+function computedStylesOf(selection: DesignSelection | null): StyleComputed | undefined {
+  return selection?.styles as StyleComputed | undefined;
 }
 
 function InlineBadge({ testId }: { testId: string }) {
@@ -128,7 +54,7 @@ function InlineBadge({ testId }: { testId: string }) {
     <span
       data-testid={testId}
       title="This property comes from the element's style attribute (inline declaration)"
-      className="rounded bg-muted px-1 text-[9px] font-medium text-muted-foreground"
+      className="rounded bg-muted px-1 text-[10px] font-medium text-muted-foreground"
     >
       Inline
     </span>
@@ -147,7 +73,7 @@ interface StyleFieldRowProps {
 
 function StyleFieldRow({ field, value, invalid, inline, busy, onChange, onClear }: StyleFieldRowProps) {
   return (
-    <div className="grid gap-1 text-xs">
+    <div className="grid min-w-0 gap-1 text-xs">
       <span className="flex items-center gap-1">
         {field.label}
         {inline && <InlineBadge testId={`inline-badge-${field.property}`} />}
@@ -210,13 +136,21 @@ export interface SelectionEditorProps {
   /** 预览元素导航（父级/子级）；缺省时两个按钮禁用。 */
   onSelectPath?: (path: number[]) => void;
   onApply: (operations: DesignEditOperation[]) => void;
+  /** 分组折叠状态（layout store）；缺省时组件内维护临时状态。 */
+  collapsedSections?: Record<string, boolean>;
+  onToggleSection?: (id: string) => void;
+  /** 空态入口（无选区时的引导）。 */
+  onGenerate?: () => void;
+  onTemplate?: () => void;
+  /** 空态页面信息。 */
+  pageInfo?: { fileName: string | null; depCount: number };
 }
 
 /**
- * Form for the element selected in the preview（P3 §2.3 分组表单）：
- * 文字/颜色、排版、尺寸与间距、边框，img 追加图片组、a 追加链接组；
- * 应用按钮一次提交全部变更并做客户端预检，另有导航（父级/子级）与
- * 受限结构操作（复制/删除/上移/下移）。
+ * 检查器 Design 页签（P2 §4.5）：按元素类型分组渲染同一批字段，
+ * 逻辑（预检/批量提交/导航/结构操作）与拆分前逐条一致。
+ * 分组可折叠（状态入 layout store），底部吸底条只在有未提交修改时出现：
+ * 仍是一次提交全部字段、一条撤销记录（保留批量 Apply 语义）。
  */
 export function SelectionEditor({
   selection,
@@ -230,6 +164,11 @@ export function SelectionEditor({
   sessionId,
   onSelectPath,
   onApply,
+  collapsedSections,
+  onToggleSection,
+  onGenerate,
+  onTemplate,
+  pageInfo,
 }: SelectionEditorProps) {
   const [textValue, setTextValue] = useState(() => selection?.sourceText ?? selection?.text ?? '');
   const [colorValue, setColorValue] = useState(() => selection?.color ?? '');
@@ -238,7 +177,7 @@ export function SelectionEditor({
   const [srcValue, setSrcValue] = useState(() => selection?.attrs?.src ?? '');
   const [altValue, setAltValue] = useState(() => selection?.attrs?.alt ?? '');
   const [hrefValue, setHrefValue] = useState(() => selection?.attrs?.href ?? '');
-  /** 预检失败的字段中文名；非空时整单不提交并在应用按钮下方提示。 */
+  /** 预检失败的字段名；非空时整单不提交并在吸底条上方提示。 */
   const [invalidLabels, setInvalidLabels] = useState<string[]>([]);
   /** 定位失败的选区；仅对发起跳转的那次选区显示错误，选区变化即失效。 */
   const [locateFailed, setLocateFailed] = useState<DesignSelection | null>(null);
@@ -249,6 +188,22 @@ export function SelectionEditor({
   const [assetState, setAssetState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [assetFiles, setAssetFiles] = useState<string[]>([]);
   const assetCacheRef = useRef<{ key: string; files: string[] } | null>(null);
+  /** 无外部 store 时的折叠兜底（组件测试/独立挂载）。 */
+  const [localCollapsed, setLocalCollapsed] = useState<Record<string, boolean>>({});
+  const collapsedMap = collapsedSections ?? localCollapsed;
+
+  const resetFields = () => {
+    setTextValue(selection?.sourceText ?? selection?.text ?? '');
+    setColorValue(selection?.color ?? '');
+    setBackgroundValue(selection?.backgroundColor ?? '');
+    setStyleValues(initialStyleValues(selection));
+    setSrcValue(selection?.attrs?.src ?? '');
+    setAltValue(selection?.attrs?.alt ?? '');
+    setHrefValue(selection?.attrs?.href ?? '');
+    setInvalidLabels([]);
+    setConfirmDelete(false);
+    setAssetPanelOpen(false);
+  };
 
   // 选区变化重置全部字段与瞬时状态（沿用既有 useEffect 模式）。
   useEffect(() => {
@@ -296,12 +251,42 @@ export function SelectionEditor({
 
   if (!selection) {
     return (
-      <section className="flex flex-col gap-3" aria-label="Selected element">
+      <section className="flex flex-col gap-3 p-3" aria-label="Selected element">
         <div className="text-[11px] font-medium text-muted-foreground">Selected element</div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs leading-relaxed text-muted-foreground">
           Click an element in the preview to edit it. The preview targets static HTML/CSS; do not
           rely on JavaScript rendering or CDN resources.
         </p>
+        {(pageInfo || onGenerate || onTemplate) && (
+          <div className="grid gap-1 border-t border-border pt-3 text-[11px]">
+            {pageInfo?.fileName && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Page</span>
+                <span className="truncate font-mono">{pageInfo.fileName}</span>
+              </div>
+            )}
+            {pageInfo && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Dependencies</span>
+                <span>{pageInfo.depCount}</span>
+              </div>
+            )}
+          </div>
+        )}
+        {(onGenerate || onTemplate) && (
+          <div className="grid gap-1.5 pt-1">
+            {onGenerate && (
+              <Button size="sm" variant="outline" className="justify-start" onClick={onGenerate}>
+                Ask the Agent to build a page
+              </Button>
+            )}
+            {onTemplate && (
+              <Button size="sm" variant="outline" className="justify-start" onClick={onTemplate}>
+                Start from template
+              </Button>
+            )}
+          </div>
+        )}
       </section>
     );
   }
@@ -321,64 +306,28 @@ export function SelectionEditor({
     onApply([{ kind: 'attribute', name, value: null }]);
   };
 
-  /**
-   * 收集待提交操作：与初始值不同且 trim 非空的字段；颜色两字段沿用宽松行为
-   * （非空即提交，引擎 safeColor 兜底），其余 style/attribute 字段逐个过
-   * safeStyleValue/safeAttrValue 预检——任何非法字段整单不提交并返回 null。
-   */
-  const collectOperations = (): DesignEditOperation[] | null => {
-    const operations: DesignEditOperation[] = [];
-    const invalid: string[] = [];
-    if (textValue !== (selection.sourceText ?? selection.text)) {
-      operations.push({ kind: 'text', value: textValue });
-    }
-    if (colorValue.trim() && colorValue !== (selection.color ?? '')) {
-      operations.push({ kind: 'style', property: 'color', value: colorValue });
-    }
-    if (backgroundValue.trim() && backgroundValue !== (selection.backgroundColor ?? '')) {
-      operations.push({ kind: 'style', property: 'background-color', value: backgroundValue });
-    }
-    for (const field of APPLICABLE_STYLE_FIELDS) {
-      const value = styleValues[field.property] ?? '';
-      if (!value.trim() || value === (computedStyles?.[field.property] ?? '')) continue;
-      const safe = safeStyleValue(field.property, value);
-      if (safe === null) {
-        invalid.push(field.label);
-        continue;
-      }
-      operations.push({ kind: 'style', property: field.property, value: safe });
-    }
-    const attributeFields: Array<{ name: DesignAttributeName; label: string; value: string }> = [];
-    if (selection.tagName === 'img') {
-      attributeFields.push(
-        { name: 'src', label: 'Image URL', value: srcValue },
-        { name: 'alt', label: 'Alt text', value: altValue }
-      );
-    }
-    if (selection.tagName === 'a') {
-      attributeFields.push({ name: 'href', label: 'Link URL', value: hrefValue });
-    }
-    for (const field of attributeFields) {
-      if (!field.value.trim() || field.value === (selection.attrs?.[field.name] ?? '')) continue;
-      const safe = safeAttrValue(field.name, field.value, selection.tagName);
-      if (safe === null) {
-        invalid.push(field.label);
-        continue;
-      }
-      operations.push({ kind: 'attribute', name: field.name, value: safe });
-    }
-    if (invalid.length > 0) {
-      setInvalidLabels(invalid);
-      return null;
-    }
-    return operations;
+  const draftValues = {
+    textValue,
+    colorValue,
+    backgroundValue,
+    styleValues,
+    srcValue,
+    altValue,
+    hrefValue,
   };
 
+  /** 吸底条的 pending 计数：合法操作 + 预检失败字段（两者都是未提交修改）。 */
+  const pendingResult = collectOperations(draftValues, selection, computedStyles);
+  const pending = pendingResult.operations.length + pendingResult.invalid.length;
+
   const applyChanges = () => {
-    const operations = collectOperations();
-    if (operations === null) return;
+    const result = collectOperations(draftValues, selection, computedStyles);
+    if (result.invalid.length > 0) {
+      setInvalidLabels(result.invalid);
+      return;
+    }
     setInvalidLabels([]);
-    onApply(operations);
+    onApply(result.operations);
   };
 
   /** 查看源码（P2 §5.2）：行号基于草稿计算；fileViewer 永远显示磁盘版本。 */
@@ -476,14 +425,38 @@ export function SelectionEditor({
     />
   );
 
+  const isOpen = (id: InspectorSectionId): boolean =>
+    !(collapsedMap[id] ?? !DEFAULT_SECTION_OPEN[id]);
+
+  const toggleSection = (id: InspectorSectionId) => {
+    if (onToggleSection) onToggleSection(id);
+    else
+      setLocalCollapsed(previous => ({
+        ...previous,
+        [id]: !(previous[id] ?? !DEFAULT_SECTION_OPEN[id]),
+      }));
+  };
+
+  const section = (id: InspectorSectionId, title: string, children: ReactNode) =>
+    isSectionVisible(id, selection.tagName) ? (
+      <InspectorSection
+        key={id}
+        id={id}
+        title={title}
+        open={isOpen(id)}
+        onToggle={() => toggleSection(id)}
+      >
+        {children}
+      </InspectorSection>
+    ) : null;
+
   return (
-    <section className="flex flex-col gap-3" aria-label="Selected element">
-      <div className="text-[11px] font-medium text-muted-foreground">Selected element</div>
-      <div className="flex items-center justify-between font-mono text-xs text-muted-foreground">
-        <span>
+    <section className="flex min-h-full flex-col" aria-label="Selected element">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 font-mono text-[11px] text-muted-foreground">
+        <span className="min-w-0 truncate">
           &lt;{selection.tagName}&gt; · {selection.elementPath.join('.')}
         </span>
-        <span className="flex items-center gap-1">
+        <span className="flex shrink-0 items-center gap-1">
           <Button
             size="sm"
             aria-label="Parent"
@@ -505,12 +478,14 @@ export function SelectionEditor({
         </span>
       </div>
       {overrideWarning && (
-        <div role="status" className="text-xs text-warning">
+        <div role="status" className="px-3 pt-2 text-xs text-warning">
           {OVERRIDE_WARNING}
         </div>
       )}
-      <label className="grid gap-1 text-xs">
-        Text
+
+      {section(
+        'text',
+        'Text',
         <textarea
           aria-label="Element text"
           className={`${FIELD_CLASS} resize-y`}
@@ -518,207 +493,246 @@ export function SelectionEditor({
           value={textValue}
           onChange={e => setTextValue(e.target.value)}
         />
-      </label>
-      <div className="grid grid-cols-2 gap-2">
+      )}
+
+      {section(
+        'link',
+        'Link',
         <div className="grid gap-1 text-xs">
+          <span>Link URL</span>
           <span className="flex items-center gap-1">
-            Text color
-            {inlineNames.has('color') && <InlineBadge testId="inline-badge-color" />}
-          </span>
-          <div className="flex items-center gap-1">
             <Input
-              aria-label="Text color"
-              value={colorValue}
-              placeholder="#000000"
+              aria-label="Link URL"
+              value={hrefValue}
+              placeholder="page.html or https://…"
               disabled={busy}
-              onChange={e => setColorValue(e.target.value)}
+              aria-invalid={invalidLabels.includes('Link URL') || undefined}
+              onChange={e => setHrefValue(e.target.value)}
             />
             <Button
               size="sm"
               className="shrink-0"
               disabled={busy}
-              aria-label="Clear text color"
-              onClick={() => onApply([{ kind: 'style', property: 'color', value: null }])}
+              aria-label="Clear link URL"
+              onClick={() => clearAttribute('href')}
             >
-              Clear text color
+              ×
             </Button>
-          </div>
-        </div>
-        <div className="grid gap-1 text-xs">
-          <span className="flex items-center gap-1">
-            Background color
-            {inlineNames.has('background-color') && <InlineBadge testId="inline-badge-background-color" />}
           </span>
-          <div className="flex items-center gap-1">
-            <Input
-              aria-label="Background color"
-              value={backgroundValue}
-              placeholder="transparent"
-              disabled={busy}
-              onChange={e => setBackgroundValue(e.target.value)}
-            />
-            <Button
-              size="sm"
-              className="shrink-0"
-              disabled={busy}
-              aria-label="Clear background color"
-              onClick={() => onApply([{ kind: 'style', property: 'background-color', value: null }])}
-            >
-              Clear background color
-            </Button>
+        </div>
+      )}
+
+      {section(
+        'image',
+        'Image',
+        <>
+          <div className="grid gap-1 text-xs">
+            <span>Image URL</span>
+            <span className="flex items-center gap-1">
+              <Input
+                aria-label="Image URL"
+                value={srcValue}
+                placeholder="assets/photo.png"
+                disabled={busy}
+                aria-invalid={invalidLabels.includes('Image URL') || undefined}
+                onChange={e => setSrcValue(e.target.value)}
+              />
+              <Button
+                size="sm"
+                className="shrink-0"
+                disabled={busy || !sessionId}
+                aria-label="Choose image"
+                onClick={toggleAssetPanel}
+              >
+                Browse…
+              </Button>
+              <Button
+                size="sm"
+                className="shrink-0"
+                disabled={busy}
+                aria-label="Clear image URL"
+                onClick={() => clearAttribute('src')}
+              >
+                Clear
+              </Button>
+            </span>
+            {assetPanelOpen && (
+              <div
+                data-testid="asset-list"
+                className="max-h-40 overflow-y-auto rounded-md border border-border p-1"
+              >
+                {assetState === 'loading' && (
+                  <div className="px-1 py-0.5 text-[11px] text-muted-foreground">{ASSET_LOADING}</div>
+                )}
+                {assetState === 'error' && (
+                  <div className="flex items-center gap-1 px-1 py-0.5 text-[11px] text-destructive">
+                    <span role="alert">{ASSET_LOAD_ERROR}</span>
+                    <Button size="sm" onClick={() => fetchAssets(true)}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
+                {assetState === 'ready' && assetFiles.length === 0 && (
+                  <div className="px-1 py-0.5 text-[11px] text-muted-foreground">{ASSET_EMPTY}</div>
+                )}
+                {assetState === 'ready' &&
+                  assetFiles.map(file => (
+                    <button
+                      key={file}
+                      type="button"
+                      onClick={() => chooseAsset(file)}
+                      className="block w-full truncate rounded px-1 py-0.5 text-left font-mono text-[11px] text-foreground transition-colors hover:bg-secondary"
+                    >
+                      {file}
+                    </button>
+                  ))}
+              </div>
+            )}
           </div>
-        </div>
-      </div>
-      <div className="grid gap-2">
-        <GroupTitle>Typography</GroupTitle>
-        <div className="grid grid-cols-2 gap-2">
-          {TYPOGRAPHY_FIELDS.map(renderStyleField)}
-        </div>
-      </div>
-      <div className="grid gap-2">
-        <GroupTitle>Size &amp; spacing</GroupTitle>
-        <div className="grid grid-cols-2 gap-2">{SIZE_FIELDS.map(renderStyleField)}</div>
-      </div>
-      <div className="grid gap-2">
-        <GroupTitle>Border</GroupTitle>
-        <div className="grid grid-cols-2 gap-2">{BORDER_FIELDS.map(renderStyleField)}</div>
-      </div>
-      {selection.tagName === 'img' && (
-        <div className="grid gap-2">
-          <GroupTitle>Image</GroupTitle>
+          <div className="grid gap-1 text-xs">
+            <span>Alt text</span>
+            <span className="flex items-center gap-1">
+              <Input
+                aria-label="Alt text"
+                value={altValue}
+                disabled={busy}
+                aria-invalid={invalidLabels.includes('Alt text') || undefined}
+                onChange={e => setAltValue(e.target.value)}
+              />
+              <Button
+                size="sm"
+                className="shrink-0"
+                disabled={busy}
+                aria-label="Clear alt text"
+                onClick={() => clearAttribute('alt')}
+              >
+                ×
+              </Button>
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">{renderStyleField(OBJECT_FIT_FIELD)}</div>
+        </>
+      )}
+
+      {section(
+        'typography',
+        'Typography',
+        <div className="grid grid-cols-2 gap-2">{TYPOGRAPHY_FIELDS.map(renderStyleField)}</div>
+      )}
+
+      {section(
+        'fill-border',
+        'Fill & border',
+        <>
           <div className="grid grid-cols-2 gap-2">
-            <div className="col-span-2 grid gap-1 text-xs">
-              <span>Image URL</span>
-              <span className="flex items-center gap-1">
-                <Input
-                  aria-label="Image URL"
-                  value={srcValue}
-                  placeholder="assets/photo.png"
-                  disabled={busy}
-                  aria-invalid={invalidLabels.includes('Image URL') || undefined}
-                  onChange={e => setSrcValue(e.target.value)}
-                />
-                <Button
-                  size="sm"
-                  className="shrink-0"
-                  disabled={busy || !sessionId}
-                  aria-label="Choose image"
-                  onClick={toggleAssetPanel}
-                >
-                  Browse…
-                </Button>
-                <Button
-                  size="sm"
-                  className="shrink-0"
-                  disabled={busy}
-                  aria-label="Clear image URL"
-                  onClick={() => clearAttribute('src')}
-                >
-                  Clear
-                </Button>
-              </span>
-              {assetPanelOpen && (
-                <div
-                  data-testid="asset-list"
-                  className="max-h-40 overflow-y-auto rounded-md border border-border p-1"
-                >
-                  {assetState === 'loading' && (
-                    <div className="px-1 py-0.5 text-[11px] text-muted-foreground">{ASSET_LOADING}</div>
-                  )}
-                  {assetState === 'error' && (
-                    <div className="flex items-center gap-1 px-1 py-0.5 text-[11px] text-destructive">
-                      <span role="alert">{ASSET_LOAD_ERROR}</span>
-                      <Button size="sm" onClick={() => fetchAssets(true)}>
-                        Retry
-                      </Button>
-                    </div>
-                  )}
-                  {assetState === 'ready' && assetFiles.length === 0 && (
-                    <div className="px-1 py-0.5 text-[11px] text-muted-foreground">{ASSET_EMPTY}</div>
-                  )}
-                  {assetState === 'ready' &&
-                    assetFiles.map(file => (
-                      <button
-                        key={file}
-                        type="button"
-                        onClick={() => chooseAsset(file)}
-                        className="block w-full truncate rounded px-1 py-0.5 text-left font-mono text-[11px] text-foreground transition-colors hover:bg-secondary"
-                      >
-                        {file}
-                      </button>
-                    ))}
-                </div>
-              )}
-            </div>
+            {selection.tagName !== 'img' && (
             <div className="grid gap-1 text-xs">
-              <span>Alt text</span>
               <span className="flex items-center gap-1">
+                Text color
+                {inlineNames.has('color') && <InlineBadge testId="inline-badge-color" />}
+              </span>
+              <div className="flex items-center gap-1">
                 <Input
-                  aria-label="Alt text"
-                  value={altValue}
+                  aria-label="Text color"
+                  value={colorValue}
+                  placeholder="#000000"
                   disabled={busy}
-                  aria-invalid={invalidLabels.includes('Alt text') || undefined}
-                  onChange={e => setAltValue(e.target.value)}
+                  onChange={e => setColorValue(e.target.value)}
                 />
                 <Button
                   size="sm"
                   className="shrink-0"
                   disabled={busy}
-                  aria-label="Clear alt text"
-                  onClick={() => clearAttribute('alt')}
+                  aria-label="Clear text color"
+                  onClick={() => onApply([{ kind: 'style', property: 'color', value: null }])}
                 >
-                  ×
+                  Clear text color
                 </Button>
-              </span>
+              </div>
             </div>
-            {renderStyleField(OBJECT_FIT_FIELD)}
-          </div>
-        </div>
-      )}
-      {selection.tagName === 'a' && (
-        <div className="grid gap-2">
-          <GroupTitle>Link</GroupTitle>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="col-span-2 grid gap-1 text-xs">
-              <span>Link URL</span>
+            )}
+            <div className="grid gap-1 text-xs">
               <span className="flex items-center gap-1">
+                Background color
+                {inlineNames.has('background-color') && (
+                  <InlineBadge testId="inline-badge-background-color" />
+                )}
+              </span>
+              <div className="flex items-center gap-1">
                 <Input
-                  aria-label="Link URL"
-                  value={hrefValue}
-                  placeholder="page.html or https://…"
+                  aria-label="Background color"
+                  value={backgroundValue}
+                  placeholder="transparent"
                   disabled={busy}
-                  aria-invalid={invalidLabels.includes('Link URL') || undefined}
-                  onChange={e => setHrefValue(e.target.value)}
+                  onChange={e => setBackgroundValue(e.target.value)}
                 />
                 <Button
                   size="sm"
                   className="shrink-0"
                   disabled={busy}
-                  aria-label="Clear link URL"
-                  onClick={() => clearAttribute('href')}
+                  aria-label="Clear background color"
+                  onClick={() => onApply([{ kind: 'style', property: 'background-color', value: null }])}
                 >
-                  ×
+                  Clear background color
                 </Button>
-              </span>
+              </div>
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-2">{BORDER_FIELDS.map(renderStyleField)}</div>
+        </>
+      )}
+
+      {section(
+        'size-spacing',
+        'Size & spacing',
+        <div className="grid grid-cols-2 gap-2">{SIZE_FIELDS.map(renderStyleField)}</div>
+      )}
+
+      {section(
+        'structure',
+        'Structure',
+        <>
+          <div className="flex flex-wrap items-center gap-1">
+            <Button size="sm" disabled={structureDisabled} onClick={() => submitStructure('duplicate')}>
+              Copy
+            </Button>
+            <Button
+              size="sm"
+              variant={confirmDelete ? 'destructive' : 'ghost'}
+              disabled={structureDisabled}
+              aria-label="Delete element"
+              onClick={handleDeleteClick}
+            >
+              {confirmDelete ? DELETE_CONFIRM_LABEL : 'Delete'}
+            </Button>
+            <Button size="sm" disabled={!canMoveUp} onClick={() => submitStructure('move-up')}>
+              Move up
+            </Button>
+            <Button size="sm" disabled={!canMoveDown} onClick={() => submitStructure('move-down')}>
+              Move down
+            </Button>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              onClick={viewSource}
+              disabled={busy || !docSource || !docPath}
+              aria-label="View source"
+            >
+              View source
+            </Button>
+            {dirty && <span className="text-[10px] text-muted-foreground">{LINE_OFFSET_HINT}</span>}
+          </div>
+        </>
+      )}
+
+      {locateFailed === selection && (
+        <div role="alert" className="px-3 pt-2 text-xs text-destructive">
+          {LOCATE_ERROR}
         </div>
       )}
-      <div className="flex items-center gap-2">
-        <Button size="sm" variant="primary" onClick={applyChanges} disabled={busy}>
-          Apply changes
-        </Button>
-        <Button
-          size="sm"
-          onClick={viewSource}
-          disabled={busy || !docSource || !docPath}
-          aria-label="View source"
-        >
-          View source
-        </Button>
-      </div>
       {invalidLabels.length > 0 && (
-        <div className="text-xs text-destructive">
+        <div role="alert" className="px-3 pt-2 text-xs text-destructive">
           {invalidLabels.map(label => (
             <div key={label}>
               {INVALID_PREFIX}
@@ -727,33 +741,27 @@ export function SelectionEditor({
           ))}
         </div>
       )}
-      <div className="flex items-center gap-1 border-t border-border pt-2">
-        <span className="text-[11px] font-medium text-muted-foreground">Structure</span>
-        <Button size="sm" disabled={structureDisabled} onClick={() => submitStructure('duplicate')}>
-          Copy
-        </Button>
-        <Button
-          size="sm"
-          variant={confirmDelete ? 'destructive' : 'ghost'}
-          disabled={structureDisabled}
-          aria-label="Delete element"
-          onClick={handleDeleteClick}
-        >
-          {confirmDelete ? DELETE_CONFIRM_LABEL : 'Delete'}
-        </Button>
-        <Button size="sm" disabled={!canMoveUp} onClick={() => submitStructure('move-up')}>
-          Move up
-        </Button>
-        <Button size="sm" disabled={!canMoveDown} onClick={() => submitStructure('move-down')}>
-          Move down
-        </Button>
-      </div>
-      {locateFailed === selection && (
-        <div role="alert" className="text-xs text-destructive">
-          {LOCATE_ERROR}
+
+      {pending > 0 && (
+        <div className="sticky bottom-0 z-10 mt-auto flex items-center gap-2 border-t border-border bg-background/95 px-3 py-2 backdrop-blur">
+          <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+            {pending} pending change{pending === 1 ? '' : 's'}
+          </span>
+          <span className="flex-1" />
+          <Button size="sm" className="shrink-0 whitespace-nowrap" onClick={resetFields} disabled={busy}>
+            Discard
+          </Button>
+          <Button
+            size="sm"
+            variant="primary"
+            className="shrink-0 whitespace-nowrap"
+            onClick={applyChanges}
+            disabled={busy}
+          >
+            Apply changes
+          </Button>
         </div>
       )}
-      {dirty && <div className="text-[10px] text-muted-foreground">{LINE_OFFSET_HINT}</div>}
     </section>
   );
 }

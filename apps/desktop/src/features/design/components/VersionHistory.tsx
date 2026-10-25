@@ -207,28 +207,34 @@ export function VersionHistory({
 
   return (
     <section aria-label="Version history" className="flex flex-col gap-2">
-      <div className="flex items-center gap-1">
-        <span className="text-[11px] font-medium text-muted-foreground">Version history</span>
-        <IconButton size="sm" aria-label="Refresh version list" onClick={() => void refresh()}>
-          <RefreshCw size={12} />
-        </IconButton>
-        <div className="flex-1" />
-        <Input
-          aria-label="Version note"
-          placeholder="Version note (optional)"
-          value={labelValue}
-          onChange={e => setLabelValue(e.target.value)}
-          disabled={!docPath}
-          className="h-6 w-32 px-2 py-0 text-[11px]"
-        />
-        <Button
-          size="sm"
-          onClick={() => void saveVersion()}
-          disabled={!docPath || busy || dirty || capturing}
-          title={dirty ? 'Save your changes before creating a version snapshot' : 'Save the current on-disk content as a version'}
-        >
-          Save version
-        </Button>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1">
+          <span className="shrink-0 whitespace-nowrap text-[11px] font-medium text-muted-foreground">
+            Version history
+          </span>
+          <IconButton size="sm" aria-label="Refresh version list" onClick={() => void refresh()}>
+            <RefreshCw size={12} />
+          </IconButton>
+        </div>
+        <div className="flex items-center gap-1">
+          <Input
+            aria-label="Version note"
+            placeholder="Version note (optional)"
+            value={labelValue}
+            onChange={e => setLabelValue(e.target.value)}
+            disabled={!docPath}
+            className="h-6 min-w-0 flex-1 px-2 py-0 text-[11px]"
+          />
+          <Button
+            size="sm"
+            className="shrink-0 whitespace-nowrap"
+            onClick={() => void saveVersion()}
+            disabled={!docPath || busy || dirty || capturing}
+            title={dirty ? 'Save your changes before creating a version snapshot' : 'Save the current on-disk content as a version'}
+          >
+            Save version
+          </Button>
+        </div>
       </div>
       {notice && (
         <div role="status" className="text-xs text-muted-foreground">
