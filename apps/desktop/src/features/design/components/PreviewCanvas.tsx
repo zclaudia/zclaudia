@@ -67,8 +67,10 @@ export function PreviewCanvas({
   onScaleChangeRef.current = onScaleChange;
 
   useEffect(() => {
+    // 宽度还是 0（首帧，或总览用 hidden 把画布量成 0）时 fit 的 scale 是占位 1，不要写回状态条。
+    if (!fill && zoom.mode === 'fit' && containerSize.width <= 0) return;
     onScaleChangeRef.current?.(scale);
-  }, [scale]);
+  }, [scale, fill, zoom.mode, containerSize.width]);
 
   return (
     <div

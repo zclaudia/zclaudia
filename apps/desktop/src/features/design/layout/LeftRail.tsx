@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { FileText, Library, ListTree, PanelLeftClose, Presentation } from 'lucide-react';
 import { IconButton } from '../../../components/ui/Button';
@@ -16,6 +16,8 @@ export interface LeftRailProps {
   onSelectTab: (tab: DesignLeftTab) => void;
   onToggle: () => void;
   onResize: (width: number) => void;
+  /** Measured workbench width. Overlay drawers leave a strip of canvas so they can be clicked shut. */
+  containerWidth?: number;
   pages: ReactNode;
   layers: ReactNode;
   library: ReactNode;
@@ -42,6 +44,7 @@ export function LeftRail({
   onSelectTab,
   onToggle,
   onResize,
+  containerWidth = 0,
   pages,
   layers,
   library,
@@ -49,34 +52,39 @@ export function LeftRail({
 }: LeftRailProps) {
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
-  useEffect(() => {
-    const onMove = (event: PointerEvent) => {
-      const drag = dragRef.current;
-      if (!drag) return;
-      const next = Math.min(
-        DESIGN_LEFT_WIDTH_MAX,
-        Math.max(DESIGN_LEFT_WIDTH_MIN, drag.startWidth + event.clientX - drag.startX)
-      );
-      onResize(next);
-    };
-    const onUp = () => {
-      dragRef.current = null;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-    };
-  }, [onResize]);
+  const resizeTo = (next: number) => {
+    onResize(
+      Math.min(DESIGN_LEFT_WIDTH_MAX, Math.max(DESIGN_LEFT_WIDTH_MIN, Math.round(next)))
+    );
+  };
 
-  const startResize = (event: ReactPointerEvent) => {
+  const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
+    if (typeof event.currentTarget.setPointerCapture === 'function') {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
     dragRef.current = { startX: event.clientX, startWidth: width };
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
+  };
+
+  const moveResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    resizeTo(drag.startWidth + event.clientX - drag.startX);
+  };
+
+  const endResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    if (
+      typeof event.currentTarget.releasePointerCapture === 'function' &&
+      event.currentTarget.hasPointerCapture?.(event.pointerId)
+    ) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   };
 
   const tabs = deckAvailable
@@ -90,13 +98,16 @@ export function LeftRail({
     slides: 'Slides',
   };
 
-  const widthStyle = { width: tier === 'wide' ? width : 240 };
+  const overlayCap =
+    containerWidth > 0 ? Math.max(160, containerWidth - 40 - 28) : Math.min(width, 240);
+  const panelWidth = tier === 'wide' ? width : Math.min(width, overlayCap);
+  const widthStyle = { width: panelWidth };
 
   const rootTierClass =
     tier === 'wide'
       ? 'relative flex min-h-0 shrink-0 border-r border-border bg-sidebar'
       : tier === 'medium'
-        ? 'relative flex min-h-0 w-10 shrink-0 border-r border-border bg-sidebar'
+        ? 'relative z-dropdown flex min-h-0 w-10 shrink-0 border-r border-border bg-sidebar'
         : `absolute inset-y-0 left-0 z-dropdown flex min-h-0 border-r border-border bg-sidebar shadow-apple-lg ${
             open ? '' : 'hidden'
           }`;
@@ -161,7 +172,14 @@ export function LeftRail({
             aria-orientation="vertical"
             tabIndex={0}
             onPointerDown={startResize}
-            className="absolute inset-y-0 right-0 w-1 cursor-col-resize transition-colors hover:bg-border"
+            onPointerMove={moveResize}
+            onPointerUp={endResize}
+            onPointerCancel={endResize}
+            onKeyDown={event => {
+              if (event.key === 'ArrowRight') resizeTo(width + 16);
+              if (event.key === 'ArrowLeft') resizeTo(width - 16);
+            }}
+            className="absolute inset-y-0 -right-0.5 w-1.5 cursor-col-resize transition-colors hover:bg-border"
           />
         )}
       </div>

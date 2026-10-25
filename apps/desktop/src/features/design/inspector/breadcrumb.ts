@@ -34,6 +34,24 @@ function segmentLabel(element: P5Element): string {
   return label;
 }
 
+/**
+ * Agent bar chip: `tag.class` using the first class on the selected element.
+ * No selection → `Page`. No class, or a path that does not resolve → the tag.
+ */
+export function selectionChipLabel(
+  source: string | null | undefined,
+  selection: { tagName: string; elementPath: number[] } | null
+): string {
+  if (!selection) return 'Page';
+  const tag = selection.tagName.toLowerCase();
+  if (!source) return tag;
+  const { document } = parseDocument(source);
+  const element = findElement(document, selection.elementPath);
+  if (!element) return tag;
+  const firstClass = firstClassToken(attrValue(element, 'class'));
+  return firstClass ? `${tag}.${firstClass}` : tag;
+}
+
 function firstClassToken(classAttr: string | undefined): string | undefined {
   if (!classAttr) return undefined;
   return classAttr.trim().split(/\s+/).find(Boolean);

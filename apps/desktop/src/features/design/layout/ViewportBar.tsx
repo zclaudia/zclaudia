@@ -4,6 +4,7 @@ import { IconButton } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Tooltip } from '../../../components/ui/Tooltip';
 import type { DesignViewport, DesignViewportPreset } from '../types';
+import { ZOOM_MAX, ZOOM_MIN, clampZoom, stepZoom, zoomAnchor } from './zoom';
 
 export interface ViewportBarProps {
   viewport: DesignViewport;
@@ -16,13 +17,6 @@ export interface ViewportBarProps {
 
 const WIDTH_MIN = 240;
 const WIDTH_MAX = 3840;
-const ZOOM_MIN = 0.25;
-const ZOOM_MAX = 2;
-const ZOOM_STEP = 0.1;
-
-const clampZoom = (value: number): number =>
-  // 步进 10%，夹在 25%–200%；避开二进制小数误差。
-  Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(value * 100) / 100));
 
 const PRESET_WIDTH: Partial<Record<DesignViewportPreset, number>> = {
   desktop: 1280,
@@ -86,9 +80,14 @@ export function ViewportBar({
     }
   };
 
-  const scalePercent = Math.round((actualScale ?? zoom.value) * 100);
+  const anchor = zoomAnchor(zoom, actualScale);
+  const scalePercent = Math.round((zoom.mode === 'fit' ? anchor : (actualScale ?? zoom.value)) * 100);
   const fitLabel = zoom.mode === 'fit' && !fill;
   const zoomLabel = fitLabel ? `Fit · ${scalePercent}%` : `${scalePercent}%`;
+  const leaveFit = (): { mode: 'manual'; value: number } => ({
+    mode: 'manual',
+    value: clampZoom(anchor),
+  });
 
   return (
     <div className="flex min-w-0 items-center gap-0.5">
@@ -135,8 +134,8 @@ export function ViewportBar({
         <IconButton
           size="sm"
           aria-label="Zoom out"
-          disabled={fill || zoom.value <= ZOOM_MIN}
-          onClick={() => onZoomChange({ mode: 'manual', value: clampZoom(zoom.value - ZOOM_STEP) })}
+          disabled={fill || anchor <= ZOOM_MIN}
+          onClick={() => onZoomChange(stepZoom(zoom, actualScale, -1))}
         >
           <Minus size={13} strokeWidth={1.75} />
         </IconButton>
@@ -147,11 +146,7 @@ export function ViewportBar({
         disabled={fill}
         onDoubleClick={() => onZoomChange({ mode: 'manual', value: 1 })}
         onClick={() =>
-          onZoomChange(
-            zoom.mode === 'fit'
-              ? { mode: 'manual', value: zoom.value }
-              : { mode: 'fit', value: zoom.value }
-          )
+          onZoomChange(zoom.mode === 'fit' ? leaveFit() : { mode: 'fit', value: zoom.value })
         }
         className="h-6 min-w-[58px] rounded-md px-1 text-center text-[11px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
       >
@@ -161,8 +156,8 @@ export function ViewportBar({
         <IconButton
           size="sm"
           aria-label="Zoom in"
-          disabled={fill || zoom.value >= ZOOM_MAX}
-          onClick={() => onZoomChange({ mode: 'manual', value: clampZoom(zoom.value + ZOOM_STEP) })}
+          disabled={fill || anchor >= ZOOM_MAX}
+          onClick={() => onZoomChange(stepZoom(zoom, actualScale, 1))}
         >
           <Plus size={13} strokeWidth={1.75} />
         </IconButton>
@@ -174,11 +169,7 @@ export function ViewportBar({
           aria-pressed={zoom.mode === 'fit'}
           disabled={fill}
           onClick={() =>
-            onZoomChange(
-              zoom.mode === 'fit'
-                ? { mode: 'manual', value: zoom.value }
-                : { mode: 'fit', value: zoom.value }
-            )
+            onZoomChange(zoom.mode === 'fit' ? leaveFit() : { mode: 'fit', value: zoom.value })
           }
           className={zoom.mode === 'fit' ? 'bg-secondary text-foreground' : ''}
         >

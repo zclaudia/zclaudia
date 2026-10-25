@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ancestorsOf } from '../inspector/breadcrumb';
+import { ancestorsOf, selectionChipLabel } from '../inspector/breadcrumb';
 
 const SOURCE = '<body><main class="hero"><h1 id="t" class="a b">x</h1></main></body>';
 
@@ -10,6 +10,17 @@ describe('ancestorsOf', () => {
       { path: [0], label: 'main.hero' },
       { path: [0, 0], label: 'h1#t.a' },
     ]);
+  });
+
+  it('chip is tag.class, Page when nothing is selected, and the tag when there is no class', () => {
+    expect(selectionChipLabel(null, null)).toBe('Page');
+    expect(
+      selectionChipLabel(SOURCE, { tagName: 'h1', elementPath: [0, 0] })
+    ).toBe('h1.a');
+    expect(
+      selectionChipLabel(SOURCE, { tagName: 'main', elementPath: [0] })
+    ).toBe('main.hero');
+    expect(selectionChipLabel(null, { tagName: 'div', elementPath: [0] })).toBe('div');
   });
 
   it('returns an empty list for an empty path', () => {

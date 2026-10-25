@@ -126,20 +126,19 @@ describe('designLayoutStore — 设计工作台布局偏好', () => {
     expect(useDesignLayoutStore.getState().rightTab).toBe('design');
   });
 
-  it('toggleSection 默认 false -> true，翻转两次回到 false', () => {
-    const { toggleSection } = useDesignLayoutStore.getState();
-    expect(useDesignLayoutStore.getState().collapsedSections['outline']).toBeFalsy();
-    toggleSection('outline');
-    expect(useDesignLayoutStore.getState().collapsedSections['outline']).toBe(true);
-    toggleSection('outline');
-    expect(useDesignLayoutStore.getState().collapsedSections['outline']).toBe(false);
+  it('setSectionCollapsed 写入显式值，缺省键不会被取反成折叠', () => {
+    const { setSectionCollapsed } = useDesignLayoutStore.getState();
+    expect(useDesignLayoutStore.getState().collapsedSections['fill-border']).toBeUndefined();
+    setSectionCollapsed('fill-border', false);
+    expect(useDesignLayoutStore.getState().collapsedSections['fill-border']).toBe(false);
+    setSectionCollapsed('fill-border', true);
+    expect(useDesignLayoutStore.getState().collapsedSections['fill-border']).toBe(true);
   });
 
-  it('toggleSection 各分区互不影响', () => {
-    const { toggleSection } = useDesignLayoutStore.getState();
-    toggleSection('layers');
-    toggleSection('outline');
-    toggleSection('outline');
+  it('setSectionCollapsed 各分区互不影响', () => {
+    const { setSectionCollapsed } = useDesignLayoutStore.getState();
+    setSectionCollapsed('layers', true);
+    setSectionCollapsed('outline', false);
     const sections = useDesignLayoutStore.getState().collapsedSections;
     expect(sections['layers']).toBe(true);
     expect(sections['outline']).toBe(false);

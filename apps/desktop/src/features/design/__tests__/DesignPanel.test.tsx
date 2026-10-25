@@ -2124,8 +2124,9 @@ describe('DesignPanel', () => {
     expect(await screen.findByTestId('rule-@inline/0-0')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Run mode' }));
     await waitFor(() => expect(interactive.buildDesignRunPreview).toHaveBeenCalled());
-    expect(screen.queryByTestId('rule-@inline/0-0')).not.toBeInTheDocument();
-    expect(screen.queryByText('Style sources')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rule-@inline/0-0')).not.toBeVisible();
+    expect(screen.getByText('Style sources')).not.toBeVisible();
+    expect(screen.getByText('Run mode')).toBeVisible();
   });
 
   it('P3.5 C4：切页后样式来源区清空（旧规则卡不渲染，回到空态）', async () => {

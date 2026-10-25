@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { LeftRail } from '../layout/LeftRail';
 
 function mount(overrides: Partial<React.ComponentProps<typeof LeftRail>> = {}) {
@@ -19,6 +19,7 @@ function mount(overrides: Partial<React.ComponentProps<typeof LeftRail>> = {}) {
     ...overrides,
   };
   render(<LeftRail {...props} />);
+  return props;
 }
 
 describe('LeftRail（P4 左栏面板显隐）', () => {
@@ -49,6 +50,18 @@ describe('LeftRail（P4 左栏面板显隐）', () => {
     expect(rail).not.toHaveClass('hidden');
     expect(rail).toHaveClass('flex');
     expect(screen.getByRole('button', { name: 'Collapse panel' })).toBeVisible();
+  });
+
+  it('宽档拖拽分隔条时捕获指针，位移进入预览区仍按起点改宽', () => {
+    const props = mount({ tier: 'wide', open: true, width: 240 });
+    const handle = screen.getByRole('separator', { name: 'Resize panel' });
+    handle.setPointerCapture = vi.fn();
+    fireEvent.pointerDown(handle, { pointerId: 7, clientX: 300 });
+    expect(handle.setPointerCapture).toHaveBeenCalledWith(7);
+    fireEvent.pointerMove(handle, { pointerId: 7, clientX: 360 });
+    expect(props.onResize).toHaveBeenCalledWith(300);
+    fireEvent.pointerUp(handle, { pointerId: 7, clientX: 360 });
+    expect(document.body.style.cursor).toBe('');
   });
 
   it('deck 可用时多一个 Slides 入口', () => {

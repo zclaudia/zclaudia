@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { Inspector } from '../inspector/Inspector';
 import type { InspectorProps } from '../inspector/Inspector';
 import type { DesignSelection } from '../types';
@@ -99,17 +99,44 @@ describe('Inspector（P2 检查器骨架）', () => {
     expect(screen.getByTestId('pane-history')).toBeVisible();
   });
 
-  it('运行模式只显示只读说明，隐藏页签', () => {
+  it('运行模式只显示只读说明，表单保持挂载但隐藏', () => {
     mount({ runMode: true });
     expect(screen.getByText('Run mode')).toBeInTheDocument();
     expect(screen.queryByRole('tablist', { name: 'Inspector tabs' })).not.toBeInTheDocument();
-    expect(screen.queryByTestId('pane-design')).not.toBeInTheDocument();
+    expect(screen.getByTestId('pane-design')).not.toBeVisible();
   });
 
-  it('窄档折叠为 peek，点击 Expand 上抛展开', () => {
+  it('窄档折叠为 peek 时表单仍挂载，点击 Expand 上抛展开', () => {
     const onToggleCollapsed = vi.fn();
     mount({ narrow: true, collapsed: true, onToggleCollapsed });
+    expect(screen.getByTestId('pane-design')).not.toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Expand inspector' }));
     expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
+  });
+
+  it('Parent 在面包屑右侧，提交去掉最后一段的路径；body 与无选区时禁用', () => {
+    const h = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Parent' }));
+    expect(h.onSelectPath).toHaveBeenCalledWith([0]);
+
+    const root = render(
+      <Inspector
+        {...{
+          selection: { ...SELECTION, elementPath: [] },
+          docSource: SOURCE,
+          rightTab: 'design' as const,
+          onRightTabChange: vi.fn(),
+          onSelectPath: vi.fn(),
+          collapsedSections: {},
+          onToggleSection: vi.fn(),
+          dirty: false,
+          runMode: false,
+          design: <div />,
+          styles: <div />,
+          history: <div />,
+        }}
+      />
+    );
+    expect(within(root.container).getByRole('button', { name: 'Parent' })).toBeDisabled();
   });
 });

@@ -24,6 +24,8 @@ interface TooltipProps {
   /** Hover delay in ms; focus shows immediately. */
   delay?: number;
   className?: string;
+  /** Classes on the anchor wrapper (default `inline-flex`). Use when the tip must fill a flex row. */
+  anchorClassName?: string;
   /** Disable without unwrapping (e.g. when a menu is open on the same control). */
   disabled?: boolean;
 }
@@ -36,6 +38,7 @@ export function Tooltip({
   side = 'top',
   delay = 350,
   className = '',
+  anchorClassName = 'inline-flex',
   disabled = false,
 }: TooltipProps) {
   const [open, setOpen] = useState(false);
@@ -107,7 +110,7 @@ export function Tooltip({
     <>
       <span
         ref={anchorRef}
-        className="inline-flex"
+        className={anchorClassName}
         onMouseEnter={() => show(false)}
         onMouseLeave={hide}
         onFocus={() => show(true)}

@@ -26,21 +26,23 @@ export function InspectorSection({
 }: InspectorSectionProps) {
   return (
     <section data-section={id} className="border-b border-border">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={`inspector-section-${id}`}
-        onClick={onToggle}
-        className="flex h-[34px] w-full items-center gap-1.5 px-3 text-left text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ChevronDown
-          size={12}
-          strokeWidth={1.75}
-          className={`shrink-0 transition-transform ${open ? '' : '-rotate-90'}`}
-        />
-        <span className="min-w-0 flex-1 truncate">{title}</span>
-        {action}
-      </button>
+      <div className="flex items-center">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={`inspector-section-${id}`}
+          onClick={onToggle}
+          className="flex h-[34px] min-w-0 flex-1 items-center gap-1.5 px-3 text-left text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ChevronDown
+            size={12}
+            strokeWidth={1.75}
+            className={`shrink-0 transition-transform ${open ? '' : '-rotate-90'}`}
+          />
+          <span className="min-w-0 flex-1 truncate">{title}</span>
+        </button>
+        {action ? <div className="shrink-0 pr-2">{action}</div> : null}
+      </div>
       <div
         id={`inspector-section-${id}`}
         className={`grid transition-[grid-template-rows] duration-150 ${

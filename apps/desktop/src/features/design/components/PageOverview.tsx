@@ -117,7 +117,7 @@ export function PageOverview({
       </ul>
       {pages.length === 0 && (
         <p className="text-xs text-muted-foreground">
-          No page open yet; choose a file from "Open page" first.
+          No page open yet. Open one from the Pages panel.
         </p>
       )}
     </div>

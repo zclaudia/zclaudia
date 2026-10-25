@@ -24,7 +24,8 @@ interface DesignLayoutState extends DesignLayoutPrefs {
   setRightOpen(open: boolean): void;
   toggleRight(): void;
   setRightTab(tab: DesignRightTab): void;
-  toggleSection(id: string): void;
+  /** Write the collapsed flag explicitly. Missing keys are not "open" — callers apply section defaults. */
+  setSectionCollapsed(id: string, collapsed: boolean): void;
   resetLayout(): void;
 }
 
@@ -60,9 +61,9 @@ export const useDesignLayoutStore = create<DesignLayoutState>()(
       setRightOpen: open => set({ rightOpen: open }),
       toggleRight: () => set(state => ({ rightOpen: !state.rightOpen })),
       setRightTab: tab => set({ rightTab: tab }),
-      toggleSection: id =>
+      setSectionCollapsed: (id, collapsed) =>
         set(state => ({
-          collapsedSections: { ...state.collapsedSections, [id]: !state.collapsedSections[id] },
+          collapsedSections: { ...state.collapsedSections, [id]: collapsed },
         })),
       resetLayout: () => set(defaultPrefs()),
     }),

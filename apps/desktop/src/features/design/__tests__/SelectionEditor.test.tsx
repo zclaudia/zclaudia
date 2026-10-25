@@ -270,14 +270,16 @@ describe('SelectionEditor 导航（P3 §6.2）', () => {
     vi.clearAllMocks();
   });
 
-  it('父级按钮提交 slice(0,-1) 路径', () => {
-    const { onSelectPath } = mount({ selection: { ...selection, elementPath: [0, 0] } });
-    fireEvent.click(screen.getByRole('button', { name: 'Parent' }));
-    expect(onSelectPath).toHaveBeenCalledTimes(1);
-    expect(onSelectPath).toHaveBeenCalledWith([0]);
+  it('默认折叠的分组第一次点击请求展开，而不是再记成折叠', () => {
+    const onToggleSection = vi.fn();
+    mount({ collapsedSections: {}, onToggleSection });
+    fireEvent.click(screen.getByRole('button', { name: 'Fill & border' }));
+    expect(onToggleSection).toHaveBeenCalledWith('fill-border', false);
+    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    expect(onToggleSection).toHaveBeenCalledWith('text', true);
   });
 
-  it('子级按钮提交首子元素路径', () => {
+  it('子级按钮在结构分组旁，提交首子元素路径', () => {
     const { onSelectPath } = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Child' }));
     expect(onSelectPath).toHaveBeenCalledTimes(1);
@@ -289,22 +291,14 @@ describe('SelectionEditor 导航（P3 §6.2）', () => {
     expect(screen.getByRole('button', { name: 'Child' })).toBeDisabled();
   });
 
-  it('根元素（body）父级禁用', () => {
-    mount({ selection: { ...selection, elementPath: [] } });
-    expect(screen.getByRole('button', { name: 'Parent' })).toBeDisabled();
-  });
-
-  it('onSelectPath 缺省时父级/子级都禁用', () => {
+  it('onSelectPath 缺省时子级禁用', () => {
     mount({ onSelectPath: undefined });
-    expect(screen.getByRole('button', { name: 'Parent' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Child' })).toBeDisabled();
   });
 
-  it('docSource 缺省时子级禁用，父级仍可用', () => {
-    const { onSelectPath } = mount({ docSource: null, selection: { ...selection, elementPath: [0, 0] } });
+  it('docSource 缺省时子级禁用', () => {
+    mount({ docSource: null, selection: { ...selection, elementPath: [0, 0] } });
     expect(screen.getByRole('button', { name: 'Child' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Parent' }));
-    expect(onSelectPath).toHaveBeenCalledWith([0]);
   });
 });
 

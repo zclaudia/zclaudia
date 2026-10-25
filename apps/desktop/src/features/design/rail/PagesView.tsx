@@ -4,6 +4,7 @@ import { Badge } from '../../../components/ui/Badge';
 import { DropdownMenu } from '../../../components/ui/DropdownMenu';
 import { IconButton } from '../../../components/ui/Button';
 import { TONE_DOT } from '../../../components/ui/tone';
+import { Tooltip } from '../../../components/ui/Tooltip';
 import type { DesignPageSnapshot } from '../workspace/controller';
 import { PageThumbnail } from './PageThumbnail';
 
@@ -83,12 +84,11 @@ export function PagesView({
               >
                 <button
                   type="button"
-                  aria-label={`Activate ${page.path}`}
+                  aria-label={`Activate ${page.path}${page.status === 'dirty' ? ', unsaved' : ''}`}
                   aria-current={active ? 'page' : undefined}
-                  title={page.path}
                   onClick={() => onActivate(page.path)}
                   className={`flex min-w-0 flex-1 items-center gap-1.5 rounded-md p-1 text-left text-[11px] text-foreground transition-colors ${
-                    active ? 'bg-primary/5' : ''
+                    active ? 'bg-secondary' : ''
                   }`}
                 >
                   <PageThumbnail
@@ -96,7 +96,9 @@ export function PagesView({
                     preview={previews[page.path]}
                     onRequestPreview={() => onRequestPreview(page)}
                   />
-                  <span className="min-w-0 flex-1 truncate">{basename(page.path)}</span>
+                  <Tooltip content={page.path} anchorClassName="min-w-0 flex-1">
+                    <span className="min-w-0 flex-1 truncate">{basename(page.path)}</span>
+                  </Tooltip>
                   {page.status === 'dirty' && (
                     <span
                       aria-hidden
@@ -137,15 +139,16 @@ export function PagesView({
             <ul>
               {notOpen.map(path => (
                 <li key={path}>
+                  <Tooltip content={path} anchorClassName="flex w-full min-w-0">
                   <button
                     type="button"
                     aria-label={`Open ${path}`}
-                    title={path}
                     onClick={() => onOpen(path)}
                     className="w-full truncate rounded-md px-1 py-1 text-left font-mono text-[11px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                   >
                     {path}
                   </button>
+                  </Tooltip>
                 </li>
               ))}
             </ul>

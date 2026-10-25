@@ -3,6 +3,7 @@ import { Button, IconButton } from '../../../components/ui/Button';
 import { Tooltip } from '../../../components/ui/Tooltip';
 import { PageTabs } from './PageTabs';
 import { ViewportBar } from './ViewportBar';
+import { ZOOM_MAX, ZOOM_MIN, clampZoom, stepZoom, zoomAnchor } from './zoom';
 import { MoreMenu } from './MoreMenu';
 import type { DropdownMenuEntry } from '../../../components/ui/DropdownMenu';
 import type { DesignTier } from './tiers';
@@ -54,10 +55,6 @@ export interface TopBarProps {
   onToggleTree: () => void;
 }
 
-const ZOOM_STEP = 0.1;
-const clampZoom = (value: number): number =>
-  Math.min(2, Math.max(0.25, Math.round(value * 100) / 100));
-
 /**
  * 单行顶栏（P1 §4.1）：页签 / 视口与缩放 / 模式 / 撤销重做 / Save / ⋯。
  * 一行只有一个实心按钮（Save）；窄档把视口、缩放、撤销重做收进 ⋯ 菜单。
@@ -108,71 +105,93 @@ export function TopBar({
 }: TopBarProps) {
   const narrow = tier === 'narrow';
   const showModeLabels = !compact && !narrow;
+  const anchor = zoomAnchor(zoom, actualScale);
 
-  const narrowEntries: DropdownMenuEntry[] = narrow
-    ? [
-        'separator',
-        {
-          key: 'undo-narrow',
-          label: 'Undo',
-          onSelect: onUndo,
-          disabled: !canUndo || busy,
-        },
-        {
-          key: 'redo-narrow',
-          label: 'Redo',
-          onSelect: onRedo,
-          disabled: !canRedo || busy,
-        },
-        'separator',
-        {
-          key: 'viewport-desktop',
-          label: 'Desktop 1280',
-          onSelect: () => onViewportChange({ preset: 'desktop', width: 1280 }),
-        },
-        {
-          key: 'viewport-tablet',
-          label: 'Tablet 768',
-          onSelect: () => onViewportChange({ preset: 'tablet', width: 768 }),
-        },
-        {
-          key: 'viewport-mobile',
-          label: 'Mobile 390',
-          onSelect: () => onViewportChange({ preset: 'mobile', width: 390 }),
-        },
-        {
-          key: 'viewport-fill',
-          label: 'Fill',
-          onSelect: () => onViewportChange({ preset: 'fill', width: null }),
-        },
-        'separator',
-        {
-          key: 'zoom-out-narrow',
-          label: 'Zoom out',
-          onSelect: () =>
-            onZoomChange({ mode: 'manual', value: clampZoom(zoom.value - ZOOM_STEP) }),
-          disabled: viewport.preset === 'fill' || zoom.value <= 0.25,
-        },
-        {
-          key: 'zoom-in-narrow',
-          label: 'Zoom in',
-          onSelect: () =>
-            onZoomChange({ mode: 'manual', value: clampZoom(zoom.value + ZOOM_STEP) }),
-          disabled: viewport.preset === 'fill' || zoom.value >= 2,
-        },
-        {
-          key: 'zoom-fit-narrow',
-          label: 'Fit width',
-          onSelect: () =>
-            onZoomChange(
-              zoom.mode === 'fit'
-                ? { mode: 'manual', value: zoom.value }
-                : { mode: 'fit', value: zoom.value }
-            ),
-          disabled: viewport.preset === 'fill',
-        },
-      ]
-    : [];
+  const narrowEntries: DropdownMenuEntry[] = [
+    ...(compact
+      ? ([
+          'separator',
+          {
+            key: 'edit-compact',
+            label: 'Edit mode',
+            onSelect: () => onPreviewModeChange('edit'),
+          },
+          {
+            key: 'run-compact',
+            label: 'Run mode',
+            onSelect: () => onPreviewModeChange('run'),
+          },
+          {
+            key: 'slides-compact',
+            label: 'Slides',
+            onSelect: onSlides,
+            disabled: !deckAvailable,
+          },
+        ] as DropdownMenuEntry[])
+      : []),
+    ...(narrow
+      ? ([
+          'separator',
+          {
+            key: 'undo-narrow',
+            label: 'Undo',
+            onSelect: onUndo,
+            disabled: !canUndo || busy,
+          },
+          {
+            key: 'redo-narrow',
+            label: 'Redo',
+            onSelect: onRedo,
+            disabled: !canRedo || busy,
+          },
+          'separator',
+          {
+            key: 'viewport-desktop',
+            label: 'Desktop 1280',
+            onSelect: () => onViewportChange({ preset: 'desktop', width: 1280 }),
+          },
+          {
+            key: 'viewport-tablet',
+            label: 'Tablet 768',
+            onSelect: () => onViewportChange({ preset: 'tablet', width: 768 }),
+          },
+          {
+            key: 'viewport-mobile',
+            label: 'Mobile 390',
+            onSelect: () => onViewportChange({ preset: 'mobile', width: 390 }),
+          },
+          {
+            key: 'viewport-fill',
+            label: 'Fill',
+            onSelect: () => onViewportChange({ preset: 'fill', width: null }),
+          },
+          'separator',
+          {
+            key: 'zoom-out-narrow',
+            label: 'Zoom out',
+            onSelect: () => onZoomChange(stepZoom(zoom, actualScale, -1)),
+            disabled: viewport.preset === 'fill' || anchor <= ZOOM_MIN,
+          },
+          {
+            key: 'zoom-in-narrow',
+            label: 'Zoom in',
+            onSelect: () => onZoomChange(stepZoom(zoom, actualScale, 1)),
+            disabled: viewport.preset === 'fill' || anchor >= ZOOM_MAX,
+          },
+          {
+            key: 'zoom-fit-narrow',
+            label: 'Fit width',
+            onSelect: () =>
+              onZoomChange(
+                zoom.mode === 'fit'
+                  ? { mode: 'manual', value: clampZoom(anchor) }
+                  : { mode: 'fit', value: zoom.value }
+              ),
+            disabled: viewport.preset === 'fill',
+          },
+        ] as DropdownMenuEntry[])
+      : []),
+  ];
 
   return (
     <div
@@ -210,6 +229,7 @@ export function TopBar({
         />
       )}
       <div className="flex-1" />
+      {!compact && (
       <div
         role="group"
         aria-label="Preview mode"
@@ -262,6 +282,7 @@ export function TopBar({
           </button>
         </Tooltip>
       </div>
+      )}
       {!narrow && (
         <>
           <Tooltip content="Undo ⌘Z">

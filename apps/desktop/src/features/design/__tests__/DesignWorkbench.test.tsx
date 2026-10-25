@@ -94,6 +94,14 @@ describe('DesignWorkbench（P1 三档骨架）', () => {
     expect(onCloseDrawer).toHaveBeenCalledTimes(1);
   });
 
+  it('中档抽屉打开时同样有遮罩，Esc 触发关闭', () => {
+    const onCloseDrawer = vi.fn();
+    render(<Harness tier="medium" leftOpen onCloseDrawer={onCloseDrawer} />);
+    expect(screen.getByRole('button', { name: 'Close panels' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onCloseDrawer).toHaveBeenCalledTimes(1);
+  });
+
   it('宽档不渲染抽屉遮罩', () => {
     render(<Harness tier="wide" />);
     expect(screen.queryByRole('button', { name: 'Close panels' })).not.toBeInTheDocument();

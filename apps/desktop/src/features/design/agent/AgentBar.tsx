@@ -8,6 +8,8 @@ import type { DesignSelection } from '../types';
 
 export interface AgentBarProps {
   selection: DesignSelection | null;
+  /** `tag.class` when a class is known; otherwise the tag, or `Page`. */
+  chipLabel?: string;
   dirty: boolean;
   busy: boolean;
   runMode: boolean;
@@ -29,6 +31,7 @@ export interface AgentBarProps {
  */
 export function AgentBar({
   selection,
+  chipLabel,
   dirty,
   busy,
   runMode,
@@ -75,7 +78,7 @@ export function AgentBar({
             }`}
           >
             <MousePointer2 size={11} strokeWidth={1.75} className="shrink-0" />
-            {selection ? `<${selection.tagName}>` : 'Page'}
+            {chipLabel ?? (selection ? selection.tagName.toLowerCase() : 'Page')}
           </span>
         </Tooltip>
         <input

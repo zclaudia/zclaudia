@@ -19,6 +19,8 @@ import { DropdownMenu } from '../../../components/ui/DropdownMenu';
 import type { DropdownMenuEntry } from '../../../components/ui/DropdownMenu';
 import { Tooltip } from '../../../components/ui/Tooltip';
 
+const menuIcon = (Icon: typeof Download) => <Icon size={14} strokeWidth={1.75} />;
+
 export interface MoreMenuProps {
   docPath: string | null;
   loading: boolean;
@@ -75,21 +77,21 @@ export function MoreMenu({
     {
       key: 'export',
       label: 'Export',
-      icon: <Download />,
+      icon: menuIcon(Download),
       onSelect: onExport,
       disabled: !docPath || loading,
     },
     {
       key: 'render-export',
       label: 'Render export',
-      icon: <ImageDown />,
+      icon: menuIcon(ImageDown),
       onSelect: onRenderExport,
       disabled: !docPath || loading,
     },
     {
       key: 'share',
       label: 'Share',
-      icon: <Share2 />,
+      icon: menuIcon(Share2),
       onSelect: onShare,
       disabled: !docPath || loading,
     },
@@ -97,45 +99,45 @@ export function MoreMenu({
     {
       key: 'diff',
       label: 'Unsaved changes',
-      icon: <FileDiff />,
+      icon: menuIcon(FileDiff),
       onSelect: onDiff,
       disabled: !dirty,
     },
     {
       key: 'reload',
       label: 'Reload',
-      icon: <RotateCw />,
+      icon: menuIcon(RotateCw),
       onSelect: onReload,
       disabled: !docPath || busy,
     },
     {
       key: 'refresh',
       label: 'Refresh design files',
-      icon: <RefreshCw />,
+      icon: menuIcon(RefreshCw),
       onSelect: onRefresh,
     },
     'separator',
-    { key: 'templates', label: 'Templates', icon: <Sparkles />, onSelect: onTemplates },
-    { key: 'brand', label: 'Brand', icon: <Palette />, onSelect: onBrand },
-    { key: 'assets', label: 'Assets', icon: <Images />, onSelect: onAssets },
-    { key: 'media', label: 'Media', icon: <Wand2 />, onSelect: onMedia },
+    { key: 'templates', label: 'Templates', icon: menuIcon(Sparkles), onSelect: onTemplates },
+    { key: 'brand', label: 'Brand', icon: menuIcon(Palette), onSelect: onBrand },
+    { key: 'assets', label: 'Assets', icon: menuIcon(Images), onSelect: onAssets },
+    { key: 'media', label: 'Media', icon: menuIcon(Wand2), onSelect: onMedia },
     'separator',
     {
       key: 'overview',
       label: overviewOpen ? 'Overview (on)' : 'Overview',
-      icon: <LayoutGrid />,
+      icon: menuIcon(LayoutGrid),
       onSelect: onToggleOverview,
     },
     {
       key: 'structure',
       label: treeOpen ? 'Structure (on)' : 'Structure',
-      icon: <ListTree />,
+      icon: menuIcon(ListTree),
       onSelect: onToggleTree,
     },
     {
       key: 'slides',
       label: 'Slides',
-      icon: <Presentation />,
+      icon: menuIcon(Presentation),
       onSelect: onSlides,
       disabled: !deckAvailable,
     },

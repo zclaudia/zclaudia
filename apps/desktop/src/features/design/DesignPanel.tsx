@@ -35,6 +35,7 @@ import { useElementTier } from './hooks/useElementTier';
 import { usePreviewBridge } from './hooks/usePreviewBridge';
 import { usePreviewPipeline } from './hooks/usePreviewPipeline';
 import { useStyleSources } from './hooks/useStyleSources';
+import { selectionChipLabel } from './inspector/breadcrumb';
 import { Inspector } from './inspector/Inspector';
 import { CanvasBanner } from './layout/CanvasBanner';
 import type { CanvasBannerItem } from './layout/CanvasBanner';
@@ -112,7 +113,13 @@ function DesignPanelSession({
   const visible = useWorkspaceVisible();
 
   // ---- 响应式档位（§3.2）：面板容器实测宽度；0 → wide，首帧不闪 ----
-  const { ref: rootRef, tier, compact, height: panelHeight } = useElementTier<HTMLDivElement>();
+  const {
+    ref: rootRef,
+    width: panelWidth,
+    tier,
+    compact,
+    height: panelHeight,
+  } = useElementTier<HTMLDivElement>();
 
   // ---- 布局偏好（§3.3，全局持久化）；抽屉开合是临时态 ----
   const leftOpen = useDesignLayoutStore(s => s.leftOpen);
@@ -127,12 +134,13 @@ function DesignPanelSession({
   const setLeftTab = useDesignLayoutStore(s => s.setLeftTab);
   const setLibraryTab = useDesignLayoutStore(s => s.setLibraryTab);
   const setLeftWidth = useDesignLayoutStore(s => s.setLeftWidth);
-  const setRightOpen = useDesignLayoutStore(s => s.setRightOpen);
   const toggleRight = useDesignLayoutStore(s => s.toggleRight);
   const setRightTab = useDesignLayoutStore(s => s.setRightTab);
-  const toggleSection = useDesignLayoutStore(s => s.toggleSection);
-  /** 窄/中档面板抽屉（临时态，不持久化）。 */
+  const setSectionCollapsed = useDesignLayoutStore(s => s.setSectionCollapsed);
+  /** 窄/中档左栏抽屉（临时态，不持久化）。 */
   const [drawerOpen, setDrawerOpen] = useState(false);
+  /** 窄档底部面板展开（临时态）。宽/中档检查器开合仍用持久化的 rightOpen。 */
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   // ---- 通知与画布缩放 ----
   const notices = useDesignNotices();
@@ -230,8 +238,8 @@ function DesignPanelSession({
     if (tier !== 'narrow' || !selectionKey) return;
     if (autoOpenedRef.current === selectionKey) return;
     autoOpenedRef.current = selectionKey;
-    setRightOpen(true);
-  }, [tier, selectionKey, setRightOpen]);
+    setSheetOpen(true);
+  }, [tier, selectionKey]);
 
   /** deck 检测与结构解析：按活动页快照 memo（页对象仅在自身 rev 变化时更换，含草稿修订推进）。 */
   const deckDetected = useMemo(
@@ -461,6 +469,11 @@ function DesignPanelSession({
   };
 
   const railPanelOpen = tier === 'wide' ? leftOpen : drawerOpen;
+  const inspectorOpen = tier === 'narrow' ? sheetOpen : rightOpen;
+  const toggleInspector = () => {
+    if (tier === 'narrow') setSheetOpen(open => !open);
+    else toggleRight();
+  };
   const toggleRailPanel = () => {
     if (tier === 'wide') toggleLeft();
     else setDrawerOpen(open => !open);
@@ -540,7 +553,7 @@ function DesignPanelSession({
         compact={compact}
         height={panelHeight}
         leftOpen={railPanelOpen}
-        rightOpen={rightOpen}
+        rightOpen={inspectorOpen}
         leftWidth={leftWidth}
         onCloseDrawer={() => setDrawerOpen(false)}
         topBar={
@@ -599,6 +612,7 @@ function DesignPanelSession({
             onSelectTab={selectRailTab}
             onToggle={toggleRailPanel}
             onResize={setLeftWidth}
+            containerWidth={panelWidth}
             pages={
               <PagesView
                 pages={state.pages}
@@ -684,6 +698,7 @@ function DesignPanelSession({
               )}
               <AgentBar
                 selection={activePage?.selection ?? null}
+                chipLabel={selectionChipLabel(activePage?.source, activePage?.selection ?? null)}
                 dirty={activePage?.status === 'dirty'}
                 busy={activePage?.busy ?? false}
                 runMode={previewMode === 'run'}
@@ -708,12 +723,12 @@ function DesignPanelSession({
             onRightTabChange={setRightTab}
             onSelectPath={bridge.selectPath}
             collapsedSections={collapsedSections}
-            onToggleSection={toggleSection}
+            onToggleSection={setSectionCollapsed}
             dirty={activePage?.status === 'dirty'}
             runMode={previewMode === 'run'}
             narrow={tier === 'narrow'}
-            collapsed={tier === 'narrow' && !rightOpen}
-            onToggleCollapsed={toggleRight}
+            collapsed={tier === 'narrow' && !sheetOpen}
+            onToggleCollapsed={() => setSheetOpen(open => !open)}
             design={
               <SelectionEditor
                 selection={activePage?.selection ?? null}
@@ -728,7 +743,7 @@ function DesignPanelSession({
                 onSelectPath={bridge.selectPath}
                 onApply={handleApply}
                 collapsedSections={collapsedSections}
-                onToggleSection={toggleSection}
+                onToggleSection={setSectionCollapsed}
                 onGenerate={() => {
                   document
                     .querySelector<HTMLInputElement>('[data-testid="design-agent-bar"] input')
@@ -796,8 +811,8 @@ function DesignPanelSession({
             viewport={state.ui.viewport}
             zoomLabel={`${zoomPercent}%`}
             onViewDiff={() => setDraftDiffOpen(true)}
-            rightOpen={rightOpen}
-            onToggleInspector={toggleRight}
+            rightOpen={inspectorOpen}
+            onToggleInspector={toggleInspector}
           />
         }
       />

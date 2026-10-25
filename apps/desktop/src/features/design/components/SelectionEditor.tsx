@@ -138,7 +138,7 @@ export interface SelectionEditorProps {
   onApply: (operations: DesignEditOperation[]) => void;
   /** 分组折叠状态（layout store）；缺省时组件内维护临时状态。 */
   collapsedSections?: Record<string, boolean>;
-  onToggleSection?: (id: string) => void;
+  onToggleSection?: (id: string, collapsed: boolean) => void;
   /** 空态入口（无选区时的引导）。 */
   onGenerate?: () => void;
   onTemplate?: () => void;
@@ -429,15 +429,19 @@ export function SelectionEditor({
     !(collapsedMap[id] ?? !DEFAULT_SECTION_OPEN[id]);
 
   const toggleSection = (id: InspectorSectionId) => {
-    if (onToggleSection) onToggleSection(id);
-    else
-      setLocalCollapsed(previous => ({
-        ...previous,
-        [id]: !(previous[id] ?? !DEFAULT_SECTION_OPEN[id]),
-      }));
+    // Currently open → store collapsed=true. Currently closed (including a missing
+    // key whose default is closed) → store collapsed=false. Do not flip a missing key.
+    const nextCollapsed = isOpen(id);
+    if (onToggleSection) onToggleSection(id, nextCollapsed);
+    else setLocalCollapsed(previous => ({ ...previous, [id]: nextCollapsed }));
   };
 
-  const section = (id: InspectorSectionId, title: string, children: ReactNode) =>
+  const section = (
+    id: InspectorSectionId,
+    title: string,
+    children: ReactNode,
+    action?: ReactNode
+  ) =>
     isSectionVisible(id, selection.tagName) ? (
       <InspectorSection
         key={id}
@@ -445,6 +449,7 @@ export function SelectionEditor({
         title={title}
         open={isOpen(id)}
         onToggle={() => toggleSection(id)}
+        action={action}
       >
         {children}
       </InspectorSection>
@@ -452,31 +457,6 @@ export function SelectionEditor({
 
   return (
     <section className="flex min-h-full flex-col" aria-label="Selected element">
-      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 font-mono text-[11px] text-muted-foreground">
-        <span className="min-w-0 truncate">
-          &lt;{selection.tagName}&gt; · {selection.elementPath.join('.')}
-        </span>
-        <span className="flex shrink-0 items-center gap-1">
-          <Button
-            size="sm"
-            aria-label="Parent"
-            disabled={!onSelectPath || elementPathEmpty}
-            onClick={() => onSelectPath?.(selection.elementPath.slice(0, -1))}
-          >
-            Parent
-          </Button>
-          <Button
-            size="sm"
-            aria-label="Child"
-            disabled={!onSelectPath || docSource === null || childPath === null}
-            onClick={() => {
-              if (childPath) onSelectPath?.(childPath);
-            }}
-          >
-            Child
-          </Button>
-        </span>
-      </div>
       {overrideWarning && (
         <div role="status" className="px-3 pt-2 text-xs text-warning">
           {OVERRIDE_WARNING}
@@ -723,7 +703,17 @@ export function SelectionEditor({
             </Button>
             {dirty && <span className="text-[10px] text-muted-foreground">{LINE_OFFSET_HINT}</span>}
           </div>
-        </>
+        </>,
+        <Button
+          size="sm"
+          aria-label="Child"
+          disabled={!onSelectPath || docSource === null || childPath === null}
+          onClick={() => {
+            if (childPath) onSelectPath?.(childPath);
+          }}
+        >
+          Child
+        </Button>
       )}
 
       {locateFailed === selection && (

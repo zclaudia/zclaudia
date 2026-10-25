@@ -46,11 +46,11 @@ describe('AgentBar（P3 画布内联交接）', () => {
     vi.clearAllMocks();
   });
 
-  it('无选区显示 Page chip；有选区显示元素 tag', () => {
+  it('无选区显示 Page chip；有选区显示 tag.class', () => {
     mount();
     expect(screen.getByText('Page')).toBeInTheDocument();
-    mount({ selection });
-    expect(screen.getByText('<h1>')).toBeInTheDocument();
+    mount({ selection, chipLabel: 'h1.title' });
+    expect(screen.getByText('h1.title')).toBeInTheDocument();
   });
 
   it('空输入也允许发送（等价默认提示词），发送后预填并清空输入', () => {

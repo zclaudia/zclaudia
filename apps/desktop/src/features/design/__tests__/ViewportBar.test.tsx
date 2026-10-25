@@ -109,7 +109,9 @@ describe('ViewportBar（P1 顶栏视口/缩放）', () => {
       'true'
     );
     fireEvent.click(screen.getByRole('button', { name: 'Fit width' }));
-    expect(hFit.onZoomChange).toHaveBeenLastCalledWith({ mode: 'manual', value: 1.5 });
+    expect(hFit.onZoomChange).toHaveBeenLastCalledWith({ mode: 'manual', value: 0.64 });
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    expect(hFit.onZoomChange).toHaveBeenLastCalledWith({ mode: 'manual', value: 0.54 });
   });
 
   it('fill 预设下所有缩放控件禁用且隐藏宽度输入', () => {

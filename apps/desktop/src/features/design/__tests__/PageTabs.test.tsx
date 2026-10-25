@@ -46,10 +46,11 @@ describe('PageTabs（P1 顶栏页签）', () => {
     vi.clearAllMocks();
   });
 
-  it('每个打开页一个标签：basename + 全路径 title + aria-selected', () => {
+  it('每个打开页一个标签：basename + 全路径 tooltip + aria-selected', () => {
     mount();
     const tab = screen.getByRole('tab', { name: /index\.html/ });
-    expect(tab).toHaveAttribute('title', 'design/index.html');
+    fireEvent.focus(tab);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('design/index.html');
     expect(tab).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: /about\.html/ })).toHaveAttribute(
       'aria-selected',

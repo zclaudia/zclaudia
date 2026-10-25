@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { DesignTier } from './tiers';
 
@@ -15,7 +15,7 @@ export interface DesignWorkbenchProps {
   canvas: ReactNode;
   inspector: ReactNode;
   statusBar: ReactNode;
-  /** 窄档抽屉关闭（Esc / 点画布）。 */
+  /** 中档/窄档抽屉关闭（Esc / 点画布）。 */
   onCloseDrawer: () => void;
 }
 
@@ -39,23 +39,25 @@ export function DesignWorkbench({
   onCloseDrawer,
 }: DesignWorkbenchProps) {
   const narrow = tier === 'narrow';
+  const overlayDrawer = tier !== 'wide' && leftOpen;
 
-  /** 关闭抽屉并把焦点还给触发按钮（窄档才存在）。 */
-  const closeDrawer = () => {
+  /** 关闭覆盖式抽屉，焦点回到打开它的按钮。 */
+  const closeDrawer = useCallback(() => {
+    const trigger =
+      document.querySelector<HTMLElement>('[aria-label="Toggle pages panel"]') ??
+      document.querySelector<HTMLElement>('[data-testid="design-rail"] [aria-pressed="true"]');
     onCloseDrawer();
-    requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>('[aria-label="Toggle pages panel"]')?.focus();
-    });
-  };
+    requestAnimationFrame(() => trigger?.focus());
+  }, [onCloseDrawer]);
 
   useEffect(() => {
-    if (!narrow || !leftOpen) return;
+    if (!overlayDrawer) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeDrawer();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  });
+  }, [overlayDrawer, closeDrawer]);
 
   // 窄档底部面板：目标 45%（上限 420），但至少给画布留 96px；
   // 面板本身很矮（工具面板最小内容区 120px）时退化为 76px peek，绝不让
@@ -92,13 +94,18 @@ export function DesignWorkbench({
         className="relative grid min-h-0 flex-1"
         style={gridStyle}
       >
-        {narrow && leftOpen && (
+        {overlayDrawer && (
           <button
             type="button"
             aria-label="Close panels"
             tabIndex={-1}
             onClick={closeDrawer}
-            className="absolute inset-0 z-dropdown cursor-default bg-foreground/10"
+            className="absolute z-dropdown cursor-default bg-foreground/10"
+            style={
+              narrow
+                ? { inset: 0 }
+                : { gridColumn: '2 / -1', gridRow: 1, inset: 0 }
+            }
           />
         )}
         <div

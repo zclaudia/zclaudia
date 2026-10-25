@@ -50,16 +50,19 @@ export function PageThumbnail({
     return () => observer.disconnect();
   }, [visible]);
 
+  const requestKey = page.draftRevision ? `${page.path}:${page.draftRevision}` : null;
+
   useEffect(() => {
     if (!visible) return;
     if (preview) {
       requestedRef.current = null;
       return;
     }
-    if (requestedRef.current === page.path) return;
-    requestedRef.current = page.path;
+    // 文档还没载入时 ensurePreview 会直接返回；这时不能按 path 锁死，否则修订到达后永远是灰块。
+    if (!requestKey || requestedRef.current === requestKey) return;
+    requestedRef.current = requestKey;
     onRequestPreview();
-  }, [visible, preview, page.path, onRequestPreview]);
+  }, [visible, preview, requestKey, onRequestPreview]);
 
   return (
     <div

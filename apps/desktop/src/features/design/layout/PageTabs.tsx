@@ -59,11 +59,11 @@ export function PageTabs({
                   : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
               }`}
             >
+              <Tooltip content={page.path}>
               <button
                 type="button"
                 role="tab"
                 aria-selected={active}
-                title={page.path}
                 onClick={() => onActivate(page.path)}
                 className="flex min-w-0 items-center gap-1 outline-none"
               >
@@ -84,6 +84,7 @@ export function PageTabs({
                   />
                 )}
               </button>
+              </Tooltip>
               <Tooltip content="Close page">
                 <IconButton
                   size="sm"
