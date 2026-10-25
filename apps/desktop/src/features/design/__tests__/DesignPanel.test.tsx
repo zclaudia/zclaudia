@@ -12,6 +12,12 @@ import { discardAllCssDrafts } from '../css-drafts';
 import * as api from '../api';
 import * as preview from '../preview';
 import * as interactive from '../interactive';
+import { DECK_RATIO_DIMENSIONS, filterSlideInPreviewHtml } from '../deck';
+import {
+  buildPageCaptureRequest,
+  buildRenderExportFilename,
+  captureHtmlImage,
+} from '../render-export';
 import { sha256HexSync } from '../html/hash';
 import type { DesignDepsResult } from '../types';
 
@@ -61,6 +67,11 @@ vi.mock('../interactive', () => ({
     async () => ({ html: '<html></html>', blocked: { scripts: 0, links: 0 } })
   ),
 }));
+// 渲染导出内容现在由合并对话框真实挂载：捕获打桩，其余纯函数/PDF 保持真实。
+vi.mock('../render-export', async importOriginal => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return { ...actual, captureHtmlImage: vi.fn() };
+});
 
 /** run 反馈 hook 的受控返回值（横幅用例直接改 status + rerender）。 */
 const runFeedbackMock = vi.hoisted(() => ({
@@ -136,25 +147,24 @@ vi.mock('../rail/AssetLibraryView', () => ({
     ) : null,
 }));
 
-/** P5 三组件（L23/L24）按既有 mock 风格打桩：只断言挂载与回调连线（专属测试文件覆盖内部行为）。 */
-vi.mock('../components/DeckPanel', () => ({
-  DeckPanel: (props: {
-    open: boolean;
+/** P5 组件按既有 mock 风格打桩：只断言挂载/可见性门控与回调连线（专属测试文件覆盖内部行为）。 */
+vi.mock('../rail/SlidesView', () => ({
+  SlidesView: (props: {
+    active: boolean;
     page: { path: string; source: string; busy: boolean } | null;
     previewHtml: string | null;
     deck: { slides: unknown[]; ratio: string } | null;
     onCommit: (source: string, label: string) => Promise<boolean>;
     onPresent: (index: number) => void;
-    onClose: () => void;
   }) =>
-    props.open ? (
-      <div data-testid="deck-panel">
-        <span data-testid="deck-panel-page">{props.page?.path ?? ''}</span>
-        <span data-testid="deck-panel-slides">
+    props.active ? (
+      <div data-testid="slides-view">
+        <span data-testid="slides-view-page">{props.page?.path ?? ''}</span>
+        <span data-testid="slides-view-slides">
           {props.deck ? props.deck.slides.length : 'none'}
         </span>
-        <span data-testid="deck-panel-ratio">{props.deck?.ratio ?? 'none'}</span>
-        <span data-testid="deck-panel-preview">
+        <span data-testid="slides-view-ratio">{props.deck?.ratio ?? 'none'}</span>
+        <span data-testid="slides-view-preview">
           {props.previewHtml === null ? 'building' : 'ready'}
         </span>
         <button
@@ -169,7 +179,6 @@ vi.mock('../components/DeckPanel', () => ({
           mock-commit slides
         </button>
         <button type="button" onClick={() => props.onPresent(1)}>mock-present</button>
-        <button type="button" onClick={props.onClose}>mock-close slides</button>
       </div>
     ) : null,
 }));
@@ -188,28 +197,6 @@ vi.mock('../components/DeckPresenter', () => ({
       <button type="button" onClick={props.onClose}>mock-close presenter</button>
     </div>
   ),
-}));
-vi.mock('../components/RenderExportDialog', () => ({
-  RenderExportDialog: (props: {
-    open: boolean;
-    entryPath: string;
-    previewHtml: string | null;
-    deck: { slides: unknown[]; ratio: string } | null;
-    viewport: { preset: string; width: number | null };
-    onClose: () => void;
-  }) =>
-    props.open ? (
-      <div data-testid="render-export-dialog">
-        <span data-testid="render-export-entry">{props.entryPath}</span>
-        <span data-testid="render-export-deck">
-          {props.deck ? `${props.deck.slides.length}:${props.deck.ratio}` : 'none'}
-        </span>
-        <span data-testid="render-export-viewport">
-          {`${props.viewport.preset}:${props.viewport.width === null ? 'null' : props.viewport.width}`}
-        </span>
-        <button type="button" onClick={props.onClose}>mock-close render export</button>
-      </div>
-    ) : null,
 }));
 vi.mock('../components/MediaGenPanel', () => ({
   MediaGenPanel: (props: {
@@ -447,11 +434,18 @@ describe('DesignPanel', () => {
     // P6 媒体端点：面板本体不消费（MediaGenPanel 打桩），补缺省返回保持 mock 全量。
     vi.mocked(api.listDesignMediaProviders).mockResolvedValue({ providers: [], profiles: [] });
     vi.mocked(api.listDesignMediaTasks).mockResolvedValue({ tasks: [] });
-    // P7 分享端点：分享面板（真实挂载）打开即拉列表；缺省空列表保持 mock 全量。
+    // P7 分享端点：分享内容（合并对话框内真实挂载）打开即拉列表；缺省空列表保持 mock 全量。
     vi.mocked(api.listDesignShares).mockResolvedValue({ shares: [] });
     vi.mocked(api.listDesignShareComments).mockResolvedValue({ comments: [] });
+    // P5a：合并对话框打开时 Export 页签自动导出（干净页语义不变）。
+    vi.mocked(api.exportDesignZip).mockResolvedValue({
+      blob: new Blob(['zip-bytes']),
+      filename: 'auto-export.zip',
+    });
+    saveBlobToFileMock.mockResolvedValue('/Downloads/auto-export.zip');
     runFeedbackMock.status = null;
-    // clearAllMocks 不还原实现：显式恢复运行预览构建器的缺省返回（blocked 全 0）。
+    // clearAllMocks 不还原实现：显式恢复预览构建器的缺省返回（渲染导出按页切片用）。
+    vi.mocked(preview.buildDesignPreview).mockResolvedValue('<html></html>');
     vi.mocked(interactive.buildDesignRunPreview).mockResolvedValue({
       html: '<html></html>',
       blocked: { scripts: 0, links: 0 },
@@ -1063,7 +1057,7 @@ describe('DesignPanel', () => {
     await screen.findByTitle('Design preview');
     expect(screen.queryByRole('button', { name: 'Unsaved changes' })).not.toBeInTheDocument();
     expect(screen.getByText('Saved')).toBeInTheDocument();
-    await openMoreMenu('Export');
+    await openMoreMenu('Export & Share');
     await waitFor(() =>
       expect(api.exportDesignZip).toHaveBeenCalledWith('remote-1', {
         sessionId: 'session-1',
@@ -1087,8 +1081,8 @@ describe('DesignPanel', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
     expect(screen.getByRole('button', { name: 'Unsaved changes' })).toBeEnabled();
 
-    await openMoreMenu('Export');
-    const dialog = await screen.findByRole('dialog', { name: 'Export' });
+    await openMoreMenu('Export & Share');
+    const dialog = await screen.findByRole('dialog', { name: 'Export & Share' });
     expect(within(dialog).getByText(/has unsaved changes/)).toBeInTheDocument();
     expect(api.exportDesignZip).not.toHaveBeenCalled();
 
@@ -1669,7 +1663,7 @@ describe('DesignPanel', () => {
     expect(screen.queryByTestId('template-view')).not.toBeInTheDocument();
   });
 
-  // ---- P5（L25）面板接线：模式切换 / 运行桥接消息 / deck 三组件 / 渲染导出 ----
+  // ---- P5（L25）面板接线：模式切换 / 运行桥接消息 / 左栏 Slides 内嵌 + 播放器 / 渲染导出 ----
 
   it('P5：工具栏提供编辑/运行分段按钮（aria-pressed），非 deck 页 Slides 从 More actions 打开且禁用', async () => {
     mount();
@@ -1687,7 +1681,11 @@ describe('DesignPanel', () => {
     expect(screen.queryByRole('button', { name: 'Slides' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
     expect(await screen.findByRole('menuitem', { name: 'Slides' })).toBeDisabled();
-    expect(screen.getByRole('menuitem', { name: 'Render export' })).toBeEnabled();
+    // P5a：原 Export / Render export / Share 三条合并为一条 Export & Share。
+    expect(screen.getByRole('menuitem', { name: 'Export & Share' })).toBeEnabled();
+    expect(screen.queryByRole('menuitem', { name: 'Export' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Render export' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Share' })).not.toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
   });
 
@@ -1811,7 +1809,7 @@ describe('DesignPanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('P5：deck 页幻灯片可用，DeckPanel 挂载且 onCommit 走 controller.applySource；切页关闭', async () => {
+  it('P5b：Slides 入口切到左栏页签（非对话框），编辑提交走 controller.applySource；切页内嵌跟随新活动页', async () => {
     disk.set('design/index.html', { source: DECK_SOURCE, revision: 'revision-1' });
     disk.set('p2.html', { source: pageSource('B'), revision: 'rev-b' });
     vi.mocked(api.listDesignFiles).mockResolvedValue({
@@ -1822,26 +1820,38 @@ describe('DesignPanel', () => {
     const deckButton = await moreMenuItem('Slides');
     expect(deckButton).toBeEnabled();
     fireEvent.click(deckButton);
-    expect(screen.getByTestId('deck-panel')).toBeInTheDocument();
-    expect(screen.getByTestId('deck-panel-page')).toHaveTextContent('design/index.html');
-    expect(screen.getByTestId('deck-panel-slides')).toHaveTextContent('2');
-    expect(screen.getByTestId('deck-panel-ratio')).toHaveTextContent('16:9');
-    expect(screen.getByTestId('deck-panel-preview')).toHaveTextContent('ready');
+    // 左栏页签而非 Modal：抽屉/面板由 selectRailTab 打开。
+    expect(useDesignLayoutStore.getState().leftTab).toBe('slides');
+    expect(useDesignLayoutStore.getState().leftOpen).toBe(true);
+    expect(screen.getByTestId('slides-view')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Slides' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('slides-view-page')).toHaveTextContent('design/index.html');
+    expect(screen.getByTestId('slides-view-slides')).toHaveTextContent('2');
+    expect(screen.getByTestId('slides-view-ratio')).toHaveTextContent('16:9');
+    expect(screen.getByTestId('slides-view-preview')).toHaveTextContent('ready');
 
     fireEvent.click(screen.getByRole('button', { name: 'mock-commit slides' }));
     // applySource 生效：草稿变化 → 保存/撤销可用。
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
     expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
 
-    // 切页：面板/播放器/渲染导出对话框一并关闭，避免陈旧 deck 展示。
+    // 切页：只关闭播放器/合并对话框；左栏 Slides 保持挂载并跟随新活动页（非 deck 页 deck=null）。
     await openPage('p2.html');
-    expect(screen.queryByTestId('deck-panel')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('slides-view-page')).toHaveTextContent('p2.html')
+    );
+    expect(screen.getByTestId('slides-view')).toBeInTheDocument();
+    expect(screen.getByTestId('slides-view-slides')).toHaveTextContent('none');
     expect(screen.queryByTestId('deck-presenter')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('render-export-dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Export & Share' })).not.toBeInTheDocument();
   });
 
-  it('P5：DeckPanel onPresent 挂载 DeckPresenter（起始页/页数/比例），onClose 关闭', async () => {
+  it('P5b：内嵌 Slides onPresent 挂载 DeckPresenter（起始页/页数/比例）；切页仅关闭播放器', async () => {
     disk.set('design/index.html', { source: DECK_SOURCE, revision: 'revision-1' });
+    disk.set('p2.html', { source: pageSource('B'), revision: 'rev-b' });
+    vi.mocked(api.listDesignFiles).mockResolvedValue({
+      files: ['design/index.html', 'p2.html'],
+    });
     mount();
     await screen.findByTitle('Design preview');
     fireEvent.click(await moreMenuItem('Slides'));
@@ -1852,29 +1862,83 @@ describe('DesignPanel', () => {
     expect(screen.getByTestId('deck-presenter-ratio')).toHaveTextContent('16:9');
     fireEvent.click(screen.getByRole('button', { name: 'mock-close presenter' }));
     expect(screen.queryByTestId('deck-presenter')).not.toBeInTheDocument();
+
+    // 再次演示后切页：只关闭播放器；左栏内嵌 Slides 继续挂载并跟随新页。
+    fireEvent.click(screen.getByRole('button', { name: 'mock-present' }));
+    expect(screen.getByTestId('deck-presenter')).toBeInTheDocument();
+    await openPage('p2.html');
+    await waitFor(() => expect(screen.queryByTestId('deck-presenter')).not.toBeInTheDocument());
+    expect(screen.getByTestId('slides-view')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('slides-view-page')).toHaveTextContent('p2.html')
+    );
   });
 
-  it('P5：deck 页渲染导出对话框携带 entryPath/deck/viewport', async () => {
+  it('P5/P5a：deck 页 Render 页签按活动页 deck 比例逐页捕获并以入口路径命名', async () => {
     disk.set('design/index.html', { source: DECK_SOURCE, revision: 'revision-1' });
+    // deck 预览 HTML 必须包含 slide 标记，filterSlideInPreviewHtml 才能按页切片。
+    vi.mocked(preview.buildDesignPreview).mockResolvedValue(DECK_SOURCE);
+    vi.mocked(captureHtmlImage).mockImplementation(async request => ({
+      blob: new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: request.mime }),
+      width: request.width,
+      height: request.height,
+    }));
     mount();
     await screen.findByTitle('Design preview');
-    await openMoreMenu('Render export');
-    expect(screen.getByTestId('render-export-dialog')).toBeInTheDocument();
-    expect(screen.getByTestId('render-export-entry')).toHaveTextContent('design/index.html');
-    expect(screen.getByTestId('render-export-deck')).toHaveTextContent('2:16:9');
-    expect(screen.getByTestId('render-export-viewport')).toHaveTextContent('fill:null');
-    fireEvent.click(screen.getByRole('button', { name: 'mock-close render export' }));
-    expect(screen.queryByTestId('render-export-dialog')).not.toBeInTheDocument();
+    await openMoreMenu('Export & Share');
+    const dialog = await screen.findByRole('dialog', { name: 'Export & Share' });
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Render PNG/PDF' }));
+    // deck 页：PDF 按钮页数 = deck 页数；PNG 逐页下载。
+    expect(
+      within(dialog).getByRole('button', { name: 'Export PDF (2 pages · full-page image)' })
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Export PNG (one download per page)' })
+    );
+    await waitFor(() => expect(captureHtmlImage).toHaveBeenCalledTimes(2));
+    for (let index = 0; index < 2; index += 1) {
+      expect(captureHtmlImage).toHaveBeenNthCalledWith(index + 1, {
+        html: filterSlideInPreviewHtml(DECK_SOURCE, index),
+        width: DECK_RATIO_DIMENSIONS['16:9'].width,
+        height: DECK_RATIO_DIMENSIONS['16:9'].height,
+        mime: 'image/png',
+      });
+    }
+    expect(saveBlobToFileMock.mock.calls.map(call => call[1])).toEqual(
+      expect.arrayContaining([
+        buildRenderExportFilename('design/index.html', 'png', 0),
+        buildRenderExportFilename('design/index.html', 'png', 1),
+      ])
+    );
+    expect(
+      within(dialog).getByText('Export finished: 2/2 pages succeeded.')
+    ).toBeInTheDocument();
   });
 
-  it('P5：非 deck 页渲染导出 deck=null（仅 PNG 视口区域模式）', async () => {
+  it('P5/P5a：非 deck 页 Render 页签仅提供视口区域 PNG，并按活动页视口组装捕获请求', async () => {
+    vi.mocked(captureHtmlImage).mockImplementation(async request => ({
+      blob: new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: request.mime }),
+      width: request.width,
+      height: request.height,
+    }));
     mount();
     await screen.findByTitle('Design preview');
-    await openMoreMenu('Render export');
-    expect(screen.getByTestId('render-export-dialog')).toBeInTheDocument();
-    expect(screen.getByTestId('render-export-entry')).toHaveTextContent('design/index.html');
-    expect(screen.getByTestId('render-export-deck')).toHaveTextContent('none');
-    expect(screen.getByTestId('render-export-viewport')).toHaveTextContent('fill:null');
+    await openMoreMenu('Export & Share');
+    const dialog = await screen.findByRole('dialog', { name: 'Export & Share' });
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Render PNG/PDF' }));
+    expect(within(dialog).queryByRole('button', { name: /Export PDF/ })).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole('button', { name: 'Export PNG (one download per page)' })
+    ).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Export PNG (viewport area)' }));
+    await waitFor(() => expect(captureHtmlImage).toHaveBeenCalledTimes(1));
+    expect(captureHtmlImage).toHaveBeenCalledWith(
+      buildPageCaptureRequest('<html></html>', { preset: 'fill', width: null })
+    );
+    expect(saveBlobToFileMock.mock.calls.map(call => call[1])).toContain(
+      buildRenderExportFilename('design/index.html', 'png')
+    );
+    expect(within(dialog).getByText('Export finished: 1/1 pages succeeded.')).toBeInTheDocument();
   });
 
   // ---- P6（L36）面板接线：媒体生成面板打开/props 透传/替换事务/落库刷新/切页关闭 ----
@@ -1958,13 +2022,13 @@ describe('DesignPanel', () => {
     );
   });
 
-  // ---- P7（S7）面板接线：分享按钮 / 真实 SharePanel 挂载 / 交接 prefill / 切页关闭 ----
+  // ---- P7/P5a 面板接线：合并对话框的分享页签 / 交接 prefill / 切页关闭 ----
 
-  it('P7：分享按钮无活动页禁用，有活动页可打开分享面板（分享链接 tab）', async () => {
+  it('P7/P5a：Export & Share 无活动页禁用；有活动页打开默认 Export，切到 Share 页签显示分享链接', async () => {
     vi.mocked(api.listDesignFiles).mockResolvedValue({ files: [] });
     const empty = mount();
     await waitFor(() => expect(api.listDesignFiles).toHaveBeenCalled());
-    const disabledShare = await moreMenuItem('Share');
+    const disabledShare = await moreMenuItem('Export & Share');
     expect(disabledShare).toBeDisabled();
     fireEvent.keyDown(document, { key: 'Escape' });
     empty.unmount();
@@ -1972,13 +2036,19 @@ describe('DesignPanel', () => {
     vi.mocked(api.listDesignFiles).mockResolvedValue({ files: ['design/index.html'] });
     mount();
     await screen.findByTitle('Design preview');
-    await openMoreMenu('Share');
-    const dialog = await screen.findByRole('dialog', { name: 'Share' });
+    await openMoreMenu('Export & Share');
+    const dialog = await screen.findByRole('dialog', { name: 'Export & Share' });
+    // 默认落在 Export 页签。
+    expect(within(dialog).getByRole('tab', { name: 'Export ZIP' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Share' }));
     expect(within(dialog).getByRole('tab', { name: 'Share links' })).toHaveAttribute(
       'aria-selected',
       'true'
     );
-    // SharePanel 挂载即拉版本与分享列表（活动页作为 entryPath）。
+    // 三个内容同时挂载：分享内容打开即拉版本与分享列表（活动页作为 entryPath）。
     await waitFor(() =>
       expect(api.listDesignShares).toHaveBeenCalledWith(
         'remote-1',
@@ -1992,7 +2062,7 @@ describe('DesignPanel', () => {
         .getAllByRole('button', { name: 'Close' })
         .find(button => button.textContent?.trim() === 'Close')!
     );
-    expect(screen.queryByRole('dialog', { name: 'Share' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Export & Share' })).not.toBeInTheDocument();
   });
 
   it('P7：审阅评论「交给 Agent 修改」把含评论正文的 prompt 填入聊天并关闭面板', async () => {
@@ -2041,8 +2111,9 @@ describe('DesignPanel', () => {
     });
     mount();
     await screen.findByTitle('Design preview');
-    await openMoreMenu('Share');
-    const dialog = await screen.findByRole('dialog', { name: 'Share' });
+    await openMoreMenu('Export & Share');
+    const dialog = await screen.findByRole('dialog', { name: 'Export & Share' });
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Share' }));
     fireEvent.click(within(dialog).getByRole('tab', { name: 'Review comments' }));
     const handoffButton = await within(dialog).findByRole('button', {
       name: 'Hand off to Agent sc-1',
@@ -2057,7 +2128,7 @@ describe('DesignPanel', () => {
     const content = useComposerStore.getState().pendingPrefills['session-1']?.content ?? '';
     expect(content).toContain('Please update the current page design/index.html based on the review feedback above');
     expect(await screen.findByText('Prefilled into the current chat — add your requirements and send.')).toBeInTheDocument();
-    expect(screen.queryByRole('dialog', { name: 'Share' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Export & Share' })).not.toBeInTheDocument();
   });
 
   it('P7：切页时分享面板一并关闭（deck/media 同款 effect）', async () => {
@@ -2065,10 +2136,10 @@ describe('DesignPanel', () => {
     vi.mocked(api.listDesignFiles).mockResolvedValue({ files: ['design/index.html', 'p2.html'] });
     mount();
     await screen.findByTitle('Design preview');
-    await openMoreMenu('Share');
-    expect(await screen.findByRole('dialog', { name: 'Share' })).toBeInTheDocument();
+    await openMoreMenu('Export & Share');
+    expect(await screen.findByRole('dialog', { name: 'Export & Share' })).toBeInTheDocument();
     await openPage('p2.html');
-    expect(screen.queryByRole('dialog', { name: 'Share' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Export & Share' })).not.toBeInTheDocument();
   });
 
   // ---- P3.5（C1）样式来源桥接：rules-request 发送 / design-rules 校验与存入 ----
@@ -2429,18 +2500,18 @@ describe('DesignPanel', () => {
     const frame = await mountExternalStylePage();
     await openExternalRuleRow(frame);
     // 无 CSS 草稿：打开导出对话框无该提示。
-    await openMoreMenu('Export');
-    const dialog = await screen.findByRole('dialog', { name: 'Export' });
+    await openMoreMenu('Export & Share');
+    const dialog = await screen.findByRole('dialog', { name: 'Export & Share' });
     expect(within(dialog).queryByText(EXPORT_NOTICE)).not.toBeInTheDocument();
     await waitFor(() => expect(within(dialog).getByText('Exported: export.zip')).toBeInTheDocument());
     // Modal 自带 X（aria-label Close）与 footer Close 同名：点 footer 的（最后一个）。
     fireEvent.click(within(dialog).getAllByRole('button', { name: 'Close' }).at(-1)!);
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Export' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Export & Share' })).not.toBeInTheDocument());
     // 产生 CSS 脏草稿后：顶部提示出现。
     applyExternalValue(screen.getByRole('textbox', { name: 'Value for color' }), '#00ff00');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled());
-    await openMoreMenu('Export');
-    const dialog2 = await screen.findByRole('dialog', { name: 'Export' });
+    await openMoreMenu('Export & Share');
+    const dialog2 = await screen.findByRole('dialog', { name: 'Export & Share' });
     expect(within(dialog2).getByText(EXPORT_NOTICE)).toBeInTheDocument();
   });
 });

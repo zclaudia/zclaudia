@@ -40,9 +40,7 @@ export interface TopBarProps {
   onRedo: () => void;
   onSave: () => void;
   onToggleLeft: () => void;
-  onExport: () => void;
-  onRenderExport: () => void;
-  onShare: () => void;
+  onExportShare: () => void;
   onDiff: () => void;
   onReload: () => void;
   onRefresh: () => void;
@@ -86,9 +84,7 @@ export function TopBar({
   onRedo,
   onSave,
   onToggleLeft,
-  onExport,
-  onRenderExport,
-  onShare,
+  onExportShare,
   onDiff,
   onReload,
   onRefresh,
@@ -232,9 +228,7 @@ export function TopBar({
         deckAvailable={deckAvailable}
         overviewOpen={overviewOpen}
         treeOpen={treeOpen}
-        onExport={onExport}
-        onRenderExport={onRenderExport}
-        onShare={onShare}
+        onExportShare={onExportShare}
         onDiff={onDiff}
         onReload={onReload}
         onRefresh={onRefresh}

@@ -1,6 +1,6 @@
 # 设计工作台 UI 重构实现方案
 
-日期：2026-10-24。状态：P0–P4c 与 P6 键盘/文档已落地（2026-10-24），并完成真实应用三档截图走查与缺陷修复（2026-10-25）；P5 待后续批次。
+日期：2026-10-24。状态：P0–P4c、P5a/P5b 与 P6 键盘/文档已落地（2026-10-24/25），并完成真实应用三档截图走查与缺陷修复（2026-10-25）；P6 可选版本计数与最终走查待后续批次。
 
 范围：`apps/desktop/src/features/design/` 的**视图层**。目标是把当前「纵向堆叠的工具栏 + 256px 长表单」重构为
 [`docs/mockups/design-workbench-layout.html`](../mockups/design-workbench-layout.html) 所示的自适应工作台：
@@ -42,8 +42,8 @@
 | `PageOverview`（画布替换式网格）                                 | 左栏 Pages（缩略图列表）；网格视图保留为 Pages 头部的「Grid」开关       | 抽出 `PageThumbnail`                         |
 | `TemplateDialog` / `AssetLibrary`                                | 左栏 Library 的 Templates / Assets 视图                                 | 抽 `*View` 内容，Modal 变成薄壳              |
 | `BrandPanel` / `MediaGenPanel`                                   | 左栏 Library 的 Brand / Media 视图（`BrandView` / `MediaGenView`，表单型；Modal 变薄壳，见 §6.4 的取舍） | P4c 已落地                                   |
-| `ExportDialog` / `RenderExportDialog` / `SharePanel`             | 单个「Export & Share」对话框（分页签）                                  | P5 抽内容合并，之前先从 `⋯` 菜单分别进入     |
-| `DeckPanel` / `DeckPresenter`                                    | 顶栏 Slides 入口 → 左栏 Slides 页签（检测到 deck 时出现）；播放器不变   | P5                                           |
+| `ExportDialog` / `RenderExportDialog` / `SharePanel`             | 单个「Export & Share」对话框（分页签）                                  | P5a 已落地（三个 Content + 薄壳）            |
+| `DeckPanel` / `DeckPresenter`                                    | 顶栏 Slides 入口 → 左栏 Slides 页签（检测到 deck 时出现）；播放器不变   | P5b 已落地（`rail/SlidesView` + Modal 薄壳） |
 | `AgentContextPreview`（Modal）                                   | Agent 输入条上的「Context」popover                                      | P3 取代                                      |
 | `DraftDiffModal`（`DesignPanel` 末尾）                           | 保持 Modal；入口 = 状态条「Unsaved」 + `⋯` 菜单 + History 页签顶行      | 移出到 `components/DraftDiffModal.tsx`       |
 | 保存前关闭 / Reload CSS 两个确认 Modal                           | 不变                                                                    | 随组合根保留                                 |
@@ -160,7 +160,7 @@ features/design/
 
    | 条目                      | 行为                                                         | 备注                                    |
    | ------------------------- | ------------------------------------------------------------ | --------------------------------------- |
-   | Export & Share…           | P5 前拆成三条：Export ZIP… / Render PNG/PDF… / Share…         | 需活动页且非 loading                    |
+   | Export & Share…           | 打开合并对话框（Export ZIP / Render PNG/PDF / Share 三页签）  | 需活动页且非 loading；P5a 起为唯一条目  |
    | Unsaved changes           | 打开 `DraftDiffModal`                                        | 仅 dirty                                |
    | Reload from disk          | `controller.reload()`                                        | 原按钮 `Reload`                         |
    | Refresh file list         | `refreshNow()`                                               | 原 `Refresh design files`               |
@@ -299,8 +299,9 @@ features/design/
 
 ### P5 对话框归并与 Slides（M）
 
-- [ ] 5a：`ExportShareDialog`（三页签同时挂载）+ 三个 Content 抽取；5b：`SlidesView`。
-- 验收：导出/渲染/分享各自原有测试迁移后通过；渲染导出进行中切换页签不中断。
+- [x] 5a：`ExportShareDialog`（一个 Modal + 三页签）+ `ExportDialogContent` / `RenderExportContent` / `ShareContent` 抽取；三个 Content 在对话框打开期间**同时挂载**，切页签只切 `hidden`/`aria-selected` 且不改变各自 `open`，渲染导出的长任务不会因切页签中断；关闭整个对话框时子内容卸载并按原语义重置，下次打开默认 Export。`ExportDialog` / `RenderExportDialog` / `SharePanel` 保留为 Modal 兼容薄壳（页脚动作移入 Content）。`⋯` 菜单三条入口合并为一条 Export & Share；切页/分享交接关闭合并对话框。
+- [x] 5b：`SlidesView`（`DeckPanel` 状态机与 UI 搬入左栏 Slides 页签）+ `DeckPanel` Modal 兼容薄壳；`active=false` 渲染 null（缩略图 iframe 零后台挂载）但组件保持挂载、保留草稿；顶栏/`⋯` 菜单 Slides 经 `selectRailTab('slides')` 打开左栏（不再开面板 Modal），切页只关闭 `DeckPresenter`；紧凑栏内工具条/页卡动作换行、非紧凑 Modal 布局不变。
+- 验收：导出/渲染/分享各自原有测试经薄壳全绿；`ExportShareDialog` 覆盖三内容同挂载/节点身份、渲染中切页签继续、关闭重开复位与分享交接；渲染导出进行中切换页签不中断；`DeckPanel`/`DeckPresenter` 原测试全绿，`SlidesView` 覆盖不可见零 iframe、激活挂载、隐藏/重新激活保留草稿与无标记空态可用。
 
 ### P6 收尾（S–M）
 

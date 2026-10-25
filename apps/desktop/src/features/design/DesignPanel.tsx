@@ -11,13 +11,10 @@ import { AgentBar } from './agent/AgentBar';
 import { relativeAssetRef } from './asset-ref';
 import { useAgentRunFeedback } from './agent-run-watch';
 import { BrandPanel } from './components/BrandPanel';
-import { DeckPanel } from './components/DeckPanel';
 import { DeckPresenter } from './components/DeckPresenter';
 import { DraftDiffModal } from './components/DraftDiffModal';
-import { ExportDialog } from './components/ExportDialog';
+import { ExportShareDialog } from './components/ExportShareDialog';
 import { MediaGenPanel } from './components/MediaGenPanel';
-import { RenderExportDialog } from './components/RenderExportDialog';
-import { SharePanel } from './components/SharePanel';
 import { PageOverview } from './components/PageOverview';
 import { PreviewCanvas } from './components/PreviewCanvas';
 import { SelectionEditor } from './components/SelectionEditor';
@@ -47,9 +44,10 @@ import { TopBar } from './layout/TopBar';
 import { AssetLibraryView } from './rail/AssetLibraryView';
 import { BrandView } from './rail/BrandView';
 import { LayersView } from './rail/LayersView';
-import { LibraryView, SlidesView } from './rail/LibraryView';
+import { LibraryView } from './rail/LibraryView';
 import { MediaGenView } from './rail/MediaGenView';
 import { PagesView } from './rail/PagesView';
+import { SlidesView } from './rail/SlidesView';
 import { TemplateView } from './rail/TemplateView';
 import { useDesignLayoutStore } from './stores/designLayoutStore';
 import { useDesignWorkspace } from './useDesignWorkspace';
@@ -152,15 +150,13 @@ function DesignPanelSession({
   // ---- P5 三态模式与 deck / 渲染导出（§2.4/§5）：面板会话内 state，不持久化 ----
   const [previewMode, setPreviewMode] = useState<'edit' | 'run'>('edit');
   const [presentDeck, setPresentDeck] = useState<{ startIndex: number } | null>(null);
-  const [deckOpen, setDeckOpen] = useState(false);
-  const [renderExportOpen, setRenderExportOpen] = useState(false);
+  /** P5a 合并后的 Export & Share 对话框（ZIP / 渲染导出 / 分享）。 */
+  const [exportShareOpen, setExportShareOpen] = useState(false);
   const [mediaOpen, setMediaOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
 
   // ---- P4c Library：Brand / Media 内嵌为主，原 Modal 仅留作工具行的兜底 ----
   const [brandOpen, setBrandOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
   const [draftDiffOpen, setDraftDiffOpen] = useState(false);
   /** 页面关闭确认（dirty 页：保存 / 放弃修改 / 取消）。 */
   const [confirmClosePath, setConfirmClosePath] = useState<string | null>(null);
@@ -219,15 +215,14 @@ function DesignPanelSession({
     refreshNow,
   });
 
-  // 切页时关闭幻灯片面板/播放器、渲染导出对话框、媒体生成面板与分享面板，避免陈旧页数据展示；会话切换经 key 重挂载自然复位。
+  // 切页时关闭幻灯片播放器、Export & Share 对话框与媒体生成面板，避免陈旧页数据展示；会话切换经 key 重挂载自然复位。
+  // P5b 起 Slides 编辑器常驻左栏：切页只关闭播放器，内嵌视图随活动页 prop 更新。
   const activePath = state.activePath;
   const clearStyleRules = bridge.clearStyleRules;
   useEffect(() => {
-    setDeckOpen(false);
     setPresentDeck(null);
-    setRenderExportOpen(false);
+    setExportShareOpen(false);
     setMediaOpen(false);
-    setShareOpen(false);
     // P3.5 §5：切页一并清空样式来源区，旧页规则不污染新选区（选区回落由 rules-request 重新拉取）。
     clearStyleRules();
   }, [activePath, clearStyleRules]);
@@ -486,6 +481,8 @@ function DesignPanelSession({
     } else setDrawerOpen(true);
   };
   const openLayers = () => selectRailTab('layers');
+  /** P5b：Slides 是动作，不是模式——选中左栏 Slides 页签并打开抽屉/面板。 */
+  const showSlides = () => selectRailTab('slides');
   const openLibrary = (tab: typeof libraryTab) => {
     setLibraryTab(tab);
     selectRailTab('library');
@@ -505,6 +502,8 @@ function DesignPanelSession({
   const libraryPanelVisible = visible && railPanelOpen && leftTab === 'library';
   const brandInlineActive = libraryPanelVisible && libraryTab === 'brand' && !brandOpen;
   const mediaInlineActive = libraryPanelVisible && libraryTab === 'media' && !mediaOpen;
+  /** P5b：Slides 内嵌视图仅在真正可见时激活（隐藏时不挂任何缩略图 iframe）。 */
+  const slidesInlineActive = visible && railPanelOpen && leftTab === 'slides';
   const handleTemplateInstalled = (entry: string) => {
     selectRailTab('pages');
     refreshNow();
@@ -608,14 +607,12 @@ function DesignPanelSession({
             onViewportChange={viewport => controller.setViewport(viewport)}
             onZoomChange={zoom => controller.setZoom(zoom)}
             onPreviewModeChange={changePreviewMode}
-            onSlides={() => setDeckOpen(true)}
+            onSlides={showSlides}
             onUndo={() => void controller.undo()}
             onRedo={() => void controller.redo()}
             onSave={() => void controller.save()}
             onToggleLeft={toggleRailPanel}
-            onExport={() => setExportOpen(true)}
-            onRenderExport={() => setRenderExportOpen(true)}
-            onShare={() => setShareOpen(true)}
+            onExportShare={() => setExportShareOpen(true)}
             onDiff={() => setDraftDiffOpen(true)}
             onReload={() => void controller.reload()}
             onRefresh={refreshNow}
@@ -723,9 +720,17 @@ function DesignPanelSession({
             }
             slides={
               <SlidesView
-                deckAvailable={deckDetected}
-                slideCount={deckInfo?.slides.length ?? null}
-                onOpenSlides={() => setDeckOpen(true)}
+                active={slidesInlineActive}
+                page={
+                  activePage
+                    ? { path: activePage.path, source: activePage.source, busy: activePage.busy }
+                    : null
+                }
+                previewHtml={pipeline.activePreview || null}
+                deck={deckInfo}
+                compact
+                onCommit={(source, label) => controller.applySource(source, label)}
+                onPresent={startIndex => setPresentDeck({ startIndex })}
               />
             }
           />
@@ -918,20 +923,6 @@ function DesignPanelSession({
           onClose={() => setMediaOpen(false)}
         />
       )}
-      {shareOpen && (
-        <SharePanel
-          open
-          onClose={() => setShareOpen(false)}
-          backendId={backendId}
-          sessionId={sessionId}
-          docPath={activePage?.path ?? null}
-          currentSource={activePage?.source ?? null}
-          onHandoff={prompt => {
-            prefillWithNotice(prompt);
-            setShareOpen(false);
-          }}
-        />
-      )}
       {draftDiffOpen && activePage && (
         <DraftDiffModal
           open
@@ -942,33 +933,41 @@ function DesignPanelSession({
           onClose={() => setDraftDiffOpen(false)}
         />
       )}
-      {exportOpen && activePage && (
-        <ExportDialog
+      {/* ---- P5a 合并对话框（§4.8）：三页签同时挂载；关闭/切页由同一状态与 effect 管理 ---- */}
+      {exportShareOpen && activePage && (
+        <ExportShareDialog
           open
-          backendId={backendId}
-          sessionId={sessionId}
-          path={activePage.path}
-          dirty={activePage.status === 'dirty'}
-          expectedRevision={activePage.docRevision}
-          draftSource={activePage.source}
-          onSave={saveForExport}
-          onRefresh={refreshNow}
-          onClose={() => setExportOpen(false)}
-          cssDirty={styles.cssDraftDirty}
+          onClose={() => setExportShareOpen(false)}
+          exportProps={{
+            backendId,
+            sessionId,
+            path: activePage.path,
+            dirty: activePage.status === 'dirty',
+            expectedRevision: activePage.docRevision,
+            draftSource: activePage.source,
+            onSave: saveForExport,
+            onRefresh: refreshNow,
+            cssDirty: styles.cssDraftDirty,
+          }}
+          renderProps={{
+            entryPath: activePage.path,
+            previewHtml: pipeline.activePreview || null,
+            deck: deckInfo,
+            viewport: state.ui.viewport,
+          }}
+          shareProps={{
+            backendId,
+            sessionId,
+            docPath: activePage.path,
+            currentSource: activePage.source,
+            onHandoff: prompt => {
+              prefillWithNotice(prompt);
+              setExportShareOpen(false);
+            },
+          }}
         />
       )}
-      {/* ---- P5 幻灯片面板 / 播放器 / 渲染导出（§5/§6.3）；切页由上方 effect 统一关闭 ---- */}
-      {deckOpen && activePage && (
-        <DeckPanel
-          open
-          page={{ path: activePage.path, source: activePage.source, busy: activePage.busy }}
-          previewHtml={pipeline.activePreview || null}
-          deck={deckInfo}
-          onCommit={(source, label) => controller.applySource(source, label)}
-          onPresent={startIndex => setPresentDeck({ startIndex })}
-          onClose={() => setDeckOpen(false)}
-        />
-      )}
+      {/* ---- P5 幻灯片播放器（§5/§6.3）：编辑在左栏 Slides 页签；切页由上方 effect 关闭播放器 ---- */}
       {presentDeck && deckInfo && (
         <DeckPresenter
           slides={deckInfo.slides}
@@ -976,16 +975,6 @@ function DesignPanelSession({
           previewHtml={pipeline.activePreview || null}
           startIndex={presentDeck.startIndex}
           onClose={() => setPresentDeck(null)}
-        />
-      )}
-      {renderExportOpen && activePage && (
-        <RenderExportDialog
-          open
-          onClose={() => setRenderExportOpen(false)}
-          entryPath={activePage.path}
-          previewHtml={pipeline.activePreview || null}
-          deck={deckInfo}
-          viewport={state.ui.viewport}
         />
       )}
       {confirmClosePath && (

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ExternalLink, Maximize2, Presentation } from 'lucide-react';
+import { ExternalLink, Maximize2 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import type { DesignLibraryTab } from '../stores/designLayoutStore';
 
@@ -102,40 +102,6 @@ export function LibraryView({
       <div hidden={libraryTab !== 'templates'}>{templates}</div>
       <div hidden={libraryTab !== 'brand'}>{brand}</div>
       <div hidden={libraryTab !== 'media'}>{media}</div>
-    </div>
-  );
-}
-
-export interface SlidesViewProps {
-  deckAvailable: boolean;
-  slideCount: number | null;
-  onOpenSlides: () => void;
-}
-
-/** 左栏 Slides（P5b 的过渡形态）：检测到 deck 时显示页数并打开原面板。 */
-export function SlidesView({ deckAvailable, slideCount, onOpenSlides }: SlidesViewProps) {
-  return (
-    <div className="flex flex-col gap-2 p-2">
-      <div className="flex flex-col gap-2 rounded-md border border-border p-3">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
-          <Presentation size={15} strokeWidth={1.75} />
-        </span>
-        <div className="text-xs font-medium">Slides</div>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {deckAvailable
-            ? `This page defines ${slideCount ?? 0} slide${slideCount === 1 ? '' : 's'}.`
-            : 'This page has no slide markers (data-zclaudia-slide).'}
-        </p>
-        <Button
-          size="sm"
-          variant="outline"
-          aria-label="Open slides panel"
-          onClick={onOpenSlides}
-          disabled={!deckAvailable}
-        >
-          Open slides
-        </Button>
-      </div>
     </div>
   );
 }

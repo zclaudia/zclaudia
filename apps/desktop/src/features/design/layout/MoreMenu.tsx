@@ -1,7 +1,5 @@
 import {
-  Download,
   FileDiff,
-  ImageDown,
   Images,
   LayoutGrid,
   ListTree,
@@ -14,12 +12,13 @@ import {
   Sparkles,
   Wand2,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { IconButton } from '../../../components/ui/Button';
 import { DropdownMenu } from '../../../components/ui/DropdownMenu';
 import type { DropdownMenuEntry } from '../../../components/ui/DropdownMenu';
 import { Tooltip } from '../../../components/ui/Tooltip';
 
-const menuIcon = (Icon: typeof Download) => <Icon size={14} strokeWidth={1.75} />;
+const menuIcon = (Icon: LucideIcon) => <Icon size={14} strokeWidth={1.75} />;
 
 export interface MoreMenuProps {
   docPath: string | null;
@@ -29,9 +28,8 @@ export interface MoreMenuProps {
   deckAvailable: boolean;
   overviewOpen: boolean;
   treeOpen: boolean;
-  onExport: () => void;
-  onRenderExport: () => void;
-  onShare: () => void;
+  /** 合并后的 Export & Share 对话框（ZIP / 渲染导出 / 分享三个页签）。 */
+  onExportShare: () => void;
   onDiff: () => void;
   onReload: () => void;
   onRefresh: () => void;
@@ -58,9 +56,7 @@ export function MoreMenu({
   deckAvailable,
   overviewOpen,
   treeOpen,
-  onExport,
-  onRenderExport,
-  onShare,
+  onExportShare,
   onDiff,
   onReload,
   onRefresh,
@@ -75,24 +71,10 @@ export function MoreMenu({
 }: MoreMenuProps) {
   const entries: DropdownMenuEntry[] = [
     {
-      key: 'export',
-      label: 'Export',
-      icon: menuIcon(Download),
-      onSelect: onExport,
-      disabled: !docPath || loading,
-    },
-    {
-      key: 'render-export',
-      label: 'Render export',
-      icon: menuIcon(ImageDown),
-      onSelect: onRenderExport,
-      disabled: !docPath || loading,
-    },
-    {
-      key: 'share',
-      label: 'Share',
+      key: 'export-share',
+      label: 'Export & Share',
       icon: menuIcon(Share2),
-      onSelect: onShare,
+      onSelect: onExportShare,
       disabled: !docPath || loading,
     },
     'separator',
