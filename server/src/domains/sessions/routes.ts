@@ -445,13 +445,13 @@ export function createSessionRoutes(
       // and a composition root that forgot to inject it would never find out.
       console.warn('[sessions] no title generation port injected; generate-title is a no-op');
     }
+    // The title service publishes the landed session resource event itself
+    // (session-event-port registry), so this idle path has no WS audience to
+    // broadcast to — the broadcast seam stays a no-op.
     requestTitleGeneration?.({
       db,
       sessionId: req.params.id,
-      broadcast: msg => {
-        if (msg.type === 'sessions_updated')
-          sessionEvents?.publishSessionEvent('updated', msg.session);
-      },
+      broadcast: () => {},
     });
     res.status(202).json({ success: true });
   });

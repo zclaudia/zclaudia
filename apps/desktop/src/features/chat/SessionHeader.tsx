@@ -145,7 +145,7 @@ export function SessionHeader({
     return msgs?.find(m => m.role === 'user')?.content ?? null;
   });
   const topicText = firstUserText ? firstUserText.replace(/\s+/g, ' ').trim().slice(0, 40) : null;
-  const chipText = resolveTopicChip(currentSession.autoTitle, topicText);
+  const chipText = resolveTopicChip(currentSession.autoTitle, topicText, currentSession.name);
 
   // Right-panel toggle — a persistent affordance on desktop (like Cursor's panel toggle).
   const rightCollapsed = useRightSidebarStore(s => s.collapsed);

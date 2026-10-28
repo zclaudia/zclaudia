@@ -15,12 +15,18 @@ export const TITLE_INSTRUCTION =
   'Reply with only a short title (≤6 words) summarizing this conversation, in its language.';
 
 export function shouldRegenerateTitle(input: {
+  name?: string;
   autoTitle?: string;
   autoTitleMsgCount?: number;
   userMsgCount: number;
 }): boolean {
-  const { autoTitle, autoTitleMsgCount, userMsgCount } = input;
+  const { name, autoTitle, autoTitleMsgCount, userMsgCount } = input;
   if (userMsgCount < 1) return false;
+  // An explicit name that differs from the auto title was set by hand (or
+  // programmatically) — it outranks the auto title and locks it. A name equal
+  // to the auto title is the write-through state of an unnamed session and
+  // must keep refreshing.
+  if (name && name !== autoTitle) return false;
   if (!autoTitle) return true;
   return userMsgCount - (autoTitleMsgCount ?? 0) >= TITLE_REGEN_THRESHOLD;
 }

@@ -1,6 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { maybeGenerateSessionTitle } from '../session-title-service.js';
+import {
+  setSessionEventPublisher,
+  getSessionEventPublisher,
+} from '../../../../domains/sessions/session-event-port.js';
 
 function makeDb(type = 'regular'): Database.Database {
   const db = new Database(':memory:');
@@ -62,22 +66,73 @@ describe('maybeGenerateSessionTitle', () => {
   beforeEach(() => {
     db = makeDb();
   });
+  afterEach(() => {
+    // The publisher registry is module-global; never leak a spy across tests.
+    setSessionEventPublisher(null);
+    expect(getSessionEventPublisher()).toBeNull();
+  });
 
   it('persists the title and broadcasts sessions_updated on first message', async () => {
     const d = deps(db);
     maybeGenerateSessionTitle(d);
     await flush();
     const row = db
-      .prepare('SELECT auto_title, auto_title_msg_count FROM sessions WHERE id = ?')
+      .prepare('SELECT name, auto_title, auto_title_msg_count FROM sessions WHERE id = ?')
       .get('s1') as any;
     expect(row.auto_title).toBe('Project Overview');
     expect(row.auto_title_msg_count).toBe(1);
+    expect(row.name).toBe('Project Overview'); // write-through to the unnamed session
     expect(d.broadcast).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'sessions_updated',
         session: expect.objectContaining({ id: 's1', autoTitle: 'Project Overview' }),
       })
     );
+  });
+
+  it('publishes the landed session resource event so resource-only peers sync', async () => {
+    const publishSessionEvent = vi.fn();
+    setSessionEventPublisher({ publishSessionEvent });
+    maybeGenerateSessionTitle(deps(db));
+    await flush();
+    expect(publishSessionEvent).toHaveBeenCalledWith(
+      'updated',
+      expect.objectContaining({ id: 's1', name: 'Project Overview', autoTitle: 'Project Overview' })
+    );
+  });
+
+  it('does not publish a resource event when generation fails', async () => {
+    const publishSessionEvent = vi.fn();
+    setSessionEventPublisher({ publishSessionEvent });
+    maybeGenerateSessionTitle(deps(db, { generate: vi.fn().mockRejectedValue(new Error('boom')) }));
+    await flush();
+    expect(publishSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('skips generation entirely for a manually named session', async () => {
+    db.prepare("UPDATE sessions SET name = 'Manual' WHERE id = 's1'").run();
+    const d = deps(db);
+    maybeGenerateSessionTitle(d);
+    await flush();
+    expect(d.generate).not.toHaveBeenCalled();
+    expect(d.broadcast).not.toHaveBeenCalled();
+  });
+
+  it('regenerates the written-through name as the conversation moves on', async () => {
+    db.prepare(
+      "UPDATE sessions SET name = 'Old', auto_title = 'Old', auto_title_msg_count = 1 WHERE id = 's1'"
+    ).run();
+    db.exec(`
+      INSERT INTO messages (id, session_id, role, content, created_at) VALUES
+        ('m2','s1','user','second',2), ('m3','s1','user','third',3), ('m4','s1','user','fourth',4);
+    `);
+    const d = deps(db); // 4 user messages − 1 counted = 3 ≥ threshold
+    maybeGenerateSessionTitle(d);
+    await flush();
+    expect(d.generate).toHaveBeenCalledTimes(1);
+    const row = db.prepare('SELECT name, auto_title FROM sessions WHERE id = ?').get('s1') as any;
+    expect(row.name).toBe('Project Overview');
+    expect(row.auto_title).toBe('Project Overview');
   });
 
   it('broadcasts pending=true before generating and pending=false with the title after', async () => {
@@ -136,6 +191,9 @@ describe('maybeGenerateSessionTitle', () => {
     const last = (d.broadcast.mock.calls.at(-1) as unknown as Array<any>)[0];
     expect(last.session.name).toBe('Renamed');
     expect(last.session.autoTitle).toBe('Project Overview');
+    // The write-through must also yield to the concurrent rename in the row.
+    const row = db.prepare('SELECT name FROM sessions WHERE id = ?').get('s1') as any;
+    expect(row.name).toBe('Renamed');
   });
 
   it('skips background sessions', async () => {

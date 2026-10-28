@@ -7,6 +7,7 @@ import type { BackendResourceEventMessage } from '@zclaudia/protocol/sync';
 import type { RunLike } from '../../utils/run-state.js';
 import type { ProjectChangeEvent } from '../../domains/projects/index.js';
 import type { SessionEventPublisherPort } from '../../domains/sessions/index.js';
+import { setSessionEventPublisher } from '../../domains/sessions/session-event-port.js';
 import type { LocalPRAiSessionPort } from '../../domains/local-pr/index.js';
 import type { SupervisionAiRunPort } from '../../domains/supervision/index.js';
 import type { WorkflowAiRunPort } from '../../domains/workflows/index.js';
@@ -60,6 +61,9 @@ export function createDomainPorts(deps: CreateDomainPortsDeps): DomainPorts {
       gatewayClient?.commands.backendData.broadcastSessionEvent(type, session);
     },
   };
+  // Publish-as-a-service: code paths outside the DI graph (e.g. the run
+  // completion title trigger) resolve the same fan-out through the registry.
+  setSessionEventPublisher(sessionEvents);
 
   const supervisionAiRunPort: SupervisionAiRunPort = {
     startVirtualRun: async ({ clientId, sessionId, input, workingDirectory, onMessage }) => {

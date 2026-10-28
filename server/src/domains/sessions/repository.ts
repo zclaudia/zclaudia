@@ -40,14 +40,25 @@ export class SessionRepository extends BaseRepository<
   }
 
   /**
-   * Persist the AI-generated topic title. Intentionally does NOT touch
-   * `updated_at` — this is a background enrichment and must not reorder
-   * sidebar lists that sort by recency.
+   * Persist the AI-generated topic title. A session with no explicit name
+   * gets the title written through to `name` too, so every consumer that only
+   * carries `name` (gateway snapshots, resource events, REST sync) sees it.
+   * The CASE keeps the previous auto title in sync on regeneration while any
+   * other non-empty name — manual or programmatic — is preserved, so a rename
+   * is never overridden. Intentionally does NOT touch `updated_at` — this is a
+   * background enrichment and must not reorder sidebar lists that sort by
+   * recency.
    */
   updateAutoTitle(sessionId: string, autoTitle: string, autoTitleMsgCount: number): void {
     this.db
-      .prepare('UPDATE sessions SET auto_title = ?, auto_title_msg_count = ? WHERE id = ?')
-      .run(autoTitle, autoTitleMsgCount, sessionId);
+      .prepare(
+        `UPDATE sessions
+         SET auto_title = ?,
+             auto_title_msg_count = ?,
+             name = CASE WHEN name IS NULL OR name = '' OR name = auto_title THEN ? ELSE name END
+         WHERE id = ?`
+      )
+      .run(autoTitle, autoTitleMsgCount, autoTitle, sessionId);
   }
 
   /** Monotonic per-session message version (migration 039); 0 when the session is missing. */
@@ -121,7 +132,9 @@ export class SessionRepository extends BaseRepository<
     }
     if (data.name !== undefined) {
       updates.push('name = ?');
-      params.push(data.name);
+      // '' means "cleared" — store NULL so the auto-title write-through (and
+      // every name-IS-NULL check) treats the session as unnamed again.
+      params.push(data.name || null);
     }
     if (data.agentProfileId !== undefined) {
       updates.push('agent_profile_id = ?');

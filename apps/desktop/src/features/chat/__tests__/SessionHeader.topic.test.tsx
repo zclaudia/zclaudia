@@ -14,4 +14,10 @@ describe('resolveTopicChip', () => {
   it('returns null when neither is available', () => {
     expect(resolveTopicChip(undefined, null)).toBeNull();
   });
+  it('falls back to the first user message when the name mirrors the auto title (write-through)', () => {
+    expect(resolveTopicChip('AI Title', 'first message', 'AI Title')).toBe('first message');
+  });
+  it('keeps the AI chip beside a manual name that differs from it', () => {
+    expect(resolveTopicChip('AI Title', 'first message', 'Manual Name')).toBe('AI Title');
+  });
 });

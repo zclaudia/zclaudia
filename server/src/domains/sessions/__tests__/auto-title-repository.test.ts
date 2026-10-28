@@ -41,6 +41,49 @@ describe('auto-title repository support', () => {
     expect(s.updatedAt).toBe(100); // unchanged
   });
 
+  it('updateAutoTitle writes the title through to name when the session is unnamed', () => {
+    const repo = new SessionRepository(db);
+    repo.updateAutoTitle('s1', 'My Topic', 3);
+    const s = repo.findById('s1')!;
+    expect(s.name).toBe('My Topic');
+    expect(s.updatedAt).toBe(100); // write-through is still a background enrichment
+  });
+
+  it('updateAutoTitle never overrides an explicit name', () => {
+    const repo = new SessionRepository(db);
+    db.prepare("UPDATE sessions SET name = 'Manual' WHERE id = 's1'").run();
+    repo.updateAutoTitle('s1', 'My Topic', 3);
+    const s = repo.findById('s1')!;
+    expect(s.name).toBe('Manual');
+    expect(s.autoTitle).toBe('My Topic');
+  });
+
+  it('updateAutoTitle treats a legacy empty-string name as unnamed', () => {
+    const repo = new SessionRepository(db);
+    db.prepare("UPDATE sessions SET name = '' WHERE id = 's1'").run();
+    repo.updateAutoTitle('s1', 'My Topic', 3);
+    expect(repo.findById('s1')!.name).toBe('My Topic');
+  });
+
+  it('updateAutoTitle refreshes a previously written-through name on regeneration', () => {
+    const repo = new SessionRepository(db);
+    repo.updateAutoTitle('s1', 'Old Topic', 1);
+    repo.updateAutoTitle('s1', 'New Topic', 4);
+    const s = repo.findById('s1')!;
+    expect(s.name).toBe('New Topic');
+    expect(s.autoTitle).toBe('New Topic');
+  });
+
+  it('updateQuery stores a cleared name as NULL so write-through can resume', () => {
+    const repo = new SessionRepository(db);
+    repo.updateAutoTitle('s1', 'My Topic', 3);
+    repo.update('s1', { name: '' } as any);
+    const cleared = repo.findById('s1')!;
+    expect(cleared.name).toBeUndefined();
+    repo.updateAutoTitle('s1', 'New Topic', 6);
+    expect(repo.findById('s1')!.name).toBe('New Topic');
+  });
+
   it('countUserMessagesBySession counts only user-role messages', () => {
     const msgRepo = new SessionMessageRepository(db);
     expect(msgRepo.countUserMessagesBySession('s1')).toBe(2);

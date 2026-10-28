@@ -4,6 +4,7 @@ import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { SessionRepository } from '../../../domains/sessions/repository.js';
 import { SessionMessageRepository } from '../../../domains/sessions/message-repository.js';
+import { getSessionEventPublisher } from '../../../domains/sessions/session-event-port.js';
 import { getAutoTitleConfig } from '../../../utils/auto-title-config.js';
 import { shouldRegenerateTitle } from './session-title-helpers.js';
 import { generateSessionTitle } from './generate-session-title.js';
@@ -47,6 +48,7 @@ async function runTitleGeneration(deps: MaybeGenerateSessionTitleDeps): Promise<
   const userMsgCount = new SessionMessageRepository(db).countUserMessagesBySession(sessionId);
   if (
     !shouldRegenerateTitle({
+      name: session.name,
       autoTitle: session.autoTitle,
       autoTitleMsgCount: session.autoTitleMsgCount,
       userMsgCount,
@@ -83,6 +85,12 @@ async function runTitleGeneration(deps: MaybeGenerateSessionTitleDeps): Promise<
     });
     if (title) {
       repo.updateAutoTitle(sessionId, title, userMsgCount);
+      // The run WS broadcast reaches direct + gateway-channel clients, but
+      // resource-only peers (remote session lists) need the resource event.
+      // Published from the persisted row; publishSessionEvent never bumps
+      // updated_at, so sidebar recency ordering is unaffected.
+      const landed = repo.findById(sessionId);
+      if (landed) getSessionEventPublisher()?.publishSessionEvent('updated', landed);
     } else {
       failureReason = 'title generation returned no result';
     }

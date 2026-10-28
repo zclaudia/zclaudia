@@ -29,6 +29,28 @@ describe('shouldRegenerateTitle', () => {
       shouldRegenerateTitle({ autoTitle: undefined, autoTitleMsgCount: undefined, userMsgCount: 0 })
     ).toBe(false);
   });
+  it('locks a manual name: never generates once name diverges from the auto title', () => {
+    expect(shouldRegenerateTitle({ name: 'Manual', userMsgCount: 1 })).toBe(false);
+    expect(
+      shouldRegenerateTitle({ name: 'Manual', autoTitle: 'X', autoTitleMsgCount: 1, userMsgCount: 9 })
+    ).toBe(false);
+  });
+  it('keeps refreshing when name equals the auto title (write-through state)', () => {
+    expect(
+      shouldRegenerateTitle({ name: 'X', autoTitle: 'X', autoTitleMsgCount: 1, userMsgCount: 2 })
+    ).toBe(false);
+    expect(
+      shouldRegenerateTitle({
+        name: 'X',
+        autoTitle: 'X',
+        autoTitleMsgCount: 1,
+        userMsgCount: 1 + TITLE_REGEN_THRESHOLD,
+      })
+    ).toBe(true);
+  });
+  it('treats an empty-string name as unnamed', () => {
+    expect(shouldRegenerateTitle({ name: '', userMsgCount: 1 })).toBe(true);
+  });
 });
 
 describe('pickTitleWindow', () => {
