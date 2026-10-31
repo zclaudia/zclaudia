@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { FIELD_CLASS, Input } from '../../../components/ui/Input';
-import { Modal } from '../../../components/ui/Modal';
+import { DesignModal as Modal } from '../components/DesignModal';
 import { Select } from '../../../components/ui/Select';
 import {
   addDeckSlide,
@@ -32,9 +32,9 @@ const SIBLINGS_HINT = 'Slides are not under the same parent and cannot be reorde
 const FIRST_HINT = 'Already the first page';
 const LAST_HINT = 'Already the last page';
 const LIMIT_HINT = 'Reached the 60-page limit';
-const COMMIT_FAILED = 'The change did not take effect: the page is busy or the content did not change.';
-const EMPTY_HINT =
-  'This page has no slide markers; "Add page" will write the first slide.';
+const COMMIT_FAILED =
+  'The change did not take effect: the page is busy or the content did not change.';
+const EMPTY_HINT = 'This page has no slide markers; "Add page" will write the first slide.';
 
 export interface SlidesViewProps {
   /**
@@ -51,6 +51,7 @@ export interface SlidesViewProps {
   /** 提交源码变换（面板接 controller.applySource）；false = 未生效。 */
   onCommit: (source: string, label: string) => Promise<boolean>;
   onPresent: (startIndex: number) => void;
+  allowPresent?: boolean;
   /** 左栏紧凑布局（200px 起）；默认关闭，Modal 兼容壳保持原宽布局。 */
   compact?: boolean;
 }
@@ -73,6 +74,7 @@ export function SlidesView({
   deck,
   onCommit,
   onPresent,
+  allowPresent = true,
   compact = false,
 }: SlidesViewProps) {
   const pagePath = page?.path ?? '';
@@ -144,9 +146,16 @@ export function SlidesView({
     const n = slide.index + 1;
     const upDisabled = busy || !siblings || slide.index === 0;
     const downDisabled = busy || !siblings || slide.index === slides.length - 1;
-    const upTitle = !siblings ? SIBLINGS_HINT : slide.index === 0 ? FIRST_HINT : `Move page ${n} up`;
-    const downTitle =
-      !siblings ? SIBLINGS_HINT : slide.index === slides.length - 1 ? LAST_HINT : `Move page ${n} down`;
+    const upTitle = !siblings
+      ? SIBLINGS_HINT
+      : slide.index === 0
+        ? FIRST_HINT
+        : `Move page ${n} up`;
+    const downTitle = !siblings
+      ? SIBLINGS_HINT
+      : slide.index === slides.length - 1
+        ? LAST_HINT
+        : `Move page ${n} down`;
     let thumb: string | null = null;
     if (previewHtml) {
       try {
@@ -210,7 +219,10 @@ export function SlidesView({
             title={upTitle}
             disabled={upDisabled}
             onClick={() =>
-              void run(base => reorderDeckSlides(base, slide.index, slide.index - 1), `Move page ${n} up`)
+              void run(
+                base => reorderDeckSlides(base, slide.index, slide.index - 1),
+                `Move page ${n} up`
+              )
             }
           >
             Move up
@@ -221,7 +233,10 @@ export function SlidesView({
             title={downTitle}
             disabled={downDisabled}
             onClick={() =>
-              void run(base => reorderDeckSlides(base, slide.index, slide.index + 1), `Move page ${n} down`)
+              void run(
+                base => reorderDeckSlides(base, slide.index, slide.index + 1),
+                `Move page ${n} down`
+              )
             }
           >
             Move down
@@ -235,15 +250,17 @@ export function SlidesView({
           >
             Delete
           </Button>
-          <Button
-            size="sm"
-            aria-label={`Present page ${n}`}
-            title={`Present from page ${n}`}
-            disabled={busy}
-            onClick={() => onPresent(slide.index)}
-          >
-            Present
-          </Button>
+          {allowPresent && (
+            <Button
+              size="sm"
+              aria-label={`Present page ${n}`}
+              title={`Present from page ${n}`}
+              disabled={busy}
+              onClick={() => onPresent(slide.index)}
+            >
+              Present
+            </Button>
+          )}
           <Button
             size="sm"
             aria-label={`Notes of page ${n}`}
@@ -267,7 +284,9 @@ export function SlidesView({
             <div className="flex items-center justify-between gap-1">
               <span
                 className={`text-[10px] ${
-                  notesDraft.length > MAX_NOTES_LENGTH ? 'text-destructive' : 'text-muted-foreground'
+                  notesDraft.length > MAX_NOTES_LENGTH
+                    ? 'text-destructive'
+                    : 'text-muted-foreground'
                 }`}
               >
                 {`${notesDraft.length}/${MAX_NOTES_LENGTH}`}

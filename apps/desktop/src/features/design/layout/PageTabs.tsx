@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useIsMobile } from '../../../hooks/useMediaQuery';
 import { Plus, TriangleAlert, X } from 'lucide-react';
 import { IconButton } from '../../../components/ui/Button';
 import { DropdownMenu } from '../../../components/ui/DropdownMenu';
@@ -35,6 +36,7 @@ export function PageTabs({
   onOpen,
   showOnlyActive = false,
 }: PageTabsProps) {
+  const isMobile = useIsMobile();
   const unopened = useMemo(() => {
     const open = new Set(pages.map(page => page.path));
     return files.filter(path => !open.has(path));
@@ -102,6 +104,8 @@ export function PageTabs({
         })}
       </div>
       <DropdownMenu
+        isMobile={isMobile}
+        panelClassName={isMobile ? 'design-mobile-menu' : ''}
         ariaLabel="Open page"
         align="start"
         entries={

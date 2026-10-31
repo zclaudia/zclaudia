@@ -11,6 +11,7 @@ import type { DesignViewport } from '../types';
 export interface TopBarProps {
   tier: DesignTier;
   compact: boolean;
+  mobile?: boolean;
   pages: DesignPageSnapshot[];
   activePath: string | null;
   files: string[];
@@ -61,6 +62,7 @@ export interface TopBarProps {
 export function TopBar({
   tier,
   compact,
+  mobile = false,
   pages,
   activePath,
   files,
@@ -221,6 +223,7 @@ export function TopBar({
         </Button>
       </Tooltip>
       <MoreMenu
+        mobile={mobile}
         docPath={docPath}
         loading={loading}
         busy={busy}

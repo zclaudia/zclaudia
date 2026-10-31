@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { activatePanel, deactivatePanel, isPanelActive, usePanelIsActive } from '../openPanel';
+import {
+  activatePanel,
+  closeMobilePanels,
+  deactivatePanel,
+  isPanelActive,
+  usePanelIsActive,
+} from '../openPanel';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 import { findPaneWithTool, useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
@@ -44,7 +50,7 @@ function seedSessionCtx() {
 
 describe('openPanel utility', () => {
   beforeEach(() => {
-    usePluginStore.setState({ panels: [], panelPlacements: {} });
+    usePluginStore.setState({ panels: [], panelPlacements: {}, disabledBuiltinPanels: [] });
     useBottomPanelStore.setState({ activeTab: '' });
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
     useProjectWorkspaceStore.setState({ byProject: {} });
@@ -61,6 +67,60 @@ describe('openPanel utility', () => {
   });
 
   describe('activatePanel', () => {
+    it('returns to mobile chat without closing disabled or desktop-only tools', () => {
+      const closeDraft = vi.fn(() =>
+        usePluginStore.getState().updatePanelVisibility('draft', false)
+      );
+      const closeDisabled = vi.fn();
+      usePluginStore.setState({
+        disabledBuiltinPanels: ['disabled'],
+        panels: [
+          {
+            id: 'design',
+            pluginId: 'design',
+            type: 'panel',
+            label: 'Design',
+            platforms: ['desktop', 'mobile'],
+            visible: true,
+          },
+          {
+            id: 'draft',
+            pluginId: 'draft',
+            type: 'panel',
+            label: 'Draft',
+            platforms: ['mobile'],
+            visible: true,
+            onClose: closeDraft,
+          },
+          {
+            id: 'disabled',
+            pluginId: 'disabled',
+            type: 'panel',
+            label: 'Disabled',
+            platforms: ['mobile'],
+            visible: true,
+            onClose: closeDisabled,
+          },
+          {
+            id: 'desktop',
+            pluginId: 'desktop',
+            type: 'panel',
+            label: 'Desktop',
+            platforms: ['desktop'],
+            visible: true,
+          },
+        ],
+      });
+      closeMobilePanels();
+      expect(closeDraft).toHaveBeenCalledOnce();
+      expect(closeDisabled).not.toHaveBeenCalled();
+      expect(usePluginStore.getState().panels.map(panel => [panel.id, panel.visible])).toEqual([
+        ['design', false],
+        ['draft', false],
+        ['disabled', true],
+        ['desktop', true],
+      ]);
+    });
     it('routes bottom-placed panels to bottomPanelStore', () => {
       registerPanel('foo', 'bottom');
       activatePanel('foo');

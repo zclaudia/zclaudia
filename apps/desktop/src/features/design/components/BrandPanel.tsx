@@ -1,5 +1,5 @@
 import { Button } from '../../../components/ui/Button';
-import { Modal } from '../../../components/ui/Modal';
+import { DesignModal as Modal } from './DesignModal';
 import { BrandView } from '../rail/BrandView';
 import type { BrandViewProps } from '../rail/BrandView';
 

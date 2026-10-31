@@ -11,6 +11,8 @@ import { useRightSidebarStore } from '../../../stores/rightSidebarStore';
 import { selectProjectChat } from '../../../actions/projectWorkspaceActions';
 import { useDraftEditorStore } from '../../../stores/draftEditorStore';
 import { useFileViewerStore } from '../../../stores/fileViewerStore';
+import { useOwnershipStore } from '../../../stores/ownershipStore';
+import { useServerStore } from '../../../stores/serverStore';
 
 const { streamOwners } = vi.hoisted(() => ({ streamOwners: new Map<string, number>() }));
 vi.mock('../../../components/workspace/useWorkspaceHydrated', () => ({
@@ -64,7 +66,9 @@ vi.mock('../../../components/panels/PanelRenderer', () => ({
   PanelActions: () => null,
 }));
 vi.mock('../../../components/BottomPanel', () => ({
-  BottomPanel: () => <div data-testid="bottom" />,
+  BottomPanel: (props: { sessionId?: string; backendId?: string }) => (
+    <div data-testid="bottom" data-session={props.sessionId} data-backend={props.backendId} />
+  ),
 }));
 
 import { SessionChatLayout } from '../SessionChatLayout';
@@ -102,6 +106,18 @@ describe('SessionChatLayout bottom panel placement', () => {
     isMobileMock.mockReturnValue(true);
     render(<SessionChatLayout sessionId="s1" />);
     expect(screen.queryByTestId('bottom')).not.toBeNull();
+  });
+
+  it('binds the mobile panel to the session owner instead of another active server', () => {
+    isMobileMock.mockReturnValue(true);
+    useServerStore.setState({ activeServerId: 'other-backend' });
+    useOwnershipStore.setState({ sessionBackendIds: { s1: 'session-owner', s2: 'second-owner' } });
+    const view = render(<SessionChatLayout sessionId="s1" />);
+    expect(screen.getByTestId('bottom')).toHaveAttribute('data-session', 's1');
+    expect(screen.getByTestId('bottom')).toHaveAttribute('data-backend', 'session-owner');
+    view.rerender(<SessionChatLayout sessionId="s2" />);
+    expect(screen.getByTestId('bottom')).toHaveAttribute('data-session', 's2');
+    expect(screen.getByTestId('bottom')).toHaveAttribute('data-backend', 'second-owner');
   });
 
   it('uses one unified desktop host and preserves navigation callbacks', () => {

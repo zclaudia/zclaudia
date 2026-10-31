@@ -207,6 +207,21 @@ export function deactivatePanel(panelId: string): void {
   if (activeTab === panelId) setActiveTab('');
 }
 
+/** Dismiss the mobile tool overlay so the current chat is visible again. */
+export function closeMobilePanels(): void {
+  const store = usePluginStore.getState();
+  for (const panel of store.panels) {
+    if (
+      panel.visible === false ||
+      !(panel.platforms ?? ['desktop']).includes('mobile') ||
+      store.disabledBuiltinPanels.includes(panel.id)
+    )
+      continue;
+    if (panel.onClose) panel.onClose();
+    else store.updatePanelVisibility(panel.id, false);
+  }
+}
+
 /**
  * Reactive hook: is this panel currently shown to the user?
  *

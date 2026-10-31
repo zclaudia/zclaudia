@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspaceTool } from '../../components/workspace/WorkspaceToolContext';
 import { useWorkspaceVisible } from '../../components/workspace/WorkspaceContext';
 import { Button } from '../../components/ui/Button';
-import { Modal } from '../../components/ui/Modal';
+import { DesignModal as Modal } from './components/DesignModal';
+import { useIsMobile } from '../../hooks/useMediaQuery';
+import { useAndroidBack } from '../../hooks/useAndroidBack';
+import { closeMobilePanels } from '../../actions/openPanel';
+import './mobile.css';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { DesignSnapshotError, restoreDesignSnapshot } from './api';
 import type { DesignConflictFile } from './api';
@@ -61,7 +65,9 @@ export { isValidRulesMessage };
 const basename = (path: string): string => path.slice(path.lastIndexOf('/') + 1) || path;
 
 const openFailureMessage = (result: Extract<OpenPageResult, { ok: false }>): string =>
-  result.reason === 'limit' ? 'Close unsaved pages first' : (result.message ?? 'Failed to open page');
+  result.reason === 'limit'
+    ? 'Close unsaved pages first'
+    : (result.message ?? 'Failed to open page');
 
 export function DesignPanel() {
   const tool = useWorkspaceTool();
@@ -113,20 +119,24 @@ function DesignPanelSession({
     ? (state.pages.find(page => page.path === state.activePath) ?? null)
     : null;
   const visible = useWorkspaceVisible();
+  const isMobile = useIsMobile();
 
   // ---- 响应式档位（§3.2）：面板容器实测宽度；0 → wide，首帧不闪 ----
   const {
     ref: rootRef,
     width: panelWidth,
-    tier,
-    compact,
+    tier: measuredTier,
+    compact: measuredCompact,
     height: panelHeight,
   } = useElementTier<HTMLDivElement>();
+  const tier = isMobile ? 'narrow' : measuredTier;
+  const compact = isMobile || measuredCompact;
 
   // ---- 布局偏好（§3.3，全局持久化）；抽屉开合是临时态 ----
   const leftOpen = useDesignLayoutStore(s => s.leftOpen);
   const leftTab = useDesignLayoutStore(s => s.leftTab);
-  const libraryTab = useDesignLayoutStore(s => s.libraryTab);
+  const storedLibraryTab = useDesignLayoutStore(s => s.libraryTab);
+  const libraryTab = isMobile && storedLibraryTab === 'media' ? 'assets' : storedLibraryTab;
   const leftWidth = useDesignLayoutStore(s => s.leftWidth);
   const rightOpen = useDesignLayoutStore(s => s.rightOpen);
   const rightTab = useDesignLayoutStore(s => s.rightTab);
@@ -143,6 +153,8 @@ function DesignPanelSession({
   const [drawerOpen, setDrawerOpen] = useState(false);
   /** 窄档底部面板展开（临时态）。宽/中档检查器开合仍用持久化的 rightOpen。 */
   const [sheetOpen, setSheetOpen] = useState(false);
+  useAndroidBack(() => setDrawerOpen(false), isMobile && visible && drawerOpen, 25);
+  useAndroidBack(() => setSheetOpen(false), isMobile && visible && sheetOpen, 20);
 
   // ---- 通知与画布缩放 ----
   const notices = useDesignNotices();
@@ -333,7 +345,11 @@ function DesignPanelSession({
   /** P6 §8.3：媒体面板「替换选中图片」——产物相对引用写入选中 <img> 的 src（AssetLibrary 替换同款事务）。 */
   const handleReplaceSelectionSrc = (assetPath: string) => {
     void handleApply([
-      { kind: 'attribute', name: 'src', value: relativeAssetRef(activePage?.path ?? '', assetPath) },
+      {
+        kind: 'attribute',
+        name: 'src',
+        value: relativeAssetRef(activePage?.path ?? '', assetPath),
+      },
     ]);
   };
 
@@ -438,7 +454,9 @@ function DesignPanelSession({
 
   /** 聚焦聊天输入框（通知里的「Open chat」动作；找不到时静默）。 */
   const focusComposer = useCallback(() => {
-    const input = document.querySelector<HTMLTextAreaElement>('textarea[placeholder="Type a message..."]');
+    const input = document.querySelector<HTMLTextAreaElement>(
+      'textarea[placeholder="Type a message..."]'
+    );
     input?.focus();
   }, []);
 
@@ -446,6 +464,10 @@ function DesignPanelSession({
   const prefillWithNotice = useCallback(
     (prompt: string) => {
       agent.prefill(prompt);
+      if (isMobile) {
+        closeMobilePanels();
+        return;
+      }
       notices.push({
         id: 'prefill',
         text: 'Prefilled into the current chat — add your requirements and send.',
@@ -453,7 +475,7 @@ function DesignPanelSession({
         actions: [{ label: 'Open chat', onSelect: focusComposer }],
       });
     },
-    [agent, focusComposer, notices]
+    [agent, focusComposer, notices, isMobile]
   );
 
   const openPage = useCallback(
@@ -470,7 +492,11 @@ function DesignPanelSession({
     (request: string): AgentContextPayload => {
       const input = agent.buildContextInput();
       const task = activePage?.selection ? 'modify' : 'generate';
-      const context = buildDesignAgentContext(input, task, request.trim() ? { request } : undefined);
+      const context = buildDesignAgentContext(
+        input,
+        task,
+        request.trim() ? { request } : undefined
+      );
       return { task, sections: context.sections, prompt: context.prompt };
     },
     [activePage?.selection, agent]
@@ -519,7 +545,8 @@ function DesignPanelSession({
   /** 内嵌 Brand / Media 的唯一活动面：左栏可见且命中页签；对应对话框打开时让位。 */
   const libraryPanelVisible = visible && railPanelOpen && leftTab === 'library';
   const brandInlineActive = libraryPanelVisible && libraryTab === 'brand' && !brandOpen;
-  const mediaInlineActive = libraryPanelVisible && libraryTab === 'media' && !mediaOpen;
+  const mediaInlineActive =
+    !isMobile && libraryPanelVisible && libraryTab === 'media' && !mediaOpen;
   /** P5b：Slides 内嵌视图仅在真正可见时激活（隐藏时不挂任何缩略图 iframe）。 */
   const slidesInlineActive = visible && railPanelOpen && leftTab === 'slides';
   const handleTemplateInstalled = (entry: string) => {
@@ -589,10 +616,11 @@ function DesignPanelSession({
   const zoomPercent = Math.round((actualScale ?? state.ui.zoom.value) * 100);
 
   return (
-    <div ref={rootRef} data-testid="design-panel" className="h-full min-h-0">
+    <div ref={rootRef} data-testid="design-panel" data-mobile={isMobile} className="h-full min-h-0">
       <DesignWorkbench
         tier={tier}
         compact={compact}
+        touch={isMobile}
         height={panelHeight}
         leftOpen={railPanelOpen}
         rightOpen={inspectorOpen}
@@ -602,6 +630,7 @@ function DesignPanelSession({
           <TopBar
             tier={tier}
             compact={compact}
+            mobile={isMobile}
             pages={state.pages}
             activePath={state.activePath}
             files={files}
@@ -682,18 +711,23 @@ function DesignPanelSession({
             }
             library={
               <LibraryView
+                mediaAvailable={!isMobile}
                 libraryTab={libraryTab}
                 onLibraryTabChange={setLibraryTab}
                 assets={
                   <AssetLibraryView
-                    active={visible && railPanelOpen && leftTab === 'library' && libraryTab === 'assets'}
+                    active={
+                      visible && railPanelOpen && leftTab === 'library' && libraryTab === 'assets'
+                    }
                     compact
                     backendId={backendId}
                     sessionId={sessionId}
                     openPages={state.pages.map(page => ({ path: page.path, source: page.source }))}
                     referencedAssets={(activePage?.deps ?? []).map(dep => dep.path)}
                     activeDocPath={activePage?.path ?? null}
-                    selection={activePage?.selection ? { tagName: activePage.selection.tagName } : null}
+                    selection={
+                      activePage?.selection ? { tagName: activePage.selection.tagName } : null
+                    }
                     onApply={handleApply}
                     onImported={agent.handleAssetImported}
                   />
@@ -701,7 +735,10 @@ function DesignPanelSession({
                 templates={
                   <TemplateView
                     active={
-                      visible && railPanelOpen && leftTab === 'library' && libraryTab === 'templates'
+                      visible &&
+                      railPanelOpen &&
+                      leftTab === 'library' &&
+                      libraryTab === 'templates'
                     }
                     compact
                     openEntryOnInstall
@@ -747,8 +784,11 @@ function DesignPanelSession({
                 previewHtml={pipeline.activePreview || null}
                 deck={deckInfo}
                 compact
+                allowPresent={!isMobile}
                 onCommit={(source, label) => controller.applySource(source, label)}
-                onPresent={startIndex => setPresentDeck({ startIndex })}
+                onPresent={startIndex => {
+                  if (!isMobile) setPresentDeck({ startIndex });
+                }}
               />
             }
           />
@@ -823,6 +863,7 @@ function DesignPanelSession({
         }
         inspector={
           <Inspector
+            touch={isMobile}
             selection={activePage?.selection ?? null}
             docSource={activePage?.source ?? null}
             rightTab={rightTab}
@@ -932,7 +973,7 @@ function DesignPanelSession({
           onSaved={agent.reloadBrand}
         />
       )}
-      {mediaOpen && (
+      {!isMobile && mediaOpen && (
         <MediaGenPanel
           open
           backendId={backendId}
@@ -955,7 +996,7 @@ function DesignPanelSession({
         />
       )}
       {/* ---- P5a 合并对话框（§4.8）：三页签同时挂载；关闭/切页由同一状态与 effect 管理 ---- */}
-      {exportShareOpen && activePage && (
+      {!isMobile && exportShareOpen && activePage && (
         <ExportShareDialog
           open
           onClose={() => setExportShareOpen(false)}
@@ -989,7 +1030,7 @@ function DesignPanelSession({
         />
       )}
       {/* ---- P5 幻灯片播放器（§5/§6.3）：编辑在左栏 Slides 页签；切页由上方 effect 关闭播放器 ---- */}
-      {presentDeck && deckInfo && (
+      {!isMobile && presentDeck && deckInfo && (
         <DeckPresenter
           slides={deckInfo.slides}
           ratio={deckInfo.ratio}
@@ -1048,8 +1089,8 @@ function DesignPanelSession({
           }
         >
           <div className="p-4 text-xs text-muted-foreground">
-            Reload "{styles.confirmCssReloadPath}" from disk? Unsaved style edits in this file will be
-            lost.
+            Reload "{styles.confirmCssReloadPath}" from disk? Unsaved style edits in this file will
+            be lost.
           </div>
         </Modal>
       )}

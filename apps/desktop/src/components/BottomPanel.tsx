@@ -5,6 +5,8 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import { useAndroidBack } from '../hooks/useAndroidBack';
 import { PanelActions, PanelContent } from './panels/PanelRenderer';
 import { usePanelRegion } from './panels/usePanelRegion';
+import { WorkspaceToolProvider } from './workspace/WorkspaceToolContext';
+import { closeMobilePanels } from '../actions/openPanel';
 
 const MIN_HEIGHT = 100;
 const MAX_HEIGHT_VH = 70;
@@ -26,12 +28,20 @@ function clampHeight(px: number): number {
 }
 
 interface BottomPanelProps {
+  sessionId?: string;
+  backendId?: string;
   projectId: string | undefined;
   projectRoot: string | undefined;
   workingDirectory?: string;
 }
 
-export function BottomPanel({ projectId, projectRoot, workingDirectory }: BottomPanelProps) {
+export function BottomPanel({
+  sessionId,
+  backendId,
+  projectId,
+  projectRoot,
+  workingDirectory,
+}: BottomPanelProps) {
   const isMobile = useIsMobile();
   const activeTab = useBottomPanelStore(s => s.activeTab);
   const setActiveTab = useBottomPanelStore(s => s.setActiveTab);
@@ -70,7 +80,9 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
   // Android back to close current panel
   useAndroidBack(
     () => {
-      activePanel?.onClose?.();
+      if (!activePanel) return;
+      if (activePanel.onClose) activePanel.onClose();
+      else usePluginStore.getState().updatePanelVisibility(activePanel.id, false);
     },
     isOpen,
     15
@@ -125,6 +137,10 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
   }, []);
 
   const handleClose = () => {
+    if (isMobile) {
+      closeMobilePanels();
+      return;
+    }
     const { updatePanelVisibility } = usePluginStore.getState();
     // Close all visible panels
     visiblePanels.forEach(p => {
@@ -191,19 +207,38 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
         </div>
 
         <div className="flex-1 overflow-hidden relative">
-          {mountedPanels.map(panel => (
-            <div
-              key={panel.id}
-              className={`absolute inset-0 ${effectiveTab === panel.id ? '' : 'invisible'}`}
-            >
+          {mountedPanels.map(panel => {
+            const content = (
               <PanelContent
                 panel={panel}
                 projectId={projectId}
                 projectRoot={projectRoot}
                 workingDirectory={workingDirectory}
               />
-            </div>
-          ))}
+            );
+            return (
+              <div
+                key={panel.id}
+                className={`absolute inset-0 ${effectiveTab === panel.id ? '' : 'invisible'}`}
+              >
+                {panel.id === 'design' ? (
+                  <WorkspaceToolProvider
+                    sessionId={sessionId ?? ''}
+                    backendId={backendId}
+                    projectId={projectId}
+                    projectRoot={projectRoot}
+                    workingDirectory={workingDirectory}
+                    toolId={panel.id}
+                    visible={effectiveTab === panel.id}
+                  >
+                    {content}
+                  </WorkspaceToolProvider>
+                ) : (
+                  content
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );

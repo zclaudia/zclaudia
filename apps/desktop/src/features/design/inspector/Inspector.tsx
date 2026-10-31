@@ -19,6 +19,7 @@ export interface InspectorProps {
   runMode: boolean;
   /** 窄档底部面板的抓手。 */
   narrow?: boolean;
+  touch?: boolean;
   /** 窄档底部面板是否折叠为 76px peek。 */
   collapsed?: boolean;
   /** 窄档展开/收起底部面板。 */
@@ -50,6 +51,7 @@ export function Inspector({
   dirty,
   runMode,
   narrow = false,
+  touch = false,
   collapsed = false,
   onToggleCollapsed,
   design,
@@ -92,8 +94,14 @@ export function Inspector({
               type="button"
               aria-label="Collapse inspector"
               onClick={onToggleCollapsed}
-              className="mx-auto mt-1.5 h-1 w-9 shrink-0 rounded-full bg-border"
-            />
+              className={
+                touch
+                  ? 'flex h-11 w-full shrink-0 items-center justify-center'
+                  : 'mx-auto mt-1.5 h-1 w-9 shrink-0 rounded-full bg-border'
+              }
+            >
+              {touch && <span aria-hidden className="h-1 w-9 rounded-full bg-border" />}
+            </button>
           )}
           <div className="flex shrink-0 items-start gap-2 border-b border-border px-3 pb-2 pt-2.5">
             <div className="min-w-0 flex-1">
@@ -177,7 +185,10 @@ export function Inspector({
                   >
                     {tab.label}
                     {tab.id === 'history' && dirty && (
-                      <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${TONE_DOT.warning}`} />
+                      <span
+                        aria-hidden
+                        className={`h-1.5 w-1.5 rounded-full ${TONE_DOT.warning}`}
+                      />
                     )}
                   </button>
                 );

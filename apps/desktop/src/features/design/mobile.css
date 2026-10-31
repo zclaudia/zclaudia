@@ -1,0 +1,100 @@
+/* Scoped to Design: forceMobile uses the same controls as an actual phone. */
+[data-testid='design-panel'][data-mobile='true'] button,
+.design-mobile-dialog button,
+.design-mobile-menu [role='menuitem'] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+[data-testid='design-panel'][data-mobile='true'] input:not([type='checkbox']):not([type='radio']),
+[data-testid='design-panel'][data-mobile='true'] select,
+[data-testid='design-panel'][data-mobile='true'] textarea,
+.design-mobile-dialog input:not([type='checkbox']):not([type='radio']),
+.design-mobile-dialog select,
+.design-mobile-dialog textarea {
+  min-height: 44px;
+  font-size: 16px;
+}
+
+[data-testid='design-panel'][data-mobile='true'] [data-testid='design-topbar'] {
+  gap: 2px;
+  padding-inline: 2px;
+}
+
+[data-testid='design-panel'][data-mobile='true'] [aria-label='Design pages'] > div {
+  height: 44px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+[data-testid='design-panel'][data-mobile='true'] [data-testid='design-rail'] > div:first-child {
+  width: 48px;
+}
+
+[data-testid='design-panel'][data-mobile='true'] [data-testid='design-rail-panel'] {
+  left: 48px;
+}
+
+[data-testid='design-panel'][data-mobile='true']
+  [data-testid='design-rail-panel']
+  > div:first-child {
+  height: 48px;
+}
+
+/* Two rows keep viewport and zoom controls reachable even at 320px. */
+[data-testid='design-panel'][data-mobile='true'] [data-testid='design-canvas-toolbar'] {
+  height: auto;
+  min-height: 96px;
+  overflow: visible;
+}
+
+[data-testid='design-panel'][data-mobile='true'] [data-testid='design-canvas-toolbar'] > div {
+  flex-wrap: wrap;
+}
+
+[data-testid='design-panel'][data-mobile='true']
+  [data-testid='design-canvas-toolbar']
+  > div
+  > span {
+  display: none;
+}
+
+[data-testid='design-panel'][data-mobile='true'] [data-testid='design-canvas-toolbar'] > div > div {
+  width: 100%;
+  justify-content: center;
+}
+
+[data-testid='design-panel'][data-mobile='true'] [data-testid='design-agent-bar'] > div:last-child {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+[data-testid='design-panel'][data-mobile='true'] [data-testid='design-agent-bar'] input {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+[data-testid='design-panel'][data-mobile='true']
+  [data-testid='design-agent-bar']
+  > div:last-child
+  > span {
+  min-width: 0;
+  white-space: normal;
+}
+
+[data-testid='design-panel'][data-mobile='true'] [data-testid='design-canvas'] {
+  padding-bottom: 112px;
+}
+
+[data-testid='design-panel'][data-mobile='true'] [data-testid='design-statusbar'] {
+  height: 44px;
+  gap: 4px;
+  padding-inline: 4px;
+}
+
+.design-mobile-menu {
+  max-height: calc(100dvh - 16px);
+  max-width: calc(100vw - 16px);
+  overflow-y: auto;
+}

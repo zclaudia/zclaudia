@@ -47,7 +47,10 @@ export function StatusBar({
   onToggleInspector,
 }: StatusBarProps): JSX.Element {
   return (
-    <div className="flex h-[26px] shrink-0 items-center gap-3 border-t border-border px-3 text-[11px] text-muted-foreground select-none">
+    <div
+      data-testid="design-statusbar"
+      className="flex h-[26px] shrink-0 items-center gap-3 border-t border-border px-3 text-[11px] text-muted-foreground select-none"
+    >
       {loading ? (
         <span>Loading…</span>
       ) : busy ? (

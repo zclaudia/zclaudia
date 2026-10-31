@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
+import { useWorkspaceTool } from '../workspace/WorkspaceToolContext';
+import { useWorkspaceVisible } from '../workspace/WorkspaceContext';
+import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 
@@ -117,6 +120,100 @@ describe('BottomPanel', () => {
   });
 
   // ── Basic rendering ─────────────────────────────────────────────────────
+
+  it('binds mobile tools to their host session/backend and tracks tab visibility', () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    const Probe = () => {
+      const tool = useWorkspaceTool();
+      const visible = useWorkspaceVisible();
+      return <div data-testid="bound-tool">{JSON.stringify({ ...tool, visible })}</div>;
+    };
+    usePluginStore.getState().registerPanel({
+      id: 'design',
+      pluginId: 'design',
+      type: 'panel',
+      label: 'Design',
+      component: Probe,
+      platforms: ['desktop', 'mobile'],
+      visible: true,
+    });
+    registerTerminalPanel(true);
+    useBottomPanelStore.setState({ activeTab: 'design' });
+    const view = render(
+      <BottomPanel
+        sessionId="s1"
+        backendId="remote-1"
+        projectId="p1"
+        projectRoot="/work"
+        workingDirectory="/work/tree"
+      />
+    );
+    expect(JSON.parse(screen.getByTestId('bound-tool').textContent!)).toEqual({
+      sessionId: 's1',
+      backendId: 'remote-1',
+      projectId: 'p1',
+      projectRoot: '/work',
+      workingDirectory: '/work/tree',
+      visible: true,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal', exact: true }));
+    expect(JSON.parse(screen.getByTestId('bound-tool').textContent!).visible).toBe(false);
+    view.rerender(
+      <BottomPanel sessionId="s2" backendId="remote-2" projectId="p2" projectRoot="/other" />
+    );
+    expect(JSON.parse(screen.getByTestId('bound-tool').textContent!)).toMatchObject({
+      sessionId: 's2',
+      backendId: 'remote-2',
+      projectId: 'p2',
+    });
+  });
+
+  it('Android back hides an active mobile panel without an onClose callback', () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    usePluginStore.getState().registerPanel({
+      id: 'design',
+      pluginId: 'design',
+      type: 'panel',
+      label: 'Design',
+      component: () => <div>Design content</div>,
+      platforms: ['desktop', 'mobile'],
+      visible: true,
+    });
+    useBottomPanelStore.setState({ activeTab: 'design' });
+    render(<BottomPanel sessionId="s1" backendId="remote-1" projectId="p1" projectRoot="/work" />);
+    const registration = vi
+      .mocked(useAndroidBack)
+      .mock.calls.find(call => call[1] && call[2] === 15)!;
+    act(() => registration[0]());
+    expect(usePluginStore.getState().panels.find(panel => panel.id === 'design')?.visible).toBe(
+      false
+    );
+    expect(screen.queryByText('Design content')).not.toBeInTheDocument();
+  });
+
+  it('preserves the legacy context of other mobile tools and their header actions', () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    const Probe = () => (
+      <div data-testid="legacy-context">{useWorkspaceTool() === null ? 'unbound' : 'bound'}</div>
+    );
+    usePluginStore.getState().registerPanel({
+      id: 'terminal',
+      pluginId: 'terminal',
+      type: 'panel',
+      label: 'Terminal',
+      component: Probe,
+      actions: Probe,
+      platforms: ['desktop', 'mobile'],
+      visible: true,
+    });
+    render(
+      <BottomPanel sessionId="s1" backendId="session-owner" projectId="p1" projectRoot="/work" />
+    );
+    expect(screen.getAllByTestId('legacy-context').map(node => node.textContent)).toEqual([
+      'unbound',
+      'unbound',
+    ]);
+  });
 
   it('renders without crashing', () => {
     const { container } = render(<BottomPanel projectId="p1" projectRoot="/test" />);

@@ -46,6 +46,12 @@ function mount(overrides: Partial<SlidesViewProps> = {}) {
 }
 
 describe('SlidesView（P5b 左栏内嵌）', () => {
+  it('keeps slide editing available without a playback entry on mobile', () => {
+    mount({ allowPresent: false });
+    expect(screen.queryByRole('button', { name: /Present page/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add page' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Notes of page 1' })).toBeEnabled();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
   });

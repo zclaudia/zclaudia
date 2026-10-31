@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { DesignPanel, isValidRulesMessage } from '../DesignPanel';
 import { WorkspaceToolProvider } from '../../../components/workspace/WorkspaceToolContext';
 import { useComposerStore } from '../../../stores/composerStore';
+import { usePluginStore } from '../../../stores/pluginStore';
 import { useDesignLayoutStore } from '../stores/designLayoutStore';
 import { useChatMessageStore } from '../../../stores/chatMessageStore';
 import { ApiError } from '../../../services/api/unwrap';
@@ -454,6 +455,99 @@ describe('DesignPanel', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('mobile previews, edits and saves, with back closing the inspector and drawer first', async () => {
+    window.history.replaceState(null, '', '/?forceMobile=1');
+    mount();
+    await screen.findByTitle('Design preview');
+    expect(screen.getByTestId('design-workbench')).toHaveAttribute('data-tier', 'narrow');
+    expect(api.getDesignDocument).toHaveBeenCalledWith(
+      'remote-1',
+      'session-1',
+      'design/index.html'
+    );
+    await selectElement();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Element text' }), {
+      target: { value: 'Mobile edit' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(disk.get('design/index.html')?.source).toContain('Mobile edit'));
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle pages panel' }));
+    fireEvent(window, new Event('android-back', { cancelable: true }));
+    expect(screen.getByTestId('design-rail')).toHaveAttribute('data-open', 'false');
+    expect(screen.getByRole('button', { name: 'Collapse inspector' })).toBeInTheDocument();
+    fireEvent(window, new Event('android-back', { cancelable: true }));
+    expect(screen.getByRole('button', { name: 'Expand inspector' })).toBeInTheDocument();
+  });
+
+  it('mobile handoff preserves the composer draft and returns to chat by closing tool overlays', async () => {
+    window.history.replaceState(null, '', '/?forceMobile=1');
+    useComposerStore.setState({
+      drafts: { 'session-1': { content: 'Existing request', attachments: [] } },
+      pendingPrefills: {},
+    });
+    usePluginStore.setState({
+      panels: [
+        {
+          id: 'design',
+          pluginId: 'design',
+          type: 'panel',
+          label: 'Design',
+          platforms: ['desktop', 'mobile'],
+          visible: true,
+        },
+        {
+          id: 'memory',
+          pluginId: 'memory',
+          type: 'panel',
+          label: 'Memory',
+          platforms: ['desktop', 'mobile'],
+          visible: true,
+        },
+      ],
+    });
+    mount();
+    await screen.findByTitle('Design preview');
+    await askAgent('Make the title blue');
+    const content = useComposerStore.getState().pendingPrefills['session-1']?.content;
+    expect(content).toContain('Existing request');
+    expect(content).toContain('Make the title blue');
+    expect(useComposerStore.getState().drafts['session-1']?.content).toBe('Existing request');
+    expect(usePluginStore.getState().panels.every(panel => panel.visible === false)).toBe(true);
+    expect(api.putDesignDocument).not.toHaveBeenCalled();
+  });
+
+  it('mobile hides export and media even with a persisted media tab, and handles dialog back', async () => {
+    window.history.replaceState(null, '', '/?forceMobile=1');
+    useDesignLayoutStore.setState({ leftTab: 'library', libraryTab: 'media' });
+    mount();
+    await screen.findByTitle('Design preview');
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle pages panel' }));
+    expect(screen.getByRole('tab', { name: 'Assets' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('tab', { name: 'Media' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    expect(screen.queryByRole('menuitem', { name: 'Export & Share' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Media' })).not.toBeInTheDocument();
+    fireEvent(window, new Event('android-back', { cancelable: true }));
+    expect(screen.queryByRole('menu', { name: 'More actions' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('design-rail')).toHaveAttribute('data-open', 'true');
+    fireEvent(window, new Event('android-back', { cancelable: true }));
+    await selectElement();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Element text' }), {
+      target: { value: 'Draft' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Close design/index.html' }));
+    expect(screen.getByRole('dialog', { name: 'Save before closing' })).toBeInTheDocument();
+    fireEvent(window, new Event('android-back', { cancelable: true }));
+    expect(screen.queryByRole('dialog', { name: 'Save before closing' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+    expect(api.exportDesignZip).not.toHaveBeenCalled();
   });
 
   it('loads the first HTML file and pre-fills the bound composer while preserving its draft', async () => {

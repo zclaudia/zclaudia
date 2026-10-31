@@ -8,6 +8,7 @@ import { useDraftEditorStore } from '../../stores/draftEditorStore';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useServerStore } from '../../stores/serverStore';
+import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useGitStore } from '../git';
 import { SessionWorkspaceView } from './SessionWorkspaceView';
@@ -86,6 +87,10 @@ export function SessionChatLayout({
   // Re-sync visibility to match whether *the current project* has an open
   // drawer, so the tab only appears when it has real content.
   const activeServerId = useServerStore(s => s.activeServerId);
+  const ownerBackendId = useOwnershipStore(
+    s => s.getSessionBackendId(sessionId) ?? s.getProjectBackendId(projectId)
+  );
+  const backendId = ownerBackendId ?? activeServerId;
   useEffect(() => {
     if (!isMobile) return;
     if (!projectId) return;
@@ -104,12 +109,14 @@ export function SessionChatLayout({
     if (!isMobile) return undefined;
     return (
       <BottomPanel
+        sessionId={sessionId}
+        backendId={backendId ?? undefined}
         projectId={projectId}
         projectRoot={projectRoot}
         workingDirectory={workingDirectory}
       />
     );
-  }, [poppedOutLabel, isMobile, projectId, projectRoot, workingDirectory]);
+  }, [poppedOutLabel, isMobile, sessionId, backendId, projectId, projectRoot, workingDirectory]);
 
   if (!isMobile) {
     return (

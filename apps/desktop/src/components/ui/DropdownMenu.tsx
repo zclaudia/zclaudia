@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { useAndroidBack } from '../../hooks/useAndroidBack';
 
 /**
  * Action-menu primitive extracted from Select's open/dismiss/keyboard
@@ -45,6 +46,7 @@ interface TriggerArgs {
 }
 
 interface DropdownMenuProps {
+  isMobile?: boolean;
   entries: DropdownMenuEntry[];
   /** Render the trigger button; spread `props` onto it and attach `ref`. */
   trigger: (args: TriggerArgs) => ReactNode;
@@ -57,6 +59,7 @@ interface DropdownMenuProps {
 const VIEWPORT_MARGIN = 8;
 
 export function DropdownMenu({
+  isMobile = false,
   entries,
   trigger,
   align = 'start',
@@ -77,6 +80,7 @@ export function DropdownMenu({
     setPanelStyle({ visibility: 'hidden' });
     if (returnFocus) triggerRef.current?.focus();
   }, []);
+  useAndroidBack(() => close(true), isMobile && open, 40);
 
   // Position after render so the real panel size drives the clamping math.
   useLayoutEffect(() => {

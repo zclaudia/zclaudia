@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
-import { Modal } from '../../../components/ui/Modal';
+import { DesignModal as Modal } from './DesignModal';
 import { getDesignAsset, getDesignSnapshotDetail, getDesignSnapshotFile } from '../api';
 import type { DesignSnapshotDetail } from '../api';
 import { formatBytes, lineDiff } from '../diff';

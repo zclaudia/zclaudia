@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '../../../components/ui/Button';
-import { Modal } from '../../../components/ui/Modal';
+import { DesignModal as Modal } from './DesignModal';
 import { getDesignDocument } from '../api';
 import { lineDiff } from '../diff';
 import { LineDiffView } from './VersionDiff';

@@ -144,6 +144,7 @@ describe('initBuiltinPanels', () => {
       expect.objectContaining({
         id: 'design',
         pluginId: 'com.zclaudia.design',
+        platforms: ['desktop', 'mobile'],
         openMode: 'dedicated',
         defaultPlacement: 'right',
       })

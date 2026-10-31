@@ -5,6 +5,7 @@ import type { DesignTier } from './tiers';
 export interface DesignWorkbenchProps {
   tier: DesignTier;
   compact: boolean;
+  touch?: boolean;
   /** 组合根实测高度（窄档用于计算底部面板高度，避免挤占画布）。 */
   height?: number;
   leftOpen: boolean;
@@ -27,6 +28,7 @@ export interface DesignWorkbenchProps {
 export function DesignWorkbench({
   tier,
   compact,
+  touch = false,
   height = 0,
   leftOpen,
   rightOpen,
@@ -62,7 +64,7 @@ export function DesignWorkbench({
   // 窄档底部面板：目标 45%（上限 420），但至少给画布留 96px；
   // 面板本身很矮（工具面板最小内容区 120px）时退化为 76px peek，绝不让
   // 两个 grid 行的最小高度之和超过可用高度。
-  const mainHeight = Math.max(0, height - 44 - 26);
+  const mainHeight = Math.max(0, height - 44 - (touch ? 44 : 26));
   const inspectorRow = rightOpen
     ? Math.max(
         76,
@@ -101,11 +103,7 @@ export function DesignWorkbench({
             tabIndex={-1}
             onClick={closeDrawer}
             className="absolute z-dropdown cursor-default bg-foreground/10"
-            style={
-              narrow
-                ? { inset: 0 }
-                : { gridColumn: '2 / -1', gridRow: 1, inset: 0 }
-            }
+            style={narrow ? { inset: 0 } : { gridColumn: '2 / -1', gridRow: 1, inset: 0 }}
           />
         )}
         <div

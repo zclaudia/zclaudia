@@ -21,6 +21,7 @@ import { Tooltip } from '../../../components/ui/Tooltip';
 const menuIcon = (Icon: LucideIcon) => <Icon size={14} strokeWidth={1.75} />;
 
 export interface MoreMenuProps {
+  mobile?: boolean;
   docPath: string | null;
   loading: boolean;
   busy: boolean;
@@ -49,6 +50,7 @@ export interface MoreMenuProps {
  * 菜单条目沿用既有可访问名称，入口换位但能力不减。
  */
 export function MoreMenu({
+  mobile = false,
   docPath,
   loading,
   busy,
@@ -70,14 +72,18 @@ export function MoreMenu({
   extraEntries = [],
 }: MoreMenuProps) {
   const entries: DropdownMenuEntry[] = [
-    {
-      key: 'export-share',
-      label: 'Export & Share',
-      icon: menuIcon(Share2),
-      onSelect: onExportShare,
-      disabled: !docPath || loading,
-    },
-    'separator',
+    ...(!mobile
+      ? ([
+          {
+            key: 'export-share',
+            label: 'Export & Share',
+            icon: menuIcon(Share2),
+            onSelect: onExportShare,
+            disabled: !docPath || loading,
+          },
+          'separator',
+        ] as DropdownMenuEntry[])
+      : []),
     {
       key: 'diff',
       label: 'Unsaved changes',
@@ -102,7 +108,9 @@ export function MoreMenu({
     { key: 'templates', label: 'Templates', icon: menuIcon(Sparkles), onSelect: onTemplates },
     { key: 'brand', label: 'Brand', icon: menuIcon(Palette), onSelect: onBrand },
     { key: 'assets', label: 'Assets', icon: menuIcon(Images), onSelect: onAssets },
-    { key: 'media', label: 'Media', icon: menuIcon(Wand2), onSelect: onMedia },
+    ...(!mobile
+      ? [{ key: 'media', label: 'Media', icon: menuIcon(Wand2), onSelect: onMedia }]
+      : []),
     'separator',
     {
       key: 'overview',
@@ -128,6 +136,8 @@ export function MoreMenu({
 
   return (
     <DropdownMenu
+      isMobile={mobile}
+      panelClassName={mobile ? 'design-mobile-menu' : ''}
       ariaLabel="More actions"
       align="end"
       entries={entries}

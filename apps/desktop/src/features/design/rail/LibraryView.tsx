@@ -4,6 +4,7 @@ import { Button } from '../../../components/ui/Button';
 import type { DesignLibraryTab } from '../stores/designLayoutStore';
 
 export interface LibraryViewProps {
+  mediaAvailable?: boolean;
   libraryTab: DesignLibraryTab;
   onLibraryTabChange: (tab: DesignLibraryTab) => void;
   assets: ReactNode;
@@ -35,6 +36,7 @@ const UTILITY_COPY = {
  * 320px；Open in dialog 仍走原 Modal 薄壳（兼容与兜底，同时暂停内嵌实例）。
  */
 export function LibraryView({
+  mediaAvailable = true,
   libraryTab,
   onLibraryTabChange,
   assets,
@@ -56,7 +58,7 @@ export function LibraryView({
         aria-label="Library sections"
         className="grid shrink-0 grid-cols-4 gap-0.5 rounded-md border border-border p-0.5"
       >
-        {TABS.map(tab => {
+        {TABS.filter(tab => mediaAvailable || tab.id !== 'media').map(tab => {
           const active = tab.id === libraryTab;
           return (
             <button
@@ -76,7 +78,7 @@ export function LibraryView({
           );
         })}
       </div>
-      {utility !== null && utilityTab !== null && (
+      {utility !== null && utilityTab !== null && (mediaAvailable || utilityTab !== 'media') && (
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
           <Button
             size="sm"
@@ -101,7 +103,7 @@ export function LibraryView({
       <div hidden={libraryTab !== 'assets'}>{assets}</div>
       <div hidden={libraryTab !== 'templates'}>{templates}</div>
       <div hidden={libraryTab !== 'brand'}>{brand}</div>
-      <div hidden={libraryTab !== 'media'}>{media}</div>
+      {mediaAvailable && <div hidden={libraryTab !== 'media'}>{media}</div>}
     </div>
   );
 }

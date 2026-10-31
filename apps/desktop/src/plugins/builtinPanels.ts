@@ -41,7 +41,7 @@ export function initBuiltinPanels() {
     icon: 'Paintbrush',
     component: DesignPanel,
     order: 9,
-    platforms: ['desktop'],
+    platforms: ['desktop', 'mobile'],
     defaultPlacement: 'right',
     openMode: 'dedicated',
     alwaysMount: false,

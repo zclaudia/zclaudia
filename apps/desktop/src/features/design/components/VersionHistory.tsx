@@ -3,7 +3,7 @@ import { RefreshCw } from 'lucide-react';
 import { Badge } from '../../../components/ui/Badge';
 import { Button, IconButton } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
-import { Modal } from '../../../components/ui/Modal';
+import { DesignModal as Modal } from './DesignModal';
 import { createDesignSnapshot, getDesignSnapshotDetail, listDesignSnapshots } from '../api';
 import type { DesignConflictFile, DesignSnapshotDetail, DesignSnapshotSummary } from '../api';
 import { formatBytes } from '../diff';
