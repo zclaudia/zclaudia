@@ -1,4 +1,4 @@
-import { Bell, Search, SquareStack, X } from 'lucide-react';
+import { Bell, Search, SquareStack, X, Maximize2, Minimize2 } from 'lucide-react';
 import type { MobileSidebarHeaderProps } from './types';
 import { isDesktopTauri } from '../../utils/platform';
 import { openWindowManagerWindow } from '../../utils/windowManagerWindow';
@@ -11,6 +11,7 @@ const ACTION_REST =
 
 export function MobileSidebarHeader({
   onClose,
+  widthMode = 'compact', canExpand = false, widthChangeDisabled = false, onToggleWidth,
   onOpenSearch,
   onOpenNotifications,
   isNotificationsOpen,
@@ -66,9 +67,22 @@ export function MobileSidebarHeader({
             </button>
           )}
         </div>
-        <button onClick={onClose} className={`${ACTION} ${ACTION_REST}`} aria-label="Close menu">
-          <X size={20} strokeWidth={1.75} />
-        </button>
+        <div className="flex items-center">
+          {canExpand && (
+            <button
+              onClick={onToggleWidth}
+              disabled={widthChangeDisabled}
+              className={`${ACTION} ${ACTION_REST} disabled:opacity-40`}
+              aria-label={widthMode === 'wide' ? 'Restore menu width' : 'Expand menu width'}
+              aria-pressed={widthMode === 'wide'}
+            >
+              {widthMode === 'wide' ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+            </button>
+          )}
+          <button onClick={onClose} className={`${ACTION} ${ACTION_REST}`} aria-label="Close menu">
+            <X size={20} strokeWidth={1.75} />
+          </button>
+        </div>
       </div>
       {/* Inset divider — one rule language across header / nav / footer. */}
       <div className="mx-3 flex-shrink-0 border-t border-border" aria-hidden />

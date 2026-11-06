@@ -29,6 +29,7 @@ import { useHomeQuickActionsStore } from '../../stores/homeQuickActionsStore';
 import type { SettingsTab } from '../settings';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 import { claudiaSidebarStatus, computeContextMenuPosition, getNoBackendsMessage } from './derive';
+import type { DrawerWidthMode } from './drawerMotion';
 import { useMobileDrawerFocus } from './useMobileDrawerFocus';
 import { useSidebarResize } from './useSidebarResize';
 import { useProjectWorktrees } from './useProjectWorktrees';
@@ -43,6 +44,13 @@ interface SidebarProps {
   isMobile?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
+  drawerVisible?: boolean;
+  widthMode?: DrawerWidthMode;
+  canExpand?: boolean;
+  widthChangeDisabled?: boolean;
+  onToggleWidth?: () => void;
+  onOverlayActiveChange?: (active: boolean) => void;
+  modalPaused?: boolean;
   drawerPanelRef?: RefObject<HTMLDivElement | null>;
   drawerBackdropRef?: RefObject<HTMLDivElement | null>;
   onOpenDashboard?: (projectId: string) => void;
@@ -88,6 +96,11 @@ export function Sidebar({
   isMobile,
   isOpen,
   onClose,
+  drawerVisible = isOpen,
+  widthMode = 'compact',
+  canExpand = false,
+  widthChangeDisabled = false,
+  onToggleWidth, onOverlayActiveChange, modalPaused = false,
   drawerPanelRef,
   drawerBackdropRef,
   onOpenDashboard,
@@ -106,12 +119,6 @@ export function Sidebar({
   searchOpen: searchOpenProp,
   onSearchOpenChange,
 }: SidebarProps) {
-  const { panelRef: mobileDrawerPanelRef, handleDrawerKeyDown } = useMobileDrawerFocus({
-    isMobile,
-    isOpen,
-    onClose,
-    drawerPanelRef,
-  });
   const data = useSidebarData();
   const topLevelViewKind = useTopLevelViewStore(s => s.view.kind);
   const {
@@ -212,6 +219,20 @@ export function Sidebar({
     },
     [onSearchOpenChange]
   );
+
+  const localOverlayActive = searchOpen || !!contextMenuProject || !!settingsProjectId ||
+    agentDialogOpen || !!newSession.request || newProject.show;
+  useEffect(() => {
+    onOverlayActiveChange?.(localOverlayActive);
+    return () => onOverlayActiveChange?.(false);
+  }, [localOverlayActive, onOverlayActiveChange]);
+  const { panelRef: mobileDrawerPanelRef, handleDrawerKeyDown } = useMobileDrawerFocus({
+    isMobile,
+    isOpen,
+    onClose,
+    drawerPanelRef,
+    paused: modalPaused || localOverlayActive,
+  });
 
   // Resizable width (desktop) — mirrors the right sidebar's drag handle.
   const { sidebarWidth, onResizeStart, onResizeKeyDown } = useSidebarResize();
@@ -497,12 +518,14 @@ export function Sidebar({
       <>
         <div
           ref={drawerBackdropRef}
-          className={`mobile-drawer-backdrop fixed inset-0 bg-black z-40 ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          data-mobile-drawer-surface
+          className={`mobile-drawer-backdrop fixed inset-0 bg-black z-40 ${drawerVisible ? 'pointer-events-auto' : 'pointer-events-none'}`}
           onClick={isOpen ? onClose : undefined}
           aria-hidden="true"
         />
         <div
           ref={mobileDrawerPanelRef}
+          data-mobile-drawer-surface
           role="dialog"
           aria-modal={isOpen ? 'true' : undefined}
           aria-hidden={isOpen ? undefined : 'true'}
@@ -510,10 +533,14 @@ export function Sidebar({
           aria-label="Navigation"
           tabIndex={-1}
           onKeyDown={handleDrawerKeyDown}
-          className={`mobile-drawer-panel fixed inset-y-0 left-0 bg-[hsl(var(--sidebar))] border-r border-border/60 z-50 shadow-apple-xl flex flex-col safe-top-pad safe-bottom-pad outline-none ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          className={`mobile-drawer-panel fixed inset-y-0 left-0 bg-[hsl(var(--sidebar))] border-r border-border/60 z-50 shadow-apple-xl flex flex-col safe-top-pad safe-bottom-pad outline-none ${drawerVisible ? 'pointer-events-auto' : 'pointer-events-none'}`}
         >
           <MobileSidebarHeader
             onClose={onClose}
+            widthMode={widthMode}
+            canExpand={canExpand}
+            widthChangeDisabled={widthChangeDisabled}
+            onToggleWidth={onToggleWidth}
             onOpenSearch={() => {
               setSearchOpen(true);
               onClose?.();

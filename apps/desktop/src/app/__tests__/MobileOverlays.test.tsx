@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { createRef } from 'react';
 import { MobileOverlays } from '../MobileOverlays';
 
 vi.mock('../../features/claudia/ClaudiaChat', () => ({
@@ -28,7 +27,6 @@ function renderOverlays(
       isAgentExpanded={props.isAgentExpanded ?? false}
       isFeedOpen={props.isFeedOpen ?? false}
       padFeedTopInset={props.padFeedTopInset ?? false}
-      swipeCloseRef={createRef<HTMLDivElement>()}
       agentSwipePreview={{ mode: null, progress: 0 }}
       claudiaSwipePreviewProgress={0}
       claudiaOverlayOpacity={0}

@@ -32,6 +32,10 @@ export interface SidebarHeaderProps {
 
 /** Props for MobileSidebarHeader */
 export interface MobileSidebarHeaderProps {
+  widthMode?: 'compact' | 'wide';
+  canExpand?: boolean;
+  widthChangeDisabled?: boolean;
+  onToggleWidth?: () => void;
   onClose?: () => void;
   /** Opens the full-screen SearchModal. Claudia moved to the nav list. */
   onOpenSearch?: () => void;

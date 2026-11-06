@@ -34,6 +34,11 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**',
       '**/src-tauri/**',
+      'src/app/__tests__/useMobileDrawer.test.tsx',
+      'src/app/__tests__/useMobileNavigationGesture.test.tsx',
+      'src/app/__tests__/useMobileNavigationBlocker.test.tsx',
+      'src/features/sidebar/__tests__/drawerMotion*.test.ts',
+      'src/features/sidebar/__tests__/useMobileDrawerFocus.test.tsx',
       'src/hooks/transport/**/*.test.ts',
       'src/hooks/__tests__/useDataLoader.test.ts',
       'src/hooks/__tests__/useAndroidBack.test.ts',

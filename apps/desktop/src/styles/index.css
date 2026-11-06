@@ -993,30 +993,28 @@ button {
 }
 
 /* Mobile navigation drawer. Horizontal ownership is decided by
-   useHorizontalDrag; pan-y leaves normal document/list scrolling native. */
+   the shell coordinator; native scroll and pinch zoom remain available. */
 .mobile-drawer-gesture-surface {
-  touch-action: pan-y;
+  /* Descendant code blocks must retain their native horizontal scroll axis. */
+  touch-action: auto;
 }
 
 /* Closed by default; useMobileDrawer then owns transform, width, opacity and
    transition timing as inline styles (compositor-only, no inherited custom
    properties to restyle the sidebar's subtree on every touchmove). */
 .mobile-drawer-panel {
-  width: 300px;
+  width: min(300px, 100vw);
+  touch-action: pan-y pinch-zoom;
   transform: translate3d(-100%, 0, 0);
   /* Hidden while closed so its shadow doesn't bleed onto the screen edge. */
   visibility: hidden;
-  transition-property: transform, width, visibility;
-  transition-duration: 350ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Motion owns the continuous position; CSS must not interpolate it again. */
   will-change: transform;
 }
 
 .mobile-drawer-backdrop {
   opacity: 0;
-  transition-property: opacity;
-  transition-duration: 350ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  touch-action: pan-y pinch-zoom;
   will-change: opacity;
 }
 

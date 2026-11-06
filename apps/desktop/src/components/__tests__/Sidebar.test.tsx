@@ -73,9 +73,6 @@ vi.mock('../../features/sidebar/ProjectWorkspaceItem', () => ({
 vi.mock('../../features/sidebar/worktreeGrouping', () => ({
   groupSessionsByWorktree: vi.fn().mockReturnValue([]),
 }));
-vi.mock('../../hooks/useSwipeBack', () => ({
-  useSwipeBack: vi.fn().mockReturnValue({ current: null }),
-}));
 vi.mock('../../hooks/useSelectionCoordinator', () => ({
   useSelectionCoordinator: () => ({
     selectProject: selectionMocks.selectProject,

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 import type { Ref } from 'react';
+import { Select } from '../../components/ui/Select';
 
 const { mockUseIsMobile, mockUseAndroidBack, mockIsAndroid, mockShouldShowDirectGatewaySetup } =
   vi.hoisted(() => ({
@@ -20,17 +21,24 @@ vi.mock('../../features/sidebar/Sidebar', () => ({
     isOpen,
     drawerPanelRef,
     drawerBackdropRef,
+    onToggleWidth, widthMode, canExpand, widthChangeDisabled, onClose,
   }: {
     onOpenSettings?: (tab?: 'permissions') => void;
     isOpen?: boolean;
     drawerPanelRef?: Ref<HTMLDivElement>;
     drawerBackdropRef?: Ref<HTMLDivElement>;
+    onToggleWidth?: () => void;
+    onClose?: () => void;
+    widthMode?: string; canExpand?: boolean; widthChangeDisabled?: boolean;
   }) => (
     <aside data-testid="app-sidebar" data-open={isOpen ? 'true' : 'false'}>
       {/* Stand-ins for the real drawer panel and backdrop so the gesture layer
           has something to paint its CSS variables onto. */}
-      <div data-testid="drawer-panel" ref={drawerPanelRef} />
-      <div data-testid="drawer-backdrop" ref={drawerBackdropRef} />
+      <div data-testid="drawer-panel" data-mobile-drawer-surface ref={drawerPanelRef} />
+      <div data-testid="drawer-backdrop" data-mobile-drawer-surface ref={drawerBackdropRef} />
+      {canExpand && <button disabled={widthChangeDisabled} onClick={onToggleWidth}>{widthMode === 'wide' ? 'Restore menu width' : 'Expand menu width'}</button>}
+      <button onClick={onClose}>Close menu</button>
+      <Select value="one" onChange={() => {}} ariaLabel="Drawer choices" options={[{ value: 'one', label: 'Only choice' }]} />
       <button onClick={() => onOpenSettings?.('permissions')}>Open Settings</button>
     </aside>
   ),
@@ -77,7 +85,7 @@ vi.mock('../../components/ToastContainer', () => ({
 }));
 vi.mock('../../components/UpdateBanner', () => ({ UpdateBanner: () => null }));
 vi.mock('../AppHeader', () => ({ AppHeader: () => null }));
-vi.mock('../MobileOverlays', () => ({ MobileOverlays: () => null }));
+vi.mock('../MobileOverlays', () => ({ MobileOverlays: ({ agentSwipePreview }: { agentSwipePreview: { progress: number } }) => <output data-testid="claudia-preview">{agentSwipePreview.progress}</output> }));
 
 vi.mock('../../contexts/ConnectionContext', () => ({
   useConnection: () => ({
@@ -96,7 +104,6 @@ vi.mock('../../hooks/useSelectionCoordinator', () => ({
 }));
 vi.mock('../../hooks/useMediaQuery', () => ({ useIsMobile: mockUseIsMobile }));
 vi.mock('../../hooks/useAndroidBack', () => ({ useAndroidBack: mockUseAndroidBack }));
-vi.mock('../../hooks/useSwipeBack', () => ({ useSwipeBack: () => ({ current: null }) }));
 vi.mock('../../hooks/useAutoUpdate', () => ({ useAutoUpdate: () => undefined }));
 vi.mock('../../hooks/useServerLatencyMonitor', () => ({
   useServerLatencyMonitor: () => undefined,
@@ -338,161 +345,101 @@ describe('App shell modes on mobile', () => {
   });
 });
 
-describe('Mobile drawer detents', () => {
-  // jsdom reports a 1024px viewport, so the expanded stage lands on the cap.
-  const EXPANDED_WIDTH_PX = 420;
-  const PEEK_WIDTH_PX = 300;
-
+describe('Mobile drawer width controls', () => {
   beforeEach(() => {
     resetStores();
     vi.clearAllMocks();
     mockUseIsMobile.mockReturnValue(true);
   });
-
-  function touch(target: Element, type: string, x: number) {
-    const point = { identifier: 1, target, clientX: x, clientY: 100 } as unknown as Touch;
-    const isEnd = type === 'touchend' || type === 'touchcancel';
-    act(() =>
-      target.dispatchEvent(
-        new TouchEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          touches: isEnd ? [] : [point],
-          changedTouches: [point],
-        })
-      )
-    );
-  }
-
-  // AppHeader is stubbed out in this harness, so the hamburger comes from the
-  // shell-mode header.
   async function renderOpenDrawer() {
     const view = render(<App />);
-    act(() => {
-      useTopLevelViewStore.getState().openPlugins();
-    });
+    act(() => useTopLevelViewStore.getState().openPlugins());
     await view.findByTestId('plugins-view');
     fireEvent.click(view.getByRole('button', { name: 'Open menu' }));
-    const surface = view.container.querySelector('.mobile-drawer-gesture-surface');
-    if (!surface) throw new Error('drawer gesture surface not rendered');
-    return {
-      ...view,
-      surface,
-      drawerWidth: () => view.getByTestId('drawer-panel').style.width,
-      isOpen: () => view.getByTestId('app-sidebar').getAttribute('data-open') === 'true',
+    await waitFor(() => expect(view.getByRole('button', { name: 'Expand menu width' }).hasAttribute('disabled')).toBe(false));
+    return { ...view,
+      width: () => view.getByTestId('drawer-panel').style.width,
+      isOpen: () => view.getByTestId('app-sidebar').getAttribute('data-open') === 'true' };
+  }
+  it('preserves the existing 60px Claudia preview range after navigation activation', () => {
+    const view = render(<App />);
+    const content = view.container.querySelector('main')!;
+    const send = (type: string, x: number) => {
+      const touch = { identifier: 1, target: content, clientX: x, clientY: 200 } as unknown as Touch;
+      fireEvent(content, new TouchEvent(type, { bubbles: true, cancelable: true,
+        touches: [touch], targetTouches: [touch], changedTouches: [touch] }));
     };
-  }
-
-  /**
-   * Drag and release with no flick velocity. Timestamps have to be explicit:
-   * touches dispatched within the same millisecond would otherwise read as an
-   * infinitely fast flick.
-   */
-  function slowDrag(surface: Element, deltaX: number) {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(0);
-      touch(surface, 'touchstart', 200);
-      vi.setSystemTime(500);
-      touch(surface, 'touchmove', 200 + deltaX);
-      vi.setSystemTime(1000);
-      touch(surface, 'touchend', 200 + deltaX);
-    } finally {
-      vi.useRealTimers();
-    }
-  }
-
-  it('widens the open drawer to the expanded stage on a further right drag', async () => {
-    const { surface, drawerWidth, isOpen } = await renderOpenDrawer();
-    expect(drawerWidth()).toBe(`${PEEK_WIDTH_PX}px`);
-
-    slowDrag(surface, 140);
-
-    expect(drawerWidth()).toBe(`${EXPANDED_WIDTH_PX}px`);
-    expect(isOpen()).toBe(true);
+    send('touchstart', 500);
+    send('touchmove', 470);
+    expect(Number(view.getByTestId('claudia-preview').textContent)).toBeCloseTo(22 / 60);
+    fireEvent(content, new TouchEvent('touchcancel', { bubbles: true, cancelable: true,
+      touches: [], targetTouches: [], changedTouches: [{ identifier: 1, target: content, clientX: 470, clientY: 200 } as unknown as Touch] }));
   });
-
-  it('steps the expanded drawer back to the standard width instead of closing', async () => {
-    const { surface, drawerWidth, isOpen } = await renderOpenDrawer();
-    slowDrag(surface, 140);
-    expect(drawerWidth()).toBe(`${EXPANDED_WIDTH_PX}px`);
-
-    slowDrag(surface, -170);
-
-    expect(drawerWidth()).toBe(`${PEEK_WIDTH_PX}px`);
-    expect(isOpen()).toBe(true);
-  });
-
-  it('closes from the expanded stage on a hard leftward fling', async () => {
-    const { surface, isOpen } = await renderOpenDrawer();
-    slowDrag(surface, 140);
-    expect(isOpen()).toBe(true);
-
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(0);
-      touch(surface, 'touchstart', 300);
-      vi.setSystemTime(10);
-      touch(surface, 'touchmove', 280);
-      vi.setSystemTime(20);
-      touch(surface, 'touchend', 260);
-    } finally {
-      vi.useRealTimers();
-    }
-
-    expect(isOpen()).toBe(false);
-  });
-
-  it('commits a short, slow drag to the next detent instead of falling back', async () => {
-    const { surface, drawerWidth, isOpen } = await renderOpenDrawer();
-
-    slowDrag(surface, 40);
-    expect(drawerWidth()).toBe(`${EXPANDED_WIDTH_PX}px`);
-
-    slowDrag(surface, -40);
-    expect(drawerWidth()).toBe(`${PEEK_WIDTH_PX}px`);
-
-    slowDrag(surface, -40);
-    expect(isOpen()).toBe(false);
-  });
-
-  it('keeps the drawer put when a drag is too small to read as intent', async () => {
-    const { surface, drawerWidth, isOpen } = await renderOpenDrawer();
-
-    slowDrag(surface, 20);
-
-    expect(drawerWidth()).toBe(`${PEEK_WIDTH_PX}px`);
-    expect(isOpen()).toBe(true);
-  });
-
-  it('walks Android back down one detent at a time', async () => {
+  it('keeps the drawer visible and modal while a shared menu blocks navigation', async () => {
     const view = await renderOpenDrawer();
-    const { surface, drawerWidth, isOpen } = view;
-    slowDrag(surface, 140);
-    expect(drawerWidth()).toBe(`${EXPANDED_WIDTH_PX}px`);
-
-    const stepBack = () => {
-      const call = mockUseAndroidBack.mock.calls
-        .filter(([, , priority]) => priority === 10)
-        .at(-1)!;
+    const panel = view.getByTestId('drawer-panel');
+    fireEvent.click(view.getByRole('button', { name: 'Drawer choices' }));
+    expect(view.isOpen()).toBe(true);
+    expect(view.width()).toBe('300px');
+    expect(panel.style.visibility).toBe('visible');
+    const content = view.container.querySelector('main')!;
+    const touch = (type: string, x: number, end = false) => {
+      const point = { identifier: 1, target: content, clientX: x, clientY: 200 } as unknown as Touch;
+      fireEvent(content, new TouchEvent(type, { bubbles: true, cancelable: true,
+        touches: end ? [] : [point], targetTouches: end ? [] : [point], changedTouches: [point] }));
+    };
+    touch('touchstart', 500); touch('touchmove', 200); touch('touchend', 200, true);
+    expect(panel.style.transform).toBe('translate3d(0px, 0, 0)');
+    fireEvent.keyDown(view.getByRole('listbox'), { key: 'Escape' });
+    expect(view.isOpen()).toBe(true);
+    expect(view.width()).toBe('300px');
+    expect(panel.style.visibility).toBe('visible');
+  });
+  it('switches reading width through the explicit expand and restore buttons', async () => {
+    const view = await renderOpenDrawer();
+    expect(view.width()).toBe('300px');
+    fireEvent.click(view.getByRole('button', { name: 'Expand menu width' }));
+    expect(view.width()).toBe('420px');
+    expect(view.isOpen()).toBe(true);
+    fireEvent.click(view.getByRole('button', { name: 'Restore menu width' }));
+    expect(view.width()).toBe('300px');
+  });
+  it('retains modal presence while closing and reopens at compact width', async () => {
+    const view = await renderOpenDrawer();
+    fireEvent.click(view.getByRole('button', { name: 'Expand menu width' }));
+    fireEvent.click(view.getByRole('button', { name: 'Close menu' }));
+    expect(view.isOpen()).toBe(true);
+    expect(view.width()).toBe('420px');
+    await waitFor(() => expect(view.isOpen()).toBe(false));
+    fireEvent.click(view.getByRole('button', { name: 'Open menu' }));
+    expect(view.width()).toBe('300px');
+  });
+  it('steps Android back from wide to compact before closing', async () => {
+    const view = await renderOpenDrawer();
+    fireEvent.click(view.getByRole('button', { name: 'Expand menu width' }));
+    const back = () => {
+      const call = mockUseAndroidBack.mock.calls.filter(([, , priority]) => priority === 10).at(-1)!;
       expect(call[1]).toBe(true);
       act(() => call[0]());
     };
-
-    stepBack();
-    expect(isOpen()).toBe(true);
-    expect(drawerWidth()).toBe(`${PEEK_WIDTH_PX}px`);
-
-    stepBack();
-    expect(isOpen()).toBe(false);
-    // Closed, the panel is hidden so its shadow doesn't bleed onto the edge.
+    back();
+    expect(view.width()).toBe('300px');
+    expect(view.isOpen()).toBe(true);
+    back();
+    await waitFor(() => expect(view.isOpen()).toBe(false));
     expect(view.getByTestId('drawer-panel').style.visibility).toBe('hidden');
   });
-
-  it('shows the panel once the drawer opens', async () => {
+  it('repaints replacement drawer nodes after settings unmounts the shell', async () => {
     const view = await renderOpenDrawer();
-    const panel = view.getByTestId('drawer-panel');
-    expect(panel.style.visibility).toBe('visible');
+    fireEvent.click(view.getByRole('button', { name: 'Open Settings' }));
+    await view.findByTestId('settings-panel');
+    fireEvent.click(view.getByRole('button', { name: 'Back to app' }));
+    act(() => useTopLevelViewStore.getState().openPlugins());
+    await view.findByTestId('plugins-view');
+    expect(view.getByTestId('drawer-panel').style.width).toBe('300px');
+    expect(view.isOpen()).toBe(false);
+    fireEvent.click(view.getByRole('button', { name: 'Open menu' }));
+    expect(view.getByTestId('drawer-panel').style.visibility).toBe('visible');
   });
 });
 

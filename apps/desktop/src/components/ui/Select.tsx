@@ -11,6 +11,7 @@ import {
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
+import { useMobileNavigationBlocker } from '../../app/useMobileNavigationBlocker';
 
 export interface SelectOption<T extends string = string> {
   value: T;
@@ -75,6 +76,7 @@ export function Select<T extends string = string>({
   ariaLabel,
 }: SelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
+  useMobileNavigationBlocker(isOpen);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);

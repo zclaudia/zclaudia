@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { IconButton } from './Button';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { trapTab } from '../../utils/focusTrap';
+import { useMobileNavigationBlocker } from '../../app/useMobileNavigationBlocker';
 
 type ModalSize = 'md' | 'lg' | '2xl';
 type ModalPlacement = 'top' | 'center' | 'bottom';
@@ -69,6 +70,7 @@ export function Modal({
   zClassName = 'z-[100]',
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  useMobileNavigationBlocker(open);
 
   useAndroidBack(onClose, isMobile && open, 30);
 

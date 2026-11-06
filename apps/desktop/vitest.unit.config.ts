@@ -45,7 +45,11 @@ export default defineConfig({
       'src/services/terminal/**/*.test.ts',
       'src/plugins/__tests__/builtinPanels.test.ts',
     ],
-    exclude: ['**/node_modules/**', '**/src-tauri/**'],
+    exclude: [
+      '**/node_modules/**',
+      '**/src-tauri/**',
+      'src/features/sidebar/__tests__/drawerMotion*.test.ts',
+    ],
     pool: 'forks',
     coverage: {
       provider: 'istanbul',

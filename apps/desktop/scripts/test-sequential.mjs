@@ -37,7 +37,6 @@ const CONFIGS = [
     file: 'vitest.hooks.config.ts',
     include: [
       'src/hooks/__tests__/useAndroidBack.test.ts',
-      'src/hooks/__tests__/useHorizontalDrag.test.tsx',
       'src/hooks/__tests__/useDataLoader.test.ts',
       'src/hooks/__tests__/useGatewayConnection.features.test.ts',
       'src/hooks/__tests__/useBackendFacade.test.ts',
@@ -55,9 +54,23 @@ const CONFIGS = [
     exclude: ['**/node_modules/**', '**/src-tauri/**'],
   },
   {
+    name: 'gestures',
+    file: 'vitest.gestures.config.ts',
+    include: [
+      'src/app/__tests__/useMobileDrawer.test.tsx',
+      'src/app/__tests__/useMobileNavigationGesture.test.tsx',
+      'src/app/__tests__/useMobileNavigationBlocker.test.tsx',
+      'src/app/__tests__/mobileNavigationGesture*.test.ts',
+      'src/features/sidebar/__tests__/drawerMotion*.test.ts',
+      'src/features/sidebar/__tests__/useMobileDrawerFocus.test.tsx',
+    ],
+    exclude: ['**/node_modules/**', '**/src-tauri/**'],
+  },
+  {
     name: 'ui',
     file: 'vitest.ui.config.ts',
     include: [
+      'src/app/**/*.test.tsx',
       'src/components/**/*.test.tsx',
       'src/contexts/**/*.test.tsx',
       'src/hooks/**/*.test.ts',
@@ -67,6 +80,11 @@ const CONFIGS = [
     exclude: [
       '**/node_modules/**',
       '**/src-tauri/**',
+      'src/app/__tests__/useMobileDrawer.test.tsx',
+      'src/app/__tests__/useMobileNavigationGesture.test.tsx',
+      'src/app/__tests__/useMobileNavigationBlocker.test.tsx',
+      'src/features/sidebar/__tests__/drawerMotion*.test.ts',
+      'src/features/sidebar/__tests__/useMobileDrawerFocus.test.tsx',
       'src/hooks/transport/**/*.test.ts',
       'src/hooks/__tests__/useDataLoader.test.ts',
       'src/hooks/__tests__/useAndroidBack.test.ts',

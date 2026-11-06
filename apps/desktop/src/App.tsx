@@ -20,8 +20,10 @@ import { useSelectionCoordinator } from './hooks/useSelectionCoordinator';
 import { useTaskCompletionToasts } from './features/task-center/useTaskCompletionToasts';
 import { useIsMobile } from './hooks/useMediaQuery';
 import { useAndroidBack } from './hooks/useAndroidBack';
-import { useSwipeBack } from './hooks/useSwipeBack';
-import { drawerStageBelow } from './features/sidebar/drawerStage';
+import { useMobileNavigationGesture } from './app/useMobileNavigationGesture';
+import { useMobileNavigationBlocker } from './app/useMobileNavigationBlocker';
+import type { DrawerRelease } from './app/useMobileDrawer';
+import { usePermissionStore } from './stores/permissionStore';
 import { useMobileDrawer } from './app/useMobileDrawer';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useServerLatencyMonitor } from './hooks/useServerLatencyMonitor';
@@ -153,7 +155,14 @@ function AppContent() {
   );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarSearchOpen, setSidebarSearchOpen] = useState(false);
+  const [sidebarOverlayActive, setSidebarOverlayActive] = useState(false);
+  const permissionOpen = usePermissionStore(s => !!s.pendingRequest);
+  const pluginPermissionOpen = usePluginStore(s => !!s.pendingPermissionRequest);
+  const navigationShellRef = useRef<HTMLDivElement>(null);
   const [isFeedOpen, setFeedOpen] = useState(false);
+  const sharedModalOpen = useMobileNavigationBlocker();
+  const navigationBlocked = sharedModalOpen || sidebarOverlayActive || permissionOpen || pluginPermissionOpen ||
+    notificationsModalOpen || fileViewerFullscreen;
   const [agentSwipePreview, setAgentSwipePreview] = useState<{
     mode: 'open' | 'close' | null;
     progress: number;
@@ -197,21 +206,18 @@ function AppContent() {
   // themselves.
   const sessionOwnsTopInset = !!selectedSessionId && !isAgentExpanded && !isShellTopLevelView;
 
+  const drawer = useMobileDrawer({
+    isMobile,
+    gestureActive: isAppTopLevelView || isShellTopLevelView,
+    isAgentExpanded, isFeedOpen, isFileViewerFullscreen: fileViewerFullscreen,
+  });
   const {
-    drawerStage,
-    setDrawerStage,
     sidebarOpen,
     setSidebarOpen,
     drawerPanelRef,
     drawerBackdropRef,
-    drawerGestureRef,
-  } = useMobileDrawer({
-    isMobile,
-    gestureActive: isAppTopLevelView || isShellTopLevelView,
-    isAgentExpanded,
-    isFeedOpen,
-    isFileViewerFullscreen: fileViewerFullscreen,
-  });
+    widthMode, canExpand, widthChangeDisabled, toggleWidth, stepBack, drawerVisible,
+  } = drawer;
 
   // Toasts render on every viewport; only placement differs (mobile stacks
   // top-center, desktop uses ToastContainer's bottom-right default).
@@ -346,17 +352,16 @@ function AppContent() {
   );
   useAndroidBack(
     () => setAgentExpanded(false),
-    (isAppTopLevelView || isShellTopLevelView) && isMobile && isAgentExpanded,
+    (isAppTopLevelView || isShellTopLevelView) && isMobile && isAgentExpanded && !sidebarOpen,
     20
   );
   // The mobile notifications feed covers the content area; back closes it
   // before the shell-mode escape (same priority tier would tie on order).
   // The drawer sits above it, so the drawer closes first.
   useAndroidBack(() => setFeedOpen(false), isMobile && isFeedOpen && !sidebarOpen, 22);
-  // Back steps down one detent (expanded → drawer → closed) so it undoes the
-  // same amount a leftward swipe would.
+  // Android back first restores compact reading width, then closes the drawer.
   useAndroidBack(
-    () => setDrawerStage(drawerStageBelow(drawerStage)),
+    stepBack,
     (isAppTopLevelView || isShellTopLevelView) && isMobile && sidebarOpen,
     10
   );
@@ -374,41 +379,45 @@ function AppContent() {
     20
   );
 
-  // --- Mobile swipe gestures ---
-  // These recognizers report on every touchmove, including the zero progress of
-  // a swipe going the other way (a drawer drag over <main>). Keep the previous
-  // state object for those so the shell doesn't re-render mid-drag.
-  const updateAgentSwipePreview = useCallback((mode: 'open' | 'close', progress: number) => {
-    setAgentSwipePreview(current => {
-      if (progress > 0) {
-        return current.mode === mode && current.progress === progress
-          ? current
-          : { mode, progress };
-      }
-      return current.mode === null && current.progress === 0
-        ? current
-        : { mode: null, progress: 0 };
-    });
+  // Both panels share one input owner for the complete touch session.
+  const claudiaDragRef = useRef<{ open: boolean; distance: number } | null>(null);
+  const cancelClaudiaDrag = useCallback(() => {
+    claudiaDragRef.current = null;
+    setAgentSwipePreview({ mode: null, progress: 0 });
   }, []);
-
-  const swipeOpenClaudiaRef = useSwipeBack<HTMLElement>({
-    onSwipe: () => setAgentExpanded(true),
-    onProgress: progress => updateAgentSwipePreview('open', progress),
-    enabled:
-      isAppTopLevelView && isMobile && !isAgentExpanded && !sidebarOpen && !fileViewerFullscreen,
-    direction: 'left',
-    startZone: { startRatio: 0.25, endRatio: 0.75 },
-    threshold: 60,
-  });
-
-  const swipeCloseClaudiaRef = useSwipeBack({
-    onSwipe: () => setAgentExpanded(false),
-    onProgress: progress => updateAgentSwipePreview('close', progress),
-    enabled: isAppTopLevelView && isMobile && isAgentExpanded,
-    direction: 'right',
-    fullWidth: true,
-    threshold: 60,
-    velocityThreshold: 0.18,
+  const claudiaGesture = {
+    getGestureState: () => ({ present: isAgentExpanded, targetOpen: isAgentExpanded,
+      enabled: isAppTopLevelView && !navigationBlocked }),
+    beginDrag: () => {
+      if (!isAppTopLevelView || navigationBlocked) return false;
+      claudiaDragRef.current = { open: isAgentExpanded, distance: 0 };
+      return true;
+    },
+    updateDrag: (distance: number) => {
+      const drag = claudiaDragRef.current;
+      if (!drag) return;
+      drag.distance = distance;
+      // Preserve Claudia's existing 60px preview range while sharing ownership.
+      const progress = Math.max(0, Math.min(1, (drag.open ? distance : -distance) / 60));
+      setAgentSwipePreview({ mode: drag.open ? 'close' : 'open', progress });
+    },
+    endDrag: ({ velocityPxPerSecond, releaseRunDistancePx }: DrawerRelease) => {
+      const drag = claudiaDragRef.current;
+      if (!drag) return;
+      const direction = drag.open ? 1 : -1;
+      const commit = direction * drag.distance >= 60 ||
+        (direction * velocityPxPerSecond >= (drag.open ? 180 : 300) && direction * releaseRunDistancePx >= 16);
+      if (commit) setAgentExpanded(!drag.open);
+      cancelClaudiaDrag();
+    },
+    cancelDrag: cancelClaudiaDrag,
+  };
+  useMobileNavigationGesture({ target: navigationShellRef,
+    enabled: isMobile && (isAppTopLevelView || isShellTopLevelView),
+    blocked: navigationBlocked || (isFeedOpen && !drawer.drawerVisible), drawer, claudia: claudiaGesture,
+    commandVersion: `${topLevelView.kind}:${isAgentExpanded}`,
+    // The system owns the outermost iOS back/forward region.
+    ignoreEdgeWidth: /iPad|iPhone|iPod/.test(navigator.userAgent) ? 20 : 0,
   });
 
   // --- Conditional early returns (setup / loading screens) ---
@@ -529,18 +538,21 @@ function AppContent() {
       {isMobile &&
         !(selectedSessionId && !isAgentExpanded) &&
         (isAgentExpanded || !isShellTopLevelView) && (
-          <AppHeader
-            isMobile={isMobile}
-            isAgentExpanded={isAgentExpanded}
-            onOpenSidebar={() => setSidebarOpen(true)}
-            onCloseAgent={() => setAgentExpanded(false)}
-          />
+          <div data-mobile-drawer-background>
+            <AppHeader
+              isMobile={isMobile}
+              isAgentExpanded={isAgentExpanded}
+              onOpenSidebar={() => setSidebarOpen(true)}
+              onCloseAgent={() => setAgentExpanded(false)}
+            />
+          </div>
         )}
 
       {!isMobile && <UpdateBanner />}
 
       <div
-        ref={drawerGestureRef}
+        ref={navigationShellRef}
+        data-mobile-navigation-shell
         className={`flex flex-1 overflow-hidden ${isMobile ? 'mobile-drawer-gesture-surface' : ''}`}
       >
         <Sidebar
@@ -548,6 +560,13 @@ function AppContent() {
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
           isMobile={isMobile}
           isOpen={sidebarOpen}
+          drawerVisible={drawerVisible}
+          widthMode={widthMode}
+          canExpand={canExpand}
+          widthChangeDisabled={widthChangeDisabled}
+          onToggleWidth={toggleWidth}
+          onOverlayActiveChange={setSidebarOverlayActive}
+          modalPaused={permissionOpen || pluginPermissionOpen || fileViewerFullscreen}
           onClose={() => setSidebarOpen(false)}
           drawerPanelRef={drawerPanelRef}
           drawerBackdropRef={drawerBackdropRef}
@@ -583,7 +602,7 @@ function AppContent() {
           />
         )}
 
-        <main ref={swipeOpenClaudiaRef} className="flex-1 flex flex-col overflow-hidden relative">
+        <main data-mobile-drawer-background tabIndex={-1} className="flex-1 flex flex-col overflow-hidden relative">
           {/* Desktop: the main column owns its own top drag strip. The full-width
               AppHeader (which used to provide this) only renders on mobile now, and
               only SessionHeader re-adds a strip — so welcome/dashboard views would
@@ -617,7 +636,6 @@ function AppContent() {
                 isAgentExpanded={isAgentExpanded}
                 isFeedOpen={isFeedOpen}
                 padFeedTopInset={sessionOwnsTopInset}
-                swipeCloseRef={swipeCloseClaudiaRef}
                 agentSwipePreview={agentSwipePreview}
                 claudiaSwipePreviewProgress={claudiaSwipePreviewProgress}
                 claudiaOverlayOpacity={claudiaOverlayOpacity}

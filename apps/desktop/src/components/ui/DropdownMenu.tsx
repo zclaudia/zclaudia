@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
+import { useMobileNavigationBlocker } from '../../app/useMobileNavigationBlocker';
 
 /**
  * Action-menu primitive extracted from Select's open/dismiss/keyboard
@@ -67,6 +68,7 @@ export function DropdownMenu({
   panelClassName = '',
 }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
+  useMobileNavigationBlocker(open);
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({ visibility: 'hidden' });
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);

@@ -1,4 +1,3 @@
-import type { RefObject } from 'react';
 import { ClaudiaChat } from '../features/claudia/ClaudiaChat';
 import { NotificationsPanel } from '../components/notifications/NotificationsPanel';
 
@@ -7,7 +6,6 @@ interface MobileOverlaysProps {
   isFeedOpen: boolean;
   /** No shell header sits above the feed, so it must clear the status bar itself. */
   padFeedTopInset: boolean;
-  swipeCloseRef: RefObject<HTMLDivElement | null>;
   agentSwipePreview: { mode: 'open' | 'close' | null; progress: number };
   claudiaSwipePreviewProgress: number;
   claudiaOverlayOpacity: number;
@@ -18,7 +16,6 @@ export function MobileOverlays({
   isAgentExpanded,
   isFeedOpen,
   padFeedTopInset,
-  swipeCloseRef,
   agentSwipePreview,
   claudiaSwipePreviewProgress,
   claudiaOverlayOpacity,
@@ -45,7 +42,6 @@ export function MobileOverlays({
 
       {/* Agent panel (always mounted to preserve state) */}
       <div
-        ref={swipeCloseRef}
         className={`absolute inset-0 z-20 bg-background will-change-transform ${
           isAgentExpanded || agentSwipePreview.mode === 'open' ? '' : 'hidden'
         } ${
