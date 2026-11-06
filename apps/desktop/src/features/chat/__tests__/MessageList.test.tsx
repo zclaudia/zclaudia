@@ -1054,7 +1054,7 @@ describe('MessageList', () => {
     expect(list.children.length).toBe(1);
   });
 
-  it('handles many messages without virtualization (below threshold)', () => {
+  it('bounds an initial page before viewport metrics arrive', () => {
     const messages = Array.from({ length: 50 }, (_, i) =>
       makeMessage({
         id: `msg-${i}`,
@@ -1064,7 +1064,8 @@ describe('MessageList', () => {
     );
     render(<MessageList messages={messages} />);
     const list = screen.getByTestId('message-list');
-    expect(list.children.length).toBe(50);
+    expect(list.querySelectorAll('[data-message-id]').length).toBeLessThan(20);
+    expect(screen.queryByText('Message 49')).not.toBeInTheDocument();
   });
 
   it('handles messages array with only filtered-out items', () => {

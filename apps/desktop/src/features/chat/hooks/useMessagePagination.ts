@@ -9,6 +9,7 @@ const MESSAGES_PER_PAGE = 50;
 const BOTTOM_REFRESH_LIMIT = 12;
 const BOTTOM_REFRESH_COOLDOWN_MS = 2500;
 const SUPPRESS_LOAD_MORE_MS = 1200;
+const USER_SCROLL_INTENT_MS = 1500;
 
 interface UseMessagePaginationParams {
   sessionId: string;
@@ -43,6 +44,8 @@ export function useMessagePagination({
     inFlight: false,
   });
   const lastScrollTopRef = useRef(0);
+  const userScrollIntentUntilRef = useRef(0);
+  const scrollMetricsFrameRef = useRef<number | null>(null);
   const suppressLoadMoreUntilRef = useRef<number>(0);
   const messageJumpTimeoutRef = useRef<number | null>(null);
 
@@ -55,6 +58,7 @@ export function useMessagePagination({
 
   const scrollToBottom = useCallback(
     (instant = false) => {
+      userScrollIntentUntilRef.current = 0;
       const container = messagesContainerRef.current;
       if (container) {
         container.scrollTo({
@@ -81,6 +85,7 @@ export function useMessagePagination({
       const target = document.querySelector(`[data-message-id="${escapedId}"]`);
       if (!(target instanceof HTMLElement)) return false;
 
+      userScrollIntentUntilRef.current = 0;
       target.scrollIntoView({ block: 'center', behavior: isMobile ? 'auto' : 'smooth' });
       setHighlightedMessageId(messageId);
       window.setTimeout(() => {
@@ -104,6 +109,7 @@ export function useMessagePagination({
       const targetTop = Math.max(0, container.scrollHeight * progress - container.clientHeight / 2);
 
       suppressLoadMoreUntilRef.current = Date.now() + SUPPRESS_LOAD_MORE_MS;
+      userScrollIntentUntilRef.current = 0;
       container.scrollTo({ top: targetTop, behavior: 'auto' });
       return true;
     },
@@ -310,17 +316,9 @@ export function useMessagePagination({
     }
     console.debug(`[ChatInterface] loadMoreMessages: loading before=${oldestTimestamp}`);
 
-    // Save scroll position before loading
-    const container = messagesContainerRef.current;
-    const scrollHeightBefore = container?.scrollHeight || 0;
-
+    // The message list preserves its visible DOM anchor when history commits.
+    // Total scrollHeight deltas include unrelated streaming growth at the tail.
     await loadMessages(oldestTimestamp);
-
-    // Restore scroll position after loading
-    if (container) {
-      const scrollHeightAfter = container.scrollHeight;
-      container.scrollTop = scrollHeightAfter - scrollHeightBefore;
-    }
   }, [loadMessages, sessionPagination]);
 
   // Fallback sync: fetch latest when user is at bottom
@@ -347,17 +345,72 @@ export function useMessagePagination({
 
   const handleMessageWheel = useCallback(
     (deltaY: number) => {
-      if (deltaY <= 0) return;
+      if (deltaY <= 0) {
+        userScrollIntentUntilRef.current = 0;
+        return;
+      }
+      userScrollIntentUntilRef.current = Date.now() + USER_SCROLL_INTENT_MS;
       const container = messagesContainerRef.current;
       if (!container) return;
 
       const distanceFromBottom =
         container.scrollHeight - container.scrollTop - container.clientHeight;
       if (distanceFromBottom <= 24) {
+        userScrollIntentUntilRef.current = 0;
         void refreshLatestMessagesFromBottom();
       }
     },
     [refreshLatestMessagesFromBottom]
+  );
+
+  // Touch scrolls (including momentum) need the same repair path as wheel
+  // input, but plain scroll events also come from streaming auto-follow.
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    let lastTouchY: number | null = null;
+    const onTouchStart = (event: TouchEvent) => {
+      lastTouchY = event.touches[0]?.clientY ?? null;
+      userScrollIntentUntilRef.current = 0;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const nextY = event.touches[0]?.clientY;
+      if (nextY == null || lastTouchY == null) return;
+      handleMessageWheel(lastTouchY - nextY);
+      lastTouchY = nextY;
+    };
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
+    container.addEventListener('touchmove', onTouchMove, { passive: true });
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
+    };
+  }, [sessionId, initialLoadDone, handleMessageWheel]);
+
+  const scheduleScrollMetrics = useCallback(() => {
+    if (scrollMetricsFrameRef.current != null) return;
+    scrollMetricsFrameRef.current = requestAnimationFrame(() => {
+      scrollMetricsFrameRef.current = null;
+      const container = messagesContainerRef.current;
+      if (!container) return;
+      const scrollTop = container.scrollTop;
+      const viewportHeight = container.clientHeight;
+      setScrollMetrics(previous =>
+        previous.scrollTop === scrollTop && previous.viewportHeight === viewportHeight
+          ? previous
+          : { scrollTop, viewportHeight }
+      );
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (scrollMetricsFrameRef.current != null) {
+        cancelAnimationFrame(scrollMetricsFrameRef.current);
+        scrollMetricsFrameRef.current = null;
+      }
+    },
+    [sessionId]
   );
 
   // Handle scroll to detect when user scrolls near top or away from bottom
@@ -368,10 +421,7 @@ export function useMessagePagination({
     const wasScrollingDown = currentScrollTop > lastScrollTopRef.current;
     lastScrollTopRef.current = currentScrollTop;
 
-    setScrollMetrics({
-      scrollTop: currentScrollTop,
-      viewportHeight: container.clientHeight,
-    });
+    scheduleScrollMetrics();
 
     // If scrolled near top (within 100px), load more messages
     const suppressLoadMore = Date.now() < suppressLoadMoreUntilRef.current;
@@ -388,28 +438,25 @@ export function useMessagePagination({
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
     setShowScrollToBottom(distanceFromBottom > 300);
-    // Mobile-safe fallback: touch scrolling won't fire wheel events
-    if (wasScrollingDown && distanceFromBottom <= 24) {
+    if (
+      wasScrollingDown &&
+      distanceFromBottom <= 24 &&
+      Date.now() < userScrollIntentUntilRef.current
+    ) {
+      userScrollIntentUntilRef.current = 0;
       void refreshLatestMessagesFromBottom();
     }
-  }, [loadMoreMessages, refreshLatestMessagesFromBottom, sessionPagination]);
+  }, [loadMoreMessages, refreshLatestMessagesFromBottom, scheduleScrollMetrics, sessionPagination]);
 
   // Scroll metrics resize listener
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
 
-    const updateMetrics = () => {
-      setScrollMetrics({
-        scrollTop: container.scrollTop,
-        viewportHeight: container.clientHeight,
-      });
-    };
-
-    updateMetrics();
-    window.addEventListener('resize', updateMetrics);
-    return () => window.removeEventListener('resize', updateMetrics);
-  }, [sessionId, initialLoadDone]);
+    scheduleScrollMetrics();
+    window.addEventListener('resize', scheduleScrollMetrics);
+    return () => window.removeEventListener('resize', scheduleScrollMetrics);
+  }, [sessionId, initialLoadDone, scheduleScrollMetrics]);
 
   // Retry initial load (e.g., after error)
   const retryLoad = useCallback(() => {
@@ -422,6 +469,11 @@ export function useMessagePagination({
   const resetRefs = useCallback(() => {
     bottomRefreshRef.current = { lastAt: 0, inFlight: false };
     lastScrollTopRef.current = 0;
+    userScrollIntentUntilRef.current = 0;
+    if (scrollMetricsFrameRef.current != null) {
+      cancelAnimationFrame(scrollMetricsFrameRef.current);
+      scrollMetricsFrameRef.current = null;
+    }
     if (messageJumpTimeoutRef.current != null) {
       window.clearTimeout(messageJumpTimeoutRef.current);
       messageJumpTimeoutRef.current = null;

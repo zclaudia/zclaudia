@@ -11,6 +11,8 @@ const reset = () => {
     backgroundRunIds: new Set(),
     runHealth: {},
     runRetryStatus: {},
+    runTranscripts: {},
+    runToolMeta: {},
     activeToolCalls: {},
     toolCallsHistory: {},
     runContentBlocks: {},
@@ -222,5 +224,156 @@ describe('runStore backgroundable tool affordance', () => {
     expect(call.effect).toEqual(effect);
     expect(call.backgroundable).toBe(true);
     expect(call.status).toBe('completed');
+  });
+});
+
+describe('runStore projection sharing', () => {
+  beforeEach(reset);
+
+  it('preserves tool objects and both levels of tool containers across text deltas with 100 tools', () => {
+    const store = useRunStore.getState();
+    store.startRun('r1', 's1');
+    store.appendTextBlock('r1', 'Before tools');
+    for (let index = 0; index < 100; index++) {
+      store.addToolCall('r1', `t${index}`, 'Read', { path: `file-${index}` });
+      store.updateToolCallResult('r1', `t${index}`, 'ok');
+    }
+    store.appendTextBlock('r1', 'Answer');
+    const before = useRunStore.getState();
+    store.appendTextBlock('r1', '!');
+    const after = useRunStore.getState();
+
+    expect(after.activeToolCalls).toBe(before.activeToolCalls);
+    expect(after.activeToolCalls.r1).toBe(before.activeToolCalls.r1);
+    expect(after.toolCallsHistory).toBe(before.toolCallsHistory);
+    expect(after.toolCallsHistory.r1).toBe(before.toolCallsHistory.r1);
+    for (let index = 0; index < 100; index++) {
+      expect(after.activeToolCalls.r1[`t${index}`]).toBe(before.activeToolCalls.r1[`t${index}`]);
+    }
+    expect(after.runContentBlocks.r1).not.toBe(before.runContentBlocks.r1);
+    for (let index = 0; index < 101; index++) {
+      expect(after.runContentBlocks.r1[index]).toBe(before.runContentBlocks.r1[index]);
+    }
+    expect(after.runContentBlocks.r1.at(-1)).toEqual({ type: 'text', content: 'Answer!' });
+  });
+
+  it('updates only the affected tool for activity and completion, retaining blocks and other runs', () => {
+    const store = useRunStore.getState();
+    store.startRun('r1', 's1');
+    store.startRun('r2', 's2');
+    store.addToolCall('r1', '10', 'Read', { path: 'a' });
+    store.addToolCall('r1', '2', 'Read', { path: 'b' });
+    store.addToolCall('r2', 'other', 'Read', { path: 'c' });
+    const before = useRunStore.getState();
+    store.updateToolCallActivity('r1', '2', 'Reading');
+    const active = useRunStore.getState();
+    expect(active.activeToolCalls.r1['10']).toBe(before.activeToolCalls.r1['10']);
+    expect(active.activeToolCalls.r1['2']).not.toBe(before.activeToolCalls.r1['2']);
+    expect(active.activeToolCalls.r1['2'].activity).toBe('Reading');
+    expect(active.activeToolCalls.r2).toBe(before.activeToolCalls.r2);
+    expect(active.toolCallsHistory.r2).toBe(before.toolCallsHistory.r2);
+    expect(active.runContentBlocks).toBe(before.runContentBlocks);
+    expect(active.toolCallsHistory.r1.map(tool => tool.id)).toEqual(['10', '2']);
+
+    const effect = { kind: 'shell' as const, command: 'ls' };
+    store.updateToolCallResult('r1', '2', 'done', false, effect);
+    const completed = useRunStore.getState();
+    expect(completed.activeToolCalls.r1['10']).toBe(active.activeToolCalls.r1['10']);
+    expect(completed.activeToolCalls.r1['2']).not.toBe(active.activeToolCalls.r1['2']);
+    expect(completed.activeToolCalls.r1['2']).toMatchObject({
+      status: 'completed',
+      result: 'done',
+      activity: 'Reading',
+      effect,
+    });
+    expect(completed.runContentBlocks).toBe(before.runContentBlocks);
+  });
+
+  it('retains projection references for duplicate starts and repeated activity', () => {
+    const store = useRunStore.getState();
+    store.startRun('r1', 's1');
+    const input = { path: 'a' };
+    store.addToolCall('r1', 't1', 'Read', input);
+    const before = useRunStore.getState();
+    store.addToolUseBlock('r1', 't1');
+    store.addToolCall('r1', 't1', 'Read', input);
+    const duplicate = useRunStore.getState();
+    expect(duplicate.runTranscripts).toBe(before.runTranscripts);
+    expect(duplicate.activeToolCalls).toBe(before.activeToolCalls);
+    expect(duplicate.toolCallsHistory).toBe(before.toolCallsHistory);
+    expect(duplicate.runContentBlocks).toBe(before.runContentBlocks);
+
+    store.updateToolCallActivity('r1', 't1', 'Reading');
+    const active = useRunStore.getState();
+    store.updateToolCallActivity('r1', 't1', 'Reading');
+    expect(useRunStore.getState().activeToolCalls).toBe(active.activeToolCalls);
+    expect(useRunStore.getState().toolCallsHistory).toBe(active.toolCallsHistory);
+  });
+
+  it('projects late fields and host metadata even when tool_started otherwise no-ops', () => {
+    const store = useRunStore.getState();
+    useChatMessageStore
+      .getState()
+      .setMessages('s1', [
+        { id: 'm1', sessionId: 's1', role: 'assistant', content: '', createdAt: 1 },
+      ]);
+    store.startRun('r1', 's1', false, 'm1');
+    store.addToolUseBlock('r1', 'inner');
+    store.addToolCall('r1', 'other', 'Read', {});
+    const before = useRunStore.getState();
+    const effect = { kind: 'shell' as const, command: 'ls' };
+    store.addToolCall(
+      'r1',
+      'inner',
+      'Bash',
+      { command: 'ls' },
+      'plan_exit',
+      effect,
+      true,
+      'parent'
+    );
+    const filled = useRunStore.getState();
+    expect(filled.activeToolCalls.r1.inner).toMatchObject({
+      toolName: 'Bash',
+      toolInput: { command: 'ls' },
+      effect,
+      backgroundable: true,
+      parentToolUseId: 'parent',
+      semantic: 'plan_exit',
+    });
+    expect(filled.activeToolCalls.r1.other).toBe(before.activeToolCalls.r1.other);
+    expect(filled.runContentBlocks).toBe(before.runContentBlocks);
+    const newEffect = { kind: 'shell' as const, command: 'pwd' };
+    store.addToolCall('r1', 'inner', 'Bash', undefined, undefined, newEffect);
+    const updated = useRunStore.getState();
+    expect(updated.runTranscripts).toBe(filled.runTranscripts);
+    expect(updated.runTranscripts.r1).toBe(filled.runTranscripts.r1);
+    expect(updated.activeToolCalls.r1.inner).toMatchObject({
+      effect: newEffect,
+      backgroundable: true,
+      parentToolUseId: 'parent',
+    });
+    expect(updated.activeToolCalls.r1.other).toBe(filled.activeToolCalls.r1.other);
+    store.addToolCall('r1', 'inner', 'Bash', undefined, undefined, newEffect);
+    expect(useRunStore.getState().activeToolCalls).toBe(updated.activeToolCalls);
+    expect(useRunStore.getState().toolCallsHistory).toBe(updated.toolCallsHistory);
+
+    store.updateToolCallResult('r1', 'inner', 'failed', true);
+    store.finalizeRunToMessage('r1');
+    const finalized = useChatMessageStore.getState().messages.s1[0];
+    expect(finalized.toolCalls?.map(tool => tool.id)).toEqual(['inner', 'other']);
+    expect(finalized.toolCalls?.[0]).toMatchObject({
+      status: 'error',
+      result: 'failed',
+      isError: true,
+      semantic: 'plan_exit',
+      effect: newEffect,
+      backgroundable: true,
+      parentToolUseId: 'parent',
+    });
+    expect(finalized.contentBlocks).toEqual([
+      { type: 'tool_use', toolUseId: 'inner' },
+      { type: 'tool_use', toolUseId: 'other' },
+    ]);
   });
 });

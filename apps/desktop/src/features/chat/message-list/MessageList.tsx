@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, memo } from 'react';
+import { useState, useMemo, useCallback, memo, type RefObject } from 'react';
 import type { ContentBlock } from '@zclaudia/shared/core/message';
 import type { MessageWithToolCalls } from '../../../stores/chatMessageStore';
 import type { ToolCallState } from '../../../stores/runStore';
@@ -23,6 +23,7 @@ export interface MessageListProps {
   streamingToolCalls?: ToolCallState[];
   scrollTop?: number;
   viewportHeight?: number;
+  scrollContainerRef?: RefObject<HTMLDivElement | null>;
   resendTargetMessageId?: string;
   highlightedMessageId?: string | null;
   onResendTarget?: () => void;
@@ -46,6 +47,7 @@ export const MessageList = memo(function MessageList({
   streamingToolCalls,
   scrollTop = 0,
   viewportHeight = 0,
+  scrollContainerRef,
   resendTargetMessageId,
   highlightedMessageId,
   onResendTarget,
@@ -72,12 +74,12 @@ export const MessageList = memo(function MessageList({
 
   const filteredMessages = useMemo(() => filterRenderableMessages(messages), [messages]);
 
-  const firstMessageId = filteredMessages[0]?.id || '';
-  const { shouldVirtualize, virtualWindow, getMeasureRef } = useItemVirtualizer({
-    itemCount: filteredMessages.length,
+  const itemKeys = useMemo(() => filteredMessages.map(message => message.id), [filteredMessages]);
+  const { virtualWindow, getMeasureRef } = useItemVirtualizer({
+    itemKeys,
     scrollTop,
     viewportHeight,
-    resetKey: firstMessageId,
+    scrollContainerRef,
   });
 
   // Precompute the index of the last assistant message for streaming block assignment
@@ -146,19 +148,6 @@ export const MessageList = memo(function MessageList({
     <FilePreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
   );
 
-  if (!shouldVirtualize) {
-    return (
-      <TranscriptCapabilitiesProvider value={capabilities}>
-        <FileRefContext.Provider value={fileRefContextValue}>
-          <div data-testid="message-list" className="space-y-5 min-w-0 max-w-full">
-            {filteredMessages.map((message, index) => renderMessage(message, index))}
-          </div>
-          {previewModal}
-        </FileRefContext.Provider>
-      </TranscriptCapabilitiesProvider>
-    );
-  }
-
   return (
     <TranscriptCapabilitiesProvider value={capabilities}>
       <FileRefContext.Provider value={fileRefContextValue}>
@@ -170,7 +159,7 @@ export const MessageList = memo(function MessageList({
               <div
                 key={message.id}
                 ref={getMeasureRef(absoluteIndex)}
-                className="mb-4 min-w-0 max-w-full"
+                className="pb-4 min-w-0 max-w-full"
               >
                 {renderMessage(message, absoluteIndex)}
               </div>

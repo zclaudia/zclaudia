@@ -40,6 +40,26 @@ function CollapsedTextBlock({ content }: { content: string }) {
   );
 }
 
+type ToolGroupProps = {
+  toolCalls: ToolCallState[];
+  defaultCollapsed: boolean;
+  isStreaming: boolean;
+};
+
+// Regrouping streamed text creates new arrays, but completed groups still
+// contain the same tool objects. Keep that boundary stable so ToolCallList
+// retains its previous array and does not revisit every completed tool.
+const ToolGroup = memo(
+  function ToolGroup(props: ToolGroupProps) {
+    return <ToolCallList {...props} />;
+  },
+  (previous, next) =>
+    previous.defaultCollapsed === next.defaultCollapsed &&
+    previous.isStreaming === next.isStreaming &&
+    previous.toolCalls.length === next.toolCalls.length &&
+    previous.toolCalls.every((tool, index) => tool === next.toolCalls[index])
+);
+
 /** Segmented content renderer — interleaves collapsed text, tool calls, and final text */
 export const SegmentedContent = memo(function SegmentedContent({
   contentBlocks,
@@ -107,7 +127,7 @@ export const SegmentedContent = memo(function SegmentedContent({
               key={`tools-${segIdx}`}
               className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0"
             >
-              <ToolCallList
+              <ToolGroup
                 toolCalls={segment.toolCalls}
                 defaultCollapsed={!isStreaming || !isTrailingTools}
                 isStreaming={isStreaming && isTrailingTools}

@@ -43,6 +43,9 @@ function SummaryBar({ toolCalls, onClick }: { toolCalls: ToolCallState[]; onClic
   const errorCount = toolCalls.filter(tc => getToolCallDisplayStatus(tc) === 'error').length;
   const runningCount = toolCalls.filter(tc => getToolCallDisplayStatus(tc) === 'running').length;
 
+  const visibleTools = toolCalls.slice(-MAX_VISIBLE_TOOLS);
+  const hiddenCount = toolCalls.length - visibleTools.length;
+
   return (
     <div
       onClick={onClick}
@@ -78,7 +81,7 @@ function SummaryBar({ toolCalls, onClick }: { toolCalls: ToolCallState[]; onClic
         </span>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        {toolCalls.map((tc, idx) => {
+        {visibleTools.map((tc, idx) => {
           const displayStatus = getToolCallDisplayStatus(tc);
           return (
             <span
@@ -97,6 +100,11 @@ function SummaryBar({ toolCalls, onClick }: { toolCalls: ToolCallState[]; onClic
             </span>
           );
         })}
+        {hiddenCount > 0 && (
+          <span className="self-center text-[10px] text-muted-foreground">
+            +{hiddenCount} earlier
+          </span>
+        )}
       </div>
     </div>
   );

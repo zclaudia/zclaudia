@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import { createRef } from 'react';
 import { ChatMessagePane } from '../ChatMessagePane';
 import type { ToolCallState } from '../../../stores/runStore';
@@ -133,6 +133,7 @@ function defineScrollableMetrics(
 }
 
 describe('ChatMessagePane', () => {
+  afterEach(() => vi.restoreAllMocks());
   beforeEach(() => {
     mockInteractionsState.interactions = {};
     mockInteractionsState.owners = {};
@@ -305,6 +306,118 @@ describe('ChatMessagePane', () => {
     });
 
     expect(scrollToBottom).not.toHaveBeenCalled();
+  });
+
+  function renderResizablePane() {
+    let onResize: () => void = () => {};
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    vi.spyOn(globalThis, 'ResizeObserver').mockImplementation(
+      class {
+        constructor(callback: () => void) {
+          onResize = callback;
+        }
+        observe = observe;
+        unobserve = vi.fn();
+        disconnect = disconnect;
+      } as unknown as typeof ResizeObserver
+    );
+    let pendingFrame: FrameRequestCallback | undefined;
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      pendingFrame = callback;
+      return 42;
+    });
+    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const scrollToBottom = vi.fn();
+    const view = renderPane({ scrollToBottom });
+    const viewport = view.container.querySelector('.overflow-y-auto') as HTMLElement;
+    const content = viewport.firstElementChild as HTMLElement;
+    const height = vi
+      .spyOn(content, 'getBoundingClientRect')
+      .mockReturnValue({ height: 1000 } as DOMRect);
+    defineScrollableMetrics(viewport, { scrollTop: 500, scrollHeight: 1000, clientHeight: 500 });
+    fireEvent.scroll(viewport);
+    return {
+      ...view,
+      viewport,
+      content,
+      observe,
+      disconnect,
+      scrollToBottom,
+      requestFrame,
+      cancelFrame,
+      resize: (nextHeight: number) => {
+        height.mockReturnValue({ height: nextHeight } as DOMRect);
+        defineScrollableMetrics(viewport, {
+          scrollTop: viewport.scrollTop,
+          scrollHeight: nextHeight,
+          clientHeight: 500,
+        });
+        act(() => onResize());
+      },
+      flush: () => act(() => pendingFrame?.(0)),
+    };
+  }
+
+  it('follows the final content height after virtual rows settle, coalescing resize callbacks', () => {
+    const pane = renderResizablePane();
+    expect(pane.observe).toHaveBeenCalledWith(pane.content);
+    pane.resize(1200);
+    pane.resize(1400);
+    expect(pane.requestFrame).toHaveBeenCalledTimes(1);
+    expect(pane.scrollToBottom).not.toHaveBeenCalled();
+    pane.flush();
+    expect(pane.scrollToBottom).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it('does not pull a reader down when they scroll up during a pending content resize', () => {
+    const pane = renderResizablePane();
+    pane.resize(1200);
+    pane.viewport.scrollTop = 400;
+    fireEvent.scroll(pane.viewport);
+    pane.flush();
+    expect(pane.scrollToBottom).not.toHaveBeenCalled();
+  });
+
+  it('keeps following when a delayed downward scroll event arrives after another chunk grows', () => {
+    const pane = renderResizablePane();
+    defineScrollableMetrics(pane.viewport, {
+      scrollTop: 501,
+      scrollHeight: 1334,
+      clientHeight: 500,
+    });
+    fireEvent.scroll(pane.viewport);
+    pane.resize(1400);
+    pane.flush();
+    expect(pane.scrollToBottom).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it('ignores one-pixel anchor corrections while following streamed content', () => {
+    const pane = renderResizablePane();
+    pane.resize(1200);
+    pane.viewport.scrollTop = 499;
+    fireEvent.scroll(pane.viewport);
+    pane.flush();
+    expect(pane.scrollToBottom).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it('does not re-engage follow mode from a one-pixel correction after scrolling up', () => {
+    const pane = renderResizablePane();
+    pane.viewport.scrollTop = 440;
+    fireEvent.scroll(pane.viewport);
+    pane.viewport.scrollTop = 441;
+    fireEvent.scroll(pane.viewport);
+    pane.resize(1200);
+    pane.flush();
+    expect(pane.scrollToBottom).not.toHaveBeenCalled();
+  });
+
+  it('cancels pending resize follow-up when the pane unmounts', () => {
+    const pane = renderResizablePane();
+    pane.resize(1200);
+    pane.unmount();
+    expect(pane.disconnect).toHaveBeenCalled();
+    expect(pane.cancelFrame).toHaveBeenCalledWith(42);
   });
 
   it('stops auto-scrolling to bottom after the user scrolls upward', () => {

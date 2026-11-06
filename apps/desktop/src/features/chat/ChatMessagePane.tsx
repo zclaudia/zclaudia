@@ -183,6 +183,7 @@ export const ChatMessagePane = memo(function ChatMessagePane({
     [sessionToolCallHistory, sessionToolCalls]
   );
   const shouldStickToBottomRef = useRef(true);
+  const messagesContentRef = useRef<HTMLDivElement>(null);
   const lastObservedScrollTopRef = useRef(0);
   const prevMessageCountRef = useRef<number | null>(null);
   const prevStreamingSignatureRef = useRef<string | null>(null);
@@ -197,6 +198,10 @@ export const ChatMessagePane = memo(function ChatMessagePane({
     prevToolCallCountRef.current = null;
   }, [sessionId]);
 
+  useEffect(() => {
+    if (highlightedMessageId) shouldStickToBottomRef.current = false;
+  }, [highlightedMessageId]);
+
   const hasSessionSnapshot = !!sessionPagination;
   const isInitialMessageLoading = !loadError && (!initialLoadDone || !hasSessionSnapshot);
 
@@ -205,7 +210,12 @@ export const ChatMessagePane = memo(function ChatMessagePane({
     if (!container) return;
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
-    shouldStickToBottomRef.current = distanceFromBottom < AUTO_STICK_BOTTOM_THRESHOLD_PX;
+    // A delayed auto-scroll event can arrive after another streamed chunk
+    // has grown the content. Distance alone must not turn follow mode off;
+    // upward scrolling does that in handleMessagesScroll.
+    if (distanceFromBottom < AUTO_STICK_BOTTOM_THRESHOLD_PX) {
+      shouldStickToBottomRef.current = true;
+    }
   }, [messagesContainerRef]);
 
   const scrollToBottomIfSticky = useCallback(
@@ -234,13 +244,19 @@ export const ChatMessagePane = memo(function ChatMessagePane({
     if (container) {
       const currentScrollTop = container.scrollTop;
       const distanceFromBottom = container.scrollHeight - currentScrollTop - container.clientHeight;
-      const isScrollingUp = currentScrollTop < lastObservedScrollTopRef.current;
+      // Virtual rows round measured heights to whole pixels. Replacing a
+      // spacer can move the browser's scroll anchor back by one pixel; that
+      // correction must not disengage follow mode during an otherwise steady stream.
+      const isScrollingUp = currentScrollTop < lastObservedScrollTopRef.current - 1;
 
       if (isScrollingUp && distanceFromBottom > 0) {
         // Any explicit upward scroll should disengage auto-stick immediately,
         // otherwise streaming updates can yank the viewport back to the bottom.
         shouldStickToBottomRef.current = false;
-      } else {
+      } else if (
+        currentScrollTop > lastObservedScrollTopRef.current + 1 ||
+        distanceFromBottom <= 1
+      ) {
         updateStickToBottom();
       }
 
@@ -252,13 +268,45 @@ export const ChatMessagePane = memo(function ChatMessagePane({
 
   useEffect(() => {
     const el = messagesContainerRef.current;
-    if (!el) return;
+    const content = messagesContentRef.current;
+    if (!el || !content) return;
     updateEdgeFade();
     if (typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(updateEdgeFade);
+    let contentHeight = content.getBoundingClientRect().height;
+    let viewportHeight = el.clientHeight;
+    let frame: number | null = null;
+    const ro = new ResizeObserver(() => {
+      const nextContentHeight = content.getBoundingClientRect().height;
+      const nextViewportHeight = el.clientHeight;
+      const changed = nextContentHeight !== contentHeight || nextViewportHeight !== viewportHeight;
+      contentHeight = nextContentHeight;
+      viewportHeight = nextViewportHeight;
+      if (!changed || frame !== null) return;
+      // Markdown and virtual-row measurements can settle after the message
+      // update effect. Follow the final height, but never pull a reader back
+      // after they have scrolled up, including during this pending frame.
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        if (initialLoadDone && shouldStickToBottomRef.current) {
+          const distance = el.scrollHeight - el.clientHeight - el.scrollTop;
+          if (Math.abs(distance) > 1) {
+            scrollToBottomIfSticky(true);
+            lastObservedScrollTopRef.current = el.scrollTop;
+          }
+        }
+        updateEdgeFade();
+      });
+    });
     ro.observe(el);
-    return () => ro.disconnect();
-  }, [messagesContainerRef, updateEdgeFade, sessionMessages.length, initialLoadDone]);
+    ro.observe(content);
+    return () => {
+      ro.disconnect();
+      if (frame !== null) {
+        cancelAnimationFrame(frame);
+        frame = null;
+      }
+    };
+  }, [messagesContainerRef, updateEdgeFade, scrollToBottomIfSticky, sessionId, initialLoadDone]);
   const FADE_PX = 32;
   const edgeMaskStyle =
     edgeFade.top || edgeFade.bottom
@@ -362,7 +410,7 @@ export const ChatMessagePane = memo(function ChatMessagePane({
       >
         {/* Centered reading column — keeps content from stretching edge-to-edge
           on wide windows; whitespace falls to both sides like Claude/Cursor. */}
-        <div className="mx-auto w-full max-w-3xl">
+        <div ref={messagesContentRef} className="mx-auto w-full max-w-3xl">
           {/* Load more indicator */}
           {sessionPagination?.hasMore && (
             <div className="text-center py-2 mb-2">
@@ -413,6 +461,7 @@ export const ChatMessagePane = memo(function ChatMessagePane({
           )}
 
           <MessageList
+            scrollContainerRef={messagesContainerRef}
             messages={sessionMessages}
             streamingContentBlocks={useStreamingSegmented ? sessionContentBlocks : undefined}
             streamingToolCalls={useStreamingSegmented ? sessionToolCallHistory : undefined}

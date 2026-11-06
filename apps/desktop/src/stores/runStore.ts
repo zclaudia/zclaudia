@@ -153,24 +153,39 @@ function toToolCallState(
   };
 }
 
+// Kit blocks are immutable: stream deltas replace only the trailing block.
+// A weak cache shares all earlier projected blocks without retaining old runs.
+const projectedBlocks = new WeakMap<AssistantTurnItem['blocks'][number], ContentBlock>();
+
 function projectBlocks(turn: AssistantTurnItem | undefined): ContentBlock[] {
   if (!turn) return [];
   return turn.blocks.flatMap((block): ContentBlock[] => {
-    if (block.kind === 'text') return [{ type: 'text', content: block.text }];
-    if (block.kind === 'thinking') {
-      return [
-        {
-          type: 'thinking',
-          content: block.text,
-          ...(block.signature !== undefined ? { signature: block.signature } : {}),
-        },
-      ];
+    const cached = projectedBlocks.get(block);
+    if (cached) return [cached];
+    let projected: ContentBlock;
+    if (block.kind === 'text') projected = { type: 'text', content: block.text };
+    else if (block.kind === 'thinking') {
+      projected = {
+        type: 'thinking',
+        content: block.text,
+        ...(block.signature !== undefined ? { signature: block.signature } : {}),
+      };
+    } else if (block.kind === 'tool_call') {
+      projected = { type: 'tool_use', toolUseId: block.toolCallId };
     }
-    if (block.kind === 'tool_call') return [{ type: 'tool_use', toolUseId: block.toolCallId }];
     // Host-defined custom blocks (kit ≥ 0.8) have no ContentBlock projection;
     // this app never emits them.
-    return [];
+    else return [];
+    projectedBlocks.set(block, projected);
+    return [projected];
   });
+}
+
+function sameToolState(previous: ToolCallState, next: ToolCallState): boolean {
+  return (
+    Object.keys(previous).length === Object.keys(next).length &&
+    (Object.keys(next) as (keyof ToolCallState)[]).every(key => previous[key] === next[key])
+  );
 }
 
 /**
@@ -191,20 +206,51 @@ function applyRunEvents(
   );
   const nextMeta = meta ?? state.runToolMeta;
   if (transcript === previous && nextMeta === state.runToolMeta) return {};
+  const previousTurn = runTurn(previous, runId);
   const turn = runTurn(transcript, runId);
-  const history = turn
-    ? orderedToolCalls(turn).map(tool => toToolCallState(tool, nextMeta[runId]))
-    : [];
-  return {
-    runTranscripts: { ...state.runTranscripts, [runId]: transcript },
+  const update: Partial<RunState> = {
+    runTranscripts:
+      transcript === previous
+        ? state.runTranscripts
+        : { ...state.runTranscripts, [runId]: transcript },
     runToolMeta: nextMeta,
-    runContentBlocks: { ...state.runContentBlocks, [runId]: projectBlocks(turn) },
-    activeToolCalls: {
-      ...state.activeToolCalls,
-      [runId]: Object.fromEntries(history.map(tool => [tool.id, tool])),
-    },
-    toolCallsHistory: { ...state.toolCallsHistory, [runId]: history },
   };
+  if (turn?.blocks !== previousTurn?.blocks) {
+    update.runContentBlocks = { ...state.runContentBlocks, [runId]: projectBlocks(turn) };
+  }
+  // In kit 0.9, text/thinking deltas retain toolCalls, and tool order only
+  // changes when tool_started adds a call (and replaces this map). Avoid
+  // walking/projecting the entire tool history on every streamed character.
+  if (turn?.toolCalls !== previousTurn?.toolCalls || nextMeta[runId] !== state.runToolMeta[runId]) {
+    const previousCalls = state.activeToolCalls[runId];
+    const previousHistory = state.toolCallsHistory[runId];
+    const history = turn
+      ? orderedToolCalls(turn).map(tool => {
+          const existing = previousCalls?.[tool.id];
+          if (
+            existing &&
+            tool === previousTurn?.toolCalls[tool.id] &&
+            nextMeta[runId]?.[tool.id] === state.runToolMeta[runId]?.[tool.id]
+          ) {
+            return existing;
+          }
+          const projected = toToolCallState(tool, nextMeta[runId]);
+          return existing && sameToolState(existing, projected) ? existing : projected;
+        })
+      : [];
+    if (
+      !previousHistory ||
+      history.length !== previousHistory.length ||
+      history.some((tool, index) => tool !== previousHistory[index])
+    ) {
+      update.activeToolCalls = {
+        ...state.activeToolCalls,
+        [runId]: Object.fromEntries(history.map(tool => [tool.id, tool])),
+      };
+      update.toolCallsHistory = { ...state.toolCallsHistory, [runId]: history };
+    }
+  }
+  return update;
 }
 
 export const useRunStore = create<RunState>((set, get) => ({
