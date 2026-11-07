@@ -27,6 +27,7 @@ export function GitSidebarPanel({
   const [tab, setTab] = useState<SubTab>('status');
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [spinning, setSpinning] = useState(false);
+  const [worktreesLoadedFor, setWorktreesLoadedFor] = useState<string | null>(null);
 
   const worktrees = useGitStore(s => (projectId ? (s.worktrees[projectId] ?? []) : []));
   const setWorktrees = useGitStore(s => s.setWorktrees);
@@ -36,7 +37,7 @@ export function GitSidebarPanel({
   // so the panel follows the session by default.
   useEffect(() => {
     setOverride(null);
-  }, [workingDirectory, projectRoot]);
+  }, [projectId, workingDirectory, projectRoot]);
 
   // Load the project's worktrees for the switcher.
   useEffect(() => {
@@ -47,13 +48,26 @@ export function GitSidebarPanel({
       .then(list => {
         if (!cancelled) setWorktrees(projectId, list);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setWorktreesLoadedFor(projectId);
+      });
     return () => {
       cancelled = true;
     };
   }, [projectId, setWorktrees]);
 
-  const effectivePath = resolveEffectiveWorktree(override, workingDirectory, projectRoot);
+  // The backend's worktree list is authoritative. When the session has no
+  // worktree and the desktop's project cache lost its rootPath (partial gateway
+  // snapshot after a backend re-registration, remote backend, …), fall back to
+  // the main worktree instead of showing an empty panel.
+  const discoveredPath = useMemo(() => {
+    const main = worktrees.find(w => w.isMain);
+    return main?.path ?? worktrees[0]?.path ?? null;
+  }, [worktrees]);
+
+  const effectivePath =
+    resolveEffectiveWorktree(override, workingDirectory, projectRoot) ?? discoveredPath;
   const status = useGitStore(selectStatus(projectId ?? '', effectivePath ?? ''));
 
   const refreshStatus = useCallback(async () => {
@@ -83,13 +97,33 @@ export function GitSidebarPanel({
     [worktrees, effectivePath]
   );
 
-  if (!projectId || !effectivePath) {
+  if (!projectId) {
     return (
       <div className="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
         <div>
-          <p className="text-sm">No git worktree available.</p>
-          <p className="text-xs mt-1">Open a session in a project with a local path to use git.</p>
+          <p className="text-sm">No project selected.</p>
+          <p className="text-xs mt-1">Open a session in a project to use git.</p>
         </div>
+      </div>
+    );
+  }
+
+  const worktreesReady = worktrees.length > 0 || worktreesLoadedFor === projectId;
+
+  if (!effectivePath) {
+    return (
+      <div className="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
+        {worktreesReady ? (
+          <div>
+            <p className="text-sm">No git worktree available.</p>
+            <p className="text-xs mt-1">The backend didn't report a worktree for this project.</p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-xs">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" strokeWidth={1.75} />
+            Loading worktrees…
+          </div>
+        )}
       </div>
     );
   }

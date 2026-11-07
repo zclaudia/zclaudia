@@ -17,4 +17,14 @@ describe('resolveEffectiveWorktree', () => {
   it('returns null when nothing is available', () => {
     expect(resolveEffectiveWorktree(null, undefined, undefined)).toBeNull();
   });
+
+  it('treats empty and whitespace-only paths as absent', () => {
+    expect(resolveEffectiveWorktree('', '', '/root')).toBe('/root');
+    expect(resolveEffectiveWorktree('  ', undefined, '/root')).toBe('/root');
+    expect(resolveEffectiveWorktree(null, '', '   ')).toBeNull();
+  });
+
+  it('trims the resolved path', () => {
+    expect(resolveEffectiveWorktree(null, ' /wd ', '/root')).toBe('/wd');
+  });
 });

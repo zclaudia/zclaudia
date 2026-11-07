@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, memo } from 'react';
 import { type ToolCallState } from '../../../stores/runStore';
 import { CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight, Wrench } from 'lucide-react';
 import { formatToolInput } from './toolFormatters';
@@ -35,6 +35,58 @@ function getToolCallDisplayStatus(tc: ToolCallState): ToolCallState['status'] {
 }
 
 const MAX_VISIBLE_TOOLS = 5;
+// `gap-1.5` at the default 16px root font size.
+const SUMMARY_CHIP_GAP_PX = 6;
+
+interface SummaryChip {
+  id: string;
+  status: ToolCallState['status'];
+  summary: string;
+  toolCall: ToolCallState;
+}
+
+function SummaryChipBadge({ chip, title }: { chip: SummaryChip; title?: string }) {
+  return (
+    <span
+      data-summary-chip
+      title={title}
+      className={`inline-flex shrink-0 items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] ${
+        chip.status === 'error'
+          ? 'bg-destructive/20 text-destructive'
+          : chip.status === 'running'
+            ? 'bg-muted text-primary'
+            : 'bg-secondary text-muted-foreground'
+      }`}
+    >
+      <span>{getStatusIconComponent(chip.status)}</span>
+      <span className="truncate max-w-[120px]">{chip.summary}</span>
+    </span>
+  );
+}
+
+/**
+ * How many summary chips fit on a single line, leaving room for the ellipsis
+ * whenever chips after the last one would be hidden.
+ */
+function fitSummaryChipCount(
+  widths: readonly number[],
+  moreWidth: number,
+  available: number,
+  totalCount: number,
+  gap: number = SUMMARY_CHIP_GAP_PX
+): number {
+  let used = 0;
+  let count = 0;
+  for (const width of widths) {
+    const next = count === 0 ? width : used + gap + width;
+    const hidesMore = totalCount > count + 1;
+    const reserved = hidesMore ? gap + moreWidth : 0;
+    if (next + reserved > available) break;
+    used = next;
+    count += 1;
+  }
+  return count;
+}
 
 function SummaryBar({ toolCalls, onClick }: { toolCalls: ToolCallState[]; onClick: () => void }) {
   const completedCount = toolCalls.filter(
@@ -43,8 +95,63 @@ function SummaryBar({ toolCalls, onClick }: { toolCalls: ToolCallState[]; onClic
   const errorCount = toolCalls.filter(tc => getToolCallDisplayStatus(tc) === 'error').length;
   const runningCount = toolCalls.filter(tc => getToolCallDisplayStatus(tc) === 'running').length;
 
-  const visibleTools = toolCalls.slice(-MAX_VISIBLE_TOOLS);
-  const hiddenCount = toolCalls.length - visibleTools.length;
+  // The latest calls are the candidates; the layout pass below decides how many of
+  // them fit on one line, so narrow (mobile) panes never grow the card to several rows.
+  // The oldest candidates are dropped first — the newest call must stay visible.
+  const chips: SummaryChip[] = toolCalls.slice(-MAX_VISIBLE_TOOLS).map(tc => ({
+    id: tc.id,
+    status: getToolCallDisplayStatus(tc),
+    summary: getToolCallSummary(tc),
+    toolCall: tc,
+  }));
+  const chipKey = chips.map(chip => `${chip.id}:${chip.status}:${chip.summary}`).join('|');
+
+  const rowRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLSpanElement>(null);
+  // Bumped on resize so the fit calculation runs again for the new width.
+  const [measureToken, setMeasureToken] = useState(0);
+  const measureKey = `${chipKey}#${toolCalls.length}#${measureToken}`;
+  const [measured, setMeasured] = useState<{ key: string; count: number } | null>(null);
+  // Until this exact chip set is measured, render every candidate (never painted —
+  // the layout effect below settles the count before the browser draws).
+  const measuring = measured?.key !== measureKey;
+  const fitCount = measuring ? chips.length : (measured?.count ?? chips.length);
+
+  // Rotations and pane resizes re-open the fit calculation.
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!row || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => setMeasureToken(token => token + 1));
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!measuring) return;
+    const row = rowRef.current;
+    if (!row) return;
+    const available = row.getBoundingClientRect().width;
+    if (available <= 0) {
+      // No layout yet (tests, detached row): fall back to the count cap.
+      setMeasured({ key: measureKey, count: chips.length });
+      return;
+    }
+    const rendered = Array.from(row.querySelectorAll<HTMLElement>('[data-summary-chip]'));
+    const moreWidth = moreRef.current?.getBoundingClientRect().width ?? 0;
+    // Read the real gap: root font scaling can make `gap-1.5` larger than 6px.
+    const computedGap = Number.parseFloat(getComputedStyle(row).columnGap);
+    const count = fitSummaryChipCount(
+      rendered.map(chip => chip.getBoundingClientRect().width),
+      moreWidth,
+      available,
+      toolCalls.length,
+      Number.isFinite(computedGap) ? computedGap : SUMMARY_CHIP_GAP_PX
+    );
+    setMeasured({ key: measureKey, count });
+  }, [measuring, measureKey, chips.length, toolCalls.length]);
+
+  const hiddenCount = Math.max(0, toolCalls.length - fitCount);
+  const visibleChips = measuring ? chips : chips.slice(chips.length - fitCount);
 
   return (
     <div
@@ -80,31 +187,38 @@ function SummaryBar({ toolCalls, onClick }: { toolCalls: ToolCallState[]; onClic
           Click to expand <ChevronRight size={10} />
         </span>
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        {visibleTools.map((tc, idx) => {
-          const displayStatus = getToolCallDisplayStatus(tc);
-          return (
-            <span
-              key={tc.id || idx}
-              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] ${
-                displayStatus === 'error'
-                  ? 'bg-destructive/20 text-destructive'
-                  : displayStatus === 'running'
-                    ? 'bg-muted text-primary'
-                    : 'bg-secondary text-muted-foreground'
-              }`}
-              title={formatToolInput(tc.toolName, tc.toolInput)}
-            >
-              <span>{getStatusIconComponent(displayStatus)}</span>
-              <span className="truncate max-w-[120px]">{getToolCallSummary(tc)}</span>
-            </span>
-          );
-        })}
-        {hiddenCount > 0 && (
-          <span className="self-center text-[10px] text-muted-foreground">
-            +{hiddenCount} earlier
+      <div
+        ref={rowRef}
+        data-testid="tool-summary-row"
+        className="flex items-center gap-1.5 overflow-hidden"
+      >
+        {(measuring || hiddenCount > 0) && (
+          <span
+            ref={moreRef}
+            data-testid="tool-summary-more"
+            aria-hidden={measuring || undefined}
+            title={
+              measuring
+                ? undefined
+                : `${hiddenCount} earlier tool call${hiddenCount > 1 ? 's' : ''} hidden`
+            }
+            className="shrink-0 self-center text-[10px] text-muted-foreground"
+          >
+            …
           </span>
         )}
+        {visibleChips.map((chip, index) => (
+          <SummaryChipBadge
+            key={chip.id || index}
+            chip={chip}
+            // Tooltips are only for the settled row; the measuring pass never paints.
+            title={
+              measuring
+                ? undefined
+                : formatToolInput(chip.toolCall.toolName, chip.toolCall.toolInput)
+            }
+          />
+        ))}
       </div>
     </div>
   );
@@ -219,5 +333,6 @@ export {
   getToolCallSummary,
   getStatusIconComponent,
   getToolCallDisplayStatus,
+  fitSummaryChipCount,
   MAX_VISIBLE_TOOLS,
 };
