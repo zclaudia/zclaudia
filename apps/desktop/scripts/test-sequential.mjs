@@ -58,6 +58,7 @@ const CONFIGS = [
     file: 'vitest.gestures.config.ts',
     include: [
       'src/app/__tests__/useMobileDrawer.test.tsx',
+      'src/app/__tests__/useClaudiaGesture.test.tsx',
       'src/app/__tests__/useMobileNavigationGesture.test.tsx',
       'src/app/__tests__/useMobileNavigationBlocker.test.tsx',
       'src/app/__tests__/mobileNavigationGesture*.test.ts',
@@ -81,6 +82,7 @@ const CONFIGS = [
       '**/node_modules/**',
       '**/src-tauri/**',
       'src/app/__tests__/useMobileDrawer.test.tsx',
+      'src/app/__tests__/useClaudiaGesture.test.tsx',
       'src/app/__tests__/useMobileNavigationGesture.test.tsx',
       'src/app/__tests__/useMobileNavigationBlocker.test.tsx',
       'src/features/sidebar/__tests__/drawerMotion*.test.ts',

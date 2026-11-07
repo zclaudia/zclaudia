@@ -85,7 +85,7 @@ vi.mock('../../components/ToastContainer', () => ({
 }));
 vi.mock('../../components/UpdateBanner', () => ({ UpdateBanner: () => null }));
 vi.mock('../AppHeader', () => ({ AppHeader: () => null }));
-vi.mock('../MobileOverlays', () => ({ MobileOverlays: ({ agentSwipePreview }: { agentSwipePreview: { progress: number } }) => <output data-testid="claudia-preview">{agentSwipePreview.progress}</output> }));
+vi.mock('../MobileOverlays', () => ({ MobileOverlays: ({ panelRef, backdropRef }: { panelRef: React.RefObject<HTMLDivElement | null>; backdropRef: React.RefObject<HTMLDivElement | null> }) => <><div data-testid="claudia-preview" ref={panelRef} /><div ref={backdropRef} /></> }));
 
 vi.mock('../../contexts/ConnectionContext', () => ({
   useConnection: () => ({
@@ -361,7 +361,7 @@ describe('Mobile drawer width controls', () => {
       width: () => view.getByTestId('drawer-panel').style.width,
       isOpen: () => view.getByTestId('app-sidebar').getAttribute('data-open') === 'true' };
   }
-  it('preserves the existing 60px Claudia preview range after navigation activation', () => {
+  it('tracks Claudia by pixels after navigation activation and restores on cancellation', async () => {
     const view = render(<App />);
     const content = view.container.querySelector('main')!;
     const send = (type: string, x: number) => {
@@ -371,9 +371,12 @@ describe('Mobile drawer width controls', () => {
     };
     send('touchstart', 500);
     send('touchmove', 470);
-    expect(Number(view.getByTestId('claudia-preview').textContent)).toBeCloseTo(22 / 60);
+    const panel = view.getByTestId('claudia-preview');
+    expect(panel.style.transform).toBe(`translate3d(${window.innerWidth - 22}px, 0, 0)`);
     fireEvent(content, new TouchEvent('touchcancel', { bubbles: true, cancelable: true,
       touches: [], targetTouches: [], changedTouches: [{ identifier: 1, target: content, clientX: 470, clientY: 200 } as unknown as Touch] }));
+    await waitFor(() => expect(panel.style.visibility).toBe('hidden'));
+    expect(panel.style.transform).toBe(`translate3d(${window.innerWidth}px, 0, 0)`);
   });
   it('keeps the drawer visible and modal while a shared menu blocks navigation', async () => {
     const view = await renderOpenDrawer();

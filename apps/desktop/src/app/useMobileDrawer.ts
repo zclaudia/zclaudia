@@ -57,17 +57,19 @@ export function useMobileDrawer(options: UseMobileDrawerOptions) {
     const { x, opacity } = drawerVisuals(p, widthRef.current);
     const visible = p > 0 || stateRef.current.targetOpen;
     if (panel) {
-      panel.style.transition = 'none';
       panel.style.transform = `translate3d(${x}px, 0, 0)`;
       // Width is fixed throughout every drag/settle, so avoid repeated layout writes.
       const width = `${widthRef.current}px`;
       if (panel.style.width !== width) panel.style.width = width;
-      panel.style.visibility = visible ? 'visible' : 'hidden';
+      const visibility = visible ? 'visible' : 'hidden';
+      if (panel.style.visibility !== visibility) panel.style.visibility = visibility;
+      const pointerEvents = visible ? 'auto' : 'none';
+      if (panel.style.pointerEvents !== pointerEvents) panel.style.pointerEvents = pointerEvents;
     }
     if (backdrop) {
-      backdrop.style.transition = 'none';
       backdrop.style.opacity = String(opacity);
-      backdrop.style.pointerEvents = visible || stateRef.current.modalActive ? 'auto' : 'none';
+      const pointerEvents = visible || stateRef.current.modalActive ? 'auto' : 'none';
+      if (backdrop.style.pointerEvents !== pointerEvents) backdrop.style.pointerEvents = pointerEvents;
     }
   }, [drawerPosition]);
   const stop = useCallback(() => {
@@ -86,6 +88,8 @@ export function useMobileDrawer(options: UseMobileDrawerOptions) {
     animationRef.current = null;
     if (!open) widthRef.current = widthsRef.current.compact;
     drawerPosition.set(open ? widthRef.current : 0);
+    const widthButton = drawerPanelRef.current?.querySelector<HTMLButtonElement>('[data-drawer-width-toggle]');
+    if (widthButton) widthButton.disabled = !open;
     publish({ phase: 'idle', targetOpen: open, modalActive: open,
       ...(open ? {} : { widthMode: 'compact' as const }) });
     paint();
@@ -150,9 +154,13 @@ export function useMobileDrawer(options: UseMobileDrawerOptions) {
     const priorTargetOpen = stateRef.current.targetOpen;
     stop();
     dragRef.current = { start: drawerPosition.get(), width: widthRef.current, priorTargetOpen };
-    publish({ phase: 'dragging' });
+    // Keep the drag phase synchronous without rendering the entire app on touchmove activation.
+    stateRef.current = { ...stateRef.current, phase: 'dragging' };
+    const widthButton = drawerPanelRef.current?.querySelector<HTMLButtonElement>('[data-drawer-width-toggle]');
+    if (widthButton) widthButton.disabled = true;
+    paint();
     return true;
-  }, [drawerPosition, enabled, publish, stop]);
+  }, [drawerPosition, enabled, paint, stop]);
   const updateDrag = useCallback((distancePx: number) => {
     const drag = dragRef.current;
     if (drag) drawerPosition.set(clampDrawerPosition(drag.start + distancePx, drag.width));
@@ -187,6 +195,8 @@ export function useMobileDrawer(options: UseMobileDrawerOptions) {
   useLayoutEffect(() => {
     const panel = drawerPanelRef.current;
     const backdrop = drawerBackdropRef.current;
+    if (panel) panel.style.transition = 'none';
+    if (backdrop) backdrop.style.transition = 'none';
     const unsubscribe = drawerPosition.on('change', paint);
     paint();
     return () => {
@@ -208,6 +218,8 @@ export function useMobileDrawer(options: UseMobileDrawerOptions) {
         return;
       }
       const panel = drawerPanelRef.current;
+      const widthButton = panel?.querySelector<HTMLButtonElement>('[data-drawer-width-toggle]');
+      if (widthButton) widthButton.disabled = !stateRef.current.targetOpen;
       const shell = panel?.closest('[data-mobile-navigation-shell]');
       const containerWidth = shell?.getBoundingClientRect().width || window.innerWidth;
       // Resolve safe-area env() through computed padding on a measurement-only element.

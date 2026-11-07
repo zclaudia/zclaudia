@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import { Sidebar } from './features/sidebar/Sidebar';
 import { NotificationsModal } from './features/sidebar/NotificationsModal';
 import { SidebarCollapsedBar } from './features/sidebar/SidebarCollapsedBar';
@@ -22,7 +22,7 @@ import { useIsMobile } from './hooks/useMediaQuery';
 import { useAndroidBack } from './hooks/useAndroidBack';
 import { useMobileNavigationGesture } from './app/useMobileNavigationGesture';
 import { useMobileNavigationBlocker } from './app/useMobileNavigationBlocker';
-import type { DrawerRelease } from './app/useMobileDrawer';
+import { useClaudiaGesture } from './app/useClaudiaGesture';
 import { usePermissionStore } from './stores/permissionStore';
 import { useMobileDrawer } from './app/useMobileDrawer';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
@@ -163,10 +163,7 @@ function AppContent() {
   const sharedModalOpen = useMobileNavigationBlocker();
   const navigationBlocked = sharedModalOpen || sidebarOverlayActive || permissionOpen || pluginPermissionOpen ||
     notificationsModalOpen || fileViewerFullscreen;
-  const [agentSwipePreview, setAgentSwipePreview] = useState<{
-    mode: 'open' | 'close' | null;
-    progress: number;
-  }>({ mode: null, progress: 0 });
+
 
   const hasConnected = useRef(false);
 
@@ -224,18 +221,6 @@ function AppContent() {
   const toastContainer = (
     <ToastContainer className={isMobile ? MOBILE_TOAST_CONTAINER_CLASS : undefined} />
   );
-
-  const claudiaSwipePreviewProgress = useMemo(() => {
-    const progress = Math.max(0, Math.min(1, agentSwipePreview.progress));
-    if (progress === 0 || progress === 1) return progress;
-    return Math.min(1, progress * 0.72 + progress * progress * 0.28);
-  }, [agentSwipePreview.progress]);
-
-  const claudiaOverlayOpacity = useMemo(() => {
-    if (agentSwipePreview.mode === 'open') return claudiaSwipePreviewProgress * 0.14;
-    if (agentSwipePreview.mode === 'close') return (1 - claudiaSwipePreviewProgress) * 0.14;
-    return isAgentExpanded ? 0.14 : 0;
-  }, [agentSwipePreview.mode, claudiaSwipePreviewProgress, isAgentExpanded]);
 
   const openNotifications = useCallback(() => {
     setAgentExpanded(false);
@@ -335,15 +320,6 @@ function AppContent() {
     prevSessionRef.current = selectedSessionId;
   }, [selectedSessionId]);
 
-  // Reset swipe preview on expand/collapse
-  useEffect(() => {
-    if (isAgentExpanded) {
-      setAgentSwipePreview(c => (c.mode === 'open' ? { mode: null, progress: 0 } : c));
-      return;
-    }
-    setAgentSwipePreview(c => (c.mode === 'close' ? { mode: null, progress: 0 } : c));
-  }, [isAgentExpanded]);
-
   // --- Android back gestures ---
   useAndroidBack(
     () => setFileViewerFullscreen(false),
@@ -380,41 +356,10 @@ function AppContent() {
   );
 
   // Both panels share one input owner for the complete touch session.
-  const claudiaDragRef = useRef<{ open: boolean; distance: number } | null>(null);
-  const cancelClaudiaDrag = useCallback(() => {
-    claudiaDragRef.current = null;
-    setAgentSwipePreview({ mode: null, progress: 0 });
-  }, []);
-  const claudiaGesture = {
-    getGestureState: () => ({ present: isAgentExpanded, targetOpen: isAgentExpanded,
-      enabled: isAppTopLevelView && !navigationBlocked }),
-    beginDrag: () => {
-      if (!isAppTopLevelView || navigationBlocked) return false;
-      claudiaDragRef.current = { open: isAgentExpanded, distance: 0 };
-      return true;
-    },
-    updateDrag: (distance: number) => {
-      const drag = claudiaDragRef.current;
-      if (!drag) return;
-      drag.distance = distance;
-      // Preserve Claudia's existing 60px preview range while sharing ownership.
-      const progress = Math.max(0, Math.min(1, (drag.open ? distance : -distance) / 60));
-      setAgentSwipePreview({ mode: drag.open ? 'close' : 'open', progress });
-    },
-    endDrag: ({ velocityPxPerSecond, releaseRunDistancePx }: DrawerRelease) => {
-      const drag = claudiaDragRef.current;
-      if (!drag) return;
-      const direction = drag.open ? 1 : -1;
-      const commit = direction * drag.distance >= 60 ||
-        (direction * velocityPxPerSecond >= (drag.open ? 180 : 300) && direction * releaseRunDistancePx >= 16);
-      if (commit) setAgentExpanded(!drag.open);
-      cancelClaudiaDrag();
-    },
-    cancelDrag: cancelClaudiaDrag,
-  };
+  const claudia = useClaudiaGesture(isAgentExpanded, isAppTopLevelView && !navigationBlocked, setAgentExpanded);
   useMobileNavigationGesture({ target: navigationShellRef,
     enabled: isMobile && (isAppTopLevelView || isShellTopLevelView),
-    blocked: navigationBlocked || (isFeedOpen && !drawer.drawerVisible), drawer, claudia: claudiaGesture,
+    blocked: navigationBlocked || (isFeedOpen && !drawer.drawerVisible), drawer, claudia: claudia.adapter,
     commandVersion: `${topLevelView.kind}:${isAgentExpanded}`,
     // The system owns the outermost iOS back/forward region.
     ignoreEdgeWidth: /iPad|iPhone|iPod/.test(navigator.userAgent) ? 20 : 0,
@@ -636,9 +581,8 @@ function AppContent() {
                 isAgentExpanded={isAgentExpanded}
                 isFeedOpen={isFeedOpen}
                 padFeedTopInset={sessionOwnsTopInset}
-                agentSwipePreview={agentSwipePreview}
-                claudiaSwipePreviewProgress={claudiaSwipePreviewProgress}
-                claudiaOverlayOpacity={claudiaOverlayOpacity}
+                panelRef={claudia.panelRef}
+                backdropRef={claudia.backdropRef}
                 onCloseFeed={() => setFeedOpen(false)}
               />
             )}

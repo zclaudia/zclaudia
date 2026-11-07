@@ -70,6 +70,7 @@ export function MobileSidebarHeader({
         <div className="flex items-center">
           {canExpand && (
             <button
+              data-drawer-width-toggle
               onClick={onToggleWidth}
               disabled={widthChangeDisabled}
               className={`${ACTION} ${ACTION_REST} disabled:opacity-40`}

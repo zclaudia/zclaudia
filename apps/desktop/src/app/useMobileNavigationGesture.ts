@@ -34,9 +34,12 @@ interface Session {
   x: number;
   y: number;
   originX: number;
+  boundaryLeft: number;
+  boundaryWidth: number;
   target: EventTarget | null;
   samples: NavigationSample[];
   paused: boolean;
+  pausedOwner?: 'drawer' | 'claudia';
   adapter?: MobileNavigationAdapter;
   drawerVersion?: number;
   claudiaVersion?: number;
@@ -54,7 +57,7 @@ export function useMobileNavigationGesture(options: UseMobileNavigationGestureOp
     session.current = null;
     if (!current) return;
     if (current.adapter && (current.owner === 'drawer' || current.owner === 'claudia')) latest.current[current.owner].cancelDrag();
-    else if (current.paused) latest.current.drawer.resumePending?.();
+    else if (current.paused) latest.current[current.pausedOwner ?? 'drawer'].resumePending?.();
   }, []);
 
   const captureVersions = useCallback((current: Session) => {
@@ -74,7 +77,7 @@ export function useMobileNavigationGesture(options: UseMobileNavigationGestureOp
 
   const nativeOwnership = useCallback((current: Session, owner: 'native' | 'ignored') => {
     current.owner = owner;
-    if (current.paused) latest.current.drawer.resumePending?.();
+    if (current.paused) latest.current[current.pausedOwner ?? 'drawer'].resumePending?.();
     current.paused = false;
   }, []);
 
@@ -118,11 +121,15 @@ export function useMobileNavigationGesture(options: UseMobileNavigationGestureOp
           (edge > 0 && (touch.clientX - rect.left < edge || touch.clientX - rect.left > width - edge));
         const visible = config.drawer.getGestureState().present;
         const surface = touchEvent.target instanceof Element && !!touchEvent.target.closest('[data-mobile-drawer-surface]');
+        const claudiaSurface = touchEvent.target instanceof Element && !!touchEvent.target.closest('[data-mobile-claudia-surface]');
+        const pausedOwner = !excluded && visible && surface ? 'drawer' :
+          !excluded && claudiaSurface ? 'claudia' : undefined;
         session.current = {
           owner: excluded ? 'ignored' : 'pending', identifier: touch.identifier,
           x: touch.clientX, y: touch.clientY, originX: touch.clientX,
+          boundaryLeft: rect.left, boundaryWidth: width,
           target: touchEvent.target, samples: [{ x: touch.clientX, time }],
-          paused: !excluded && visible && surface ? !!config.drawer.pausePending?.() : false,
+          pausedOwner, paused: pausedOwner ? !!config[pausedOwner].pausePending?.() : false,
         };
         captureVersions(session.current);
         return;
@@ -144,9 +151,7 @@ export function useMobileNavigationGesture(options: UseMobileNavigationGestureOp
           nativeOwnership(current, 'native');
           return;
         }
-        const rect = boundary.getBoundingClientRect();
-        const width = rect.width || boundary.clientWidth || window.innerWidth;
-        const ratio = (current.x - rect.left) / width;
+        const ratio = (current.x - current.boundaryLeft) / current.boundaryWidth;
         const owner = config.drawer.getGestureState().present ? 'drawer' :
           config.claudia.getGestureState().present ? 'claudia' :
             dx > 0 ? 'drawer' : ratio >= 0.25 && ratio <= 0.75 ? 'claudia' : 'ignored';
@@ -176,7 +181,7 @@ export function useMobileNavigationGesture(options: UseMobileNavigationGestureOp
           current.adapter.endDrag(navigationRelease(current.samples, touch.clientX, time));
         }
       } else if (state.last) {
-        if (current.paused) config.drawer.resumePending?.();
+        if (current.paused) config[current.pausedOwner ?? 'drawer'].resumePending?.();
         session.current = null;
       }
     },

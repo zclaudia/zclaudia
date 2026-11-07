@@ -1,6 +1,6 @@
-import { act, cleanup, renderHook } from '@testing-library/react';
+import { act, cleanup, render, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { StrictMode, type PropsWithChildren } from 'react';
+import { StrictMode, useLayoutEffect, type PropsWithChildren } from 'react';
 import type * as Motion from 'motion';
 import { useMobileDrawer } from '../useMobileDrawer';
 
@@ -27,6 +27,29 @@ beforeEach(() => {
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
 });
 describe('mobile drawer controller', () => {
+  it('does not rerender the app at drag activation and disables width control until release', () => {
+    let renders = 0;
+    let controller: ReturnType<typeof useMobileDrawer>;
+    function Harness() {
+      const drawer = useMobileDrawer(defaults);
+      const { drawerPanelRef, drawerBackdropRef, widthChangeDisabled } = drawer;
+      useLayoutEffect(() => { renders += 1; controller = drawer; });
+      return <><div ref={drawerPanelRef}><button data-drawer-width-toggle disabled={widthChangeDisabled}>Width</button></div><div ref={drawerBackdropRef} /></>;
+    }
+    const view = render(<Harness />);
+    act(() => controller.setSidebarOpen(true));
+    act(finishLast);
+    const before = renders;
+    const button = view.getByRole('button') as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    act(() => { controller.beginDrag(); controller.updateDrag(-40); });
+    expect(renders).toBe(before);
+    expect(controller.getGestureState().phase).toBe('dragging');
+    expect(button.disabled).toBe(true);
+    act(() => controller.endDrag(release));
+    act(finishLast);
+    expect(button.disabled).toBe(false);
+  });
   it('rearms lifecycle guards after StrictMode replay and stops on unmount', () => {
     const { result, unmount } = renderHook(() => useMobileDrawer(defaults), {
       wrapper: ({ children }: PropsWithChildren) => <StrictMode>{children}</StrictMode>,

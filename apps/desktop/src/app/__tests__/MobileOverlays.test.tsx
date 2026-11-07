@@ -1,3 +1,4 @@
+import { createRef } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MobileOverlays } from '../MobileOverlays';
@@ -27,9 +28,8 @@ function renderOverlays(
       isAgentExpanded={props.isAgentExpanded ?? false}
       isFeedOpen={props.isFeedOpen ?? false}
       padFeedTopInset={props.padFeedTopInset ?? false}
-      agentSwipePreview={{ mode: null, progress: 0 }}
-      claudiaSwipePreviewProgress={0}
-      claudiaOverlayOpacity={0}
+      panelRef={createRef<HTMLDivElement>()}
+      backdropRef={createRef<HTMLDivElement>()}
       onCloseFeed={onCloseFeed}
     />
   );

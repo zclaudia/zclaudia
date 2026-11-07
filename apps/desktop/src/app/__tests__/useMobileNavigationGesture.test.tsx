@@ -56,6 +56,16 @@ function setup(overrides: Partial<Options> = {}) {
 }
 
 describe('unified mobile navigation gesture', () => {
+  it('measures the shell once for a touch while retaining native scroll arbitration', () => {
+    const { button, drawer, getByTestId } = setup();
+    const shell = getByTestId('shell');
+    const measure = vi.spyOn(shell, 'getBoundingClientRect');
+    touch(button, 'touchstart', 400);
+    touch(button, 'touchmove', 440);
+    touch(button, 'touchmove', 470);
+    expect(measure).toHaveBeenCalledTimes(1);
+    expect(drawer.beginDrag).toHaveBeenCalledOnce();
+  });
   it('locks drawer ownership when a right swipe reverses beyond its origin', () => {
     const { button, drawer, claudia } = setup();
     touch(button, 'touchstart', 400);
