@@ -15,6 +15,14 @@ export async function getProjectsForBackend(backendId: string | null): Promise<P
   return apiCallForBackend<Project[]>(backendId, '/api/projects');
 }
 
+/** Fetch one full project record (including `rootPath` and `type`) from its backend. */
+export async function getProjectForBackend(
+  backendId: string | null | undefined,
+  projectId: string
+): Promise<Project> {
+  return apiCallForBackend<Project>(backendId, `/api/projects/${projectId}`);
+}
+
 export async function createProject(
   data: {
     name: string;

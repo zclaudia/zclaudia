@@ -1,10 +1,67 @@
 import type { BackendFacadeEvent } from '@zclaudia/shared/facade/types';
+import { resolveCanonicalBackendId } from '../../actions/controlPlane';
+import { getProjectForBackend } from '../../services/api/projects';
+import { resolveOwnershipBackendId } from '../../services/project-store-coordination';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useSessionsStore } from '../../stores/sessionsStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { syncBackendSessionCatalog } from '../../services/backend-session-catalog';
+
+/**
+ * Gateway resource payloads describe projects with id/name/timestamps only.
+ * When such a partial record is the first (or last) thing the desktop sees for
+ * a project, the cached entry loses `rootPath` and the real `type`, which
+ * breaks every path-dependent surface (Git panel, file references, worktree
+ * labels). Backfill the full record from its backend once per project.
+ *
+ * Only the active backend is hydrated: non-active backends get a full REST
+ * load when they become active. Failed requests are retried on the next
+ * snapshot/event instead of being remembered as done.
+ */
+const hydratedProjectKeys = new Set<string>();
+
+function isActiveBackend(backendId: string): boolean {
+  const activeBackendId = resolveOwnershipBackendId();
+  if (!activeBackendId) return false;
+  return activeBackendId === backendId || activeBackendId === resolveCanonicalBackendId(backendId);
+}
+
+function hydratePartialProjects(backendId: string, projectIds: Iterable<string>): void {
+  if (!isActiveBackend(backendId)) return;
+  for (const projectId of projectIds) {
+    const key = `${backendId}:${projectId}`;
+    if (hydratedProjectKeys.has(key)) continue;
+    const project = useProjectStore.getState().projects.find(item => item.id === projectId);
+    if (project?.rootPath || project?.type === 'chat_only') continue;
+    hydratedProjectKeys.add(key);
+    void getProjectForBackend(backendId, projectId)
+      .then(fullProject => {
+        // Keep the ownership record authoritative: a canonical backend id may
+        // differ from the facade id used for the request.
+        const ownerBackendId =
+          useOwnershipStore.getState().getProjectBackendId(projectId) ?? backendId;
+        useProjectStore.getState().upsertProjectForBackend(ownerBackendId, fullProject);
+      })
+      .catch(() => {
+        // The backend may still be starting up — let the next snapshot retry.
+        hydratedProjectKeys.delete(key);
+      });
+  }
+}
+
+function forgetHydratedProjects(backendId: string): void {
+  const prefix = `${backendId}:`;
+  for (const key of hydratedProjectKeys) {
+    if (key.startsWith(prefix)) hydratedProjectKeys.delete(key);
+  }
+}
+
+/** Test-only: clear the module-level hydration cache between cases. */
+export function __resetBackendProjectHydrationForTests(): void {
+  hydratedProjectKeys.clear();
+}
 
 export function syncBackendDataSnapshot(
   event: Extract<BackendFacadeEvent, { type: 'backend_data_snapshot' }>
@@ -85,6 +142,10 @@ export function syncBackendDataSnapshot(
         updatedAt: p.updatedAt,
       }))
     );
+    hydratePartialProjects(
+      backendId,
+      projects.map(p => p.projectId)
+    );
   }
 }
 
@@ -100,6 +161,9 @@ export function syncBackendsRemoved(
     useSessionsStore.getState().clearBackendSessions(backendId);
     useProjectStore.getState().replaceProjectsForBackend(backendId, []);
     useOwnershipStore.getState().removeProjectOwnersByBackend(backendId);
+    // A backend can re-register under the same id; its projects come back as
+    // partial snapshot records and must be hydrated again.
+    forgetHydratedProjects(backendId);
   }
 }
 
@@ -190,6 +254,7 @@ export function syncBackendDataEvent(
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     });
+    hydratePartialProjects(backendId, [p.projectId]);
   } else if (dataEvent.resourceType === 'project' && dataEvent.op === 'remove') {
     useProjectStore.getState().removeProjectForBackend(backendId, dataEvent.resourceId);
   }
