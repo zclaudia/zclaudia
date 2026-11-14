@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 const backendFacadeHookMocks = vi.hoisted(() => {
@@ -231,6 +231,23 @@ describe('useBackendFacade run_event forwarding', () => {
     expect(useFacadeStore.getState().facade).toBe(backendFacadeHookMocks.embeddedInstances[0]);
     expect(backendFacadeHookMocks.embeddedInstances[0].connect).toHaveBeenCalledTimes(1);
 
+    unmount();
+  });
+
+  it('reconnects the facade when backend recovery publishes a new local port', () => {
+    useServerStore.setState({ localServerPort: 4100 });
+    const { unmount } = renderHook(() => useBackendFacade());
+    const previous = backendFacadeHookMocks.embeddedInstances[0];
+    expect(previous.target).toBe(4100);
+    expect(previous.connect).toHaveBeenCalledOnce();
+
+    act(() => useServerStore.getState().setLocalServerPort(4101));
+
+    const recovered = backendFacadeHookMocks.embeddedInstances[1];
+    expect(previous.disconnect).toHaveBeenCalledOnce();
+    expect(recovered.target).toBe(4101);
+    expect(recovered.connect).toHaveBeenCalledOnce();
+    expect(useFacadeStore.getState().facade).toBe(recovered);
     unmount();
   });
 

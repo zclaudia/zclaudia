@@ -696,6 +696,7 @@ describe('GatewayClient', () => {
         send: vi.fn(),
         readyState: 1,
         removeAllListeners: vi.fn(),
+        on: vi.fn(),
         close: vi.fn(),
       };
       (client as any).transport.ws = ws;

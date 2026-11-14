@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { createElement, StrictMode } from 'react';
 import { useEmbeddedServer } from '../useEmbeddedServer.js';
 
 // Capture event handlers registered by the hook
@@ -118,6 +119,7 @@ describe('hooks/useEmbeddedServer', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockInvoke.mockReset().mockResolvedValue({});
     vi.useFakeTimers();
 
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -139,6 +141,7 @@ describe('hooks/useEmbeddedServer', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
     consoleLogSpy.mockRestore();
     consoleErrorSpy.mockRestore();
     consoleWarnSpy.mockRestore();
@@ -235,7 +238,7 @@ describe('hooks/useEmbeddedServer', () => {
 
       // Flush all promises
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       // sidecar should not have been called
@@ -262,7 +265,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       expect(result.current.status).toBe('ready');
@@ -277,11 +280,14 @@ describe('hooks/useEmbeddedServer', () => {
       renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       const { Command } = await import('@tauri-apps/plugin-shell');
-      expect(mockFetch).toHaveBeenCalledWith('http://127.0.0.1:3100/health');
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://127.0.0.1:3100/health',
+        expect.objectContaining({ cache: 'no-store', signal: expect.any(AbortSignal) })
+      );
       expect(Command.sidecar).not.toHaveBeenCalled();
     });
 
@@ -295,7 +301,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       expect(result.current.status).toBe('ready');
@@ -312,7 +318,7 @@ describe('hooks/useEmbeddedServer', () => {
       renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       const { Command } = await import('@tauri-apps/plugin-shell');
@@ -327,7 +333,7 @@ describe('hooks/useEmbeddedServer', () => {
       renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       const { Command } = await import('@tauri-apps/plugin-shell');
@@ -344,7 +350,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       // Simulate stdout emitting SERVER_READY
@@ -367,7 +373,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       const stdoutHandler = stdoutHandlers.get('data');
@@ -387,7 +393,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       const stdoutHandler = stdoutHandlers.get('data');
@@ -407,7 +413,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       const stdoutHandler = stdoutHandlers.get('data');
@@ -427,7 +433,7 @@ describe('hooks/useEmbeddedServer', () => {
       renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       const stdoutHandler = stdoutHandlers.get('data');
@@ -459,7 +465,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       expect(result.current.status).toBe('error');
@@ -484,7 +490,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       expect(result.current.status).toBe('error');
@@ -493,6 +499,38 @@ describe('hooks/useEmbeddedServer', () => {
   });
 
   describe('process lifecycle events', () => {
+    it('automatically replaces a crashed dev sidecar and ignores its delayed events', async () => {
+      mockTauriInternals();
+      const { result } = renderHook(() => useEmbeddedServer());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4200);
+      });
+      const oldStdout = stdoutHandlers.get('data')!;
+      const oldClose = commandHandlers.get('close')!;
+      const oldError = commandHandlers.get('error')!;
+      act(() => oldStdout('SERVER_READY:4100'));
+      await act(async () => {
+        oldClose({ code: 1, signal: null });
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(result.current.status).toBe('error');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4200);
+      });
+      expect(stdoutHandlers.get('data')).not.toBe(oldStdout);
+      act(() => stdoutHandlers.get('data')!('SERVER_READY:4101'));
+      act(() => {
+        oldStdout('SERVER_READY:9999');
+        oldError('old failure');
+        oldClose({ code: 1, signal: null });
+      });
+      expect(result.current.status).toBe('ready');
+      expect(result.current.port).toBe(4101);
+    });
+
     it('sets error state on process error event', async () => {
       mockTauriInternals();
       mockFetch.mockRejectedValue(new Error('Not running'));
@@ -500,7 +538,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       const errorHandler = commandHandlers.get('error');
@@ -522,7 +560,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       const closeHandler = commandHandlers.get('close');
@@ -532,7 +570,7 @@ describe('hooks/useEmbeddedServer', () => {
       await act(async () => {
         closeHandler!({ code: 1, signal: null });
         // Let the fetch promise in the close handler resolve/reject
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(0);
         // Flush microtasks
         await Promise.resolve();
         await Promise.resolve();
@@ -549,7 +587,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       // First transition to ready
@@ -565,7 +603,7 @@ describe('hooks/useEmbeddedServer', () => {
       // Simulate process close after ready - health check also fails
       await act(async () => {
         closeHandler!({ code: null, signal: 9 });
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(0);
         await Promise.resolve();
         await Promise.resolve();
       });
@@ -583,7 +621,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       // Transition to ready
@@ -601,7 +639,7 @@ describe('hooks/useEmbeddedServer', () => {
 
       await act(async () => {
         closeHandler!({ code: 0, signal: null });
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(0);
         await Promise.resolve();
         await Promise.resolve();
       });
@@ -617,7 +655,7 @@ describe('hooks/useEmbeddedServer', () => {
       renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       const stderrHandler = stderrHandlers.get('data');
@@ -644,7 +682,7 @@ describe('hooks/useEmbeddedServer', () => {
       renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       const { Command } = await import('@tauri-apps/plugin-shell');
@@ -683,7 +721,7 @@ describe('hooks/useEmbeddedServer', () => {
       renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       expect(mockSpawnFn).toHaveBeenCalled();
@@ -696,7 +734,7 @@ describe('hooks/useEmbeddedServer', () => {
       renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
         await Promise.resolve();
       });
 
@@ -718,7 +756,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
         await Promise.resolve();
       });
 
@@ -748,7 +786,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { unmount } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       const stdoutHandler = stdoutHandlers.get('data');
@@ -771,7 +809,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { unmount } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       const errorHandler = commandHandlers.get('error');
@@ -790,13 +828,200 @@ describe('hooks/useEmbeddedServer', () => {
       const { unmount } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       unmount();
 
       // In dev mode, stop_server should NOT be called (process left running for HMR reuse)
       expect(mockInvoke).not.toHaveBeenCalledWith('stop_server');
+    });
+  });
+
+  describe('automatic recovery', () => {
+    beforeEach(() => {
+      mockTauriInternals();
+      vi.stubEnv('DEV', false);
+      let port = 4100;
+      mockInvoke.mockImplementation((command: string) =>
+        Promise.resolve(command === 'start_server' ? { port: port++ } : {})
+      );
+    });
+
+    const advance = async (ms: number) => {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(ms);
+      });
+    };
+    const starts = () => mockInvoke.mock.calls.filter(([command]) => command === 'start_server');
+
+    it('starts only one production backend under StrictMode effect replay', async () => {
+      const { result } = renderHook(() => useEmbeddedServer(), {
+        wrapper: ({ children }) => createElement(StrictMode, null, children),
+      });
+      await advance(0);
+      expect(result.current.port).toBe(4100);
+      expect(starts()).toHaveLength(1);
+    });
+
+    it('restarts a crashed production backend and publishes its new port', async () => {
+      const { result } = renderHook(() => useEmbeddedServer());
+      await advance(0);
+      expect(result.current.port).toBe(4100);
+      await advance(15000);
+      expect(result.current.status).toBe('error');
+      expect(result.current.port).toBeNull();
+      await advance(1000);
+      expect(result.current.status).toBe('ready');
+      expect(result.current.port).toBe(4101);
+      expect(starts()).toHaveLength(2);
+      expect(mockInvoke).toHaveBeenCalledWith('stop_server');
+      mockFetch.mockResolvedValue({ ok: true });
+      await advance(5000);
+      expect(mockFetch).toHaveBeenLastCalledWith(
+        'http://127.0.0.1:4101/health',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
+    });
+
+    it('keeps a healthy local backend running during a gateway outage', async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+      const { result } = renderHook(() => useEmbeddedServer());
+      await advance(0);
+      await advance(65000);
+      expect(result.current.status).toBe('ready');
+      expect(starts()).toHaveLength(1);
+      expect(mockFetch.mock.calls.every(([url]) => url === 'http://127.0.0.1:4100/health')).toBe(
+        true
+      );
+    });
+
+    it('resets the failure count when a local probe succeeds', async () => {
+      mockFetch
+        .mockRejectedValueOnce(new Error('offline'))
+        .mockRejectedValueOnce(new Error('offline'))
+        .mockResolvedValueOnce({ ok: true });
+      const { result } = renderHook(() => useEmbeddedServer());
+      await advance(0);
+      await advance(25000);
+      expect(result.current.status).toBe('ready');
+      expect(starts()).toHaveLength(1);
+      await advance(5000);
+      expect(result.current.status).toBe('error');
+    });
+
+    it('bounds hanging probes and never overlaps them', async () => {
+      mockFetch.mockImplementation(
+        (_url, { signal }: { signal: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+          })
+      );
+      const { result } = renderHook(() => useEmbeddedServer());
+      await advance(0);
+      await advance(21000);
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(result.current.status).toBe('error');
+      await advance(1000);
+      expect(result.current.port).toBe(4101);
+    });
+
+    it('backs off repeated startup failures and resets after a stable minute', async () => {
+      mockInvoke.mockImplementation((command: string) =>
+        command === 'start_server'
+          ? Promise.reject(new Error('startup failed'))
+          : Promise.resolve({})
+      );
+      const { result } = renderHook(() => useEmbeddedServer());
+      await advance(0);
+      expect(result.current.status).toBe('error');
+      for (const delay of [1000, 2000, 4000, 8000, 16000, 30000, 30000]) {
+        const count = starts().length;
+        await advance(delay - 1);
+        expect(starts()).toHaveLength(count);
+        await advance(1);
+        expect(starts()).toHaveLength(count + 1);
+      }
+      mockInvoke.mockImplementation((command: string) =>
+        Promise.resolve(command === 'start_server' ? { port: 4200 } : {})
+      );
+      mockFetch.mockResolvedValue({ ok: true });
+      await advance(30000);
+      await advance(60000);
+      mockFetch.mockRejectedValue(new Error('crashed'));
+      await advance(15000);
+      expect(result.current.status).toBe('error');
+      const count = starts().length;
+      await advance(1000);
+      expect(starts()).toHaveLength(count + 1);
+      expect(result.current.status).toBe('ready');
+    });
+
+    it('cancels pending recovery when disabled', async () => {
+      const { rerender } = renderHook(({ disabled }) => useEmbeddedServer({ disabled }), {
+        initialProps: { disabled: false },
+      });
+      await advance(0);
+      await advance(15000);
+      rerender({ disabled: true });
+      await advance(60000);
+      expect(starts()).toHaveLength(1);
+    });
+
+    it('keeps retrying when stopping the old backend repeatedly fails', async () => {
+      const { result } = renderHook(() => useEmbeddedServer());
+      await advance(0);
+      mockInvoke.mockImplementation((command: string) =>
+        command === 'stop_server' ? Promise.reject(new Error('stop failed')) : Promise.resolve({})
+      );
+      await advance(15000);
+      await advance(1000);
+      expect(result.current.status).toBe('error');
+      expect(result.current.error).toContain('stop failed');
+      await advance(2000);
+      expect(mockInvoke.mock.calls.filter(([command]) => command === 'stop_server')).toHaveLength(
+        2
+      );
+      expect(starts()).toHaveLength(1);
+    });
+
+    it('cancels pending recovery on unmount', async () => {
+      const { unmount } = renderHook(() => useEmbeddedServer());
+      await advance(0);
+      await advance(15000);
+      unmount();
+      await advance(60000);
+      expect(starts()).toHaveLength(1);
+    });
+
+    it('ignores a failed health probe from a previous launch', async () => {
+      let rejectProbe!: (error: Error) => void;
+      mockFetch.mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectProbe = reject;
+          })
+      );
+      const { result } = renderHook(() => useEmbeddedServer());
+      await advance(0);
+      await advance(5000);
+      await act(async () => result.current.restart());
+      expect(result.current.port).toBe(4101);
+      await act(async () => rejectProbe(new Error('stale failure')));
+      expect(result.current.status).toBe('ready');
+      expect(result.current.port).toBe(4101);
+    });
+
+    it('allows manual restart to supersede an automatic retry without double spawning', async () => {
+      const { result } = renderHook(() => useEmbeddedServer());
+      await advance(0);
+      await advance(15000);
+      await act(async () => {
+        await Promise.all([result.current.restart(), result.current.restart()]);
+      });
+      await advance(1000);
+      expect(result.current.port).toBe(4101);
+      expect(starts()).toHaveLength(2);
     });
   });
 
@@ -807,7 +1032,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer({ disabled: true }));
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       expect(result.current.status).toBe('disabled');
@@ -820,7 +1045,7 @@ describe('hooks/useEmbeddedServer', () => {
       const { result } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(4200);
       });
 
       expect(result.current.status).toBe('disabled');

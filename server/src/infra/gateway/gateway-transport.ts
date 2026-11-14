@@ -43,8 +43,7 @@ export class GatewayTransport {
     }
     this.clearConnectTimeout();
     if (this.ws) {
-      this.ws.removeAllListeners();
-      this.ws.close();
+      this.closeSocket(this.ws);
       this.ws = null;
     }
 
@@ -61,8 +60,8 @@ export class GatewayTransport {
     this.connectTimeout = setTimeout(() => {
       if (this.ws !== currentWs || this.deps.isConnected()) return;
       console.warn(`[Gateway] Connection attempt timed out after ${this.connectTimeoutMs / 1000}s`);
-      currentWs.removeAllListeners();
-      currentWs.close();
+      this.clearConnectTimeout();
+      this.closeSocket(currentWs);
       if (this.ws === currentWs) this.ws = null;
       this.deps.onDisconnect(null);
       this.scheduleReconnect();
@@ -105,8 +104,7 @@ export class GatewayTransport {
     this.clearConnectTimeout();
     this.deps.onDisconnect(null);
     if (this.ws) {
-      this.ws.removeAllListeners();
-      this.ws.close();
+      this.closeSocket(this.ws);
       this.ws = null;
     }
   }
@@ -142,6 +140,15 @@ export class GatewayTransport {
   notifyHandshakeComplete(): void {
     this.clearConnectTimeout();
     this.reconnectAttempts = 0;
+  }
+
+  private closeSocket(ws: WebSocket): void {
+    ws.removeAllListeners();
+    // Closing a CONNECTING socket aborts the HTTP handshake and emits an error
+    // on the next tick. Keep an error listener until disposal completes so an
+    // expected cancellation cannot become a process-level uncaught exception.
+    ws.on('error', () => {});
+    ws.close();
   }
 
   private clearConnectTimeout(): void {

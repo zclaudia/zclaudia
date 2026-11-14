@@ -53,7 +53,7 @@ describe('GatewayTransport', () => {
 
     it('closes an existing socket before reconnecting', () => {
       transport = new GatewayTransport(makeDeps());
-      const mockWs = { removeAllListeners: vi.fn(), close: vi.fn() };
+      const mockWs = { removeAllListeners: vi.fn(), on: vi.fn(), close: vi.fn() };
       (transport as any).ws = mockWs;
       transport.connect();
       expect(mockWs.removeAllListeners).toHaveBeenCalled();
@@ -141,7 +141,7 @@ describe('GatewayTransport', () => {
     it('sets intentional disconnect, notifies, and closes the socket', () => {
       const onDisconnect = vi.fn();
       transport = new GatewayTransport(makeDeps({ onDisconnect }));
-      const mockWs = { removeAllListeners: vi.fn(), close: vi.fn() };
+      const mockWs = { removeAllListeners: vi.fn(), on: vi.fn(), close: vi.fn() };
       (transport as any).ws = mockWs;
       transport.disconnect();
       expect((transport as any).intentionalDisconnect).toBe(true);
