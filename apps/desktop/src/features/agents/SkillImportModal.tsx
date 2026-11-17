@@ -52,7 +52,7 @@ function OutcomeRow({ outcome }: { outcome: ExternalSkillImportOutcome }) {
     <div className="flex items-center gap-2 px-2 py-1 text-sm">
       {icon}
       <span className="truncate">{outcome.name}</span>
-      <span className="truncate text-[11px] text-muted-foreground/60">{outcome.agentLabel}</span>
+      <span className="truncate text-[11px] text-muted-foreground">{outcome.agentLabel}</span>
       {detail && <span className="ml-auto text-[11px] text-muted-foreground">{detail}</span>}
     </div>
   );
@@ -206,7 +206,7 @@ export function SkillImportModal({ open, backendId, onClose, onImported }: Skill
         ) : importable.length === 0 ? (
           <div className="flex flex-col items-center gap-1 py-6 text-center">
             <p className="text-sm text-muted-foreground">No importable skills found</p>
-            <p className="text-xs text-muted-foreground/60">
+            <p className="text-xs text-muted-foreground">
               Nothing detected from Claude Code, Codex CLI, or Cursor — or everything was already
               imported.
             </p>
@@ -241,17 +241,17 @@ export function SkillImportModal({ open, backendId, onClose, onImported }: Skill
                   <div key={source.agent} className="flex flex-col gap-1">
                     <div className="flex items-baseline gap-2">
                       <span className="text-sm font-medium">{source.agentLabel}</span>
-                      <span className="truncate font-mono text-[10px] text-muted-foreground/60">
+                      <span className="truncate font-mono text-[10px] text-muted-foreground">
                         {source.status === 'ok' ? source.path : 'not found'}
                       </span>
                       {skippedCount > 0 && (
-                        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground/60">
+                        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
                           {skippedCount} skipped
                         </span>
                       )}
                     </div>
                     {importableSkills.length === 0 ? (
-                      <p className="px-2 text-xs text-muted-foreground/60">Nothing to import</p>
+                      <p className="px-2 text-xs text-muted-foreground">Nothing to import</p>
                     ) : (
                       <div className="flex flex-col">
                         {importableSkills.map(skill => {

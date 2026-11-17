@@ -29,8 +29,8 @@ const VARIANT: Record<ButtonVariant, string> = {
 /* h-7 matches the chrome row height; text tiers follow the composer (11px)
  * and modal-footer (13px) sizes already in use. */
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-6 max-md:h-9 px-2 text-[11px]',
-  md: 'h-7 max-md:h-9 px-3 text-[13px]',
+  sm: 'h-6 max-md:h-11 px-2 text-xs',
+  md: 'h-7 max-md:h-11 px-3 text-[13px]',
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -57,7 +57,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
  * `p-1/p-1.5 rounded(-md) text-muted-foreground hover:…` recipes; hover fill is
  * standardized on bg-secondary (the documented chrome hover fill).
  *
- * Touch grows the button itself (`max-md:h-9`), never a negative-inset pseudo
+ * Touch grows the button itself (`max-md:h-11`), never a negative-inset pseudo
  * element: an invisible bleed made adjacent buttons' hit areas overlap, so a
  * tap near Run's edge landed on its neighbor (Disable) instead.
  */
@@ -71,7 +71,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   { size = 'md', className = '', type = 'button', ...rest },
   ref
 ) {
-  const dim = size === 'sm' ? 'h-6 w-6 max-md:h-8 max-md:w-8' : 'h-7 w-7 max-md:h-9 max-md:w-9';
+  const dim = size === 'sm' ? 'h-6 w-6 max-md:h-11 max-md:w-11' : 'h-7 w-7 max-md:h-11 max-md:w-11';
   return (
     <button
       ref={ref}

@@ -55,9 +55,10 @@ export default {
         ring: 'hsl(var(--ring))',
       },
       borderRadius: {
-        xl: 'calc(var(--radius) + 4px)',
+        '2xl': 'var(--radius-dialog)',
+        xl: 'var(--radius-panel)',
         lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
+        md: 'var(--radius-control)',
         sm: 'calc(var(--radius) - 4px)',
       },
       boxShadow: {

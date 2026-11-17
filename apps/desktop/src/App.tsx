@@ -56,6 +56,7 @@ import { isAndroid } from './utils/platform';
 import { shouldShowDirectGatewaySetup } from './utils/directGatewaySetup';
 import { getMobileControlPlaneState } from './services/mobileConnectionState';
 import { PaneSkeleton } from './components/ui/Skeleton';
+import { StartupConnectionState } from './app/StartupConnectionState';
 
 const FileViewerWindow = lazy(() =>
   import('./components/fileviewer/FileViewerWindow').then(m => ({ default: m.FileViewerWindow }))
@@ -397,35 +398,12 @@ function AppContent() {
     const isError = embeddedServerStatus === 'error';
 
     return (
-      <div className="flex flex-col h-dvh bg-background text-foreground">
-        <div className="safe-top-spacer bg-background flex-shrink-0" data-tauri-drag-region />
-        <div className="flex-1 flex items-center justify-center" data-tauri-drag-region>
-          <div className="text-center">
-            {isError ? (
-              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                <svg
-                  className="w-5 h-5 text-destructive"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </div>
-            ) : (
-              <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            )}
-            <p className={`text-sm ${isError ? 'text-destructive' : 'text-muted-foreground'}`}>
-              {statusText}
-            </p>
-          </div>
-        </div>
-      </div>
+      <StartupConnectionState
+        key={embeddedServerStatus}
+        message={statusText}
+        error={isError}
+        onRetry={() => window.location.reload()}
+      />
     );
   }
 

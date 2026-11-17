@@ -59,9 +59,11 @@ describe('HomeView', () => {
     useServerStore.setState({ activeServerId: 'local' });
   });
 
-  it('renders nothing before the initial data load completes', () => {
+  it('shows a loading skeleton without flashing onboarding before the initial data load', () => {
     const { container } = render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
-    expect(container.innerHTML).toBe('');
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+    expect(container.querySelector('[data-skeleton]')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /New session/ })).toBeNull();
   });
 
   it('renders the new home layout (greeting + quick actions) when there are no sessions', () => {
@@ -294,9 +296,9 @@ describe('HomeView', () => {
     expect(screen.getByTestId('usage-strip')).toBeTruthy();
   });
 
-  it('still renders nothing (no usage strip) before the initial load even when empty', () => {
-    // dataServerId stays null → cold-start guard suppresses the whole view.
-    const { container } = render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
-    expect(container.innerHTML).toBe('');
+  it('keeps the usage strip hidden while the initial catalog is loading', () => {
+    render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByTestId('usage-strip')).not.toBeInTheDocument();
   });
 });

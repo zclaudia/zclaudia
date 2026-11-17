@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { DropdownMenu, type DropdownMenuEntry } from '../DropdownMenu';
 import { IconButton } from '../Button';
@@ -23,7 +23,29 @@ function renderMenu(onEdit = vi.fn(), onDelete = vi.fn()) {
   return { onEdit, onDelete };
 }
 
+afterEach(() => vi.restoreAllMocks());
+
 describe('DropdownMenu', () => {
+  it('clamps using unscaled layout size so entry animation cannot move the final panel offscreen', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(240);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(180);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      return {
+        top: 8,
+        bottom: 52,
+        left: window.innerWidth - 52,
+        right: window.innerWidth - 8,
+        width: 44,
+        height: 44,
+        x: window.innerWidth - 52,
+        y: 8,
+        toJSON: () => ({}),
+      };
+    });
+    renderMenu();
+    fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
+    expect(screen.getByRole('menu').style.left).toBe(`${window.innerWidth - 248}px`);
+  });
   it('opens on trigger click and renders role="menu" with items', () => {
     renderMenu();
     fireEvent.click(screen.getByRole('button', { name: 'Actions' }));

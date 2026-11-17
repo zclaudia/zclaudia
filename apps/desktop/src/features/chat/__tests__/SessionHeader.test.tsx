@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { useState } from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useChatMessageStore } from '../../../stores/chatMessageStore';
 import { useServerStore } from '../../../stores/serverStore';
@@ -80,6 +81,20 @@ const baseProps = {
   onPopOut: vi.fn(),
   onToggleSessionMenu: vi.fn(),
 };
+
+function ControlledSessionHeader(props: Parameters<typeof SessionHeader>[0]) {
+  const [open, setOpen] = useState(props.showSessionMenu);
+  return (
+    <SessionHeader
+      {...props}
+      showSessionMenu={open}
+      onToggleSessionMenu={() => {
+        props.onToggleSessionMenu();
+        setOpen(value => !value);
+      }}
+    />
+  );
+}
 
 function setupStores(overrides?: { messages?: Record<string, any[]> }) {
   useChatMessageStore.setState({
@@ -269,14 +284,14 @@ describe('SessionHeader', () => {
 
   describe('mobile session info', () => {
     it('offers a Session info item in the mobile "…" menu', () => {
-      render(<SessionHeader {...baseProps} isMobile showSessionMenu />);
+      render(<ControlledSessionHeader {...baseProps} isMobile showSessionMenu />);
       expect(screen.getByText('Session info')).toBeTruthy();
     });
 
     it('opens the info overlay (with context %) from the mobile menu and closes it again', () => {
       const onToggleSessionMenu = vi.fn();
       render(
-        <SessionHeader
+        <ControlledSessionHeader
           {...baseProps}
           isMobile
           showSessionMenu
@@ -297,7 +312,7 @@ describe('SessionHeader', () => {
     });
 
     it('closes the info overlay on the Android back gesture', () => {
-      render(<SessionHeader {...baseProps} isMobile showSessionMenu />);
+      render(<ControlledSessionHeader {...baseProps} isMobile showSessionMenu />);
       fireEvent.click(screen.getByText('Session info'));
       expect(screen.getByTestId('session-info-overlay')).toBeTruthy();
 

@@ -28,6 +28,7 @@ export interface DropdownMenuItem {
   icon?: ReactNode;
   onSelect: () => void;
   disabled?: boolean;
+  description?: string;
   destructive?: boolean;
 }
 
@@ -55,6 +56,8 @@ interface DropdownMenuProps {
   /** Accessible name for the menu. */
   ariaLabel: string;
   panelClassName?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const VIEWPORT_MARGIN = 8;
@@ -66,8 +69,18 @@ export function DropdownMenu({
   align = 'start',
   ariaLabel,
   panelClassName = '',
+  open: controlledOpen,
+  onOpenChange,
 }: DropdownMenuProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = useCallback(
+    (nextOpen: boolean) => {
+      if (controlledOpen === undefined) setInternalOpen(nextOpen);
+      onOpenChange?.(nextOpen);
+    },
+    [controlledOpen, onOpenChange]
+  );
   useMobileNavigationBlocker(open);
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({ visibility: 'hidden' });
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -77,11 +90,14 @@ export function DropdownMenu({
 
   const items = entries.filter((e): e is DropdownMenuItem => e !== 'separator');
 
-  const close = useCallback((returnFocus: boolean) => {
-    setOpen(false);
-    setPanelStyle({ visibility: 'hidden' });
-    if (returnFocus) triggerRef.current?.focus();
-  }, []);
+  const close = useCallback(
+    (returnFocus: boolean) => {
+      setOpen(false);
+      setPanelStyle({ visibility: 'hidden' });
+      if (returnFocus) triggerRef.current?.focus();
+    },
+    [setOpen]
+  );
   useAndroidBack(() => close(true), isMobile && open, 40);
 
   // Position after render so the real panel size drives the clamping math.
@@ -90,7 +106,9 @@ export function DropdownMenu({
     const rect = triggerRef.current?.getBoundingClientRect();
     const panel = panelRef.current;
     if (!rect || !panel) return;
-    const { width, height } = panel.getBoundingClientRect();
+    // Entry animation scales the visual rect; clamp using the final layout size.
+    const width = panel.offsetWidth;
+    const height = panel.offsetHeight;
     let top = rect.bottom + 4;
     if (top + height > window.innerHeight - VIEWPORT_MARGIN) {
       top = Math.max(VIEWPORT_MARGIN, rect.top - height - 4);
@@ -100,12 +118,12 @@ export function DropdownMenu({
     setPanelStyle({ top, left });
   }, [open, align]);
 
-  // Focus the first enabled item on open (menu convention).
-  useEffect(() => {
-    if (!open) return;
+  // Browsers cannot focus the initially hidden panel until positioning makes it visible.
+  useLayoutEffect(() => {
+    if (!open || panelStyle.visibility === 'hidden') return;
     const first = items.findIndex(item => !item.disabled);
     if (first >= 0) itemRefs.current[first]?.focus();
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, panelStyle.visibility]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Outside mousedown + window resize/scroll dismiss.
   useEffect(() => {
@@ -197,10 +215,12 @@ export function DropdownMenu({
             }}
             type="button"
             role="menuitem"
+            aria-label={typeof entry.label === 'string' ? entry.label : undefined}
             tabIndex={-1}
             disabled={entry.disabled}
             onClick={() => handleSelect(entry)}
-            className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] outline-none transition-colors disabled:opacity-50 ${
+            aria-describedby={entry.description ? `${menuId}-${entry.key}-description` : undefined}
+            className={`flex w-full items-center gap-2 px-3 py-1.5 max-md:min-h-11 text-left text-[13px] outline-none transition-colors disabled:opacity-50 ${
               entry.destructive
                 ? 'text-destructive hover:bg-destructive/10 focus:bg-destructive/10'
                 : 'text-foreground hover:bg-muted focus:bg-muted'
@@ -211,7 +231,17 @@ export function DropdownMenu({
                 {entry.icon}
               </span>
             )}
-            <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+            <span className="min-w-0 flex-1 text-left">
+              <span className="block truncate">{entry.label}</span>
+              {entry.description && (
+                <span
+                  id={`${menuId}-${entry.key}-description`}
+                  className="mt-0.5 block whitespace-normal text-xs"
+                >
+                  {entry.description}
+                </span>
+              )}
+            </span>
           </button>
         );
       })}
@@ -231,7 +261,7 @@ export function DropdownMenu({
           'aria-controls': open ? menuId : undefined,
           onClick: e => {
             e.stopPropagation();
-            setOpen(v => !v);
+            setOpen(!open);
           },
           onKeyDown: e => {
             if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {

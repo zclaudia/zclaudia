@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { SelectorTrigger } from '../SelectorTrigger';
 
 describe('SelectorTrigger', () => {
@@ -69,7 +69,7 @@ describe('SelectorTrigger', () => {
 
     const button = screen.getByRole('button');
     expect(button.className).toContain('cursor-not-allowed');
-    expect(button.className).toContain('text-amber');
+    expect(button.className).toContain('text-warning');
   });
 
   it('uses lock reason as title when locked', () => {
@@ -79,7 +79,7 @@ describe('SelectorTrigger', () => {
       </SelectorTrigger>
     );
 
-    expect(screen.getByRole('button')).toHaveAttribute('title', 'Task in progress');
+    expect(screen.getByRole('button')).toHaveAccessibleDescription('Task in progress');
   });
 
   it('uses custom title when not locked', () => {
@@ -89,7 +89,24 @@ describe('SelectorTrigger', () => {
       </SelectorTrigger>
     );
 
-    expect(screen.getByRole('button')).toHaveAttribute('title', 'Custom title');
+    expect(screen.getByRole('button')).toHaveAccessibleDescription('Custom title');
+  });
+
+  it('keeps locked controls keyboard-discoverable without allowing activation', () => {
+    const onClick = vi.fn();
+    render(
+      <SelectorTrigger onClick={onClick} locked lockReason="任务执行期间无法修改">
+        选项
+      </SelectorTrigger>
+    );
+    const button = screen.getByRole('button');
+    act(() => button.focus());
+    expect(button).toHaveFocus();
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).toHaveAccessibleDescription('任务执行期间无法修改');
+    fireEvent.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+    expect(button).toHaveClass('h-11');
   });
 
   it('applies custom className', () => {
@@ -127,7 +144,7 @@ describe('SelectorTrigger', () => {
       </SelectorTrigger>
     );
 
-    expect(screen.getByRole('button')).toHaveAttribute('title', 'Lock reason');
+    expect(screen.getByRole('button')).toHaveAccessibleDescription('Lock reason');
   });
 
   it('uses title when locked but no lock reason provided', () => {
@@ -137,7 +154,7 @@ describe('SelectorTrigger', () => {
       </SelectorTrigger>
     );
 
-    expect(screen.getByRole('button')).toHaveAttribute('title', 'Title');
+    expect(screen.getByRole('button')).toHaveAccessibleDescription('Title');
   });
 
   it('uses "Locked" as default title when locked with no title or lock reason', () => {
@@ -147,6 +164,6 @@ describe('SelectorTrigger', () => {
       </SelectorTrigger>
     );
 
-    expect(screen.getByRole('button')).toHaveAttribute('title', 'Locked');
+    expect(screen.getByRole('button')).toHaveAccessibleDescription('已锁定');
   });
 });

@@ -8,6 +8,15 @@
  */
 export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'destructive' | 'thinking';
 
+export const STATUS_TONE = {
+  running: 'success',
+  waiting: 'warning',
+  failed: 'destructive',
+  completed: 'success',
+  online: 'success',
+  offline: 'neutral',
+} as const satisfies Record<string, Tone>;
+
 /** Plain status text (sidebar row status, inline labels). */
 export const TONE_TEXT: Record<Tone, string> = {
   neutral: 'text-muted-foreground',
