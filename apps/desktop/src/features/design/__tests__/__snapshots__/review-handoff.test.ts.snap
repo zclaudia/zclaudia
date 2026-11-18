@@ -4,13 +4,13 @@ exports[`buildReviewHandoff（P7 §6.2 审阅进聊天交接） > 完整样例�
 {
   "prompt": "## Review feedback
 - Author: 林一
-- Time: 2026/10/24 12:30:00
+- Time: <comment-time>
 - Comment:
 请把这段标题换成蓝色，谢谢。
 
 ## Shared version
 - Label: v3 定稿
-- Snapshot time: 2026/10/23 16:00:00
+- Snapshot time: <snapshot-time>
 - Entry file: design/index.html
 - Existing shares still show this version; they will not change with this edit.
 
@@ -32,14 +32,14 @@ Please update the current page design/index.html based on the review feedback ab
   "sections": [
     {
       "body": "- Author: 林一
-- Time: 2026/10/24 12:30:00
+- Time: <comment-time>
 - Comment:
 请把这段标题换成蓝色，谢谢。",
       "title": "Review feedback",
     },
     {
       "body": "- Label: v3 定稿
-- Snapshot time: 2026/10/23 16:00:00
+- Snapshot time: <snapshot-time>
 - Entry file: design/index.html
 - Existing shares still show this version; they will not change with this edit.",
       "title": "Shared version",

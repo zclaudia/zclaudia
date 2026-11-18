@@ -4,6 +4,9 @@ import type { AgentsBackend, AgentsTab, LibraryItem } from './agents-types';
 import { ItemCard } from './ui/ItemCard';
 import type { ItemCardAction } from './ui/ItemCard';
 import { FilterChips } from './ui/FilterChips';
+import { Button } from '../../components/ui/Button';
+import { PaneSkeleton } from '../../components/ui/Skeleton';
+import { STATUS_TONE, TONE_DOT } from '../../components/ui/tone';
 
 const TAB_TITLE: Record<AgentsTab, string> = {
   profiles: 'Agent Profiles',
@@ -27,6 +30,9 @@ export function BrowseView({
   onDeleteLlmProfile,
   onDeleteSkill,
   onDeleteMcpServer,
+  loading = false,
+  errors,
+  onRetry,
 }: {
   tab: AgentsTab;
   backendFilter: string;
@@ -43,6 +49,9 @@ export function BrowseView({
   onDeleteLlmProfile?: (item: LibraryItem) => void;
   onDeleteSkill?: (item: LibraryItem) => void;
   onDeleteMcpServer?: (item: LibraryItem) => void;
+  loading?: boolean;
+  errors?: ReadonlyMap<string, string>;
+  onRetry?: () => void;
 }) {
   const [query, setQuery] = useState('');
   const byName = useMemo(() => new Map(backends.map(b => [b.backendId, b])), [backends]);
@@ -86,6 +95,12 @@ export function BrowseView({
     ...backends.map(b => ({ key: b.backendId, label: b.name, online: b.online })),
   ];
 
+  const scopedBackends = backends.filter(
+    b => backendFilter === 'all' || b.backendId === backendFilter
+  );
+  const online = scopedBackends.some(b => b.online);
+  const failedBackends = scopedBackends.filter(b => errors?.has(b.backendId));
+  const hasQuery = query.trim().length > 0;
   const gridClass = 'grid auto-rows-min grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3';
 
   const actionsFor = (item: LibraryItem): ItemCardAction[] | undefined => {
@@ -156,37 +171,27 @@ export function BrowseView({
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
       <div className="flex flex-col gap-3 border-b border-border px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="min-w-0 truncate text-sm font-medium" title={TAB_TITLE[tab]}>
-            {TAB_TITLE[tab]}
-          </h1>
-          <div className="ml-auto flex items-center gap-2">
-            <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-secondary/30 px-3 py-1.5 text-xs text-muted-foreground focus-within:ring-1 focus-within:ring-ring">
-              <Search className="h-3.5 w-3.5" strokeWidth={1.75} />
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="min-w-0 text-xl font-semibold tracking-tight">{TAB_TITLE[tab]}</h1>
+          <div className="flex w-full min-w-0 items-center gap-2 sm:ml-auto sm:w-auto">
+            <div className="flex h-11 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm text-muted-foreground focus-within:ring-2 focus-within:ring-ring md:h-9">
+              <Search className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
               <input
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Search…"
                 aria-label="Search"
-                className="w-28 bg-transparent outline-none placeholder:text-muted-foreground"
+                className="w-full min-w-0 bg-transparent text-foreground outline-none placeholder:text-muted-foreground sm:w-36"
               />
             </div>
             {tab === 'skills' && onImportSkills && (
-              <button
-                type="button"
-                onClick={onImportSkills}
-                className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-secondary"
-              >
-                <FolderInput className="h-3.5 w-3.5" strokeWidth={1.75} /> Import
-              </button>
+              <Button onClick={onImportSkills} disabled={!online} className="h-9 shrink-0">
+                <FolderInput className="h-4 w-4" strokeWidth={1.75} aria-hidden /> Import
+              </Button>
             )}
-            <button
-              type="button"
-              onClick={onNew}
-              className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-secondary"
-            >
-              <Plus className="h-3.5 w-3.5" strokeWidth={1.75} /> New
-            </button>
+            <Button variant="primary" onClick={onNew} disabled={!online} className="h-9 shrink-0">
+              <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden /> New
+            </Button>
           </div>
         </div>
         {(backends.length > 1 || backendFilter !== 'all') && (
@@ -197,10 +202,58 @@ export function BrowseView({
         )}
       </div>
 
-      {visible.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center text-muted-foreground">
-          <p className="text-sm">Nothing here yet</p>
-          <p className="mt-1 text-xs opacity-60">Create one with New.</p>
+      {failedBackends.length > 0 && items.length > 0 && (
+        <div
+          role="status"
+          className="mx-4 mt-4 flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+        >
+          <p className="flex-1">
+            部分 Backend 加载失败：{failedBackends.map(b => b.name).join('、')}
+          </p>
+          {onRetry && (
+            <Button onClick={onRetry} disabled={loading}>
+              重试
+            </Button>
+          )}
+        </div>
+      )}
+      {loading && items.length === 0 ? (
+        <div role="status" aria-busy="true" className="flex-1">
+          <span className="sr-only">正在加载资源</span>
+          <PaneSkeleton />
+        </div>
+      ) : visible.length === 0 ? (
+        <div
+          role="status"
+          className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-12 text-center"
+        >
+          <p className="text-sm font-medium text-foreground">
+            {!online
+              ? 'Backend 暂不可用'
+              : failedBackends.length > 0
+                ? '资源加载失败'
+                : hasQuery
+                  ? '没有匹配的资源'
+                  : '还没有资源'}
+          </p>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            {!online
+              ? '请检查 Backend 连接，恢复后会自动更新。'
+              : failedBackends.length > 0
+                ? '数据暂时无法读取，请重试；已有资源不会因此被删除。'
+                : hasQuery
+                  ? '试试其他关键词，或清空搜索查看全部资源。'
+                  : '点击右上角 New，创建第一个资源。'}
+          </p>
+          {online && failedBackends.length > 0 && onRetry ? (
+            <Button variant="outline" onClick={onRetry} className="mt-2">
+              重新加载
+            </Button>
+          ) : hasQuery ? (
+            <Button variant="outline" onClick={() => setQuery('')} className="mt-2">
+              清空搜索
+            </Button>
+          ) : null}
         </div>
       ) : groups ? (
         <div className="flex-1 space-y-5 overflow-y-auto p-4">
@@ -208,12 +261,14 @@ export function BrowseView({
             <section key={group.backend.backendId}>
               <div className="mb-2 flex items-center gap-2 px-0.5">
                 <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    group.backend.online ? 'bg-emerald-500' : 'bg-muted-foreground/50'
-                  }`}
+                  role="img"
+                  aria-label={group.backend.online ? '在线' : '离线'}
+                  className={`h-1.5 w-1.5 rounded-full ${TONE_DOT[group.backend.online ? STATUS_TONE.online : STATUS_TONE.offline]}`}
                 />
-                <h3 className="text-xs font-medium text-muted-foreground">{group.backend.name}</h3>
-                <span className="text-[11px] text-muted-foreground/60">{group.items.length}</span>
+                <h2 className="text-sm font-medium text-muted-foreground">{group.backend.name}</h2>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {group.items.length}
+                </span>
               </div>
               <div className={gridClass}>{group.items.map(renderCard)}</div>
             </section>

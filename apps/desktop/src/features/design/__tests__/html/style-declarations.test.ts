@@ -87,7 +87,9 @@ describe('parseDeclarations', () => {
   });
 
   it('keeps the last same-name declaration (case-insensitive)', () => {
-    expect(parseDeclarations('color: red; COLOR: blue')).toEqual([{ name: 'COLOR', value: 'blue' }]);
+    expect(parseDeclarations('color: red; COLOR: blue')).toEqual([
+      { name: 'COLOR', value: 'blue' },
+    ]);
     expect(parseDeclarations('margin: 0; color: red; color: green')).toEqual([
       { name: 'margin', value: '0' },
       { name: 'color', value: 'green' },

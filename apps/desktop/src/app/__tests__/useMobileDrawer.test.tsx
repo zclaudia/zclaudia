@@ -4,16 +4,33 @@ import { StrictMode, useLayoutEffect, type PropsWithChildren } from 'react';
 import type * as Motion from 'motion';
 import { useMobileDrawer } from '../useMobileDrawer';
 
-const animations = vi.hoisted(() => [] as Array<{ target: number; value: { set(v: number): void }; options: { onComplete(): void; onUpdate?(v: number): void }; stop: ReturnType<typeof vi.fn> }>);
+const animations = vi.hoisted(
+  () =>
+    [] as Array<{
+      target: number;
+      value: { set(v: number): void };
+      options: { onComplete(): void; onUpdate?(v: number): void };
+      stop: ReturnType<typeof vi.fn>;
+    }>
+);
 vi.mock('motion', async importOriginal => {
   const actual = await importOriginal<typeof Motion>();
-  return { ...actual, animate: vi.fn((value, target, options) => {
-    const animation = { value, target, options, stop: vi.fn() };
-    animations.push(animation);
-    return animation;
-  }) };
+  return {
+    ...actual,
+    animate: vi.fn((value, target, options) => {
+      const animation = { value, target, options, stop: vi.fn() };
+      animations.push(animation);
+      return animation;
+    }),
+  };
 });
-const defaults = { isMobile: true, gestureActive: true, isAgentExpanded: false, isFeedOpen: false, isFileViewerFullscreen: false };
+const defaults = {
+  isMobile: true,
+  gestureActive: true,
+  isAgentExpanded: false,
+  isFeedOpen: false,
+  isFileViewerFullscreen: false,
+};
 const release = { velocityPxPerSecond: 0, releaseRunDistancePx: 0 };
 function finishLast() {
   const a = animations.at(-1)!;
@@ -33,8 +50,20 @@ describe('mobile drawer controller', () => {
     function Harness() {
       const drawer = useMobileDrawer(defaults);
       const { drawerPanelRef, drawerBackdropRef, widthChangeDisabled } = drawer;
-      useLayoutEffect(() => { renders += 1; controller = drawer; });
-      return <><div ref={drawerPanelRef}><button data-drawer-width-toggle disabled={widthChangeDisabled}>Width</button></div><div ref={drawerBackdropRef} /></>;
+      useLayoutEffect(() => {
+        renders += 1;
+        controller = drawer;
+      });
+      return (
+        <>
+          <div ref={drawerPanelRef}>
+            <button data-drawer-width-toggle disabled={widthChangeDisabled}>
+              Width
+            </button>
+          </div>
+          <div ref={drawerBackdropRef} />
+        </>
+      );
     }
     const view = render(<Harness />);
     act(() => controller.setSidebarOpen(true));
@@ -42,7 +71,10 @@ describe('mobile drawer controller', () => {
     const before = renders;
     const button = view.getByRole('button') as HTMLButtonElement;
     expect(button.disabled).toBe(false);
-    act(() => { controller.beginDrag(); controller.updateDrag(-40); });
+    act(() => {
+      controller.beginDrag();
+      controller.updateDrag(-40);
+    });
     expect(renders).toBe(before);
     expect(controller.getGestureState().phase).toBe('dragging');
     expect(button.disabled).toBe(true);
@@ -76,21 +108,27 @@ describe('mobile drawer controller', () => {
     expect(result.current.sidebarOpen).toBe(false);
     expect(result.current.phase).toBe('idle');
   });
-  it.each([0.25, 0.5, 0.75])('picks up a wide close at %s without jumping or changing width', fraction => {
-    const { result } = renderHook(() => useMobileDrawer(defaults));
-    act(() => result.current.setSidebarOpen(true));
-    act(finishLast);
-    act(() => result.current.toggleWidth());
-    expect(result.current.widthMode).toBe('wide');
-    act(() => result.current.setSidebarOpen(false));
-    act(() => result.current.drawerPosition.set(390 * fraction));
-    const position = result.current.drawerPosition.get();
-    act(() => { result.current.beginDrag(); result.current.updateDrag(0); });
-    expect(result.current.drawerPosition.get()).toBe(position);
-    act(() => result.current.updateDrag(-10));
-    expect(result.current.drawerPosition.get()).toBe(position - 10);
-    expect(result.current.widthMode).toBe('wide');
-  });
+  it.each([0.25, 0.5, 0.75])(
+    'picks up a wide close at %s without jumping or changing width',
+    fraction => {
+      const { result } = renderHook(() => useMobileDrawer(defaults));
+      act(() => result.current.setSidebarOpen(true));
+      act(finishLast);
+      act(() => result.current.toggleWidth());
+      expect(result.current.widthMode).toBe('wide');
+      act(() => result.current.setSidebarOpen(false));
+      act(() => result.current.drawerPosition.set(390 * fraction));
+      const position = result.current.drawerPosition.get();
+      act(() => {
+        result.current.beginDrag();
+        result.current.updateDrag(0);
+      });
+      expect(result.current.drawerPosition.get()).toBe(position);
+      act(() => result.current.updateDrag(-10));
+      expect(result.current.drawerPosition.get()).toBe(position - 10);
+      expect(result.current.widthMode).toBe('wide');
+    }
+  );
   it('ignores a late close completion after a newer open', () => {
     const { result } = renderHook(() => useMobileDrawer(defaults));
     act(() => result.current.setSidebarOpen(true));
@@ -108,11 +146,17 @@ describe('mobile drawer controller', () => {
   });
   it('invalidates drag end after an explicit command', () => {
     const { result } = renderHook(() => useMobileDrawer(defaults));
-    act(() => { result.current.beginDrag(); result.current.updateDrag(200); });
+    act(() => {
+      result.current.beginDrag();
+      result.current.updateDrag(200);
+    });
     expect(result.current.sidebarOpen).toBe(false);
     act(() => result.current.setSidebarOpen(false));
     const count = animations.length;
-    act(() => { result.current.updateDrag(290); result.current.endDrag({ velocityPxPerSecond: 1000, releaseRunDistancePx: 80 }); });
+    act(() => {
+      result.current.updateDrag(290);
+      result.current.endDrag({ velocityPxPerSecond: 1000, releaseRunDistancePx: 80 });
+    });
     expect(animations).toHaveLength(count);
     expect(result.current.targetOpen).toBe(false);
     expect(result.current.drawerPosition.get()).toBe(200);
@@ -144,7 +188,9 @@ describe('mobile drawer controller', () => {
     const { result } = renderHook(() => useMobileDrawer(defaults));
     act(() => result.current.setSidebarOpen(true));
     act(() => result.current.drawerPosition.set(100));
-    act(() => { expect(result.current.pausePending()).toBe(true); });
+    act(() => {
+      expect(result.current.pausePending()).toBe(true);
+    });
     expect(result.current.phase).toBe('pending');
     act(() => result.current.resumePending());
     expect(animations.at(-1)!.target).toBe(300);
@@ -156,8 +202,13 @@ describe('mobile drawer controller', () => {
     expect(result.current.targetOpen).toBe(false);
   });
   it('cancels disabled drags and resizes to the existing target without a stale completion', () => {
-    const { result, rerender } = renderHook(props => useMobileDrawer(props), { initialProps: defaults });
-    act(() => { result.current.beginDrag(); result.current.updateDrag(200); });
+    const { result, rerender } = renderHook(props => useMobileDrawer(props), {
+      initialProps: defaults,
+    });
+    act(() => {
+      result.current.beginDrag();
+      result.current.updateDrag(200);
+    });
     rerender({ ...defaults, isFileViewerFullscreen: true });
     expect(result.current.phase).toBe('settling');
     act(() => window.dispatchEvent(new Event('resize')));
@@ -173,18 +224,30 @@ describe('mobile drawer controller', () => {
     const { result } = renderHook(() => useMobileDrawer(defaults));
     act(() => result.current.setSidebarOpen(true));
     const animation = animations.at(-1)!;
-    act(() => { animation.value.set(311); animation.options.onUpdate?.(311); });
+    act(() => {
+      animation.value.set(311);
+      animation.options.onUpdate?.(311);
+    });
     expect(result.current.drawerPosition.get()).toBe(300);
     expect(result.current.phase).toBe('idle');
     expect(animation.stop).toHaveBeenCalled();
-    act(() => { result.current.beginDrag(); result.current.updateDrag(-5); });
+    act(() => {
+      result.current.beginDrag();
+      result.current.updateDrag(-5);
+    });
     expect(result.current.drawerPosition.get()).toBe(295);
   });
   it('releases modal state when hidden and remeasures before reduced-motion reopening', () => {
-    vi.spyOn(window, 'matchMedia').mockImplementation(query => Object.assign(new EventTarget(), {
-      matches: query.includes('reduced-motion'), media: query, onchange: null,
-      addListener: vi.fn(), removeListener: vi.fn(),
-    }) as unknown as MediaQueryList);
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      query =>
+        Object.assign(new EventTarget(), {
+          matches: query.includes('reduced-motion'),
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        }) as unknown as MediaQueryList
+    );
     const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
     const { result } = renderHook(() => useMobileDrawer(defaults));
     act(() => result.current.setSidebarOpen(true));

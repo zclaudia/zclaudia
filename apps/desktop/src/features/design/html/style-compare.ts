@@ -54,7 +54,11 @@ export function colorsEquivalent(written: string, computed: string): boolean {
  * 比较写入口径与计算值：true = 相等，false = 失配，null = 无可靠口径跳过
  * （font-family、margin/padding 简写、非纯 px 写法的长度、bolder/lighter 等）。
  */
-export function compareCssValues(property: string, written: string, computed: string): boolean | null {
+export function compareCssValues(
+  property: string,
+  written: string,
+  computed: string
+): boolean | null {
   if (COLOR_KEYS.has(property)) return colorsEquivalent(written, computed);
   if (property === 'font-weight') {
     const expectedWeight = fontWeightValue(written);

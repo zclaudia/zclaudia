@@ -11,6 +11,7 @@ import {
   DesignError,
   DesignService,
   assertContained,
+  fileNameHasControlCharacter,
   toDesignError,
   validateRelativePath,
 } from './design-service.js';
@@ -151,7 +152,8 @@ function normalizeSize(value: unknown): string | undefined {
 
 function normalizeTargetDir(value: unknown): string {
   if (value === undefined) return DEFAULT_ASSETS_DIR;
-  if (typeof value !== 'string' || !value) throw mediaValidation('targetDir must be a workspace-relative path');
+  if (typeof value !== 'string' || !value)
+    throw mediaValidation('targetDir must be a workspace-relative path');
   try {
     validateRelativePath(value);
   } catch {
@@ -161,7 +163,8 @@ function normalizeTargetDir(value: unknown): string {
 }
 
 function requireRelativeField(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !value) throw mediaValidation(`${field} must be a workspace-relative path`);
+  if (typeof value !== 'string' || !value)
+    throw mediaValidation(`${field} must be a workspace-relative path`);
   try {
     validateRelativePath(value);
   } catch {
@@ -192,7 +195,9 @@ function requireVideoFps(value: unknown): number {
     value < MEDIA_VIDEO_MIN_FPS ||
     value > MEDIA_VIDEO_MAX_FPS
   ) {
-    throw mediaValidation(`fps must be an integer between ${MEDIA_VIDEO_MIN_FPS} and ${MEDIA_VIDEO_MAX_FPS}`);
+    throw mediaValidation(
+      `fps must be an integer between ${MEDIA_VIDEO_MIN_FPS} and ${MEDIA_VIDEO_MAX_FPS}`
+    );
   }
   return value;
 }
@@ -277,9 +282,7 @@ function toSummary(row: MediaTaskRow): DesignMediaTaskSummary {
     progress: parseJsonOrNull<DesignMediaProgress>(row.progress_json),
     result: parseJsonOrNull<DesignMediaTaskResult>(row.result_json),
     error:
-      row.error_code !== null
-        ? { code: row.error_code, message: row.error_message ?? '' }
-        : null,
+      row.error_code !== null ? { code: row.error_code, message: row.error_message ?? '' } : null,
   };
 }
 
@@ -338,7 +341,12 @@ export class MediaTaskService {
          LIMIT 1`
       )
       .get(workspaceRoot, dedupKey);
-    if (duplicate) throw new DesignError(409, 'MEDIA_TASK_ACTIVE_EXISTS', 'An identical task is already in progress');
+    if (duplicate)
+      throw new DesignError(
+        409,
+        'MEDIA_TASK_ACTIVE_EXISTS',
+        'An identical task is already in progress'
+      );
 
     const now = Date.now();
     const id = randomUUID();
@@ -386,7 +394,11 @@ export class MediaTaskService {
       return toSummary(this.requireRow(taskId, workspaceRoot));
     }
     if (row.status !== 'running')
-      throw new DesignError(409, 'MEDIA_TASK_INVALID_STATE', 'The task has already finished and cannot be canceled');
+      throw new DesignError(
+        409,
+        'MEDIA_TASK_INVALID_STATE',
+        'The task has already finished and cannot be canceled'
+      );
     const run = this.active.get(taskId);
     if (!run) {
       // 防御：运行中行缺失活动记录（仅可能来自异常外部改写）——直接落 cancelled。
@@ -407,11 +419,13 @@ export class MediaTaskService {
       throw new DesignError(404, 'MEDIA_TASK_NOT_FOUND', 'Task not found');
     const row = this.requireRow(taskId, workspaceRoot);
     const result =
-      row.status === 'completed'
-        ? parseJsonOrNull<DesignMediaTaskResult>(row.result_json)
-        : null;
+      row.status === 'completed' ? parseJsonOrNull<DesignMediaTaskResult>(row.result_json) : null;
     if (!result)
-      throw new DesignError(409, 'MEDIA_TASK_INVALID_STATE', 'The task is not finished yet or has no artifact');
+      throw new DesignError(
+        409,
+        'MEDIA_TASK_INVALID_STATE',
+        'The task is not finished yet or has no artifact'
+      );
     // 经 design resolve() containment：越界/私有问题在授权与符号链接层被拒绝。
     const resolved = await this.designService.resolveFile(sessionId, result.path);
     return {
@@ -476,7 +490,8 @@ export class MediaTaskService {
       let errorMessage = 'Task execution failed';
       try {
         const executor = this.executors[row.kind];
-        if (!executor) throw new MediaTaskRunError('INTERNAL', 'No executor is configured for this task type');
+        if (!executor)
+          throw new MediaTaskRunError('INTERNAL', 'No executor is configured for this task type');
         const execution: MediaTaskExecution = {
           id: row.id,
           kind: row.kind,
@@ -495,13 +510,20 @@ export class MediaTaskService {
           errorMessage = error.message;
         } else {
           errorCode = 'INTERNAL';
-          errorMessage = error instanceof Error && error.message ? error.message : 'Task execution failed';
+          errorMessage =
+            error instanceof Error && error.message ? error.message : 'Task execution failed';
         }
       }
 
       // 取消优先（§1.2/§1.4）：signal 已中止则一律 cancelled；已写产物保留 result_json。
       if (controller.signal.aborted) {
-        this.finalizeStatus(row.id, 'cancelled', result ? JSON.stringify(result) : null, null, null);
+        this.finalizeStatus(
+          row.id,
+          'cancelled',
+          result ? JSON.stringify(result) : null,
+          null,
+          null
+        );
       } else if (result) {
         this.finalizeStatus(row.id, 'completed', JSON.stringify(result), null, null);
       } else {
@@ -628,7 +650,8 @@ export function createImageTaskExecutor(deps: ImageTaskExecutorDeps): MediaTaskE
     const params = execution.params;
     if (params.type !== 'image-generate' && params.type !== 'image-edit')
       throw new MediaTaskRunError('INTERNAL', 'The image executor received a non-image task');
-    if (!execution.provider) throw new MediaTaskRunError('INTERNAL', 'The image task is missing its service profile');
+    if (!execution.provider)
+      throw new MediaTaskRunError('INTERNAL', 'The image task is missing its service profile');
 
     await ctx.onProgress({ phase: 'submitting' });
 
@@ -642,7 +665,9 @@ export function createImageTaskExecutor(deps: ImageTaskExecutorDeps): MediaTaskE
       } catch (error) {
         throw new MediaTaskRunError(
           'ENTRY_UNREADABLE',
-          error instanceof Error && error.message ? `Source image is not readable: ${error.message}` : 'Source image is not readable'
+          error instanceof Error && error.message
+            ? `Source image is not readable: ${error.message}`
+            : 'Source image is not readable'
         );
       }
     }
@@ -672,7 +697,9 @@ export function createImageTaskExecutor(deps: ImageTaskExecutorDeps): MediaTaskE
     } catch (error) {
       throw new MediaTaskRunError(
         'ASSET_WRITE_FAILED',
-        error instanceof Error && error.message ? error.message : 'Failed to write the artifact to the asset library'
+        error instanceof Error && error.message
+          ? error.message
+          : 'Failed to write the artifact to the asset library'
       );
     }
     return {
@@ -695,10 +722,14 @@ const MAX_GENERATED_NAME_CANDIDATES = 100;
 /** 文件名规则与 DesignService.validateAssetFileName 同口径，白名单限 .mp4/.webm/.mov。 */
 function validateGeneratedAssetFileName(fileName: unknown): string {
   if (typeof fileName !== 'string' || !fileName || fileName.length > MAX_GENERATED_NAME_LENGTH)
-    throw new DesignError(400, 'ASSET_INVALID', 'Filename must be a non-empty string of at most 200 characters');
+    throw new DesignError(
+      400,
+      'ASSET_INVALID',
+      'Filename must be a non-empty string of at most 200 characters'
+    );
   if (/[/\\]/.test(fileName) || path.basename(fileName) !== fileName)
     throw new DesignError(400, 'ASSET_INVALID', 'Filename must not contain path separators');
-  if (/[\u0000-\u001f\u007f]/.test(fileName))
+  if (fileNameHasControlCharacter(fileName))
     throw new DesignError(400, 'ASSET_INVALID', 'Filename must not contain control characters');
   const extension = path.extname(fileName).toLowerCase();
   if (!GENERATED_ASSET_EXTENSIONS.has(extension))

@@ -16,6 +16,7 @@ import {
   LayoutPanelTop,
 } from 'lucide-react';
 import { BrandMark } from '../../components/BrandMark';
+import { STATUS_TONE, TONE_DOT } from '../../components/ui/tone';
 import type { AutomationTab } from '../automation/automation-types';
 import type { AgentsTab } from '../agents/agents-types';
 import type { PluginsTab } from '../plugins/plugins-types';
@@ -121,6 +122,7 @@ function ModeTabsNav<K extends string>({
               onClick={() => onSelect(key)}
               aria-label={label}
               data-selected={active || undefined}
+              aria-current={active ? 'page' : undefined}
               className={rowClass(active)}
             >
               <Icon className={iconClass(active)} strokeWidth={1.75} />
@@ -156,17 +158,17 @@ export function SidebarNav({
   // Mobile rows are a 44px touch tier and sit at full foreground: navigation
   // used to render muted while the smaller tree rows rendered foreground/600,
   // which inverted the hierarchy. Depth now reads from inset and weight.
-  const rowBase = isMobile
-    ? 'w-full text-left px-3 h-11 rounded-md text-sm font-medium hover:bg-secondary active:bg-secondary flex items-center gap-3'
-    : 'w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-secondary hover:text-foreground flex items-center gap-2';
+  const rowBase = `w-full text-left rounded-md flex items-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+    isMobile ? 'px-3 h-11 text-sm gap-3' : 'px-2 py-1.5 text-sm gap-2'
+  }`;
   const iconSize = isMobile ? 'w-5 h-5' : 'w-4 h-4';
   const rowClass = (active: boolean) =>
     `${rowBase} ${
       active
-        ? 'bg-secondary text-foreground'
+        ? 'bg-secondary text-foreground font-semibold ring-1 ring-inset ring-border'
         : isMobile
-          ? 'text-foreground'
-          : 'text-muted-foreground'
+          ? 'text-foreground font-medium hover:bg-secondary/50 active:bg-secondary/50'
+          : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
     }`;
   // The label carries the hierarchy, so the glyph stays muted until the row is
   // active (on desktop the whole row is muted and the icon inherits it).
@@ -219,6 +221,7 @@ export function SidebarNav({
           onClick={onHome}
           aria-label="Home"
           data-selected={isHomeActive || undefined}
+          aria-current={isHomeActive ? 'page' : undefined}
           className={rowClass(!!isHomeActive)}
         >
           <Home className={iconClass(!!isHomeActive)} strokeWidth={1.75} />
@@ -231,6 +234,7 @@ export function SidebarNav({
             onClick={onOpenClaudia}
             aria-label="Claudia"
             data-selected={isClaudiaActive || undefined}
+            aria-current={isClaudiaActive ? 'page' : undefined}
             className={rowClass(!!isClaudiaActive)}
           >
             <BrandMark
@@ -240,12 +244,20 @@ export function SidebarNav({
             <span className="flex-1 truncate text-left">Claudia</span>
             {claudiaStatus && !isClaudiaActive && (
               <span
+                role="img"
+                aria-label={
+                  claudiaStatus === 'permission'
+                    ? '等待确认'
+                    : claudiaStatus === 'unread'
+                      ? '有未读消息'
+                      : '运行中'
+                }
                 className={`h-[7px] w-[7px] flex-shrink-0 rounded-full ${
                   claudiaStatus === 'permission'
                     ? 'bg-warning'
                     : claudiaStatus === 'unread'
                       ? 'bg-primary animate-pulse'
-                      : 'bg-warning animate-pulse'
+                      : `${TONE_DOT[STATUS_TONE.running]} animate-pulse`
                 }`}
               />
             )}

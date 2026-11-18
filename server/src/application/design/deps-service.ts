@@ -113,7 +113,11 @@ export class DepsService {
       let css: Buffer | null;
       try {
         css = (
-          await readBoundedFile(path.join(file.root, ref.path), DEPS_MAX_CSS_READ_BYTES, 'Stylesheet')
+          await readBoundedFile(
+            path.join(file.root, ref.path),
+            DEPS_MAX_CSS_READ_BYTES,
+            'Stylesheet'
+          )
         ).bytes;
       } catch {
         css = null;

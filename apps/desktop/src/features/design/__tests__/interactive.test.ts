@@ -123,9 +123,9 @@ describe('buildDesignRunPreview', () => {
     expect(doc.querySelector('a[href="about.html"]')?.getAttribute('href')).toBe('about.html');
     expect(doc.querySelector('a[href="#section"]')?.hasAttribute('data-zclaudia-nav')).toBe(false);
     expect(doc.querySelector('a[href="doc.pdf"]')?.hasAttribute('data-zclaudia-nav')).toBe(false);
-    expect(
-      doc.querySelector('a[href="//cdn.invalid/x"]')?.hasAttribute('data-zclaudia-nav')
-    ).toBe(false);
+    expect(doc.querySelector('a[href="//cdn.invalid/x"]')?.hasAttribute('data-zclaudia-nav')).toBe(
+      false
+    );
     expect(blocked.links).toBe(2);
     expect(blocked.scripts).toBe(0);
   });
@@ -325,7 +325,8 @@ describe('buildDesignRunPreview', () => {
         '<body><p>x</p></body>',
       filePath: 'index.html',
       loadAsset: async path => {
-        if (path === 'css/site.css') return { mimeType: 'text/css', data: btoa('b { color: red }') };
+        if (path === 'css/site.css')
+          return { mimeType: 'text/css', data: btoa('b { color: red }') };
         throw new Error('missing');
       },
       channel: 'mark-ch',

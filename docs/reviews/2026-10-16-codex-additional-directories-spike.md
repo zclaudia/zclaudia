@@ -35,13 +35,13 @@ Experimental schema generated with `codex app-server generate-json-schema --expe
 Relevant fields: `ThreadStartParams/ThreadResumeParams`: `sandbox` (enum string), `config` (free object),
 `runtimeWorkspaceRoots`, `permissions`; `TurnStartParams`: `sandboxPolicy`, `runtimeWorkspaceRoots`, `permissions`.
 
-| # | Payload | experimentalApi | Result |
-|---|---|---|---|
-| s5 | `thread/start {..., sandbox:"workspace-write", config:{"sandbox_workspace_write":{"writable_roots":["B"],"network_access":true}}}` | false | **works**; response `sandbox.writableRoots=[B]`, `runtimeWorkspaceRoots=[A,B]`; write B exit 0 |
-| s5c | spawn with `-c 'sandbox_workspace_write.writable_roots=["B"]'` (process-level) | false | **works** (contradicts the `config.ts` comment that `-c sandbox_*` has no effect — only true for `sandbox_permissions`) |
-| s4n | `turn/start {..., sandboxPolicy:{"type":"workspaceWrite","writableRoots":["B"],"networkAccess":true}}` | false | **works** |
-| s3 | `thread/start {..., runtimeWorkspaceRoots:["A","B"]}` | true | works (response shows sandbox.writableRoots=[B]) |
-| s3n | same as s3 | false | **rejected**: `-32600 thread/start.runtimeWorkspaceRoots requires experimentalApi capability` |
+| #   | Payload                                                                                                                            | experimentalApi | Result                                                                                                                  |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| s5  | `thread/start {..., sandbox:"workspace-write", config:{"sandbox_workspace_write":{"writable_roots":["B"],"network_access":true}}}` | false           | **works**; response `sandbox.writableRoots=[B]`, `runtimeWorkspaceRoots=[A,B]`; write B exit 0                          |
+| s5c | spawn with `-c 'sandbox_workspace_write.writable_roots=["B"]'` (process-level)                                                     | false           | **works** (contradicts the `config.ts` comment that `-c sandbox_*` has no effect — only true for `sandbox_permissions`) |
+| s4n | `turn/start {..., sandboxPolicy:{"type":"workspaceWrite","writableRoots":["B"],"networkAccess":true}}`                             | false           | **works**                                                                                                               |
+| s3  | `thread/start {..., runtimeWorkspaceRoots:["A","B"]}`                                                                              | true            | works (response shows sandbox.writableRoots=[B])                                                                        |
+| s3n | same as s3                                                                                                                         | false           | **rejected**: `-32600 thread/start.runtimeWorkspaceRoots requires experimentalApi capability`                           |
 
 Note `sandboxPolicy` replaces the whole policy: `networkAccess` must be re-stated (default false), otherwise the
 loopback `push_file` flow that `config.ts` enables via `sandbox_workspace_write.network_access=true` breaks.

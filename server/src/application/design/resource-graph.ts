@@ -32,7 +32,16 @@ export interface ResourceRefResult {
   skipped: SkippedResource[];
 }
 
-const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.avif']);
+const IMAGE_EXTENSIONS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.ico',
+  '.avif',
+]);
 const FONT_EXTENSIONS = new Set(['.woff', '.woff2', '.ttf', '.otf', '.eot']);
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.mov']);
 
@@ -101,7 +110,11 @@ function resolveReference(raw: string, fromDir: string): { path: string } | { sk
   return { path: parts.join('/') };
 }
 
-function collect(candidates: Array<{ raw: string; kind?: ResourceRefKind }>, fromDir: string, result: ResourceRefResult): void {
+function collect(
+  candidates: Array<{ raw: string; kind?: ResourceRefKind }>,
+  fromDir: string,
+  result: ResourceRefResult
+): void {
   const byPath = new Map<string, ResourceRef>();
   const skippedRaw = new Set<string>();
   // Refs collected earlier in the same document win; so do skip reasons.

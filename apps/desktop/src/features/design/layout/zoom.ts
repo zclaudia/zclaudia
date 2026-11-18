@@ -19,5 +19,8 @@ export function stepZoom(
   actualScale: number | null | undefined,
   direction: -1 | 1
 ): { mode: 'manual'; value: number } {
-  return { mode: 'manual', value: clampZoom(zoomAnchor(zoom, actualScale) + direction * ZOOM_STEP) };
+  return {
+    mode: 'manual',
+    value: clampZoom(zoomAnchor(zoom, actualScale) + direction * ZOOM_STEP),
+  };
 }

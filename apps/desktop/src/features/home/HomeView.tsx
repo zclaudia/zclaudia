@@ -19,6 +19,9 @@ import { generateSessionTitle } from '../../services/api';
 import { selectHomeSessions, type HomeSessionRow } from './homeSessions';
 import { greeting } from './greeting';
 import { UsageStatsStrip } from './UsageStatsStrip';
+import { Button } from '../../components/ui/Button';
+import { PaneSkeleton } from '../../components/ui/Skeleton';
+import { STATUS_TONE, TONE_DOT } from '../../components/ui/tone';
 
 interface HomeViewProps {
   onNewSession: () => void;
@@ -137,28 +140,26 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
 
   const isEmpty = needsAttention.length === 0 && running.length === 0 && recent.length === 0;
 
-  // Before the initial REST load finishes the stores are empty regardless of
-  // real data — rendering the empty state then would flash onboarding on every
-  // cold start. Stay blank until useDataLoader has stamped the load complete.
-  // Once there's activity (running/recent), the load is implicitly done.
-  if (isEmpty && !dataLoaded) return null;
+  // Keep onboarding hidden until the first catalog arrives without leaving a blank pane.
+  if (isEmpty && !dataLoaded) {
+    return (
+      <div className="mx-auto max-w-2xl px-6 pt-12" role="status" aria-busy="true">
+        <p className="text-sm text-muted-foreground">正在加载会话与项目…</p>
+        <PaneSkeleton />
+      </div>
+    );
+  }
 
   const quickActions = (
-    <div className="flex gap-2">
-      <button
-        onClick={onNewSession}
-        className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-      >
-        <Plus size={13} strokeWidth={1.75} />
+    <div className="flex flex-wrap gap-2">
+      <Button variant="primary" onClick={onNewSession} className="h-9">
+        <Plus size={15} strokeWidth={1.75} aria-hidden />
         New session
-      </button>
-      <button
-        onClick={onAddProject}
-        className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-      >
-        <FolderPlus size={13} strokeWidth={1.75} />
+      </Button>
+      <Button variant="outline" onClick={onAddProject} className="h-9">
+        <FolderPlus size={15} strokeWidth={1.75} aria-hidden />
         Add project
-      </button>
+      </Button>
     </div>
   );
 
@@ -235,29 +236,41 @@ function SessionGroup({
 }) {
   return (
     <div>
-      <div className="px-2 text-[11px] font-medium text-muted-foreground">{label}</div>
+      <div className="px-2 text-xs font-medium text-muted-foreground">{label}</div>
       <ul className="mt-1">
         {rows.map(row => (
           <li key={JSON.stringify([row.backendKey, row.id])}>
             <button
               onClick={() => onOpen(row)}
-              className="w-full px-2 py-1.5 rounded-md text-left hover:bg-secondary transition-colors group"
+              className="w-full px-2 py-1.5 max-md:py-3 rounded-md text-left hover:bg-secondary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring group"
             >
               <span className="flex items-center gap-2">
                 {row.needsAttention ? (
-                  <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse shrink-0" />
+                  <span
+                    role="img"
+                    aria-label="等待处理"
+                    className={`w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${TONE_DOT[STATUS_TONE.waiting]}`}
+                  />
                 ) : row.isRunning ? (
-                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shrink-0" />
+                  <span
+                    role="img"
+                    aria-label="运行中"
+                    className={`w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${TONE_DOT[STATUS_TONE.running]}`}
+                  />
                 ) : row.hasFailed ? (
                   // Settled, so no pulse — it is a result to review, not activity.
-                  <span className="w-1.5 h-1.5 rounded-full bg-destructive shrink-0" />
+                  <span
+                    role="img"
+                    aria-label="失败"
+                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${TONE_DOT[STATUS_TONE.failed]}`}
+                  />
                 ) : null}
                 <span
                   className={`truncate text-sm text-foreground${row.titlePending ? ' animate-pulse' : ''}`}
                 >
                   {row.title}
                 </span>
-                <span className="ml-auto shrink-0 pl-4 text-[11px] text-muted-foreground">
+                <span className="ml-auto shrink-0 pl-4 text-xs text-muted-foreground">
                   {timeAgo(row.updatedAt)}
                 </span>
               </span>

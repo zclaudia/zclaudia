@@ -155,7 +155,9 @@ describe('ExportDialog（P2 §6.4）', () => {
     mount();
     expect(await screen.findByText('assets/gone.png')).toBeInTheDocument();
     expect(screen.getByText('assets/x.css')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Export anyway (the manifest will note missing files)' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Export anyway (the manifest will note missing files)' })
+    );
     await waitFor(() => expect(exportDesignZip).toHaveBeenCalledTimes(2));
     expect(exportDesignZip).toHaveBeenLastCalledWith('remote-1', {
       sessionId: 's1',

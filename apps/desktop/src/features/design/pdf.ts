@@ -37,7 +37,9 @@ function encodeLatin1(text: string): Uint8Array {
 function validatePages(pages: readonly PdfJpegPage[]): void {
   if (pages.length === 0) throw new Error('PDF export failed: at least one page is required');
   if (pages.length > MAX_PDF_PAGES) {
-    throw new Error(`PDF export failed: page count ${pages.length} exceeds the limit of ${MAX_PDF_PAGES}`);
+    throw new Error(
+      `PDF export failed: page count ${pages.length} exceeds the limit of ${MAX_PDF_PAGES}`
+    );
   }
   for (let index = 0; index < pages.length; index += 1) {
     const page = pages[index];
@@ -55,7 +57,9 @@ function validatePages(pages: readonly PdfJpegPage[]): void {
       );
     }
     if (!(page.jpegBytes instanceof Uint8Array) || page.jpegBytes.length < MIN_JPEG_BYTES) {
-      throw new Error(`PDF export failed: ${label} has invalid JPEG data (length too short: fewer than ${MIN_JPEG_BYTES} bytes)`);
+      throw new Error(
+        `PDF export failed: ${label} has invalid JPEG data (length too short: fewer than ${MIN_JPEG_BYTES} bytes)`
+      );
     }
     if (page.jpegBytes[0] !== JPEG_SOI_0 || page.jpegBytes[1] !== JPEG_SOI_1) {
       throw new Error(`PDF export failed: ${label} data is not a valid JPEG (missing SOI marker)`);
@@ -69,10 +73,14 @@ function validatePages(pages: readonly PdfJpegPage[]): void {
  * （`q wPt 0 0 hPt 0 0 cm /ImN Do Q`）。xref 表偏移逐一计算，trailer 指向
  * Catalog，`%%EOF` 结尾。
  */
-export function buildImagePdf(pages: readonly PdfJpegPage[], options?: BuildImagePdfOptions): Uint8Array {
+export function buildImagePdf(
+  pages: readonly PdfJpegPage[],
+  options?: BuildImagePdfOptions
+): Uint8Array {
   validatePages(pages);
   const dpi = options?.dpi ?? 96;
-  if (!Number.isFinite(dpi) || dpi <= 0) throw new Error('PDF export failed: dpi must be a positive number');
+  if (!Number.isFinite(dpi) || dpi <= 0)
+    throw new Error('PDF export failed: dpi must be a positive number');
 
   const pageObjectNumber = (index: number): number => 3 + index * 3;
   const totalObjects = 2 + pages.length * 3;
@@ -131,11 +139,11 @@ export function buildImagePdf(pages: readonly PdfJpegPage[], options?: BuildImag
   pushAscii(`xref\n0 ${totalObjects + 1}\n`);
   pushAscii('0000000000 65535 f \n');
   for (let objectNumber = 1; objectNumber <= totalObjects; objectNumber += 1) {
-    pushAscii(
-      `${String(offsets[objectNumber]).padStart(10, '0')} 00000 n \n`
-    );
+    pushAscii(`${String(offsets[objectNumber]).padStart(10, '0')} 00000 n \n`);
   }
-  pushAscii(`trailer\n<< /Size ${totalObjects + 1} /Root 1 0 R >>\nstartxref\n${startxref}\n%%EOF\n`);
+  pushAscii(
+    `trailer\n<< /Size ${totalObjects + 1} /Root 1 0 R >>\nstartxref\n${startxref}\n%%EOF\n`
+  );
 
   const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
   const output = new Uint8Array(total);

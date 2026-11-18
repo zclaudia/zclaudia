@@ -100,7 +100,10 @@ describe('DeckPanel（P5 §5.1）', () => {
     const afterUp = reorderDeckSlides(DECK_SOURCE, 1, 0);
     fireEvent.click(screen.getByRole('button', { name: 'Move page 1 down' }));
     await waitFor(() => expect(h.onCommit).toHaveBeenCalledTimes(2));
-    expect(h.onCommit).toHaveBeenLastCalledWith(reorderDeckSlides(afterUp, 0, 1), 'Move page 1 down');
+    expect(h.onCommit).toHaveBeenLastCalledWith(
+      reorderDeckSlides(afterUp, 0, 1),
+      'Move page 1 down'
+    );
   });
 
   it('标记元素非同父级时排序按钮禁用并显示原因', () => {
@@ -110,7 +113,10 @@ describe('DeckPanel（P5 §5.1）', () => {
     });
     const up = screen.getByRole('button', { name: 'Move page 1 up' });
     expect(up).toBeDisabled();
-    expect(up).toHaveAttribute('title', 'Slides are not under the same parent and cannot be reordered');
+    expect(up).toHaveAttribute(
+      'title',
+      'Slides are not under the same parent and cannot be reordered'
+    );
     expect(screen.getByRole('button', { name: 'Move page 1 down' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Move page 3 down' })).toBeDisabled();
   });
@@ -130,7 +136,9 @@ describe('DeckPanel（P5 §5.1）', () => {
     fireEvent.change(screen.getByLabelText('Title of page 1'), {
       target: { value: '长'.repeat(201) },
     });
-    expect(await screen.findByRole('alert')).toHaveTextContent('Title must be at most 200 characters');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Title must be at most 200 characters'
+    );
     expect(h.onCommit).not.toHaveBeenCalled();
   });
 
@@ -189,14 +197,20 @@ describe('DeckPanel（P5 §5.1）', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Slide aspect ratio' }));
     fireEvent.click(screen.getByRole('option', { name: '4:3' }));
     await waitFor(() => expect(h.onCommit).toHaveBeenCalledTimes(1));
-    expect(h.onCommit).toHaveBeenCalledWith(setDeckRatio(DECK_SOURCE, '4:3'), 'Set slide aspect ratio to 4:3');
+    expect(h.onCommit).toHaveBeenCalledWith(
+      setDeckRatio(DECK_SOURCE, '4:3'),
+      'Set slide aspect ratio to 4:3'
+    );
   });
 
   it('onCommit 返回 false 时页内 alert 显示提交失败', async () => {
     const h = mount({ onCommit: vi.fn().mockResolvedValue(false) });
     fireEvent.click(screen.getByRole('button', { name: 'Move page 1 down' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('The change did not take effect');
-    expect(h.onCommit).toHaveBeenCalledWith(reorderDeckSlides(DECK_SOURCE, 0, 1), 'Move page 1 down');
+    expect(h.onCommit).toHaveBeenCalledWith(
+      reorderDeckSlides(DECK_SOURCE, 0, 1),
+      'Move page 1 down'
+    );
   });
 
   it('busy 时全部操作禁用', () => {

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @zclaudia/desktop run build",
+  "outputDirectory": "apps/desktop/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}

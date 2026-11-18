@@ -34,6 +34,12 @@ elif [[ "${resolve_command[0]:-}" == "env" ]]; then
   fi
 fi
 
+# Vercel selects a supported 22.x version instead of the exact local pin.
+if [[ -n "${VERCEL:-}" ]]; then
+  node "$PROJECT_ROOT/scripts/hooks/ensure-node-version.mjs"
+  exec "${resolve_command[@]}"
+fi
+
 if [[ "$CURRENT_NODE" == "$EXPECTED_NODE" ]]; then
   exec "${resolve_command[@]}"
 fi

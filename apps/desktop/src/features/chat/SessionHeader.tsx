@@ -1,13 +1,11 @@
 import { SessionSettingsDialog } from './SessionSettingsDialog';
+import { SessionActionsMenu } from './SessionActionsMenu';
+import { IconButton } from '../../components/ui/Button';
 import { WorkspaceChatControls } from '../../components/workspace/WorkspaceChatControls';
 import { useState, type ReactNode } from 'react';
 import {
-  RotateCcw,
-  Download,
-  ExternalLink,
-  Archive,
   ArrowLeft,
-  MoreHorizontal,
+  Menu,
   WifiOff,
   Bot,
   Cpu,
@@ -23,7 +21,6 @@ import {
   Users,
   PanelRight,
   MessageSquare,
-  Info,
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -166,20 +163,9 @@ export function SessionHeader({
       <div className="absolute inset-x-0 top-0 hidden h-2 sm:block" data-tauri-drag-region />
       {/* Mobile: hamburger menu */}
       {isMobile && onOpenSidebar && (
-        <button
-          onClick={onOpenSidebar}
-          className="relative flex h-8 w-8 -ml-1 items-center justify-center rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex-shrink-0 before:absolute before:-inset-1.5 before:content-[''] md:before:content-none"
-          aria-label="Open menu"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 6h16M4 12h16M4 18h16"
-            />
-          </svg>
-        </button>
+        <IconButton onClick={onOpenSidebar} aria-label="Open menu">
+          <Menu className="h-5 w-5" strokeWidth={1.75} />
+        </IconButton>
       )}
       {/* Back button for background sessions */}
       {currentSession.type === 'background' && onReturnToDashboard && currentSession.projectId && (
@@ -206,6 +192,7 @@ export function SessionHeader({
           value={renameValue}
           onChange={e => onRenameChange(e.target.value)}
           onKeyDown={e => {
+            if (e.nativeEvent.isComposing || e.keyCode === 229) return;
             if (e.key === 'Enter') onRenameConfirm();
             if (e.key === 'Escape') onRenameCancel();
           }}
@@ -305,7 +292,7 @@ export function SessionHeader({
       <span className="hidden" data-stub-project-id={currentProject?.id} />
       {connectionQuality === 'degraded' && (
         <div
-          className="flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[9px] font-medium text-warning shrink-0"
+          className="flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-xs font-medium text-warning shrink-0"
           title="Backend may be unresponsive — heartbeat timeout"
         >
           <WifiOff size={10} />
@@ -323,166 +310,25 @@ export function SessionHeader({
       {/* Actions (hidden for background sessions) */}
       {currentSession.type !== 'background' && (
         <>
-          {/* Desktop: collapse low-frequency actions into a "..." menu */}
-          {!isMobile && (
-            <div className="relative shrink-0">
-              <button
-                onClick={onToggleSessionMenu}
-                className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${showSessionMenu ? 'bg-secondary text-foreground' : 'hover:bg-secondary text-muted-foreground hover:text-foreground'}`}
-                title="Session actions"
-                aria-label="Session actions"
-                aria-haspopup="menu"
-                aria-expanded={showSessionMenu}
-              >
-                <MoreHorizontal size={16} strokeWidth={1.75} />
-              </button>
-              {showSessionMenu && (
-                <>
-                  <div className="fixed inset-0 z-[70]" onClick={onToggleSessionMenu} />
-                  <div
-                    role="menu"
-                    className="absolute right-0 top-full z-[80] mt-1 min-w-44 overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-md"
-                  >
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        setShowSettings(true);
-                        onToggleSessionMenu();
-                      }}
-                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
-                    >
-                      <Shield size={13} />
-                      Session settings
-                    </button>
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        onResetProviderSession();
-                        onToggleSessionMenu();
-                      }}
-                      disabled={isLoading}
-                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <RotateCcw size={13} className="shrink-0 text-muted-foreground" />
-                      Reset session
-                    </button>
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        onExport();
-                        onToggleSessionMenu();
-                      }}
-                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
-                    >
-                      <Download size={13} className="shrink-0 text-muted-foreground" />
-                      Export as Markdown
-                    </button>
-                    {isDesktopTauri && !isStandaloneSessionWindow && (
-                      <button
-                        role="menuitem"
-                        onClick={() => {
-                          onPopOut();
-                          onToggleSessionMenu();
-                        }}
-                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
-                      >
-                        <ExternalLink size={13} className="shrink-0 text-muted-foreground" />
-                        Open in new window
-                      </button>
-                    )}
-                    <div className="my-1 h-px bg-border" />
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        onArchive();
-                        onToggleSessionMenu();
-                      }}
-                      disabled={archiveDisabled}
-                      title={archiveDisabled ? 'Stop the run before archiving' : undefined}
-                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-destructive hover:bg-destructive/8 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                    >
-                      <Archive size={13} className="shrink-0" />
-                      Archive session
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+          <SessionActionsMenu
+            open={showSessionMenu}
+            onOpenChange={open => {
+              if (open !== showSessionMenu) onToggleSessionMenu();
+            }}
+            isMobile={isMobile}
+            isLoading={isLoading}
+            archiveDisabled={archiveDisabled}
+            canPopOut={!isMobile && isDesktopTauri && !isStandaloneSessionWindow}
+            onInfo={() => setShowMobileInfo(true)}
+            onSettings={() => setShowSettings(true)}
+            onReset={onResetProviderSession}
+            onExport={onExport}
+            onArchive={onArchive}
+            onPopOut={onPopOut}
+          />
           {/* Mobile: collapse actions into "..." dropdown */}
           {isMobile && (
             <>
-              <div className="relative shrink-0">
-                <button
-                  onClick={onToggleSessionMenu}
-                  className="relative flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors before:absolute before:-inset-1.5 before:content-[''] md:before:content-none"
-                  title="Session actions"
-                  aria-label="Session actions"
-                >
-                  <MoreHorizontal size={16} strokeWidth={1.75} />
-                </button>
-                {showSessionMenu && (
-                  <>
-                    <div className="fixed inset-0 z-[70]" onClick={onToggleSessionMenu} />
-                    <div className="fixed right-3 top-[calc(env(safe-area-inset-top,0px)+42px)] z-[80] min-w-[180px] overflow-hidden rounded-xl border border-border bg-popover py-1 shadow-md">
-                      <button
-                        onClick={() => {
-                          setShowMobileInfo(true);
-                          onToggleSessionMenu();
-                        }}
-                        className="w-full text-left px-3 py-2 min-h-[44px] text-sm flex items-center gap-2 text-foreground hover:bg-muted"
-                      >
-                        <Info size={14} />
-                        Session info
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowSettings(true);
-                          onToggleSessionMenu();
-                        }}
-                        className="w-full text-left px-3 py-2 min-h-[44px] text-sm flex items-center gap-2 text-foreground hover:bg-muted"
-                      >
-                        <Shield size={14} />
-                        Session settings
-                      </button>
-                      <div className="my-1 h-px bg-border" />
-                      <button
-                        onClick={() => {
-                          onResetProviderSession();
-                          onToggleSessionMenu();
-                        }}
-                        disabled={isLoading}
-                        className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted disabled:opacity-50"
-                      >
-                        <RotateCcw size={14} />
-                        Reset Session
-                      </button>
-                      <button
-                        onClick={() => {
-                          onExport();
-                          onToggleSessionMenu();
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted"
-                      >
-                        <Download size={14} />
-                        Export Markdown
-                      </button>
-                      <button
-                        onClick={() => {
-                          onArchive();
-                          onToggleSessionMenu();
-                        }}
-                        disabled={archiveDisabled}
-                        title={archiveDisabled ? 'Stop the run before archiving' : undefined}
-                        className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-destructive hover:bg-destructive/8 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                      >
-                        <Archive size={14} />
-                        Archive
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
               {/* Mobile session-info overlay — same content as the desktop info
                   popover, sized for phones and dismissed by backdrop tap or the
                   close button. */}

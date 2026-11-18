@@ -64,9 +64,10 @@ vi.mock('../api', () => ({
 }));
 vi.mock('../preview', () => ({ buildDesignPreview: vi.fn(async () => '<html></html>') }));
 vi.mock('../interactive', () => ({
-  buildDesignRunPreview: vi.fn(
-    async () => ({ html: '<html></html>', blocked: { scripts: 0, links: 0 } })
-  ),
+  buildDesignRunPreview: vi.fn(async () => ({
+    html: '<html></html>',
+    blocked: { scripts: 0, links: 0 },
+  })),
 }));
 // 渲染导出内容现在由合并对话框真实挂载：捕获打桩，其余纯函数/PDF 保持真实。
 vi.mock('../render-export', async importOriginal => {
@@ -101,7 +102,9 @@ vi.mock('../rail/BrandView', () => ({
   BrandView: (props: { active: boolean; onSaved: () => void }) =>
     props.active ? (
       <div data-testid="brand-view">
-        <button type="button" onClick={props.onSaved}>mock-save brand</button>
+        <button type="button" onClick={props.onSaved}>
+          mock-save brand
+        </button>
       </div>
     ) : null,
 }));
@@ -132,8 +135,12 @@ vi.mock('../components/BrandPanel', () => ({
   BrandPanel: (props: { open: boolean; onClose: () => void; onSaved: () => void }) =>
     props.open ? (
       <div data-testid="brand-dialog">
-        <button type="button" onClick={props.onSaved}>mock-save brand dialog</button>
-        <button type="button" onClick={props.onClose}>mock-close brand</button>
+        <button type="button" onClick={props.onSaved}>
+          mock-save brand dialog
+        </button>
+        <button type="button" onClick={props.onClose}>
+          mock-close brand
+        </button>
       </div>
     ) : null,
 }));
@@ -179,7 +186,9 @@ vi.mock('../rail/SlidesView', () => ({
         >
           mock-commit slides
         </button>
-        <button type="button" onClick={() => props.onPresent(1)}>mock-present</button>
+        <button type="button" onClick={() => props.onPresent(1)}>
+          mock-present
+        </button>
       </div>
     ) : null,
 }));
@@ -195,7 +204,9 @@ vi.mock('../components/DeckPresenter', () => ({
       <span data-testid="deck-presenter-start">{props.startIndex}</span>
       <span data-testid="deck-presenter-slides">{props.slides.length}</span>
       <span data-testid="deck-presenter-ratio">{props.ratio}</span>
-      <button type="button" onClick={props.onClose}>mock-close presenter</button>
+      <button type="button" onClick={props.onClose}>
+        mock-close presenter
+      </button>
     </div>
   ),
 }));
@@ -213,14 +224,18 @@ vi.mock('../components/MediaGenPanel', () => ({
       <div data-testid="media-dialog">
         <span data-testid="media-dialog-session">{props.sessionId ?? 'none'}</span>
         <span data-testid="media-dialog-active-doc">{props.activeDocPath ?? 'none'}</span>
-        <span data-testid="media-dialog-image-ready">{props.imageSelectionReady ? 'yes' : 'no'}</span>
+        <span data-testid="media-dialog-image-ready">
+          {props.imageSelectionReady ? 'yes' : 'no'}
+        </span>
         <button type="button" onClick={() => props.onReplaceSelectionSrc('assets/gen-1.png')}>
           mock-replace selected image dialog
         </button>
         <button type="button" onClick={() => props.onAssetImported('assets/gen-1.png')}>
           mock-import generated asset dialog
         </button>
-        <button type="button" onClick={props.onClose}>mock-close media</button>
+        <button type="button" onClick={props.onClose}>
+          mock-close media
+        </button>
       </div>
     ) : null,
 }));
@@ -343,11 +358,15 @@ async function openAgentContext(request = '') {
 
 /** 通过 `+` 菜单打开一个未打开的文件并等它的标签出现。 */
 async function openPage(path: string) {
+  // The menu stays closed while every known file is already open.
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Open page' })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'Open page' }));
   fireEvent.click(await screen.findByRole('menuitem', { name: path }));
   const name = path.slice(path.lastIndexOf('/') + 1);
   await waitFor(() =>
-    expect(screen.getByRole('tab', { name: new RegExp(name.replace('.', '\\.')) })).toBeInTheDocument()
+    expect(
+      screen.getByRole('tab', { name: new RegExp(name.replace('.', '\\.')) })
+    ).toBeInTheDocument()
   );
 }
 
@@ -355,9 +374,9 @@ async function openPage(path: string) {
 async function editActivePage(fromText: string, toText: string) {
   const source = pageSource(fromText);
   await waitFor(() =>
-    expect(
-      vi.mocked(preview.buildDesignPreview).mock.calls.some(call => call[0] === source)
-    ).toBe(true)
+    expect(vi.mocked(preview.buildDesignPreview).mock.calls.some(call => call[0] === source)).toBe(
+      true
+    )
   );
   await selectElement(source);
   fireEvent.change(screen.getByRole('textbox', { name: 'Element text' }), {
@@ -405,7 +424,9 @@ describe('DesignPanel', () => {
         }
       } else if (input.expectedRevision !== current.revision) {
         return Promise.reject(
-          new Error(`revision conflict: expected ${input.expectedRevision} but disk has ${current.revision}`)
+          new Error(
+            `revision conflict: expected ${input.expectedRevision} but disk has ${current.revision}`
+          )
         );
       }
       const saved = { path: input.path, source: input.source, revision: `saved-${++savedCounter}` };
@@ -576,7 +597,9 @@ describe('DesignPanel', () => {
     expect(state.pendingPrefills['session-1']?.content).toContain('Existing request');
     expect(state.pendingPrefills['session-1']?.content).toContain('design/index.html');
     expect(state.drafts['session-1']?.attachments).toHaveLength(1);
-    expect(await screen.findByText('Prefilled into the current chat — add your requirements and send.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Prefilled into the current chat — add your requirements and send.')
+    ).toBeInTheDocument();
   });
 
   it('does not poll while its workspace host is hidden', () => {
@@ -590,7 +613,9 @@ describe('DesignPanel', () => {
         <DesignPanel />
       </WorkspaceToolProvider>
     );
-    expect(screen.getByText('Connect the session backend before opening the design panel.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Connect the session backend before opening the design panel.')
+    ).toBeInTheDocument();
     expect(api.listDesignFiles).not.toHaveBeenCalled();
   });
 
@@ -696,7 +721,9 @@ describe('DesignPanel', () => {
       target: { value: 'bad-color' },
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Apply changes' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid color value; enter a valid CSS color');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Invalid color value; enter a valid CSS color'
+    );
   });
 
   it('reloads an unchanged document when explicitly reverting a dirty draft', async () => {
@@ -756,8 +783,7 @@ describe('DesignPanel', () => {
           .mocked(preview.buildDesignPreview)
           .mock.calls.some(
             call =>
-              typeof call[0] === 'string' &&
-              call[0].includes('style=" background-color: #222222"')
+              typeof call[0] === 'string' && call[0].includes('style=" background-color: #222222"')
           )
       ).toBe(true)
     );
@@ -886,9 +912,7 @@ describe('DesignPanel', () => {
 
     // 第二次保存成功（mock 队列已消费，回到磁盘校验实现）：标志清除。
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() =>
-      expect(screen.queryByText(/updated elsewhere/)).not.toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.queryByText(/updated elsewhere/)).not.toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -916,9 +940,7 @@ describe('DesignPanel', () => {
       files: ['p1.html', 'p2.html', 'p3.html'],
     });
     mount();
-    await waitFor(() =>
-      expect(screen.getByRole('tab', { name: /p1\.html/ })).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByRole('tab', { name: /p1\.html/ })).toBeInTheDocument());
     await openPage('p2.html');
     await openPage('p3.html');
 
@@ -1039,33 +1061,35 @@ describe('DesignPanel', () => {
   });
 
   it('confirms before closing a dirty page: discarding removes it, saving closes it', async () => {
+    disk.set('design/other.html', { source: pageSource('Other'), revision: 'other-1' });
+    vi.mocked(api.listDesignFiles).mockResolvedValue({
+      files: ['design/index.html', 'design/other.html'],
+    });
     mount();
     await screen.findByTitle('Design preview');
-    await selectElement();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Element text' }), {
-      target: { value: 'Changed' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+    // Keep another tab open so empty-workspace discovery cannot reopen index.html.
+    await openPage('design/other.html');
+    await screen.findByRole('tab', { name: 'other.html', selected: true });
+    fireEvent.click(screen.getByRole('tab', { name: 'index.html' }));
+    await editActivePage('Hello', 'Changed');
 
     fireEvent.click(screen.getByRole('button', { name: 'Close design/index.html' }));
     const dialog = screen.getByRole('dialog', { name: 'Save before closing' });
-    expect(within(dialog).getByText(/has unsaved changes\. Save them before closing\?/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/has unsaved changes\. Save them before closing\?/)
+    ).toBeInTheDocument();
 
     // 放弃修改：页面直接移除。
     fireEvent.click(within(dialog).getByRole('button', { name: 'Discard changes' }));
+    // The tab's accessible name is the file basename, not the workspace path.
     await waitFor(() =>
-      expect(screen.queryByRole('tab', { name: /design\/index\.html/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: 'index.html' })).not.toBeInTheDocument()
     );
 
     // 重新打开并编辑后关闭：保存成功再关闭。
     await openPage('design/index.html');
-    await selectElement();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Element text' }), {
-      target: { value: 'Changed again' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+    await screen.findByRole('tab', { name: 'index.html', selected: true });
+    await editActivePage('Hello', 'Changed again');
     fireEvent.click(screen.getByRole('button', { name: 'Close design/index.html' }));
     fireEvent.click(
       within(screen.getByRole('dialog', { name: 'Save before closing' })).getByRole('button', {
@@ -1075,11 +1099,14 @@ describe('DesignPanel', () => {
     await waitFor(() =>
       expect(api.putDesignDocument).toHaveBeenCalledWith(
         'remote-1',
-        expect.objectContaining({ path: 'design/index.html', source: expect.stringContaining('Changed again') })
+        expect.objectContaining({
+          path: 'design/index.html',
+          source: expect.stringContaining('Changed again'),
+        })
       )
     );
     await waitFor(() =>
-      expect(screen.queryByRole('tab', { name: /design\/index\.html/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: 'index.html' })).not.toBeInTheDocument()
     );
   });
 
@@ -1093,7 +1120,9 @@ describe('DesignPanel', () => {
       expect(screen.getByLabelText('Missing file design/index.html')).toBeInTheDocument()
     );
     expect(
-      screen.getByText('This file no longer exists in the workspace; save to recreate it, or close the page.')
+      screen.getByText(
+        'This file no longer exists in the workspace; save to recreate it, or close the page.'
+      )
     ).toBeInTheDocument();
 
     await selectElement();
@@ -1130,7 +1159,9 @@ describe('DesignPanel', () => {
     await screen.findByTitle('Design preview');
     await selectElement();
     expect(
-      screen.queryByText('The file viewer shows the saved version; line numbers may be offset relative to the draft')
+      screen.queryByText(
+        'The file viewer shows the saved version; line numbers may be offset relative to the draft'
+      )
     ).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: 'Element text' }), {
       target: { value: 'Changed' },
@@ -1138,7 +1169,9 @@ describe('DesignPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
     expect(
-      screen.getByText('The file viewer shows the saved version; line numbers may be offset relative to the draft')
+      screen.getByText(
+        'The file viewer shows the saved version; line numbers may be offset relative to the draft'
+      )
     ).toBeInTheDocument();
   });
 
@@ -1189,7 +1222,10 @@ describe('DesignPanel', () => {
     await waitFor(() =>
       expect(api.putDesignDocument).toHaveBeenCalledWith(
         'remote-1',
-        expect.objectContaining({ path: 'design/index.html', source: expect.stringContaining('Changed') })
+        expect.objectContaining({
+          path: 'design/index.html',
+          source: expect.stringContaining('Changed'),
+        })
       )
     );
     await waitFor(() =>
@@ -1214,16 +1250,24 @@ describe('DesignPanel', () => {
       target: { value: 'Changed' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Unsaved changes' })).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Unsaved changes' })).toBeEnabled()
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Unsaved changes' }));
     const dialog = await screen.findByRole('dialog', { name: 'Unsaved changes' });
     expect(within(dialog).getByText('Unsaved changes · index.html')).toBeInTheDocument();
     await waitFor(() =>
-      expect(api.getDesignDocument).toHaveBeenCalledWith('remote-1', 'session-1', 'design/index.html')
+      expect(api.getDesignDocument).toHaveBeenCalledWith(
+        'remote-1',
+        'session-1',
+        'design/index.html'
+      )
     );
     // lineDiff 输出：删除行（磁盘 Hello 版）+ 新增行（草稿 Changed 版）。
-    expect(within(dialog).getByText('<html><body><h1>Hello</h1></body></html>')).toBeInTheDocument();
+    expect(
+      within(dialog).getByText('<html><body><h1>Hello</h1></body></html>')
+    ).toBeInTheDocument();
     expect(
       within(dialog).getByText('<html><body><h1>Changed</h1></body></html>')
     ).toBeInTheDocument();
@@ -1330,9 +1374,7 @@ describe('DesignPanel', () => {
     expect(await screen.findByText(OVERRIDE_WARNING_TEXT)).toBeInTheDocument();
     // 计算值匹配 → 告警隐藏。
     reply({ 'font-size': '20px' });
-    await waitFor(() =>
-      expect(screen.queryByText(OVERRIDE_WARNING_TEXT)).not.toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.queryByText(OVERRIDE_WARNING_TEXT)).not.toBeInTheDocument());
   });
 
   it('compares top-level color fields on the reselect reply for mixed color+style applies', async () => {
@@ -1348,9 +1390,9 @@ describe('DesignPanel', () => {
     const styled =
       '<html><body><h1 style="color: #123456; font-size: 20px">Hello</h1></body></html>';
     await waitFor(() =>
-      expect(vi.mocked(preview.buildDesignPreview).mock.calls.some(call => call[0] === styled)).toBe(
-        true
-      )
+      expect(
+        vi.mocked(preview.buildDesignPreview).mock.calls.some(call => call[0] === styled)
+      ).toBe(true)
     );
     frame = (await screen.findByTitle('Design preview')) as HTMLIFrameElement;
     fireEvent.load(frame);
@@ -1381,9 +1423,7 @@ describe('DesignPanel', () => {
     expect(await screen.findByText(OVERRIDE_WARNING_TEXT)).toBeInTheDocument();
     // 等价颜色（#123456 = rgb(18, 52, 86)）→ 不再告警。
     reply('rgb(18, 52, 86)');
-    await waitFor(() =>
-      expect(screen.queryByText(OVERRIDE_WARNING_TEXT)).not.toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.queryByText(OVERRIDE_WARNING_TEXT)).not.toBeInTheDocument());
   });
 
   it('a pure color edit keeps the legacy verify loop and never sends select-path', async () => {
@@ -1595,7 +1635,9 @@ describe('DesignPanel', () => {
     const content = useComposerStore.getState().pendingPrefills['session-1']?.content ?? '';
     expect(content).toContain('Update the current page at design/index.html');
     expect(content).toContain('Follow the brand rules and tokens above when present');
-    expect(await screen.findByText('Prefilled into the current chat — add your requirements and send.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Prefilled into the current chat — add your requirements and send.')
+    ).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Agent context' })).not.toBeInTheDocument();
   });
 
@@ -1611,9 +1653,7 @@ describe('DesignPanel', () => {
 
     const dialog = await openAgentContext('Make the hero bolder');
     const promptEl = within(dialog).getByText(/Update the current page at design\/about\.html/);
-    expect(promptEl.textContent).toContain(
-      'according to the request; preserve unrelated content'
-    );
+    expect(promptEl.textContent).toContain('according to the request; preserve unrelated content');
     expect(promptEl.textContent).toContain('## Request\n\nMake the hero bolder');
     expect(promptEl.textContent).not.toContain('Update the current page at design/index.html');
     fireEvent.click(screen.getByRole('button', { name: 'Send to chat' }));
@@ -1649,7 +1689,9 @@ describe('DesignPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preview context' }));
     expect(useComposerStore.getState().pendingPrefills['session-1']).toBeUndefined();
     expect(screen.queryByRole('dialog', { name: 'Agent context' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Prefilled into the current chat — add your requirements and send.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Prefilled into the current chat — add your requirements and send.')
+    ).not.toBeInTheDocument();
   });
 
   it('handoff：上下文 prompt 含选中元素 tag/path，发送后填入聊天', async () => {
@@ -1815,10 +1857,19 @@ describe('DesignPanel', () => {
     expect(edit).toHaveAttribute('aria-pressed', 'true');
     expect(run).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(run);
-    expect(screen.getByRole('button', { name: 'Edit mode' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: 'Run mode' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Edit mode' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(screen.getByRole('button', { name: 'Run mode' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Edit mode' }));
-    expect(screen.getByRole('button', { name: 'Edit mode' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Edit mode' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
     // Slides 不再是顶栏第三种模式：唯一入口是 More actions 菜单。
     expect(screen.queryByRole('button', { name: 'Slides' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
@@ -1852,9 +1903,13 @@ describe('DesignPanel', () => {
     // 缓存键分叉：本页未再走静态构建器。
     expect(preview.buildDesignPreview).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('textbox', { name: 'Element text' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Click an element in the preview to edit it/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Click an element in the preview to edit it/)
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Run mode: interaction only')).toBeInTheDocument();
-    expect(screen.getByText('Removed 2 external script(s) and 1 external link(s)')).toBeInTheDocument();
+    expect(
+      screen.getByText('Removed 2 external script(s) and 1 external link(s)')
+    ).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Ask Agent' })).not.toBeInTheDocument();
 
     // 切回编辑模式：状态条消失，静态预览按新模式键重建（缓存按 path 单槽替换），编辑区恢复。
@@ -1862,7 +1917,9 @@ describe('DesignPanel', () => {
     expect(
       screen.queryByText('Run mode: interaction only — switch back to Edit mode to make changes')
     ).not.toBeInTheDocument();
-    expect(screen.queryByText('Removed 2 external script(s) and 1 external link(s)')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Removed 2 external script(s) and 1 external link(s)')
+    ).not.toBeInTheDocument();
     expect(await screen.findByRole('textbox', { name: 'Element text' })).toBeInTheDocument();
     expect(preview.buildDesignPreview).toHaveBeenCalledTimes(2);
     expect(interactive.buildDesignRunPreview).toHaveBeenCalledTimes(1);
@@ -1888,9 +1945,7 @@ describe('DesignPanel', () => {
       })
     );
     expect(await screen.findByText('Opened design/new.html')).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByRole('tab', { name: /new\.html/ })).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByRole('tab', { name: /new\.html/ })).toBeInTheDocument());
     // 新活动页在运行模式下同样走运行构建器。
     await waitFor(() => {
       const calls = vi.mocked(interactive.buildDesignRunPreview).mock.calls;
@@ -1931,7 +1986,9 @@ describe('DesignPanel', () => {
       })
     );
     expect(await screen.findByText('Blocked opening an external link')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss notice: Blocked opening an external link' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Dismiss notice: Blocked opening an external link' })
+    );
     expect(screen.queryByText('Blocked opening an external link')).not.toBeInTheDocument();
 
     fireEvent(
@@ -1947,7 +2004,9 @@ describe('DesignPanel', () => {
       })
     );
     expect(
-      await screen.findByText('Blocked a non-page link (only in-workspace HTML navigation is supported)')
+      await screen.findByText(
+        'Blocked a non-page link (only in-workspace HTML navigation is supported)'
+      )
     ).toBeInTheDocument();
   });
 
@@ -2052,9 +2111,7 @@ describe('DesignPanel', () => {
         buildRenderExportFilename('design/index.html', 'png', 1),
       ])
     );
-    expect(
-      within(dialog).getByText('Export finished: 2/2 pages succeeded.')
-    ).toBeInTheDocument();
+    expect(within(dialog).getByText('Export finished: 2/2 pages succeeded.')).toBeInTheDocument();
   });
 
   it('P5/P5a：非 deck 页 Render 页签仅提供视口区域 PNG，并按活动页视口组装捕获请求', async () => {
@@ -2268,8 +2325,12 @@ describe('DesignPanel', () => {
       expect(content).toContain('标题改成蓝色更好');
     });
     const content = useComposerStore.getState().pendingPrefills['session-1']?.content ?? '';
-    expect(content).toContain('Please update the current page design/index.html based on the review feedback above');
-    expect(await screen.findByText('Prefilled into the current chat — add your requirements and send.')).toBeInTheDocument();
+    expect(content).toContain(
+      'Please update the current page design/index.html based on the review feedback above'
+    );
+    expect(
+      await screen.findByText('Prefilled into the current chat — add your requirements and send.')
+    ).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Export & Share' })).not.toBeInTheDocument();
   });
 
@@ -2362,12 +2423,22 @@ describe('DesignPanel', () => {
   }
 
   /** 以最新构建的 channel 从预览 iframe 发 design-rules 载荷。 */
-  const sendRules = (frame: HTMLIFrameElement, rules: unknown, extra: Record<string, unknown> = {}) =>
+  const sendRules = (
+    frame: HTMLIFrameElement,
+    rules: unknown,
+    extra: Record<string, unknown> = {}
+  ) =>
     fireEvent(
       window,
       new MessageEvent('message', {
         source: frame.contentWindow,
-        data: { type: 'zclaudia:design-rules', channel: latestChannel(), elementPath: [0], rules, ...extra },
+        data: {
+          type: 'zclaudia:design-rules',
+          channel: latestChannel(),
+          elementPath: [0],
+          rules,
+          ...extra,
+        },
       })
     );
 
@@ -2414,9 +2485,9 @@ describe('DesignPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Apply value for color' }));
     const styled = STYLE_SOURCE_PAGE.replace('#ff0000', '#00ff00');
     await waitFor(() =>
-      expect(vi.mocked(preview.buildDesignPreview).mock.calls.some(call => call[0] === styled)).toBe(
-        true
-      )
+      expect(
+        vi.mocked(preview.buildDesignPreview).mock.calls.some(call => call[0] === styled)
+      ).toBe(true)
     );
     frame = (await screen.findByTitle('Design preview')) as HTMLIFrameElement;
     const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
@@ -2478,8 +2549,7 @@ describe('DesignPanel', () => {
     specificity: [0, 0, 1],
     importantProps: [],
   };
-  const EXPORT_NOTICE =
-    'Unsaved style changes are not included in exports — save styles first.';
+  const EXPORT_NOTICE = 'Unsaved style changes are not included in exports — save styles first.';
 
   /** 打开引用外部 css 的页面并让选区落地（computed color 与磁盘 css 源值等值）。 */
   async function mountExternalStylePage() {
@@ -2519,7 +2589,9 @@ describe('DesignPanel', () => {
     const frame = await mountExternalStylePage();
     const input = await openExternalRuleRow(frame);
     // 来源区不再显示第一批只读文案。
-    expect(screen.queryByText('External stylesheet editing arrives in a later batch')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('External stylesheet editing arrives in a later batch')
+    ).not.toBeInTheDocument();
     applyExternalValue(input, '#00ff00');
     // 草稿优先进 cssSources：来源区行立即显示新值。
     expect(await screen.findByText('#00ff00')).toBeInTheDocument();
@@ -2597,7 +2669,9 @@ describe('DesignPanel', () => {
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Reload style file' })).not.toBeInTheDocument()
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('A style file was changed outside the panel');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'A style file was changed outside the panel'
+    );
     expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled();
     // Keep draft：横幅收起，草稿保留（之后重试仍会 409，可重新载入解决）。
     fireEvent.click(screen.getByRole('button', { name: 'Keep draft' }));
@@ -2630,7 +2704,9 @@ describe('DesignPanel', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Save styles' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('disk on fire');
-    expect(screen.queryByText('A style file was changed outside the panel')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('A style file was changed outside the panel')
+    ).not.toBeInTheDocument();
     // 草稿保留：Save styles 仍可用。
     expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled();
   });
@@ -2646,10 +2722,14 @@ describe('DesignPanel', () => {
     await openMoreMenu('Export & Share');
     const dialog = await screen.findByRole('dialog', { name: 'Export & Share' });
     expect(within(dialog).queryByText(EXPORT_NOTICE)).not.toBeInTheDocument();
-    await waitFor(() => expect(within(dialog).getByText('Exported: export.zip')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(dialog).getByText('Exported: export.zip')).toBeInTheDocument()
+    );
     // Modal 自带 X（aria-label Close）与 footer Close 同名：点 footer 的（最后一个）。
     fireEvent.click(within(dialog).getAllByRole('button', { name: 'Close' }).at(-1)!);
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Export & Share' })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Export & Share' })).not.toBeInTheDocument()
+    );
     // 产生 CSS 脏草稿后：顶部提示出现。
     applyExternalValue(screen.getByRole('textbox', { name: 'Value for color' }), '#00ff00');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save styles' })).toBeEnabled());
@@ -2698,22 +2778,24 @@ describe('isValidRulesMessage', () => {
     expect(isValidRulesMessage({ ...valid, rules: [{ ...validRule, origin: '' }] })).toBe(false);
     expect(isValidRulesMessage({ ...valid, rules: [{ ...validRule, origin: 1 }] })).toBe(false);
     expect(isValidRulesMessage({ ...valid, rules: [{ ...validRule, rulePath: [] }] })).toBe(false);
-    expect(isValidRulesMessage({ ...valid, rules: [{ ...validRule, rulePath: [1.5] }] })).toBe(false);
-    expect(
-      isValidRulesMessage({ ...valid, rules: [{ ...validRule, selectorText: '' }] })
-    ).toBe(false);
+    expect(isValidRulesMessage({ ...valid, rules: [{ ...validRule, rulePath: [1.5] }] })).toBe(
+      false
+    );
+    expect(isValidRulesMessage({ ...valid, rules: [{ ...validRule, selectorText: '' }] })).toBe(
+      false
+    );
     expect(
       isValidRulesMessage({ ...valid, rules: [{ ...validRule, selectorText: 'x'.repeat(301) }] })
     ).toBe(false);
-    expect(
-      isValidRulesMessage({ ...valid, rules: [{ ...validRule, specificity: [0, 0] }] })
-    ).toBe(false);
+    expect(isValidRulesMessage({ ...valid, rules: [{ ...validRule, specificity: [0, 0] }] })).toBe(
+      false
+    );
     expect(
       isValidRulesMessage({ ...valid, rules: [{ ...validRule, specificity: [0, 0, 10000] }] })
     ).toBe(false);
-    expect(
-      isValidRulesMessage({ ...valid, rules: [{ ...validRule, importantProps: [''] }] })
-    ).toBe(false);
+    expect(isValidRulesMessage({ ...valid, rules: [{ ...validRule, importantProps: [''] }] })).toBe(
+      false
+    );
     expect(
       isValidRulesMessage({
         ...valid,

@@ -57,7 +57,10 @@ vi.mock('../../../stores/chatMessageStore', () => ({
 const REV_A = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
 const REV_B = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 
-const state = (files: string[], openPages: { path: string; docRevision: string }[]): DesignWatchState => ({
+const state = (
+  files: string[],
+  openPages: { path: string; docRevision: string }[]
+): DesignWatchState => ({
   files,
   openPages,
 });
@@ -65,7 +68,10 @@ const state = (files: string[], openPages: { path: string; docRevision: string }
 describe('diffDesignWatchState（P4 §6.1 磁盘对比）', () => {
   it('新增文件：after.files − before.files，保持 after 顺序', () => {
     const diff = diffDesignWatchState(
-      state(['design/index.html', 'design/a.html'], [{ path: 'design/index.html', docRevision: REV_A }]),
+      state(
+        ['design/index.html', 'design/a.html'],
+        [{ path: 'design/index.html', docRevision: REV_A }]
+      ),
       state(
         ['design/index.html', 'design/a.html', 'design/b.html', 'design/c.html'],
         [{ path: 'design/index.html', docRevision: REV_A }]
@@ -105,14 +111,20 @@ describe('diffDesignWatchState（P4 §6.1 磁盘对比）', () => {
 
   it('changedPages 保持 after.openPages 顺序', () => {
     const diff = diffDesignWatchState(
-      state([], [
-        { path: 'design/z.html', docRevision: REV_A },
-        { path: 'design/a.html', docRevision: REV_A },
-      ]),
-      state([], [
-        { path: 'design/z.html', docRevision: REV_B },
-        { path: 'design/a.html', docRevision: REV_B },
-      ])
+      state(
+        [],
+        [
+          { path: 'design/z.html', docRevision: REV_A },
+          { path: 'design/a.html', docRevision: REV_A },
+        ]
+      ),
+      state(
+        [],
+        [
+          { path: 'design/z.html', docRevision: REV_B },
+          { path: 'design/a.html', docRevision: REV_B },
+        ]
+      )
     );
     expect(diff.changedPages).toEqual(['design/z.html', 'design/a.html']);
   });
@@ -206,7 +218,9 @@ describe('useAgentRunFeedback（P4 §6.2）', () => {
     vi.useFakeTimers();
     hookHarness.state.runIds = {};
     hookHarness.state.messages = {};
-    vi.mocked(listDesignFiles).mockReset().mockResolvedValue({ files: ['design/index.html'] });
+    vi.mocked(listDesignFiles)
+      .mockReset()
+      .mockResolvedValue({ files: ['design/index.html'] });
     vi.mocked(getDesignDocument)
       .mockReset()
       .mockImplementation(async (_backendId: string, _sessionId: string, path: string) => ({

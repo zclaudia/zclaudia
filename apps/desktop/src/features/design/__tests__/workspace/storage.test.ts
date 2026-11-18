@@ -66,10 +66,7 @@ describe('workspace ui storage', () => {
 
   it('truncates recents to 12 string entries', () => {
     const recents = Array.from({ length: 15 }, (_, index) => `p${index}.html`);
-    localStorage.setItem(
-      workspaceUiStorageKey('k'),
-      JSON.stringify({ version: 1, recents })
-    );
+    localStorage.setItem(workspaceUiStorageKey('k'), JSON.stringify({ version: 1, recents }));
     const loaded = loadWorkspaceUiState('k');
     expect(loaded.recents).toEqual(recents.slice(0, 12));
     expect(loaded.recents).toHaveLength(12);
@@ -155,9 +152,7 @@ describe('workspace ui storage', () => {
     localStorage.setItem = () => {
       throw new Error('quota exceeded');
     };
-    expect(() =>
-      saveWorkspaceUiState('k', defaultWorkspaceUiState())
-    ).not.toThrow();
+    expect(() => saveWorkspaceUiState('k', defaultWorkspaceUiState())).not.toThrow();
     localStorage.setItem = original;
 
     const originalGet = localStorage.getItem.bind(localStorage);

@@ -39,7 +39,9 @@ function formatTime(ts: number): string {
 
 /** 失效原因中文短语（match.reason 理论上恒有，兜底防 undefined）。 */
 function reasonText(reason: string | undefined): string {
-  return (reason && LOCATOR_REASON_TEXT[reason as keyof typeof LOCATOR_REASON_TEXT]) || 'Unknown reason';
+  return (
+    (reason && LOCATOR_REASON_TEXT[reason as keyof typeof LOCATOR_REASON_TEXT]) || 'Unknown reason'
+  );
 }
 
 /** 「快照中的目标元素」段：快照源码 / 整页评论 / 命中切片 / 罕见失效如实写原因。 */
@@ -65,7 +67,9 @@ function currentTargetBody(
   if (currentSource === null) return 'Current source unavailable.';
   const path = currentDocPath ?? '(unknown path)';
   if (comment.target === null) {
-    return [`- Page: ${path}`, 'Whole-page comment (not anchored to a specific element).'].join('\n');
+    return [`- Page: ${path}`, 'Whole-page comment (not anchored to a specific element).'].join(
+      '\n'
+    );
   }
   const match = matchCommentTarget(currentSource, comment.target);
   if (!match.matched) {
@@ -110,7 +114,10 @@ export function buildReviewHandoff(input: ReviewHandoffInput): {
       ].join('\n'),
     },
     { title: 'Target element in the snapshot', body: snapshotTargetBody(comment, snapshotSource) },
-    { title: 'Location in the current version', body: currentTargetBody(comment, currentSource, currentDocPath) },
+    {
+      title: 'Location in the current version',
+      body: currentTargetBody(comment, currentSource, currentDocPath),
+    },
     {
       title: 'Instruction',
       body: `Please update the current page ${currentDocPath ?? '(unknown path)'} based on the review feedback above. Keep everything unrelated to the feedback unchanged.`,

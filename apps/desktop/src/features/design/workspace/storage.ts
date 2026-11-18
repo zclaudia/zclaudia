@@ -84,7 +84,9 @@ export function normalizeUiState(input: unknown): DesignWorkspaceUiState {
     version: 1,
     activePath: typeof raw.activePath === 'string' ? raw.activePath : null,
     recents: Array.isArray(raw.recents)
-      ? raw.recents.filter((entry): entry is string => typeof entry === 'string').slice(0, RECENTS_LIMIT)
+      ? raw.recents
+          .filter((entry): entry is string => typeof entry === 'string')
+          .slice(0, RECENTS_LIMIT)
       : [],
     viewport: normalizeViewport(raw.viewport),
     zoom: normalizeZoom(raw.zoom),

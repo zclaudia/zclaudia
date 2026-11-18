@@ -56,6 +56,7 @@ import { isAndroid } from './utils/platform';
 import { shouldShowDirectGatewaySetup } from './utils/directGatewaySetup';
 import { getMobileControlPlaneState } from './services/mobileConnectionState';
 import { PaneSkeleton } from './components/ui/Skeleton';
+import { StartupConnectionState } from './app/StartupConnectionState';
 
 const FileViewerWindow = lazy(() =>
   import('./components/fileviewer/FileViewerWindow').then(m => ({ default: m.FileViewerWindow }))
@@ -161,9 +162,13 @@ function AppContent() {
   const navigationShellRef = useRef<HTMLDivElement>(null);
   const [isFeedOpen, setFeedOpen] = useState(false);
   const sharedModalOpen = useMobileNavigationBlocker();
-  const navigationBlocked = sharedModalOpen || sidebarOverlayActive || permissionOpen || pluginPermissionOpen ||
-    notificationsModalOpen || fileViewerFullscreen;
-
+  const navigationBlocked =
+    sharedModalOpen ||
+    sidebarOverlayActive ||
+    permissionOpen ||
+    pluginPermissionOpen ||
+    notificationsModalOpen ||
+    fileViewerFullscreen;
 
   const hasConnected = useRef(false);
 
@@ -206,14 +211,21 @@ function AppContent() {
   const drawer = useMobileDrawer({
     isMobile,
     gestureActive: isAppTopLevelView || isShellTopLevelView,
-    isAgentExpanded, isFeedOpen, isFileViewerFullscreen: fileViewerFullscreen,
+    isAgentExpanded,
+    isFeedOpen,
+    isFileViewerFullscreen: fileViewerFullscreen,
   });
   const {
     sidebarOpen,
     setSidebarOpen,
     drawerPanelRef,
     drawerBackdropRef,
-    widthMode, canExpand, widthChangeDisabled, toggleWidth, stepBack, drawerVisible,
+    widthMode,
+    canExpand,
+    widthChangeDisabled,
+    toggleWidth,
+    stepBack,
+    drawerVisible,
   } = drawer;
 
   // Toasts render on every viewport; only placement differs (mobile stacks
@@ -356,10 +368,17 @@ function AppContent() {
   );
 
   // Both panels share one input owner for the complete touch session.
-  const claudia = useClaudiaGesture(isAgentExpanded, isAppTopLevelView && !navigationBlocked, setAgentExpanded);
-  useMobileNavigationGesture({ target: navigationShellRef,
+  const claudia = useClaudiaGesture(
+    isAgentExpanded,
+    isAppTopLevelView && !navigationBlocked,
+    setAgentExpanded
+  );
+  useMobileNavigationGesture({
+    target: navigationShellRef,
     enabled: isMobile && (isAppTopLevelView || isShellTopLevelView),
-    blocked: navigationBlocked || (isFeedOpen && !drawer.drawerVisible), drawer, claudia: claudia.adapter,
+    blocked: navigationBlocked || (isFeedOpen && !drawer.drawerVisible),
+    drawer,
+    claudia: claudia.adapter,
     commandVersion: `${topLevelView.kind}:${isAgentExpanded}`,
     // The system owns the outermost iOS back/forward region.
     ignoreEdgeWidth: /iPad|iPhone|iPod/.test(navigator.userAgent) ? 20 : 0,
@@ -397,35 +416,12 @@ function AppContent() {
     const isError = embeddedServerStatus === 'error';
 
     return (
-      <div className="flex flex-col h-dvh bg-background text-foreground">
-        <div className="safe-top-spacer bg-background flex-shrink-0" data-tauri-drag-region />
-        <div className="flex-1 flex items-center justify-center" data-tauri-drag-region>
-          <div className="text-center">
-            {isError ? (
-              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                <svg
-                  className="w-5 h-5 text-destructive"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </div>
-            ) : (
-              <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            )}
-            <p className={`text-sm ${isError ? 'text-destructive' : 'text-muted-foreground'}`}>
-              {statusText}
-            </p>
-          </div>
-        </div>
-      </div>
+      <StartupConnectionState
+        key={embeddedServerStatus}
+        message={statusText}
+        error={isError}
+        onRetry={() => window.location.reload()}
+      />
     );
   }
 
@@ -547,7 +543,11 @@ function AppContent() {
           />
         )}
 
-        <main data-mobile-drawer-background tabIndex={-1} className="flex-1 flex flex-col overflow-hidden relative">
+        <main
+          data-mobile-drawer-background
+          tabIndex={-1}
+          className="flex-1 flex flex-col overflow-hidden relative"
+        >
           {/* Desktop: the main column owns its own top drag strip. The full-width
               AppHeader (which used to provide this) only renders on mobile now, and
               only SessionHeader re-adds a strip — so welcome/dashboard views would

@@ -3,8 +3,10 @@ import { Modal } from '../../../components/ui/Modal';
 import { MediaGenView } from '../rail/MediaGenView';
 import type { MediaGenViewProps } from '../rail/MediaGenView';
 
-export interface MediaGenPanelProps
-  extends Omit<MediaGenViewProps, 'active' | 'compact' | 'resetOnHide'> {
+export interface MediaGenPanelProps extends Omit<
+  MediaGenViewProps,
+  'active' | 'compact' | 'resetOnHide'
+> {
   open: boolean;
   onClose: () => void;
 }

@@ -41,7 +41,9 @@ export interface BrandWriteInput {
 // deliberately builds its own keeper instance instead of importing the
 // document one, so the two services never evict each other's copies.
 const BRAND_BACKUP_ROOT = path.join(
-  process.env.ZCLAUDIA_DATA_DIR ? path.resolve(process.env.ZCLAUDIA_DATA_DIR) : path.join(os.homedir(), '.zclaudia'),
+  process.env.ZCLAUDIA_DATA_DIR
+    ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
+    : path.join(os.homedir(), '.zclaudia'),
   'design-write-backups'
 );
 const brandBackupKeeper = createRollingBackupKeeper(BRAND_BACKUP_ROOT, 5);
@@ -77,8 +79,18 @@ export class BrandService {
   ): Promise<{ designMdRevision: string | null; tokensCssRevision: string | null }> {
     const root = await this.design.workspace(sessionId);
     const jobs = [
-      { key: 'designMdRevision' as const, path: DESIGN_MD_PATH, content: input.designMd, revision: input.designMdRevision },
-      { key: 'tokensCssRevision' as const, path: TOKENS_CSS_PATH, content: input.tokensCss, revision: input.tokensCssRevision },
+      {
+        key: 'designMdRevision' as const,
+        path: DESIGN_MD_PATH,
+        content: input.designMd,
+        revision: input.designMdRevision,
+      },
+      {
+        key: 'tokensCssRevision' as const,
+        path: TOKENS_CSS_PATH,
+        content: input.tokensCss,
+        revision: input.tokensCssRevision,
+      },
     ].filter(job => job.content !== undefined);
     if (jobs.length === 0)
       throw new DesignError(400, 'VALIDATION_ERROR', 'designMd or tokensCss is required');
@@ -103,7 +115,11 @@ export class BrandService {
    * the write outside the workspace (the leaf itself is guarded by
    * safeWriteFile's O_NOFOLLOW + final-check rename).
    */
-  private async containedAbsolute(root: string, relativePath: string, createDir?: boolean): Promise<string> {
+  private async containedAbsolute(
+    root: string,
+    relativePath: string,
+    createDir?: boolean
+  ): Promise<string> {
     const relative = validateRelativePath(relativePath);
     const absolute = path.resolve(root, relative);
     assertContained(root, absolute);
@@ -175,7 +191,12 @@ export class BrandService {
   /** Name the failing file so a partial two-file write is diagnosable. */
   private static annotate(error: unknown, filePath: string): unknown {
     if (error instanceof DesignError)
-      return new DesignError(error.status, error.code, `${filePath}: ${error.message}`, error.details);
+      return new DesignError(
+        error.status,
+        error.code,
+        `${filePath}: ${error.message}`,
+        error.details
+      );
     return error;
   }
 }

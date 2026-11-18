@@ -58,7 +58,10 @@ describe('ModeSelector chip variant', () => {
         variant="chip"
       />
     );
-    expect(screen.getByRole('button', { name: 'Plan mode' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Plan mode' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('keeps the dropdown when the runtime offers other modes', () => {

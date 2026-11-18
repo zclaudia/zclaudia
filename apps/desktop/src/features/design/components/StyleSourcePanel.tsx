@@ -115,7 +115,14 @@ interface DeclarationRowProps {
 }
 
 /** 单条声明行：属性名、源码值与生效徽标；可编辑时提供改值（input + apply）与删除（走撤销）。 */
-function DeclarationRow({ declaration, target, rulePath, busy, onApply, onApplyExternal }: DeclarationRowProps) {
+function DeclarationRow({
+  declaration,
+  target,
+  rulePath,
+  busy,
+  onApply,
+  onApplyExternal,
+}: DeclarationRowProps) {
   const [draft, setDraft] = useState(declaration.value);
   const [error, setError] = useState<string | null>(null);
   const editable = declaration.editable && target !== null;
@@ -134,7 +141,12 @@ function DeclarationRow({ declaration, target, rulePath, busy, onApply, onApplyE
         },
       ]);
     } else {
-      onApplyExternal?.(target.origin, { rulePath, property: declaration.property, value, create: false });
+      onApplyExternal?.(target.origin, {
+        rulePath,
+        property: declaration.property,
+        value,
+        create: false,
+      });
     }
   };
 
@@ -223,7 +235,13 @@ interface AddDeclarationFormProps {
 }
 
 /** 新增声明表单（§4：create=true，属性不存在才生效；非法就地提示，不发事务）。 */
-function AddDeclarationForm({ target, rulePath, busy, onApply, onApplyExternal }: AddDeclarationFormProps) {
+function AddDeclarationForm({
+  target,
+  rulePath,
+  busy,
+  onApply,
+  onApplyExternal,
+}: AddDeclarationFormProps) {
   const [property, setProperty] = useState('');
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -240,7 +258,14 @@ function AddDeclarationForm({ target, rulePath, busy, onApply, onApplyExternal }
     setValue('');
     if (target.kind === 'inline') {
       onApply([
-        { kind: 'styleBlock', styleOrdinal: target.ordinal, rulePath, property: name, value, create: true },
+        {
+          kind: 'styleBlock',
+          styleOrdinal: target.ordinal,
+          rulePath,
+          property: name,
+          value,
+          create: true,
+        },
       ]);
     } else {
       onApplyExternal?.(target.origin, { rulePath, property: name, value, create: true });
@@ -274,14 +299,20 @@ function AddDeclarationForm({ target, rulePath, busy, onApply, onApplyExternal }
           value={value}
           disabled={busy}
           aria-invalid={
-            (error === INVALID_VALUE_NOTICE || error === REQUIRED_VALUE_NOTICE) || undefined
+            error === INVALID_VALUE_NOTICE || error === REQUIRED_VALUE_NOTICE || undefined
           }
           onChange={event => {
             setValue(event.target.value);
             setError(null);
           }}
         />
-        <Button size="sm" className="shrink-0" type="submit" disabled={busy} aria-label="Add declaration">
+        <Button
+          size="sm"
+          className="shrink-0"
+          type="submit"
+          disabled={busy}
+          aria-label="Add declaration"
+        >
           Add
         </Button>
       </form>

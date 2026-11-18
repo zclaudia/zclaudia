@@ -246,7 +246,8 @@ function moveCssDraftHistory(
   const ws = workspaceOf(identity);
   const record = ws.drafts.get(path);
   if (!record) return false;
-  const next = direction === 'undo' ? record.history.undo(record.source) : record.history.redo(record.source);
+  const next =
+    direction === 'undo' ? record.history.undo(record.source) : record.history.redo(record.source);
   if (next === null) return false; // EditHistory 已在基线漂移时自重建
   record.source = next;
   record.revision = sha256HexSync(next);

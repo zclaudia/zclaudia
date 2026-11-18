@@ -4,16 +4,16 @@
 
 ## 目录约定
 
-| 目录 | 放什么 | 命名约定 |
-| --- | --- | --- |
-| `(根部)` | 长期有效的参考文档 | 主题命名,如 `managed-runtimes.md` |
-| `development/` | 开发/集成指南 | 主题命名 |
-| `plans/` | 实现计划(进行中/仍有未完成项) | `YYYY-MM-DD-*-plan.md`,系列文档用系列前缀 |
-| `reviews/` | 审查、审计、spike 记录(一次性的) | `YYYY-MM-DD-*`,专题可建子目录 |
-| `reports/` | 对比分析、测试执行报告、[未完成项台账](reports/2026-10-18-open-items-ledger.md) | `YYYY-MM-DD-*` |
-| `quality-audit/` | 2026-09 全仓质量审计(自成一个体系) | 见其内部 [README](quality-audit/README.md) |
-| `archive/` | 已完成/失效的历史文档,只读 | 镜像原结构,见 [archive/README](archive/README.md) |
-| `superpowers/` | 2026-06~07 SDD 工作流历史归档(仅本地,未入库) | `YYYY-MM-DD-*` |
+| 目录             | 放什么                                                                          | 命名约定                                          |
+| ---------------- | ------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `(根部)`         | 长期有效的参考文档                                                              | 主题命名,如 `managed-runtimes.md`                 |
+| `development/`   | 开发/集成指南                                                                   | 主题命名                                          |
+| `plans/`         | 实现计划(进行中/仍有未完成项)                                                   | `YYYY-MM-DD-*-plan.md`,系列文档用系列前缀         |
+| `reviews/`       | 审查、审计、spike 记录(一次性的)                                                | `YYYY-MM-DD-*`,专题可建子目录                     |
+| `reports/`       | 对比分析、测试执行报告、[未完成项台账](reports/2026-10-18-open-items-ledger.md) | `YYYY-MM-DD-*`                                    |
+| `quality-audit/` | 2026-09 全仓质量审计(自成一个体系)                                              | 见其内部 [README](quality-audit/README.md)        |
+| `archive/`       | 已完成/失效的历史文档,只读                                                      | 镜像原结构,见 [archive/README](archive/README.md) |
+| `superpowers/`   | 2026-06~07 SDD 工作流历史归档(仅本地,未入库)                                    | `YYYY-MM-DD-*`                                    |
 
 新文档请对号入座:一次性的审查/走查/审计放 `reviews/` 并带日期前缀;要长期查阅的参考文档放根部或 `development/`;完成或失效的计划/设计移入 `archive/`(git mv 保留历史),其中未实现的项先提取进[台账](reports/2026-10-18-open-items-ledger.md)。
 

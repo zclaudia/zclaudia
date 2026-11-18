@@ -162,40 +162,40 @@ export function TopBar({
       />
       <div className="flex-1" />
       {!compact && (
-      <div
-        role="group"
-        aria-label="Preview mode"
-        className="flex items-center gap-0.5 rounded-md bg-secondary p-0.5"
-      >
-        <button
-          type="button"
-          aria-label="Edit mode"
-          aria-pressed={previewMode === 'edit'}
-          onClick={() => onPreviewModeChange('edit')}
-          className={`flex h-6 items-center gap-1 rounded px-1.5 text-[11px] transition-colors ${
-            previewMode === 'edit'
-              ? 'bg-card font-medium text-foreground shadow-apple-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
+        <div
+          role="group"
+          aria-label="Preview mode"
+          className="flex items-center gap-0.5 rounded-md bg-secondary p-0.5"
         >
-          <MousePointer2 size={12} strokeWidth={1.75} />
-          {showModeLabels && 'Edit'}
-        </button>
-        <button
-          type="button"
-          aria-label="Run mode"
-          aria-pressed={previewMode === 'run'}
-          onClick={() => onPreviewModeChange('run')}
-          className={`flex h-6 items-center gap-1 rounded px-1.5 text-[11px] transition-colors ${
-            previewMode === 'run'
-              ? 'bg-card font-medium text-foreground shadow-apple-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Play size={12} strokeWidth={1.75} />
-          {showModeLabels && 'Run'}
-        </button>
-      </div>
+          <button
+            type="button"
+            aria-label="Edit mode"
+            aria-pressed={previewMode === 'edit'}
+            onClick={() => onPreviewModeChange('edit')}
+            className={`flex h-6 items-center gap-1 rounded px-1.5 text-[11px] transition-colors ${
+              previewMode === 'edit'
+                ? 'bg-card font-medium text-foreground shadow-apple-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <MousePointer2 size={12} strokeWidth={1.75} />
+            {showModeLabels && 'Edit'}
+          </button>
+          <button
+            type="button"
+            aria-label="Run mode"
+            aria-pressed={previewMode === 'run'}
+            onClick={() => onPreviewModeChange('run')}
+            className={`flex h-6 items-center gap-1 rounded px-1.5 text-[11px] transition-colors ${
+              previewMode === 'run'
+                ? 'bg-card font-medium text-foreground shadow-apple-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Play size={12} strokeWidth={1.75} />
+            {showModeLabels && 'Run'}
+          </button>
+        </div>
       )}
       {!narrow && (
         <>

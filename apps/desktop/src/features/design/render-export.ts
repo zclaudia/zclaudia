@@ -53,7 +53,13 @@ function loadImage(url: string): Promise<HTMLImageElement> {
       reject(error);
     };
     const timer = setTimeout(
-      () => fail(new RenderCaptureError('capture-failed', 'Page capture failed: preview image load timed out')),
+      () =>
+        fail(
+          new RenderCaptureError(
+            'capture-failed',
+            'Page capture failed: preview image load timed out'
+          )
+        ),
       IMAGE_LOAD_TIMEOUT_MS
     );
     image.onload = () => {
@@ -61,7 +67,12 @@ function loadImage(url: string): Promise<HTMLImageElement> {
       resolve(image);
     };
     image.onerror = () =>
-      fail(new RenderCaptureError('capture-failed', 'Page capture failed: preview image failed to load'));
+      fail(
+        new RenderCaptureError(
+          'capture-failed',
+          'Page capture failed: preview image failed to load'
+        )
+      );
     image.src = url;
   });
 }
@@ -71,8 +82,8 @@ function canvasToBlob(
   mime: 'image/png' | 'image/jpeg',
   quality: number | undefined
 ): Promise<Blob | null> {
-  return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), mime, quality);
+  return new Promise(resolve => {
+    canvas.toBlob(blob => resolve(blob), mime, quality);
   });
 }
 
@@ -98,16 +109,23 @@ export async function captureHtmlImage(
   canvas.height = request.height;
   const context = canvas.getContext('2d');
   if (!context) {
-    throw new RenderCaptureError('capture-unsupported', 'Page capture is not supported in this environment (no Canvas 2D)');
+    throw new RenderCaptureError(
+      'capture-unsupported',
+      'Page capture is not supported in this environment (no Canvas 2D)'
+    );
   }
   context.fillStyle = '#ffffff';
   context.fillRect(0, 0, request.width, request.height);
   context.drawImage(image, 0, 0);
 
-  const quality = request.quality ?? (request.mime === 'image/jpeg' ? DEFAULT_JPEG_QUALITY : undefined);
+  const quality =
+    request.quality ?? (request.mime === 'image/jpeg' ? DEFAULT_JPEG_QUALITY : undefined);
   const blob = await canvasToBlob(canvas, request.mime, quality);
   if (!blob) {
-    throw new RenderCaptureError('capture-unsupported', 'Page capture is not supported in this environment (image encoding failed)');
+    throw new RenderCaptureError(
+      'capture-unsupported',
+      'Page capture is not supported in this environment (image encoding failed)'
+    );
   }
   return { blob, width: request.width, height: request.height };
 }

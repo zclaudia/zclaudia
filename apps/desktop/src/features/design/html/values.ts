@@ -44,7 +44,11 @@ export function safeColor(value: string): string | null {
 // P3 style property whitelist (§2.1)
 // ---------------------------------------------------------------------------
 
-const COLOR_PROPERTIES = new Set<DesignStyleProperty>(['color', 'background-color', 'border-color']);
+const COLOR_PROPERTIES = new Set<DesignStyleProperty>([
+  'color',
+  'background-color',
+  'border-color',
+]);
 
 const LENGTH_UNITS = 'px|em|rem|%|vh|vw|vmin|vmax|ch|ex|pt|pc|cm|mm|q|in';
 /** `±number+unit` with ≤4 integer digits and ≤3 fraction digits. */
@@ -79,7 +83,18 @@ const LENGTH_OPTIONS: Partial<Record<DesignStyleProperty, LengthOptions>> = {
 
 const KEYWORD_PROPERTIES: Partial<Record<DesignStyleProperty, string[]>> = {
   'text-align': ['left', 'right', 'center', 'justify', 'start', 'end'],
-  'border-style': ['none', 'hidden', 'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset'],
+  'border-style': [
+    'none',
+    'hidden',
+    'solid',
+    'dashed',
+    'dotted',
+    'double',
+    'groove',
+    'ridge',
+    'inset',
+    'outset',
+  ],
   'object-fit': ['fill', 'contain', 'cover', 'none', 'scale-down'],
 };
 
@@ -113,7 +128,14 @@ function safeLineHeight(value: string): string | null {
     return numeric >= 0.1 && numeric <= 10 ? value : null;
   }
   if (value === '0') return null; // a *positive* length is required
-  if (safeLengthToken(value, { allowNegative: false, allowAuto: false, maxAbsolute: 10000, multi: false }) === null)
+  if (
+    safeLengthToken(value, {
+      allowNegative: false,
+      allowAuto: false,
+      maxAbsolute: 10000,
+      multi: false,
+    }) === null
+  )
     return null;
   const numeric = parseFloat(LENGTH_NUMBER.exec(value)?.[0] ?? '');
   return Number.isFinite(numeric) && numeric > 0 ? value : null;
@@ -210,7 +232,11 @@ function hasControlChars(value: string): boolean {
  * 扩展名白名单（先剥 #fragment/?query）；alt ≤500 任意非控制字符文本；
  * href ≤2000，拒绝 javascript:/data:/vbscript:（大小写不敏感）与控制字符。
  */
-export function safeAttrValue(name: DesignAttributeName, value: string, tagName: string): string | null {
+export function safeAttrValue(
+  name: DesignAttributeName,
+  value: string,
+  tagName: string
+): string | null {
   const tag = tagName.toLowerCase();
   if (name === 'href' ? tag !== 'a' : tag !== 'img') return null;
 

@@ -175,7 +175,7 @@ describe('PermissionSelector', () => {
     render(<PermissionSelector value={null} onChange={() => {}} disabled={true} />);
 
     const button = screen.getByRole('button');
-    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('should not open dropdown when disabled', () => {

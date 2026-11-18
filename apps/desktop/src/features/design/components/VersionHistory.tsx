@@ -123,7 +123,9 @@ export function VersionHistory({
       });
       setLabelValue('');
       setNotice(
-        summary.complete ? 'Version snapshot created.' : 'Version snapshot created (incomplete: some assets were not captured).'
+        summary.complete
+          ? 'Version snapshot created.'
+          : 'Version snapshot created (incomplete: some assets were not captured).'
       );
       await refresh();
     } catch (e) {
@@ -230,7 +232,11 @@ export function VersionHistory({
             className="shrink-0 whitespace-nowrap"
             onClick={() => void saveVersion()}
             disabled={!docPath || busy || dirty || capturing}
-            title={dirty ? 'Save your changes before creating a version snapshot' : 'Save the current on-disk content as a version'}
+            title={
+              dirty
+                ? 'Save your changes before creating a version snapshot'
+                : 'Save the current on-disk content as a version'
+            }
           >
             Save version
           </Button>
@@ -251,7 +257,9 @@ export function VersionHistory({
       ) : summaries === null && !error ? (
         <p className="text-xs text-muted-foreground">Loading versions…</p>
       ) : summaries !== null && summaries.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No version snapshots yet; they appear after saving or creating one manually.</p>
+        <p className="text-xs text-muted-foreground">
+          No version snapshots yet; they appear after saving or creating one manually.
+        </p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {summaries?.map(summary => (
@@ -345,12 +353,7 @@ export function VersionHistory({
                 <Button size="sm" onClick={closeConfirm}>
                   Cancel
                 </Button>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={onConfirmClick}
-                  disabled={restoring}
-                >
+                <Button size="sm" variant="primary" onClick={onConfirmClick} disabled={restoring}>
                   {restoring
                     ? 'Restoring…'
                     : confirmStage === 'incomplete'
@@ -365,13 +368,16 @@ export function VersionHistory({
             {conflictFiles ? (
               <>
                 <div role="alert" className="text-destructive">
-                  The following files changed after the snapshot; the restore was canceled. Reload the latest content and try again.
+                  The following files changed after the snapshot; the restore was canceled. Reload
+                  the latest content and try again.
                 </div>
                 <ul className="flex flex-col gap-1 rounded-md border border-border px-2 py-1.5">
                   {conflictFiles.map(file => (
                     <li key={file.path} className="font-mono text-[11px]">
                       {file.path}
-                      {file.reason ? <span className="text-muted-foreground"> · {file.reason}</span> : null}
+                      {file.reason ? (
+                        <span className="text-muted-foreground"> · {file.reason}</span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -379,11 +385,15 @@ export function VersionHistory({
             ) : (
               <>
                 <div className="text-muted-foreground">
-                  Workspace files will be restored to the version of {formatTime(detail.summary.createdAt)} ({SOURCE_LABEL[detail.summary.source]}
-                  {detail.summary.label ? ` · ${detail.summary.label}` : ''}). Files outside the manifest will not be touched.
+                  Workspace files will be restored to the version of{' '}
+                  {formatTime(detail.summary.createdAt)} ({SOURCE_LABEL[detail.summary.source]}
+                  {detail.summary.label ? ` · ${detail.summary.label}` : ''}). Files outside the
+                  manifest will not be touched.
                 </div>
                 {dirty && (
-                  <div className="text-warning">There are unsaved changes; restoring will discard them.</div>
+                  <div className="text-warning">
+                    There are unsaved changes; restoring will discard them.
+                  </div>
                 )}
                 {!detail.summary.complete && (
                   <div className="rounded-md border border-border bg-secondary/60 px-2 py-1.5 text-warning">
@@ -392,11 +402,16 @@ export function VersionHistory({
                       {detail.summary.incompleteReasons.length === 0 ? (
                         <li>some assets not captured</li>
                       ) : (
-                        detail.summary.incompleteReasons.map(reason => <li key={reason}>{reason}</li>)
+                        detail.summary.incompleteReasons.map(reason => (
+                          <li key={reason}>{reason}</li>
+                        ))
                       )}
                     </ul>
                     {confirmStage === 'incomplete' && (
-                      <div className="mt-1">Acknowledged the uncaptured assets above; to restore anyway, click "Restore anyway" again.</div>
+                      <div className="mt-1">
+                        Acknowledged the uncaptured assets above; to restore anyway, click "Restore
+                        anyway" again.
+                      </div>
                     )}
                   </div>
                 )}

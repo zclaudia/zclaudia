@@ -140,14 +140,14 @@ export function PagesView({
               {notOpen.map(path => (
                 <li key={path}>
                   <Tooltip content={path} anchorClassName="flex w-full min-w-0">
-                  <button
-                    type="button"
-                    aria-label={`Open ${path}`}
-                    onClick={() => onOpen(path)}
-                    className="w-full truncate rounded-md px-1 py-1 text-left font-mono text-[11px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                  >
-                    {path}
-                  </button>
+                    <button
+                      type="button"
+                      aria-label={`Open ${path}`}
+                      onClick={() => onOpen(path)}
+                      className="w-full truncate rounded-md px-1 py-1 text-left font-mono text-[11px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    >
+                      {path}
+                    </button>
                   </Tooltip>
                 </li>
               ))}

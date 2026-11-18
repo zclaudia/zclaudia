@@ -1,12 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {
-  lstatSync,
-  promises as fs,
-  readFileSync,
-  renameSync,
-  statSync,
-  type Stats,
-} from 'node:fs';
+import { lstatSync, promises as fs, readFileSync, renameSync, statSync, type Stats } from 'node:fs';
 import path from 'node:path';
 import type Database from 'better-sqlite3';
 import type { BlobStore } from '../../infra/design/blob-store.js';
@@ -103,7 +96,11 @@ export class RestoreService {
         'SNAPSHOT_INCOMPLETE',
         'Snapshot is incomplete; pass confirmIncomplete to restore it anyway'
       );
-    if (typeof expectedRevisions !== 'object' || expectedRevisions === null || Array.isArray(expectedRevisions))
+    if (
+      typeof expectedRevisions !== 'object' ||
+      expectedRevisions === null ||
+      Array.isArray(expectedRevisions)
+    )
       throw new DesignError(400, 'VALIDATION_ERROR', 'expectedRevisions must be an object');
     const expected = expectedRevisions as Record<string, unknown>;
 
@@ -124,7 +121,9 @@ export class RestoreService {
       if (finished) return;
       finished = true;
       this.db
-        .prepare('UPDATE design_restore_log SET finished_at = ?, status = ?, report = ? WHERE id = ?')
+        .prepare(
+          'UPDATE design_restore_log SET finished_at = ?, status = ?, report = ? WHERE id = ?'
+        )
         .run(Date.now(), status, JSON.stringify(report), logId);
     };
 

@@ -11,13 +11,7 @@ export type SharePanelProps = ShareContentProps;
  */
 export function SharePanel(props: SharePanelProps) {
   return (
-    <Modal
-      open={props.open}
-      onClose={props.onClose}
-      ariaLabel="Share"
-      title="Share"
-      size="2xl"
-    >
+    <Modal open={props.open} onClose={props.onClose} ariaLabel="Share" title="Share" size="2xl">
       <ShareContent {...props} />
     </Modal>
   );

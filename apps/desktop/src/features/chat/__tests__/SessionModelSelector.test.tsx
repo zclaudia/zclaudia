@@ -157,7 +157,10 @@ describe('session model selector', () => {
   it('does not discover or allow editing during a run', async () => {
     render(<SessionModelSelector sessionId="s" disabled />);
     await screen.findByText('One');
-    expect(screen.getByRole('button', { name: 'Session model and thinking' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Session model and thinking' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     expect(getSessionModelSettings).toHaveBeenCalledWith('s', false, expect.any(AbortSignal));
   });
 });

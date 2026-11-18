@@ -34,7 +34,11 @@ interface FakeCanvas {
 }
 
 interface CanvasMock {
-  context: { fillStyle: string; fillRect: ReturnType<typeof vi.fn>; drawImage: ReturnType<typeof vi.fn> };
+  context: {
+    fillStyle: string;
+    fillRect: ReturnType<typeof vi.fn>;
+    drawImage: ReturnType<typeof vi.fn>;
+  };
   canvases: FakeCanvas[];
   canvas: () => FakeCanvas | null;
 }
@@ -45,26 +49,28 @@ function mockCanvas(overrides: { context?: unknown; blob?: Blob | null } = {}): 
     'context' in overrides
       ? overrides.context
       : { fillStyle: '', fillRect: vi.fn(), drawImage: vi.fn() };
-  const blob = 'blob' in overrides ? overrides.blob : new Blob(['png-bytes'], { type: 'image/png' });
+  const blob =
+    'blob' in overrides ? overrides.blob : new Blob(['png-bytes'], { type: 'image/png' });
   const canvases: FakeCanvas[] = [];
   const originalCreateElement = document.createElement.bind(document);
-  vi.spyOn(document, 'createElement').mockImplementation(
-    ((tagName: string, options?: ElementCreationOptions) => {
-      if (String(tagName).toLowerCase() === 'canvas') {
-        const fake: FakeCanvas = {
-          width: 0,
-          height: 0,
-          getContext: vi.fn(() => context),
-          toBlob: vi.fn((callback: BlobCallback) => {
-            callback(blob);
-          }),
-        };
-        canvases.push(fake);
-        return fake as unknown as HTMLCanvasElement;
-      }
-      return originalCreateElement(tagName, options);
-    }) as unknown as typeof document.createElement
-  );
+  vi.spyOn(document, 'createElement').mockImplementation(((
+    tagName: string,
+    options?: ElementCreationOptions
+  ) => {
+    if (String(tagName).toLowerCase() === 'canvas') {
+      const fake: FakeCanvas = {
+        width: 0,
+        height: 0,
+        getContext: vi.fn(() => context),
+        toBlob: vi.fn((callback: BlobCallback) => {
+          callback(blob);
+        }),
+      };
+      canvases.push(fake);
+      return fake as unknown as HTMLCanvasElement;
+    }
+    return originalCreateElement(tagName, options);
+  }) as unknown as typeof document.createElement);
   return {
     context: context as CanvasMock['context'],
     canvases,
@@ -111,14 +117,23 @@ describe('captureHtmlImage', () => {
     expect(canvas.context.fillRect).toHaveBeenCalledWith(0, 0, 1280, 900);
     expect(canvas.context.drawImage).toHaveBeenCalledWith(image, 0, 0);
     expect(canvas.canvas()?.getContext).toHaveBeenCalledWith('2d');
-    expect(canvas.canvas()?.toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/png', undefined);
+    expect(canvas.canvas()?.toBlob).toHaveBeenCalledWith(
+      expect.any(Function),
+      'image/png',
+      undefined
+    );
     expect(canvas.canvas()?.width).toBe(1280);
     expect(canvas.canvas()?.height).toBe(900);
   });
 
   it('defaults jpeg quality to 0.92 and honours an explicit quality', async () => {
     const first = mockCanvas();
-    const firstPending = captureHtmlImage({ html: '<p>x</p>', width: 800, height: 600, mime: 'image/jpeg' });
+    const firstPending = captureHtmlImage({
+      html: '<p>x</p>',
+      width: 800,
+      height: 600,
+      mime: 'image/jpeg',
+    });
     MockImage.instances[0].onload?.();
     await firstPending;
     expect(first.canvas()?.toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/jpeg', 0.92);
@@ -138,7 +153,12 @@ describe('captureHtmlImage', () => {
 
   it('maps image onerror to a capture-failed error', async () => {
     mockCanvas();
-    const pending = captureHtmlImage({ html: '<p>x</p>', width: 800, height: 600, mime: 'image/png' });
+    const pending = captureHtmlImage({
+      html: '<p>x</p>',
+      width: 800,
+      height: 600,
+      mime: 'image/png',
+    });
     MockImage.instances[0].onerror?.();
     await expect(pending).rejects.toBeInstanceOf(RenderCaptureError);
     await expect(pending).rejects.toMatchObject({ code: 'capture-failed' });
@@ -156,14 +176,24 @@ describe('captureHtmlImage', () => {
 
   it('maps a null 2d context to capture-unsupported', async () => {
     mockCanvas({ context: null });
-    const pending = captureHtmlImage({ html: '<p>x</p>', width: 800, height: 600, mime: 'image/png' });
+    const pending = captureHtmlImage({
+      html: '<p>x</p>',
+      width: 800,
+      height: 600,
+      mime: 'image/png',
+    });
     MockImage.instances[0].onload?.();
     await expect(pending).rejects.toMatchObject({ code: 'capture-unsupported' });
   });
 
   it('maps a null toBlob result to capture-unsupported', async () => {
     const canvas = mockCanvas({ blob: null });
-    const pending = captureHtmlImage({ html: '<p>x</p>', width: 800, height: 600, mime: 'image/png' });
+    const pending = captureHtmlImage({
+      html: '<p>x</p>',
+      width: 800,
+      height: 600,
+      mime: 'image/png',
+    });
     MockImage.instances[0].onload?.();
     await expect(pending).rejects.toBeInstanceOf(RenderCaptureError);
     await expect(pending).rejects.toMatchObject({ code: 'capture-unsupported' });

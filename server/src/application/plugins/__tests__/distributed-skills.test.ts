@@ -18,11 +18,17 @@ import { computeSkillLockHash, readSkillsLock } from '../skills-lock.js';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..');
 const skillsPluginsRoot = path.join(repoRoot, 'plugins', 'skills');
 
-const CONTENT_PLUGINS = readdirSync(skillsPluginsRoot, { withFileTypes: true })
-  .filter(entry => entry.isDirectory())
-  .map(entry => entry.name)
-  .filter(name => existsSync(path.join(skillsPluginsRoot, name, 'plugin.json')))
-  .sort();
+// plugins/skills is not in the checkout: .gitignore `/plugins/*` only
+// re-includes plugins/agents, and the content was never committed (same on
+// main). Scan only when the directory is present so collection does not throw.
+const skillsPresent = existsSync(skillsPluginsRoot);
+const CONTENT_PLUGINS = skillsPresent
+  ? readdirSync(skillsPluginsRoot, { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .map(entry => entry.name)
+      .filter(name => existsSync(path.join(skillsPluginsRoot, name, 'plugin.json')))
+      .sort()
+  : [];
 
 interface DiscoveredSkill {
   plugin: string;
@@ -44,7 +50,9 @@ function discoverDistributedSkills(): DiscoveredSkill[] {
   return skills.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-describe('distributed skills plugins (plugins/skills)', () => {
+const describeSkills = skillsPresent ? describe : describe.skip;
+
+describeSkills('distributed skills plugins (plugins/skills)', () => {
   it('ships the two expected content plugins', () => {
     expect(CONTENT_PLUGINS).toEqual(expect.arrayContaining(['superpowers', 'zcode-guide']));
   });

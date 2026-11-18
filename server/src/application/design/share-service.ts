@@ -108,7 +108,10 @@ function isValidTarget(value: unknown): value is DesignShareCommentTarget {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const candidate = value as Record<string, unknown>;
   if (!Array.isArray(candidate.elementPath)) return false;
-  if (candidate.elementPath.length < 1 || candidate.elementPath.length > SHARE_ELEMENT_PATH_MAX_DEPTH)
+  if (
+    candidate.elementPath.length < 1 ||
+    candidate.elementPath.length > SHARE_ELEMENT_PATH_MAX_DEPTH
+  )
     return false;
   if (
     !candidate.elementPath.every(
@@ -253,7 +256,11 @@ function normalizeCommentTarget(value: unknown): DesignShareCommentTarget | null
       'target must be { elementPath: number[], tagName: string, text: string }'
     );
   const candidate = value as DesignShareCommentTarget;
-  return { elementPath: [...candidate.elementPath], tagName: candidate.tagName.trim(), text: candidate.text };
+  return {
+    elementPath: [...candidate.elementPath],
+    tagName: candidate.tagName.trim(),
+    text: candidate.text,
+  };
 }
 
 /** 清单标题的 basename 兜底（entryPath 为 posix 相对路径）。 */
@@ -300,7 +307,17 @@ export class ShareService {
          (id, workspace_root, session_id, snapshot_id, token, title, scope, created_at, expires_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(id, workspace, sessionId as string, snapshot.id, token, title, scope, createdAt, expiresAt);
+      .run(
+        id,
+        workspace,
+        sessionId as string,
+        snapshot.id,
+        token,
+        title,
+        scope,
+        createdAt,
+        expiresAt
+      );
     return {
       id,
       token,

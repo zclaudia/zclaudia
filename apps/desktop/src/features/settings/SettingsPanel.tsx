@@ -128,10 +128,11 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
       key={tab.id}
       onClick={() => setActiveTab(tab.id)}
       data-testid={`${tab.id}-tab`}
-      className={`flex-shrink-0 px-3 py-2.5 rounded-md text-sm flex items-center gap-2.5 transition-colors ${
+      aria-current={activeTab === tab.id ? 'page' : undefined}
+      className={`flex-shrink-0 px-3 py-2.5 rounded-md text-sm flex items-center gap-2.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         activeTab === tab.id
-          ? 'bg-muted/60 text-foreground'
-          : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+          ? 'bg-secondary text-foreground font-semibold ring-1 ring-inset ring-border'
+          : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
       }`}
     >
       {tab.icon}
@@ -229,11 +230,17 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                     value={navQuery}
                     onChange={e => setNavQuery(e.target.value)}
                     placeholder="Search settings…"
+                    aria-label="搜索设置"
                     className="w-full pl-8 pr-2 py-1.5 text-sm bg-secondary/50 rounded-md placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
                   />
                 </div>
 
                 {visibleTabs.map(renderTabButton)}
+                {visibleTabs.length === 0 && (
+                  <p role="status" className="px-3 py-4 text-sm text-muted-foreground">
+                    没有匹配的设置，请尝试其他关键词。
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -245,6 +252,14 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
             {!isMobile && <div className="h-9 flex-shrink-0" data-tauri-drag-region />}
             <div className="flex-1 overflow-y-auto">
               <div className={isMobile ? 'p-3' : 'max-w-[640px] mx-auto px-8 pt-2 pb-10'}>
+                {!isMobile && (
+                  <header className="mb-6 border-b border-border pb-4">
+                    <p className="mb-1 text-xs text-muted-foreground">设置</p>
+                    <h1 className="text-xl font-semibold tracking-tight">
+                      {tabs.find(t => t.id === activeTab)?.label}
+                    </h1>
+                  </header>
+                )}
                 {activeTab === 'general' && <GeneralSettings />}
 
                 {activeTab === 'agent' && <AgentSettings />}

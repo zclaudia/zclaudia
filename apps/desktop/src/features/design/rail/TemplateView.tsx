@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../../components/ui/Button';
-import {
-  isDesignHttpError,
-  installDesignTemplate,
-  listDesignTemplates,
-} from '../api';
+import { isDesignHttpError, installDesignTemplate, listDesignTemplates } from '../api';
 import type { DesignTemplateSummary } from '../api';
 
 const LOADING_LABEL = 'Loading templates…';
@@ -107,9 +103,7 @@ export function TemplateView({
       <li
         key={template.id}
         className={`flex gap-3 rounded-md border border-border ${
-          compact
-            ? 'flex-col px-2.5 py-2'
-            : 'items-start justify-between px-3 py-2'
+          compact ? 'flex-col px-2.5 py-2' : 'items-start justify-between px-3 py-2'
         }`}
       >
         <div className="min-w-0 flex flex-col gap-0.5">
@@ -185,7 +179,10 @@ export function TemplateView({
       {result === null && templates !== null && (
         <>
           {conflict !== null && (
-            <div role="alert" className="flex flex-col gap-1.5 rounded-md border border-border px-3 py-2">
+            <div
+              role="alert"
+              className="flex flex-col gap-1.5 rounded-md border border-border px-3 py-2"
+            >
               <span className="text-warning">{CONFLICT_TITLE}</span>
               <ul className="flex max-h-32 flex-col gap-0.5 overflow-y-auto">
                 {conflict.files.map(file => (

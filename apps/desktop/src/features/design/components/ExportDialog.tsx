@@ -10,13 +10,7 @@ export type ExportDialogProps = ExportDialogContentProps;
  */
 export function ExportDialog(props: ExportDialogProps) {
   return (
-    <Modal
-      open={props.open}
-      onClose={props.onClose}
-      ariaLabel="Export"
-      title="Export"
-      size="md"
-    >
+    <Modal open={props.open} onClose={props.onClose} ariaLabel="Export" title="Export" size="md">
       <ExportDialogContent {...props} />
     </Modal>
   );

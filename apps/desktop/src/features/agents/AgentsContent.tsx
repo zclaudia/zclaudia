@@ -76,7 +76,7 @@ function EmptyState({ noun, hint }: { noun: EmptyStateNoun; hint?: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
       <p className="text-sm">Select {NOUN_WITH_ARTICLE[noun]}</p>
-      <p className="mt-1 text-xs opacity-60">
+      <p className="mt-1 text-sm text-muted-foreground">
         {hint ?? `Pick ${NOUN_WITH_ARTICLE[noun]} from the library, or create one with New.`}
       </p>
     </div>
@@ -487,6 +487,28 @@ export function AgentsContent({
     return (
       <div className="relative h-full">
         <BrowseView
+          key={activeTab}
+          loading={
+            (activeTab === 'profiles'
+              ? data
+              : activeTab === 'skills'
+                ? skillsData
+                : activeTab === 'mcp-servers'
+                  ? mcpData
+                  : providersData
+            ).loading
+          }
+          errors={
+            (activeTab === 'profiles'
+              ? data
+              : activeTab === 'skills'
+                ? skillsData
+                : activeTab === 'mcp-servers'
+                  ? mcpData
+                  : providersData
+            ).errors
+          }
+          onRetry={bumpAgentsRefresh}
           tab={activeTab}
           backendFilter={backendFilter}
           backends={backends}
@@ -700,7 +722,7 @@ export function AgentsContent({
             <p className="text-sm text-muted-foreground">
               Couldn't load directories for this backend.
             </p>
-            <p className="mt-1 text-xs text-muted-foreground/60">
+            <p className="mt-1 text-xs text-muted-foreground">
               Editing is disabled until the list can be loaded.
             </p>
           </DetailShell>

@@ -13,10 +13,7 @@ import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
-import {
-  AdditionalDirectoriesField,
-  cleanAdditionalPaths,
-} from '../sidebar';
+import { AdditionalDirectoriesField, cleanAdditionalPaths } from '../sidebar';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';

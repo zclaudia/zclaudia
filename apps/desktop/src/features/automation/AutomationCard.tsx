@@ -5,7 +5,7 @@ import { Play, Pause, Trash2, Shield, Loader2 } from 'lucide-react';
 import type { AutomationItem } from './automation-types';
 import { ListCard, StatusDot, ToneBadge, MetaSep } from './AutomationSharedComponents';
 import { ScopeChunk } from './AutomationScope';
-import type { Tone } from '../../components/ui/tone';
+import { STATUS_TONE, type Tone } from '../../components/ui/tone';
 
 export function AutomationCard({
   item,
@@ -28,7 +28,7 @@ export function AutomationCard({
 }) {
   const tone: Tone =
     item.status === 'running'
-      ? 'warning'
+      ? STATUS_TONE.running
       : item.status === 'error'
         ? 'destructive'
         : item.enabled
@@ -53,7 +53,12 @@ export function AutomationCard({
         </button>
       }
       titleExpanded={nameExpanded}
-      titleExtra={item.isSystem ? <ToneBadge tone="neutral">System</ToneBadge> : undefined}
+      titleExtra={
+        <>
+          {item.status === 'running' && <ToneBadge tone={STATUS_TONE.running}>运行中</ToneBadge>}
+          {item.isSystem && <ToneBadge tone="neutral">System</ToneBadge>}
+        </>
+      }
       meta={
         <>
           <ScopeChunk projectId={item.projectId} label={scopeLabel} />

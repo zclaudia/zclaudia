@@ -6,7 +6,7 @@ The Lineage panel (`apps/desktop/src/features/lineage/`) is the in-repo referenc
 ## 1. Color is semantics only
 
 Chrome carries zero decorative color. Allowed: status dots (`bg-success`,
-running/online), warnings (`warning` tokens, elevated permissions), destructive
+running/online), warnings (`warning` tokens, waiting for input or elevated permissions), destructive
 (`destructive` tokens), diff +/- colors, unread indicators. Everything else is
 grayscale (`foreground` / `muted-foreground` / `secondary`). Target: at most two
 semantic color groups visible per screen of chrome. Never hardcode raw palette
@@ -38,8 +38,12 @@ other chrome icon stay monochrome lucide.
 - Section labels: `text-[11px] font-medium text-muted-foreground`, sentence case —
   never `uppercase` + `tracking-*`. Use the `SECTION_LABEL` constant from
   `src/components/ui/typography.ts` instead of hand-rolling the classes.
-- Muted micro-text uses exactly two opacity steps: `text-muted-foreground` and
-  `text-muted-foreground/60`.
+- Secondary text uses `text-muted-foreground` at full opacity. Do not layer
+  opacity on instructions, counts, paths or status labels: contrast must remain
+  at least 4.5:1 after compositing with the actual surface.
+- Selected navigation uses a persistent weight + inset border in addition to its
+  fill; hover uses a lighter fill and keyboard focus has its own ring. Mark the
+  current destination with `aria-current="page"`.
 - Nested sub-section labels (a group heading inside a panel that already has its own
   header) keep the same size and sentence case but may use `text-foreground` to
   preserve one level of hierarchy below the muted panel header.
@@ -80,6 +84,9 @@ hand-rolling their recipes:
   slow, unstyled, and invisible to keyboard users; don't add new ones in chrome.
 - **Tone map** (`tone.ts`) — every status color. `TONE_TEXT` / `TONE_BADGE` /
   `TONE_DOT` keyed by semantic tone; never a raw palette badge map per feature.
+  `STATUS_TONE` is the shared lifecycle dictionary: running/online/completed use
+  success, waiting uses warning, failed uses destructive and offline uses neutral.
+  Pair color with a label, icon or accessible text.
 - **Select / Modal / Input (`FIELD_CLASS`) / Toggle / FormField** — as before.
 - **InspectorSection** (`features/design/inspector/InspectorSection.tsx`) — the
   collapsible-group primitive for inspector panels: `<button>` summary with
@@ -110,6 +117,13 @@ Radius is assigned by **role**, never by size or local taste:
 | Panel        | `rounded-xl` (16px)                | Floating surfaces: `Select`/`DropdownMenu` panels, popovers                                                                                                                                                                                                                                     |
 | Chrome       | `rounded-2xl`                      | Modals, the chat composer container                                                                                                                                                                                                                                                             |
 | Inline token | `var(--radius-inline-token)` (5px) | Chips embedded in the text flow: prose inline code, `@file` reference chips (`FileLineReference`, `FileReference`). At ~20px line height, the control-tier 10px reads as a half-pill — inline tokens stay small. In TSX use `rounded-[var(--radius-inline-token)]`; in CSS use the var directly |
+
+Control, panel and dialog radii use `--radius-control`, `--radius-panel` and
+`--radius-dialog`. Color themes must not override these geometry tokens.
+High-frequency mobile buttons, icon buttons and selector triggers use real 44px
+hit areas, not negative-inset pseudo elements that overlap adjacent controls.
+The current font-size preference affects chat content, not the whole interface;
+label it accordingly rather than implying global UI scaling.
 
 One more consistency rule: sibling controls in the same form share a height
 tier (dialog fields are `h-9`). The same radius on a shorter control looks

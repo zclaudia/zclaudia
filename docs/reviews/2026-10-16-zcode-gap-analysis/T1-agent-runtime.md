@@ -9,23 +9,24 @@
 
 ## 1. 两侧结构对照（简表）
 
-| 子域 | ZCode（apps/zcode-cli/packages） | zclaudia | 差距判断 |
-|---|---|---|---|
-| Agent 主循环 | `core/src/runtime/agent-runtime.ts`（720 行）+ `core/src/agent/turn-machine.ts`（344 行显式状态机）+ `runtime/methods/`（约 150 个文件：turn-loop、steering、resume、fork、rewind、compact 等） | 双轨：自有 Pi 运行时 `server/src/infra/providers/pi-runtime/agent-loop/pi-agent-loop-executor.ts`（基于 `@earendil-works/pi-agent-core` 的 `runAgentLoop`）+ 外部引擎插件（claude/codex/cursor 经 SDK/ACP 驱动，`plugins/agents/*/src/runner.ts`） | 循环本体相当（zclaudia 复用 pi-agent-core 成熟实现）；ZCode 在**循环外围的规范化**（状态机、命令队列、恢复）更强 |
-| 子代理 | `core/src/subagent/runner.ts`（2145 行：前台/后台、SendMessage 导向、快照/等待/停止）+ explore/general-purpose/persistent-memory + `tool-event-mirror.ts` | `pi-runtime/task-tools.ts`（645 行：Agent/TaskOutput/Monitor/SendMessage/RespondToCoordinator）+ `session-tree/` + `conversation/runtime/background-task-coordinator.ts` | 主干相当；ZCode 多持久记忆、事件镜像、任务注册表一等化 |
-| 工具系统 | `core/src/tool/`：`handlers/` 129 个文件、`executor/` 39 个文件、scheduler/registry/path-policy/read-file-state 等 | `pi-runtime/` 100+ 文件（read/bash/edit-write/grep/symbol/web/skill/task/lsp/eval 等）+ `tool-scheduler.ts`（并发上限 10、超时、快照） | 工具覆盖面相当；ZCode 在 bash 只读判定深度与变更纪律上领先 |
-| 权限审批 | `core/src/permission/service.ts`（732 行）+ `broker.ts` + `tool/executor/permission-*`（10 文件）+ 授权跨 resume 恢复 | `conversation/agent/permission-evaluator.ts` + `permission-memory.ts`（remember key 持久化）+ `permission-rule-promotion.ts` + `bash-readonly/` + `runtime/run-permissions.ts` | 主干相当；ZCode 增量在授权恢复、审批竞态、能力分组 |
-| Hooks | `contracts/src/hooks/index.ts`（8 类事件 + zod schema）+ `core/src/hooks/`（runner 462 行 + workspace-hook-trust 约 10 文件） | `shared/src/interaction/user-hooks.ts:3` 仅 `PreToolUse \| PostToolUse`；执行器 `pi-runtime/user-hooks.ts`；配置 `conversation/runtime/resolve-user-hooks.ts`（global+project 两层） | **事件面 2 vs 8，且无信任准入**，明显落后 |
-| 上下文压缩 | `core/src/compact/`：auto-compact 策略（policy.ts，provider_usage token 源、preflight-v1、熔断）+ **microcompact.ts（286 行工具结果定点清理）** + manual/prompt/rounds | `conversation/compaction/`：compaction-service.ts（371 行，摘要式 + 串行化队列）+ chunked-summary.ts + circuit-breaker.ts（熔断 + 冷却，env 可调） | 摘要式相当；**缺 microcompact 层** |
-| 会话恢复/fork/rewind | `runtime/methods/resume.ts`（执行状态恢复 + 权限授权恢复 + checkpoint 还原）+ `session-fork.ts`（identity remap）+ `file-rewind.ts`（717 行）+ `workspace-checkpoints.ts` + `contracts/src/rewind/`（Scope/Strategy zod） | `session-tree/fork.ts`（forkSessionAt）+ `pi-runtime/file-history.ts`（每文件 20 份备份/7 天 TTL）+ `runtime/run-recovery.ts` + sqlite session 存储 | 有原语；ZCode 的 scope/strategy 模型与消息级 rewind 语义更完整 |
-| TUI | `packages/tui/src/`：**86 个源文件**（OpenTUI React 19 + shiki 高亮 + 鼠标滚动回看 + 侧栏 + 主题 + i18n），另有 `docs/design/v2/tui-*.md` 约 24 篇 spec 和 `bootstrap/src/zcode-protocol-v4/`（TUI 只是客户端之一） | **缺失**：无任何 TUI 包；`apps/desktop` 为 Tauri+React，`server/src/infra/terminal-manager.ts` 是面向桌面 UI 的 node-pty 终端透传，不是 agent TUI | 形态级空白 |
-| 测试 | 各包 `--test` + `e2e/`（含 compact-microcompact、file-tools-atomic-write）+ `tests/` | plugins/agents + agent-common + server/application 共 178 个 `*.test.ts`（`find` 统计） | 覆盖广度两侧都重视 |
+| 子域                 | ZCode（apps/zcode-cli/packages）                                                                                                                                                                                          | zclaudia                                                                                                                                                                                                                                           | 差距判断                                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Agent 主循环         | `core/src/runtime/agent-runtime.ts`（720 行）+ `core/src/agent/turn-machine.ts`（344 行显式状态机）+ `runtime/methods/`（约 150 个文件：turn-loop、steering、resume、fork、rewind、compact 等）                           | 双轨：自有 Pi 运行时 `server/src/infra/providers/pi-runtime/agent-loop/pi-agent-loop-executor.ts`（基于 `@earendil-works/pi-agent-core` 的 `runAgentLoop`）+ 外部引擎插件（claude/codex/cursor 经 SDK/ACP 驱动，`plugins/agents/*/src/runner.ts`） | 循环本体相当（zclaudia 复用 pi-agent-core 成熟实现）；ZCode 在**循环外围的规范化**（状态机、命令队列、恢复）更强 |
+| 子代理               | `core/src/subagent/runner.ts`（2145 行：前台/后台、SendMessage 导向、快照/等待/停止）+ explore/general-purpose/persistent-memory + `tool-event-mirror.ts`                                                                 | `pi-runtime/task-tools.ts`（645 行：Agent/TaskOutput/Monitor/SendMessage/RespondToCoordinator）+ `session-tree/` + `conversation/runtime/background-task-coordinator.ts`                                                                           | 主干相当；ZCode 多持久记忆、事件镜像、任务注册表一等化                                                           |
+| 工具系统             | `core/src/tool/`：`handlers/` 129 个文件、`executor/` 39 个文件、scheduler/registry/path-policy/read-file-state 等                                                                                                        | `pi-runtime/` 100+ 文件（read/bash/edit-write/grep/symbol/web/skill/task/lsp/eval 等）+ `tool-scheduler.ts`（并发上限 10、超时、快照）                                                                                                             | 工具覆盖面相当；ZCode 在 bash 只读判定深度与变更纪律上领先                                                       |
+| 权限审批             | `core/src/permission/service.ts`（732 行）+ `broker.ts` + `tool/executor/permission-*`（10 文件）+ 授权跨 resume 恢复                                                                                                     | `conversation/agent/permission-evaluator.ts` + `permission-memory.ts`（remember key 持久化）+ `permission-rule-promotion.ts` + `bash-readonly/` + `runtime/run-permissions.ts`                                                                     | 主干相当；ZCode 增量在授权恢复、审批竞态、能力分组                                                               |
+| Hooks                | `contracts/src/hooks/index.ts`（8 类事件 + zod schema）+ `core/src/hooks/`（runner 462 行 + workspace-hook-trust 约 10 文件）                                                                                             | `shared/src/interaction/user-hooks.ts:3` 仅 `PreToolUse \| PostToolUse`；执行器 `pi-runtime/user-hooks.ts`；配置 `conversation/runtime/resolve-user-hooks.ts`（global+project 两层）                                                               | **事件面 2 vs 8，且无信任准入**，明显落后                                                                        |
+| 上下文压缩           | `core/src/compact/`：auto-compact 策略（policy.ts，provider_usage token 源、preflight-v1、熔断）+ **microcompact.ts（286 行工具结果定点清理）** + manual/prompt/rounds                                                    | `conversation/compaction/`：compaction-service.ts（371 行，摘要式 + 串行化队列）+ chunked-summary.ts + circuit-breaker.ts（熔断 + 冷却，env 可调）                                                                                                 | 摘要式相当；**缺 microcompact 层**                                                                               |
+| 会话恢复/fork/rewind | `runtime/methods/resume.ts`（执行状态恢复 + 权限授权恢复 + checkpoint 还原）+ `session-fork.ts`（identity remap）+ `file-rewind.ts`（717 行）+ `workspace-checkpoints.ts` + `contracts/src/rewind/`（Scope/Strategy zod） | `session-tree/fork.ts`（forkSessionAt）+ `pi-runtime/file-history.ts`（每文件 20 份备份/7 天 TTL）+ `runtime/run-recovery.ts` + sqlite session 存储                                                                                                | 有原语；ZCode 的 scope/strategy 模型与消息级 rewind 语义更完整                                                   |
+| TUI                  | `packages/tui/src/`：**86 个源文件**（OpenTUI React 19 + shiki 高亮 + 鼠标滚动回看 + 侧栏 + 主题 + i18n），另有 `docs/design/v2/tui-*.md` 约 24 篇 spec 和 `bootstrap/src/zcode-protocol-v4/`（TUI 只是客户端之一）       | **缺失**：无任何 TUI 包；`apps/desktop` 为 Tauri+React，`server/src/infra/terminal-manager.ts` 是面向桌面 UI 的 node-pty 终端透传，不是 agent TUI                                                                                                  | 形态级空白                                                                                                       |
+| 测试                 | 各包 `--test` + `e2e/`（含 compact-microcompact、file-tools-atomic-write）+ `tests/`                                                                                                                                      | plugins/agents + agent-common + server/application 共 178 个 `*.test.ts`（`find` 统计）                                                                                                                                                            | 覆盖广度两侧都重视                                                                                               |
 
 ---
 
 ## 2. ZCode 领先点（核心章节）
 
 ### 2.1 Hooks 生命周期：8 类事件 + workspace hook 信任准入体系 【P1】
+
 - **解决的问题**：让 hook 不只「Pre/Post 工具」两个点，而能介入权限请求、工具失败、提交 prompt、会话起止；并解决「项目里别人的 hook 脚本是否可信」的准入问题。
 - **证据路径（ZCode 侧）**：
   - `apps/zcode-cli/packages/contracts/src/hooks/index.ts`：`HookEventName` 含 `PreToolUse / PermissionRequest / PostToolUse / PostToolUseFailure / UserPromptSubmit / SessionStart / Stop`（第 70–193 行区域，zod discriminatedUnion 输出 schema）
@@ -36,6 +37,7 @@
 - **体量估计**：事件扩展 2–3 天；信任准入子系统 1–2 周。
 
 ### 2.2 子代理运行时：前台/后台生命周期 + 运行中 SendMessage 导向 + 任务注册表一等化 【P1】
+
 - **解决的问题**：subagent 不是「阻塞跑完返回文本」，而是可后台化、可中途导向（steer）、可查询快照、完成后以结构化通知回流父会话的一等任务对象。
 - **证据路径（ZCode 侧）**：
   - `apps/zcode-cli/packages/core/src/subagent/runner.ts`（2145 行：`SubagentStart/Run/SendMessage/Wait/Stop/TaskSnapshot`、`AgentBackgroundedOutput`、child traceContext、子会话持久化钩子 `onSessionReady`）
@@ -47,6 +49,7 @@
 - **体量估计**：注册表 + 镜像 1–2 周。
 
 ### 2.3 Microcompact：工具结果定点清理压缩层 【P1】
+
 - **解决的问题**：会话超限前先清「旧的大工具结果」（读文件、bash 输出等），避免动辄全量摘要；比 summary compaction 更快、保真更高。
 - **证据路径（ZCode 侧）**：
   - `apps/zcode-cli/packages/core/src/compact/microcompact.ts`（286 行：阈值比 0.9、保留最近 5 条工具结果、idle 60 分钟、最小节省 256 token、9 类可压缩工具白名单、错误结果清理、`[Old tool result content cleared]` 占位）
@@ -57,6 +60,7 @@
 - **体量估计**：3–5 天。
 
 ### 2.4 TUI 终端形态整体缺失 【P2】
+
 - **解决的问题**：为 server 型 agent 提供键盘优先的本地终端客户端；ZCode 还把 TUI 设计为 Protocol V4 的一个普通客户端，业务状态不在 TUI 层（见 `apps/zcode-cli/AGENTS.md`「TUI 只负责输入采集、布局渲染和临时交互态」）。
 - **证据路径（ZCode 侧）**：
   - `apps/zcode-cli/packages/tui/src/`（86 文件：`app-permission.ts`、`app-approval.ts`、`app-question-panel.tsx`、`app-file-mentions.ts`、`app-sidebar-subagents.tsx`、`app-shiki-diff-view.tsx`、`app-mouse*`/`app-selection-*`、`app-queued-inputs.tsx`、`theme/` 等；React 19 + `@mbears/opentui-*`）
@@ -67,6 +71,7 @@
 - **体量估计**：完整 TUI 4–6 周；最小可用（transcript+输入+权限面板）1–2 周。
 
 ### 2.5 Turn 状态机 + Runtime Command Queue（结构化 steering/排队输入）【P2】
+
 - **解决的问题**：把「一轮」的相位（模型请求→工具调度→权限→聚合→完成/失败）与「轮中插入的输入/通知/控制命令」形式化，避免散落各处的回调态。
 - **证据路径（ZCode 侧）**：
   - `apps/zcode-cli/packages/core/src/agent/turn-machine.ts`（344 行：`requestPermission/resolvePermission/queuePendingInput/drainPendingInputs/aggregateResults` 等显式相位转移）+ `turn-state.ts`（相位合法性 `canTransitionTo`）
@@ -77,6 +82,7 @@
 - **体量估计**：1 周。
 
 ### 2.6 会话 fork / rewind / workspace checkpoint 体系 【P2】
+
 - **解决的问题**：对话树分支、消息级回退、文件级回滚三者打通，且 fork 时 identity（消息/目标/校验器 id）完整重映射、可跨恢复。
 - **证据路径（ZCode 侧）**：
   - `apps/zcode-cli/packages/core/src/runtime/methods/session-fork.ts`（`ForkIdentityMap`、goal 快照重映射、原子 fork notice）+ `stable-fork-boundary.ts`
@@ -88,6 +94,7 @@
 - **体量估计**：1–2 周。
 
 ### 2.7 权限：授权跨 resume 恢复 + 审批竞态处理 + 审批建议 【P2】
+
 - **解决的问题**：审批是异步交互，需要处理「批下来时轮已结束/流已断」「用户没选时的默认建议」「重启后未消费的授权」等长尾。
 - **证据路径（ZCode 侧）**：
   - `apps/zcode-cli/packages/core/src/runtime/permission-grant-recovery.ts`（`recoverPendingPermissionGrant` + `unpublishedPermissionGrants` WeakMap）+ `runtime/helpers/permission-grant-resume.ts`（`restorePermissionGrantMarker`）
@@ -98,6 +105,7 @@
 - **体量估计**：各 2–4 天。
 
 ### 2.8 子代理持久记忆（user/project/local 三级作用域）【P2】
+
 - **解决的问题**：专用 agent（如 code-reviewer）跨会话积累领域记忆，按作用域隔离存取并在启动时注入。
 - **证据路径（ZCode 侧）**：`apps/zcode-cli/packages/core/src/subagent/persistent-memory.ts`（110 行：`~/.zcode/agent-memory/<agent>` / `.zcode/agent-memory` / `.zcode/agent-memory-local` 三级根目录解析）+ `persistent-memory-prompt.ts`（169 行注入文案）+ `profile.ts`（`AgentMemoryScope`，re-export 自 contracts）
 - **zclaudia 现状**：缺失——`shared/src/core/agent-profile.ts:47-77` 的 `AgentProfileConfig` 无 agent 级记忆字段；`pi-runtime/memory-tool.ts`/`memory-provider.ts` 是主会话记忆，非 per-agent 持久记忆。
@@ -105,6 +113,7 @@
 - **体量估计**：2–3 天。
 
 ### 2.9 spec 驱动的工具变更纪律 + contracts/adapters 架构边界 【P3】
+
 - **解决的问题**：工具/权限/事件任何一处改动都要过端到端链路 checklist，防止「改了 schema 忘了 UI/远控/持久化」。
 - **证据路径（ZCode 侧）**：
   - `apps/zcode-cli/docs/design/v2/tool/00-tool-change-chain.md`（强制前置阅读；含多次带日期的演进记录与验收要求）
@@ -115,6 +124,7 @@
 - **体量估计**：写 spec 1–2 天，长期执行成本为主。
 
 ### 2.10 Bash 只读判定的方言级完备度 【P3】
+
 - **解决的问题**：把「这条 bash 命令是否只读」判定到 argv/flag/git 子命令/方言（CMD/POSIX/Git Bash）粒度，支撑 plan 模式与自动放行。
 - **证据路径（ZCode 侧）**：`apps/zcode-cli/packages/core/src/tool/handlers/bash-readonly-policy-*.ts` 约 20 个文件（argv-direct/flags-git/multiword-gh/commands 等），变更验收记录见 `docs/design/v2/tool/00-tool-change-chain.md` 的 2026-09-24 补充段（七类识别正反例）。
 - **zclaudia 现状**：`server/src/application/conversation/agent/bash-readonly/`（analyze.ts/policies.ts/index.ts）+ `shell-parser.ts`——有实现但规模小约一个数量级。
@@ -153,7 +163,7 @@
 
 > 复核人：独立复核员（与探索员无共享上下文），2026-10-16。覆盖第 2 章 P1/P2 共 8 条，全部为本轮只读实读核对；ZCode 侧路径省略前缀 `apps/zcode-cli/`。
 
-- ⚠️ Hooks 生命周期：8 类事件 + workspace hook 信任准入 —— 事件实为 **7 类非 8 类**（`packages/contracts/src/hooks/index.ts:7-15` `HookEventName` 枚举与 `:251-278` zod schema 均恰好 7 个），但所指 PermissionRequest/SessionStart/Stop/PostToolUseFailure 四事件全部存在，信任准入子系统属实（`packages/core/src/hooks/workspace-hook-trust-coordinator.ts:22` `WorkspaceHookTrustCoordinator`，9 个 workspace-hook-*.ts 共 1170 行；`packages/core/src/hooks/runner.ts:35` `InMemoryHookRunner` 462 行、`:381` emitHookEvent）；zclaudia 侧属实（`shared/src/interaction/user-hooks.ts:3` 仅 `PreToolUse | PostToolUse`，三个 hook 相关文件 grep 无 trust/准入概念）。
+- ⚠️ Hooks 生命周期：8 类事件 + workspace hook 信任准入 —— 事件实为 **7 类非 8 类**（`packages/contracts/src/hooks/index.ts:7-15` `HookEventName` 枚举与 `:251-278` zod schema 均恰好 7 个），但所指 PermissionRequest/SessionStart/Stop/PostToolUseFailure 四事件全部存在，信任准入子系统属实（`packages/core/src/hooks/workspace-hook-trust-coordinator.ts:22` `WorkspaceHookTrustCoordinator`，9 个 workspace-hook-\*.ts 共 1170 行；`packages/core/src/hooks/runner.ts:35` `InMemoryHookRunner` 462 行、`:381` emitHookEvent）；zclaudia 侧属实（`shared/src/interaction/user-hooks.ts:3` 仅 `PreToolUse | PostToolUse`，三个 hook 相关文件 grep 无 trust/准入概念）。
 - ✅ Microcompact 工具结果定点清理 —— 全部命中：保留最近 5 条（`packages/core/src/compact/microcompact.ts:16`）、阈值比 0.9（`:19`）、9 类可压缩工具白名单（`:21-31`）、决策 reason 可观测（`:55-66`）；`packages/core/src/compact/policy.ts:28` `provider_usage`、`:9` 输出预留 32K；`e2e/compact-microcompact/` 存在（含 case-microcompact.mjs）；zclaudia `compaction/` 仅 chunked-summary/circuit-breaker/compaction-service 三文件，grep 无 microcompact/工具结果定点清理。
 - ✅ 子代理运行时一等化 —— `packages/core/src/subagent/runner.ts` 2145 行，SubagentStart/SendMessage/Wait/Stop/TaskSnapshot 类型（`:32-41`）、`AgentBackgroundedOutput`（`:21`）、后台化分支（`:150-153`）均在；`packages/core/src/runtime-task/registry.ts:43` `RuntimeTaskSnapshot` + `:174-182` pendingMessages + `:103` 终态集合；`packages/core/src/subagent/tool-event-mirror.ts` 186 行，`:16-28` 镜像 ToolCall*/Permission* 事件进父会话；zclaudia server/src grep 无 mirror/runtime-task registry。
 - ✅ 子代理持久记忆 —— `packages/core/src/subagent/persistent-memory.ts:17-31` user/project/local 三级根目录解析、`:70` `loadPersistentAgentMemory` 读 MEMORY.md 并经 `persistent-memory-prompt.ts`（169 行）注入；zclaudia `shared/src/core/agent-profile.ts` 全文无 memory 字段（`:68` 仅注释提及 in-memory）。

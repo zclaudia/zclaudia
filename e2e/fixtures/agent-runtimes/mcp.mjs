@@ -117,10 +117,13 @@ export async function exerciseMcp(runtime, args, cwd, prompt, inlineConfig, exer
   const request = (method, params = {}) =>
     new Promise((resolve, reject) => {
       const id = ++nextId;
-      const timeout = setTimeout(() => {
-        pending.delete(id);
-        reject(new Error(`MCP ${method} timed out`));
-      }, params.name === 'design_workbench' ? 15000 : 5000);
+      const timeout = setTimeout(
+        () => {
+          pending.delete(id);
+          reject(new Error(`MCP ${method} timed out`));
+        },
+        params.name === 'design_workbench' ? 15000 : 5000
+      );
       pending.set(id, message => {
         clearTimeout(timeout);
         pending.delete(id);
@@ -212,8 +215,14 @@ export async function exerciseDesignMcp(args, cwd, prompt) {
       : '<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:sans-serif;padding:40px}</style></head><body><h1>New settings</h1><p>Created from chat</p></body></html>';
     writeFileSync(path.join(cwd, target), html);
     const presented = await call({ action: 'present', path: target });
-    appendFileSync(process.env.E2E_RUNTIME_AUDIT, JSON.stringify({ designTool: 'present', result: presented }) + '\n');
-    writeFileSync(path.join(cwd, 'design-agent-result.json'), JSON.stringify({ before, presented }));
+    appendFileSync(
+      process.env.E2E_RUNTIME_AUDIT,
+      JSON.stringify({ designTool: 'present', result: presented }) + '\n'
+    );
+    writeFileSync(
+      path.join(cwd, 'design-agent-result.json'),
+      JSON.stringify({ before, presented })
+    );
     assert.equal(presented.ok, true, JSON.stringify(presented));
     assert.equal(presented.displayed, true);
     assert.equal(presented.path, target);

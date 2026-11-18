@@ -136,7 +136,9 @@ describe('MediaGenPanel（P6 §8.2）', () => {
 
   it('三 tab 切换：默认图片生成；视频 tab 缺省活动页入口且校验错误就地显示', async () => {
     mount();
-    expect(screen.getByRole('tab', { name: 'Image generation', selected: true })).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: 'Image generation', selected: true })
+    ).toBeInTheDocument();
     expect(await screen.findByText('BigModel')).toBeInTheDocument();
     expect(screen.getByLabelText('Prompt')).toHaveValue('');
     expect(screen.getByText('Enter a prompt')).toBeInTheDocument();
@@ -183,7 +185,9 @@ describe('MediaGenPanel（P6 §8.2）', () => {
       profiles: [{ id: 'p2', name: '缺密钥', providerType: 'openai', hasCredential: false }],
     });
     mount();
-    expect(await screen.findByText('Configure an OpenAI-compatible service in Settings first')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Configure an OpenAI-compatible service in Settings first')
+    ).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Prompt'), { target: { value: '海报' } });
     fireEvent.change(screen.getByLabelText('Model name'), { target: { value: 'cogview-4' } });
     expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
@@ -222,7 +226,9 @@ describe('MediaGenPanel（P6 §8.2）', () => {
     mount();
     await fillImageForm();
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('An identical task is already in progress');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'An identical task is already in progress'
+    );
     expect(screen.getByLabelText('Prompt')).toHaveValue('海报');
   });
 
@@ -263,7 +269,9 @@ describe('MediaGenPanel（P6 §8.2）', () => {
     const row = await screen.findByTestId('media-task-t-failed');
     expect(within(row).getByRole('alert')).toHaveTextContent('页面没有产生任何画面帧');
     fireEvent.click(within(row).getByRole('button', { name: 'Retry Motion video task' }));
-    await screen.findByText('This will resubmit the generation request and may incur costs. Continue?');
+    await screen.findByText(
+      'This will resubmit the generation request and may incur costs. Continue?'
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(
       screen.queryByText('This will resubmit the generation request and may incur costs. Continue?')

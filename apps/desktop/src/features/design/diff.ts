@@ -38,7 +38,11 @@ function splitLines(text: string): string[] {
  * `truncated` flag is set. The common prefix/suffix is trimmed before the
  * LCS table is built to keep the table small for typical documents.
  */
-export function lineDiff(a: string, b: string, maxLines: number = DEFAULT_MAX_LINES): LineDiffResult {
+export function lineDiff(
+  a: string,
+  b: string,
+  maxLines: number = DEFAULT_MAX_LINES
+): LineDiffResult {
   const aAll = splitLines(a);
   const bAll = splitLines(b);
   let truncated = aAll.length > maxLines || bAll.length > maxLines;

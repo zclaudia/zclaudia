@@ -303,11 +303,9 @@ const PAGE_STABILIZE_MS = 300;
 // 同款用法已在 browser 域 puppeteer-engine.ts 验证。
 class CdpScreencastPage implements RenderPage {
   private client: CDPSession | null = null;
-  private handler: ((payload: {
-    data: string;
-    metadata: { timestamp?: number };
-    sessionId: number;
-  }) => void) | null = null;
+  private handler:
+    | ((payload: { data: string; metadata: { timestamp?: number }; sessionId: number }) => void)
+    | null = null;
 
   constructor(private readonly page: Page) {}
 
@@ -420,7 +418,10 @@ export function assertOutputWithinLimit(
 function assertVideoParams(execution: MediaTaskExecution): DesignMediaTaskParamsVideoRender {
   const params = execution.params;
   if (params.type !== 'video-render') {
-    throw new MediaTaskRunError('INTERNAL', 'Task parameters do not match the video-render executor');
+    throw new MediaTaskRunError(
+      'INTERNAL',
+      'Task parameters do not match the video-render executor'
+    );
   }
   const evenDimensions =
     Number.isInteger(params.width) &&
@@ -458,7 +459,10 @@ function assertVideoParams(execution: MediaTaskExecution): DesignMediaTaskParams
     );
   }
   if (typeof params.entryPath !== 'string' || params.entryPath.trim().length === 0) {
-    throw new MediaTaskRunError('RENDER_FAILED', 'Invalid video parameters: missing entry file path.');
+    throw new MediaTaskRunError(
+      'RENDER_FAILED',
+      'Invalid video parameters: missing entry file path.'
+    );
   }
   return params;
 }
@@ -478,7 +482,10 @@ function summarizeStderr(stderrTail: string): string {
 const RENDER_POLL_INTERVAL_MS = 50;
 
 export function createVideoRenderExecutor(deps: VideoRenderDeps): MediaTaskExecutor {
-  return async (execution: MediaTaskExecution, ctx: MediaExecutorContext): Promise<DesignMediaTaskResult> => {
+  return async (
+    execution: MediaTaskExecution,
+    ctx: MediaExecutorContext
+  ): Promise<DesignMediaTaskResult> => {
     const params = assertVideoParams(execution);
 
     let browser: RenderBrowser | null = null;
@@ -659,7 +666,10 @@ export function createVideoRenderExecutor(deps: VideoRenderDeps): MediaTaskExecu
       } catch (err) {
         if (err instanceof MediaTaskRunError) throw err;
         const message = err instanceof Error ? err.message : String(err);
-        throw new MediaTaskRunError('ASSET_WRITE_FAILED', `Failed to write the video artifact: ${message}`);
+        throw new MediaTaskRunError(
+          'ASSET_WRITE_FAILED',
+          `Failed to write the video artifact: ${message}`
+        );
       }
       return { path: saved.path, bytes: saved.bytes, mime: 'video/mp4', usage: null };
     } catch (err) {

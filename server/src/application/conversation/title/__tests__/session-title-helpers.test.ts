@@ -32,7 +32,12 @@ describe('shouldRegenerateTitle', () => {
   it('locks a manual name: never generates once name diverges from the auto title', () => {
     expect(shouldRegenerateTitle({ name: 'Manual', userMsgCount: 1 })).toBe(false);
     expect(
-      shouldRegenerateTitle({ name: 'Manual', autoTitle: 'X', autoTitleMsgCount: 1, userMsgCount: 9 })
+      shouldRegenerateTitle({
+        name: 'Manual',
+        autoTitle: 'X',
+        autoTitleMsgCount: 1,
+        userMsgCount: 9,
+      })
     ).toBe(false);
   });
   it('keeps refreshing when name equals the auto title (write-through state)', () => {

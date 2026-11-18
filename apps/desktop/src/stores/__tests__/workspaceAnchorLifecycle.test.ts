@@ -254,7 +254,10 @@ describe('deleted session ownership and adopted layout', () => {
         },
       },
     } as any);
-    expect(useProjectStore.getState().sessions.map(session => session.id)).toEqual(['A', 'B']);
+    // The archive upsert mirrors into the catalog: A leaves because it was in
+    // this backend's sync bucket. B was not, so it stays. Chat refs are still
+    // removed immediately and the tools-only anchor remains.
+    expect(useProjectStore.getState().sessions.map(session => session.id)).toEqual(['B']);
     expect(refs().filter(isChatRef)).toEqual([]);
     expect(refs()).toEqual([memory]);
     expect(useSessionsStore.getState().remoteSessions.get('be')).toEqual([]);

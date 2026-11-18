@@ -53,9 +53,7 @@ export function LeftRail({
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const resizeTo = (next: number) => {
-    onResize(
-      Math.min(DESIGN_LEFT_WIDTH_MAX, Math.max(DESIGN_LEFT_WIDTH_MIN, Math.round(next)))
-    );
+    onResize(Math.min(DESIGN_LEFT_WIDTH_MAX, Math.max(DESIGN_LEFT_WIDTH_MIN, Math.round(next))));
   };
 
   const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {

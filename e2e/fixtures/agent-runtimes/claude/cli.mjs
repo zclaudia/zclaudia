@@ -171,8 +171,29 @@ createInterface({ input: process.stdin }).on('line', async line => {
   if (prompt.includes('E2E_MCP')) await exerciseMcp('claude', args, process.cwd(), prompt);
   if (prompt.includes('E2E_DESIGN_CHAT_')) {
     await exerciseDesignMcp(args, process.cwd(), prompt);
-    assistant([{ type: 'text', text: prompt.includes('E2E_DESIGN_CHAT_REFINE') ? 'E2E_DESIGN_CHAT_REFINED' : 'E2E_DESIGN_CHAT_PRESENTED' }]);
-    emit({ type: 'result', subtype: 'success', session_id: sessionId, uuid: randomUUID(), is_error: false, result: 'Design displayed', duration_ms: 1, duration_api_ms: 0, num_turns: 1, total_cost_usd: 0, usage: { input_tokens: 1, output_tokens: 1 }, modelUsage: {}, permission_denials: [] });
+    assistant([
+      {
+        type: 'text',
+        text: prompt.includes('E2E_DESIGN_CHAT_REFINE')
+          ? 'E2E_DESIGN_CHAT_REFINED'
+          : 'E2E_DESIGN_CHAT_PRESENTED',
+      },
+    ]);
+    emit({
+      type: 'result',
+      subtype: 'success',
+      session_id: sessionId,
+      uuid: randomUUID(),
+      is_error: false,
+      result: 'Design displayed',
+      duration_ms: 1,
+      duration_api_ms: 0,
+      num_turns: 1,
+      total_cost_usd: 0,
+      usage: { input_tokens: 1, output_tokens: 1 },
+      modelUsage: {},
+      permission_denials: [],
+    });
     return;
   }
   // Deterministic design-workbench acceptance flow, through the real runtime

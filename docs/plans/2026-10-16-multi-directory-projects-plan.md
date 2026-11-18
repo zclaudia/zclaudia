@@ -8,14 +8,14 @@
 
 **主目录 + 附加目录，不是对称多根。**
 
-| 方面 | 主目录 `rootPath` | 附加目录 `additionalPaths` |
-| --- | --- | --- |
-| session `cwd` / 相对路径基准 | ✅ | ❌（agent 用绝对路径访问） |
-| agent 读写、权限边界内 | ✅ | ✅ |
-| 沙箱可写 | ✅ | ✅ |
-| git 状态 / worktree / Local PR / supervision / checkpoint | ✅ | ❌（本期明确不管） |
-| LSP 诊断 / 符号工具 | ✅ | ❌ |
-| 文件树 / `@file` | ✅ | 二期 |
+| 方面                                                      | 主目录 `rootPath` | 附加目录 `additionalPaths` |
+| --------------------------------------------------------- | ----------------- | -------------------------- |
+| session `cwd` / 相对路径基准                              | ✅                | ❌（agent 用绝对路径访问） |
+| agent 读写、权限边界内                                    | ✅                | ✅                         |
+| 沙箱可写                                                  | ✅                | ✅                         |
+| git 状态 / worktree / Local PR / supervision / checkpoint | ✅                | ❌（本期明确不管）         |
+| LSP 诊断 / 符号工具                                       | ✅                | ❌                         |
+| 文件树 / `@file`                                          | ✅                | 二期                       |
 
 - 仅 `type = 'code'` 且已设 `rootPath` 的项目可配置；`chat_only` 与无主目录项目不展示该入口。
 - 附加目录与项目绑定，不随 worktree 映射：session 的 `cwd` 可能是主目录的 worktree，附加目录始终是原路径。
@@ -36,14 +36,14 @@
 
 ## 3. 阶段划分
 
-| 阶段 | 内容 | 依赖 | 可并行 |
-| --- | --- | --- | --- |
-| P0 | Spike：Codex 与 Cursor 能否注入可写/可读附加根 | 无 | 与 P1 并行 |
-| P1 | 数据 + 校验 + API + 共享类型 | 无 | — |
-| P2 | 运行时：根集合下发、权限判定、Pi 工具/沙箱、Claude 透传、系统提示 | P1 | 子任务可并行（见 §5） |
-| P3 | 桌面 UI：新建项目、项目设置、runtime 能力提示 | P1 | 与 P2 并行（文件互不重叠） |
-| P4 | Codex / Cursor 接入（按 P0 结论） | P0、P2 | — |
-| P5 | 文件树 / `@file` / 文件查看器多根展示（二期，可拆独立 PR） | P1 | — |
+| 阶段 | 内容                                                              | 依赖   | 可并行                     |
+| ---- | ----------------------------------------------------------------- | ------ | -------------------------- |
+| P0   | Spike：Codex 与 Cursor 能否注入可写/可读附加根                    | 无     | 与 P1 并行                 |
+| P1   | 数据 + 校验 + API + 共享类型                                      | 无     | —                          |
+| P2   | 运行时：根集合下发、权限判定、Pi 工具/沙箱、Claude 透传、系统提示 | P1     | 子任务可并行（见 §5）      |
+| P3   | 桌面 UI：新建项目、项目设置、runtime 能力提示                     | P1     | 与 P2 并行（文件互不重叠） |
+| P4   | Codex / Cursor 接入（按 P0 结论）                                 | P0、P2 | —                          |
+| P5   | 文件树 / `@file` / 文件查看器多根展示（二期，可拆独立 PR）        | P1     | —                          |
 
 ## 4. P1：数据、校验、API
 
@@ -57,7 +57,7 @@
    - 数量上限 8；
    - `chat_only` 项目或无 `rootPath` 时拒绝设置；
    - `ProjectPatch` 支持 `additionalPaths` 的设置与清空（传 `null`/`[]`）。
-   错误信息使用用户可读英文（UI 文案一律英文）。
+     错误信息使用用户可读英文（UI 文案一律英文）。
 5. **API**：项目 create/update 路由透传 `additionalPaths`（`apps/desktop/src/services/api/projects.ts` 对应服务端路由，核对 `domains/projects` 路由文件）；复用 `interfaces/http/files.ts` 约 149 行的「目录列表（project-root picker）」接口选目录。
 6. **主目录变更联动**：改 `rootPath` 时对既有 `additionalPaths` 重新跑 `normalizeAdditionalPaths`，被新主目录包含的自动丢弃。
 7. **测试**：model 校验单测（相对路径、不存在、文件、嵌套、重复、敏感路径、超上限、chat_only）；repository 往返测试；路由测试。
@@ -65,12 +65,14 @@
 ## 5. P2：运行时
 
 ### 5.1 根集合下发（单一事实源）
+
 - 在 `run-bootstrap.ts` 加载 session 时一并读出项目的 `additional_paths`，得到 `workspaceRoots = { primary: cwd, additional: string[] }`。
 - 写入 `ActiveRun`（`application/conversation/transport/types.ts`，现有 `workspaceRoot`、`allowedOutsideWorkspaceRoots` 旁新增 `additionalRoots: string[]`）。`background-follow-up.ts` 里构造 ActiveRun 的位置（约 259 行）同步补齐。
 - 运行时校验：执行时附加目录若已不存在，则跳过并 `console.warn`，不让整个 run 失败；在 run 开头给用户一条非阻塞提示（沿用现有 notice 机制，若无则只记日志）。
 - 宿主 `RunOptions`（`run-context.ts` 的 `baseRunOptions`）新增 `additionalDirectories?: string[]`，插件契约类型同步新增（找到 `RunOptions` 的定义处，若来自 npm 包 `@zclaudia/plugin-sdk` 需走其发布流程，**先确认**；若不想动 SDK，可经现有 extension/metadata 字段透传，二选一在实施前定）。
 
 ### 5.2 权限判定（安全相关，TDD）
+
 - `shell-parser.ts` 新增 `isPathWithinAnyRoot(filePath, roots[])`，保留 `isPathWithinRoot` 不变。
 - `permission-evaluator.ts`：`getOutsideWorkspacePaths / getOutsideWorkspaceRootsToRemember / isOutsideWorkspacePathAllowed / targetsOutsideWorkspace` 的 `rootPath: string` 参数改为 `roots: { primary: string; additional?: string[] }`（或保持 `rootPath` 并追加 `additionalRoots`，以改动面最小为准）。相对路径仍基于 primary 解析。`EvaluationContext` 增 `additionalRoots`。
 - `run-permissions.ts` 479/520/538 行传入 `additionalRoots`；`isOutsideWorkspacePathAllowed` 的 `allowedRoots` 取「学到的根 ∪ 附加目录」。
@@ -78,6 +80,7 @@
 - 重点测试：路径穿越（`extra/../secret`）、前缀碰撞（`/a/proj-extra` 不应被 `/a/proj` 放行，现有 `+ path.sep` 已处理，要回归）、符号链接逃逸（附加目录内指向目录外的链接）、Bash 命令中的相对路径与 `cd`、大小写不敏感文件系统（macOS）。
 
 ### 5.3 Pi 工具层
+
 - `workspace-paths.ts`：新增 `resolveInsideWorkspaces(roots, requestedPath)`：相对路径基于 primary；绝对路径在任一根内（沿用同一套 realpath + 缺失祖先探测）则放行；`Path is outside workspace` 错误信息列出可用根。`resolveInsideWorkspace(cwd, p)` 保留为单根包装，**21 个调用点逐个迁移**，通过 `tool-options.ts` 把 `workspaceRoots` 注入各工具工厂（read / edit / write / patch-executor / search / ast-bridge / rename-symbol / lsp / symbol / bash / file-history）。
 - Glob/Grep：默认搜 primary；显式 `path` 指向附加目录时允许。
 - `file-history`（快照/rewind）：路径落在附加目录时也要能记录与回滚，核对其以 workspace 相对路径作 key 的假设，必要时改用 `root 标识 + 相对路径`。
@@ -86,11 +89,13 @@
 - Pi 的 sandbox 拒写检测与 remediation（`remediation.ts`）逻辑不变，但提示文案若提到「workspace」需覆盖附加目录。
 
 ### 5.4 Claude 插件
+
 - `ClaudeAgentRunOptions` 增 `additionalDirectories?: string[]`，`adapter.ts` 从宿主 RunOptions 映射，`runner.ts` 两处 `sdkOptions` 设置 `additionalDirectories`。
 - 其 `canUseTool` 回调走服务端 `run-permissions` 判定，已由 §5.2 覆盖。
 - `plugins/agents/claude` 下已有未提交改动，同样先对齐归属。
 
 ### 5.5 让 agent 知道有哪些目录
+
 - 在项目上下文/系统提示（核对 `run-context.ts` / `run-prompt.ts` 里 `taskContext` / 项目 context 拼装处）追加一段：`Additional directories (read/write allowed): <abs path> …`，并说明相对路径基于主目录、使用附加目录需用绝对路径、附加目录不参与 git 状态。
 - 对原生 context 的 runtime（Claude/Codex）通过 `developerInstructions` 或等价通道；Pi 走其 system prompt。无附加目录时不输出该段（保持提示缓存前缀稳定，避免无谓破坏 prompt cache）。
 
@@ -108,6 +113,7 @@
 ## 7. P0 / P4：Codex 与 Cursor
 
 **P0 Spike（各约半天，输出写入 `docs/` 并记 memory）**
+
 - Codex：用固定的 CLI 版本（`app-server-protocol.ts` 注释写 0.154.0）实测 `thread/start` 是否接受 `sandbox` / `config` 覆盖（`sandbox_workspace_write.writable_roots`）或 per-turn `sandboxPolicy`；确认 thread 创建后能否变更；确认只读访问 cwd 外是否本来就放行（`workspaceWrite` 下通常读不受限、写受限）。
 - Cursor：实测 `cursor-agent` 是否有 add-dir / workspace 多目录参数；ACP `session/new` 是否接受多个 workspace folder。
 - 结论分三档：`native`（原生支持，直接透传）/ `host`（宿主经 canUseTool 审批放行）/ `none`（降级：仅提示词告知路径，写入走原有 outside-workspace 审批）。
@@ -115,6 +121,7 @@
 **P4**：按结论实现；`none` 档必须保证降级行为诚实（UI 提示 + 提示词不承诺可写）。
 
 **P0 结论（已完成，详见 `docs/reviews/2026-10-16-{codex,cursor}-additional-directories-spike.md`）**
+
 - Codex：`native`。`thread/start`/`thread/resume` 传 `sandbox:"workspace-write"` 与 `config:{sandbox_workspace_write:{writable_roots:[…],network_access:true}}`（无需 experimentalApi）；`resume` 在新进程里**不持久化**、传入即**替换**，所以每次 resume 都必须带全量列表；运行中变更用 `turn/start.sandboxPolicy`（会替换整个策略，须重述 `networkAccess:true`）。读 cwd 外本来就放行。plan 模式不加根。bump 版本前需在 `runtime-compatibility.json` 的最低版本上复测，且仅验证了 macOS。
 - Cursor：`host`。ACP 无原生多根，`session/new.additionalDirectories` 被静默忽略；读不拦；文件写到 cwd 外会发 `session/request_permission`（`kind:"edit"`，带 `diff.path`），宿主可按路径自动应答（现有 `AcpPermissionBridge`→`canUseTool` 通路）。shell 写入按命令白名单拦、与目录无关，无法按根自动放行（写入会照常弹审批）。legacy stream-json 视为 `none`。
 - 因此 P4：Codex 透传 writable_roots；Cursor 在权限桥里对「edit 且路径落在附加目录内」自动允许，shell 保持审批；descriptor：Pi=`host`、Claude=`native`、Codex=`native`、Cursor=`host`（shell 除外）。
@@ -141,15 +148,15 @@
 
 ## 11. 风险
 
-| 风险 | 对策 |
-| --- | --- |
-| 权限边界放宽引入越权 | 词法 + realpath 双重校验；敏感路径与数据目录拒绝；TDD；上限 8 个 |
-| Pi 21 个调用点迁移遗漏 | 先加一条全局测试：grep 禁止新代码再调用旧单根 `resolveInsideWorkspace`（迁移完后保留包装仅供测试/内部） |
-| Codex/Cursor 无原生能力 | P0 先定档位，UI 如实提示，不做假承诺 |
-| 与工作区未提交 WIP 冲突 | 单独分支/worktree 实施；先确认 WIP 归属 |
-| plugin-sdk 契约改动需发布 | 先确认 `RunOptions` 定义归属，优先选不改 SDK 的透传方案 |
-| 附加目录失效 | 运行时跳过 + 提示；设置页标红不存在的路径 |
-| 提示缓存被破坏 | 无附加目录时不输出该段；有时放在稳定的 system 段且顺序固定 |
+| 风险                      | 对策                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 权限边界放宽引入越权      | 词法 + realpath 双重校验；敏感路径与数据目录拒绝；TDD；上限 8 个                                        |
+| Pi 21 个调用点迁移遗漏    | 先加一条全局测试：grep 禁止新代码再调用旧单根 `resolveInsideWorkspace`（迁移完后保留包装仅供测试/内部） |
+| Codex/Cursor 无原生能力   | P0 先定档位，UI 如实提示，不做假承诺                                                                    |
+| 与工作区未提交 WIP 冲突   | 单独分支/worktree 实施；先确认 WIP 归属                                                                 |
+| plugin-sdk 契约改动需发布 | 先确认 `RunOptions` 定义归属，优先选不改 SDK 的透传方案                                                 |
+| 附加目录失效              | 运行时跳过 + 提示；设置页标红不存在的路径                                                               |
+| 提示缓存被破坏            | 无附加目录时不输出该段；有时放在稳定的 system 段且顺序固定                                              |
 
 ## 12. 待用户确认
 

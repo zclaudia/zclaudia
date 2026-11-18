@@ -46,7 +46,7 @@ describe('BrowseView', () => {
 
   it('shows an empty state when there are no items', () => {
     setup({ items: [] });
-    expect(screen.getByText(/Nothing here yet|No items/i)).toBeInTheDocument();
+    expect(screen.getByText('还没有资源')).toBeInTheDocument();
   });
 
   it('groups cards under backend headers when multiple backends exist', () => {

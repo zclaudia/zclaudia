@@ -122,7 +122,9 @@ function TreeBranch({ node, depth, isSelected, isExpanded, onToggle, onSelect }:
             </span>
           )}
           {node.truncated && (
-            <span className="shrink-0 pl-1 text-[10px] text-muted-foreground/70">… (truncated)</span>
+            <span className="shrink-0 pl-1 text-[10px] text-muted-foreground/70">
+              … (truncated)
+            </span>
           )}
         </button>
       </div>

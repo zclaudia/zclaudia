@@ -50,7 +50,9 @@ const CAPTURE_FAILED_NOTICE = 'Page capture failed';
 /** RenderCaptureError 中文映射；其余 Error 用 message，非 Error 用 String。 */
 function describeCaptureError(error: unknown): string {
   if (error instanceof RenderCaptureError) {
-    return error.code === 'capture-unsupported' ? CAPTURE_UNSUPPORTED_NOTICE : CAPTURE_FAILED_NOTICE;
+    return error.code === 'capture-unsupported'
+      ? CAPTURE_UNSUPPORTED_NOTICE
+      : CAPTURE_FAILED_NOTICE;
   }
   return error instanceof Error ? error.message : String(error);
 }
@@ -78,7 +80,12 @@ export function RenderExportContent({
   const runIdRef = useRef(0);
   const liveRef = useRef(true);
   /** 进行中流程的已收集结果（取消时立即以已收集内容汇总）。 */
-  const progressRef = useRef<{ total: number; succeeded: number; files: string[]; errors: PageError[] }>({
+  const progressRef = useRef<{
+    total: number;
+    succeeded: number;
+    files: string[];
+    errors: PageError[];
+  }>({
     total: 0,
     succeeded: 0,
     files: [],
@@ -243,7 +250,8 @@ export function RenderExportContent({
     <>
       <div className="flex flex-col gap-3 p-4 text-xs">
         <div className="text-muted-foreground">
-          The export contains the current preview (including unsaved changes); the PDF is a full-page image with non-editable text.
+          The export contains the current preview (including unsaved changes); the PDF is a
+          full-page image with non-editable text.
         </div>
         {stage.kind === 'idle' && previewHtml === null && (
           <div role="status" className="text-muted-foreground">
@@ -259,7 +267,8 @@ export function RenderExportContent({
           <>
             {stage.cancelled ? (
               <div role="status" className="text-muted-foreground">
-                Canceled: {stage.succeeded}/{stage.total} pages succeeded; downloaded files are kept.
+                Canceled: {stage.succeeded}/{stage.total} pages succeeded; downloaded files are
+                kept.
               </div>
             ) : stage.succeeded === 0 ? (
               <div role="alert" className="text-destructive">
@@ -316,7 +325,12 @@ export function RenderExportContent({
                 Export PDF ({deck.slides.length} pages · full-page image)
               </Button>
             ) : (
-              <Button size="sm" variant="primary" onClick={startPageExport} disabled={exportDisabled}>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={startPageExport}
+                disabled={exportDisabled}
+              >
                 Export PNG (viewport area)
               </Button>
             )}

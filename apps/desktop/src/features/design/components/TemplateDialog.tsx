@@ -3,8 +3,10 @@ import { Modal } from '../../../components/ui/Modal';
 import { TemplateView } from '../rail/TemplateView';
 import type { TemplateViewProps } from '../rail/TemplateView';
 
-export interface TemplateDialogProps
-  extends Omit<TemplateViewProps, 'active' | 'compact' | 'openEntryOnInstall'> {
+export interface TemplateDialogProps extends Omit<
+  TemplateViewProps,
+  'active' | 'compact' | 'openEntryOnInstall'
+> {
   open: boolean;
   onClose: () => void;
 }

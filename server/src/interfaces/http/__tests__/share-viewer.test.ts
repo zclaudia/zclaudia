@@ -147,13 +147,7 @@ describe('design share viewer routes', () => {
 
   /** /s/<token>/f/<逐段 encode 的清单路径>。 */
   function fileUrl(share: { token: string }, manifestPath: string): string {
-    return (
-      `/s/${share.token}/f/` +
-      manifestPath
-        .split('/')
-        .map(encodeURIComponent)
-        .join('/')
-    );
+    return `/s/${share.token}/f/` + manifestPath.split('/').map(encodeURIComponent).join('/');
   }
 
   // ---------------------------------------------------------------------------
@@ -275,7 +269,12 @@ describe('design share viewer routes', () => {
     }
 
     // 点前缀组件、反斜杠、空组件可完整抵达路由 → publicFile 的 403。
-    for (const manifestPath of ['.git/config', 'assets/.hidden.png', 'assets\\bg.png', 'index.html/']) {
+    for (const manifestPath of [
+      '.git/config',
+      'assets/.hidden.png',
+      'assets\\bg.png',
+      'index.html/',
+    ]) {
       const res = await request(app).get(fileUrl(share, manifestPath));
       expect(res.status, manifestPath).toBe(403);
       expect(res.body.error.code, manifestPath).toBe('PATH_FORBIDDEN');
@@ -318,7 +317,11 @@ describe('design share viewer routes', () => {
     expect(unknown.body).toMatchObject({ success: false, error: { code: 'SHARE_NOT_FOUND' } });
 
     await shares.revoke('sa', share.id);
-    for (const path of [`/s/${share.token}`, `/s/${share.token}/manifest.json`, `/s/${share.token}/comments`]) {
+    for (const path of [
+      `/s/${share.token}`,
+      `/s/${share.token}/manifest.json`,
+      `/s/${share.token}/comments`,
+    ]) {
       const res = await request(app).get(path);
       expect(res.status, path).toBe(404);
       expect(res.body.error.code, path).toBe('SHARE_NOT_FOUND');
@@ -357,7 +360,11 @@ describe('design share viewer routes', () => {
     const { share } = await setupShare({ scope: 'local' });
     mount({ isLocal: () => false });
 
-    for (const path of [`/s/${share.token}`, `/s/${share.token}/manifest.json`, `/s/${share.token}/comments`]) {
+    for (const path of [
+      `/s/${share.token}`,
+      `/s/${share.token}/manifest.json`,
+      `/s/${share.token}/comments`,
+    ]) {
       const res = await request(app).get(path);
       expect(res.status, path).toBe(403);
       expect(res.body.error.code, path).toBe('SHARE_LOCAL_ONLY');

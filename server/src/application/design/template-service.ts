@@ -40,7 +40,9 @@ export class TemplateService {
 
   /** Static catalog, no IO. */
   list(): { templates: DesignTemplateSummary[] } {
-    return { templates: DESIGN_TEMPLATES.map(summary => ({ ...summary, files: [...summary.files] })) };
+    return {
+      templates: DESIGN_TEMPLATES.map(summary => ({ ...summary, files: [...summary.files] })),
+    };
   }
 
   async install(
@@ -122,7 +124,11 @@ export class TemplateService {
         // Replace only what was seen: hash the current content and let
         // safeWriteFile reject the write when it raced ahead of us.
         try {
-          const current = await readBoundedFile(target.absolute, MAX_TEMPLATE_FILE_BYTES, 'Template file');
+          const current = await readBoundedFile(
+            target.absolute,
+            MAX_TEMPLATE_FILE_BYTES,
+            'Template file'
+          );
           expectedRevision = createHash('sha256').update(current.bytes).digest('hex');
         } catch (error) {
           if (!(error instanceof SafeFileWriteError && error.code === 'FILE_NOT_FOUND'))

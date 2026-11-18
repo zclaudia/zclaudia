@@ -371,7 +371,11 @@ export function createDesignShareRoutes(
   const resolveAccess = async (req: Request): Promise<ShareAccess> => {
     const access = await shares.resolveByToken(req.params.token);
     if (access.share.scope === 'local' && !isLocal(req)) {
-      throw new DesignError(403, 'SHARE_LOCAL_ONLY', 'This share is only accessible from this machine');
+      throw new DesignError(
+        403,
+        'SHARE_LOCAL_ONLY',
+        'This share is only accessible from this machine'
+      );
     }
     return access;
   };

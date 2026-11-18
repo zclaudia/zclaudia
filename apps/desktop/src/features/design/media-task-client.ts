@@ -257,7 +257,8 @@ export function buildImageCreateInput(
 ): DesignMediaCreateInput | { error: string } {
   const prompt = args.prompt.trim();
   if (prompt.length === 0) return { error: 'Enter a prompt' };
-  if (prompt.length > PROMPT_MAX) return { error: `Prompt must be at most ${PROMPT_MAX} characters` };
+  if (prompt.length > PROMPT_MAX)
+    return { error: `Prompt must be at most ${PROMPT_MAX} characters` };
   const profileId = args.provider?.profileId.trim() ?? '';
   const model = args.provider?.model.trim() ?? '';
   if (profileId === '') return { error: 'Choose an image service' };
@@ -333,7 +334,8 @@ export function buildVideoCreateInput(
   if (fps < 8 || fps > 60) return { error: 'Frame rate must be between 8 and 60' };
   const seconds = parseNumber(args.durationSeconds);
   if (seconds === null) return { error: 'Enter a duration (seconds)' };
-  if (seconds < 0.5 || seconds > 60) return { error: 'Duration must be between 0.5 and 60 seconds' };
+  if (seconds < 0.5 || seconds > 60)
+    return { error: 'Duration must be between 0.5 and 60 seconds' };
   return {
     sessionId: '',
     kind: 'video-render',

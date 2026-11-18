@@ -3,20 +3,16 @@ import { DesignModal as Modal } from './DesignModal';
 import { BrandView } from '../rail/BrandView';
 import type { BrandViewProps } from '../rail/BrandView';
 
-export interface BrandPanelProps
-  extends Omit<BrandViewProps, 'active' | 'compact' | 'resetOnHide'> {
+export interface BrandPanelProps extends Omit<
+  BrandViewProps,
+  'active' | 'compact' | 'resetOnHide'
+> {
   open: boolean;
   onClose: () => void;
 }
 
 /** Modal compatibility shell; the brand editor and its state live in BrandView. */
-export function BrandPanel({
-  open,
-  backendId,
-  sessionId,
-  onClose,
-  onSaved,
-}: BrandPanelProps) {
+export function BrandPanel({ open, backendId, sessionId, onClose, onSaved }: BrandPanelProps) {
   return (
     <Modal
       open={open}

@@ -19,8 +19,16 @@ import type { CssSourceEdit } from '../css-source';
 import { sha256HexSync } from '../html/hash';
 import { DesignEditError } from '../types';
 
-const identity: CssDraftIdentity = { backendId: 'css-draft-b', projectId: 'css-draft-p', workingDirectory: '/css-draft-w' };
-const otherIdentity: CssDraftIdentity = { backendId: 'css-draft-b2', projectId: 'css-draft-p', workingDirectory: '/css-draft-w' };
+const identity: CssDraftIdentity = {
+  backendId: 'css-draft-b',
+  projectId: 'css-draft-p',
+  workingDirectory: '/css-draft-w',
+};
+const otherIdentity: CssDraftIdentity = {
+  backendId: 'css-draft-b2',
+  projectId: 'css-draft-p',
+  workingDirectory: '/css-draft-w',
+};
 const PATH = 'design/css/main.css';
 
 /**
@@ -75,7 +83,9 @@ describe('css-drafts（P3.5 第二批 C6：外部 .css 进程内草稿表）', (
         value: '700',
         create: false,
       });
-      expect(source).toBe(CSS.replace('font-weight: bold !important;', 'font-weight: 700 !important;'));
+      expect(source).toBe(
+        CSS.replace('font-weight: bold !important;', 'font-weight: 700 !important;')
+      );
     });
 
     it('删除：中间声明连同前导空白与分号整体移除', () => {
@@ -133,7 +143,12 @@ describe('css-drafts（P3.5 第二批 C6：外部 .css 进程内草稿表）', (
     it('非法值 / 属性不存在 / 定位失败 / 相同值：报错且原文不动', () => {
       const base = opened();
       expect(() =>
-        apply(PATH, base, { rulePath: [0], property: 'color', value: 'url(evil.png)', create: false })
+        apply(PATH, base, {
+          rulePath: [0],
+          property: 'color',
+          value: 'url(evil.png)',
+          create: false,
+        })
       ).toThrowError(DesignEditError);
       expect(() =>
         apply(PATH, base, { rulePath: [0], property: 'display', value: null, create: false })
@@ -153,7 +168,12 @@ describe('css-drafts（P3.5 第二批 C6：外部 .css 进程内草稿表）', (
       ).toThrowError(/not open/);
       const base = opened();
       expect(() =>
-        apply(PATH, `${base}-stale`, { rulePath: [0], property: 'color', value: 'blue', create: false })
+        apply(PATH, `${base}-stale`, {
+          rulePath: [0],
+          property: 'color',
+          value: 'blue',
+          create: false,
+        })
       ).toThrowError(DesignEditError);
     });
   });
@@ -212,7 +232,10 @@ describe('css-drafts（P3.5 第二批 C6：外部 .css 进程内草稿表）', (
   describe('纪元与快照', () => {
     it('draftEpoch 每文件自增；工作区 cssDraftEpoch 任一文件 apply 自增', () => {
       const base = opened();
-      const other = openCssDraft(identity, 'other.css', { source: 'a { color: #f00; }', revision: 'r-o' });
+      const other = openCssDraft(identity, 'other.css', {
+        source: 'a { color: #f00; }',
+        revision: 'r-o',
+      });
       const epoch0 = cssDraftEpoch(identity);
       const fileEpoch0 = getCssDraft(identity, PATH)!.draftEpoch;
       apply(PATH, base, { rulePath: [0], property: 'color', value: 'blue', create: false });
@@ -291,7 +314,10 @@ describe('css-drafts（P3.5 第二批 C6：外部 .css 进程内草稿表）', (
         value: 'green',
         create: false,
       });
-      const kept = openCssDraft(identity, PATH, { source: 'h1 { color: #000; }', revision: 'disk-rev-3' });
+      const kept = openCssDraft(identity, PATH, {
+        source: 'h1 { color: #000; }',
+        revision: 'disk-rev-3',
+      });
       expect(kept.dirty).toBe(true);
       expect(kept.source).toContain('color: green');
       expect(kept.baseRevision).toBe('disk-rev-2');

@@ -76,7 +76,9 @@ export class DesignError extends Error {
 // server/src/infra/storage/db.ts (ZCLAUDIA_DATA_DIR ?? ~/.zclaudia) without
 // importing it, to keep the storage module free of application-layer ties.
 const DESIGN_BACKUP_ROOT = path.join(
-  process.env.ZCLAUDIA_DATA_DIR ? path.resolve(process.env.ZCLAUDIA_DATA_DIR) : path.join(os.homedir(), '.zclaudia'),
+  process.env.ZCLAUDIA_DATA_DIR
+    ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
+    : path.join(os.homedir(), '.zclaudia'),
   'design-write-backups'
 );
 const designBackupKeeper = createRollingBackupKeeper(DESIGN_BACKUP_ROOT, 5);
@@ -105,6 +107,15 @@ export function toDesignError(error: unknown): unknown {
 
 function hash(source: Buffer | string): string {
   return createHash('sha256').update(source).digest('hex');
+}
+
+/** C0 controls and DEL, matched by code unit (same set as /[\u0000-\u001f\u007f]/). */
+export function fileNameHasControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
 }
 /**
  * Editable source whitelist (P3.5 §6): HTML/HTM entry pages plus external .css
@@ -303,7 +314,9 @@ export class DesignService {
       predicate = name => VIDEO_ASSET_PATTERN.test(name);
     } else if (kinds === 'all') {
       predicate = name =>
-        IMAGE_ASSET_PATTERN.test(name) || FONT_ASSET_PATTERN.test(name) || VIDEO_ASSET_PATTERN.test(name);
+        IMAGE_ASSET_PATTERN.test(name) ||
+        FONT_ASSET_PATTERN.test(name) ||
+        VIDEO_ASSET_PATTERN.test(name);
     } else {
       throw new DesignError(
         400,
@@ -423,7 +436,11 @@ export class DesignService {
         return { path: [dirRelative.split(path.sep).join('/'), candidate].join('/') };
       }
       if (taken >= MAX_IMPORT_NAME_CANDIDATES)
-        throw new DesignError(400, 'ASSET_INVALID', `Too many files with the same name in the target directory; cannot generate a new name for ${name}`);
+        throw new DesignError(
+          400,
+          'ASSET_INVALID',
+          `Too many files with the same name in the target directory; cannot generate a new name for ${name}`
+        );
       candidate = `${stem}-${taken + 2}${extension}`;
     }
   }
@@ -431,10 +448,14 @@ export class DesignService {
   /** File-name rules for imports; every violation is a readable ASSET_INVALID. */
   private static validateAssetFileName(fileName: unknown): string {
     if (typeof fileName !== 'string' || !fileName || fileName.length > MAX_IMPORT_NAME_LENGTH)
-      throw new DesignError(400, 'ASSET_INVALID', 'Filename must be a non-empty string of at most 200 characters');
+      throw new DesignError(
+        400,
+        'ASSET_INVALID',
+        'Filename must be a non-empty string of at most 200 characters'
+      );
     if (/[/\\]/.test(fileName) || path.basename(fileName) !== fileName)
       throw new DesignError(400, 'ASSET_INVALID', 'Filename must not contain path separators');
-    if (/[\u0000-\u001f\u007f]/.test(fileName))
+    if (fileNameHasControlCharacter(fileName))
       throw new DesignError(400, 'ASSET_INVALID', 'Filename must not contain control characters');
     const extension = path.extname(fileName).toLowerCase();
     if (!IMPORTABLE_EXTENSIONS.has(extension))
@@ -454,7 +475,11 @@ export class DesignService {
       throw new DesignError(400, 'ASSET_INVALID', 'dataBase64 is not valid base64');
     const bytes = Buffer.from(dataBase64, 'base64');
     if (bytes.length < 1 || bytes.length > MAX_ASSET_BYTES)
-      throw new DesignError(400, 'ASSET_INVALID', 'Decoded asset size must be between 1 byte and 10 MiB');
+      throw new DesignError(
+        400,
+        'ASSET_INVALID',
+        'Decoded asset size must be between 1 byte and 10 MiB'
+      );
     return bytes;
   }
 }

@@ -212,14 +212,20 @@ describe('AssetLibrary（P4 §4.2）', () => {
     );
     expect((await screen.findAllByText('3 B')).length).toBe(2);
     expect(document.querySelectorAll('img')).toHaveLength(0);
-    expect(screen.queryByRole('button', { name: /Replace selected image/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Replace selected image/ })
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Choose asset files to import')).not.toBeInTheDocument();
-    expect(screen.getByText('Videos come from media generation tasks and cannot be imported')).toBeInTheDocument();
+    expect(
+      screen.getByText('Videos come from media generation tasks and cannot be imported')
+    ).toBeInTheDocument();
     // 切回图片 tab：导入与替换按钮照常回归。
     fireEvent.click(screen.getByRole('tab', { name: 'Image' }));
     expect(await screen.findByRole('button', { name: 'Import' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Replace selected image clip.mp4' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Replace selected image clip.mp4' })
+    ).toBeInTheDocument();
   });
 
   it('视频体积读取失败（如 >10 MiB）显示「体积未知」', async () => {

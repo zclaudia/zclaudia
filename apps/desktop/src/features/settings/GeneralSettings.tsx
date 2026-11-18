@@ -16,6 +16,7 @@ export function GeneralSettings() {
         <SettingsRow
           icon={<Type className="w-4 h-4" strokeWidth={1.75} />}
           title="Font size"
+          description="Adjusts prose, code, and the input. Navigation and settings stay the same."
           control={<FontSizeToggle />}
         />
       </SettingsGroup>
@@ -35,12 +36,17 @@ const FONT_SIZE_OPTIONS: { key: FontSizePreset; label: string }[] = [
 function FontSizeToggle() {
   const { fontSize, setFontSize } = useUIStore();
   return (
-    <div className="flex items-center bg-secondary/80 rounded-lg p-0.5 gap-0.5">
+    <div
+      role="group"
+      aria-label="Font size"
+      className="flex items-center bg-secondary/80 rounded-lg p-0.5 gap-0.5"
+    >
       {FONT_SIZE_OPTIONS.map(opt => (
         <button
           key={opt.key}
           onClick={() => setFontSize(opt.key)}
-          className={`px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 max-md:py-2 ${
+          aria-pressed={fontSize === opt.key}
+          className={`h-8 px-3 rounded-md text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:h-11 ${
             fontSize === opt.key
               ? 'bg-card text-foreground shadow-apple-sm'
               : 'text-muted-foreground hover:text-foreground'

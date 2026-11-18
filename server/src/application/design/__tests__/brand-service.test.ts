@@ -56,7 +56,9 @@ describe('BrandService', () => {
       designMdRevision: sha256(DESIGN_MD),
       tokensCssRevision: sha256(TOKENS_CSS),
     });
-    await expect(readFile(path.join(rootA, 'design', 'DESIGN.md'), 'utf8')).resolves.toBe(DESIGN_MD);
+    await expect(readFile(path.join(rootA, 'design', 'DESIGN.md'), 'utf8')).resolves.toBe(
+      DESIGN_MD
+    );
     await expect(readFile(path.join(rootA, 'design', 'tokens.css'), 'utf8')).resolves.toBe(
       TOKENS_CSS
     );
@@ -89,7 +91,9 @@ describe('BrandService', () => {
     await brand.write('sa', { designMd: DESIGN_MD, designMdRevision: '' });
     const written = await brand.write('sa', { tokensCss: TOKENS_CSS, tokensCssRevision: '' });
     expect(written).toEqual({ designMdRevision: null, tokensCssRevision: sha256(TOKENS_CSS) });
-    await expect(readFile(path.join(rootA, 'design', 'DESIGN.md'), 'utf8')).resolves.toBe(DESIGN_MD);
+    await expect(readFile(path.join(rootA, 'design', 'DESIGN.md'), 'utf8')).resolves.toBe(
+      DESIGN_MD
+    );
   });
 
   it('keeps the first file when the second write fails and names the failing file', async () => {

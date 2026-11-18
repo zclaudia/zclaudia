@@ -84,7 +84,9 @@ export function ViewportBar({
   };
 
   const anchor = zoomAnchor(zoom, actualScale);
-  const scalePercent = Math.round((zoom.mode === 'fit' ? anchor : (actualScale ?? zoom.value)) * 100);
+  const scalePercent = Math.round(
+    (zoom.mode === 'fit' ? anchor : (actualScale ?? zoom.value)) * 100
+  );
   const fitLabel = zoom.mode === 'fit' && !fill;
   const zoomLabel = fitLabel ? `Fit · ${scalePercent}%` : `${scalePercent}%`;
   const leaveFit = (): { mode: 'manual'; value: number } => ({

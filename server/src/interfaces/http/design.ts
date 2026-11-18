@@ -40,19 +40,15 @@ import type {
 
 function handleError(res: Response, error: unknown): void {
   if (error instanceof DesignError) {
-    res
-      .status(error.status)
-      .json({
-        success: false,
-        error: { code: error.code, message: error.message, ...(error.details ?? {}) },
-      });
+    res.status(error.status).json({
+      success: false,
+      error: { code: error.code, message: error.message, ...(error.details ?? {}) },
+    });
   } else {
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'Design request failed' },
-      });
+    res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_ERROR', message: 'Design request failed' },
+    });
   }
 }
 
@@ -114,7 +110,11 @@ function defaultMakeImageProvider(
   return async ref => {
     const profile = profilesRepo.findById(ref.profileId);
     if (!profile || profile.providerType !== 'openai') {
-      throw new DesignError(400, 'MEDIA_VALIDATION', 'The specified service profile does not exist or does not support image generation');
+      throw new DesignError(
+        400,
+        'MEDIA_VALIDATION',
+        'The specified service profile does not exist or does not support image generation'
+      );
     }
     if (!profile.apiKey) {
       throw new DesignError(400, 'MEDIA_VALIDATION', 'The selected service profile has no API key');
@@ -184,7 +184,10 @@ function lanShareUrls(token: string): string[] {
   return urls;
 }
 
-export function createDesignRoutes(db: Database.Database, mediaDeps?: DesignMediaRoutesDeps): Router {
+export function createDesignRoutes(
+  db: Database.Database,
+  mediaDeps?: DesignMediaRoutesDeps
+): Router {
   const router = Router();
   const service = new DesignService(db);
   const blobs = new BlobStore(path.join(resolveDataDir(), 'design-snapshots'));
@@ -204,8 +207,7 @@ export function createDesignRoutes(db: Database.Database, mediaDeps?: DesignMedi
   const profilesRepo = new LlmProfileRepository(db);
   const listProfiles: NonNullable<DesignMediaRoutesDeps['listProfiles']> =
     mediaDeps?.listProfiles ?? (() => profilesRepo.findAllOrdered());
-  const makeImageProvider =
-    mediaDeps?.makeImageProvider ?? defaultMakeImageProvider(profilesRepo);
+  const makeImageProvider = mediaDeps?.makeImageProvider ?? defaultMakeImageProvider(profilesRepo);
   let mediaServiceInstance: MediaTaskService | null = mediaDeps?.mediaService ?? null;
   const mediaService = (): MediaTaskService => {
     mediaServiceInstance ??= new MediaTaskService(
@@ -261,7 +263,8 @@ export function createDesignRoutes(db: Database.Database, mediaDeps?: DesignMedi
   });
   router.put('/brand', async (req: Request, res: Response) => {
     try {
-      const { sessionId, designMd, designMdRevision, tokensCss, tokensCssRevision } = req.body ?? {};
+      const { sessionId, designMd, designMdRevision, tokensCss, tokensCssRevision } =
+        req.body ?? {};
       res.json({
         success: true,
         data: await brand.write(sessionId, {
@@ -398,7 +401,12 @@ export function createDesignRoutes(db: Database.Database, mediaDeps?: DesignMedi
       const { sessionId, expectedRevisions, confirmIncomplete } = req.body ?? {};
       res.json({
         success: true,
-        data: await restores.restore(sessionId, req.params.id, expectedRevisions, confirmIncomplete),
+        data: await restores.restore(
+          sessionId,
+          req.params.id,
+          expectedRevisions,
+          confirmIncomplete
+        ),
       });
     } catch (error) {
       handleError(res, error);
@@ -432,7 +440,9 @@ export function createDesignRoutes(db: Database.Database, mediaDeps?: DesignMedi
     try {
       res.json({
         success: true,
-        data: { tasks: await mediaService().list(req.query.sessionId, numericQuery(req.query.limit)) },
+        data: {
+          tasks: await mediaService().list(req.query.sessionId, numericQuery(req.query.limit)),
+        },
       });
     } catch (error) {
       handleError(res, error);

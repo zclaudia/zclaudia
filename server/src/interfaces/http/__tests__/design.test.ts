@@ -136,24 +136,20 @@ describe('design routes', () => {
       .get('/api/design/document')
       .query({ sessionId: 'sa', path: 'index.html' });
     expect(loaded.body.data).toMatchObject({ path: 'index.html', source: '<p>old</p>' });
-    const saved = await request(app)
-      .put('/api/design/document')
-      .send({
-        sessionId: 'sa',
-        path: 'index.html',
-        source: '<p>new</p>',
-        expectedRevision: loaded.body.data.revision,
-      });
+    const saved = await request(app).put('/api/design/document').send({
+      sessionId: 'sa',
+      path: 'index.html',
+      source: '<p>new</p>',
+      expectedRevision: loaded.body.data.revision,
+    });
     expect(saved.status).toBe(200);
     expect(saved.body.data.source).toBe('<p>new</p>');
-    const stale = await request(app)
-      .put('/api/design/document')
-      .send({
-        sessionId: 'sa',
-        path: 'index.html',
-        source: '<p>lost</p>',
-        expectedRevision: loaded.body.data.revision,
-      });
+    const stale = await request(app).put('/api/design/document').send({
+      sessionId: 'sa',
+      path: 'index.html',
+      source: '<p>lost</p>',
+      expectedRevision: loaded.body.data.revision,
+    });
     expect(stale.status).toBe(409);
     expect(stale.body.error.code).toBe('REVISION_CONFLICT');
     expect(await readFile(file, 'utf8')).toBe('<p>new</p>');
@@ -217,14 +213,12 @@ describe('design routes', () => {
       revision: sha256('p { color: red; }'),
     });
 
-    const saved = await request(app)
-      .put('/api/design/document')
-      .send({
-        sessionId: 'sa',
-        path: 'assets/site.css',
-        source: 'p { color: blue; }',
-        expectedRevision: loaded.body.data.revision,
-      });
+    const saved = await request(app).put('/api/design/document').send({
+      sessionId: 'sa',
+      path: 'assets/site.css',
+      source: 'p { color: blue; }',
+      expectedRevision: loaded.body.data.revision,
+    });
     expect(saved.status).toBe(200);
     expect(saved.body.data).toEqual({
       path: 'assets/site.css',
@@ -238,14 +232,12 @@ describe('design routes', () => {
     );
     expect(residue).toEqual([]);
 
-    const stale = await request(app)
-      .put('/api/design/document')
-      .send({
-        sessionId: 'sa',
-        path: 'assets/site.css',
-        source: 'p { color: lost; }',
-        expectedRevision: loaded.body.data.revision,
-      });
+    const stale = await request(app).put('/api/design/document').send({
+      sessionId: 'sa',
+      path: 'assets/site.css',
+      source: 'p { color: lost; }',
+      expectedRevision: loaded.body.data.revision,
+    });
     expect(stale.status).toBe(409);
     expect(stale.body.error.code).toBe('REVISION_CONFLICT');
     expect(await readFile(file, 'utf8')).toBe('p { color: blue; }');
@@ -337,14 +329,12 @@ describe('design routes', () => {
       .get('/api/design/document')
       .query({ sessionId: 'sa', path: 'index.html' });
     expect(loaded.status).toBe(200);
-    const saved = await request(app)
-      .put('/api/design/document')
-      .send({
-        sessionId: 'sa',
-        path: 'index.html',
-        source: '<p>new</p>',
-        expectedRevision: loaded.body.data.revision,
-      });
+    const saved = await request(app).put('/api/design/document').send({
+      sessionId: 'sa',
+      path: 'index.html',
+      source: '<p>new</p>',
+      expectedRevision: loaded.body.data.revision,
+    });
     expect(saved.status).toBe(200);
     expect(await readFile(path.join(rootA, 'index.html'), 'utf8')).toBe('<p>new</p>');
   });
@@ -470,7 +460,9 @@ describe('design snapshot routes', () => {
     expect(restored.status).toBe(200);
     expect(restored.body.data.restored.sort()).toEqual(['assets/site.css', 'index.html']);
     expect(await readFile(path.join(rootA, 'index.html'), 'utf8')).toContain('<p>v1</p>');
-    expect(await readFile(path.join(rootA, 'assets', 'site.css'), 'utf8')).toBe('p { color: red; }');
+    expect(await readFile(path.join(rootA, 'assets', 'site.css'), 'utf8')).toBe(
+      'p { color: red; }'
+    );
     expect(restored.body.data.summary.source).toBe('restore');
   });
 
@@ -708,12 +700,19 @@ describe('design deps and export routes', () => {
     expect(Number(ok.headers['content-length'])).toBe(ok.body.length);
     const zip = await JSZip.loadAsync(ok.body);
     expect(await zip.file('index.html')?.async('string')).toBe(html);
-    expect(await zip.file('assets/site.css')?.async('string')).toBe('body { background: url("bg.png"); }');
+    expect(await zip.file('assets/site.css')?.async('string')).toBe(
+      'body { background: url("bg.png"); }'
+    );
     expect(zip.file('zclaudia-export.json')).toBeTruthy();
 
     const stale = await request(app)
       .post('/api/design/export')
-      .send({ sessionId: 'sa', path: 'index.html', mode: 'disk', expectedRevision: '0'.repeat(64) });
+      .send({
+        sessionId: 'sa',
+        path: 'index.html',
+        mode: 'disk',
+        expectedRevision: '0'.repeat(64),
+      });
     expect(stale.status).toBe(409);
     expect(stale.body.error.code).toBe('REVISION_CONFLICT');
 
@@ -746,7 +745,9 @@ describe('design deps and export routes', () => {
     expect(ok.status).toBe(200);
     expect(ok.headers['content-type']).toBe('application/zip');
     const zip = await JSZip.loadAsync(ok.body);
-    const manifest = JSON.parse((await zip.file('zclaudia-export.json')?.async('string')) ?? 'null');
+    const manifest = JSON.parse(
+      (await zip.file('zclaudia-export.json')?.async('string')) ?? 'null'
+    );
     expect(manifest.missing).toEqual(['gone.png']);
     expect(zip.file('gone.png')).toBeNull();
   });
@@ -756,9 +757,13 @@ describe('design deps and export routes', () => {
 
     // Rebuild after deletion: empty revision + allowCreate.
     await rm(path.join(rootA, 'index.html'));
-    const rebuilt = await request(app)
-      .put('/api/design/document')
-      .send({ sessionId: 'sa', path: 'index.html', source: '<p>rebuilt</p>', expectedRevision: '', allowCreate: true });
+    const rebuilt = await request(app).put('/api/design/document').send({
+      sessionId: 'sa',
+      path: 'index.html',
+      source: '<p>rebuilt</p>',
+      expectedRevision: '',
+      allowCreate: true,
+    });
     expect(rebuilt.status).toBe(200);
     expect(rebuilt.body.data.revision).toBe(sha256('<p>rebuilt</p>'));
     expect(await readFile(path.join(rootA, 'index.html'), 'utf8')).toBe('<p>rebuilt</p>');
@@ -787,9 +792,13 @@ describe('design deps and export routes', () => {
 
     // allowCreate against an existing file still verifies the revision.
     await writeFile(path.join(rootA, 'index.html'), '<p>live</p>');
-    const stale = await request(app)
-      .put('/api/design/document')
-      .send({ sessionId: 'sa', path: 'index.html', source: 'x', expectedRevision: '', allowCreate: true });
+    const stale = await request(app).put('/api/design/document').send({
+      sessionId: 'sa',
+      path: 'index.html',
+      source: 'x',
+      expectedRevision: '',
+      allowCreate: true,
+    });
     expect(stale.status).toBe(409);
     expect(stale.body.error.code).toBe('REVISION_CONFLICT');
     expect(await readFile(path.join(rootA, 'index.html'), 'utf8')).toBe('<p>live</p>');
@@ -939,14 +948,21 @@ describe('design template, brand and asset routes', () => {
 
     // Single-file commit: tokens.css update leaves DESIGN.md alone.
     const tokensNext = ':root { --color-primary: #7c3aed; }\n';
-    const single = await request(app).put('/api/design/brand').send({
-      sessionId: 'sa',
-      tokensCss: tokensNext,
-      tokensCssRevision: sha256(tokensCss),
-    });
+    const single = await request(app)
+      .put('/api/design/brand')
+      .send({
+        sessionId: 'sa',
+        tokensCss: tokensNext,
+        tokensCssRevision: sha256(tokensCss),
+      });
     expect(single.status).toBe(200);
-    expect(single.body.data).toEqual({ designMdRevision: null, tokensCssRevision: sha256(tokensNext) });
-    expect((await request(app).get('/api/design/brand').query({ sessionId: 'sa' })).body.data.designMd).toBe(designMd);
+    expect(single.body.data).toEqual({
+      designMdRevision: null,
+      tokensCssRevision: sha256(tokensNext),
+    });
+    expect(
+      (await request(app).get('/api/design/brand').query({ sessionId: 'sa' })).body.data.designMd
+    ).toBe(designMd);
 
     const oversized = 'x'.repeat(256 * 1024 + 1);
     const tooLarge = await request(app)
@@ -1042,14 +1058,12 @@ describe('design template, brand and asset routes', () => {
       expect(response.body.error.code, reason).toBe('ASSET_INVALID');
     }
 
-    const traversal = await request(app)
-      .post('/api/design/assets/import')
-      .send({
-        sessionId: 'sa',
-        fileName: 'ok.png',
-        dataBase64: 'AAAA',
-        targetDir: '../outside',
-      });
+    const traversal = await request(app).post('/api/design/assets/import').send({
+      sessionId: 'sa',
+      fileName: 'ok.png',
+      dataBase64: 'AAAA',
+      targetDir: '../outside',
+    });
     expect(traversal.status).toBe(400);
     expect(traversal.body.error.code).toBe('VALIDATION_ERROR');
   });
@@ -1165,7 +1179,11 @@ describe('design media routes', () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data.providers).toEqual([
-      { id: 'openai-images', label: 'OpenAI-compatible image service', capabilities: ['generate', 'edit'] },
+      {
+        id: 'openai-images',
+        label: 'OpenAI-compatible image service',
+        capabilities: ['generate', 'edit'],
+      },
     ]);
     expect(response.body.data.profiles).toEqual([
       { id: 'p1', name: 'BigModel', providerType: 'openai', hasCredential: true },
@@ -1188,20 +1206,35 @@ describe('design media routes', () => {
       .send({ sessionId: 'sa', ...payload });
     expect(created.status).toBe(201);
     expect(created.body.success).toBe(true);
-    expect(created.body.data).toMatchObject({ id: 'task-1', kind: 'image-generate', status: 'queued' });
+    expect(created.body.data).toMatchObject({
+      id: 'task-1',
+      kind: 'image-generate',
+      status: 'queued',
+    });
     expect(media.createCalls).toEqual([{ sessionId: 'sa', input: payload }]);
 
-    media.createError = new DesignError(409, 'MEDIA_TASK_ACTIVE_EXISTS', 'An identical task is already in progress');
+    media.createError = new DesignError(
+      409,
+      'MEDIA_TASK_ACTIVE_EXISTS',
+      'An identical task is already in progress'
+    );
     const conflict = await request(app)
       .post('/api/design/media-tasks')
       .send({ sessionId: 'sa', ...payload });
     expect(conflict.status).toBe(409);
     expect(conflict.body).toMatchObject({
       success: false,
-      error: { code: 'MEDIA_TASK_ACTIVE_EXISTS', message: 'An identical task is already in progress' },
+      error: {
+        code: 'MEDIA_TASK_ACTIVE_EXISTS',
+        message: 'An identical task is already in progress',
+      },
     });
 
-    media.createError = new DesignError(400, 'MEDIA_VALIDATION', 'prompt must be a non-empty string');
+    media.createError = new DesignError(
+      400,
+      'MEDIA_VALIDATION',
+      'prompt must be a non-empty string'
+    );
     const invalid = await request(app)
       .post('/api/design/media-tasks')
       .send({ sessionId: 'sa', kind: 'image-generate' });
@@ -1344,7 +1377,11 @@ describe('design media routes real assembly', () => {
     const response = await request(mountApp()).get('/api/design/media/providers');
     expect(response.status).toBe(200);
     expect(response.body.data.providers).toEqual([
-      { id: 'openai-images', label: 'OpenAI-compatible image service', capabilities: ['generate', 'edit'] },
+      {
+        id: 'openai-images',
+        label: 'OpenAI-compatible image service',
+        capabilities: ['generate', 'edit'],
+      },
     ]);
     // findAllOrdered：is_default DESC 后 name ASC。
     expect(response.body.data.profiles).toEqual([

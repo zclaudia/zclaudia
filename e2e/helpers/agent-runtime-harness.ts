@@ -100,15 +100,26 @@ export class AgentRuntimeHarness {
   }
 
   async api<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const response = await fetch(`${this.url}${endpoint}`, {
-      ...options,
-      headers: { 'Content-Type': 'application/json', ...options.headers },
-    });
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      throw new Error(`${options.method ?? 'GET'} ${endpoint}: ${JSON.stringify(payload)}`);
+    const method = options.method ?? 'GET';
+    const read = async () => {
+      const response = await fetch(`${this.url}${endpoint}`, {
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...options.headers },
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        throw new Error(`${method} ${endpoint}: ${JSON.stringify(payload)}`);
+      }
+      return payload.data as T;
+    };
+    try {
+      return await read();
+    } catch (error) {
+      // A dropped keep-alive socket on an idempotent read is retried once.
+      if (method !== 'GET' || !(error instanceof TypeError)) throw error;
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return read();
     }
-    return payload.data as T;
   }
 
   async stop(): Promise<void> {

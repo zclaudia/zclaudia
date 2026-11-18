@@ -29,7 +29,9 @@ export interface UseDesignWorkspaceResult {
 }
 
 /** 消息指纹：条数 + 末条 id（外部 agent 写入 file_change effect 落库后触发刷新）。 */
-function chatFingerprint(messages: ReturnType<typeof useChatMessageStore.getState>['messages'][string]) {
+function chatFingerprint(
+  messages: ReturnType<typeof useChatMessageStore.getState>['messages'][string]
+) {
   if (!messages || messages.length === 0) return '0:';
   return `${messages.length}:${messages[messages.length - 1]?.id ?? ''}`;
 }
@@ -95,9 +97,7 @@ export function useDesignWorkspace({
     try {
       const result = await listDesignFiles(backendId, sessionId);
       if (!isMounted() || request !== requestRef.current) return;
-      htmlFiles = result.files.filter(
-        path => typeof path === 'string' && /\.html?$/i.test(path)
-      );
+      htmlFiles = result.files.filter(path => typeof path === 'string' && /\.html?$/i.test(path));
       setFiles(htmlFiles);
       controller.refreshFiles(htmlFiles);
     } catch {

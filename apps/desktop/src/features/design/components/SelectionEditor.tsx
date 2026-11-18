@@ -71,7 +71,15 @@ interface StyleFieldRowProps {
   onClear: () => void;
 }
 
-function StyleFieldRow({ field, value, invalid, inline, busy, onChange, onClear }: StyleFieldRowProps) {
+function StyleFieldRow({
+  field,
+  value,
+  invalid,
+  inline,
+  busy,
+  onChange,
+  onClear,
+}: StyleFieldRowProps) {
   return (
     <div className="grid min-w-0 gap-1">
       <span className="flex items-center gap-1 text-3xs text-muted-foreground">
@@ -386,7 +394,8 @@ export function SelectionEditor({
   };
 
   const structureDisabled = busy || elementPathEmpty || docSource === null;
-  const canMoveUp = !structureDisabled && siblingInfo.index > 0 && siblingInfo.index < siblingInfo.count;
+  const canMoveUp =
+    !structureDisabled && siblingInfo.index > 0 && siblingInfo.index < siblingInfo.count;
   const canMoveDown =
     !structureDisabled && siblingInfo.index >= 0 && siblingInfo.index < siblingInfo.count - 1;
 
@@ -545,7 +554,9 @@ export function SelectionEditor({
                 className="max-h-40 overflow-y-auto rounded-md border border-border p-1"
               >
                 {assetState === 'loading' && (
-                  <div className="px-1 py-0.5 text-[11px] text-muted-foreground">{ASSET_LOADING}</div>
+                  <div className="px-1 py-0.5 text-[11px] text-muted-foreground">
+                    {ASSET_LOADING}
+                  </div>
                 )}
                 {assetState === 'error' && (
                   <div className="flex items-center gap-1 px-1 py-0.5 text-[11px] text-destructive">
@@ -619,35 +630,35 @@ export function SelectionEditor({
         <>
           <div className="grid gap-2">
             {selection.tagName !== 'img' && (
-            <div className="grid gap-1">
-              <span className="flex items-center gap-1 text-3xs text-muted-foreground">
-                Text color
-                {inlineNames.has('color') && <InlineBadge testId="inline-badge-color" />}
-              </span>
-              <div className="flex items-center gap-1">
-                <span
-                  aria-hidden="true"
-                  className="h-4 w-4 shrink-0 rounded border border-border"
-                  style={{ backgroundColor: colorValue || 'transparent' }}
-                />
-                <Input
-                  aria-label="Text color"
-                  value={colorValue}
-                  placeholder="#000000"
-                  disabled={busy}
-                  onChange={e => setColorValue(e.target.value)}
-                />
-                <Button
-                  size="sm"
-                  className="shrink-0"
-                  disabled={busy}
-                  aria-label="Clear text color"
-                  onClick={() => onApply([{ kind: 'style', property: 'color', value: null }])}
-                >
-                  Clear text color
-                </Button>
+              <div className="grid gap-1">
+                <span className="flex items-center gap-1 text-3xs text-muted-foreground">
+                  Text color
+                  {inlineNames.has('color') && <InlineBadge testId="inline-badge-color" />}
+                </span>
+                <div className="flex items-center gap-1">
+                  <span
+                    aria-hidden="true"
+                    className="h-4 w-4 shrink-0 rounded border border-border"
+                    style={{ backgroundColor: colorValue || 'transparent' }}
+                  />
+                  <Input
+                    aria-label="Text color"
+                    value={colorValue}
+                    placeholder="#000000"
+                    disabled={busy}
+                    onChange={e => setColorValue(e.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    className="shrink-0"
+                    disabled={busy}
+                    aria-label="Clear text color"
+                    onClick={() => onApply([{ kind: 'style', property: 'color', value: null }])}
+                  >
+                    Clear text color
+                  </Button>
+                </div>
               </div>
-            </div>
             )}
             <div className="grid gap-1">
               <span className="flex items-center gap-1 text-3xs text-muted-foreground">
@@ -674,7 +685,9 @@ export function SelectionEditor({
                   className="shrink-0"
                   disabled={busy}
                   aria-label="Clear background color"
-                  onClick={() => onApply([{ kind: 'style', property: 'background-color', value: null }])}
+                  onClick={() =>
+                    onApply([{ kind: 'style', property: 'background-color', value: null }])
+                  }
                 >
                   Clear background color
                 </Button>
@@ -696,7 +709,11 @@ export function SelectionEditor({
         'Structure',
         <>
           <div className="flex flex-wrap items-center gap-1">
-            <Button size="sm" disabled={structureDisabled} onClick={() => submitStructure('duplicate')}>
+            <Button
+              size="sm"
+              disabled={structureDisabled}
+              onClick={() => submitStructure('duplicate')}
+            >
               Copy
             </Button>
             <Button
@@ -761,7 +778,12 @@ export function SelectionEditor({
             {pending} pending change{pending === 1 ? '' : 's'}
           </span>
           <span className="flex-1" />
-          <Button size="sm" className="shrink-0 whitespace-nowrap" onClick={resetFields} disabled={busy}>
+          <Button
+            size="sm"
+            className="shrink-0 whitespace-nowrap"
+            onClick={resetFields}
+            disabled={busy}
+          >
             Discard
           </Button>
           <Button

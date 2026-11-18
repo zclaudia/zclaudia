@@ -2,14 +2,34 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useMobileDrawerFocus } from '../useMobileDrawerFocus';
 
-function Drawer({ open = true, paused = false, close = () => {} }: { open?: boolean; paused?: boolean; close?: () => void }) {
-  const { panelRef, handleDrawerKeyDown } = useMobileDrawerFocus({ isMobile: true, isOpen: open, paused, onClose: close });
-  return <div ref={panelRef} role="dialog" tabIndex={-1} onKeyDown={handleDrawerKeyDown}>
-    <button>First</button><button hidden>Hidden</button><button disabled>Disabled</button><button>Last</button>
-  </div>;
+function Drawer({
+  open = true,
+  paused = false,
+  close = () => {},
+}: {
+  open?: boolean;
+  paused?: boolean;
+  close?: () => void;
+}) {
+  const { panelRef, handleDrawerKeyDown } = useMobileDrawerFocus({
+    isMobile: true,
+    isOpen: open,
+    paused,
+    onClose: close,
+  });
+  return (
+    <div ref={panelRef} role="dialog" tabIndex={-1} onKeyDown={handleDrawerKeyDown}>
+      <button>First</button>
+      <button hidden>Hidden</button>
+      <button disabled>Disabled</button>
+      <button>Last</button>
+    </div>
+  );
 }
 beforeEach(() => {
-  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockImplementation(function(this: HTMLElement) {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockImplementation(function (
+    this: HTMLElement
+  ) {
     return (this.hidden ? [] : [{}]) as unknown as DOMRectList;
   });
 });

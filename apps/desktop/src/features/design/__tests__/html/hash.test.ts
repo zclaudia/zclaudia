@@ -24,9 +24,7 @@ describe('sha256 fallback', () => {
   it('sha256Hex falls back in jsdom and still matches', async () => {
     expect((globalThis as { crypto?: { subtle?: unknown } }).crypto?.subtle).toBeUndefined();
     for (const input of inputs.slice(0, 4)) {
-      expect(await sha256Hex(input)).toBe(
-        createHash('sha256').update(input, 'utf8').digest('hex')
-      );
+      expect(await sha256Hex(input)).toBe(createHash('sha256').update(input, 'utf8').digest('hex'));
     }
   });
 });

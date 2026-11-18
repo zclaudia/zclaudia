@@ -5,7 +5,8 @@ import { exportDesignZip, isDesignHttpError } from '../api';
 import type { DesignExportRequest } from '../types';
 
 const CONFLICT_NOTICE = 'The file has changed; refreshing.';
-const SAVE_FAILED_NOTICE = 'Save failed, so the export was stopped; resolve the save problem and try again.';
+const SAVE_FAILED_NOTICE =
+  'Save failed, so the export was stopped; resolve the save problem and try again.';
 const INCOMPLETE_RETRY_LABEL = 'Export anyway (the manifest will note missing files)';
 
 /** 一次导出请求中除 confirmIncomplete 外的参数（重试时复用）。 */
@@ -160,7 +161,10 @@ export function ExportDialogContent({
     void runExport(
       base.mode === 'disk'
         ? // 磁盘可能已刷新：用最新 docRevision 重钉。
-          { mode: 'disk', expectedRevision: freshRef.current.expectedRevision ?? base.expectedRevision }
+          {
+            mode: 'disk',
+            expectedRevision: freshRef.current.expectedRevision ?? base.expectedRevision,
+          }
         : base
     );
   };
@@ -191,7 +195,10 @@ export function ExportDialogContent({
         )}
         {stage.kind === 'incomplete' && (
           <>
-            <div className="text-warning">The following referenced assets are missing from the workspace; the export was refused by default:</div>
+            <div className="text-warning">
+              The following referenced assets are missing from the workspace; the export was refused
+              by default:
+            </div>
             <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border border-border px-2 py-1.5">
               {stage.files.map(file => (
                 <li key={file} className="font-mono text-[11px]">
@@ -200,7 +207,9 @@ export function ExportDialogContent({
               ))}
             </ul>
             {stage.files.length === 0 && (
-              <div className="text-muted-foreground">The server did not return a missing-asset list.</div>
+              <div className="text-muted-foreground">
+                The server did not return a missing-asset list.
+              </div>
             )}
           </>
         )}
@@ -241,7 +250,11 @@ export function ExportDialogContent({
             >
               Save and export
             </Button>
-            <Button size="sm" onClick={() => void runExport({ mode: 'draft', draftSource })} disabled={working}>
+            <Button
+              size="sm"
+              onClick={() => void runExport({ mode: 'draft', draftSource })}
+              disabled={working}
+            >
               Export draft
             </Button>
             <Button size="sm" onClick={onClose} disabled={working}>

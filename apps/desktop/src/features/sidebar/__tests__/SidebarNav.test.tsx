@@ -4,6 +4,13 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { SidebarNav } from '../SidebarNav';
 
 describe('SidebarNav', () => {
+  it('separates selected navigation from hover and exposes the current page', () => {
+    render(<SidebarNav onHome={vi.fn()} isHomeActive onOpenAgents={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Home' })).toHaveClass('font-semibold', 'ring-inset');
+    expect(screen.getByRole('button', { name: 'Agents' })).toHaveClass('hover:bg-secondary/50');
+    expect(screen.getByRole('button', { name: 'Agents' })).not.toHaveAttribute('aria-current');
+  });
   it('renders the Home item', () => {
     render(<SidebarNav onHome={vi.fn()} isHomeActive={false} />);
     expect(screen.getByRole('button', { name: 'Home' })).toBeDefined();

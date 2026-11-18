@@ -124,7 +124,7 @@ function runTestGroup(group) {
           passed = result.numPassedTests || 0;
           failed = result.numFailedTests || 0;
         }
-      } catch (e) {
+      } catch {
         // 降级到文本解析
         const testsMatch = stdout.match(/Tests\s+(\d+)\s+passed\s+\|\s+(\d+)\s+failed/);
         if (testsMatch) {
