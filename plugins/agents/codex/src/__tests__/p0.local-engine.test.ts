@@ -167,10 +167,12 @@ describe.skipIf(!codexBinary)('P0 local engine probe (codex app-server, real bin
       apiKey: PROFILE_KEY,
       requestHeaders: { 'X-Tenant': 'tenant-probe', 'X-Pool': 'pool-probe' },
     };
-    // Session config.toml + -c re-lock overrides — the exact production path.
+    // Keep background plugin marketplace sync out of the loopback-only probe.
+    // The connection still uses the production config and re-lock overrides.
     const toml =
       buildSdkConfigToml({ connection, model: BOUND_MODEL }) +
-      '\n[mcp_servers.config_probe]\ncommand = "unused-probe"\nenabled = false\n';
+      '\n[mcp_servers.config_probe]\ncommand = "unused-probe"\nenabled = false\n' +
+      '\n[features]\nplugins = false\n';
     writeSdkConfig(codexHome, toml);
     const env = buildCodexSdkEnvironment({
       connection,

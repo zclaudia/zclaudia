@@ -1061,14 +1061,17 @@ describe('DesignPanel', () => {
   });
 
   it('confirms before closing a dirty page: discarding removes it, saving closes it', async () => {
+    disk.set('design/other.html', { source: pageSource('Other'), revision: 'other-1' });
+    vi.mocked(api.listDesignFiles).mockResolvedValue({
+      files: ['design/index.html', 'design/other.html'],
+    });
     mount();
     await screen.findByTitle('Design preview');
-    await selectElement();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Element text' }), {
-      target: { value: 'Changed' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+    // Keep another tab open so empty-workspace discovery cannot reopen index.html.
+    await openPage('design/other.html');
+    await screen.findByRole('tab', { name: 'other.html', selected: true });
+    fireEvent.click(screen.getByRole('tab', { name: 'index.html' }));
+    await editActivePage('Hello', 'Changed');
 
     fireEvent.click(screen.getByRole('button', { name: 'Close design/index.html' }));
     const dialog = screen.getByRole('dialog', { name: 'Save before closing' });
@@ -1085,12 +1088,8 @@ describe('DesignPanel', () => {
 
     // 重新打开并编辑后关闭：保存成功再关闭。
     await openPage('design/index.html');
-    await selectElement();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Element text' }), {
-      target: { value: 'Changed again' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+    await screen.findByRole('tab', { name: 'index.html', selected: true });
+    await editActivePage('Hello', 'Changed again');
     fireEvent.click(screen.getByRole('button', { name: 'Close design/index.html' }));
     fireEvent.click(
       within(screen.getByRole('dialog', { name: 'Save before closing' })).getByRole('button', {
