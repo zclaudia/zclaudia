@@ -39,6 +39,6 @@ describe('session approval settings', () => {
     render(<SessionSettingsDialog sessionId="s" isMobile={false} onClose={() => {}} />);
     expect(
       await screen.findByRole('button', { name: 'Permission mode: Project Default' })
-    ).toBeDisabled();
+    ).toHaveAttribute('aria-disabled', 'true');
   });
 });

@@ -15,8 +15,8 @@ export function GeneralSettings() {
         />
         <SettingsRow
           icon={<Type className="w-4 h-4" strokeWidth={1.75} />}
-          title="聊天字体大小"
-          description="调整正文、代码与输入区，不影响导航和设置。"
+          title="Font size"
+          description="Adjusts prose, code, and the input. Navigation and settings stay the same."
           control={<FontSizeToggle />}
         />
       </SettingsGroup>
@@ -38,7 +38,7 @@ function FontSizeToggle() {
   return (
     <div
       role="group"
-      aria-label="聊天字体大小"
+      aria-label="Font size"
       className="flex items-center bg-secondary/80 rounded-lg p-0.5 gap-0.5"
     >
       {FONT_SIZE_OPTIONS.map(opt => (

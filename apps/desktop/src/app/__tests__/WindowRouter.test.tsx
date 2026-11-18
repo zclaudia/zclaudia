@@ -60,6 +60,7 @@ describe('WindowRouter builtin panel bootstrap', () => {
     await screen.findByTestId(host);
     const panels = usePluginStore.getState().panels;
     expect(panels.map(panel => panel.id)).toEqual([
+      'design',
       'terminal',
       'file-viewer',
       'draft',

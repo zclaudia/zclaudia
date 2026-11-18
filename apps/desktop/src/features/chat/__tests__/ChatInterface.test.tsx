@@ -660,40 +660,40 @@ describe('ChatInterface', () => {
 
   // ─── Session Action Buttons ───────────────────────────────────────────
 
-  // Desktop session actions now live behind a "..." overflow menu.
-  const openSessionMenu = (container: HTMLElement) =>
-    clickAsync(container.querySelector('button[title="Session actions"]')!);
-  const menuItem = (container: HTMLElement, label: string) =>
-    Array.from(container.querySelectorAll('button[role="menuitem"]')).find(b =>
+  // Desktop session actions live behind an overflow menu portaled to document.body.
+  const openSessionMenu = () =>
+    clickAsync(document.querySelector('button[aria-label="Session actions"]')!);
+  const menuItem = (label: string) =>
+    Array.from(document.querySelectorAll('button[role="menuitem"]')).find(b =>
       b.textContent?.includes(label)
     ) as HTMLButtonElement | undefined;
 
   it('renders reset provider session menu item', async () => {
-    const { container } = render(<ChatInterface sessionId="sess-1" />);
-    await openSessionMenu(container);
-    expect(menuItem(container, 'Reset session')).toBeTruthy();
+    render(<ChatInterface sessionId="sess-1" />);
+    await openSessionMenu();
+    expect(menuItem('Reset session')).toBeTruthy();
   });
 
   it('calls resetSessionSdkSession when reset item clicked', async () => {
-    const { container } = render(<ChatInterface sessionId="sess-1" />);
-    await openSessionMenu(container);
-    await clickAsync(menuItem(container, 'Reset session')!);
+    render(<ChatInterface sessionId="sess-1" />);
+    await openSessionMenu();
+    await clickAsync(menuItem('Reset session')!);
     expect(api.resetSessionSdkSession).toHaveBeenCalledWith('sess-1');
   });
 
   it('renders export item and calls exportSession on click', async () => {
-    const { container } = render(<ChatInterface sessionId="sess-1" />);
-    await openSessionMenu(container);
-    const btn = menuItem(container, 'Export as Markdown');
+    render(<ChatInterface sessionId="sess-1" />);
+    await openSessionMenu();
+    const btn = menuItem('Export as Markdown');
     expect(btn).toBeTruthy();
     await clickAsync(btn!);
     expect(api.exportSession).toHaveBeenCalledWith('sess-1');
   });
 
   it('renders archive item and calls archiveSessions on click', async () => {
-    const { container } = render(<ChatInterface sessionId="sess-1" />);
-    await openSessionMenu(container);
-    const btn = menuItem(container, 'Archive session');
+    render(<ChatInterface sessionId="sess-1" />);
+    await openSessionMenu();
+    const btn = menuItem('Archive session');
     expect(btn).toBeTruthy();
     await clickAsync(btn!);
     expect(api.archiveSessions).toHaveBeenCalledWith(['sess-1']);
@@ -706,9 +706,9 @@ describe('ChatInterface', () => {
         backgroundRunIds: new Set(),
       },
     });
-    const { container } = render(<ChatInterface sessionId="sess-1" />);
-    await openSessionMenu(container);
-    expect(menuItem(container, 'Reset session')?.disabled).toBe(true);
+    render(<ChatInterface sessionId="sess-1" />);
+    await openSessionMenu();
+    expect(menuItem('Reset session')?.disabled).toBe(true);
   });
 
   // ─── Background Session (back button and read-only label) ─────────────
@@ -749,7 +749,7 @@ describe('ChatInterface', () => {
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     // Background sessions don't render the actions overflow menu at all.
-    expect(container.querySelector('button[title="Session actions"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Session actions"]')).toBeNull();
   });
 
   // ─── Loading State ────────────────────────────────────────────────────
@@ -1850,22 +1850,18 @@ describe('ChatInterface', () => {
   // ─── Export session functionality ───────────────────────────────────────
 
   it('shows export item in the actions menu', async () => {
-    const { container } = render(<ChatInterface sessionId="sess-1" />);
-    await clickAsync(container.querySelector('button[title="Session actions"]')!);
-    const exportItem = Array.from(container.querySelectorAll('button[role="menuitem"]')).find(b =>
-      b.textContent?.includes('Export')
-    );
+    render(<ChatInterface sessionId="sess-1" />);
+    await openSessionMenu();
+    const exportItem = menuItem('Export');
     expect(exportItem).toBeTruthy();
   });
 
   // ─── Archive session functionality ──────────────────────────────────────
 
   it('shows archive item in the actions menu', async () => {
-    const { container } = render(<ChatInterface sessionId="sess-1" />);
-    await clickAsync(container.querySelector('button[title="Session actions"]')!);
-    const archiveItem = Array.from(container.querySelectorAll('button[role="menuitem"]')).find(b =>
-      b.textContent?.includes('Archive')
-    );
+    render(<ChatInterface sessionId="sess-1" />);
+    await openSessionMenu();
+    const archiveItem = menuItem('Archive');
     expect(archiveItem).toBeTruthy();
   });
 
