@@ -20,16 +20,24 @@ export function createClaudeProcessOwner() {
 
   return {
     spawnClaudeCodeProcess,
-    kill() {
-      for (const child of children) {
-        // `killed` only means a signal was sent, not that SIGTERM succeeded.
-        if (child.exitCode !== null || child.signalCode !== null) continue;
-        try {
-          child.kill('SIGKILL');
-        } catch {
-          // The child may have exited between the check and the signal.
-        }
-      }
+    async stop() {
+      await Promise.all(
+        [...children].map(
+          child =>
+            new Promise<void>(resolve => {
+              if (child.exitCode !== null || child.signalCode !== null) {
+                resolve();
+                return;
+              }
+              // Give the CLI time to clean up subprocesses after the SDK aborts it.
+              const escalation = setTimeout(() => child.kill('SIGKILL'), 1500);
+              child.once('exit', () => {
+                clearTimeout(escalation);
+                resolve();
+              });
+            })
+        )
+      );
     },
   };
 }

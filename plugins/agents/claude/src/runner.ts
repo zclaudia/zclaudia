@@ -166,7 +166,7 @@ export async function* runClaudeAgent(
     prompt.start();
     yield* pumpClaudeStream(stream, options, prompt.close);
   } finally {
-    detachCancellation();
+    await detachCancellation();
     prompt.close();
     try {
       stream.close();
@@ -284,7 +284,7 @@ async function* runClaudeSdkAgent(
     else prompt.start();
     yield* pumpClaudeStream(stream, options, prompt.close);
   } finally {
-    detachCancellation();
+    await detachCancellation();
     prompt.close();
     stream.close();
   }
@@ -294,19 +294,23 @@ function bindClaudeCancellation(
   stream: ReturnType<typeof query>,
   controller: AbortController,
   processOwner: ReturnType<typeof createClaudeProcessOwner>
-): () => void {
+): () => Promise<void> {
+  let stopping: Promise<void> | undefined;
   const onAbort = () => {
     try {
       stream.close();
     } catch {
       // The SDK may already have closed the transport on abort.
     } finally {
-      processOwner.kill();
+      stopping = processOwner.stop();
     }
   };
   controller.signal.addEventListener('abort', onAbort, { once: true });
   if (controller.signal.aborted) onAbort();
-  return () => controller.signal.removeEventListener('abort', onAbort);
+  return async () => {
+    controller.signal.removeEventListener('abort', onAbort);
+    await stopping;
+  };
 }
 
 /**

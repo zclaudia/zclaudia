@@ -10,9 +10,13 @@ vi.mock('../resolve-cli.js', () => ({
   resolveClaudeCliFromPath: () => '/fixture/claude',
 }));
 
-afterEach(() => vi.resetAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.resetAllMocks();
+});
 
 it.each(['cli', 'sdk'] as const)('cancels only the owning query process in %s mode', async mode => {
+  vi.useFakeTimers();
   const children = [0, 1].map(() =>
     Object.assign(new EventEmitter(), {
       kill: vi.fn(),
@@ -72,7 +76,10 @@ it.each(['cli', 'sdk'] as const)('cancels only the owning query process in %s mo
     await first.next();
     await second.next();
     firstAbort.abort();
+    expect(children[0].kill).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1500);
     expect(children[0].kill).toHaveBeenCalledWith('SIGKILL');
+    children[0].emit('exit', null, 'SIGKILL');
     expect(children[1].kill).not.toHaveBeenCalled();
     expect(streams[0].close).toHaveBeenCalled();
     expect(streams[1].close).not.toHaveBeenCalled();
