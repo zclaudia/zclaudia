@@ -25,7 +25,10 @@ concurrency:
 
 jobs:
   deterministic:
-    runs-on: ubuntu-latest
+    # ubuntu-latest is 26.04. Playwright 1.60 cannot install Chromium there
+    # (`Playwright does not support chromium on ubuntu26.04-x64`). 24.04 is
+    # the image this job last passed on.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
