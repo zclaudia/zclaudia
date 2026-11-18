@@ -149,7 +149,11 @@ export interface MediaImageResult {
 
 export interface MediaImageProvider {
   readonly info: MediaImageProviderInfo;
-  generate(input: { prompt: string; size?: string; signal: AbortSignal }): Promise<MediaImageResult>;
+  generate(input: {
+    prompt: string;
+    size?: string;
+    signal: AbortSignal;
+  }): Promise<MediaImageResult>;
   edit(input: {
     prompt: string;
     size?: string;
@@ -207,7 +211,10 @@ export type MediaTaskErrorCode =
 
 /** 执行器失败的标准抛出形态；service 收口时若 ctx.signal.aborted 则改判 cancelled。 */
 export class MediaTaskRunError extends Error {
-  constructor(readonly code: MediaTaskErrorCode, message: string) {
+  constructor(
+    readonly code: MediaTaskErrorCode,
+    message: string
+  ) {
     super(message);
     this.name = 'MediaTaskRunError';
   }
@@ -218,9 +225,7 @@ export class MediaTaskRunError extends Error {
 // ---------------------------------------------------------------------------
 
 export function isDesignMediaTaskKind(value: unknown): value is DesignMediaTaskKind {
-  return (
-    value === 'image-generate' || value === 'image-edit' || value === 'video-render'
-  );
+  return value === 'image-generate' || value === 'image-edit' || value === 'video-render';
 }
 
 export function mediaTaskConcurrencyGroup(kind: DesignMediaTaskKind): 'image' | 'video' {

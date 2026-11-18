@@ -155,9 +155,9 @@ describe('ShareService', () => {
     it('rejects invalid scope values and accepts the two defined ones', async () => {
       const { snapshot } = await setupShare();
       for (const scope of ['public', 'LINK', 42, null]) {
-        await expect(
-          shares.create('sa', { snapshotId: snapshot.id, scope })
-        ).rejects.toMatchObject({ status: 400, code: 'SHARE_VALIDATION' });
+        await expect(shares.create('sa', { snapshotId: snapshot.id, scope })).rejects.toMatchObject(
+          { status: 400, code: 'SHARE_VALIDATION' }
+        );
       }
       const link = await shares.create('sa', { snapshotId: snapshot.id, scope: 'link' });
       expect(link.scope).toBe('link');
@@ -177,10 +177,12 @@ describe('ShareService', () => {
         })
       ).rejects.toMatchObject({ status: 400, code: 'SHARE_VALIDATION' });
       expect(
-        (await shares.create('sa', {
-          snapshotId: snapshot.id,
-          title: 'a'.repeat(SHARE_TITLE_MAX_LENGTH),
-        })).title
+        (
+          await shares.create('sa', {
+            snapshotId: snapshot.id,
+            title: 'a'.repeat(SHARE_TITLE_MAX_LENGTH),
+          })
+        ).title
       ).toHaveLength(SHARE_TITLE_MAX_LENGTH);
       await expect(
         shares.create('sa', { snapshotId: snapshot.id, title: 42 })
@@ -390,7 +392,10 @@ describe('ShareService', () => {
       // 4) 过期 → 410（expires_at null = 永不过期；到期含恰好 now）。
       const expiring = await shares.create('sa', { snapshotId: snapshot.id, expiresInDays: 1 });
       expect(await shares.resolveByToken(expiring.token)).toBeTruthy();
-      db.prepare('UPDATE design_shares SET expires_at = ? WHERE id = ?').run(Date.now(), expiring.id);
+      db.prepare('UPDATE design_shares SET expires_at = ? WHERE id = ?').run(
+        Date.now(),
+        expiring.id
+      );
       await expect(shares.resolveByToken(expiring.token)).rejects.toMatchObject({
         status: 410,
         code: 'SHARE_EXPIRED',
@@ -499,7 +504,9 @@ describe('ShareService', () => {
 
     it('falls back to application/octet-stream when the manifest mime is null', async () => {
       const { share } = await setupShare();
-      db.prepare("UPDATE design_snapshot_files SET mime = NULL WHERE path = 'assets/site.css'").run();
+      db.prepare(
+        "UPDATE design_snapshot_files SET mime = NULL WHERE path = 'assets/site.css'"
+      ).run();
       const file = await shares.publicFile(await accessOf(share), 'assets/site.css');
       expect(file.mime).toBe('application/octet-stream');
     });
@@ -549,11 +556,17 @@ describe('ShareService', () => {
       expect(anonymous.body).toBe('这里有问题');
       expect(anonymous.target).toBeNull();
       expect(anonymous.resolvedAt).toBeNull();
-      expect(anonymous.id).toMatch(/^sc[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+      expect(anonymous.id).toMatch(
+        /^sc[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      );
       expect(anonymous.createdAt).toBeLessThanOrEqual(Date.now());
 
-      expect((await shares.addComment(access, { author: '   ', body: 'x' })).author).toBe('Anonymous');
-      expect((await shares.addComment(access, { author: ' 小明 ', body: 'x' })).author).toBe('小明');
+      expect((await shares.addComment(access, { author: '   ', body: 'x' })).author).toBe(
+        'Anonymous'
+      );
+      expect((await shares.addComment(access, { author: ' 小明 ', body: 'x' })).author).toBe(
+        '小明'
+      );
 
       const target = { elementPath: [0, 2, 1], tagName: 'p', text: 'hello share' };
       const located = await shares.addComment(access, { body: '定位评论', target });
@@ -581,10 +594,12 @@ describe('ShareService', () => {
       await invalid({ body: 'x', author: 42 });
       await invalid({ body: 'x', author: 'a'.repeat(SHARE_COMMENT_AUTHOR_MAX_LENGTH + 1) });
       expect(
-        (await shares.addComment(access, {
-          body: 'x',
-          author: 'a'.repeat(SHARE_COMMENT_AUTHOR_MAX_LENGTH),
-        })).author
+        (
+          await shares.addComment(access, {
+            body: 'x',
+            author: 'a'.repeat(SHARE_COMMENT_AUTHOR_MAX_LENGTH),
+          })
+        ).author
       ).toHaveLength(SHARE_COMMENT_AUTHOR_MAX_LENGTH);
       // body。
       await invalid({});

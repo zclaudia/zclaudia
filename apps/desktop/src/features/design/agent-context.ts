@@ -189,7 +189,10 @@ export function buildDesignAgentContext(
   const width = input.viewport?.width;
   sections.push({
     title: 'Viewport',
-    lines: [`- Preset: ${input.viewport?.preset ?? 'fill'}`, `- Width: ${width == null ? 'auto' : `${width}px`}`],
+    lines: [
+      `- Preset: ${input.viewport?.preset ?? 'fill'}`,
+      `- Width: ${width == null ? 'auto' : `${width}px`}`,
+    ],
   });
 
   const blocks = sections.map(section => ['## ' + section.title, ...section.lines].join('\n'));

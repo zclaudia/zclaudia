@@ -193,7 +193,12 @@ export function DeckPresenter({
         >
           Next
         </Button>
-        <Button size="sm" aria-label="Notes toggle" aria-pressed={notesOpen} onClick={() => setNotesOpen(value => !value)}>
+        <Button
+          size="sm"
+          aria-label="Notes toggle"
+          aria-pressed={notesOpen}
+          onClick={() => setNotesOpen(value => !value)}
+        >
           Notes
         </Button>
         <Button size="sm" aria-label="Close presentation" onClick={onClose}>

@@ -257,8 +257,14 @@ export class DesignWorkspaceController {
       if (this.pages.get(path) === page && page.requestId === request) this.removePage(path);
       return { ok: false, reason: 'load-failed', message: errorMessage(error) };
     }
-    if (this.disposed || page.requestId !== request || this.pages.get(path) !== page || !canActivate()) {
-      if (!canActivate() && this.pages.get(path) === page && page.requestId === request) this.removePage(path);
+    if (
+      this.disposed ||
+      page.requestId !== request ||
+      this.pages.get(path) !== page ||
+      !canActivate()
+    ) {
+      if (!canActivate() && this.pages.get(path) === page && page.requestId === request)
+        this.removePage(path);
       return {
         ok: false,
         reason: 'load-failed',
@@ -267,7 +273,8 @@ export class DesignWorkspaceController {
     }
     await this.adoptDocument(page, next, canActivate);
     if (this.disposed || !canActivate()) {
-      if (!canActivate() && this.pages.get(path) === page && page.doc === null) this.removePage(path);
+      if (!canActivate() && this.pages.get(path) === page && page.doc === null)
+        this.removePage(path);
       return {
         ok: false,
         reason: 'load-failed',
@@ -522,13 +529,15 @@ export class DesignWorkspaceController {
   }
 
   /** 文档轮询结果：仅当 next.path 为活动页且页非 busy 才处理（P1 checkExternal）。 */
-  async handleExternalDoc(next: DesignDocument, canAdopt: () => boolean = () => true): Promise<void> {
+  async handleExternalDoc(
+    next: DesignDocument,
+    canAdopt: () => boolean = () => true
+  ): Promise<void> {
     const page = this.activePage();
     if (!page || page.busy || !page.doc || next.path !== page.path) return;
     // 使该页 in-flight 载入/保存结果失效：随后到期的旧响应不得覆盖本轮处理。
     page.requestId += 1;
-    const unchanged =
-      next.revision === page.doc.revision && next.source === page.doc.source;
+    const unchanged = next.revision === page.doc.revision && next.source === page.doc.source;
     if (page.draft !== page.doc.source) {
       // 脏页：保留草稿，磁盘确有变化才置标志。
       if (unchanged) return;
@@ -656,7 +665,8 @@ export class DesignWorkspaceController {
   private removePage(path: string): void {
     if (!this.pages.delete(path)) return;
     if (this.activePath === path) {
-      const next = this.ui.recents.find(candidate => candidate !== path && this.pages.has(candidate)) ?? null;
+      const next =
+        this.ui.recents.find(candidate => candidate !== path && this.pages.has(candidate)) ?? null;
       this.activePath = next;
       this.ui = { ...this.ui, activePath: next };
     }
@@ -664,7 +674,11 @@ export class DesignWorkspaceController {
   }
 
   /** 无条件以新文档接管页面状态（重算草稿修订、rebuild 历史、清 selection）。 */
-  private async adoptDocument(page: WorkspacePage, next: DesignDocument, canAdopt: () => boolean = () => true): Promise<void> {
+  private async adoptDocument(
+    page: WorkspacePage,
+    next: DesignDocument,
+    canAdopt: () => boolean = () => true
+  ): Promise<void> {
     const revision = await this.getPorts(this.sessionId).sha256(next.source);
     if (this.disposed || !canAdopt()) return;
     page.doc = next;

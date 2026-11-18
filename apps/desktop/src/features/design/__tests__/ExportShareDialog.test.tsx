@@ -248,11 +248,9 @@ describe('ExportShareDialog（P5a §4.8）', () => {
     );
     const shareInput = within(panel('share')).getByLabelText('Share title');
     // 隐藏的 Share 内容打开即加载（无轮询），证明内容确实挂载。
-    await waitFor(() => expect(listDesignShares).toHaveBeenCalledWith(
-      'remote-1',
-      's1',
-      'design/index.html'
-    ));
+    await waitFor(() =>
+      expect(listDesignShares).toHaveBeenCalledWith('remote-1', 's1', 'design/index.html')
+    );
     expect(exportDesignZip).toHaveBeenCalledTimes(1);
 
     fireEvent.click(within(dialog).getByRole('tab', { name: 'Share' }));
@@ -301,18 +299,32 @@ describe('ExportShareDialog（P5a §4.8）', () => {
     expect(captureHtmlImage).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      queue[0].resolve({ blob: new Blob([new Uint8Array([0xff, 0xd8, 0xff])]), width: 1600, height: 900 });
+      queue[0].resolve({
+        blob: new Blob([new Uint8Array([0xff, 0xd8, 0xff])]),
+        width: 1600,
+        height: 900,
+      });
     });
     expect(await within(renderPanel).findByText('Exporting 2/3…')).toBeInTheDocument();
     await act(async () => {
-      queue[1].resolve({ blob: new Blob([new Uint8Array([0xff, 0xd8, 0xff])]), width: 1600, height: 900 });
+      queue[1].resolve({
+        blob: new Blob([new Uint8Array([0xff, 0xd8, 0xff])]),
+        width: 1600,
+        height: 900,
+      });
     });
     expect(await within(renderPanel).findByText('Exporting 3/3…')).toBeInTheDocument();
     await act(async () => {
-      queue[2].resolve({ blob: new Blob([new Uint8Array([0xff, 0xd8, 0xff])]), width: 1600, height: 900 });
+      queue[2].resolve({
+        blob: new Blob([new Uint8Array([0xff, 0xd8, 0xff])]),
+        width: 1600,
+        height: 900,
+      });
     });
 
-    expect(await within(renderPanel).findByText('Export finished: 3/3 pages succeeded.')).toBeInTheDocument();
+    expect(
+      await within(renderPanel).findByText('Export finished: 3/3 pages succeeded.')
+    ).toBeInTheDocument();
     expect(captureHtmlImage).toHaveBeenCalledTimes(3);
     // 逐页捕获仍按 deck 比例与页序；下载文件按入口路径命名。
     for (let index = 0; index < 3; index += 1) {
@@ -375,7 +387,12 @@ describe('ExportShareDialog（P5a §4.8）', () => {
     const prompt = vi.mocked(props.shareProps.onHandoff).mock.calls[0][0];
     expect(prompt).toContain('请把标题改成蓝色');
     expect(prompt).toContain('Instruction');
-    expect(getDesignSnapshotFile).toHaveBeenCalledWith('remote-1', 's1', 'ds-1', 'design/index.html');
+    expect(getDesignSnapshotFile).toHaveBeenCalledWith(
+      'remote-1',
+      's1',
+      'ds-1',
+      'design/index.html'
+    );
     expect(props.onClose).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog', { name: 'Export & Share' })).toBeInTheDocument();
   });

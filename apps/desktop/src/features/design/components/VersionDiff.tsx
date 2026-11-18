@@ -43,7 +43,9 @@ function buildHunks(lines: DiffLine[], context = CONTEXT): DiffHunk[] {
     .map((line, index) => (line.type === 'same' ? -1 : index))
     .filter(index => index >= 0);
   if (changed.length === 0) {
-    return lines.length === 0 ? [] : [{ lines: lines.slice(0, context), omittedBefore: Math.max(0, lines.length - context) }];
+    return lines.length === 0
+      ? []
+      : [{ lines: lines.slice(0, context), omittedBefore: Math.max(0, lines.length - context) }];
   }
   const ranges: Array<[number, number]> = [];
   for (const index of changed) {
@@ -253,7 +255,9 @@ export function LineDiffView({ lines, truncated = false }: LineDiffViewProps) {
         ))}
       </div>
       {truncated && (
-        <div className="text-[10px] text-muted-foreground">Diff exceeds 5000 lines and was truncated.</div>
+        <div className="text-[10px] text-muted-foreground">
+          Diff exceeds 5000 lines and was truncated.
+        </div>
       )}
     </>
   );
@@ -265,7 +269,9 @@ function FileDiffSection({ view }: { view: FileDiffView }) {
       <div className="flex items-center gap-2 text-xs">
         <span className="truncate font-mono text-foreground">{view.file.path}</span>
         <Badge label={KIND_LABEL[view.file.kind]} />
-        <span className="ml-auto shrink-0 text-muted-foreground">{formatBytes(view.file.bytes)}</span>
+        <span className="ml-auto shrink-0 text-muted-foreground">
+          {formatBytes(view.file.bytes)}
+        </span>
       </div>
       {view.error && (
         <div role="alert" className="text-xs text-destructive">
@@ -288,7 +294,9 @@ function FileDiffSection({ view }: { view: FileDiffView }) {
       ) : (
         <>
           {view.missing && (
-            <div className="text-xs text-warning">The current file no longer exists; below is the snapshot content.</div>
+            <div className="text-xs text-warning">
+              The current file no longer exists; below is the snapshot content.
+            </div>
           )}
           <LineDiffView lines={view.lines ?? []} truncated={view.truncated} />
         </>

@@ -128,9 +128,10 @@ describe('SnapshotService', () => {
       status: 409,
       code: 'WORKSPACE_MISMATCH',
     });
-    await expect(
-      restores.restore('sb', captured.id, {})
-    ).rejects.toMatchObject({ status: 409, code: 'WORKSPACE_MISMATCH' });
+    await expect(restores.restore('sb', captured.id, {})).rejects.toMatchObject({
+      status: 409,
+      code: 'WORKSPACE_MISMATCH',
+    });
   });
 
   it('marks snapshots with missing referenced resources incomplete, naming the path', async () => {
@@ -214,10 +215,7 @@ describe('SnapshotService', () => {
   });
 
   it('follows css imports up to depth 4 and reports deeper ones', async () => {
-    await writeFile(
-      path.join(rootA, 'index.html'),
-      '<link rel="stylesheet" href="css0.css">'
-    );
+    await writeFile(path.join(rootA, 'index.html'), '<link rel="stylesheet" href="css0.css">');
     for (let i = 0; i < 6; i++) {
       await writeFile(path.join(rootA, `css${i}.css`), `@import "css${i + 1}.css";`);
     }
@@ -304,7 +302,9 @@ describe('SnapshotService', () => {
 
   function snapshotIds(storedRoot: string): string[] {
     return (
-      db.prepare('SELECT id FROM design_snapshots WHERE workspace_root = ?').all(storedRoot) as Array<{
+      db
+        .prepare('SELECT id FROM design_snapshots WHERE workspace_root = ?')
+        .all(storedRoot) as Array<{
         id: string;
       }>
     ).map(row => row.id);
@@ -312,9 +312,9 @@ describe('SnapshotService', () => {
 
   function fileRowCount(snapshotId: string): number {
     return (
-      db.prepare('SELECT COUNT(*) AS count FROM design_snapshot_files WHERE snapshot_id = ?').get(
-        snapshotId
-      ) as { count: number }
+      db
+        .prepare('SELECT COUNT(*) AS count FROM design_snapshot_files WHERE snapshot_id = ?')
+        .get(snapshotId) as { count: number }
     ).count;
   }
 
@@ -522,8 +522,9 @@ describe('RestoreService', () => {
       .restore('sa', snapshotId, {})
       .catch((error: unknown) => error)) as DesignError;
     expect(missing.code).toBe('RESTORE_CONFLICT');
-    const missingFiles = (missing.details as { files: Array<{ path: string; reason: string; actualRevision?: string }> })
-      .files;
+    const missingFiles = (
+      missing.details as { files: Array<{ path: string; reason: string; actualRevision?: string }> }
+    ).files;
     expect(missingFiles).toEqual([
       {
         path: 'assets/site.css',
@@ -537,9 +538,9 @@ describe('RestoreService', () => {
       },
     ]);
     expect(
-      (db.prepare('SELECT status FROM design_restore_log').all() as Array<{ status: string }>).every(
-        row => row.status === 'conflict'
-      )
+      (
+        db.prepare('SELECT status FROM design_restore_log').all() as Array<{ status: string }>
+      ).every(row => row.status === 'conflict')
     ).toBe(true);
   });
 
@@ -552,19 +553,15 @@ describe('RestoreService', () => {
     expect(captured.complete).toBe(false);
 
     await writeFile(path.join(rootA, 'index.html'), '<html><body><p>v2</p></body></html>');
-    await expect(
-      restores.restore('sa', captured.id, { index: 'x' })
-    ).rejects.toMatchObject({ status: 409, code: 'SNAPSHOT_INCOMPLETE' });
+    await expect(restores.restore('sa', captured.id, { index: 'x' })).rejects.toMatchObject({
+      status: 409,
+      code: 'SNAPSHOT_INCOMPLETE',
+    });
     expect(await readFile(path.join(rootA, 'index.html'), 'utf8')).toBe(
       '<html><body><p>v2</p></body></html>'
     );
 
-    await restores.restore(
-      'sa',
-      captured.id,
-      { 'index.html': await diskHash('index.html') },
-      true
-    );
+    await restores.restore('sa', captured.id, { 'index.html': await diskHash('index.html') }, true);
     expect(await readFile(path.join(rootA, 'index.html'), 'utf8')).toBe(
       '<html><body><img src="missing.png"><p>v1</p></body></html>'
     );
@@ -604,8 +601,11 @@ describe('RestoreService', () => {
     expect(failure).toBeInstanceOf(DesignError);
     expect(failure.status).toBe(500);
     expect(failure.code).toBe('RESTORE_FAILED');
-    const report = (failure.details as { report: { restored: string[]; failed: Array<{ path: string }>; pending: string[] } })
-      .report;
+    const report = (
+      failure.details as {
+        report: { restored: string[]; failed: Array<{ path: string }>; pending: string[] };
+      }
+    ).report;
     expect(report.restored).toEqual(['a.png', 'index.html']);
     expect(report.failed).toHaveLength(1);
     expect(report.failed[0]?.path).toBe('m.png');

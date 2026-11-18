@@ -4,17 +4,17 @@
 
 ## 1. 两侧结构对照（简表）
 
-| 维度 | ZCode | zclaudia |
-|---|---|---|
-| 桌面运行时 | Electron（tsup 打包 main/preload/renderer/host/scheduler，`packages/desktop/tsup.config.ts`；electron-builder 出三平台安装包） | Tauri 2（Rust 侧仅 ~1.9k 行：`src-tauri/src/{lib,server,window_manager,traffic_lights,wsl,network_probe,permissions,android_bridge}.rs`） |
-| 主进程能力层 | `packages/desktop/src/main/` 177 个文件：菜单/托盘/更新/窗口 chrome/webview 安全/Chrome 凭据导入/CUA 等 | `src-tauri/src/lib.rs` 222 行：托盘（Show/Quit 两项）+ macOS 权限 + 关窗隐藏到托盘 |
-| 前端工程 | `packages/ui`（约 1800 个 ts/tsx，含 49 个 shadcn 风格基础组件、ai-elements 60+、i18n、快捷键内核、Zustand store、hooks），被 desktop/web/share-ui 三个宿主复用 | `apps/desktop/src` 单体：components 146 个 tsx + features 484 个 tsx，无独立 UI 包，无 i18n 层 |
-| 聊天渲染 | `packages/ui/src/components/ai-elements/message.tsx`（1671 行，streamdown + shiki + CJK/数学/mermaid 插件） | `features/chat/message-list/assistantMarkdown.tsx`（141 行，react-markdown + prism-react-renderer） |
-| 流式动画 | streamdown 流式解析 + shimmer（motion/react）+ 独立性能基准包 `stream-animate` | `LoadingIndicator.tsx` 轮换思考文案 + 省略号动画；无流式 markdown 解析 |
-| 多窗口 | 主窗口 + about + update-status + resource-manager + cua-permission-panel + plugin-sandbox（4 个 renderer HTML 入口）+ 单实例锁/deep link 路由 | 主窗口 + DraftWindow 弹出撰写窗 + SessionChatWindow 会话弹出窗 + 项目仪表盘窗（WebviewWindow） |
-| 自动更新 | electron-updater + 自研 manifest provider，2051 行，多通道/多语言 release notes/强制更新门 | `@tauri-apps/plugin-updater` + GitHub latest.json，`hooks/useAutoUpdate.ts` + `UpdateBanner.tsx`，另有 Android APK 下载安装通道 |
-| 桌面/Web 复用 | `IPlatformService`（shared/src/platform.ts，1177 行）+ 同一 `@zcode/ui` 渲染于 Electron/Web/公开分享页/手机远控页 | 单一 Tauri 前端；移动端靠同一代码编译 Android（`tauri.android.conf.json`），无 Web 宿主复用 |
-| 设计系统 | 根 `DESIGN.md`（text-ui-* 强制字号标度）+ `packages/ui/src/styles.css` 主题 token | `scripts/gen-tokens.mjs` token 生成管线（带 --check 校验）+ radius/lifecycle 两个自研 lint 脚本 |
+| 维度          | ZCode                                                                                                                                                           | zclaudia                                                                                                                                  |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 桌面运行时    | Electron（tsup 打包 main/preload/renderer/host/scheduler，`packages/desktop/tsup.config.ts`；electron-builder 出三平台安装包）                                  | Tauri 2（Rust 侧仅 ~1.9k 行：`src-tauri/src/{lib,server,window_manager,traffic_lights,wsl,network_probe,permissions,android_bridge}.rs`） |
+| 主进程能力层  | `packages/desktop/src/main/` 177 个文件：菜单/托盘/更新/窗口 chrome/webview 安全/Chrome 凭据导入/CUA 等                                                         | `src-tauri/src/lib.rs` 222 行：托盘（Show/Quit 两项）+ macOS 权限 + 关窗隐藏到托盘                                                        |
+| 前端工程      | `packages/ui`（约 1800 个 ts/tsx，含 49 个 shadcn 风格基础组件、ai-elements 60+、i18n、快捷键内核、Zustand store、hooks），被 desktop/web/share-ui 三个宿主复用 | `apps/desktop/src` 单体：components 146 个 tsx + features 484 个 tsx，无独立 UI 包，无 i18n 层                                            |
+| 聊天渲染      | `packages/ui/src/components/ai-elements/message.tsx`（1671 行，streamdown + shiki + CJK/数学/mermaid 插件）                                                     | `features/chat/message-list/assistantMarkdown.tsx`（141 行，react-markdown + prism-react-renderer）                                       |
+| 流式动画      | streamdown 流式解析 + shimmer（motion/react）+ 独立性能基准包 `stream-animate`                                                                                  | `LoadingIndicator.tsx` 轮换思考文案 + 省略号动画；无流式 markdown 解析                                                                    |
+| 多窗口        | 主窗口 + about + update-status + resource-manager + cua-permission-panel + plugin-sandbox（4 个 renderer HTML 入口）+ 单实例锁/deep link 路由                   | 主窗口 + DraftWindow 弹出撰写窗 + SessionChatWindow 会话弹出窗 + 项目仪表盘窗（WebviewWindow）                                            |
+| 自动更新      | electron-updater + 自研 manifest provider，2051 行，多通道/多语言 release notes/强制更新门                                                                      | `@tauri-apps/plugin-updater` + GitHub latest.json，`hooks/useAutoUpdate.ts` + `UpdateBanner.tsx`，另有 Android APK 下载安装通道           |
+| 桌面/Web 复用 | `IPlatformService`（shared/src/platform.ts，1177 行）+ 同一 `@zcode/ui` 渲染于 Electron/Web/公开分享页/手机远控页                                               | 单一 Tauri 前端；移动端靠同一代码编译 Android（`tauri.android.conf.json`），无 Web 宿主复用                                               |
+| 设计系统      | 根 `DESIGN.md`（text-ui-\* 强制字号标度）+ `packages/ui/src/styles.css` 主题 token                                                                              | `scripts/gen-tokens.mjs` token 生成管线（带 --check 校验）+ radius/lifecycle 两个自研 lint 脚本                                           |
 
 ## 2. ZCode 领先点（核心章节）
 
@@ -27,7 +27,7 @@
 - **可搬运性**：**重写借鉴**。streamdown 本身是 npm 开源包（MIT），但 ZCode 的价值在集成层：streaming/static 模式切换、render key 纪律、每块错误边界、单 `$` 数学启发式。这些模式可以直接套到 zclaudia 的 react-markdown 栈上（react-markdown 也可换 streamdown）；注释里的事故记录（React #185、remend 误补 `**`）是现成的避坑清单。
 - **体量估计**：核心集成约 600–900 行（不含 streamdown 依赖本身）；数学启发式 ~110 行可整段照搬。
 
-### 2.2 Markdown 类型标度与排版体系（text-ui-* 强制 token）
+### 2.2 Markdown 类型标度与排版体系（text-ui-\* 强制 token）
 
 - **解决的问题**：AI 输出的 markdown 缺少独立阅读层级（标题/正文/表格/代码字号混用紧凑 UI 字号），且多宿主（聊天/预览/分享页）字号不一致。
 - **证据路径**：
@@ -140,7 +140,7 @@
 > 复核人：独立复核员（与探索员无共享上下文）。复核范围：第 2 章 P1/P2 领先点共 8 条，全部证据文件于本会话只读打开核对，2026-10-16。
 
 - ✅ Streamdown 流式 Markdown 渲染管线：`resolveMessageStreamdownMode` 仅真实流式返回 "streaming"、完成态固定 static（packages/ui/src/components/ai-elements/message.tsx:700-706），`parseIncompleteMarkdown={streaming}` 仅流式开启未闭合语法补全（message.tsx:1635），`MessageResponseMarkdownBoundary` 单条 markdown 异常降级纯文本（message.tsx:708-748），单 `$` 数学启发式含 `$5-$10` 价格区间豁免（message.tsx:587-628）均属实。
-- ✅ Markdown 类型标度：h1–h6 显式映射 `messageMarkdownHeadingClassNames`，h1=text-ui-xl、h2=text-ui-lg、h3–h6=text-ui-base（差异落在字重 semibold/semibold/semibold/medium/normal，报告把字重压缩进字号串是措辞小瑕疵但映射本身属实）（message.tsx:440-447），DESIGN.md:12-23 "Highest-priority UI constraint" 强制全仓库 text-ui-*、禁 `text-[13px]`、禁改 html font-size、只许 `--ui-font-size`；正文 `text-ui-base leading-[1.75]`（message.tsx:1367-1370）。
+- ✅ Markdown 类型标度：h1–h6 显式映射 `messageMarkdownHeadingClassNames`，h1=text-ui-xl、h2=text-ui-lg、h3–h6=text-ui-base（差异落在字重 semibold/semibold/semibold/medium/normal，报告把字重压缩进字号串是措辞小瑕疵但映射本身属实）（message.tsx:440-447），DESIGN.md:12-23 "Highest-priority UI constraint" 强制全仓库 text-ui-\*、禁 `text-[13px]`、禁改 html font-size、只许 `--ui-font-size`；正文 `text-ui-base leading-[1.75]`（message.tsx:1367-1370）。
 - ✅ 完整桌面自动更新体系：双间隔轮询 15min 不可见/2min 可见（autoUpdater.ts:26-27,240-241），`releaseNotesByLocale` 多语言投递（autoUpdater.ts:82-93,657-665）+ 已读记忆 `acknowledgePostUpdateReleaseNotes`（autoUpdater.ts:57,1485-1504），可取消下载 CancellationToken（autoUpdater.ts:53,1267-1268；UpdateStatusDialog.tsx:30 `onCancelDownload`），强更门阻止创建主窗口并退出（forceUpdateGuard.ts:217-254）且强制升级期拦截 second-instance deep link/workspace 请求（desktopSecondInstanceDeepLink.ts:45-65），文件实测 2051 行（wc -l），flavor 禁用 fail-closed 语义（autoUpdater.ts:61-64）。
 - ✅ 本地化原生应用菜单 + 快捷键纯函数内核：`getPreferredSystemLanguages` 修 macOS 中文系统返回 en-US（desktopApplicationMenu.ts:34-39），accelerator 解析空数组=未设置/全非法回退默认/录制态摘键（desktopApplicationMenu.ts:63-82），zoomIn 的 Plus/= 双条目（desktopApplicationMenu.ts:106-109,207-223）；bindings.ts 头注即"匹配、录制、生效表与冲突检测的唯一实现"且 IME（isComposing/Process/Dead/229）与长按 repeat 一律过滤（bindings.ts:1-7,40-52），实测 382 行、conflicts.ts 独立存在（304 行）。
 - ✅ 托盘驻留与平台差异化关闭行为：Linux PNG/Windows 独立 .ico 图标策略含高 DPI 注释（desktopTray.ts:15-26），Linux 平台门 + 能力探测 spec 引用（desktopTray.ts:37-41），flavor 决定更新入口（desktopTray.ts:86-94）；macOS 全屏关窗先 leave-full-screen 再隐藏（desktopDarwinCloseBehavior.ts:17-26）；最后一窗三分支隐藏托盘/免确认直接退出/确认退出（desktopWindowLifecycle.ts:395-425）。

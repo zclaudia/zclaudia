@@ -204,9 +204,7 @@ function makeWorld(
   };
 }
 
-function makeExecution(
-  overrides?: Partial<DesignMediaTaskParamsVideoRender>
-): MediaTaskExecution {
+function makeExecution(overrides?: Partial<DesignMediaTaskParamsVideoRender>): MediaTaskExecution {
   return {
     id: 'task-1',
     kind: 'video-render',
@@ -277,9 +275,9 @@ describe('createVideoRenderExecutor', () => {
     for (const override of cases) {
       const world = makeWorld();
       const { ctx } = makeCtx(root);
-      await expect(createVideoRenderExecutor(world.deps)(makeExecution(override), ctx)).rejects.toThrow(
-        /Invalid video parameters/
-      );
+      await expect(
+        createVideoRenderExecutor(world.deps)(makeExecution(override), ctx)
+      ).rejects.toThrow(/Invalid video parameters/);
       expect(world.spawnArgSets).toEqual([]);
       expect(world.launchCount()).toBe(0);
     }
@@ -477,7 +475,11 @@ describe('createVideoRenderExecutor', () => {
     const world = makeWorld({
       page: { mode: 'burst', burstCount: 3 },
       encoder: {
-        result: { code: 0, stdout: Buffer.alloc(MEDIA_GENERATED_VIDEO_MAX_BYTES + 1), stderrTail: '' },
+        result: {
+          code: 0,
+          stdout: Buffer.alloc(MEDIA_GENERATED_VIDEO_MAX_BYTES + 1),
+          stderrTail: '',
+        },
       },
     });
     const { ctx } = makeCtx(root);
@@ -490,7 +492,9 @@ describe('createVideoRenderExecutor', () => {
   });
 
   it('assertOutputWithinLimit is the reusable limit gate', () => {
-    expect(() => assertOutputWithinLimit(Buffer.alloc(4), 2)).toThrow(/Output exceeded the size limit/);
+    expect(() => assertOutputWithinLimit(Buffer.alloc(4), 2)).toThrow(
+      /Output exceeded the size limit/
+    );
     expect(() => assertOutputWithinLimit(Buffer.alloc(2), 2)).not.toThrow();
     expect(() =>
       assertOutputWithinLimit(Buffer.alloc(MEDIA_GENERATED_VIDEO_MAX_BYTES + 1))
@@ -538,10 +542,7 @@ describe('createVideoRenderExecutor', () => {
       }),
     };
     const { ctx, controller } = makeCtx(root);
-    const running = createVideoRenderExecutor(deps)(
-      makeExecution({ durationMs: 30_000 }),
-      ctx
-    );
+    const running = createVideoRenderExecutor(deps)(makeExecution({ durationMs: 30_000 }), ctx);
     await waitFor(() => fakePage.startCount > 0 && realEncoderPid !== null);
     expect(realEncoderPid).toBeGreaterThan(0);
     controller.abort();
@@ -585,7 +586,11 @@ describe('resolveFfmpegPath', () => {
 
   it('returns null when no candidate is executable', async () => {
     // 本机装有绝对路径候选（homebrew/系统 ffmpeg）时无法构造全失败场景。
-    const absoluteCandidates = ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'];
+    const absoluteCandidates = [
+      '/opt/homebrew/bin/ffmpeg',
+      '/usr/local/bin/ffmpeg',
+      '/usr/bin/ffmpeg',
+    ];
     if (absoluteCandidates.some(candidate => existsSync(candidate))) return;
     const previousPath = process.env.PATH;
     process.env.PATH = '';

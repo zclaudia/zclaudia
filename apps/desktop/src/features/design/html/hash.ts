@@ -81,7 +81,5 @@ export function sha256HexSync(input: string): string {
     h6 = (h6 + g) >>> 0;
     h7 = (h7 + h) >>> 0;
   }
-  return [h0, h1, h2, h3, h4, h5, h6, h7]
-    .map(word => word.toString(16).padStart(8, '0'))
-    .join('');
+  return [h0, h1, h2, h3, h4, h5, h6, h7].map(word => word.toString(16).padStart(8, '0')).join('');
 }

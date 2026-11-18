@@ -134,9 +134,7 @@ describe('safe-file-write', () => {
     const backupDir = path.join(backupRoot, sha256(path.resolve(target)).slice(0, 16));
     const names = (await readdir(backupDir)).sort();
     expect(names).toHaveLength(5);
-    const kept = await Promise.all(
-      names.map(name => readFile(path.join(backupDir, name), 'utf8'))
-    );
+    const kept = await Promise.all(names.map(name => readFile(path.join(backupDir, name), 'utf8')));
     expect(kept).toEqual(['backup-1', 'backup-2', 'backup-3', 'backup-4', 'backup-5']);
   });
 
@@ -151,9 +149,9 @@ describe('safe-file-write', () => {
     await expect(readBoundedFile(dir, 64, 'HTML document')).rejects.toMatchObject({
       code: 'UNSUPPORTED_FILE',
     });
-    await expect(readBoundedFile(path.join(dir, 'absent.html'), 64, 'HTML document')).rejects.toMatchObject(
-      { code: 'FILE_NOT_FOUND' }
-    );
+    await expect(
+      readBoundedFile(path.join(dir, 'absent.html'), 64, 'HTML document')
+    ).rejects.toMatchObject({ code: 'FILE_NOT_FOUND' });
   });
 
   it('creates a missing file when createIfMissing is set with an empty or omitted revision', async () => {

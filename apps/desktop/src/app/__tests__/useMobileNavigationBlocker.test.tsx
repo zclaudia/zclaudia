@@ -9,8 +9,17 @@ function Observer() {
   return <output data-testid="blocked">{String(blocked)}</output>;
 }
 function Fixture({ first = false, second = false }: { first?: boolean; second?: boolean }) {
-  return <><Observer /><Modal open={first} onClose={() => {}} ariaLabel="First"><button>Action</button></Modal>
-    <Modal open={second} onClose={() => {}} ariaLabel="Second">Second dialog</Modal></>;
+  return (
+    <>
+      <Observer />
+      <Modal open={first} onClose={() => {}} ariaLabel="First">
+        <button>Action</button>
+      </Modal>
+      <Modal open={second} onClose={() => {}} ariaLabel="Second">
+        Second dialog
+      </Modal>
+    </>
+  );
 }
 describe('explicit navigation modal registry', () => {
   it('blocks for every open shared Modal and releases only after all close', () => {
@@ -25,11 +34,26 @@ describe('explicit navigation modal registry', () => {
     expect(screen.getByTestId('blocked').textContent).toBe('false');
   });
   it('registers Select and DropdownMenu only while their panels are open', () => {
-    render(<><Observer />
-      <Select value="a" onChange={() => {}} options={[{ value: 'a', label: 'Alpha' }]} ariaLabel="Choice" />
-      <DropdownMenu ariaLabel="Actions" entries={[{ key: 'run', label: 'Run', onSelect: () => {} }]}
-        trigger={({ ref, props }) => <button ref={ref} {...props}>Menu</button>} />
-    </>);
+    render(
+      <>
+        <Observer />
+        <Select
+          value="a"
+          onChange={() => {}}
+          options={[{ value: 'a', label: 'Alpha' }]}
+          ariaLabel="Choice"
+        />
+        <DropdownMenu
+          ariaLabel="Actions"
+          entries={[{ key: 'run', label: 'Run', onSelect: () => {} }]}
+          trigger={({ ref, props }) => (
+            <button ref={ref} {...props}>
+              Menu
+            </button>
+          )}
+        />
+      </>
+    );
     expect(screen.getByTestId('blocked').textContent).toBe('false');
     fireEvent.click(screen.getByRole('button', { name: 'Choice' }));
     expect(screen.getByTestId('blocked').textContent).toBe('true');
@@ -42,7 +66,11 @@ describe('explicit navigation modal registry', () => {
   });
   it('unregisters an open modal when its owner unmounts', () => {
     const observer = render(<Observer />);
-    const modal = render(<Modal open onClose={() => {}} ariaLabel="Temporary">Body</Modal>);
+    const modal = render(
+      <Modal open onClose={() => {}} ariaLabel="Temporary">
+        Body
+      </Modal>
+    );
     expect(screen.getByTestId('blocked').textContent).toBe('true');
     modal.unmount();
     expect(screen.getByTestId('blocked').textContent).toBe('false');

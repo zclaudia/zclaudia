@@ -252,7 +252,9 @@ describe('Sidebar mobile drawer — modal dialog semantics', () => {
   it('traps Tab focus within the drawer panel, wrapping last -> first', () => {
     renderSidebarMobileOpen();
     const dialog = screen.getByRole('dialog');
-    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList);
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([
+      {},
+    ] as unknown as DOMRectList);
     const focusable = dialog.querySelectorAll<HTMLElement>(
       'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
     );
@@ -269,7 +271,9 @@ describe('Sidebar mobile drawer — modal dialog semantics', () => {
   it('wraps Shift+Tab from the first focusable back to the last', () => {
     renderSidebarMobileOpen();
     const dialog = screen.getByRole('dialog');
-    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList);
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([
+      {},
+    ] as unknown as DOMRectList);
     const focusable = dialog.querySelectorAll<HTMLElement>(
       'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
     );

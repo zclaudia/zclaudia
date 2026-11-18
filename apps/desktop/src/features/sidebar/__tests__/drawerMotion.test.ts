@@ -1,8 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { drawerWidths, drawerVisuals, drawerSpringVelocity, drawerVelocityFromGesture, resolveDrawerOpen } from '../drawerMotion';
+import {
+  drawerWidths,
+  drawerVisuals,
+  drawerSpringVelocity,
+  drawerVelocityFromGesture,
+  resolveDrawerOpen,
+} from '../drawerMotion';
 
-function release(position: number, priorTargetOpen = false, velocityPxPerSecond = 0, releaseRunDistancePx = 0, width = 300) {
-  return resolveDrawerOpen({ position, width, priorTargetOpen, velocityPxPerSecond, releaseRunDistancePx });
+function release(
+  position: number,
+  priorTargetOpen = false,
+  velocityPxPerSecond = 0,
+  releaseRunDistancePx = 0,
+  width = 300
+) {
+  return resolveDrawerOpen({
+    position,
+    width,
+    priorTargetOpen,
+    velocityPxPerSecond,
+    releaseRunDistancePx,
+  });
 }
 describe('two-state drawer release', () => {
   it('returns a slow ten-percent drag to its prior target', () => {

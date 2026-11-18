@@ -104,10 +104,7 @@ function mimeForPath(refPath: string): string | null {
  * file moves again after the re-read the result is flagged unstable — the
  * caller records `changed-during-capture` and keeps the re-read content.
  */
-async function readWithStabilityCheck(
-  absolutePath: string,
-  maxBytes: number
-): Promise<StableRead> {
+async function readWithStabilityCheck(absolutePath: string, maxBytes: number): Promise<StableRead> {
   const first = await readBoundedFile(absolutePath, maxBytes, 'File');
   let rechecked: Stats | null;
   try {
@@ -127,7 +124,8 @@ async function readWithStabilityCheck(
   return {
     bytes: second.bytes,
     stat: second.stat,
-    unstable: !settled || settled.mtimeMs !== second.stat.mtimeMs || settled.size !== second.stat.size,
+    unstable:
+      !settled || settled.mtimeMs !== second.stat.mtimeMs || settled.size !== second.stat.size,
   };
 }
 
@@ -176,7 +174,8 @@ export class SnapshotService {
     const queue: Array<{ ref: ResourceRef; depth: number }> = [];
     let discovered = 0;
     let limitHit = false;
-    for (const ref of collectHtmlResourceRefs(entryRead.bytes.toString('utf8'), entry.relative).refs) {
+    for (const ref of collectHtmlResourceRefs(entryRead.bytes.toString('utf8'), entry.relative)
+      .refs) {
       if (visited.has(ref.path) || queued.has(ref.path)) continue;
       queued.add(ref.path);
       queue.push({ ref, depth: 1 });
@@ -322,8 +321,7 @@ export class SnapshotService {
     const file = this.db
       .prepare('SELECT sha256, mime FROM design_snapshot_files WHERE snapshot_id = ? AND path = ?')
       .get(row.id, manifestPath) as { sha256: string; mime: string | null } | undefined;
-    if (!file)
-      throw new DesignError(404, 'FILE_NOT_FOUND', 'Path is not part of this snapshot');
+    if (!file) throw new DesignError(404, 'FILE_NOT_FOUND', 'Path is not part of this snapshot');
     const bytes = await this.blobs.readBlob(file.sha256);
     return { mime: file.mime, data: bytes.toString('base64') };
   }
@@ -372,7 +370,9 @@ export class SnapshotService {
     const root = await this.design.workspace(sessionId);
     if (row.workspaceRoot !== root)
       throw new DesignError(409, 'WORKSPACE_MISMATCH', 'Snapshot belongs to a different workspace');
-    return this.db.prepare('SELECT * FROM design_snapshots WHERE id = ?').get(row.id) as SnapshotRow;
+    return this.db
+      .prepare('SELECT * FROM design_snapshots WHERE id = ?')
+      .get(row.id) as SnapshotRow;
   }
 
   /**
@@ -382,12 +382,7 @@ export class SnapshotService {
    * private component) is a 403.
    */
   private validateManifestPath(value: unknown): string {
-    if (
-      typeof value !== 'string' ||
-      !value ||
-      value.length > 2048 ||
-      value.includes('\0')
-    )
+    if (typeof value !== 'string' || !value || value.length > 2048 || value.includes('\0'))
       throw new DesignError(400, 'VALIDATION_ERROR', 'path must be a relative file path');
     if (value.includes('\\') || path.posix.isAbsolute(value))
       throw new DesignError(403, 'PATH_FORBIDDEN', 'path is outside the snapshot manifest');
@@ -399,7 +394,8 @@ export class SnapshotService {
 
   private normalizeLabel(label: unknown): string | null {
     if (label === undefined || label === null) return null;
-    if (typeof label !== 'string') throw new DesignError(400, 'VALIDATION_ERROR', 'label must be a string');
+    if (typeof label !== 'string')
+      throw new DesignError(400, 'VALIDATION_ERROR', 'label must be a string');
     const trimmed = label.trim();
     if (!trimmed) return null;
     if (trimmed.length > 256) throw new DesignError(400, 'VALIDATION_ERROR', 'label is too long');
@@ -480,9 +476,11 @@ export class SnapshotService {
 
     // Reverse-lookup from the surviving manifests and drop orphaned blobs.
     const referenced = new Set(
-      (this.db.prepare('SELECT DISTINCT sha256 FROM design_snapshot_files').all() as Array<{
-        sha256: string;
-      }>).map(row => row.sha256)
+      (
+        this.db.prepare('SELECT DISTINCT sha256 FROM design_snapshot_files').all() as Array<{
+          sha256: string;
+        }>
+      ).map(row => row.sha256)
     );
     await this.blobs.sweepUnreferenced(referenced);
 
@@ -573,7 +571,9 @@ export class SnapshotService {
 
   private filesOf(snapshotId: string): SnapshotFile[] {
     return this.db
-      .prepare('SELECT path, sha256, bytes, kind, mime FROM design_snapshot_files WHERE snapshot_id = ? ORDER BY path')
+      .prepare(
+        'SELECT path, sha256, bytes, kind, mime FROM design_snapshot_files WHERE snapshot_id = ? ORDER BY path'
+      )
       .all(snapshotId) as unknown as SnapshotFile[];
   }
 
@@ -581,7 +581,8 @@ export class SnapshotService {
     let reasons: string[] = [];
     try {
       const parsed = JSON.parse(row.incomplete_reasons);
-      if (Array.isArray(parsed)) reasons = parsed.filter((entry): entry is string => typeof entry === 'string');
+      if (Array.isArray(parsed))
+        reasons = parsed.filter((entry): entry is string => typeof entry === 'string');
     } catch {
       reasons = [];
     }

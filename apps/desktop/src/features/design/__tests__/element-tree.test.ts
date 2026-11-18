@@ -48,17 +48,13 @@ describe('buildElementTree', () => {
       textPreview: 'Hello tree',
       capability: 'editable',
     });
-    expect(findNode(tree, [0, 1])?.textPreview).toBe(
-      'This preview text is longer than forty c'
-    );
+    expect(findNode(tree, [0, 1])?.textPreview).toBe('This preview text is longer than forty c');
     expect(findNode(tree, [0, 1])?.textPreview).toHaveLength(40);
     expect(findNode(tree, [0, 2])?.textPreview).toBe('');
   });
 
   it('marks parse5-implied elements without a source location as implicit', () => {
-    const tree = buildElementTree(
-      '<body><table><tr><td>cell</td></tr></table></body>'
-    );
+    const tree = buildElementTree('<body><table><tr><td>cell</td></tr></table></body>');
     const table = findNode(tree, [0]);
     expect(table?.tagName).toBe('table');
     expect(table?.capability).toBe('editable');

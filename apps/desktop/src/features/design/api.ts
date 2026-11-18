@@ -1,5 +1,9 @@
 import { apiCallForBackend } from '../../services/api/unwrap';
-import { fetchApiForBackend, getAuthHeadersForBackend, getBaseUrlForBackend } from '../../services/api/base';
+import {
+  fetchApiForBackend,
+  getAuthHeadersForBackend,
+  getBaseUrlForBackend,
+} from '../../services/api/base';
 import type {
   DesignDepsResult,
   DesignDocument,
@@ -68,7 +72,11 @@ function normalizeConflictFiles(source: unknown): DesignConflictFile[] {
   return files
     .map((entry): DesignConflictFile | null => {
       if (typeof entry === 'string') return { path: entry };
-      if (entry && typeof entry === 'object' && typeof (entry as { path?: unknown }).path === 'string') {
+      if (
+        entry &&
+        typeof entry === 'object' &&
+        typeof (entry as { path?: unknown }).path === 'string'
+      ) {
         const record = entry as { path: string; reason?: unknown; message?: unknown };
         const reason = record.reason ?? record.message;
         return typeof reason === 'string' ? { path: record.path, reason } : { path: record.path };
@@ -380,7 +388,9 @@ export async function installDesignTemplate(
     throw new DesignHttpError(
       error.message || `API call failed: POST ${path}`,
       error.code,
-      Array.isArray(error.files) ? error.files.filter((f): f is string => typeof f === 'string') : []
+      Array.isArray(error.files)
+        ? error.files.filter((f): f is string => typeof f === 'string')
+        : []
     );
   }
   return result.data as DesignTemplateInstallResult;

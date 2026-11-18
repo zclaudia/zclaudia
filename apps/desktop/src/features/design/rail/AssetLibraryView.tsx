@@ -175,7 +175,10 @@ export function AssetLibraryView({
         });
         const savedName = baseName(path);
         if (savedName !== file.name) {
-          setNotices(prev => [...prev, { kind: 'info', text: `${file.name} saved as ${savedName}` }]);
+          setNotices(prev => [
+            ...prev,
+            { kind: 'info', text: `${file.name} saved as ${savedName}` },
+          ]);
         }
         onImported(path);
       } catch (error) {
@@ -211,7 +214,11 @@ export function AssetLibraryView({
   return (
     <div className={`flex flex-col text-xs ${compact ? 'gap-2' : 'gap-3 p-4'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex w-fit gap-0.5 rounded-md bg-secondary p-0.5" role="tablist" aria-label="Asset type">
+        <div
+          className="flex w-fit gap-0.5 rounded-md bg-secondary p-0.5"
+          role="tablist"
+          aria-label="Asset type"
+        >
           <button
             type="button"
             role="tab"
@@ -323,7 +330,10 @@ export function AssetLibraryView({
                       className="h-10 w-10 shrink-0 rounded-md border border-border object-cover"
                     />
                   ) : (
-                    <span aria-hidden className="h-10 w-10 shrink-0 rounded-md border border-border bg-secondary" />
+                    <span
+                      aria-hidden
+                      className="h-10 w-10 shrink-0 rounded-md border border-border bg-secondary"
+                    />
                   )
                 ) : (
                   <span
@@ -338,12 +348,12 @@ export function AssetLibraryView({
                     {file}
                   </span>
                   {tab === 'font' && (
-                    <span className="text-[11px] text-muted-foreground">Fonts cannot be previewed</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Fonts cannot be previewed
+                    </span>
                   )}
                   {tab === 'video' && (
-                    <span className="text-[11px] text-muted-foreground">
-                      {sizes[file] ?? '…'}
-                    </span>
+                    <span className="text-[11px] text-muted-foreground">{sizes[file] ?? '…'}</span>
                   )}
                   {isReferenced(file, openPages, referencedAssets) && (
                     <span className="rounded-full border border-border bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">

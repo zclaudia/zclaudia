@@ -126,7 +126,10 @@ function detectImageMime(bytes: Buffer): 'image/png' | 'image/jpeg' | 'image/web
 function finishImage(bytes: Buffer, usage: DesignMediaUsage | null): MediaImageResult {
   const mime = detectImageMime(bytes);
   if (!mime) {
-    throw new MediaProviderError('provider-error', 'The service returned an unrecognized image format');
+    throw new MediaProviderError(
+      'provider-error',
+      'The service returned an unrecognized image format'
+    );
   }
   return { bytes, mime, usage };
 }
@@ -135,7 +138,10 @@ function finishImage(bytes: Buffer, usage: DesignMediaUsage | null): MediaImageR
 function assertPublicHost(hostname: string): void {
   const host = hostname.toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
   const deny = (reason: string) => {
-    throw new MediaProviderError('provider-error', `Image download URL is not allowed: ${reason} (${hostname})`);
+    throw new MediaProviderError(
+      'provider-error',
+      `Image download URL is not allowed: ${reason} (${hostname})`
+    );
   };
   if (host === 'localhost' || host.endsWith('.local')) deny('points to an internal network host');
   const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
@@ -226,7 +232,11 @@ async function parseImageResponse(res: Response, ctx: ParseContext): Promise<Med
   if (!res.ok) {
     const snippet = (await res.text().catch(() => '')).slice(0, ERROR_BODY_SNIPPET_CHARS);
     if (ctx.editEndpoint && (res.status === 404 || res.status === 405)) {
-      throw new MediaProviderError('provider-unsupported', 'The current service does not support image editing', res.status);
+      throw new MediaProviderError(
+        'provider-unsupported',
+        'The current service does not support image editing',
+        res.status
+      );
     }
     throw new MediaProviderError(
       'provider-error',
@@ -238,7 +248,12 @@ async function parseImageResponse(res: Response, ctx: ParseContext): Promise<Med
   try {
     payload = await res.json();
   } catch (err) {
-    throw toProviderError(err, ctx.externalSignal, ctx.timedOut(), 'parsing the image service response');
+    throw toProviderError(
+      err,
+      ctx.externalSignal,
+      ctx.timedOut(),
+      'parsing the image service response'
+    );
   }
   const record = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
   const data = Array.isArray(record.data) ? record.data : [];
@@ -319,17 +334,17 @@ export function createOpenAiImagesProvider(config: OpenAiImagesProviderConfig): 
       }
       const composed = composeSignal(input.signal, timeoutMs);
       try {
-      const form = new FormData();
-      form.append('model', model);
-      form.append('prompt', input.prompt);
-      if (input.size) form.append('size', input.size);
-      // 部件名带扩展名：undici 无名 Blob 会发 filename="blob"，部分上游会拒收。
-      const imagePartName = EDIT_IMAGE_PART_NAMES[input.source.mime] ?? 'image.png';
-      form.append(
-        'image',
-        new Blob([input.source.bytes], { type: input.source.mime }),
-        imagePartName
-      );
+        const form = new FormData();
+        form.append('model', model);
+        form.append('prompt', input.prompt);
+        if (input.size) form.append('size', input.size);
+        // 部件名带扩展名：undici 无名 Blob 会发 filename="blob"，部分上游会拒收。
+        const imagePartName = EDIT_IMAGE_PART_NAMES[input.source.mime] ?? 'image.png';
+        form.append(
+          'image',
+          new Blob([input.source.bytes], { type: input.source.mime }),
+          imagePartName
+        );
         const res = await fetchImpl(`${baseUrl}/images/edits`, {
           method: 'POST',
           headers: {

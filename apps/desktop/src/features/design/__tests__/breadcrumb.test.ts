@@ -14,12 +14,8 @@ describe('ancestorsOf', () => {
 
   it('chip is tag.class, Page when nothing is selected, and the tag when there is no class', () => {
     expect(selectionChipLabel(null, null)).toBe('Page');
-    expect(
-      selectionChipLabel(SOURCE, { tagName: 'h1', elementPath: [0, 0] })
-    ).toBe('h1.a');
-    expect(
-      selectionChipLabel(SOURCE, { tagName: 'main', elementPath: [0] })
-    ).toBe('main.hero');
+    expect(selectionChipLabel(SOURCE, { tagName: 'h1', elementPath: [0, 0] })).toBe('h1.a');
+    expect(selectionChipLabel(SOURCE, { tagName: 'main', elementPath: [0] })).toBe('main.hero');
     expect(selectionChipLabel(null, { tagName: 'div', elementPath: [0] })).toBe('div');
   });
 

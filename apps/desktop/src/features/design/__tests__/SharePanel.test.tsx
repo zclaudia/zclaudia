@@ -11,11 +11,7 @@ import {
   revokeDesignShare,
   setDesignShareCommentResolved,
 } from '../api';
-import type {
-  DesignShareComment,
-  DesignShareSummary,
-  DesignSnapshotSummary,
-} from '../api';
+import type { DesignShareComment, DesignShareSummary, DesignSnapshotSummary } from '../api';
 
 vi.mock('../api', () => ({
   createDesignShare: vi.fn(),
@@ -33,7 +29,8 @@ vi.mock('../../../services/api/base', () => ({
 }));
 
 const SERVER_BASE = 'http://127.0.0.1:4123';
-const REVOKE_CONFIRM_TEXT = 'Once revoked, the link stops working immediately and cannot be recovered. Revoke?';
+const REVOKE_CONFIRM_TEXT =
+  'Once revoked, the link stops working immediately and cannot be recovered. Revoke?';
 
 function makeShare(overrides: Partial<DesignShareSummary> = {}): DesignShareSummary {
   return {
@@ -119,7 +116,11 @@ describe('SharePanel（P7 §7.1）', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listDesignSnapshots).mockResolvedValue([
-      makeSnapshot({ id: 'ds-2', label: 'V2', createdAt: new Date('2026-10-23T12:00:00').getTime() }),
+      makeSnapshot({
+        id: 'ds-2',
+        label: 'V2',
+        createdAt: new Date('2026-10-23T12:00:00').getTime(),
+      }),
       makeSnapshot({ id: 'ds-1' }),
     ]);
     // 缺省一条进行中的分享：审阅评论 tab 依赖它提供下拉缺省选中项。
@@ -161,7 +162,11 @@ describe('SharePanel（P7 §7.1）', () => {
     vi.mocked(listDesignShares).mockResolvedValue({
       shares: [
         makeShare({ id: 'sh-1' }),
-        makeShare({ id: 'sh-2', token: 'tok-2', revokedAt: new Date('2026-10-23T12:00:00').getTime() }),
+        makeShare({
+          id: 'sh-2',
+          token: 'tok-2',
+          revokedAt: new Date('2026-10-23T12:00:00').getTime(),
+        }),
         makeShare({
           id: 'sh-3',
           token: 'tok-3',
@@ -201,14 +206,22 @@ describe('SharePanel（P7 §7.1）', () => {
   });
 
   it('复制按钮：clipboard 成功显示「已复制」；失败退回 window.prompt', async () => {
-    const writeText = vi.fn().mockRejectedValueOnce(new Error('denied')).mockResolvedValue(undefined);
+    const writeText = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('denied'))
+      .mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null);
     vi.mocked(listDesignShares).mockResolvedValue({ shares: [makeShare()] });
     mount();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Copy link sh-1' }));
-    await waitFor(() => expect(promptSpy).toHaveBeenCalledWith('Copy failed; copy the link manually', `${SERVER_BASE}/s/tok-1`));
+    await waitFor(() =>
+      expect(promptSpy).toHaveBeenCalledWith(
+        'Copy failed; copy the link manually',
+        `${SERVER_BASE}/s/tok-1`
+      )
+    );
     expect(screen.queryByText('Copied')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy link sh-1' }));
@@ -244,7 +257,9 @@ describe('SharePanel（P7 §7.1）', () => {
     expect(within(result).getByText('Share link created:')).toBeInTheDocument();
     expect(within(result).getByText(`${SERVER_BASE}/s/tok-new`)).toBeInTheDocument();
     expect(within(result).getByRole('button', { name: 'Copy new share link' })).toBeInTheDocument();
-    expect(within(result).getByText(/LAN address \(requires the server to listen on LAN\)/)).toBeInTheDocument();
+    expect(
+      within(result).getByText(/LAN address \(requires the server to listen on LAN\)/)
+    ).toBeInTheDocument();
     await screen.findByTestId('share-row-sh-new');
     expect(listDesignShares).toHaveBeenCalledTimes(2);
 
@@ -281,7 +296,10 @@ describe('SharePanel（P7 §7.1）', () => {
     confirmSpy.mockReturnValue(true);
     fireEvent.click(within(row).getByRole('button', { name: 'Revoke share sh-1' }));
     await waitFor(() =>
-      expect(revokeDesignShare).toHaveBeenCalledWith('remote-1', { sessionId: 's1', shareId: 'sh-1' })
+      expect(revokeDesignShare).toHaveBeenCalledWith('remote-1', {
+        sessionId: 's1',
+        shareId: 'sh-1',
+      })
     );
     await waitFor(() => expect(listDesignShares).toHaveBeenCalledTimes(2));
     expect(await screen.findByText('Revoked')).toBeInTheDocument();
@@ -355,7 +373,9 @@ describe('SharePanel（P7 §7.1）', () => {
     vi.mocked(listDesignShareComments)
       .mockResolvedValueOnce({ comments: [makeComment({ id: 'c1' })] })
       .mockResolvedValueOnce({
-        comments: [makeComment({ id: 'c1', resolvedAt: new Date('2026-10-24T12:00:00').getTime() })],
+        comments: [
+          makeComment({ id: 'c1', resolvedAt: new Date('2026-10-24T12:00:00').getTime() }),
+        ],
       });
     mount();
     fireEvent.click(await screen.findByRole('tab', { name: 'Review comments' }));
@@ -403,7 +423,12 @@ describe('SharePanel（P7 §7.1）', () => {
     const row = await screen.findByTestId('share-comment-c1');
 
     fireEvent.click(within(row).getByRole('button', { name: 'Hand off to Agent c1' }));
-    expect(getDesignSnapshotFile).toHaveBeenCalledWith('remote-1', 's1', 'ds-2', 'design/index.html');
+    expect(getDesignSnapshotFile).toHaveBeenCalledWith(
+      'remote-1',
+      's1',
+      'ds-2',
+      'design/index.html'
+    );
     await waitFor(() => expect(props.onHandoff).toHaveBeenCalledTimes(1));
     const prompt = vi.mocked(props.onHandoff).mock.calls[0][0];
     expect(prompt).toContain('请把标题改成「新品上市」');

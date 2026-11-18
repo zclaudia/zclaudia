@@ -25,11 +25,13 @@ type Tab = 'image-generate' | 'image-edit' | 'video-render';
 /** 模型建议（datalist）：覆盖 CogView 与 OpenAI 常用图片模型。 */
 const MODEL_SUGGESTIONS = ['cogview-4', 'gpt-image-1', 'dall-e-3'];
 const NO_PROFILE_HINT = 'Configure an OpenAI-compatible service in Settings first';
-const RETRY_CONFIRM_TEXT = 'This will resubmit the generation request and may incur costs. Continue?';
+const RETRY_CONFIRM_TEXT =
+  'This will resubmit the generation request and may incur costs. Continue?';
 const REPLACE_READY_TITLE = "Replace the selected image's src with this artifact";
 const REPLACE_NEEDS_IMG = 'Select an image element in the preview first';
 
-const VIDEO_TAB_NOTE = 'Motion rendering (near-real-time capture); audio is not supported (no soundtrack).';
+const VIDEO_TAB_NOTE =
+  'Motion rendering (near-real-time capture); audio is not supported (no soundtrack).';
 
 const TAB_LABELS: Record<Tab, string> = {
   'image-generate': 'Image generation',
@@ -446,9 +448,7 @@ export function MediaGenView({
     ? `${COMPACT_FIELD} px-1.5`
     : 'h-6 w-40 flex-1 px-1.5 py-0 text-[11px]';
   const sizeClass = compact ? `${COMPACT_FIELD} px-1.5` : 'h-6 w-28 px-1.5 py-0 text-[11px]';
-  const videoFieldClass = compact
-    ? `${COMPACT_FIELD} px-1.5`
-    : 'h-6 w-24 px-1.5 py-0 text-[11px]';
+  const videoFieldClass = compact ? `${COMPACT_FIELD} px-1.5` : 'h-6 w-24 px-1.5 py-0 text-[11px]';
 
   const renderServiceRow = () => (
     <>
@@ -572,7 +572,9 @@ export function MediaGenView({
         data-testid={`media-task-${task.id}`}
         className="flex flex-col gap-1.5 rounded-md border border-border p-2"
       >
-        <div className={compact ? 'flex flex-wrap items-center gap-1.5' : 'flex items-center gap-2'}>
+        <div
+          className={compact ? 'flex flex-wrap items-center gap-1.5' : 'flex items-center gap-2'}
+        >
           <span className="shrink-0 rounded-full border border-border bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
             {mediaStatusBadge(task.status)}
           </span>
@@ -670,10 +672,7 @@ export function MediaGenView({
   };
 
   return (
-    <div
-      data-testid="media-view"
-      className={`flex flex-col gap-3 text-xs ${compact ? '' : 'p-4'}`}
-    >
+    <div data-testid="media-view" className={`flex flex-col gap-3 text-xs ${compact ? '' : 'p-4'}`}>
       <div
         className="flex w-fit max-w-full flex-wrap gap-0.5 rounded-md bg-secondary p-0.5"
         role="tablist"
@@ -785,7 +784,9 @@ export function MediaGenView({
                     Loading assets…
                   </span>
                 ) : assets.length === 0 ? (
-                  <span className="text-muted-foreground">No image assets in the workspace yet</span>
+                  <span className="text-muted-foreground">
+                    No image assets in the workspace yet
+                  </span>
                 ) : (
                   <Select
                     value={sourcePath}
@@ -805,7 +806,9 @@ export function MediaGenView({
           {validationError !== null && (
             <span className="min-w-0 break-words text-destructive">{validationError}</span>
           )}
-          {sessionId === null && <span className="text-muted-foreground">No session available</span>}
+          {sessionId === null && (
+            <span className="text-muted-foreground">No session available</span>
+          )}
           <span className="ml-auto" />
           <Button
             size="sm"

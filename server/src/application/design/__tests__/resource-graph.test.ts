@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  collectCssResourceRefs,
-  collectHtmlResourceRefs,
-  kindForPath,
-} from '../resource-graph.js';
+import { collectCssResourceRefs, collectHtmlResourceRefs, kindForPath } from '../resource-graph.js';
 
 describe('collectHtmlResourceRefs', () => {
   it('collects stylesheets, images, srcset candidates, source src and css url() refs', () => {
@@ -124,8 +120,6 @@ describe('collectCssResourceRefs', () => {
     `;
     const { refs, skipped } = collectCssResourceRefs(css, 'assets/site.css');
     expect(refs).toEqual([]);
-    expect(skipped).toEqual([
-      { raw: '../../outside.png', reason: 'escapes-workspace' },
-    ]);
+    expect(skipped).toEqual([{ raw: '../../outside.png', reason: 'escapes-workspace' }]);
   });
 });

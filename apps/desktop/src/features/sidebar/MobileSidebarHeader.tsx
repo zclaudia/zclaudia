@@ -11,7 +11,10 @@ const ACTION_REST =
 
 export function MobileSidebarHeader({
   onClose,
-  widthMode = 'compact', canExpand = false, widthChangeDisabled = false, onToggleWidth,
+  widthMode = 'compact',
+  canExpand = false,
+  widthChangeDisabled = false,
+  onToggleWidth,
   onOpenSearch,
   onOpenNotifications,
   isNotificationsOpen,

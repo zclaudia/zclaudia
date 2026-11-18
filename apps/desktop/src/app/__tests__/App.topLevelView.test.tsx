@@ -21,7 +21,11 @@ vi.mock('../../features/sidebar/Sidebar', () => ({
     isOpen,
     drawerPanelRef,
     drawerBackdropRef,
-    onToggleWidth, widthMode, canExpand, widthChangeDisabled, onClose,
+    onToggleWidth,
+    widthMode,
+    canExpand,
+    widthChangeDisabled,
+    onClose,
   }: {
     onOpenSettings?: (tab?: 'permissions') => void;
     isOpen?: boolean;
@@ -29,16 +33,27 @@ vi.mock('../../features/sidebar/Sidebar', () => ({
     drawerBackdropRef?: Ref<HTMLDivElement>;
     onToggleWidth?: () => void;
     onClose?: () => void;
-    widthMode?: string; canExpand?: boolean; widthChangeDisabled?: boolean;
+    widthMode?: string;
+    canExpand?: boolean;
+    widthChangeDisabled?: boolean;
   }) => (
     <aside data-testid="app-sidebar" data-open={isOpen ? 'true' : 'false'}>
       {/* Stand-ins for the real drawer panel and backdrop so the gesture layer
           has something to paint its CSS variables onto. */}
       <div data-testid="drawer-panel" data-mobile-drawer-surface ref={drawerPanelRef} />
       <div data-testid="drawer-backdrop" data-mobile-drawer-surface ref={drawerBackdropRef} />
-      {canExpand && <button disabled={widthChangeDisabled} onClick={onToggleWidth}>{widthMode === 'wide' ? 'Restore menu width' : 'Expand menu width'}</button>}
+      {canExpand && (
+        <button disabled={widthChangeDisabled} onClick={onToggleWidth}>
+          {widthMode === 'wide' ? 'Restore menu width' : 'Expand menu width'}
+        </button>
+      )}
       <button onClick={onClose}>Close menu</button>
-      <Select value="one" onChange={() => {}} ariaLabel="Drawer choices" options={[{ value: 'one', label: 'Only choice' }]} />
+      <Select
+        value="one"
+        onChange={() => {}}
+        ariaLabel="Drawer choices"
+        options={[{ value: 'one', label: 'Only choice' }]}
+      />
       <button onClick={() => onOpenSettings?.('permissions')}>Open Settings</button>
     </aside>
   ),
@@ -85,7 +100,20 @@ vi.mock('../../components/ToastContainer', () => ({
 }));
 vi.mock('../../components/UpdateBanner', () => ({ UpdateBanner: () => null }));
 vi.mock('../AppHeader', () => ({ AppHeader: () => null }));
-vi.mock('../MobileOverlays', () => ({ MobileOverlays: ({ panelRef, backdropRef }: { panelRef: React.RefObject<HTMLDivElement | null>; backdropRef: React.RefObject<HTMLDivElement | null> }) => <><div data-testid="claudia-preview" ref={panelRef} /><div ref={backdropRef} /></> }));
+vi.mock('../MobileOverlays', () => ({
+  MobileOverlays: ({
+    panelRef,
+    backdropRef,
+  }: {
+    panelRef: React.RefObject<HTMLDivElement | null>;
+    backdropRef: React.RefObject<HTMLDivElement | null>;
+  }) => (
+    <>
+      <div data-testid="claudia-preview" ref={panelRef} />
+      <div ref={backdropRef} />
+    </>
+  ),
+}));
 
 vi.mock('../../contexts/ConnectionContext', () => ({
   useConnection: () => ({
@@ -356,25 +384,54 @@ describe('Mobile drawer width controls', () => {
     act(() => useTopLevelViewStore.getState().openPlugins());
     await view.findByTestId('plugins-view');
     fireEvent.click(view.getByRole('button', { name: 'Open menu' }));
-    await waitFor(() => expect(view.getByRole('button', { name: 'Expand menu width' }).hasAttribute('disabled')).toBe(false));
-    return { ...view,
+    await waitFor(() =>
+      expect(view.getByRole('button', { name: 'Expand menu width' }).hasAttribute('disabled')).toBe(
+        false
+      )
+    );
+    return {
+      ...view,
       width: () => view.getByTestId('drawer-panel').style.width,
-      isOpen: () => view.getByTestId('app-sidebar').getAttribute('data-open') === 'true' };
+      isOpen: () => view.getByTestId('app-sidebar').getAttribute('data-open') === 'true',
+    };
   }
   it('tracks Claudia by pixels after navigation activation and restores on cancellation', async () => {
     const view = render(<App />);
     const content = view.container.querySelector('main')!;
     const send = (type: string, x: number) => {
-      const touch = { identifier: 1, target: content, clientX: x, clientY: 200 } as unknown as Touch;
-      fireEvent(content, new TouchEvent(type, { bubbles: true, cancelable: true,
-        touches: [touch], targetTouches: [touch], changedTouches: [touch] }));
+      const touch = {
+        identifier: 1,
+        target: content,
+        clientX: x,
+        clientY: 200,
+      } as unknown as Touch;
+      fireEvent(
+        content,
+        new TouchEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          touches: [touch],
+          targetTouches: [touch],
+          changedTouches: [touch],
+        })
+      );
     };
     send('touchstart', 500);
     send('touchmove', 470);
     const panel = view.getByTestId('claudia-preview');
     expect(panel.style.transform).toBe(`translate3d(${window.innerWidth - 22}px, 0, 0)`);
-    fireEvent(content, new TouchEvent('touchcancel', { bubbles: true, cancelable: true,
-      touches: [], targetTouches: [], changedTouches: [{ identifier: 1, target: content, clientX: 470, clientY: 200 } as unknown as Touch] }));
+    fireEvent(
+      content,
+      new TouchEvent('touchcancel', {
+        bubbles: true,
+        cancelable: true,
+        touches: [],
+        targetTouches: [],
+        changedTouches: [
+          { identifier: 1, target: content, clientX: 470, clientY: 200 } as unknown as Touch,
+        ],
+      })
+    );
     await waitFor(() => expect(panel.style.visibility).toBe('hidden'));
     expect(panel.style.transform).toBe(`translate3d(${window.innerWidth}px, 0, 0)`);
   });
@@ -387,11 +444,26 @@ describe('Mobile drawer width controls', () => {
     expect(panel.style.visibility).toBe('visible');
     const content = view.container.querySelector('main')!;
     const touch = (type: string, x: number, end = false) => {
-      const point = { identifier: 1, target: content, clientX: x, clientY: 200 } as unknown as Touch;
-      fireEvent(content, new TouchEvent(type, { bubbles: true, cancelable: true,
-        touches: end ? [] : [point], targetTouches: end ? [] : [point], changedTouches: [point] }));
+      const point = {
+        identifier: 1,
+        target: content,
+        clientX: x,
+        clientY: 200,
+      } as unknown as Touch;
+      fireEvent(
+        content,
+        new TouchEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          touches: end ? [] : [point],
+          targetTouches: end ? [] : [point],
+          changedTouches: [point],
+        })
+      );
     };
-    touch('touchstart', 500); touch('touchmove', 200); touch('touchend', 200, true);
+    touch('touchstart', 500);
+    touch('touchmove', 200);
+    touch('touchend', 200, true);
     expect(panel.style.transform).toBe('translate3d(0px, 0, 0)');
     fireEvent.keyDown(view.getByRole('listbox'), { key: 'Escape' });
     expect(view.isOpen()).toBe(true);
@@ -421,7 +493,9 @@ describe('Mobile drawer width controls', () => {
     const view = await renderOpenDrawer();
     fireEvent.click(view.getByRole('button', { name: 'Expand menu width' }));
     const back = () => {
-      const call = mockUseAndroidBack.mock.calls.filter(([, , priority]) => priority === 10).at(-1)!;
+      const call = mockUseAndroidBack.mock.calls
+        .filter(([, , priority]) => priority === 10)
+        .at(-1)!;
       expect(call[1]).toBe(true);
       act(() => call[0]());
     };

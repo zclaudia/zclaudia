@@ -234,11 +234,7 @@ export class ExportService {
         throw mapped;
       }
       if (totalBytes + bytes.length > EXPORT_MAX_TOTAL_BYTES)
-        throw new DesignError(
-          413,
-          'EXPORT_LIMIT_EXCEEDED',
-          'Export exceeds the total size limit'
-        );
+        throw new DesignError(413, 'EXPORT_LIMIT_EXCEEDED', 'Export exceeds the total size limit');
       totalBytes += bytes.length;
       files.set(ref.path, { bytes, kind: ref.kind });
 

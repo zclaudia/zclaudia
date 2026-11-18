@@ -11,7 +11,13 @@
  * 不上屏不写回）；声明行携带 htmlSource 绝对偏移，供 §4 patch 直接 splice。
  */
 import postcss from 'postcss';
-import { childElements, isTextNode, parseDocument, type P5Element, type P5ParentNode } from './html/parse';
+import {
+  childElements,
+  isTextNode,
+  parseDocument,
+  type P5Element,
+  type P5ParentNode,
+} from './html/parse';
 import { compareCssValues } from './html/style-compare';
 import { safeSourceCssValue } from './html/values';
 import {
@@ -155,7 +161,14 @@ export function buildStyleRules(input: {
 
   // inline 声明只参与 winning 级联（§3：inline 面板仍是其唯一编辑入口），不产生行。
   for (const { property, value } of inlineDeclarations(input.inlineStyle)) {
-    candidates.push({ property, value, inline: true, specificity: [0, 0, 0], order: 0, declaration: null });
+    candidates.push({
+      property,
+      value,
+      inline: true,
+      specificity: [0, 0, 0],
+      order: 0,
+      declaration: null,
+    });
   }
 
   applyWinning(candidates, input.computed);
@@ -219,7 +232,10 @@ export interface BlockParse {
 export type BlockParseResult = BlockParse | { error: true };
 
 /** 每块至多解析一次（同一块可能被多条命中规则引用）。 */
-export function parseBlock(block: StyleBlock, cache: Map<number, BlockParseResult>): BlockParseResult {
+export function parseBlock(
+  block: StyleBlock,
+  cache: Map<number, BlockParseResult>
+): BlockParseResult {
   const cached = cache.get(block.ordinal);
   if (cached) return cached;
   let result: BlockParseResult;
@@ -326,7 +342,11 @@ const normalizeSelector = (selector: string): string => selector.trim().replace(
 // 声明行（源码偏移）
 // ---------------------------------------------------------------------------
 
-function declarationsOf(rule: postcss.Rule, block: StyleBlock, parse: BlockParse): CssDeclarationRow[] {
+function declarationsOf(
+  rule: postcss.Rule,
+  block: StyleBlock,
+  parse: BlockParse
+): CssDeclarationRow[] {
   const rows: CssDeclarationRow[] = [];
   for (const node of rule.nodes) {
     if (node.type !== 'decl' || !node.source?.start || !node.source?.end) continue;
@@ -385,7 +405,10 @@ const cascadeOrder = (a: WinningCandidate, b: WinningCandidate): number => {
  * 失配 → 该属性各行均标 false（级落末位已确定不是生效值）；判不出 → 保持 null。
  * !important 不参与反转：层叠层/origin 反转等复杂情形不声称覆盖，计算值为最终口径。
  */
-function applyWinning(candidates: WinningCandidate[], computed: Partial<Record<string, string>>): void {
+function applyWinning(
+  candidates: WinningCandidate[],
+  computed: Partial<Record<string, string>>
+): void {
   const groups = new Map<string, WinningCandidate[]>();
   for (const candidate of candidates) {
     const key = candidate.property.toLowerCase();
@@ -401,7 +424,8 @@ function applyWinning(candidates: WinningCandidate[], computed: Partial<Record<s
     const verdict = compareCssValues(key, winner.value, computedValue);
     if (verdict === null) continue;
     for (const candidate of sorted) {
-      if (candidate.declaration) candidate.declaration.winning = candidate === winner ? verdict : false;
+      if (candidate.declaration)
+        candidate.declaration.winning = candidate === winner ? verdict : false;
     }
   }
 }
@@ -612,7 +636,10 @@ export function buildCssEditSplice(
 export function patchCssText(cssSource: string, edit: CssSourceEdit): string {
   const block: StyleBlock = { ordinal: 0, text: cssSource, textStartOffset: 0 };
   if (byteLength(cssSource) > STYLE_BLOCK_MAX_BYTES) {
-    throw new DesignEditError('STYLE_SOURCE_NOT_FOUND', 'The stylesheet exceeds the editable size limit.');
+    throw new DesignEditError(
+      'STYLE_SOURCE_NOT_FOUND',
+      'The stylesheet exceeds the editable size limit.'
+    );
   }
   const parse = parseBlock(block, new Map<number, BlockParseResult>());
   if ('error' in parse) {

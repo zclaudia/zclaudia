@@ -119,7 +119,11 @@ function parseDeckInternal(source: string): ParsedDeck {
         if (!span) {
           throw new DesignEditError('MALFORMED_HTML', 'Slide element has no source location');
         }
-        if (parsed.errors.some(error => error.startOffset >= span.start && error.startOffset < span.end)) {
+        if (
+          parsed.errors.some(
+            error => error.startOffset >= span.start && error.startOffset < span.end
+          )
+        ) {
           throw new DesignEditError('MALFORMED_HTML', 'Slide element contains parse errors');
         }
         hits.push({ element, path, span });
@@ -200,7 +204,10 @@ export function reorderDeckSlides(source: string, from: number, to: number): str
   const fromSlide = slideAt(info, from);
   const toSlide = slideAt(info, to);
   if (!info.siblings) {
-    throw new DesignEditError('STRUCTURE_NOT_ALLOWED', 'Slides are not under the same parent and cannot be reordered');
+    throw new DesignEditError(
+      'STRUCTURE_NOT_ALLOWED',
+      'Slides are not under the same parent and cannot be reordered'
+    );
   }
   if (from === to) return source;
   const fromSpan = fromSlide.span;

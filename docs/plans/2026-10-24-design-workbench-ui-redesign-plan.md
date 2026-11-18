@@ -28,25 +28,25 @@
 
 ## 2. 现状 → 新布局映射
 
-| 现状（`components/` 或 `DesignPanel.tsx`）                       | 新位置                                                                  | 处理方式                                     |
-| ---------------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------- |
-| `DesignToolbar`（20 个文字按钮）                                 | 顶栏 + `⋯` 菜单 + 左栏入口                                              | **删除**，由 `layout/TopBar` 取代            |
-| `PageTabs`（标签 + Open page 下拉）                              | 顶栏左侧标签；未打开文件改为 `+` 菜单与 Pages 面板                      | 重写                                         |
-| `ViewportControls`（独占一行）                                   | 顶栏中部：设备图标 + 宽度 + 缩放                                        | 重写，**需要** `PreviewCanvas` 回报实际缩放  |
-| 6 种整行横幅（`DesignPanel` 内联 JSX）                           | 状态条 / 画布内通知栈 / 阻断型画布横幅 / Agent 条内联提示               | 抽出 `useDesignNotices` + 组件               |
-| `PreviewCanvas`                                                  | 画布区                                                                  | 小改（`onScaleChange`、空态）                |
-| `SelectionEditor`（759 行单表单）                                | 右栏 Design 页签                                                        | 保留逻辑，渲染拆为可折叠分组 + 吸底应用条    |
-| `StyleSourcePanel`                                               | 右栏 Styles 页签                                                        | 基本不改，仅去掉自带外边距                   |
-| `VersionHistory` + 底部折叠条                                    | 右栏 History 页签                                                       | 小改                                         |
-| `ElementTree` + Structure 开关                                   | 左栏 Layers                                                             | 小改（去 `max-h-56`、说明文字改 tooltip）    |
-| `PageOverview`（画布替换式网格）                                 | 左栏 Pages（缩略图列表）；网格视图保留为 Pages 头部的「Grid」开关       | 抽出 `PageThumbnail`                         |
-| `TemplateDialog` / `AssetLibrary`                                | 左栏 Library 的 Templates / Assets 视图                                 | 抽 `*View` 内容，Modal 变成薄壳              |
-| `BrandPanel` / `MediaGenPanel`                                   | 左栏 Library 的 Brand / Media 视图（`BrandView` / `MediaGenView`，表单型；Modal 变薄壳，见 §6.4 的取舍） | P4c 已落地                                   |
-| `ExportDialog` / `RenderExportDialog` / `SharePanel`             | 单个「Export & Share」对话框（分页签）                                  | P5a 已落地（三个 Content + 薄壳）            |
-| `DeckPanel` / `DeckPresenter`                                    | 顶栏 Slides 入口 → 左栏 Slides 页签（检测到 deck 时出现）；播放器不变   | P5b 已落地（`rail/SlidesView` + Modal 薄壳） |
-| `AgentContextPreview`（Modal）                                   | Agent 输入条上的「Context」popover                                      | P3 取代                                      |
-| `DraftDiffModal`（`DesignPanel` 末尾）                           | 保持 Modal；入口 = 状态条「Unsaved」 + `⋯` 菜单 + History 页签顶行      | 移出到 `components/DraftDiffModal.tsx`       |
-| 保存前关闭 / Reload CSS 两个确认 Modal                           | 不变                                                                    | 随组合根保留                                 |
+| 现状（`components/` 或 `DesignPanel.tsx`）           | 新位置                                                                                                   | 处理方式                                     |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `DesignToolbar`（20 个文字按钮）                     | 顶栏 + `⋯` 菜单 + 左栏入口                                                                               | **删除**，由 `layout/TopBar` 取代            |
+| `PageTabs`（标签 + Open page 下拉）                  | 顶栏左侧标签；未打开文件改为 `+` 菜单与 Pages 面板                                                       | 重写                                         |
+| `ViewportControls`（独占一行）                       | 顶栏中部：设备图标 + 宽度 + 缩放                                                                         | 重写，**需要** `PreviewCanvas` 回报实际缩放  |
+| 6 种整行横幅（`DesignPanel` 内联 JSX）               | 状态条 / 画布内通知栈 / 阻断型画布横幅 / Agent 条内联提示                                                | 抽出 `useDesignNotices` + 组件               |
+| `PreviewCanvas`                                      | 画布区                                                                                                   | 小改（`onScaleChange`、空态）                |
+| `SelectionEditor`（759 行单表单）                    | 右栏 Design 页签                                                                                         | 保留逻辑，渲染拆为可折叠分组 + 吸底应用条    |
+| `StyleSourcePanel`                                   | 右栏 Styles 页签                                                                                         | 基本不改，仅去掉自带外边距                   |
+| `VersionHistory` + 底部折叠条                        | 右栏 History 页签                                                                                        | 小改                                         |
+| `ElementTree` + Structure 开关                       | 左栏 Layers                                                                                              | 小改（去 `max-h-56`、说明文字改 tooltip）    |
+| `PageOverview`（画布替换式网格）                     | 左栏 Pages（缩略图列表）；网格视图保留为 Pages 头部的「Grid」开关                                        | 抽出 `PageThumbnail`                         |
+| `TemplateDialog` / `AssetLibrary`                    | 左栏 Library 的 Templates / Assets 视图                                                                  | 抽 `*View` 内容，Modal 变成薄壳              |
+| `BrandPanel` / `MediaGenPanel`                       | 左栏 Library 的 Brand / Media 视图（`BrandView` / `MediaGenView`，表单型；Modal 变薄壳，见 §6.4 的取舍） | P4c 已落地                                   |
+| `ExportDialog` / `RenderExportDialog` / `SharePanel` | 单个「Export & Share」对话框（分页签）                                                                   | P5a 已落地（三个 Content + 薄壳）            |
+| `DeckPanel` / `DeckPresenter`                        | 顶栏 Slides 入口 → 左栏 Slides 页签（检测到 deck 时出现）；播放器不变                                    | P5b 已落地（`rail/SlidesView` + Modal 薄壳） |
+| `AgentContextPreview`（Modal）                       | Agent 输入条上的「Context」popover                                                                       | P3 取代                                      |
+| `DraftDiffModal`（`DesignPanel` 末尾）               | 保持 Modal；入口 = 状态条「Unsaved」 + `⋯` 菜单 + History 页签顶行                                       | 移出到 `components/DraftDiffModal.tsx`       |
+| 保存前关闭 / Reload CSS 两个确认 Modal               | 不变                                                                                                     | 随组合根保留                                 |
 
 ## 3. 架构
 
@@ -82,10 +82,10 @@ narrow (<640)     topbar 压缩；rail 隐藏，经左上角按钮抽屉打开�
 
 ```ts
 interface DesignLayoutPrefs {
-  leftOpen: boolean;            // 左栏面板展开（图标条始终在）
+  leftOpen: boolean; // 左栏面板展开（图标条始终在）
   leftTab: 'pages' | 'layers' | 'library' | 'slides';
   libraryTab: 'assets' | 'templates' | 'brand' | 'media';
-  leftWidth: number;            // 200–420，默认 240
+  leftWidth: number; // 200–420，默认 240
   rightOpen: boolean;
   rightTab: 'design' | 'styles' | 'history';
   collapsedSections: Record<string, boolean>; // 检查器分组折叠，key = section id
@@ -98,15 +98,15 @@ interface DesignLayoutPrefs {
 
 先做纯重构，让后续每一步的 diff 只含布局：
 
-| 新文件                                | 搬出内容                                                                                                   |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `validators.ts`                       | `isValidSelection` / `isValidMatchedRule` / `isValidRulesMessage` 等；`DesignPanel.tsx` **继续 re-export** `isValidRulesMessage`（现有测试从这里 import） |
-| `hooks/usePreviewPipeline.ts`         | 预览缓存 LRU、`ensurePreview`、并发队列、`loadPreviewAsset`、`previews`、`activePreview`、`runBlocked`     |
-| `hooks/usePreviewBridge.ts`           | `message` 监听、`verifyRef` / `reselectRef`、`selectPath`、`handleFrameLoad`、`overrideWarning`、`runNotice`、`styleRules` |
-| `hooks/useStyleSources.ts`            | CSS 草稿表订阅、`cssDocs`、`styleSource` memo、`handleApplyExternal`、`saveStyles`、冲突/确认状态          |
-| `hooks/useAgentHandoff.ts`            | 品牌缓存、`recentImports`、`buildContextInput`、`generate` / `handoff` / `prefill`                         |
-| `components/DraftDiffModal.tsx`       | 文件末尾的 `DraftDiffModal`                                                                                |
-| `DesignPanel.tsx`（组合根，目标 ≤350 行） | `DesignPanel` 外壳（无会话态提示）、`DesignPanelSession`：装配 hooks + 渲染布局                        |
+| 新文件                                    | 搬出内容                                                                                                                                                  |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `validators.ts`                           | `isValidSelection` / `isValidMatchedRule` / `isValidRulesMessage` 等；`DesignPanel.tsx` **继续 re-export** `isValidRulesMessage`（现有测试从这里 import） |
+| `hooks/usePreviewPipeline.ts`             | 预览缓存 LRU、`ensurePreview`、并发队列、`loadPreviewAsset`、`previews`、`activePreview`、`runBlocked`                                                    |
+| `hooks/usePreviewBridge.ts`               | `message` 监听、`verifyRef` / `reselectRef`、`selectPath`、`handleFrameLoad`、`overrideWarning`、`runNotice`、`styleRules`                                |
+| `hooks/useStyleSources.ts`                | CSS 草稿表订阅、`cssDocs`、`styleSource` memo、`handleApplyExternal`、`saveStyles`、冲突/确认状态                                                         |
+| `hooks/useAgentHandoff.ts`                | 品牌缓存、`recentImports`、`buildContextInput`、`generate` / `handoff` / `prefill`                                                                        |
+| `components/DraftDiffModal.tsx`           | 文件末尾的 `DraftDiffModal`                                                                                                                               |
+| `DesignPanel.tsx`（组合根，目标 ≤350 行） | `DesignPanel` 外壳（无会话态提示）、`DesignPanelSession`：装配 hooks + 渲染布局                                                                           |
 
 验收：`pnpm --filter @zclaudia/desktop test -- features/design` 全绿，**测试一行不改**；肉眼无变化。
 
@@ -158,12 +158,12 @@ features/design/
 7. **Save**：`Button variant="primary"`，唯一实心；`!dirty || busy` 禁用。
 8. **`⋯`**（`DropdownMenu`，`align="end"`）：
 
-   | 条目                      | 行为                                                         | 备注                                    |
-   | ------------------------- | ------------------------------------------------------------ | --------------------------------------- |
-   | Export & Share…           | 打开合并对话框（Export ZIP / Render PNG/PDF / Share 三页签）  | 需活动页且非 loading；P5a 起为唯一条目  |
-   | Unsaved changes           | 打开 `DraftDiffModal`                                        | 仅 dirty                                |
-   | Reload from disk          | `controller.reload()`                                        | 原按钮 `Reload`                         |
-   | Refresh file list         | `refreshNow()`                                               | 原 `Refresh design files`               |
+   | 条目              | 行为                                                         | 备注                                   |
+   | ----------------- | ------------------------------------------------------------ | -------------------------------------- |
+   | Export & Share…   | 打开合并对话框（Export ZIP / Render PNG/PDF / Share 三页签） | 需活动页且非 loading；P5a 起为唯一条目 |
+   | Unsaved changes   | 打开 `DraftDiffModal`                                        | 仅 dirty                               |
+   | Reload from disk  | `controller.reload()`                                        | 原按钮 `Reload`                        |
+   | Refresh file list | `refreshNow()`                                               | 原 `Refresh design files`              |
 
    快捷键提示：**当前代码里没有任何设计面板快捷键**，Tooltip 不得谎称 `⌘S` / `⌘Z`。P6 再统一接线（见 §6.6），接线后才在 Tooltip 加快捷键。
 
@@ -182,14 +182,14 @@ features/design/
 
 ### 4.3 通知模型（取代 6 种整行横幅）
 
-| 原横幅                                   | 新去处                                                                         | 保持的可访问性契约 |
-| ---------------------------------------- | ------------------------------------------------------------------------------ | ------------------ |
-| Prefilled into the current chat          | `NoticeStack` 瞬时（4s），带「Open chat」动作（聚焦 composer）                 | `role="status"`    |
-| `runNotice`（导航被拦截 / Opened x）     | `NoticeStack` 瞬时（5s，沿用）                                                 | `role="status"`    |
-| `runFeedback`（Agent 完成：N 页变化）    | `NoticeStack` **常驻**（不自动消失），带变化文件按钮与 `×`                     | `role="status"`    |
-| 未保存 → 先保存再交接                    | 不再是横幅：`AgentBar` 内联禁用提示 + 「Save」按钮                             | —                  |
-| `externalChange` / `missing` / `error`   | `CanvasBanner`：画布顶部紧贴的细条（阻断/需处理，不自动消失）                  | `status` / `alert` |
-| 运行模式说明                             | 状态条（§4.2）+ 检查器的 Run 占位说明                                          | `role="status"`    |
+| 原横幅                                 | 新去处                                                         | 保持的可访问性契约 |
+| -------------------------------------- | -------------------------------------------------------------- | ------------------ |
+| Prefilled into the current chat        | `NoticeStack` 瞬时（4s），带「Open chat」动作（聚焦 composer） | `role="status"`    |
+| `runNotice`（导航被拦截 / Opened x）   | `NoticeStack` 瞬时（5s，沿用）                                 | `role="status"`    |
+| `runFeedback`（Agent 完成：N 页变化）  | `NoticeStack` **常驻**（不自动消失），带变化文件按钮与 `×`     | `role="status"`    |
+| 未保存 → 先保存再交接                  | 不再是横幅：`AgentBar` 内联禁用提示 + 「Save」按钮             | —                  |
+| `externalChange` / `missing` / `error` | `CanvasBanner`：画布顶部紧贴的细条（阻断/需处理，不自动消失）  | `status` / `alert` |
+| 运行模式说明                           | 状态条（§4.2）+ 检查器的 Run 占位说明                          | `role="status"`    |
 
 `useDesignNotices()`：`push({ id, tone, text, actions?, ttl? })`，同 id 去重刷新；返回当前列表与 `dismiss`。组件局部（不进全局 `toastStore`——这些提示带面板内动作且测试按面板作用域查询）。`runFeedback` 不 push，直接由 `useAgentRunFeedback` 状态派生渲染，避免双源。
 
@@ -211,17 +211,18 @@ features/design/
 1. 从 759 行里抽出 `collect-operations.ts`：把现有 `collectOperations`（含 `safeStyleValue` / `safeAttrValue` 预检、颜色宽松规则）改成纯函数 `collectOperations(values, selection, computedStyles): { operations, invalid }`，组件内只负责 setState。**行为逐条与原实现一致**，先补特征测试（见 §7）再搬。
 2. 分组（`InspectorSection`，默认展开项见下），顺序固定：
 
-   | 分组 id          | 内容                                  | 默认 | 可见条件（`section-matrix.ts`）                           |
-   | ---------------- | ------------------------------------- | ---- | --------------------------------------------------------- |
-   | `text`           | Element text                          | 展开 | 非 void 元素（`img`/`br`/`hr`/`input` 等不显示）          |
-   | `link`           | Link URL（+ 清除）                    | 展开 | `tagName === 'a'`                                         |
-   | `image`          | Image URL、选择/生成、Alt、`object-fit` | 展开 | `tagName === 'img'`                                       |
-   | `typography`     | 字体/字号/行高/字重/字距/对齐         | 展开 | 含文本的元素；`img` 隐藏                                  |
-   | `fill-border`    | 文字色、背景色、圆角、边框三件套      | 折叠 | 总是（文字色对 `img` 隐藏）                               |
-   | `size-spacing`   | 宽高、padding、margin                 | 折叠 | 总是                                                      |
-   | `structure`      | Copy / Delete / Move up / Move down   | 折叠 | 总是（原有禁用规则不变）                                  |
+   | 分组 id        | 内容                                    | 默认 | 可见条件（`section-matrix.ts`）                  |
+   | -------------- | --------------------------------------- | ---- | ------------------------------------------------ |
+   | `text`         | Element text                            | 展开 | 非 void 元素（`img`/`br`/`hr`/`input` 等不显示） |
+   | `link`         | Link URL（+ 清除）                      | 展开 | `tagName === 'a'`                                |
+   | `image`        | Image URL、选择/生成、Alt、`object-fit` | 展开 | `tagName === 'img'`                              |
+   | `typography`   | 字体/字号/行高/字重/字距/对齐           | 展开 | 含文本的元素；`img` 隐藏                         |
+   | `fill-border`  | 文字色、背景色、圆角、边框三件套        | 折叠 | 总是（文字色对 `img` 隐藏）                      |
+   | `size-spacing` | 宽高、padding、margin                   | 折叠 | 总是                                             |
+   | `structure`    | Copy / Delete / Move up / Move down     | 折叠 | 总是（原有禁用规则不变）                         |
 
    「可见条件」是**唯一新增的行为差异**（原先所有分组恒显）。条件只用于隐藏明显无意义的分组，隐藏不影响 `collectOperations` 能提交的字段集合。
+
 3. **吸底应用条**（`position: sticky; bottom: 0`，在检查器滚动体内）：仅当存在待提交修改时出现——「N pending changes · Discard · **Apply changes**」。
    - 保留批量应用模型（`Apply changes` 一次提交全部字段，一次一条撤销记录），**不**改为逐字段即时应用——后者会改变撤销粒度与 `mergeKey` 语义，另立决策（§9 Q1）。
    - pending 数量 = 对当前表单跑一次纯函数 `collectOperations`（不写 invalid 状态）。`Discard` = 重置为选区初始值（已有 `useEffect([selection])` 的重置逻辑复用）。
@@ -346,24 +347,24 @@ features/design/
 
 ## 8. 风险与缓解
 
-| 风险                                                       | 缓解                                                                                         |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| iframe 因布局变化重挂载，丢选区、重建桥接                  | §3.1 不变量 + 节点身份测试；总览用 `hidden` 而非卸载                                         |
-| 缩略图 iframe 数量与脚本执行成本                           | 可见性门控；仍走静态预览构建（无脚本）；沿用并发≤2 与 LRU≤8 的缓存上限                       |
-| 吸底条/折叠让表单状态丢失                                  | 折叠不卸载；选区变化才重置（沿用既有 effect）                                                |
-| 2396 行测试大面积改动、易引入遗漏                          | P0 先零改动拆分；P1 起引入 helper；每个阶段只改该阶段触及的入口                              |
-| 窄档（240px 工具最小宽）可用性                             | <360 档位专门定义；以 240/320/460 三个宽度做手动走查                                         |
-| 范围蔓延（一次想做完 mockup 全部）                         | 严格按阶段交付；检查点 A/B 后再决定 P4/P5 的取舍（尤其 Brand/Media 内嵌）                    |
+| 风险                                      | 缓解                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------- |
+| iframe 因布局变化重挂载，丢选区、重建桥接 | §3.1 不变量 + 节点身份测试；总览用 `hidden` 而非卸载                      |
+| 缩略图 iframe 数量与脚本执行成本          | 可见性门控；仍走静态预览构建（无脚本）；沿用并发≤2 与 LRU≤8 的缓存上限    |
+| 吸底条/折叠让表单状态丢失                 | 折叠不卸载；选区变化才重置（沿用既有 effect）                             |
+| 2396 行测试大面积改动、易引入遗漏         | P0 先零改动拆分；P1 起引入 helper；每个阶段只改该阶段触及的入口           |
+| 窄档（240px 工具最小宽）可用性            | <360 档位专门定义；以 240/320/460 三个宽度做手动走查                      |
+| 范围蔓延（一次想做完 mockup 全部）        | 严格按阶段交付；检查点 A/B 后再决定 P4/P5 的取舍（尤其 Brand/Media 内嵌） |
 
 ## 9. 待你确认的决策
 
-| #  | 问题                                                                 | 默认（若不回复按此做）                                           |
-| -- | -------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Q1 | 检查器仍用「批量 Apply changes」，还是改成每个字段回车/失焦即应用？   | 保留批量 Apply（吸底条）；即时应用另立项，因为会改撤销粒度       |
-| Q2 | Agent 条发送后：继续「预填到聊天、你再点发送」，还是直接发送？        | 继续预填（保留发送前可检查的安全语义）                           |
-| Q3 | Brand / Media 是否一定要内嵌左栏？                                    | 先内嵌 + 提供 Expand 与 Open in dialog 兜底，看实际手感再定      |
-| Q4 | Export & Share 合并是否值得本轮做（P5）？                             | 做，但排在 P1–P4 之后；之前三项都在 `⋯` 菜单里可达               |
-| Q5 | 左栏默认展开还是收起？                                                | 宽档展开 Pages；中/窄档收起                                      |
+| #   | 问题                                                                | 默认（若不回复按此做）                                      |
+| --- | ------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Q1  | 检查器仍用「批量 Apply changes」，还是改成每个字段回车/失焦即应用？ | 保留批量 Apply（吸底条）；即时应用另立项，因为会改撤销粒度  |
+| Q2  | Agent 条发送后：继续「预填到聊天、你再点发送」，还是直接发送？      | 继续预填（保留发送前可检查的安全语义）                      |
+| Q3  | Brand / Media 是否一定要内嵌左栏？                                  | 先内嵌 + 提供 Expand 与 Open in dialog 兜底，看实际手感再定 |
+| Q4  | Export & Share 合并是否值得本轮做（P5）？                           | 做，但排在 P1–P4 之后；之前三项都在 `⋯` 菜单里可达          |
+| Q5  | 左栏默认展开还是收起？                                              | 宽档展开 Pages；中/窄档收起                                 |
 
 ## 10. 建议的推进方式
 

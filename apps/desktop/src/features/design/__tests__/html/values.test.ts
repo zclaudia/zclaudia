@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { escapeAttr, escapeText, safeAttrValue, safeColor, safeSourceCssValue, safeStyleValue } from '../../html/values';
+import {
+  escapeAttr,
+  escapeText,
+  safeAttrValue,
+  safeColor,
+  safeSourceCssValue,
+  safeStyleValue,
+} from '../../html/values';
 import { STYLE_SOURCE_VALUE_MAX } from '../../types';
 
 describe('safeColor', () => {
@@ -138,17 +145,12 @@ describe('safeStyleValue', () => {
     expect(safeStyleValue('height', '5Rem')).toBe('5Rem');
   });
 
-  it.each([
-    ['normal'],
-    ['1.5'],
-    ['0.1'],
-    ['10'],
-    ['24px'],
-    ['2'],
-    ['0.5em'],
-  ])('accepts line-height %s', value => {
-    expect(safeStyleValue('line-height', value)).toBe(value);
-  });
+  it.each([['normal'], ['1.5'], ['0.1'], ['10'], ['24px'], ['2'], ['0.5em']])(
+    'accepts line-height %s',
+    value => {
+      expect(safeStyleValue('line-height', value)).toBe(value);
+    }
+  );
 
   it.each([
     ['0'],
@@ -177,16 +179,12 @@ describe('safeStyleValue', () => {
     expect(safeStyleValue('font-weight', value)).toBe(value);
   });
 
-  it.each([
-    ['50'],
-    ['950'],
-    ['901'],
-    ['700.5'],
-    ['-100'],
-    ['heavy'],
-  ])('rejects font-weight %s', value => {
-    expect(safeStyleValue('font-weight', value)).toBeNull();
-  });
+  it.each([['50'], ['950'], ['901'], ['700.5'], ['-100'], ['heavy']])(
+    'rejects font-weight %s',
+    value => {
+      expect(safeStyleValue('font-weight', value)).toBeNull();
+    }
+  );
 
   it('validates text-align keywords', () => {
     for (const keyword of ['left', 'right', 'center', 'justify', 'start', 'end']) {
@@ -198,7 +196,18 @@ describe('safeStyleValue', () => {
   });
 
   it('validates border-style keywords', () => {
-    for (const keyword of ['none', 'hidden', 'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset']) {
+    for (const keyword of [
+      'none',
+      'hidden',
+      'solid',
+      'dashed',
+      'dotted',
+      'double',
+      'groove',
+      'ridge',
+      'inset',
+      'outset',
+    ]) {
       expect(safeStyleValue('border-style', keyword)).toBe(keyword);
     }
     expect(safeStyleValue('border-style', 'SOLID')).toBe('SOLID');
@@ -216,7 +225,9 @@ describe('safeStyleValue', () => {
     expect(safeStyleValue('font-family', '"Helvetica Neue", Arial, sans-serif')).toBe(
       '"Helvetica Neue", Arial, sans-serif'
     );
-    expect(safeStyleValue('font-family', "'幼圆', '等线', monospace")).toBe("'幼圆', '等线', monospace");
+    expect(safeStyleValue('font-family', "'幼圆', '等线', monospace")).toBe(
+      "'幼圆', '等线', monospace"
+    );
     expect(safeStyleValue('font-family', 'Arial; Evil')).toBeNull();
     expect(safeStyleValue('font-family', 'a{b}')).toBeNull();
     expect(safeStyleValue('font-family', 'a}b')).toBeNull();
@@ -279,7 +290,9 @@ describe('safeSourceCssValue', () => {
   });
 
   it('rejects values over STYLE_SOURCE_VALUE_MAX and accepts the boundary', () => {
-    expect(safeSourceCssValue('a'.repeat(STYLE_SOURCE_VALUE_MAX))).toBe('a'.repeat(STYLE_SOURCE_VALUE_MAX));
+    expect(safeSourceCssValue('a'.repeat(STYLE_SOURCE_VALUE_MAX))).toBe(
+      'a'.repeat(STYLE_SOURCE_VALUE_MAX)
+    );
     expect(safeSourceCssValue('a'.repeat(STYLE_SOURCE_VALUE_MAX + 1))).toBeNull();
   });
 
@@ -303,7 +316,9 @@ describe('safeAttrValue', () => {
 
   it('accepts relative image sources with whitelisted extensions', () => {
     for (const extension of ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'avif']) {
-      expect(safeAttrValue('src', `images/photo.${extension}`, 'img')).toBe(`images/photo.${extension}`);
+      expect(safeAttrValue('src', `images/photo.${extension}`, 'img')).toBe(
+        `images/photo.${extension}`
+      );
     }
     expect(safeAttrValue('src', 'photo.PNG', 'img')).toBe('photo.PNG'); // extension match is case-insensitive
     expect(safeAttrValue('src', 'a.png?v=2#zoom', 'img')).toBe('a.png?v=2#zoom'); // fragment/query stripped for the check
@@ -345,7 +360,9 @@ describe('safeAttrValue', () => {
     expect(safeAttrValue('href', '#anchor', 'a')).toBe('#anchor');
     expect(safeAttrValue('href', 'docs/page.html', 'a')).toBe('docs/page.html');
     expect(safeAttrValue('href', '../up/rel.png', 'a')).toBe('../up/rel.png');
-    expect(safeAttrValue('href', 'https://example.com/a?b=1#c', 'a')).toBe('https://example.com/a?b=1#c');
+    expect(safeAttrValue('href', 'https://example.com/a?b=1#c', 'a')).toBe(
+      'https://example.com/a?b=1#c'
+    );
     expect(safeAttrValue('href', 'HTTP://EXAMPLE.COM', 'a')).toBe('HTTP://EXAMPLE.COM');
     expect(safeAttrValue('href', 'mailto:hi@example.com', 'a')).toBe('mailto:hi@example.com');
     expect(safeAttrValue('href', 'tel:+8613800000000', 'a')).toBe('tel:+8613800000000');

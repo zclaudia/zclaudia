@@ -9,10 +9,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import Database from 'better-sqlite3';
 import { DesignService } from '../design-service.js';
-import {
-  MediaTaskService,
-  createGeneratedAssetWriter,
-} from '../media-task-service.js';
+import { MediaTaskService, createGeneratedAssetWriter } from '../media-task-service.js';
 import { createVideoRenderExecutor, defaultVideoRenderDeps } from '../video-render-service.js';
 import { migration } from '../../../infra/storage/migrations/051_design_media_tasks.js';
 
@@ -39,12 +36,17 @@ const ANIMATED_HTML = `<!doctype html>
 <body><div class="box"></div></body>
 </html>`;
 
-function ffprobeJson(file: string): Promise<{ format?: { format_name?: string; duration?: string } }> {
+function ffprobeJson(
+  file: string
+): Promise<{ format?: { format_name?: string; duration?: string } }> {
   return new Promise((resolve, reject) => {
     const child = spawn('ffprobe', [
-      '-v', 'error',
-      '-show_entries', 'format=format_name,duration',
-      '-of', 'json',
+      '-v',
+      'error',
+      '-show_entries',
+      'format=format_name,duration',
+      '-of',
+      'json',
       file,
     ]);
     let out = '';
@@ -89,58 +91,54 @@ describe('P6 真实视频渲染冒烟（ZCLAUDIA_MEDIA_SMOKE=1）', () => {
     if (temp) await fs.rm(temp, { recursive: true, force: true });
   });
 
-  (RUN_SMOKE ? it : it.skip)(
-    '渲染 2 秒 CSS 动画页为可播放 MP4',
-    { timeout: 120_000 },
-    async () => {
-      const entryRel = 'design/anim/index.html';
-      await fs.mkdir(path.join(temp, 'design/anim'), { recursive: true });
-      await fs.writeFile(path.join(temp, entryRel), ANIMATED_HTML, 'utf8');
+  (RUN_SMOKE ? it : it.skip)('渲染 2 秒 CSS 动画页为可播放 MP4', { timeout: 120_000 }, async () => {
+    const entryRel = 'design/anim/index.html';
+    await fs.mkdir(path.join(temp, 'design/anim'), { recursive: true });
+    await fs.writeFile(path.join(temp, entryRel), ANIMATED_HTML, 'utf8');
 
-      const service = new DesignService(db);
-      const media = new MediaTaskService(db, service, {
-        'video-render': createVideoRenderExecutor({
-          ...defaultVideoRenderDeps(),
-          saveOutput: (sessionId, bytes) =>
-            createGeneratedAssetWriter(service, sessionId)('smoke.mp4', bytes, 'video/mp4'),
-        }),
-      });
+    const service = new DesignService(db);
+    const media = new MediaTaskService(db, service, {
+      'video-render': createVideoRenderExecutor({
+        ...defaultVideoRenderDeps(),
+        saveOutput: (sessionId, bytes) =>
+          createGeneratedAssetWriter(service, sessionId)('smoke.mp4', bytes, 'video/mp4'),
+      }),
+    });
 
-      const created = await media.create('sa', {
-        kind: 'video-render',
-        entryPath: entryRel,
-        width: 640,
-        height: 360,
-        fps: 24,
-        durationMs: 2000,
-      });
-      expect(created.status).toMatch(/queued|running/);
+    const created = await media.create('sa', {
+      kind: 'video-render',
+      entryPath: entryRel,
+      width: 640,
+      height: 360,
+      fps: 24,
+      durationMs: 2000,
+    });
+    expect(created.status).toMatch(/queued|running/);
 
-      // 轮询至终态（真实 Chrome 启动 + 2s 采集 + 编码，上限 90s）。
-      let terminal: Awaited<ReturnType<typeof media.list>>[number] | undefined;
-      const deadline = Date.now() + 90_000;
-      while (Date.now() < deadline) {
-        const tasks = await media.list('sa');
-        terminal = tasks.find(task => task.id === created.id);
-        if (terminal && !['queued', 'running'].includes(terminal.status)) break;
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      expect(terminal).toBeDefined();
-      expect(terminal?.error?.message ?? '').toBe('');
-      expect(terminal?.status).toBe('completed');
-      expect(terminal?.result?.path).toMatch(/\.mp4$/);
-
-      const absolute = path.join(temp, terminal!.result!.path);
-      const bytes = await fs.readFile(absolute);
-      expect(bytes.length).toBeGreaterThan(10_000);
-      // ftyp 盒（ISO BMFF / MP4 家族）。
-      expect(bytes.subarray(4, 8).toString('latin1')).toBe('ftyp');
-
-      const probe = await ffprobeJson(absolute);
-      expect(probe.format?.format_name).toContain('mp4');
-      const duration = Number(probe.format?.duration ?? '0');
-      expect(duration).toBeGreaterThanOrEqual(1.0);
-      expect(duration).toBeLessThanOrEqual(3.5);
+    // 轮询至终态（真实 Chrome 启动 + 2s 采集 + 编码，上限 90s）。
+    let terminal: Awaited<ReturnType<typeof media.list>>[number] | undefined;
+    const deadline = Date.now() + 90_000;
+    while (Date.now() < deadline) {
+      const tasks = await media.list('sa');
+      terminal = tasks.find(task => task.id === created.id);
+      if (terminal && !['queued', 'running'].includes(terminal.status)) break;
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
-  );
+    expect(terminal).toBeDefined();
+    expect(terminal?.error?.message ?? '').toBe('');
+    expect(terminal?.status).toBe('completed');
+    expect(terminal?.result?.path).toMatch(/\.mp4$/);
+
+    const absolute = path.join(temp, terminal!.result!.path);
+    const bytes = await fs.readFile(absolute);
+    expect(bytes.length).toBeGreaterThan(10_000);
+    // ftyp 盒（ISO BMFF / MP4 家族）。
+    expect(bytes.subarray(4, 8).toString('latin1')).toBe('ftyp');
+
+    const probe = await ffprobeJson(absolute);
+    expect(probe.format?.format_name).toContain('mp4');
+    const duration = Number(probe.format?.duration ?? '0');
+    expect(duration).toBeGreaterThanOrEqual(1.0);
+    expect(duration).toBeLessThanOrEqual(3.5);
+  });
 });

@@ -54,13 +54,7 @@ function ExportShareDialogOpen({
   const [tab, setTab] = useState<ExportShareTab>('export');
 
   return (
-    <Modal
-      open
-      onClose={onClose}
-      ariaLabel="Export & Share"
-      title="Export & Share"
-      size="2xl"
-    >
+    <Modal open onClose={onClose} ariaLabel="Export & Share" title="Export & Share" size="2xl">
       <div className="flex flex-col">
         <div
           role="tablist"

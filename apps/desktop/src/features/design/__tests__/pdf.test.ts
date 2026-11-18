@@ -3,7 +3,7 @@ import { buildImagePdf, type PdfJpegPage } from '../pdf';
 
 /** 保真 latin1 视图（每字节 → 同码位字符），供子串断言。 */
 const toStr = (bytes: Uint8Array): string =>
-  Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
+  Array.from(bytes, byte => String.fromCharCode(byte)).join('');
 
 const PAGE_ONE_JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x11, 0x7f, 0x8a, 0x01, 0x02]);
 const PAGE_TWO_JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe1, 0x33, 0x99, 0xab, 0xcd, 0xfe]);
@@ -71,9 +71,7 @@ describe('buildImagePdf', () => {
   });
 
   it('rounds pt values to the nearest integer', () => {
-    const text = toStr(
-      buildImagePdf([{ widthPx: 899, heightPx: 901, jpegBytes: PAGE_ONE_JPEG }])
-    );
+    const text = toStr(buildImagePdf([{ widthPx: 899, heightPx: 901, jpegBytes: PAGE_ONE_JPEG }]));
     // 899 * 72 / 96 = 674.25 → 674；901 * 72 / 96 = 675.75 → 676
     expect(text).toContain('/MediaBox [0 0 674 676]');
     expect(text).toContain('674 0 0 676 0 0 cm');
@@ -165,9 +163,9 @@ describe('buildImagePdf', () => {
   });
 
   it('rejects out-of-range page dimensions', () => {
-    expect(() =>
-      buildImagePdf([{ widthPx: 0, heightPx: 600, jpegBytes: PAGE_ONE_JPEG }])
-    ).toThrow('dimensions out of range');
+    expect(() => buildImagePdf([{ widthPx: 0, heightPx: 600, jpegBytes: PAGE_ONE_JPEG }])).toThrow(
+      'dimensions out of range'
+    );
     expect(() =>
       buildImagePdf([{ widthPx: 800, heightPx: 10001, jpegBytes: PAGE_ONE_JPEG }])
     ).toThrow('dimensions out of range');

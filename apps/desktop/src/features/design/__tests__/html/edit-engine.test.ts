@@ -2,7 +2,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { attributeSpan, elementSpan, findElement, newAttributeInsertOffset, parseDocument, textChildSpan } from '../../html/parse';
+import {
+  attributeSpan,
+  elementSpan,
+  findElement,
+  newAttributeInsertOffset,
+  parseDocument,
+  textChildSpan,
+} from '../../html/parse';
 import { applyEditTransaction } from '../../html/edit-engine';
 import { sha256HexSync } from '../../html/hash';
 import type {
@@ -31,7 +38,11 @@ const h1Locator = (sourceText: string = H1_TEXT): DesignSelection => ({
   sourceText,
 });
 
-const textTxn = (source: string, locator: DesignSelection, value: string): DesignEditTransaction => ({
+const textTxn = (
+  source: string,
+  locator: DesignSelection,
+  value: string
+): DesignEditTransaction => ({
   baseRevision: sha(source),
   locator,
   operations: [{ kind: 'text', value }],
@@ -48,7 +59,10 @@ const styleTxn = (
   operations: [{ kind: 'style', property, value }],
 });
 
-async function expectErrorCode(run: () => Promise<unknown>, code: DesignEditErrorCode): Promise<void> {
+async function expectErrorCode(
+  run: () => Promise<unknown>,
+  code: DesignEditErrorCode
+): Promise<void> {
   try {
     await run();
   } catch (error) {
@@ -68,7 +82,9 @@ describe('applyEditTransaction — text edits', () => {
     const start = before.indexOf(H1_RAW);
     const end = start + H1_RAW.length;
     // Byte-for-byte: everything outside the h1 text node is untouched.
-    expect(result.source).toBe(`${before.slice(0, start)}Tea &amp; Co &lt;now&gt; &amp; more${before.slice(end)}`);
+    expect(result.source).toBe(
+      `${before.slice(0, start)}Tea &amp; Co &lt;now&gt; &amp; more${before.slice(end)}`
+    );
 
     expect(result.revision).toBe(sha(result.source));
     expect(result.selection).toEqual({
@@ -160,7 +176,11 @@ describe('applyEditTransaction — text edits', () => {
       () =>
         applyEditTransaction(
           commentChild,
-          textTxn(commentChild, { elementPath: [0, 0], tagName: 'div', text: 'text', sourceText: 'text' }, 'Hello')
+          textTxn(
+            commentChild,
+            { elementPath: [0, 0], tagName: 'div', text: 'text', sourceText: 'text' },
+            'Hello'
+          )
         ),
       'NOT_PLAIN_TEXT'
     );
@@ -188,7 +208,11 @@ describe('applyEditTransaction — text edits', () => {
       () =>
         applyEditTransaction(
           before,
-          textTxn(before, { elementPath: [0, 0], tagName: 'figure', text: '', sourceText: 'old' }, 'Hi')
+          textTxn(
+            before,
+            { elementPath: [0, 0], tagName: 'figure', text: '', sourceText: 'old' },
+            'Hi'
+          )
         ),
       'TEXT_MISMATCH'
     );
@@ -353,7 +377,12 @@ describe('applyEditTransaction — style edits', () => {
   it('rejects an empty operation list', async () => {
     const before = load('basic.html');
     await expectErrorCode(
-      () => applyEditTransaction(before, { baseRevision: sha(before), locator: h1Locator(), operations: [] }),
+      () =>
+        applyEditTransaction(before, {
+          baseRevision: sha(before),
+          locator: h1Locator(),
+          operations: [],
+        }),
       'EMPTY_TRANSACTION'
     );
   });
@@ -369,7 +398,10 @@ describe('applyEditTransaction — duplicate nodes', () => {
 
   it('edits the second duplicate at [0,1]', async () => {
     const before = load('duplicates.html');
-    const result = await applyEditTransaction(before, textTxn(before, dupLocator([0, 1]), 'changed'));
+    const result = await applyEditTransaction(
+      before,
+      textTxn(before, dupLocator([0, 1]), 'changed')
+    );
 
     const p = findElement(parseDocument(before).document, [0, 1])!;
     const span = textChildSpan(p)!;
@@ -382,7 +414,8 @@ describe('applyEditTransaction — duplicate nodes', () => {
   it('rejects a locator whose fingerprint belongs to a different node', async () => {
     const before = load('duplicates.html');
     await expectErrorCode(
-      () => applyEditTransaction(before, textTxn(before, dupLocator([0, 1], 'belongs-elsewhere'), 'x')),
+      () =>
+        applyEditTransaction(before, textTxn(before, dupLocator([0, 1], 'belongs-elsewhere'), 'x')),
       'TEXT_MISMATCH'
     );
   });
@@ -556,7 +589,10 @@ describe('applyEditTransaction — chaining', () => {
 
   it('keeps text fields of the locator for style-only transactions', async () => {
     const before = load('basic.html');
-    const result = await applyEditTransaction(before, styleTxn(before, h1Locator(), 'color', 'red'));
+    const result = await applyEditTransaction(
+      before,
+      styleTxn(before, h1Locator(), 'color', 'red')
+    );
     expect(result.selection.text).toBe(H1_TEXT);
     expect(result.selection.sourceText).toBe(H1_TEXT);
     expect(result.selection.color).toBe('red');
@@ -649,7 +685,10 @@ describe('applyEditTransaction — P3 style whitelist', () => {
       text: 'multi declaration',
       sourceText: 'multi declaration',
     };
-    const result = await applyEditTransaction(before, styleTxnP(before, locator, 'margin-top', '4px'));
+    const result = await applyEditTransaction(
+      before,
+      styleTxnP(before, locator, 'margin-top', '4px')
+    );
     expect(result.selection).toEqual({
       elementPath: [1],
       tagName: 'p',
@@ -667,7 +706,10 @@ describe('applyEditTransaction — P3 style whitelist', () => {
       text: 'multi declaration',
       sourceText: 'multi declaration',
     };
-    const result = await applyEditTransaction(before, styleTxnP(before, locator, 'margin-top', '4px'));
+    const result = await applyEditTransaction(
+      before,
+      styleTxnP(before, locator, 'margin-top', '4px')
+    );
     const attrSpan = attributeSpan(findElement(parseDocument(before).document, [1])!, 'style')!;
     expect(before.slice(attrSpan.start, attrSpan.end)).toBe('style="color: blue; margin : 0"');
     expect(result.source).toBe(
@@ -708,14 +750,18 @@ describe('applyEditTransaction — P3 style whitelist', () => {
       'INVALID_VALUE'
     );
     await expectErrorCode(
-      () => applyEditTransaction(before, styleTxnP(before, h1Locator(), 'margin', '-1px auto bogus')),
+      () =>
+        applyEditTransaction(before, styleTxnP(before, h1Locator(), 'margin', '-1px auto bogus')),
       'INVALID_VALUE'
     );
   });
 
   it('keeps the original keyword spelling (case-insensitive match)', async () => {
     const before = '<main><p>hi</p></main>';
-    const result = await applyEditTransaction(before, styleTxnP(before, simple(), 'text-align', 'CENTER'));
+    const result = await applyEditTransaction(
+      before,
+      styleTxnP(before, simple(), 'text-align', 'CENTER')
+    );
     expect(result.source).toBe('<main><p style="text-align: CENTER">hi</p></main>');
   });
 });
@@ -730,7 +776,10 @@ describe('applyEditTransaction — attribute operations', () => {
 
   it('replaces an existing attribute in place and escapes the value', async () => {
     const before = load('basic.html');
-    const result = await applyEditTransaction(before, attributeTxn(before, imgLocator(), 'alt', 'Coffee & Co logo'));
+    const result = await applyEditTransaction(
+      before,
+      attributeTxn(before, imgLocator(), 'alt', 'Coffee & Co logo')
+    );
     const span = attributeSpan(findElement(parseDocument(before).document, [1, 1])!, 'alt')!;
     expect(before.slice(span.start, span.end)).toBe('alt="logo"');
     expect(result.source).toBe(
@@ -742,7 +791,10 @@ describe('applyEditTransaction — attribute operations', () => {
 
   it('inserts a new attribute after the last existing attribute', async () => {
     const before = '<main><img alt="logo"></main>';
-    const result = await applyEditTransaction(before, attributeTxn(before, plainLocator([0, 0], 'img'), 'src', 'images/pic.png'));
+    const result = await applyEditTransaction(
+      before,
+      attributeTxn(before, plainLocator([0, 0], 'img'), 'src', 'images/pic.png')
+    );
     expect(result.source).toBe('<main><img alt="logo" src="images/pic.png"></main>');
     expect(result.selection.attrs).toEqual({ src: 'images/pic.png' });
   });
@@ -788,14 +840,21 @@ describe('applyEditTransaction — attribute operations', () => {
 
   it('omits selection.attrs when nothing remains after a delete', async () => {
     const before = load('basic.html');
-    const result = await applyEditTransaction(before, attributeTxn(before, imgLocator(), 'alt', null));
+    const result = await applyEditTransaction(
+      before,
+      attributeTxn(before, imgLocator(), 'alt', null)
+    );
     expect(result.selection.attrs).toBeUndefined();
   });
 
   it('deleting an absent attribute is a no-op (EMPTY_TRANSACTION)', async () => {
     const before = '<main><img src="a.png"></main>';
     await expectErrorCode(
-      () => applyEditTransaction(before, attributeTxn(before, plainLocator([0, 0], 'img'), 'alt', null)),
+      () =>
+        applyEditTransaction(
+          before,
+          attributeTxn(before, plainLocator([0, 0], 'img'), 'alt', null)
+        ),
       'EMPTY_TRANSACTION'
     );
   });
@@ -803,12 +862,17 @@ describe('applyEditTransaction — attribute operations', () => {
   it('rejects attributes whose tag does not match (ATTRIBUTE_NOT_ALLOWED)', async () => {
     const anchor = '<main><a href="#top">x</a></main>';
     await expectErrorCode(
-      () => applyEditTransaction(anchor, attributeTxn(anchor, plainLocator([0, 0], 'a'), 'src', 'a.png')),
+      () =>
+        applyEditTransaction(
+          anchor,
+          attributeTxn(anchor, plainLocator([0, 0], 'a'), 'src', 'a.png')
+        ),
       'ATTRIBUTE_NOT_ALLOWED'
     );
     const img = '<main><img src="a.png"></main>';
     await expectErrorCode(
-      () => applyEditTransaction(img, attributeTxn(img, plainLocator([0, 0], 'img'), 'href', '#top')),
+      () =>
+        applyEditTransaction(img, attributeTxn(img, plainLocator([0, 0], 'img'), 'href', '#top')),
       'ATTRIBUTE_NOT_ALLOWED'
     );
     const div = '<main><div>x</div></main>';
@@ -821,17 +885,28 @@ describe('applyEditTransaction — attribute operations', () => {
   it('rejects values failing safeAttrValue (INVALID_VALUE)', async () => {
     const before = '<main><img src="a.png"></main>';
     await expectErrorCode(
-      () => applyEditTransaction(before, attributeTxn(before, plainLocator([0, 0], 'img'), 'src', 'a.txt')),
+      () =>
+        applyEditTransaction(
+          before,
+          attributeTxn(before, plainLocator([0, 0], 'img'), 'src', 'a.txt')
+        ),
       'INVALID_VALUE'
     );
     await expectErrorCode(
-      () => applyEditTransaction(before, attributeTxn(before, plainLocator([0, 0], 'img'), 'src', ' a.png')),
+      () =>
+        applyEditTransaction(
+          before,
+          attributeTxn(before, plainLocator([0, 0], 'img'), 'src', ' a.png')
+        ),
       'INVALID_VALUE'
     );
     const anchor = '<main><a href="#top">x</a></main>';
     await expectErrorCode(
       () =>
-        applyEditTransaction(anchor, attributeTxn(anchor, plainLocator([0, 0], 'a'), 'href', 'javascript:alert(1)')),
+        applyEditTransaction(
+          anchor,
+          attributeTxn(anchor, plainLocator([0, 0], 'a'), 'href', 'javascript:alert(1)')
+        ),
       'INVALID_VALUE'
     );
   });
@@ -849,8 +924,12 @@ describe('applyEditTransaction — attribute operations', () => {
 
 describe('applyEditTransaction — structure: duplicate', () => {
   it('duplicates a subtree after span.end, renaming ids and rewriting inner anchors', async () => {
-    const before = '<main><section id="wrap"><a id="lnk" href="#inner">go</a><div id="inner">t</div></section><p id="other">o</p></main>';
-    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 0], 'section'), 'duplicate'));
+    const before =
+      '<main><section id="wrap"><a id="lnk" href="#inner">go</a><div id="inner">t</div></section><p id="other">o</p></main>';
+    const result = await applyEditTransaction(
+      before,
+      structureTxn(before, plainLocator([0, 0], 'section'), 'duplicate')
+    );
 
     const span = elementSpan(findElement(parseDocument(before).document, [0, 0])!)!;
     const copy = before.slice(span.start, span.end);
@@ -859,7 +938,9 @@ describe('applyEditTransaction — structure: duplicate', () => {
       .replace('id="lnk"', 'id="lnk-copy"')
       .replace('href="#inner"', 'href="#inner-copy"')
       .replace('id="inner"', 'id="inner-copy"');
-    expect(result.source).toBe(`${before.slice(0, span.end)}${renamedCopy}${before.slice(span.end)}`);
+    expect(result.source).toBe(
+      `${before.slice(0, span.end)}${renamedCopy}${before.slice(span.end)}`
+    );
     // The original subtree keeps its ids and its external anchor target.
     expect(result.source).toContain('<section id="wrap"><a id="lnk" href="#inner">go</a>');
     expect(result.selection).toEqual({
@@ -872,8 +953,12 @@ describe('applyEditTransaction — structure: duplicate', () => {
   });
 
   it('resolves -copy conflicts with -copy-2 inside the uniqueness domain', async () => {
-    const before = '<main><p id="a">x</p><p id="a-copy">y</p><div id="z"><span id="a">w</span></div></main>';
-    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 2], 'div'), 'duplicate'));
+    const before =
+      '<main><p id="a">x</p><p id="a-copy">y</p><div id="z"><span id="a">w</span></div></main>';
+    const result = await applyEditTransaction(
+      before,
+      structureTxn(before, plainLocator([0, 2], 'div'), 'duplicate')
+    );
 
     const span = elementSpan(findElement(parseDocument(before).document, [0, 2])!)!;
     const expected = `${before.slice(0, span.end)}<div id="z-copy"><span id="a-copy-2">w</span></div>${before.slice(span.end)}`;
@@ -883,8 +968,12 @@ describe('applyEditTransaction — structure: duplicate', () => {
   });
 
   it('keeps anchors pointing outside the copied subtree untouched', async () => {
-    const before = '<main><nav id="n"><a href="#sec">go</a></nav><section id="sec">s</section></main>';
-    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 0], 'nav'), 'duplicate'));
+    const before =
+      '<main><nav id="n"><a href="#sec">go</a></nav><section id="sec">s</section></main>';
+    const result = await applyEditTransaction(
+      before,
+      structureTxn(before, plainLocator([0, 0], 'nav'), 'duplicate')
+    );
     // The copy is inserted directly after `</nav>`; the external #sec anchor is not rewritten.
     expect(result.source).toBe(
       before.replace('</nav>', '</nav><nav id="n-copy"><a href="#sec">go</a></nav>')
@@ -908,7 +997,10 @@ describe('applyEditTransaction — structure: delete', () => {
 
   it('allows anchors that live inside the deleted subtree', async () => {
     const before = '<main><div id="wrap"><a href="#wrap">up</a><p id="x">t</p></div></main>';
-    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 0], 'div'), 'delete'));
+    const result = await applyEditTransaction(
+      before,
+      structureTxn(before, plainLocator([0, 0], 'div'), 'delete')
+    );
     expect(result.source).toBe('<main></main>');
     expect(result.selection).toEqual({
       elementPath: [0],
@@ -921,7 +1013,10 @@ describe('applyEditTransaction — structure: delete', () => {
 
   it('removes exactly the element bytes and selects the parent', async () => {
     const before = '<main>\n  <p>one</p>\n  <p>two</p>\n</main>';
-    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 1], 'p'), 'delete'));
+    const result = await applyEditTransaction(
+      before,
+      structureTxn(before, plainLocator([0, 1], 'p'), 'delete')
+    );
 
     const span = elementSpan(findElement(parseDocument(before).document, [0, 1])!)!;
     expect(result.source).toBe(`${before.slice(0, span.start)}${before.slice(span.end)}`);
@@ -945,7 +1040,10 @@ describe('applyEditTransaction — structure: move-up / move-down', () => {
 
   it('moves an element down, preserving the bytes between the two elements', async () => {
     const before = NAV;
-    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 0], 'p'), 'move-down'));
+    const result = await applyEditTransaction(
+      before,
+      structureTxn(before, plainLocator([0, 0], 'p'), 'move-down')
+    );
 
     const t = navSpan(before, 0);
     const n = navSpan(before, 1);
@@ -968,7 +1066,10 @@ describe('applyEditTransaction — structure: move-up / move-down', () => {
 
   it('moves an element up, preserving the bytes between the two elements', async () => {
     const before = NAV;
-    const result = await applyEditTransaction(before, structureTxn(before, plainLocator([0, 2], 'em'), 'move-up'));
+    const result = await applyEditTransaction(
+      before,
+      structureTxn(before, plainLocator([0, 2], 'em'), 'move-up')
+    );
 
     const t = navSpan(before, 2);
     const p = navSpan(before, 1);
@@ -1053,7 +1154,8 @@ describe('applyEditTransaction — structure guards', () => {
 type StyleBlockOp = Extract<DesignEditOperation, { kind: 'styleBlock' }>;
 
 const styleBlockOp = (
-  overrides: Partial<StyleBlockOp> & Pick<StyleBlockOp, 'styleOrdinal' | 'rulePath' | 'property' | 'value'>
+  overrides: Partial<StyleBlockOp> &
+    Pick<StyleBlockOp, 'styleOrdinal' | 'rulePath' | 'property' | 'value'>
 ): DesignEditOperation => ({ kind: 'styleBlock', create: false, ...overrides });
 
 /**
@@ -1088,9 +1190,17 @@ const STYLE_DOC = [
   '</html>',
 ].join('\n');
 
-const mainLocator: DesignSelection = { elementPath: [0], tagName: 'main', text: 'hi', sourceText: 'hi' };
+const mainLocator: DesignSelection = {
+  elementPath: [0],
+  tagName: 'main',
+  text: 'hi',
+  sourceText: 'hi',
+};
 
-const styleBlockTxn = (source: string, operations: DesignEditOperation[]): DesignEditTransaction => ({
+const styleBlockTxn = (
+  source: string,
+  operations: DesignEditOperation[]
+): DesignEditTransaction => ({
   baseRevision: sha(source),
   locator: mainLocator,
   operations,
@@ -1100,7 +1210,9 @@ describe('applyEditTransaction — styleBlock: change value', () => {
   it('rewrites only the value token, byte-preserving the rest of the document', async () => {
     const result = await applyEditTransaction(
       STYLE_DOC,
-      styleBlockTxn(STYLE_DOC, [styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value: '#ff0000' })])
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value: '#ff0000' }),
+      ])
     );
     expect(result.source).toBe(STYLE_DOC.replace('color: #f00;', 'color: #ff0000;'));
     expect(result.revision).toBe(sha(result.source));
@@ -1112,7 +1224,9 @@ describe('applyEditTransaction — styleBlock: change value', () => {
   it('edits a rule nested in @media (rulePath [3, 0]) whose declaration has no trailing semicolon', async () => {
     const result = await applyEditTransaction(
       STYLE_DOC,
-      styleBlockTxn(STYLE_DOC, [styleBlockOp({ styleOrdinal: 0, rulePath: [3, 0], property: 'color', value: 'blue' })])
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 0, rulePath: [3, 0], property: 'color', value: 'blue' }),
+      ])
     );
     expect(result.source).toBe(STYLE_DOC.replace('color: #00f', 'color: blue'));
   });
@@ -1124,13 +1238,17 @@ describe('applyEditTransaction — styleBlock: change value', () => {
         styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'font-weight', value: '700' }),
       ])
     );
-    expect(result.source).toBe(STYLE_DOC.replace('font-weight: bold !important;', 'font-weight: 700 !important;'));
+    expect(result.source).toBe(
+      STYLE_DOC.replace('font-weight: bold !important;', 'font-weight: 700 !important;')
+    );
   });
 
   it('operates on the LAST declaration when the same property repeats in one rule', async () => {
     const result = await applyEditTransaction(
       STYLE_DOC,
-      styleBlockTxn(STYLE_DOC, [styleBlockOp({ styleOrdinal: 1, rulePath: [1], property: 'margin-top', value: '6px' })])
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 1, rulePath: [1], property: 'margin-top', value: '6px' }),
+      ])
     );
     expect(result.source).toBe(STYLE_DOC.replace('margin-top: 8px;', 'margin-top: 6px;'));
   });
@@ -1152,7 +1270,9 @@ describe('applyEditTransaction — styleBlock: change value', () => {
       () =>
         applyEditTransaction(
           STYLE_DOC,
-          styleBlockTxn(STYLE_DOC, [styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value: '#f00' })])
+          styleBlockTxn(STYLE_DOC, [
+            styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value: '#f00' }),
+          ])
         ),
       'EMPTY_TRANSACTION'
     );
@@ -1193,7 +1313,9 @@ describe('applyEditTransaction — styleBlock: delete declaration', () => {
   it('removes a declaration whose semicolon is preceded by a space, byte-exactly', async () => {
     const result = await applyEditTransaction(
       STYLE_DOC,
-      styleBlockTxn(STYLE_DOC, [styleBlockOp({ styleOrdinal: 1, rulePath: [3], property: 'color', value: null })])
+      styleBlockTxn(STYLE_DOC, [
+        styleBlockOp({ styleOrdinal: 1, rulePath: [3], property: 'color', value: null }),
+      ])
     );
     expect(result.source).toBe(STYLE_DOC.replace(' color: red ;', ''));
   });
@@ -1204,7 +1326,13 @@ describe('applyEditTransaction — styleBlock: create declaration', () => {
     const result = await applyEditTransaction(
       STYLE_DOC,
       styleBlockTxn(STYLE_DOC, [
-        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'border-radius', value: '4px', create: true }),
+        styleBlockOp({
+          styleOrdinal: 0,
+          rulePath: [2],
+          property: 'border-radius',
+          value: '4px',
+          create: true,
+        }),
       ])
     );
     expect(result.source).toBe(
@@ -1219,7 +1347,13 @@ describe('applyEditTransaction — styleBlock: create declaration', () => {
     const result = await applyEditTransaction(
       STYLE_DOC,
       styleBlockTxn(STYLE_DOC, [
-        styleBlockOp({ styleOrdinal: 1, rulePath: [4], property: 'margin-top', value: '4px', create: true }),
+        styleBlockOp({
+          styleOrdinal: 1,
+          rulePath: [4],
+          property: 'margin-top',
+          value: '4px',
+          create: true,
+        }),
       ])
     );
     // The repaired ';' lands at the insertion point (before '}') and still
@@ -1236,7 +1370,13 @@ describe('applyEditTransaction — styleBlock: create declaration', () => {
     const result = await applyEditTransaction(
       STYLE_DOC,
       styleBlockTxn(STYLE_DOC, [
-        styleBlockOp({ styleOrdinal: 1, rulePath: [2], property: 'color', value: 'red', create: true }),
+        styleBlockOp({
+          styleOrdinal: 1,
+          rulePath: [2],
+          property: 'color',
+          value: 'red',
+          create: true,
+        }),
       ])
     );
     expect(result.source).toBe(STYLE_DOC.replace('.empty {}', '.empty {\n      color: red;}'));
@@ -1246,7 +1386,13 @@ describe('applyEditTransaction — styleBlock: create declaration', () => {
     const result = await applyEditTransaction(
       STYLE_DOC,
       styleBlockTxn(STYLE_DOC, [
-        styleBlockOp({ styleOrdinal: 0, rulePath: [3, 0], property: 'margin-top', value: '4px', create: true }),
+        styleBlockOp({
+          styleOrdinal: 0,
+          rulePath: [3, 0],
+          property: 'margin-top',
+          value: '4px',
+          create: true,
+        }),
       ])
     );
     expect(result.source).toBe(
@@ -1258,8 +1404,20 @@ describe('applyEditTransaction — styleBlock: create declaration', () => {
     const result = await applyEditTransaction(
       STYLE_DOC,
       styleBlockTxn(STYLE_DOC, [
-        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'border-radius', value: '4px', create: true }),
-        styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'width', value: 'auto', create: true }),
+        styleBlockOp({
+          styleOrdinal: 0,
+          rulePath: [2],
+          property: 'border-radius',
+          value: '4px',
+          create: true,
+        }),
+        styleBlockOp({
+          styleOrdinal: 0,
+          rulePath: [2],
+          property: 'width',
+          value: 'auto',
+          create: true,
+        }),
       ])
     );
     expect(result.source).toBe(
@@ -1276,7 +1434,13 @@ describe('applyEditTransaction — styleBlock: create declaration', () => {
         applyEditTransaction(
           STYLE_DOC,
           styleBlockTxn(STYLE_DOC, [
-            styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value: 'blue', create: true }),
+            styleBlockOp({
+              styleOrdinal: 0,
+              rulePath: [2],
+              property: 'color',
+              value: 'blue',
+              create: true,
+            }),
           ])
         ),
       'INVALID_VALUE'
@@ -1289,7 +1453,13 @@ describe('applyEditTransaction — styleBlock: create declaration', () => {
         applyEditTransaction(
           STYLE_DOC,
           styleBlockTxn(STYLE_DOC, [
-            styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'display', value: null, create: true }),
+            styleBlockOp({
+              styleOrdinal: 0,
+              rulePath: [2],
+              property: 'display',
+              value: null,
+              create: true,
+            }),
           ])
         ),
       'INVALID_VALUE'
@@ -1307,7 +1477,10 @@ describe('applyEditTransaction — styleBlock: multiple operations', () => {
       ])
     );
     expect(result.source).toBe(
-      STYLE_DOC.replace('padding-top: 8px;', 'padding-top: 12px;').replace('line-height: 1.5;', 'line-height: 2;')
+      STYLE_DOC.replace('padding-top: 8px;', 'padding-top: 12px;').replace(
+        'line-height: 1.5;',
+        'line-height: 2;'
+      )
     );
   });
 
@@ -1320,7 +1493,10 @@ describe('applyEditTransaction — styleBlock: multiple operations', () => {
       ])
     );
     expect(result.source).toBe(
-      STYLE_DOC.replace('color: #f00;', 'color: blue;').replace('font-weight: bold !important;', 'font-weight: 700 !important;')
+      STYLE_DOC.replace('color: #f00;', 'color: blue;').replace(
+        'font-weight: bold !important;',
+        'font-weight: 700 !important;'
+      )
     );
   });
 
@@ -1362,23 +1538,43 @@ describe('applyEditTransaction — styleBlock: multiple operations', () => {
 });
 
 describe('applyEditTransaction — styleBlock: STYLE_SOURCE_NOT_FOUND matrix', () => {
-  const expectNotFound = (operation: DesignEditOperation, source: string = STYLE_DOC): Promise<void> =>
-    expectErrorCode(() => applyEditTransaction(source, styleBlockTxn(source, [operation])), 'STYLE_SOURCE_NOT_FOUND');
+  const expectNotFound = (
+    operation: DesignEditOperation,
+    source: string = STYLE_DOC
+  ): Promise<void> =>
+    expectErrorCode(
+      () => applyEditTransaction(source, styleBlockTxn(source, [operation])),
+      'STYLE_SOURCE_NOT_FOUND'
+    );
 
   it('rejects an out-of-range style block ordinal', async () => {
-    await expectNotFound(styleBlockOp({ styleOrdinal: 9, rulePath: [0], property: 'color', value: 'blue' }));
+    await expectNotFound(
+      styleBlockOp({ styleOrdinal: 9, rulePath: [0], property: 'color', value: 'blue' })
+    );
   });
 
   it('rejects out-of-range, empty and comment-indexed rule paths', async () => {
-    await expectNotFound(styleBlockOp({ styleOrdinal: 0, rulePath: [9], property: 'color', value: 'blue' }));
-    await expectNotFound(styleBlockOp({ styleOrdinal: 0, rulePath: [3, 9], property: 'color', value: 'blue' }));
-    await expectNotFound(styleBlockOp({ styleOrdinal: 0, rulePath: [], property: 'color', value: 'blue' }));
-    await expectNotFound(styleBlockOp({ styleOrdinal: 0, rulePath: [1], property: 'color', value: 'blue' }));
+    await expectNotFound(
+      styleBlockOp({ styleOrdinal: 0, rulePath: [9], property: 'color', value: 'blue' })
+    );
+    await expectNotFound(
+      styleBlockOp({ styleOrdinal: 0, rulePath: [3, 9], property: 'color', value: 'blue' })
+    );
+    await expectNotFound(
+      styleBlockOp({ styleOrdinal: 0, rulePath: [], property: 'color', value: 'blue' })
+    );
+    await expectNotFound(
+      styleBlockOp({ styleOrdinal: 0, rulePath: [1], property: 'color', value: 'blue' })
+    );
   });
 
   it('rejects a missing property for change and for delete', async () => {
-    await expectNotFound(styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'display', value: 'flex' }));
-    await expectNotFound(styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'display', value: null }));
+    await expectNotFound(
+      styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'display', value: 'flex' })
+    );
+    await expectNotFound(
+      styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'display', value: null })
+    );
   });
 
   it('rejects a block that does not parse as CSS', async () => {
@@ -1411,7 +1607,9 @@ describe('applyEditTransaction — styleBlock: entry validation (INVALID_VALUE)'
       () =>
         applyEditTransaction(
           STYLE_DOC,
-          styleBlockTxn(STYLE_DOC, [styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value })])
+          styleBlockTxn(STYLE_DOC, [
+            styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'color', value }),
+          ])
         ),
       'INVALID_VALUE'
     );
@@ -1436,7 +1634,12 @@ describe('applyEditTransaction — styleBlock: entry validation (INVALID_VALUE)'
         applyEditTransaction(
           STYLE_DOC,
           styleBlockTxn(STYLE_DOC, [
-            styleBlockOp({ styleOrdinal: 0, rulePath: [2], property: 'a'.repeat(64), value: 'blue' }),
+            styleBlockOp({
+              styleOrdinal: 0,
+              rulePath: [2],
+              property: 'a'.repeat(64),
+              value: 'blue',
+            }),
           ])
         ),
       'STYLE_SOURCE_NOT_FOUND'

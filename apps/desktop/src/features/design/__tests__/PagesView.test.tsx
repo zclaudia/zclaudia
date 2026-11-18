@@ -52,7 +52,9 @@ describe('PagesView', () => {
   it('为每个已打开页渲染一行（缩略图 + basename + 行菜单）', () => {
     mount();
     expect(screen.getByRole('button', { name: 'Activate design/index.html' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Activate pages/about.html, unsaved' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Activate pages/about.html, unsaved' })
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Activate pages/gone.html' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Page actions design/index.html' })
@@ -66,9 +68,9 @@ describe('PagesView', () => {
     const h = mount();
     const activeRow = screen.getByRole('button', { name: 'Activate design/index.html' });
     expect(activeRow).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('button', { name: 'Activate pages/about.html, unsaved' })).not.toHaveAttribute(
-      'aria-current'
-    );
+    expect(
+      screen.getByRole('button', { name: 'Activate pages/about.html, unsaved' })
+    ).not.toHaveAttribute('aria-current');
     fireEvent.click(screen.getByRole('button', { name: 'Activate pages/about.html, unsaved' }));
     expect(h.props.onActivate).toHaveBeenCalledWith('pages/about.html');
   });
@@ -135,17 +137,11 @@ describe('PagesView', () => {
     });
     expect(h.props.onRequestPreview).not.toHaveBeenCalled();
     h.rerender(
-      <PagesView
-        {...h.props}
-        pages={[page('design/index.html', { draftRevision: 'r9' })]}
-      />
+      <PagesView {...h.props} pages={[page('design/index.html', { draftRevision: 'r9' })]} />
     );
     expect(h.props.onRequestPreview).toHaveBeenCalledTimes(1);
     h.rerender(
-      <PagesView
-        {...h.props}
-        pages={[page('design/index.html', { draftRevision: 'r9' })]}
-      />
+      <PagesView {...h.props} pages={[page('design/index.html', { draftRevision: 'r9' })]} />
     );
     expect(h.props.onRequestPreview).toHaveBeenCalledTimes(1);
   });

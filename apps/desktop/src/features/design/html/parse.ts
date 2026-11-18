@@ -42,7 +42,9 @@ export function childElements(node: P5ParentNode): P5Element[] {
 }
 
 /** Type guard for parse5 text nodes. */
-export function isTextNode(node: DefaultTreeAdapterMap['childNode']): node is DefaultTreeAdapterMap['textNode'] {
+export function isTextNode(
+  node: DefaultTreeAdapterMap['childNode']
+): node is DefaultTreeAdapterMap['textNode'] {
   return node.nodeName === '#text';
 }
 

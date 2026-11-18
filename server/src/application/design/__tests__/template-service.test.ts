@@ -88,7 +88,9 @@ describe('design template catalog invariants', () => {
       });
 
       it('keeps every href/src relative or an in-page anchor (no scheme, protocol-relative or absolute path)', () => {
-        const references = [...html.matchAll(/\s(?:href|src)\s*=\s*"([^"]*)"/gi)].map(match => match[1]);
+        const references = [...html.matchAll(/\s(?:href|src)\s*=\s*"([^"]*)"/gi)].map(
+          match => match[1]
+        );
         expect(references.length).toBeGreaterThan(0);
         for (const reference of references) {
           expect(reference).not.toBe('');
@@ -230,7 +232,8 @@ describe('TemplateService.install', () => {
     });
   });
 
-  it('rejects a repeat install with the full conflicting file list', async () => {    await templates.install('sa', 'showcase');
+  it('rejects a repeat install with the full conflicting file list', async () => {
+    await templates.install('sa', 'showcase');
     const conflict = templates.install('sa', 'showcase');
     await expect(conflict).rejects.toMatchObject({
       status: 409,
@@ -247,9 +250,9 @@ describe('TemplateService.install', () => {
     });
     // Nothing was clobbered by the rejected attempt.
     const definition = getTemplateDefinition('showcase') as TemplateDefinition;
-    await expect(readFile(path.join(rootA, 'design', 'showcase', 'styles.css'), 'utf8')).resolves.toBe(
-      definition.sources[1].content
-    );
+    await expect(
+      readFile(path.join(rootA, 'design', 'showcase', 'styles.css'), 'utf8')
+    ).resolves.toBe(definition.sources[1].content);
   });
 
   it('replaces an existing install when overwrite is explicitly confirmed', async () => {
@@ -258,9 +261,9 @@ describe('TemplateService.install', () => {
     const result = await templates.install('sa', 'landing', true);
     expect(result.installed).toHaveLength(3);
     const definition = getTemplateDefinition('landing') as TemplateDefinition;
-    await expect(readFile(path.join(rootA, 'design', 'landing', 'index.html'), 'utf8')).resolves.toBe(
-      definition.sources[0].content
-    );
+    await expect(
+      readFile(path.join(rootA, 'design', 'landing', 'index.html'), 'utf8')
+    ).resolves.toBe(definition.sources[0].content);
     const marker = JSON.parse(
       await readFile(path.join(rootA, 'design', 'landing', 'TEMPLATE.json'), 'utf8')
     );
@@ -278,9 +281,9 @@ describe('TemplateService.install', () => {
       status: 409,
       code: 'REVISION_CONFLICT',
     });
-    await expect(readFile(path.join(rootA, 'design', 'landing', 'index.html'), 'utf8')).resolves.toBe(
-      '<p>raced</p>'
-    );
+    await expect(
+      readFile(path.join(rootA, 'design', 'landing', 'index.html'), 'utf8')
+    ).resolves.toBe('<p>raced</p>');
   });
 
   it('validates template id, overwrite flag and session', async () => {

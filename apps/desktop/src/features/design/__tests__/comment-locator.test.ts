@@ -44,21 +44,30 @@ describe('matchCommentTarget（P7 §6.1 严格定位）', () => {
 
   it('命中：文本节点不消耗 path 序号（元素子节点语义，与 element-tree 一致）', () => {
     const source = '<body>lead text<p>a</p><div>b</div></body>';
-    const match = matchCommentTarget(source, target({ elementPath: [1], tagName: 'div', text: 'b' }));
+    const match = matchCommentTarget(
+      source,
+      target({ elementPath: [1], tagName: 'div', text: 'b' })
+    );
     expect(match.matched).toBe(true);
     expect(match.snippet).toBe('<div>b</div>');
   });
 
   it('命中：折叠空白后相等即命中（源码多空白 / 目标已折叠的正例）', () => {
     const source = '<body><p>你好\n  世界</p></body>';
-    const match = matchCommentTarget(source, target({ elementPath: [0], tagName: 'p', text: '你好 世界' }));
+    const match = matchCommentTarget(
+      source,
+      target({ elementPath: [0], tagName: 'p', text: '你好 世界' })
+    );
     expect(match.matched).toBe(true);
     expect(match.text).toBe('你好 世界');
   });
 
   it('命中：text 为后代文本拼接（textContent 语义）且 ≤200 超长截断', () => {
     const source = '<body><div><p>a</p> <span>b</span></div></body>';
-    const nested = matchCommentTarget(source, target({ elementPath: [0], tagName: 'div', text: 'a b' }));
+    const nested = matchCommentTarget(
+      source,
+      target({ elementPath: [0], tagName: 'div', text: 'a b' })
+    );
     expect(nested.matched).toBe(true);
     expect(nested.text).toBe('a b');
 

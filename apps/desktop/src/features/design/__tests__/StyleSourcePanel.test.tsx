@@ -111,7 +111,9 @@ describe('StyleSourcePanel（P3.5 C4：样式来源区）', () => {
     });
 
     it('声明行展示属性名与源码值', () => {
-      mount({ rows: [ruleRow({ declarations: [declaration({ property: 'color', value: '#ff0000' })] })] });
+      mount({
+        rows: [ruleRow({ declarations: [declaration({ property: 'color', value: '#ff0000' })] })],
+      });
       const row = within(cardOf()).getByTestId('declaration-color');
       expect(row).toHaveTextContent('color:');
       expect(row).toHaveTextContent('#ff0000');
@@ -127,7 +129,9 @@ describe('StyleSourcePanel（P3.5 C4：样式来源区）', () => {
         ],
       });
       expect(within(cardOf('@inline/2', [2])).getByText('Style block #2')).toBeInTheDocument();
-      expect(within(cardOf('design/css/main.css', [3])).getByText('design/css/main.css')).toBeInTheDocument();
+      expect(
+        within(cardOf('design/css/main.css', [3])).getByText('design/css/main.css')
+      ).toBeInTheDocument();
     });
 
     it('important 徽标：声明行带 important 时显示，否则不显示', () => {
@@ -174,24 +178,31 @@ describe('StyleSourcePanel（P3.5 C4：样式来源区）', () => {
       { reason: 'oversize', text: 'Style block is too large to edit' },
     ] as const;
 
-    it.each(readOnlyCases)('readOnly reason=$reason → 文案「$text」且无编辑控件', ({ reason, text }) => {
-      mount({ rows: [ruleRow({ readOnly: { reason }, declarations: [] })] });
-      const card = cardOf();
-      expect(within(card).getByText(text)).toBeInTheDocument();
-      expect(within(card).queryByRole('textbox', { name: 'New property' })).not.toBeInTheDocument();
-      expect(within(card).queryByRole('button', { name: /Add declaration/ })).not.toBeInTheDocument();
-    });
+    it.each(readOnlyCases)(
+      'readOnly reason=$reason → 文案「$text」且无编辑控件',
+      ({ reason, text }) => {
+        mount({ rows: [ruleRow({ readOnly: { reason }, declarations: [] })] });
+        const card = cardOf();
+        expect(within(card).getByText(text)).toBeInTheDocument();
+        expect(
+          within(card).queryByRole('textbox', { name: 'New property' })
+        ).not.toBeInTheDocument();
+        expect(
+          within(card).queryByRole('button', { name: /Add declaration/ })
+        ).not.toBeInTheDocument();
+      }
+    );
 
     it('非 @inline origin 的对齐行（防御）同样不提供编辑控件', () => {
       mount({
-        rows: [
-          ruleRow({ origin: 'design/css/main.css', declarations: [declaration()] }),
-        ],
+        rows: [ruleRow({ origin: 'design/css/main.css', declarations: [declaration()] })],
       });
       const card = cardOf('design/css/main.css', [2]);
       expect(within(card).queryByLabelText('Value for color')).not.toBeInTheDocument();
       expect(within(card).queryByLabelText('Delete declaration color')).not.toBeInTheDocument();
-      expect(within(card).queryByRole('button', { name: 'Add declaration' })).not.toBeInTheDocument();
+      expect(
+        within(card).queryByRole('button', { name: 'Add declaration' })
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -282,9 +293,7 @@ describe('StyleSourcePanel（P3.5 C4：样式来源区）', () => {
       const onApply = vi.fn();
       mount({
         onApply,
-        rows: [
-          ruleRow({ origin: '@inline/1', rulePath: [0, 2], declarations: [declaration()] }),
-        ],
+        rows: [ruleRow({ origin: '@inline/1', rulePath: [0, 2], declarations: [declaration()] })],
       });
       fireEvent.click(screen.getByRole('button', { name: 'Delete declaration color' }));
       expect(onApply).toHaveBeenCalledWith([
@@ -452,10 +461,14 @@ describe('StyleSourcePanel（P3.5 C4：样式来源区）', () => {
       const onKeepDraft = vi.fn();
       const onReloadDraft = vi.fn();
       mount({ rows: [externalRow] });
-      expect(screen.queryByText('A style file was changed outside the panel')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('A style file was changed outside the panel')
+      ).not.toBeInTheDocument();
       cleanup();
       mount({ rows: [externalRow], conflictPath: EXTERNAL_ORIGIN, onKeepDraft, onReloadDraft });
-      expect(screen.getByRole('alert')).toHaveTextContent('A style file was changed outside the panel');
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'A style file was changed outside the panel'
+      );
       fireEvent.click(screen.getByRole('button', { name: 'Keep draft' }));
       expect(onKeepDraft).toHaveBeenCalledTimes(1);
       fireEvent.click(screen.getByRole('button', { name: `Reload from disk ${EXTERNAL_ORIGIN}` }));

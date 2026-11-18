@@ -65,8 +65,17 @@ describe('buildDesignPreview', () => {
     const data = { type: 'zclaudia:design-ping', channel: 'ready-channel', token: 'probe-1' };
     bridge.post(data);
     expect(bridge.sent).toHaveLength(0);
-    bridge.window.dispatchEvent(new bridge.window.MessageEvent('message', { data, source: bridge.window.parent }));
-    expect(bridge.sent).toEqual([{ type: 'zclaudia:design-ready', channel: 'ready-channel', base: 'bridge-rev', token: 'probe-1' }]);
+    bridge.window.dispatchEvent(
+      new bridge.window.MessageEvent('message', { data, source: bridge.window.parent })
+    );
+    expect(bridge.sent).toEqual([
+      {
+        type: 'zclaudia:design-ready',
+        channel: 'ready-channel',
+        base: 'bridge-rev',
+        token: 'probe-1',
+      },
+    ]);
     bridge.close();
   });
   beforeEach(() => {
@@ -304,7 +313,11 @@ describe('buildDesignPreview', () => {
       'path-channel'
     );
 
-    harness.post({ type: 'zclaudia:design-select-path', channel: 'path-channel', elementPath: [0, 0] });
+    harness.post({
+      type: 'zclaudia:design-select-path',
+      channel: 'path-channel',
+      elementPath: [0, 0],
+    });
     expect(harness.sent).toHaveLength(1);
     const selection = harness.sent[0]?.selection as Record<string, unknown>;
     expect(harness.sent[0]).toMatchObject({
@@ -319,14 +332,22 @@ describe('buildDesignPreview', () => {
     expect(harness.document.querySelector('p')?.style.outlineOffset).toBe('3px');
 
     // A second selection restores the previously highlighted element's outline.
-    harness.post({ type: 'zclaudia:design-select-path', channel: 'path-channel', elementPath: [0] });
+    harness.post({
+      type: 'zclaudia:design-select-path',
+      channel: 'path-channel',
+      elementPath: [0],
+    });
     expect(harness.sent).toHaveLength(2);
     expect((harness.sent[1]?.selection as Record<string, unknown>).tagName).toBe('main');
     expect(harness.document.querySelector('p')?.style.outline).toBe('');
     expect(harness.document.querySelector('main')?.style.outline).toBe('2px dashed #808080');
 
     // Out-of-tree paths report failure; malformed payloads and wrong channels stay silent.
-    harness.post({ type: 'zclaudia:design-select-path', channel: 'path-channel', elementPath: [9, 9] });
+    harness.post({
+      type: 'zclaudia:design-select-path',
+      channel: 'path-channel',
+      elementPath: [9, 9],
+    });
     expect(harness.sent).toHaveLength(3);
     expect(harness.sent[2]).toEqual({
       type: 'zclaudia:design-select-failed',
@@ -335,9 +356,21 @@ describe('buildDesignPreview', () => {
     });
 
     harness.post({ type: 'zclaudia:design-select-path', channel: 'other', elementPath: [0] });
-    harness.post({ type: 'zclaudia:design-select-path', channel: 'path-channel', elementPath: 'nope' });
-    harness.post({ type: 'zclaudia:design-select-path', channel: 'path-channel', elementPath: [-1] });
-    harness.post({ type: 'zclaudia:design-select-path', channel: 'path-channel', elementPath: [0.5] });
+    harness.post({
+      type: 'zclaudia:design-select-path',
+      channel: 'path-channel',
+      elementPath: 'nope',
+    });
+    harness.post({
+      type: 'zclaudia:design-select-path',
+      channel: 'path-channel',
+      elementPath: [-1],
+    });
+    harness.post({
+      type: 'zclaudia:design-select-path',
+      channel: 'path-channel',
+      elementPath: [0.5],
+    });
     expect(harness.sent).toHaveLength(3);
     harness.close();
   });
@@ -415,14 +448,20 @@ describe('design-rules bridge', () => {
         if (path === 'theme.css')
           return {
             mimeType: 'text/css',
-            data: btoa('p { margin: 0 } p[data-k="v"]:first-child { color: pink } [hidden] { display: none }'),
+            data: btoa(
+              'p { margin: 0 } p[data-k="v"]:first-child { color: pink } [hidden] { display: none }'
+            ),
           };
         throw new Error('missing');
       }
     );
 
     // p.note：theme.css 两条 + 自有块选择器组两个命中选择器（#wrap p 与 .card 都命中 → 各上报一条）。
-    harness.post({ type: 'zclaudia:design-rules-request', channel: 'rules-ch', elementPath: [0, 0] });
+    harness.post({
+      type: 'zclaudia:design-rules-request',
+      channel: 'rules-ch',
+      elementPath: [0, 0],
+    });
     expect(harness.sent).toHaveLength(1);
     expect(harness.sent[0]).toMatchObject({
       type: 'zclaudia:design-rules',
@@ -462,7 +501,11 @@ describe('design-rules bridge', () => {
     ]);
 
     // li.skip：:not() 参数递归计入特异性（li + .skip + li → [0,1,2]）；组外选择器不命中不上报。
-    harness.post({ type: 'zclaudia:design-rules-request', channel: 'rules-ch', elementPath: [1, 1] });
+    harness.post({
+      type: 'zclaudia:design-rules-request',
+      channel: 'rules-ch',
+      elementPath: [1, 1],
+    });
     expect((harness.sent[1] as { rules: unknown[] }).rules).toEqual([
       {
         origin: '@inline/0',
@@ -522,15 +565,17 @@ describe('design-rules bridge', () => {
 
     // 错误 channel、畸形路径、解析不到元素：全部静默（不回发 select-failed 同款失败消息）。
     harness.post({ type: 'zclaudia:design-rules-request', channel: 'other', elementPath: [0] });
-    harness.post({ type: 'zclaudia:design-rules-request', channel: 'quiet-ch', elementPath: 'nope' });
+    harness.post({
+      type: 'zclaudia:design-rules-request',
+      channel: 'quiet-ch',
+      elementPath: 'nope',
+    });
     harness.post({ type: 'zclaudia:design-rules-request', channel: 'quiet-ch', elementPath: [-1] });
     harness.post({ type: 'zclaudia:design-rules-request', channel: 'quiet-ch', elementPath: [9] });
     expect(harness.sent).toHaveLength(0);
 
     // 防御：ownerNode 缺来源标记的 sheet 跳过（harness 摘除标记模拟）→ 命中规则为空但仍回发空消息。
-    harness.document
-      .querySelector('style')
-      ?.removeAttribute('data-zclaudia-style-origin');
+    harness.document.querySelector('style')?.removeAttribute('data-zclaudia-style-origin');
     harness.post({ type: 'zclaudia:design-rules-request', channel: 'quiet-ch', elementPath: [0] });
     expect(harness.sent).toHaveLength(1);
     expect(harness.sent[0]).toEqual({

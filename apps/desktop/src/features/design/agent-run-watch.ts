@@ -25,7 +25,10 @@ export interface AgentRunDiff {
   changedPages: string[];
 }
 
-export function diffDesignWatchState(before: DesignWatchState, after: DesignWatchState): AgentRunDiff {
+export function diffDesignWatchState(
+  before: DesignWatchState,
+  after: DesignWatchState
+): AgentRunDiff {
   const knownFiles = new Set(before.files);
   const addedFiles = after.files.filter(path => !knownFiles.has(path));
 
@@ -146,7 +149,9 @@ export function useAgentRunFeedback(options: AgentRunFeedbackOptions): {
       try {
         const result = await listDesignFiles(current.backendId, current.sessionId);
         const raw = Array.isArray(result?.files) ? result.files : [];
-        files = raw.filter((path): path is string => typeof path === 'string' && /\.html?$/i.test(path));
+        files = raw.filter(
+          (path): path is string => typeof path === 'string' && /\.html?$/i.test(path)
+        );
       } catch {
         // 清单拉取失败：整轮放弃，保持初始等待态（不写 status）。
         return;

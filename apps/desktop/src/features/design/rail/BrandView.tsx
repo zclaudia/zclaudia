@@ -255,9 +255,7 @@ export function BrandView({
   const loading = brand === null && loadError === null;
   const textMode = brand !== null && (brand.designMd !== null || brand.tokensCss !== null);
 
-  const labelClass = compact
-    ? 'text-[11px] text-muted-foreground'
-    : 'text-muted-foreground';
+  const labelClass = compact ? 'text-[11px] text-muted-foreground' : 'text-muted-foreground';
   const colorRowClass = compact
     ? 'grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-1.5'
     : 'grid grid-cols-[4.5rem_1fr_auto] items-center gap-2';
@@ -390,7 +388,10 @@ export function BrandView({
               className={`${FIELD_CLASS} min-w-0`}
               value={form.spacingUnit}
               onChange={event =>
-                setForm(prev => ({ ...prev, spacingUnit: event.target.value as BrandSpec['spacingUnit'] }))
+                setForm(prev => ({
+                  ...prev,
+                  spacingUnit: event.target.value as BrandSpec['spacingUnit'],
+                }))
               }
             >
               <option value="4px">4px</option>
@@ -428,12 +429,7 @@ export function BrandView({
                 placeholder="assets/logo.svg (relative to design/)"
                 onChange={event => setForm(prev => ({ ...prev, logoPath: event.target.value }))}
               />
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full"
-                onClick={toggleAssets}
-              >
+              <Button size="sm" variant="outline" className="w-full" onClick={toggleAssets}>
                 Choose from asset library…
               </Button>
             </div>
@@ -459,9 +455,7 @@ export function BrandView({
               className="max-h-40 overflow-y-auto rounded-md border border-border p-1"
             >
               {assetPanel === 'loading' && (
-                <div className="px-1 py-0.5 text-[11px] text-muted-foreground">
-                  Loading assets…
-                </div>
+                <div className="px-1 py-0.5 text-[11px] text-muted-foreground">Loading assets…</div>
               )}
               {assetPanel === 'error' && (
                 <div className="flex flex-wrap items-center gap-1 px-1 py-0.5 text-[11px] text-destructive">

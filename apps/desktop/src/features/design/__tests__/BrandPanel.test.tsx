@@ -58,7 +58,12 @@ const SPEC: BrandSpec = {
   notes: '保持克制。',
 };
 
-const COLOR_LABELS = { primary: 'Primary', secondary: 'Secondary', background: 'Background', text: 'Text' } as const;
+const COLOR_LABELS = {
+  primary: 'Primary',
+  secondary: 'Secondary',
+  background: 'Background',
+  text: 'Text',
+} as const;
 
 function fillSpec(overrides: Partial<BrandSpec> = {}) {
   const spec = { ...SPEC, ...overrides };
@@ -202,7 +207,9 @@ describe('BrandPanel（P4 §3.4）', () => {
       target: { value: '# 改过的新内容\n' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save DESIGN.md' }));
-    expect(await screen.findByText('The file was updated elsewhere; reload it')).toBeInTheDocument();
+    expect(
+      await screen.findByText('The file was updated elsewhere; reload it')
+    ).toBeInTheDocument();
     expect(getDesignBrand).toHaveBeenCalledTimes(1);
     vi.mocked(getDesignBrand).mockResolvedValue({
       ...EXISTING_BRAND,

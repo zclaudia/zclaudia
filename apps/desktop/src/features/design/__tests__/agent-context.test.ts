@@ -17,7 +17,12 @@ const DESIGN_MD_SAMPLE = [
   '按钮一律使用主色，圆角统一 md。',
 ].join('\n');
 
-const TOKENS_CSS_SAMPLE = [':root {', '  --color-primary: #4f46e5;', '  --radius-md: 8px;', '}'].join('\n');
+const TOKENS_CSS_SAMPLE = [
+  ':root {',
+  '  --color-primary: #4f46e5;',
+  '  --radius-md: 8px;',
+  '}',
+].join('\n');
 
 const FULL_INPUT: AgentContextInput = {
   workingDirectory: '/Users/dev/demo-site',
@@ -108,9 +113,15 @@ describe('buildDesignAgentContext（P4 §5.1 上下文组装）', () => {
 
   it('Viewport 行：preset 固定有值，width 为 null 时写 auto', () => {
     const { sections } = buildDesignAgentContext(MINIMAL_INPUT, 'generate');
-    expect(sectionByTitle(sections, 'Viewport')?.lines).toEqual(['- Preset: fill', '- Width: auto']);
+    expect(sectionByTitle(sections, 'Viewport')?.lines).toEqual([
+      '- Preset: fill',
+      '- Width: auto',
+    ]);
     const full = buildDesignAgentContext(FULL_INPUT, 'generate');
-    expect(sectionByTitle(full.sections, 'Viewport')?.lines).toEqual(['- Preset: mobile', '- Width: 390px']);
+    expect(sectionByTitle(full.sections, 'Viewport')?.lines).toEqual([
+      '- Preset: mobile',
+      '- Width: 390px',
+    ]);
   });
 
   it('空 section 整省：无品牌/无选区/无素材/无工作区信息时只剩 Viewport', () => {
@@ -151,7 +162,9 @@ describe('buildDesignAgentContext 截断（§5.1 断言点）', () => {
     const { sections } = buildDesignAgentContext({ ...MINIMAL_INPUT, pages }, 'generate');
     const lines = sectionByTitle(sections, 'Pages')?.lines ?? [];
     expect(lines).toHaveLength(13);
-    expect(lines[0]).toBe(`- design/p0.html (disk rev ${REV_INDEX.slice(0, 12)}, unsaved local draft)`);
+    expect(lines[0]).toBe(
+      `- design/p0.html (disk rev ${REV_INDEX.slice(0, 12)}, unsaved local draft)`
+    );
     expect(lines[1]).toBe(`- design/p1.html (disk rev ${REV_INDEX.slice(0, 12)})`);
     expect(lines[12]).toBe('… (+3 more)');
   });
@@ -162,7 +175,12 @@ describe('buildDesignAgentContext 截断（§5.1 断言点）', () => {
         ...MINIMAL_INPUT,
         active: {
           ...baseActive,
-          selection: { tagName: 'p', elementPath: [0], text: 'x'.repeat(1200), sourceText: 'y'.repeat(1200) },
+          selection: {
+            tagName: 'p',
+            elementPath: [0],
+            text: 'x'.repeat(1200),
+            sourceText: 'y'.repeat(1200),
+          },
         },
       },
       'generate'
@@ -213,7 +231,10 @@ describe('buildDesignAgentContext 截断（§5.1 断言点）', () => {
       {
         ...MINIMAL_INPUT,
         assets: {
-          referenced: Array.from({ length: 25 }, (_, i) => ({ path: `design/assets/a${i}.png`, kind: 'image' })),
+          referenced: Array.from({ length: 25 }, (_, i) => ({
+            path: `design/assets/a${i}.png`,
+            kind: 'image',
+          })),
           importedRecently: Array.from({ length: 12 }, (_, i) => `design/assets/b${i}.woff2`),
         },
       },
@@ -251,7 +272,9 @@ describe('buildDesignAgentContext prompt（§5.1 结尾任务段）', () => {
       pages: [{ path: 'design/about.html', docRevision: REV_ABOUT, dirty: false }],
       active: { path: 'design/about.html', docRevision: REV_ABOUT, dirty: false, selection: null },
     };
-    const { prompt } = buildDesignAgentContext(input, 'generate', { request: 'Make the hero bolder' });
+    const { prompt } = buildDesignAgentContext(input, 'generate', {
+      request: 'Make the hero bolder',
+    });
     expect(prompt).toContain(
       'Update the current page at design/about.html in this workspace (/work/site) according to the request; preserve unrelated content.'
     );
@@ -262,7 +285,9 @@ describe('buildDesignAgentContext prompt（§5.1 结尾任务段）', () => {
 
   it('generate：空白工作台无 workingDirectory/projectId 时回退 index 并省略插值', () => {
     const { prompt } = buildDesignAgentContext(MINIMAL_INPUT, 'generate');
-    expect(prompt).toContain('Create or update a polished static HTML/CSS page at design/index.html in this workspace.');
+    expect(prompt).toContain(
+      'Create or update a polished static HTML/CSS page at design/index.html in this workspace.'
+    );
     expect(prompt).toContain('Keep the existing project context.');
   });
 

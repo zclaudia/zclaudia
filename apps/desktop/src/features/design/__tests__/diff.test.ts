@@ -46,14 +46,7 @@ describe('lineDiff', () => {
   it('interleaves same/add/del lines for crossed changes', () => {
     const result = lineDiff('a\nb\nc\nd', 'a\nx\nc\ne');
     expect(result.truncated).toBe(false);
-    expect(texts(result)).toEqual([
-      'same:a',
-      'del:b',
-      'add:x',
-      'same:c',
-      'del:d',
-      'add:e',
-    ]);
+    expect(texts(result)).toEqual(['same:a', 'del:b', 'add:x', 'same:c', 'del:d', 'add:e']);
     expect(result.lines[1]).toMatchObject({ type: 'del', aLine: 2 });
     expect(result.lines[2]).toMatchObject({ type: 'add', bLine: 2 });
     expect(result.lines[3]).toMatchObject({ type: 'same', aLine: 3, bLine: 3 });

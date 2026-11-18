@@ -6,13 +6,13 @@
 
 ## 1. 背景与目标
 
-| | zclaudia（本仓库） | ZCode（竞品，`/Users/zhvala/SourceCode/zcoder`） |
-| --- | --- | --- |
-| 定位 | 跨平台桌面 + gateway 的多 Agent 编程工作台 | AI 编程工作台：桌面 + 浏览器 + 终端 Agent（TUI/CLI） |
-| 技术栈 | Tauri + React，Node 后端，SQLite 本地优先 | Electron + Web + Node 后端，Agent CLI 源码完整入库 |
-| Agent 运行时 | Pi 内置运行时 + 插件运行时（Claude/Codex/Cursor） | 自研 Agent 内核（`apps/zcode-cli/packages/core`）+ 31 个子包 |
-| 顶层包 | apps/desktop、server、packages/agent-common、plugins/agents | 18 个 packages（android/web/rpc/provider/ui/cua/formal-proof…）+ apps/zcode-cli |
-| 工程配套 | e2e/、docs/、scripts/ | harness/、specs/、docs/（数百篇设计文档）、adr/、architecture-policy.yaml、knip、formal-proof |
+|              | zclaudia（本仓库）                                          | ZCode（竞品，`/Users/zhvala/SourceCode/zcoder`）                                              |
+| ------------ | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 定位         | 跨平台桌面 + gateway 的多 Agent 编程工作台                  | AI 编程工作台：桌面 + 浏览器 + 终端 Agent（TUI/CLI）                                          |
+| 技术栈       | Tauri + React，Node 后端，SQLite 本地优先                   | Electron + Web + Node 后端，Agent CLI 源码完整入库                                            |
+| Agent 运行时 | Pi 内置运行时 + 插件运行时（Claude/Codex/Cursor）           | 自研 Agent 内核（`apps/zcode-cli/packages/core`）+ 31 个子包                                  |
+| 顶层包       | apps/desktop、server、packages/agent-common、plugins/agents | 18 个 packages（android/web/rpc/provider/ui/cua/formal-proof…）+ apps/zcode-cli               |
+| 工程配套     | e2e/、docs/、scripts/                                       | harness/、specs/、docs/（数百篇设计文档）、adr/、architecture-policy.yaml、knip、formal-proof |
 
 目标：识别 ZCode 具备而 zclaudia 缺失或明显较弱的能力，逐项评估**可搬运性**，形成按优先级排序的借鉴清单。不实际搬运代码。
 
@@ -24,15 +24,15 @@
 
 ## 3. 对比维度与范围映射
 
-| # | 维度 | ZCode 侧 | zclaudia 侧 | 要回答的关键问题 |
-| --- | --- | --- | --- | --- |
-| T1 | Agent 核心运行时与终端形态 | `apps/zcode-cli/packages/{core,cli,tui,bootstrap,contracts,adapters}` | `plugins/agents/*`、Pi 运行时（server 侧）、`packages/agent-common` | agent loop、工具系统、权限/审批、hooks、会话恢复、上下文管理、TUI 形态哪些更强 |
-| T2 | 后端与服务架构 | `packages/{server,services,rpc,zcode-server-cli}` | `server/src/{application,domains,infra,interfaces}` | 会话管理、conversation runtime、传输层（RPC/WS）、后台任务模型的差距 |
-| T3 | 桌面客户端与 UI 体系 | `packages/{desktop,client,ui,share-ui,web-share,stream-animate}` | `apps/desktop/src/*`（React） | Electron vs Tauri 的功能代价、聊天渲染（markdown/流式动画）、组件库复用价值 |
-| T4 | 多形态与远程能力 | `packages/{web,android}`、SSH/WSL 远程工作区、`harness/remote`、`zcode --web` 分发 | 移动 web、本地 browser 模式、gateway | Android 原生应用、远程工作区（SSH/WSL）、单二进制多形态分发是否值得跟进 |
-| T5 | 扩展体系 | `UI_PLUGIN.md`、`apps/zcode-cli/packages/*-plugin`（31 包中的插件族）、`dynamic-workflow`、`zcode-cua`、`node-repl-host`、`browser-use`、`superpowers`、skills-lock、bots/automations（`docs/bots*.md`、mailbox） | `plugins/agents`（运行时插件）、agent playground | 插件形态广度（skills/命令/hooks/工作流/CUA/自动化 bot）、技能分发与锁定机制 |
-| T6 | Provider / 模型 / 订阅计费 | `packages/{provider,provider-node,model-option-map}`、`docs/bigmodel-*.md` | `server/src/auth.ts`、provider 相关配置 | 多 provider 接入、coding-plan 订阅与用量配额、模型选项映射的成熟度 |
-| T7 | 工程实践与质量基建 | `harness/`、`specs/`、`docs/adr`、`architecture-policy.yaml`、`dependency-graph.mmd`、knip、`formal-proof`、`e2e-report`、telemetry、i18n | `e2e/`、`scripts/`、eslint、`docs/{specs,plans,reviews}` | 架构治理（policy+graph+check）、形式化验证、遥测、i18n、发布工程哪些值得引入 |
+| #   | 维度                       | ZCode 侧                                                                                                                                                                                                          | zclaudia 侧                                                         | 要回答的关键问题                                                               |
+| --- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| T1  | Agent 核心运行时与终端形态 | `apps/zcode-cli/packages/{core,cli,tui,bootstrap,contracts,adapters}`                                                                                                                                             | `plugins/agents/*`、Pi 运行时（server 侧）、`packages/agent-common` | agent loop、工具系统、权限/审批、hooks、会话恢复、上下文管理、TUI 形态哪些更强 |
+| T2  | 后端与服务架构             | `packages/{server,services,rpc,zcode-server-cli}`                                                                                                                                                                 | `server/src/{application,domains,infra,interfaces}`                 | 会话管理、conversation runtime、传输层（RPC/WS）、后台任务模型的差距           |
+| T3  | 桌面客户端与 UI 体系       | `packages/{desktop,client,ui,share-ui,web-share,stream-animate}`                                                                                                                                                  | `apps/desktop/src/*`（React）                                       | Electron vs Tauri 的功能代价、聊天渲染（markdown/流式动画）、组件库复用价值    |
+| T4  | 多形态与远程能力           | `packages/{web,android}`、SSH/WSL 远程工作区、`harness/remote`、`zcode --web` 分发                                                                                                                                | 移动 web、本地 browser 模式、gateway                                | Android 原生应用、远程工作区（SSH/WSL）、单二进制多形态分发是否值得跟进        |
+| T5  | 扩展体系                   | `UI_PLUGIN.md`、`apps/zcode-cli/packages/*-plugin`（31 包中的插件族）、`dynamic-workflow`、`zcode-cua`、`node-repl-host`、`browser-use`、`superpowers`、skills-lock、bots/automations（`docs/bots*.md`、mailbox） | `plugins/agents`（运行时插件）、agent playground                    | 插件形态广度（skills/命令/hooks/工作流/CUA/自动化 bot）、技能分发与锁定机制    |
+| T6  | Provider / 模型 / 订阅计费 | `packages/{provider,provider-node,model-option-map}`、`docs/bigmodel-*.md`                                                                                                                                        | `server/src/auth.ts`、provider 相关配置                             | 多 provider 接入、coding-plan 订阅与用量配额、模型选项映射的成熟度             |
+| T7  | 工程实践与质量基建         | `harness/`、`specs/`、`docs/adr`、`architecture-policy.yaml`、`dependency-graph.mmd`、knip、`formal-proof`、`e2e-report`、telemetry、i18n                                                                         | `e2e/`、`scripts/`、eslint、`docs/{specs,plans,reviews}`            | 架构治理（policy+graph+check）、形式化验证、遥测、i18n、发布工程哪些值得引入   |
 
 ## 4. 执行方式
 
@@ -47,12 +47,16 @@
 # T{n} {维度名} 对比报告
 
 ## 1. 两侧结构对照（简表）
+
 ## 2. ZCode 领先点（核心章节，每项必含）
+
 - 名称 / 解决什么问题
 - 证据：ZCode 文件路径（可多列）+ zclaudia 现状路径
 - 可搬运性：直接移植 | 重写借鉴 | 仅思路（+ 理由：依赖耦合度、体量、License）
 - 预估搬运量级：文件数/模块级/思路级
+
 ## 3. zclaudia 已有而 ZCode 没有的优势（简列）
+
 ## 4. 不建议搬运的（及原因）
 ```
 

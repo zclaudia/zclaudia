@@ -665,7 +665,11 @@ export async function inlineStyleSources(
     const cssDir = cssPath.slice(0, cssPath.lastIndexOf('/') + 1);
     const style = doc.createElement('style');
     style.setAttribute(STYLE_ORIGIN_ATTRIBUTE, cssPath);
-    style.textContent = await rewriteCssUrls(decodeBase64Utf8(base64), cssDir, loader.loadInlineAsset);
+    style.textContent = await rewriteCssUrls(
+      decodeBase64Utf8(base64),
+      cssDir,
+      loader.loadInlineAsset
+    );
     link.replaceWith(style);
   }
   let inlineOrdinal = 0;

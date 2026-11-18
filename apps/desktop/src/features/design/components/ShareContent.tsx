@@ -48,7 +48,8 @@ const SHARE_URL_DISPLAY_LIMIT = 48;
 const TARGET_TEXT_LIMIT = 30;
 const COPIED_RESET_MS = 1500;
 const EMPTY_HINT = 'Open a page before managing shares';
-const REVOKE_CONFIRM_TEXT = 'Once revoked, the link stops working immediately and cannot be recovered. Revoke?';
+const REVOKE_CONFIRM_TEXT =
+  'Once revoked, the link stops working immediately and cannot be recovered. Revoke?';
 const LAN_NOTE = 'LAN address (requires the server to listen on LAN)';
 
 const SCOPE_OPTIONS: Array<{ value: DesignShareScope; label: string }> = [
@@ -495,7 +496,9 @@ export function ShareContent({
         </div>
         <div className="text-[10px] text-muted-foreground">
           {share.commentCount} comments ·{' '}
-          {share.lastAccessAt === null ? 'Not visited' : `Last visited ${formatTime(share.lastAccessAt)}`}
+          {share.lastAccessAt === null
+            ? 'Not visited'
+            : `Last visited ${formatTime(share.lastAccessAt)}`}
         </div>
         {lanUrls.length > 0 && (
           <div className="flex flex-col gap-1">
@@ -622,7 +625,9 @@ export function ShareContent({
                         Loading versions…
                       </span>
                     ) : snapshots.length === 0 ? (
-                      <span className="text-muted-foreground">No version snapshots yet; create a version before sharing</span>
+                      <span className="text-muted-foreground">
+                        No version snapshots yet; create a version before sharing
+                      </span>
                     ) : (
                       <Select
                         value={formSnapshotId}

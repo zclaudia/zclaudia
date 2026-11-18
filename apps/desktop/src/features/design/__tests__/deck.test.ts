@@ -119,15 +119,24 @@ describe('parseDeck', () => {
   });
 
   it('reads the body ratio and falls back to 16:9 when missing or unknown', () => {
-    expect(parseDeck('<body data-zclaudia-deck-ratio="4:3"><section data-zclaudia-slide></section></body>').ratio).toBe('4:3');
-    expect(parseDeck('<body data-zclaudia-deck-ratio="3:2"><section data-zclaudia-slide></section></body>').ratio).toBe('16:9');
+    expect(
+      parseDeck(
+        '<body data-zclaudia-deck-ratio="4:3"><section data-zclaudia-slide></section></body>'
+      ).ratio
+    ).toBe('4:3');
+    expect(
+      parseDeck(
+        '<body data-zclaudia-deck-ratio="3:2"><section data-zclaudia-slide></section></body>'
+      ).ratio
+    ).toBe('16:9');
   });
 
   it('flags siblings only when every slide shares the same parent', () => {
     expect(parseDeck(NESTED_DECK).siblings).toBe(false);
     expect(
-      parseDeck('<body><section data-zclaudia-slide>A</section><section data-zclaudia-slide>B</section></body>')
-        .siblings
+      parseDeck(
+        '<body><section data-zclaudia-slide>A</section><section data-zclaudia-slide>B</section></body>'
+      ).siblings
     ).toBe(true);
     expect(parseDeck('<body></body>').siblings).toBe(true);
   });
@@ -151,7 +160,9 @@ describe('isDeck', () => {
     expect(isDeck('<html><body><p>plain</p></body></html>')).toBe(false);
     expect(isDeck('')).toBe(false);
     expect(isDeck('<div>no body</div>')).toBe(false);
-    expect(isDeck(`<body>${'<section data-zclaudia-slide></section>'.repeat(61)}</body>`)).toBe(false);
+    expect(isDeck(`<body>${'<section data-zclaudia-slide></section>'.repeat(61)}</body>`)).toBe(
+      false
+    );
   });
 });
 
@@ -163,8 +174,16 @@ describe('reorderDeckSlides', () => {
     expect(after.slides.map(slide => slide.title)).toEqual(['第二页', '第三页', '第一页']);
     expect(after.slides).toHaveLength(3);
     // 两块之外的全部字节（含夹在中间的 p、注释）逐字节不变。
-    expect(stripSpans(SIBLING_DECK, before.slides.map(slide => slide.span))).toBe(
-      stripSpans(next, after.slides.map(slide => slide.span))
+    expect(
+      stripSpans(
+        SIBLING_DECK,
+        before.slides.map(slide => slide.span)
+      )
+    ).toBe(
+      stripSpans(
+        next,
+        after.slides.map(slide => slide.span)
+      )
     );
     // 被搬移的块自身字节原样保留，无粘连。
     const first = SIBLING_DECK.slice(before.slides[0]!.span.start, before.slides[0]!.span.end);
@@ -179,15 +198,26 @@ describe('reorderDeckSlides', () => {
     const after = parseDeck(next);
     // 第三页插到第一页原位置；中间页与 p/注释整体后移，文档序变为 C、B、A。
     expect(after.slides.map(slide => slide.title)).toEqual(['第三页', '第二页', '第一页']);
-    expect(stripSpans(SIBLING_DECK, before.slides.map(slide => slide.span))).toBe(
-      stripSpans(next, after.slides.map(slide => slide.span))
+    expect(
+      stripSpans(
+        SIBLING_DECK,
+        before.slides.map(slide => slide.span)
+      )
+    ).toBe(
+      stripSpans(
+        next,
+        after.slides.map(slide => slide.span)
+      )
     );
   });
 
   it('swaps adjacent slides with no filler between them', () => {
-    const source = '<body><section data-zclaudia-slide data-title="A">A</section><section data-zclaudia-slide data-title="B">B</section></body>';
+    const source =
+      '<body><section data-zclaudia-slide data-title="A">A</section><section data-zclaudia-slide data-title="B">B</section></body>';
     const next = reorderDeckSlides(source, 0, 1);
-    expect(next).toBe('<body><section data-zclaudia-slide data-title="B">B</section><section data-zclaudia-slide data-title="A">A</section></body>');
+    expect(next).toBe(
+      '<body><section data-zclaudia-slide data-title="B">B</section><section data-zclaudia-slide data-title="A">A</section></body>'
+    );
   });
 
   it('returns the source untouched when from equals to', () => {
@@ -220,7 +250,8 @@ describe('updateDeckSlideTitle', () => {
   });
 
   it('replaces only the attribute span when data-title already exists', () => {
-    const source = '<body><section data-zclaudia-slide data-title="旧标题" data-notes="n">A</section></body>';
+    const source =
+      '<body><section data-zclaudia-slide data-title="旧标题" data-notes="n">A</section></body>';
     const next = updateDeckSlideTitle(source, 0, '新"标题"');
     expect(next).toBe(
       '<body><section data-zclaudia-slide data-title="新&quot;标题&quot;" data-notes="n">A</section></body>'
@@ -256,7 +287,8 @@ describe('updateDeckSlideNotes', () => {
   });
 
   it('replaces an existing notes span and leaves other bytes untouched', () => {
-    const source = '<body><section data-zclaudia-slide data-notes="旧" data-title="t">A</section></body>';
+    const source =
+      '<body><section data-zclaudia-slide data-notes="旧" data-title="t">A</section></body>';
     const next = updateDeckSlideNotes(source, 0, '新&备注');
     expect(next).toBe(
       '<body><section data-zclaudia-slide data-notes="新&amp;备注" data-title="t">A</section></body>'
@@ -266,7 +298,9 @@ describe('updateDeckSlideNotes', () => {
   it('inserts notes on a slide without the attribute', () => {
     const source = '<body><section data-zclaudia-slide class="x">A</section></body>';
     const next = updateDeckSlideNotes(source, 0, 'n"1');
-    expect(next).toBe('<body><section data-zclaudia-slide class="x" data-notes="n&quot;1">A</section></body>');
+    expect(next).toBe(
+      '<body><section data-zclaudia-slide class="x" data-notes="n&quot;1">A</section></body>'
+    );
   });
 
   it('enforces the 2000-character limit and rejects control characters', () => {
@@ -284,22 +318,29 @@ describe('updateDeckSlideNotes', () => {
 
 describe('setDeckRatio', () => {
   it('replaces an existing ratio attribute span', () => {
-    const source = '<body data-zclaudia-deck-ratio="16:9"><section data-zclaudia-slide>A</section></body>';
+    const source =
+      '<body data-zclaudia-deck-ratio="16:9"><section data-zclaudia-slide>A</section></body>';
     const next = setDeckRatio(source, '4:3');
-    expect(next).toBe('<body data-zclaudia-deck-ratio="4:3"><section data-zclaudia-slide>A</section></body>');
+    expect(next).toBe(
+      '<body data-zclaudia-deck-ratio="4:3"><section data-zclaudia-slide>A</section></body>'
+    );
     expect(parseDeck(next).ratio).toBe('4:3');
   });
 
   it('inserts the ratio attribute on a body without one', () => {
     const source = '<body>\n  <section data-zclaudia-slide>A</section>\n</body>';
     const next = setDeckRatio(source, '4:3');
-    expect(next).toBe('<body data-zclaudia-deck-ratio="4:3">\n  <section data-zclaudia-slide>A</section>\n</body>');
+    expect(next).toBe(
+      '<body data-zclaudia-deck-ratio="4:3">\n  <section data-zclaudia-slide>A</section>\n</body>'
+    );
   });
 
   it('inserts after the last existing body attribute', () => {
     const source = '<body class="page"><section data-zclaudia-slide>A</section></body>';
     const next = setDeckRatio(source, '16:9');
-    expect(next).toBe('<body class="page" data-zclaudia-deck-ratio="16:9"><section data-zclaudia-slide>A</section></body>');
+    expect(next).toBe(
+      '<body class="page" data-zclaudia-deck-ratio="16:9"><section data-zclaudia-slide>A</section></body>'
+    );
   });
 
   it('rejects unknown ratios and pages without a real body', () => {
@@ -310,7 +351,8 @@ describe('setDeckRatio', () => {
 
 describe('addDeckSlide', () => {
   it('appends the template before </body> aligned to the last slide indent', () => {
-    const source = '<!doctype html>\n<html><body>\n  <section data-zclaudia-slide data-title="A">A</section>\n</body></html>';
+    const source =
+      '<!doctype html>\n<html><body>\n  <section data-zclaudia-slide data-title="A">A</section>\n</body></html>';
     const result = addDeckSlide(source);
     expect(result.index).toBe(1);
     expect(result.source).toBe(

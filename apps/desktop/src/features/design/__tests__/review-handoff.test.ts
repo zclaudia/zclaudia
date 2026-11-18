@@ -71,7 +71,12 @@ describe('buildReviewHandoff（P7 §6.2 审阅进聊天交接）', () => {
   it('审阅反馈：作者 + zh-CN 24 小时制本地时间 + 评论原文', () => {
     const { sections } = buildReviewHandoff(FULL_INPUT);
     expect(sectionByTitle(sections, 'Review feedback')?.body).toBe(
-      ['- Author: 林一', `- Time: ${formatTime(COMMENT_TS)}`, '- Comment:', '请把这段标题换成蓝色，谢谢。'].join('\n')
+      [
+        '- Author: 林一',
+        `- Time: ${formatTime(COMMENT_TS)}`,
+        '- Comment:',
+        '请把这段标题换成蓝色，谢谢。',
+      ].join('\n')
     );
   });
 
@@ -86,14 +91,18 @@ describe('buildReviewHandoff（P7 §6.2 审阅进聊天交接）', () => {
       ].join('\n')
     );
     const unlabeled = buildReviewHandoff(makeInput({ snapshot: { ...SNAPSHOT, label: null } }));
-    expect(sectionByTitle(unlabeled.sections, 'Shared version')?.body).toContain('- Label: No label');
+    expect(sectionByTitle(unlabeled.sections, 'Shared version')?.body).toContain(
+      '- Label: No label'
+    );
   });
 
   it('命中：快照段与当前段都贴元素、折叠文本与源码片段', () => {
     const { sections } = buildReviewHandoff(FULL_INPUT);
     const snippet = '<p id="intro">你好 世界</p>';
     expect(sectionByTitle(sections, 'Target element in the snapshot')?.body).toBe(
-      ['- Element: <p>', '- Collapsed text: 你好 世界', '- Snapshot source snippet:', snippet].join('\n')
+      ['- Element: <p>', '- Collapsed text: 你好 世界', '- Snapshot source snippet:', snippet].join(
+        '\n'
+      )
     );
     expect(sectionByTitle(sections, 'Location in the current version')?.body).toBe(
       [
@@ -113,32 +122,47 @@ describe('buildReviewHandoff（P7 §6.2 审阅进聊天交接）', () => {
     const pathMissing = buildReviewHandoff(
       makeInput({ currentSource: '<body><div>其他内容</div></body>' })
     );
-    expect(sectionByTitle(pathMissing.sections, 'Location in the current version')?.body).toBe(expected('Path out of range'));
+    expect(sectionByTitle(pathMissing.sections, 'Location in the current version')?.body).toBe(
+      expected('Path out of range')
+    );
 
     const tagMismatch = buildReviewHandoff(
       makeInput({ currentSource: '<body><section><span>你好 世界</span></section></body>' })
     );
-    expect(sectionByTitle(tagMismatch.sections, 'Location in the current version')?.body).toBe(expected('Tag changed'));
+    expect(sectionByTitle(tagMismatch.sections, 'Location in the current version')?.body).toBe(
+      expected('Tag changed')
+    );
 
     const textMismatch = buildReviewHandoff(
       makeInput({ currentSource: '<body><main><p id="intro">换成别的文本</p></main></body>' })
     );
-    expect(sectionByTitle(textMismatch.sections, 'Location in the current version')?.body).toBe(expected('Text changed'));
+    expect(sectionByTitle(textMismatch.sections, 'Location in the current version')?.body).toBe(
+      expected('Text changed')
+    );
   });
 
   it('快照源码不可用 / 当前源码不可用分支', () => {
     const noSnapshot = buildReviewHandoff(makeInput({ snapshotSource: null }));
-    expect(sectionByTitle(noSnapshot.sections, 'Target element in the snapshot')?.body).toBe('Snapshot source unavailable.');
+    expect(sectionByTitle(noSnapshot.sections, 'Target element in the snapshot')?.body).toBe(
+      'Snapshot source unavailable.'
+    );
 
     const noCurrent = buildReviewHandoff(makeInput({ currentSource: null }));
-    expect(sectionByTitle(noCurrent.sections, 'Location in the current version')?.body).toBe('Current source unavailable.');
+    expect(sectionByTitle(noCurrent.sections, 'Location in the current version')?.body).toBe(
+      'Current source unavailable.'
+    );
   });
 
   it('整页评论（target null）：两段都写整页评论，当前段仍给页面路径', () => {
     const { sections } = buildReviewHandoff(makeInput({ comment: { ...COMMENT, target: null } }));
-    expect(sectionByTitle(sections, 'Target element in the snapshot')?.body).toBe('Whole-page comment (not anchored to a specific element).');
+    expect(sectionByTitle(sections, 'Target element in the snapshot')?.body).toBe(
+      'Whole-page comment (not anchored to a specific element).'
+    );
     expect(sectionByTitle(sections, 'Location in the current version')?.body).toBe(
-      ['- Page: design/index.html', 'Whole-page comment (not anchored to a specific element).'].join('\n')
+      [
+        '- Page: design/index.html',
+        'Whole-page comment (not anchored to a specific element).',
+      ].join('\n')
     );
   });
 
@@ -160,14 +184,24 @@ describe('buildReviewHandoff（P7 §6.2 审阅进聊天交接）', () => {
     expect(sectionByTitle(noPath.sections, 'Instruction')?.body).toBe(
       'Please update the current page (unknown path) based on the review feedback above. Keep everything unrelated to the feedback unchanged.'
     );
-    expect(sectionByTitle(noPath.sections, 'Location in the current version')?.body).toContain('- Page: (unknown path)');
+    expect(sectionByTitle(noPath.sections, 'Location in the current version')?.body).toContain(
+      '- Page: (unknown path)'
+    );
   });
 
   it('prompt 格式：## 前缀块按 sections 顺序空行拼接', () => {
     const { sections, prompt } = buildReviewHandoff(FULL_INPUT);
-    expect(prompt).toBe(sections.map(section => `## ${section.title}\n${section.body}`).join('\n\n'));
+    expect(prompt).toBe(
+      sections.map(section => `## ${section.title}\n${section.body}`).join('\n\n')
+    );
     expect(prompt.startsWith('## Review feedback\n')).toBe(true);
-    const titles = ['Review feedback', 'Shared version', 'Target element in the snapshot', 'Location in the current version', 'Instruction'];
+    const titles = [
+      'Review feedback',
+      'Shared version',
+      'Target element in the snapshot',
+      'Location in the current version',
+      'Instruction',
+    ];
     let cursor = -1;
     for (const title of titles) {
       const at = prompt.indexOf(`## ${title}`);

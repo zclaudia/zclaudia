@@ -99,7 +99,9 @@ describe('SelectionEditor 查看源码（P2 §5.2）', () => {
   it('活动页 dirty 时显示行号偏移提示，干净时不显示', () => {
     mount({ dirty: true });
     expect(
-      screen.getByText('The file viewer shows the saved version; line numbers may be offset relative to the draft')
+      screen.getByText(
+        'The file viewer shows the saved version; line numbers may be offset relative to the draft'
+      )
     ).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -107,7 +109,9 @@ describe('SelectionEditor 查看源码（P2 §5.2）', () => {
   it('干净页不显示偏移提示', () => {
     mount({ dirty: false });
     expect(
-      screen.queryByText('The file viewer shows the saved version; line numbers may be offset relative to the draft')
+      screen.queryByText(
+        'The file viewer shows the saved version; line numbers may be offset relative to the draft'
+      )
     ).not.toBeInTheDocument();
   });
 
@@ -362,7 +366,9 @@ describe('SelectionEditor 结构操作（P3 §6.2）', () => {
     const deleteButton = screen.getByRole('button', { name: 'Delete element' });
     fireEvent.click(deleteButton);
     expect(onApply).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Delete element' })).toHaveTextContent('Click again to confirm delete');
+    expect(screen.getByRole('button', { name: 'Delete element' })).toHaveTextContent(
+      'Click again to confirm delete'
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Delete element' }));
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(onApply).toHaveBeenCalledWith([{ kind: 'structure', action: 'delete' }]);
@@ -375,7 +381,9 @@ describe('SelectionEditor 结构操作（P3 §6.2）', () => {
       selection: { ...selection, elementPath: [1], tagName: 'section' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Delete element' }));
-    expect(screen.getByRole('button', { name: 'Delete element' })).toHaveTextContent('Click again to confirm delete');
+    expect(screen.getByRole('button', { name: 'Delete element' })).toHaveTextContent(
+      'Click again to confirm delete'
+    );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3000);
     });

@@ -259,7 +259,10 @@ describe('MediaTaskService', () => {
 
     await expect(
       service.create('sa', imageInput({ provider: { profileId: 'absent', model: 'm' } }))
-    ).rejects.toMatchObject({ code: 'MEDIA_VALIDATION', message: 'The specified service profile does not exist' });
+    ).rejects.toMatchObject({
+      code: 'MEDIA_VALIDATION',
+      message: 'The specified service profile does not exist',
+    });
   });
 
   it('normalizes params (trim, default targetDir) and stores provider-less video params', async () => {
@@ -356,9 +359,7 @@ describe('MediaTaskService', () => {
     image.gates[0].resolve(IMAGE_RESULT);
     video.gates[1].resolve(VIDEO_RESULT);
     await waitFor(
-      () =>
-        rawTask(v2.id)?.status === 'completed' &&
-        rawTask(i1.id)?.status === 'completed'
+      () => rawTask(v2.id)?.status === 'completed' && rawTask(i1.id)?.status === 'completed'
     );
   });
 
@@ -424,7 +425,10 @@ describe('MediaTaskService', () => {
       errorCode: 'RUNTIME_MISSING',
       errorMessage: 'ffmpeg not found',
     });
-    expect(rawTask(t2.id)).toMatchObject({ errorCode: 'PROVIDER_TIMEOUT', errorMessage: 'Request timed out' });
+    expect(rawTask(t2.id)).toMatchObject({
+      errorCode: 'PROVIDER_TIMEOUT',
+      errorMessage: 'Request timed out',
+    });
     expect(rawTask(t3.id)).toMatchObject({ errorCode: 'INTERNAL', errorMessage: 'boom' });
 
     const listed = await service.list('sa');
@@ -456,7 +460,10 @@ describe('MediaTaskService', () => {
     );
     const summary = (await service.list('sa')).find(entry => entry.id === task.id);
     expect(summary?.status).toBe('completed');
-    expect(summary?.progress).toEqual({ phase: 'generating', detail: 'Waiting for the service to respond' });
+    expect(summary?.progress).toEqual({
+      phase: 'generating',
+      detail: 'Waiting for the service to respond',
+    });
   });
 
   it('cancels queued tasks directly without invoking the executor', async () => {
@@ -573,9 +580,9 @@ describe('MediaTaskService', () => {
         errorMessage: 'Task interrupted by a service restart',
       },
     ]);
-    expect(db.prepare('SELECT status FROM design_media_tasks WHERE id = ?').get('done')).toMatchObject(
-      { status: 'completed' }
-    );
+    expect(
+      db.prepare('SELECT status FROM design_media_tasks WHERE id = ?').get('done')
+    ).toMatchObject({ status: 'completed' });
   });
 
   it('keeps only the newest 100 tasks per workspace', async () => {
@@ -710,7 +717,11 @@ describe('createImageTaskExecutor', () => {
   }
 
   it('generates via the fake provider and imports the artifact without overwriting', async () => {
-    const fake = fakeProvider({ bytes: PNG_BYTES, mime: 'image/png', usage: { totalCostUsd: 0.02 } });
+    const fake = fakeProvider({
+      bytes: PNG_BYTES,
+      mime: 'image/png',
+      usage: { totalCostUsd: 0.02 },
+    });
     const seenRefs: DesignMediaProviderRef[] = [];
     const ctx = testCtx();
     const executor = createImageTaskExecutor({

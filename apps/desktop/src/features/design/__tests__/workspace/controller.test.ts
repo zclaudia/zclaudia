@@ -7,7 +7,12 @@ import {
 } from '../../workspace/controller';
 import { workspaceUiStorageKey } from '../../workspace/storage';
 import { sha256HexSync } from '../../html/hash';
-import type { DesignDepsResult, DesignDependencyStat, DesignDocument, DesignSelection } from '../../types';
+import type {
+  DesignDepsResult,
+  DesignDependencyStat,
+  DesignDocument,
+  DesignSelection,
+} from '../../types';
 import type { DesignWorkspacePorts } from '../../workspace/ports';
 
 const sha = (source: string): string => sha256HexSync(source);
@@ -281,7 +286,11 @@ describe('DesignWorkspaceController', () => {
     c.handleSelectionMessage(h1Selection(p1.source, 'A'));
     await c.apply([{ kind: 'text', value: 'A1' }], 'edit', 'p1:text');
     await c.apply([{ kind: 'text', value: 'A2' }], 'edit', 'p1:text');
-    expect(pageOf(c, 'p1.html')).toMatchObject({ source: editSource('A2'), canUndo: true, canRedo: false });
+    expect(pageOf(c, 'p1.html')).toMatchObject({
+      source: editSource('A2'),
+      canUndo: true,
+      canRedo: false,
+    });
 
     await editActivePage(c, 'p2.html', 'B1');
     expect(pageOf(c, 'p2.html').canUndo).toBe(true);
@@ -407,7 +416,11 @@ describe('DesignWorkspaceController', () => {
 
     // Clean page: a changed disk doc is adopted outright.
     c.handleSelectionMessage(h1Selection(pageSource('A'), 'A'));
-    await c.handleExternalDoc({ path: 'p1.html', source: pageSource('Changed'), revision: 'rev-x1' });
+    await c.handleExternalDoc({
+      path: 'p1.html',
+      source: pageSource('Changed'),
+      revision: 'rev-x1',
+    });
     expect(pageOf(c, 'p1.html')).toMatchObject({
       source: pageSource('Changed'),
       draftRevision: sha(pageSource('Changed')),
@@ -421,7 +434,11 @@ describe('DesignWorkspaceController', () => {
     await editActivePage(c, 'p1.html', 'Changed!');
 
     // Dirty page with an unchanged disk doc: no flag, draft and doc stay put.
-    await c.handleExternalDoc({ path: 'p1.html', source: pageSource('Changed'), revision: 'rev-x1' });
+    await c.handleExternalDoc({
+      path: 'p1.html',
+      source: pageSource('Changed'),
+      revision: 'rev-x1',
+    });
     expect(pageOf(c, 'p1.html')).toMatchObject({
       externalChange: false,
       source: editSource('Changed!'),
@@ -467,7 +484,11 @@ describe('DesignWorkspaceController', () => {
     await open(c, 'p2.html');
     expect(c.getSnapshot().activePath).toBe('p2.html');
 
-    await c.handleExternalDoc({ path: 'p1.html', source: pageSource('Changed'), revision: 'rev-x' });
+    await c.handleExternalDoc({
+      path: 'p1.html',
+      source: pageSource('Changed'),
+      revision: 'rev-x',
+    });
     expect(pageOf(c, 'p1.html')).toMatchObject({
       source: pageSource('A'),
       docRevision: 'rev-1',
@@ -487,7 +508,11 @@ describe('DesignWorkspaceController', () => {
     const savePromise = c.save();
     expect(pageOf(c, 'p1.html').busy).toBe(true);
 
-    await c.handleExternalDoc({ path: 'p1.html', source: pageSource('Changed'), revision: 'rev-x' });
+    await c.handleExternalDoc({
+      path: 'p1.html',
+      source: pageSource('Changed'),
+      revision: 'rev-x',
+    });
     expect(pageOf(c, 'p1.html')).toMatchObject({
       busy: true,
       externalChange: false,
@@ -524,7 +549,9 @@ describe('DesignWorkspaceController', () => {
 
     // A changed path set counts as a change too.
     h.setDeps(depsResultFor('p1.html', [stat('assets/a.css', 200), stat('assets/b.png', 5, 99)]));
-    c.applyDepsStats(depsResultFor('p1.html', [stat('assets/a.css', 200), stat('assets/b.png', 5, 99)]));
+    c.applyDepsStats(
+      depsResultFor('p1.html', [stat('assets/a.css', 200), stat('assets/b.png', 5, 99)])
+    );
     expect(c.getSnapshot().assetEpoch).toBe(2);
 
     // Missing flags are compared as well.
@@ -567,7 +594,16 @@ describe('DesignWorkspaceController', () => {
     expect(pageOf(c, 'p9.html').status).toBe('clean');
 
     // Dirty every remaining page; then there is nothing left to evict.
-    for (const path of ['p1.html', 'p3.html', 'p4.html', 'p5.html', 'p6.html', 'p7.html', 'p8.html', 'p9.html']) {
+    for (const path of [
+      'p1.html',
+      'p3.html',
+      'p4.html',
+      'p5.html',
+      'p6.html',
+      'p7.html',
+      'p8.html',
+      'p9.html',
+    ]) {
       await editActivePage(c, path, 'X');
     }
     const pagesBefore = c.getSnapshot().pages.map(page => page.path);

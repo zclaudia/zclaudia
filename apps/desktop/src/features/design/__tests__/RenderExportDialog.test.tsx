@@ -161,7 +161,9 @@ describe('RenderExportDialog（P5 §6.3）', () => {
     const viewport = { preset: 'tablet', width: 768 };
     mount({ deck: null, viewport });
     expect(screen.queryByRole('button', { name: /Export PDF/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Export PNG (one download per page)' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Export PNG (one download per page)' })
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Export PNG (viewport area)' }));
     await waitFor(() => expect(saveBlobToFile).toHaveBeenCalledTimes(1));
     expect(captureHtmlImage).toHaveBeenCalledTimes(1);
@@ -186,7 +188,9 @@ describe('RenderExportDialog（P5 §6.3）', () => {
   it('固定说明文案恒定展示', () => {
     mount();
     expect(
-      screen.getByText('The export contains the current preview (including unsaved changes); the PDF is a full-page image with non-editable text.')
+      screen.getByText(
+        'The export contains the current preview (including unsaved changes); the PDF is a full-page image with non-editable text.'
+      )
     ).toBeInTheDocument();
   });
 
@@ -194,7 +198,12 @@ describe('RenderExportDialog（P5 §6.3）', () => {
     mount();
     vi.mocked(captureHtmlImage)
       .mockRejectedValueOnce(new Error('Disk full'))
-      .mockRejectedValueOnce(new RenderCaptureError('capture-failed', 'Page capture failed: preview image failed to load'))
+      .mockRejectedValueOnce(
+        new RenderCaptureError(
+          'capture-failed',
+          'Page capture failed: preview image failed to load'
+        )
+      )
       .mockImplementationOnce(async request => ({
         blob: new Blob([JPEG_BYTES], { type: request.mime }),
         width: request.width,
@@ -213,13 +222,22 @@ describe('RenderExportDialog（P5 §6.3）', () => {
 
   it('全部失败：alert 汇总且不落盘', async () => {
     vi.mocked(captureHtmlImage).mockRejectedValue(
-      new RenderCaptureError('capture-unsupported', 'Page capture is not supported in this environment (no Canvas 2D)')
+      new RenderCaptureError(
+        'capture-unsupported',
+        'Page capture is not supported in this environment (no Canvas 2D)'
+      )
     );
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Export PNG (one download per page)' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Export failed: all 3 pages failed.');
-    expect(screen.getByText('Page 1: Page capture is not supported in this environment')).toBeInTheDocument();
-    expect(screen.getByText('Page 3: Page capture is not supported in this environment')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Export failed: all 3 pages failed.'
+    );
+    expect(
+      screen.getByText('Page 1: Page capture is not supported in this environment')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Page 3: Page capture is not supported in this environment')
+    ).toBeInTheDocument();
     expect(saveBlobToFile).not.toHaveBeenCalled();
     expect(captureHtmlImage).toHaveBeenCalledTimes(3);
   });
@@ -230,13 +248,21 @@ describe('RenderExportDialog（P5 §6.3）', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Export PNG (one download per page)' }));
     expect(await screen.findByText('Exporting 1/3…')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel export' }));
-    expect(await screen.findByText('Canceled: 0/3 pages succeeded; downloaded files are kept.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Canceled: 0/3 pages succeeded; downloaded files are kept.')
+    ).toBeInTheDocument();
     await act(async () => {
-      queue[0].resolve({ blob: new Blob([JPEG_BYTES], { type: 'image/png' }), width: 1600, height: 900 });
+      queue[0].resolve({
+        blob: new Blob([JPEG_BYTES], { type: 'image/png' }),
+        width: 1600,
+        height: 900,
+      });
     });
     expect(captureHtmlImage).toHaveBeenCalledTimes(1);
     expect(saveBlobToFile).not.toHaveBeenCalled();
-    expect(screen.getByText('Canceled: 0/3 pages succeeded; downloaded files are kept.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Canceled: 0/3 pages succeeded; downloaded files are kept.')
+    ).toBeInTheDocument();
   });
 
   it('进度文案：正在导出 i/N… 逐页推进直至成功汇总', async () => {
@@ -245,15 +271,27 @@ describe('RenderExportDialog（P5 §6.3）', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Export PDF (3 pages · full-page image)' }));
     expect(await screen.findByText('Exporting 1/3…')).toBeInTheDocument();
     await act(async () => {
-      queue[0].resolve({ blob: new Blob([JPEG_BYTES], { type: 'image/jpeg' }), width: 1600, height: 900 });
+      queue[0].resolve({
+        blob: new Blob([JPEG_BYTES], { type: 'image/jpeg' }),
+        width: 1600,
+        height: 900,
+      });
     });
     expect(await screen.findByText('Exporting 2/3…')).toBeInTheDocument();
     await act(async () => {
-      queue[1].resolve({ blob: new Blob([JPEG_BYTES], { type: 'image/jpeg' }), width: 1600, height: 900 });
+      queue[1].resolve({
+        blob: new Blob([JPEG_BYTES], { type: 'image/jpeg' }),
+        width: 1600,
+        height: 900,
+      });
     });
     expect(await screen.findByText('Exporting 3/3…')).toBeInTheDocument();
     await act(async () => {
-      queue[2].resolve({ blob: new Blob([JPEG_BYTES], { type: 'image/jpeg' }), width: 1600, height: 900 });
+      queue[2].resolve({
+        blob: new Blob([JPEG_BYTES], { type: 'image/jpeg' }),
+        width: 1600,
+        height: 900,
+      });
     });
     expect(await screen.findByText('Exported: deck.pdf (3/3 pages succeeded)')).toBeInTheDocument();
   });
@@ -278,7 +316,9 @@ describe('RenderExportDialog（P5 §6.3）', () => {
     rerender({ open: false });
     rerender({ open: true });
     expect(screen.queryByText('Export finished: 3/3 pages succeeded.')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Export PDF (3 pages · full-page image)' })).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Export PDF (3 pages · full-page image)' })
+    ).toBeEnabled();
     expect(captureHtmlImage).toHaveBeenCalledTimes(3);
   });
 });

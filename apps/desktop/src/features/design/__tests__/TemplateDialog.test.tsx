@@ -30,7 +30,8 @@ const TEMPLATES = [
   {
     id: 'landing',
     name: 'Landing page',
-    description: 'A single-page marketing landing page with a hero section, feature grid, testimonials, and a call to action.',
+    description:
+      'A single-page marketing landing page with a hero section, feature grid, testimonials, and a call to action.',
     entry: 'design/landing/index.html',
     files: ['design/landing/index.html', 'design/landing/styles.css'],
     version: '1.0.0',
@@ -39,7 +40,8 @@ const TEMPLATES = [
   {
     id: 'dashboard',
     name: 'Dashboard',
-    description: 'An admin dashboard with sidebar navigation, a metric card grid, and pure-CSS bar charts.',
+    description:
+      'An admin dashboard with sidebar navigation, a metric card grid, and pure-CSS bar charts.',
     entry: 'design/dashboard/index.html',
     files: ['design/dashboard/index.html', 'design/dashboard/styles.css'],
     version: '1.0.0',
@@ -68,10 +70,7 @@ describe('TemplateDialog（P4 §2.4）', () => {
     vi.clearAllMocks();
     vi.mocked(listDesignTemplates).mockResolvedValue({ templates: TEMPLATES });
     vi.mocked(installDesignTemplate).mockResolvedValue({
-      installed: [
-        ...TEMPLATES[0].files,
-        'design/landing/TEMPLATE.json',
-      ],
+      installed: [...TEMPLATES[0].files, 'design/landing/TEMPLATE.json'],
       entry: 'design/landing/index.html',
     });
   });
@@ -122,7 +121,9 @@ describe('TemplateDialog（P4 §2.4）', () => {
         templateId: 'landing',
       })
     );
-    expect(await screen.findByText('Installation finished; the following files were written:')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Installation finished; the following files were written:')
+    ).toBeInTheDocument();
     const installed = screen.getByTestId('installed-files');
     expect(installed).toHaveTextContent('design/landing/index.html');
     expect(installed).toHaveTextContent('design/landing/styles.css');
@@ -158,20 +159,27 @@ describe('TemplateDialog（P4 §2.4）', () => {
     expect(alert).toHaveTextContent('design/landing/index.html');
     expect(alert).toHaveTextContent('design/landing/styles.css');
     expect(screen.getByText('Reinstalling will replace the files above.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Reinstall and overwrite the files above' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Reinstall and overwrite the files above' })
+    );
     await waitFor(() => expect(installDesignTemplate).toHaveBeenCalledTimes(2));
     expect(installDesignTemplate).toHaveBeenLastCalledWith('remote-1', {
       sessionId: 's1',
       templateId: 'landing',
       overwrite: true,
     });
-    expect(await screen.findByText('Installation finished; the following files were written:')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Installation finished; the following files were written:')
+    ).toBeInTheDocument();
   });
 
   it('其余安装错误显示 message，「重试」重发同一模板安装', async () => {
     vi.mocked(installDesignTemplate)
       .mockRejectedValueOnce(new Error('会话不存在'))
-      .mockResolvedValue({ installed: ['design/landing/index.html'], entry: 'design/landing/index.html' });
+      .mockResolvedValue({
+        installed: ['design/landing/index.html'],
+        entry: 'design/landing/index.html',
+      });
     mount();
     fireEvent.click(await screen.findByRole('button', { name: 'Install Landing page' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('会话不存在');
@@ -181,7 +189,9 @@ describe('TemplateDialog（P4 §2.4）', () => {
       sessionId: 's1',
       templateId: 'landing',
     });
-    expect(await screen.findByText('Installation finished; the following files were written:')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Installation finished; the following files were written:')
+    ).toBeInTheDocument();
   });
 
   it('安装中禁用安装按钮并显示「安装中…」', async () => {
@@ -196,9 +206,14 @@ describe('TemplateDialog（P4 §2.4）', () => {
     expect(installing).toHaveTextContent('Installing…');
     expect(screen.getByRole('button', { name: 'Install Dashboard' })).toBeDisabled();
     await act(async () => {
-      resolveInstall({ installed: ['design/landing/index.html'], entry: 'design/landing/index.html' });
+      resolveInstall({
+        installed: ['design/landing/index.html'],
+        entry: 'design/landing/index.html',
+      });
     });
-    expect(await screen.findByText('Installation finished; the following files were written:')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Installation finished; the following files were written:')
+    ).toBeInTheDocument();
   });
 
   it('open false→true 重新拉取目录', async () => {

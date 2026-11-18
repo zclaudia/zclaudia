@@ -27,15 +27,23 @@ const summary = (overrides: Partial<DesignSnapshotSummary> = {}): DesignSnapshot
   ...overrides,
 });
 
-const detail = (overrides: {
-  summary?: Partial<DesignSnapshotSummary>;
-  files?: DesignSnapshotDetail['files'];
-} = {}): DesignSnapshotDetail => ({
+const detail = (
+  overrides: {
+    summary?: Partial<DesignSnapshotSummary>;
+    files?: DesignSnapshotDetail['files'];
+  } = {}
+): DesignSnapshotDetail => ({
   summary: summary(overrides.summary),
   files:
     overrides.files ??
     ([
-      { path: 'design/index.html', sha256: 'sha-entry', bytes: 1024, kind: 'entry', mime: 'text/html' },
+      {
+        path: 'design/index.html',
+        sha256: 'sha-entry',
+        bytes: 1024,
+        kind: 'entry',
+        mime: 'text/html',
+      },
       { path: 'design/style.css', sha256: 'sha-css', bytes: 1024, kind: 'css', mime: 'text/css' },
     ] as DesignSnapshotDetail['files']),
 });
@@ -165,7 +173,10 @@ describe('VersionHistory', () => {
       restore: vi.fn().mockResolvedValue({
         ok: false,
         errorCode: 'RESTORE_CONFLICT',
-        conflictFiles: [conflictFile('design/index.html', '内容已变化'), conflictFile('design/style.css')],
+        conflictFiles: [
+          conflictFile('design/index.html', '内容已变化'),
+          conflictFile('design/style.css'),
+        ],
       }),
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Restore this version' }));
@@ -198,11 +209,7 @@ describe('VersionHistory', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore anyway' }));
     await waitFor(() =>
-      expect(restore).toHaveBeenCalledWith(
-        'ds-1',
-        expect.any(Object),
-        { confirmIncomplete: true }
-      )
+      expect(restore).toHaveBeenCalledWith('ds-1', expect.any(Object), { confirmIncomplete: true })
     );
   });
 

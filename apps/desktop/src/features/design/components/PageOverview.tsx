@@ -46,20 +46,13 @@ export function PageOverview({
   }); // 每次渲染后检查：previews 随构建完成逐格补充。
 
   const openInViewer = (path: string) => {
-    useFileViewerStore.getState().openFile(
-      tool?.projectRoot ?? '',
-      path,
-      undefined,
-      undefined,
-      tool?.backendId
-    );
+    useFileViewerStore
+      .getState()
+      .openFile(tool?.projectRoot ?? '', path, undefined, undefined, tool?.backendId);
   };
 
   return (
-    <div
-      data-testid="design-overview"
-      className="min-h-0 flex-1 overflow-y-auto bg-background p-3"
-    >
+    <div data-testid="design-overview" className="min-h-0 flex-1 overflow-y-auto bg-background p-3">
       <ul className="grid grid-cols-[repeat(auto-fill,minmax(168px,1fr))] gap-2">
         {pages.map(page => (
           <li key={page.path}>

@@ -100,7 +100,9 @@ export function Sidebar({
   widthMode = 'compact',
   canExpand = false,
   widthChangeDisabled = false,
-  onToggleWidth, onOverlayActiveChange, modalPaused = false,
+  onToggleWidth,
+  onOverlayActiveChange,
+  modalPaused = false,
   drawerPanelRef,
   drawerBackdropRef,
   onOpenDashboard,
@@ -220,8 +222,13 @@ export function Sidebar({
     [onSearchOpenChange]
   );
 
-  const localOverlayActive = searchOpen || !!contextMenuProject || !!settingsProjectId ||
-    agentDialogOpen || !!newSession.request || newProject.show;
+  const localOverlayActive =
+    searchOpen ||
+    !!contextMenuProject ||
+    !!settingsProjectId ||
+    agentDialogOpen ||
+    !!newSession.request ||
+    newProject.show;
   useEffect(() => {
     onOverlayActiveChange?.(localOverlayActive);
     return () => onOverlayActiveChange?.(false);

@@ -137,7 +137,10 @@ export class EditHistory {
   }
 
   private evict(): void {
-    let bytes = this.undoStack.reduce((sum, entry) => sum + entry.before.length + entry.after.length, 0);
+    let bytes = this.undoStack.reduce(
+      (sum, entry) => sum + entry.before.length + entry.after.length,
+      0
+    );
     while (
       this.undoStack.length > 0 &&
       (this.undoStack.length > this.limit || bytes > this.maxBytes)

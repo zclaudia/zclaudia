@@ -8,17 +8,17 @@
 
 ## 1. 两侧结构对照（简表）
 
-| 能力 | ZCode | zclaudia |
-| --- | --- | --- |
-| 桌面形态 | Electron（`packages/desktop`） | Tauri v2（`apps/desktop/src-tauri`） |
-| Web 形态 | 独立 Web 客户端 `packages/web`（Vite SPA），由同一后端托管；`zcode --web` 一键启动 | 复用桌面 React 应用构建产物，由 server 托管（`server/src/interfaces/http/browser-shell.ts`），`pnpm browser:build` + `browser:start` |
-| TUI / CLI 形态 | `apps/zcode-cli/packages/tui` + `bin/zcode.mjs` runner：无参数进 TUI，`--web` 进 Web | **缺失**（无 TUI；`packages/` 下仅 `agent-common`） |
-| 单命令分发 | `pnpm build:zcode` 产出 tar.gz + `install.sh` + `latest.json`（`scripts/build-zcode.mjs`） | **缺失**（开发式脚本启动，无打包成单命令发行物） |
-| 移动端 | 手机 Web 远控页（`packages/web` 的 `/remote` 路由）+ Android 原生壳 `packages/android`（WebView + 扫码 + 前台保活） | Tauri v2 Android 应用（`apps/desktop/src-tauri/gen/android` 完整 Gradle 工程）+ 同一 React 应用的移动布局（`apps/desktop/src/app/useMobileDrawer.ts` 等）+ ntfy 推送（`apps/desktop/src/services/ntfyBridge.ts`） |
-| 远程工作区 | SSH / WSL / Docker 三后端，统一 `IRemoteBackend`（`packages/server/src/remote/`，约 9900 行）；含资源 SFTP 上传与 CDN 部署 | **缺失**（执行环境仅本地：`server/src/infra/execution-env.ts` 为本地 `NodeExecutionEnv`；grep 无 ssh2/sftp/wsl） |
-| 远程接入通道 | 外部 relay `wss://zcode.z.ai/ws`（闭源托管，仓库内无 relay 源码） | 自有 Gateway 中继（`server/src/infra/gateway/gateway-client.ts` + 外部仓库 `../zclaudia-gateway`，含 Docker 部署），NAT 穿透、HTTP-over-WS 代理、可吊销凭据 |
-| 桌面 E2E 容器化 | `Dockerfile.desktop-e2e`：Electron + xvfb + dbus 容器内跑 WDIO E2E | `e2e/` Playwright 浏览器 E2E（无桌面壳 E2E、无容器化） |
-| 会话分享 | `packages/web-share` 落地页 + 分享导入协议（`docs/conversation-share-v1.md`） | **缺失** |
+| 能力            | ZCode                                                                                                                      | zclaudia                                                                                                                                                                                                          |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 桌面形态        | Electron（`packages/desktop`）                                                                                             | Tauri v2（`apps/desktop/src-tauri`）                                                                                                                                                                              |
+| Web 形态        | 独立 Web 客户端 `packages/web`（Vite SPA），由同一后端托管；`zcode --web` 一键启动                                         | 复用桌面 React 应用构建产物，由 server 托管（`server/src/interfaces/http/browser-shell.ts`），`pnpm browser:build` + `browser:start`                                                                              |
+| TUI / CLI 形态  | `apps/zcode-cli/packages/tui` + `bin/zcode.mjs` runner：无参数进 TUI，`--web` 进 Web                                       | **缺失**（无 TUI；`packages/` 下仅 `agent-common`）                                                                                                                                                               |
+| 单命令分发      | `pnpm build:zcode` 产出 tar.gz + `install.sh` + `latest.json`（`scripts/build-zcode.mjs`）                                 | **缺失**（开发式脚本启动，无打包成单命令发行物）                                                                                                                                                                  |
+| 移动端          | 手机 Web 远控页（`packages/web` 的 `/remote` 路由）+ Android 原生壳 `packages/android`（WebView + 扫码 + 前台保活）        | Tauri v2 Android 应用（`apps/desktop/src-tauri/gen/android` 完整 Gradle 工程）+ 同一 React 应用的移动布局（`apps/desktop/src/app/useMobileDrawer.ts` 等）+ ntfy 推送（`apps/desktop/src/services/ntfyBridge.ts`） |
+| 远程工作区      | SSH / WSL / Docker 三后端，统一 `IRemoteBackend`（`packages/server/src/remote/`，约 9900 行）；含资源 SFTP 上传与 CDN 部署 | **缺失**（执行环境仅本地：`server/src/infra/execution-env.ts` 为本地 `NodeExecutionEnv`；grep 无 ssh2/sftp/wsl）                                                                                                  |
+| 远程接入通道    | 外部 relay `wss://zcode.z.ai/ws`（闭源托管，仓库内无 relay 源码）                                                          | 自有 Gateway 中继（`server/src/infra/gateway/gateway-client.ts` + 外部仓库 `../zclaudia-gateway`，含 Docker 部署），NAT 穿透、HTTP-over-WS 代理、可吊销凭据                                                       |
+| 桌面 E2E 容器化 | `Dockerfile.desktop-e2e`：Electron + xvfb + dbus 容器内跑 WDIO E2E                                                         | `e2e/` Playwright 浏览器 E2E（无桌面壳 E2E、无容器化）                                                                                                                                                            |
+| 会话分享        | `packages/web-share` 落地页 + 分享导入协议（`docs/conversation-share-v1.md`）                                              | **缺失**                                                                                                                                                                                                          |
 
 ---
 
@@ -137,15 +137,15 @@
 
 ## 4. 不建议搬运的（及原因）
 
-| 项 | 证据 | 原因 |
-| --- | --- | --- |
-| Electron + WDIO 桌面 E2E 具体栈 | `Dockerfile.desktop-e2e:96`（WDIO 入口） | zclaudia 是 Tauri + Playwright；直接搬栈=重写测试。只搬「容器化 + spec 准入门禁」模式（§2.6） |
-| 依赖 `wss://zcode.z.ai` 外部 relay 的远控链路 | `docs/web-remote-control/web-remote-control-architecture.md:64-75` | 闭源托管服务，仓库内无实现；zclaudia 已有自有 gateway，照搬只会引入外部依赖 |
-| web-remote-control v2/v3/v4 多版本并行部署链 | `docs/web-remote-control/web-remote-control-architecture.md:91-120` | 为线上灰度服务的历史包袱（三套 Dockerfile/Deployment/CI）；新实现只需单链路 + 版本化静态资源 |
-| mock-cdn 开发工作流 | `README.md:66-68` | 与 ZCode 的 CDN 基础设施强耦合；仅在做远程工作区时参考其「本地资源上传」语义 |
-| zcode SEA 单可执行构建 / SMB 上传脚本 | `apps/zcode-cli/packages/cli/package.json`（`build:sea`、`upload:sea`） | zclaudia 无 TUI 形态，Node SEA 收益低；且脚本绑定 ZCode 内网 SMB |
-| TUI 形态本体 | `apps/zcode-cli/packages/tui` | 体量大（node-pty、原生依赖收集、worker 打包，见 `scripts/build-zcode.mjs` 引用的 `stageTuiRuntime`）；非 T4 关键缺口，zclaudia 已有 Web/桌面/移动三形态覆盖 |
-| WSL 的 `wsl --terminate/--shutdown` 类干预 | `docs/wsl-remote-workspace-design.md`（明确禁止） | 不是功能而是负面清单；若做 WSL 支持直接 adopt 该纪律即可，无需搬运代码 |
+| 项                                            | 证据                                                                    | 原因                                                                                                                                                        |
+| --------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Electron + WDIO 桌面 E2E 具体栈               | `Dockerfile.desktop-e2e:96`（WDIO 入口）                                | zclaudia 是 Tauri + Playwright；直接搬栈=重写测试。只搬「容器化 + spec 准入门禁」模式（§2.6）                                                               |
+| 依赖 `wss://zcode.z.ai` 外部 relay 的远控链路 | `docs/web-remote-control/web-remote-control-architecture.md:64-75`      | 闭源托管服务，仓库内无实现；zclaudia 已有自有 gateway，照搬只会引入外部依赖                                                                                 |
+| web-remote-control v2/v3/v4 多版本并行部署链  | `docs/web-remote-control/web-remote-control-architecture.md:91-120`     | 为线上灰度服务的历史包袱（三套 Dockerfile/Deployment/CI）；新实现只需单链路 + 版本化静态资源                                                                |
+| mock-cdn 开发工作流                           | `README.md:66-68`                                                       | 与 ZCode 的 CDN 基础设施强耦合；仅在做远程工作区时参考其「本地资源上传」语义                                                                                |
+| zcode SEA 单可执行构建 / SMB 上传脚本         | `apps/zcode-cli/packages/cli/package.json`（`build:sea`、`upload:sea`） | zclaudia 无 TUI 形态，Node SEA 收益低；且脚本绑定 ZCode 内网 SMB                                                                                            |
+| TUI 形态本体                                  | `apps/zcode-cli/packages/tui`                                           | 体量大（node-pty、原生依赖收集、worker 打包，见 `scripts/build-zcode.mjs` 引用的 `stageTuiRuntime`）；非 T4 关键缺口，zclaudia 已有 Web/桌面/移动三形态覆盖 |
+| WSL 的 `wsl --terminate/--shutdown` 类干预    | `docs/wsl-remote-workspace-design.md`（明确禁止）                       | 不是功能而是负面清单；若做 WSL 支持直接 adopt 该纪律即可，无需搬运代码                                                                                      |
 
 ---
 

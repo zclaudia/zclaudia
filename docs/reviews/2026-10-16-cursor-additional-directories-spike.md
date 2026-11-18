@@ -13,12 +13,12 @@ cannot be auto-approved per root (see caveats).
 
 ## 1. Is there a native add-dir equivalent?
 
-| Surface | Result |
-| --- | --- |
-| `cursor-agent --help` | Has `--workspace <path-or-name>` and `--add-dir <path>` ("Add an additional workspace root directory", repeatable) — **print/interactive mode only**. |
-| `cursor-agent acp --help` | No options at all (`Usage: agent acp [options]`, only `-h`). No flag route for the ACP transport. |
-| ACP `initialize` | `agentCapabilities.sessionCapabilities = { list: {} }`. **No `additionalDirectories` capability** (the ACP 1.4.0 schema defines `sessionCapabilities.additionalDirectories` and `additionalDirectories?: string[]` on `session/new`/`load`/`list`; Cursor does not advertise it). |
-| ACP `session/new` with `additionalDirectories: [B]` | Accepted without error (response keys `sessionId, modes, models, configOptions`), **silently ignored**: behaviour is identical to the run without the field (§2). Do not rely on it. |
+| Surface                                                                                         | Result                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cursor-agent --help`                                                                           | Has `--workspace <path-or-name>` and `--add-dir <path>` ("Add an additional workspace root directory", repeatable) — **print/interactive mode only**.                                                                                                                                                                                                                                                             |
+| `cursor-agent acp --help`                                                                       | No options at all (`Usage: agent acp [options]`, only `-h`). No flag route for the ACP transport.                                                                                                                                                                                                                                                                                                                 |
+| ACP `initialize`                                                                                | `agentCapabilities.sessionCapabilities = { list: {} }`. **No `additionalDirectories` capability** (the ACP 1.4.0 schema defines `sessionCapabilities.additionalDirectories` and `additionalDirectories?: string[]` on `session/new`/`load`/`list`; Cursor does not advertise it).                                                                                                                                 |
+| ACP `session/new` with `additionalDirectories: [B]`                                             | Accepted without error (response keys `sessionId, modes, models, configOptions`), **silently ignored**: behaviour is identical to the run without the field (§2). Do not rely on it.                                                                                                                                                                                                                              |
 | Legacy `-p --output-format stream-json` + `--add-dir B` (the rollback transport in `runner.ts`) | Probed once per variant, `--trust --auto-review` (auto-review reported "unavailable… Falling back to Allowlist"): the edit tool to `B/written.txt` was `rejected` both with and without `--add-dir`; no file written either way. Headless has no approval path, so the flag did not unlock writes in this probe. Legacy is a gated rollback transport (`ZCLAUDIA_CURSOR_TRANSPORT=stream-json`); treat as `none`. |
 
 Existing probe assets (`plugins/agents/cursor/probes/`, `docs/archive/plans/2026-09-12-cursor-acp-migration.md` §2)
@@ -44,15 +44,15 @@ Session payloads:
 
 Results (B location matters — **under `$TMPDIR` nothing is gated, so test fixtures there prove nothing**):
 
-| Run | B location | `additionalDirectories` | Read B | Write B (file edit tool) |
-| --- | --- | --- | --- | --- |
-| 1 | `/var/folders/…/T` (macOS tmp) | no | silent, canary quoted | **silent success**, 0 permission requests |
-| 2 | same | `[B]` | silent | silent success |
-| 3 | `~/.zclaudia-spike-tmp-*` (under `$HOME`) | no | **silent**, canary quoted | **`session/request_permission`**; reject → file not written |
-| 4 | same | `[B]` | silent | **identical permission request** (twice after the agent retried); reject → not written |
-| 5 | same | no, answer `allow_once` | silent | request → allow_once → file written (`hello-from-agent\n`) |
-| 6 | same | no | — | write to `A/inside.txt` (inside cwd): **no request**, silent success |
-| 7 | same | no | — | shell `echo shell-out > <B>/shell.txt`: request `kind:"execute"`, reject → not written |
+| Run | B location                                | `additionalDirectories` | Read B                    | Write B (file edit tool)                                                               |
+| --- | ----------------------------------------- | ----------------------- | ------------------------- | -------------------------------------------------------------------------------------- |
+| 1   | `/var/folders/…/T` (macOS tmp)            | no                      | silent, canary quoted     | **silent success**, 0 permission requests                                              |
+| 2   | same                                      | `[B]`                   | silent                    | silent success                                                                         |
+| 3   | `~/.zclaudia-spike-tmp-*` (under `$HOME`) | no                      | **silent**, canary quoted | **`session/request_permission`**; reject → file not written                            |
+| 4   | same                                      | `[B]`                   | silent                    | **identical permission request** (twice after the agent retried); reject → not written |
+| 5   | same                                      | no, answer `allow_once` | silent                    | request → allow_once → file written (`hello-from-agent\n`)                             |
+| 6   | same                                      | no                      | —                         | write to `A/inside.txt` (inside cwd): **no request**, silent success                   |
+| 7   | same                                      | no                      | —                         | shell `echo shell-out > <B>/shell.txt`: request `kind:"execute"`, reject → not written |
 
 Permission request shape for the out-of-workspace write (identical with/without `additionalDirectories`):
 
@@ -63,12 +63,19 @@ Permission request shape for the out-of-workspace write (identical with/without 
     "title": "Write <B>/written.txt",
     "kind": "edit",
     "status": "pending",
-    "content": [{ "type": "diff", "path": "<B>/written.txt", "oldText": null, "newText": "hello-from-agent\n" }]
+    "content": [
+      {
+        "type": "diff",
+        "path": "<B>/written.txt",
+        "oldText": null,
+        "newText": "hello-from-agent\n"
+      }
+    ]
   },
   "options": [
-    { "optionId": "allow-once",   "kind": "allow_once" },
+    { "optionId": "allow-once", "kind": "allow_once" },
     { "optionId": "allow-always", "kind": "allow_always" },
-    { "optionId": "reject-once",  "kind": "reject_once" }
+    { "optionId": "reject-once", "kind": "reject_once" }
   ]
 }
 ```

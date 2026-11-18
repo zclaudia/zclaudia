@@ -36,9 +36,10 @@ interface RecordedCall {
   init: RequestInit;
 }
 
-function recordingFetch(
-  respond: (url: string, init: RequestInit) => Response
-): { calls: RecordedCall[]; fetch: typeof fetch } {
+function recordingFetch(respond: (url: string, init: RequestInit) => Response): {
+  calls: RecordedCall[];
+  fetch: typeof fetch;
+} {
   const calls: RecordedCall[] = [];
   const impl = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
@@ -249,7 +250,9 @@ describe('createOpenAiImagesProvider', () => {
     });
 
     it('rejects a data[0] row without b64_json and url', async () => {
-      const { fetch: impl } = recordingFetch(() => jsonResponse({ data: [{ revised_prompt: 'x' }] }));
+      const { fetch: impl } = recordingFetch(() =>
+        jsonResponse({ data: [{ revised_prompt: 'x' }] })
+      );
       await expectProviderError(makeProvider(impl).generate({ prompt: 'p', signal: IDLE_SIGNAL }), {
         code: 'provider-error',
         message: 'contains no image data',
@@ -257,7 +260,9 @@ describe('createOpenAiImagesProvider', () => {
     });
 
     it('rejects an unparseable JSON body', async () => {
-      const { fetch: impl } = recordingFetch(() => new Response('<html>oops</html>', { status: 200 }));
+      const { fetch: impl } = recordingFetch(
+        () => new Response('<html>oops</html>', { status: 200 })
+      );
       await expectProviderError(makeProvider(impl).generate({ prompt: 'p', signal: IDLE_SIGNAL }), {
         code: 'provider-error',
         message: 'parsing the image service response failed',
@@ -340,8 +345,8 @@ describe('createOpenAiImagesProvider', () => {
 
   describe('error mapping', () => {
     it('maps non-2xx to provider-error with the status and a 200-char body snippet', async () => {
-      const { fetch: impl } = recordingFetch(() =>
-        new Response(`${'A'.repeat(300)}TAIL-MARKER`, { status: 502 })
+      const { fetch: impl } = recordingFetch(
+        () => new Response(`${'A'.repeat(300)}TAIL-MARKER`, { status: 502 })
       );
       const err = await expectProviderError(
         makeProvider(impl).generate({ prompt: 'p', signal: IDLE_SIGNAL }),
@@ -440,14 +445,18 @@ describe('createOpenAiImagesProvider', () => {
       const provider = makeProvider(impl);
       const err = await expectProviderError(
         provider.edit({ prompt: 'p', source: EDIT_SOURCE, signal: IDLE_SIGNAL }),
-        { code: 'provider-unsupported', status, message: 'The current service does not support image editing' }
+        {
+          code: 'provider-unsupported',
+          status,
+          message: 'The current service does not support image editing',
+        }
       );
       expect(err.status).toBe(status);
     });
 
     it('maps other edit non-2xx to provider-error with the status', async () => {
-      const { fetch: impl } = recordingFetch(() =>
-        new Response(JSON.stringify({ error: 'bad request' }), { status: 400 })
+      const { fetch: impl } = recordingFetch(
+        () => new Response(JSON.stringify({ error: 'bad request' }), { status: 400 })
       );
       await expectProviderError(
         makeProvider(impl).edit({ prompt: 'p', source: EDIT_SOURCE, signal: IDLE_SIGNAL }),
@@ -458,7 +467,11 @@ describe('createOpenAiImagesProvider', () => {
 
   describe('usage normalization', () => {
     it.each([
-      ['all three keys', { input_tokens: 12, output_tokens: 34, total_cost: 0.05 }, { inputTokens: 12, outputTokens: 34, totalCostUsd: 0.05 }],
+      [
+        'all three keys',
+        { input_tokens: 12, output_tokens: 34, total_cost: 0.05 },
+        { inputTokens: 12, outputTokens: 34, totalCostUsd: 0.05 },
+      ],
       ['a single key', { input_tokens: 7 }, { inputTokens: 7 }],
       ['only cost', { total_cost: 0.2 }, { totalCostUsd: 0.2 }],
       ['unknown keys only', { foo: 1 }, null],

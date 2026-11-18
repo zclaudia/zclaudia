@@ -8,7 +8,8 @@ import JSZip from 'jszip';
 import { DesignError } from '../design-service.js';
 import { EXPORT_MANIFEST_NAME, ExportService } from '../export-service.js';
 
-const sha256 = (source: string | Buffer): string => createHash('sha256').update(source).digest('hex');
+const sha256 = (source: string | Buffer): string =>
+  createHash('sha256').update(source).digest('hex');
 
 describe('ExportService', () => {
   let db: Database.Database;
@@ -71,9 +72,24 @@ describe('ExportService', () => {
     expect(new Map(result.manifest.files.map(file => [file.path, file]))).toEqual(
       new Map(
         [
-          { path: 'index.html', sha256: sha256(html), bytes: Buffer.byteLength(html), kind: 'entry' },
-          { path: 'assets/site.css', sha256: sha256(css), bytes: Buffer.byteLength(css), kind: 'css' },
-          { path: 'assets/bg.png', sha256: sha256(Buffer.from([1, 2, 3, 4])), bytes: 4, kind: 'image' },
+          {
+            path: 'index.html',
+            sha256: sha256(html),
+            bytes: Buffer.byteLength(html),
+            kind: 'entry',
+          },
+          {
+            path: 'assets/site.css',
+            sha256: sha256(css),
+            bytes: Buffer.byteLength(css),
+            kind: 'css',
+          },
+          {
+            path: 'assets/bg.png',
+            sha256: sha256(Buffer.from([1, 2, 3, 4])),
+            bytes: 4,
+            kind: 'image',
+          },
         ].map(file => [file.path, file])
       )
     );
@@ -176,7 +192,11 @@ describe('ExportService', () => {
       exporter.exportZip({ sessionId: 'sa', path: 'index.html', mode: 'draft' })
     ).rejects.toMatchObject({ status: 400, code: 'VALIDATION_ERROR' });
     await expect(
-      exporter.exportZip({ sessionId: 'sa', path: 'index.html', mode: 'verbose' as unknown as 'disk' })
+      exporter.exportZip({
+        sessionId: 'sa',
+        path: 'index.html',
+        mode: 'verbose' as unknown as 'disk',
+      })
     ).rejects.toMatchObject({ status: 400, code: 'VALIDATION_ERROR' });
   });
 
@@ -243,6 +263,8 @@ describe('ExportService', () => {
       bytes: 4,
     });
     const zip = await JSZip.loadAsync(result.buffer);
-    expect(await zip.file('assets/demo.mp4')?.async('nodebuffer')).toEqual(Buffer.from([9, 9, 9, 9]));
+    expect(await zip.file('assets/demo.mp4')?.async('nodebuffer')).toEqual(
+      Buffer.from([9, 9, 9, 9])
+    );
   });
 });

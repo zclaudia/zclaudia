@@ -3,7 +3,8 @@ import { buildStyleRules, patchCssText, type CssRuleRow, type CssSourceEdit } fr
 import { STYLE_BLOCK_MAX_BYTES, DesignEditError, type DesignMatchedRule } from '../types';
 
 const matchedRule = (
-  overrides: Partial<DesignMatchedRule> & Pick<DesignMatchedRule, 'origin' | 'rulePath' | 'selectorText'>
+  overrides: Partial<DesignMatchedRule> &
+    Pick<DesignMatchedRule, 'origin' | 'rulePath' | 'selectorText'>
 ): DesignMatchedRule => ({
   specificity: [0, 1, 0],
   importantProps: [],
@@ -58,15 +59,25 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
       expect(rows.map(row => row.origin)).toEqual(['@inline/1', '@inline/0']);
       expect(rows.every(row => row.readOnly === null)).toBe(true);
       // 身份字段透传（展示用桥接原文，非 postcss 反推）。
-      expect(rows[1]).toMatchObject({ selectorText: '.card', rulePath: [2], specificity: [0, 1, 0] });
+      expect(rows[1]).toMatchObject({
+        selectorText: '.card',
+        rulePath: [2],
+        specificity: [0, 1, 0],
+      });
       expect(rows[0].declarations.map(d => `${d.property}: ${d.value}`)).toEqual(['color: #00f']);
     });
 
     it('声明行携带绝对偏移：按 start/end、valueStart/valueEnd 切片等于声明原文', () => {
-      const rows = build(SOURCE, [matchedRule({ origin: '@inline/0', rulePath: [2], selectorText: '.card' })]);
+      const rows = build(SOURCE, [
+        matchedRule({ origin: '@inline/0', rulePath: [2], selectorText: '.card' }),
+      ]);
       const row = rows[0];
       expect(row.readOnly).toBeNull();
-      expect(row.declarations.map(d => d.property)).toEqual(['color', 'padding-top', 'font-weight']);
+      expect(row.declarations.map(d => d.property)).toEqual([
+        'color',
+        'padding-top',
+        'font-weight',
+      ]);
       const [color, padding, weight] = row.declarations;
       // 声明整体与值子区间均为 htmlSource 绝对偏移，可直接切片还原。
       expect(SOURCE.slice(color.start, color.end)).toBe('color: #f00');
@@ -83,7 +94,9 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
     });
 
     it('嵌套 @media 内声明的偏移同样指向 htmlSource 绝对位置', () => {
-      const rows = build(SOURCE, [matchedRule({ origin: '@inline/1', rulePath: [0, 0], selectorText: '.card' })]);
+      const rows = build(SOURCE, [
+        matchedRule({ origin: '@inline/1', rulePath: [0, 0], selectorText: '.card' }),
+      ]);
       const color = rows[0].declarations[0];
       expect(SOURCE.slice(color.start, color.end)).toBe('color: #00f');
       expect(color.valueStart).toBe(SOURCE.indexOf('#00f'));
@@ -100,7 +113,9 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
     });
 
     it('非 Rule/AtRule 节点计入索引但不产出规则：注释占据索引 1', () => {
-      const rows = build(SOURCE, [matchedRule({ origin: '@inline/0', rulePath: [1], selectorText: '.card' })]);
+      const rows = build(SOURCE, [
+        matchedRule({ origin: '@inline/0', rulePath: [1], selectorText: '.card' }),
+      ]);
       expect(rows[0].readOnly).toEqual({ reason: 'align-mismatch' });
       expect(rows[0].declarations).toEqual([]);
     });
@@ -108,7 +123,9 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
 
   describe('只读原因', () => {
     it('selectorText 被改写 → align-mismatch', () => {
-      const rows = build(SOURCE, [matchedRule({ origin: '@inline/0', rulePath: [2], selectorText: '.cards' })]);
+      const rows = build(SOURCE, [
+        matchedRule({ origin: '@inline/0', rulePath: [2], selectorText: '.cards' }),
+      ]);
       expect(rows[0].readOnly).toEqual({ reason: 'align-mismatch' });
       expect(rows[0].declarations).toEqual([]);
     });
@@ -138,7 +155,8 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
     });
 
     it('postcss 解析失败（未闭合大括号）→ 该块 parse-error，其余块不受影响', () => {
-      const source = '<style>\n  .card { color: red;\n</style>\n<style>\n  .ok { color: blue; }\n</style>';
+      const source =
+        '<style>\n  .card { color: red;\n</style>\n<style>\n  .ok { color: blue; }\n</style>';
       const rows = build(source, [
         matchedRule({ origin: '@inline/0', rulePath: [0], selectorText: '.card' }),
         matchedRule({ origin: '@inline/1', rulePath: [0], selectorText: '.ok' }),
@@ -146,7 +164,11 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
       expect(rows[0].readOnly).toEqual({ reason: 'parse-error' });
       expect(rows[0].declarations).toEqual([]);
       expect(rows[1].readOnly).toBeNull();
-      expect(rows[1].declarations[0]).toMatchObject({ property: 'color', value: 'blue', editable: true });
+      expect(rows[1].declarations[0]).toMatchObject({
+        property: 'color',
+        value: 'blue',
+        editable: true,
+      });
     });
 
     it('块文本超过 STYLE_BLOCK_MAX_BYTES → 该块 oversize，小块不受影响', () => {
@@ -173,7 +195,9 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
 
   describe('winning 判定', () => {
     const single = (css: string): CssRuleRow[] =>
-      build(`<style>${css}</style>`, [matchedRule({ origin: '@inline/0', rulePath: [0], selectorText: '.card' })]);
+      build(`<style>${css}</style>`, [
+        matchedRule({ origin: '@inline/0', rulePath: [0], selectorText: '.card' }),
+      ]);
 
     it('颜色等价：#f00 与 rgb(255,0,0) 等值标 true，异色标 false，缺 computed 为 null', () => {
       expect(single('.card { color: #f00; }')[0].declarations[0].winning).toBeNull();
@@ -235,10 +259,12 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
     it('inline 声明优先级压过规则：规则行标 false（inline 失配时也不回标 true）', () => {
       const source = '<style>.card { color: #f00; }</style>';
       const rule = matchedRule({ origin: '@inline/0', rulePath: [0], selectorText: '.card' });
-      expect(build(source, [rule], { color: 'rgb(0, 255, 0)' }, 'color: #0f0')[0].declarations[0].winning).toBe(
-        false
-      );
-      expect(build(source, [rule], { color: '#f00' }, 'color: #0f0')[0].declarations[0].winning).toBe(false);
+      expect(
+        build(source, [rule], { color: 'rgb(0, 255, 0)' }, 'color: #0f0')[0].declarations[0].winning
+      ).toBe(false);
+      expect(
+        build(source, [rule], { color: '#f00' }, 'color: #0f0')[0].declarations[0].winning
+      ).toBe(false);
     });
 
     it('specificity 参与级联序：高特异性规则源码在先仍胜出', () => {
@@ -246,8 +272,18 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
       const rows = build(
         source,
         [
-          matchedRule({ origin: '@inline/0', rulePath: [0], selectorText: '#main .card', specificity: [1, 1, 0] }),
-          matchedRule({ origin: '@inline/0', rulePath: [1], selectorText: '.card', specificity: [0, 1, 0] }),
+          matchedRule({
+            origin: '@inline/0',
+            rulePath: [0],
+            selectorText: '#main .card',
+            specificity: [1, 1, 0],
+          }),
+          matchedRule({
+            origin: '@inline/0',
+            rulePath: [1],
+            selectorText: '.card',
+            specificity: [0, 1, 0],
+          }),
         ],
         { color: 'rgb(0, 255, 0)' }
       );
@@ -260,7 +296,12 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
       const rows = build(
         source,
         [
-          matchedRule({ origin: '@inline/0', rulePath: [0], selectorText: '.card', importantProps: ['color'] }),
+          matchedRule({
+            origin: '@inline/0',
+            rulePath: [0],
+            selectorText: '.card',
+            importantProps: ['color'],
+          }),
           matchedRule({ origin: '@inline/0', rulePath: [1], selectorText: '.card' }),
         ],
         { color: 'rgb(0, 255, 0)' }
@@ -352,11 +393,16 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
     });
 
     it('cssSources 未提供 → external-css-readonly；提供但缺该路径同样只读', () => {
-      const rule = matchedRule({ origin: 'design/css/main.css', rulePath: [0], selectorText: 'h1' });
+      const rule = matchedRule({
+        origin: 'design/css/main.css',
+        rulePath: [0],
+        selectorText: 'h1',
+      });
       expect(buildExternal([rule])[0].readOnly).toEqual({ reason: 'external-css-readonly' });
       expect(buildExternal([rule], cssSource(CSS_FILE), {})[0].readOnly).toBeNull();
       expect(
-        buildExternal([rule], { 'design/css/other.css': { source: CSS_FILE, revision: 'r' } })[0].readOnly
+        buildExternal([rule], { 'design/css/other.css': { source: CSS_FILE, revision: 'r' } })[0]
+          .readOnly
       ).toEqual({ reason: 'external-css-readonly' });
     });
 
@@ -430,7 +476,10 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
         CSS_FILE.replace('\n  padding-top: 8px;', '')
       );
       expect(patch({ rulePath: [1], property: 'margin-top', value: '4px', create: true })).toBe(
-        CSS_FILE.replace('  border-style: solid\n}', '  border-style: solid\n;\n  margin-top: 4px;}')
+        CSS_FILE.replace(
+          '  border-style: solid\n}',
+          '  border-style: solid\n;\n  margin-top: 4px;}'
+        )
       );
     });
 
@@ -441,9 +490,9 @@ describe('css-source（P3.5 C2：宿主侧源码对齐与规则模型）', () =>
       expect(() =>
         patch({ rulePath: [7], property: 'color', value: 'blue', create: false })
       ).toThrowError(DesignEditError);
-      expect(() => patch({ rulePath: [0], property: 'display', value: null, create: false })).toThrowError(
-        DesignEditError
-      );
+      expect(() =>
+        patch({ rulePath: [0], property: 'display', value: null, create: false })
+      ).toThrowError(DesignEditError);
     });
   });
 });

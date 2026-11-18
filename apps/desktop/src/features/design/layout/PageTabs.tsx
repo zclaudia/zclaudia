@@ -62,30 +62,30 @@ export function PageTabs({
               }`}
             >
               <Tooltip content={page.path}>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => onActivate(page.path)}
-                className="flex min-w-0 items-center gap-1 outline-none"
-              >
-                {page.status === 'dirty' && (
-                  <span
-                    aria-hidden
-                    data-testid={`dirty-dot-${page.path}`}
-                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${TONE_DOT.warning}`}
-                  />
-                )}
-                <span className="max-w-40 truncate">{basename(page.path)}</span>
-                {page.missing && (
-                  <TriangleAlert
-                    size={11}
-                    strokeWidth={1.75}
-                    aria-label={`Missing file ${page.path}`}
-                    className="shrink-0 text-warning"
-                  />
-                )}
-              </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => onActivate(page.path)}
+                  className="flex min-w-0 items-center gap-1 outline-none"
+                >
+                  {page.status === 'dirty' && (
+                    <span
+                      aria-hidden
+                      data-testid={`dirty-dot-${page.path}`}
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${TONE_DOT.warning}`}
+                    />
+                  )}
+                  <span className="max-w-40 truncate">{basename(page.path)}</span>
+                  {page.missing && (
+                    <TriangleAlert
+                      size={11}
+                      strokeWidth={1.75}
+                      aria-label={`Missing file ${page.path}`}
+                      className="shrink-0 text-warning"
+                    />
+                  )}
+                </button>
               </Tooltip>
               <Tooltip content="Close page">
                 <IconButton

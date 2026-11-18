@@ -162,9 +162,13 @@ function AppContent() {
   const navigationShellRef = useRef<HTMLDivElement>(null);
   const [isFeedOpen, setFeedOpen] = useState(false);
   const sharedModalOpen = useMobileNavigationBlocker();
-  const navigationBlocked = sharedModalOpen || sidebarOverlayActive || permissionOpen || pluginPermissionOpen ||
-    notificationsModalOpen || fileViewerFullscreen;
-
+  const navigationBlocked =
+    sharedModalOpen ||
+    sidebarOverlayActive ||
+    permissionOpen ||
+    pluginPermissionOpen ||
+    notificationsModalOpen ||
+    fileViewerFullscreen;
 
   const hasConnected = useRef(false);
 
@@ -207,14 +211,21 @@ function AppContent() {
   const drawer = useMobileDrawer({
     isMobile,
     gestureActive: isAppTopLevelView || isShellTopLevelView,
-    isAgentExpanded, isFeedOpen, isFileViewerFullscreen: fileViewerFullscreen,
+    isAgentExpanded,
+    isFeedOpen,
+    isFileViewerFullscreen: fileViewerFullscreen,
   });
   const {
     sidebarOpen,
     setSidebarOpen,
     drawerPanelRef,
     drawerBackdropRef,
-    widthMode, canExpand, widthChangeDisabled, toggleWidth, stepBack, drawerVisible,
+    widthMode,
+    canExpand,
+    widthChangeDisabled,
+    toggleWidth,
+    stepBack,
+    drawerVisible,
   } = drawer;
 
   // Toasts render on every viewport; only placement differs (mobile stacks
@@ -357,10 +368,17 @@ function AppContent() {
   );
 
   // Both panels share one input owner for the complete touch session.
-  const claudia = useClaudiaGesture(isAgentExpanded, isAppTopLevelView && !navigationBlocked, setAgentExpanded);
-  useMobileNavigationGesture({ target: navigationShellRef,
+  const claudia = useClaudiaGesture(
+    isAgentExpanded,
+    isAppTopLevelView && !navigationBlocked,
+    setAgentExpanded
+  );
+  useMobileNavigationGesture({
+    target: navigationShellRef,
     enabled: isMobile && (isAppTopLevelView || isShellTopLevelView),
-    blocked: navigationBlocked || (isFeedOpen && !drawer.drawerVisible), drawer, claudia: claudia.adapter,
+    blocked: navigationBlocked || (isFeedOpen && !drawer.drawerVisible),
+    drawer,
+    claudia: claudia.adapter,
     commandVersion: `${topLevelView.kind}:${isAgentExpanded}`,
     // The system owns the outermost iOS back/forward region.
     ignoreEdgeWidth: /iPad|iPhone|iPod/.test(navigator.userAgent) ? 20 : 0,
@@ -525,7 +543,11 @@ function AppContent() {
           />
         )}
 
-        <main data-mobile-drawer-background tabIndex={-1} className="flex-1 flex flex-col overflow-hidden relative">
+        <main
+          data-mobile-drawer-background
+          tabIndex={-1}
+          className="flex-1 flex flex-col overflow-hidden relative"
+        >
           {/* Desktop: the main column owns its own top drag strip. The full-width
               AppHeader (which used to provide this) only renders on mobile now, and
               only SessionHeader re-adds a strip — so welcome/dashboard views would

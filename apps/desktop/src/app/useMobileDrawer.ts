@@ -2,8 +2,14 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { animate, motionValue } from 'motion';
 import { useIsMounted } from '../hooks/useIsMounted';
 import {
-  clampDrawerPosition, DRAWER_MOTION, drawerSpringVelocity, drawerVisuals, drawerWidths,
-  resolveDrawerOpen, type DrawerPhase, type DrawerWidthMode,
+  clampDrawerPosition,
+  DRAWER_MOTION,
+  drawerSpringVelocity,
+  drawerVisuals,
+  drawerWidths,
+  resolveDrawerOpen,
+  type DrawerPhase,
+  type DrawerWidthMode,
 } from '../features/sidebar/drawerMotion';
 
 export interface UseMobileDrawerOptions {
@@ -28,12 +34,19 @@ export interface DrawerRelease {
 /** One continuous position; React receives only discrete lifecycle changes. */
 export function useMobileDrawer(options: UseMobileDrawerOptions) {
   const optionsRef = useRef(options);
-  useLayoutEffect(() => { optionsRef.current = options; }, [options]);
+  useLayoutEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
   const drawerPanelRef = useRef<HTMLDivElement>(null);
   const drawerBackdropRef = useRef<HTMLDivElement>(null);
   const [drawerPosition] = useState(() => motionValue(0));
-  const [state, setState] = useState<DrawerState>({ phase: 'idle', targetOpen: false,
-    modalActive: false, widthMode: 'compact', canExpand: false });
+  const [state, setState] = useState<DrawerState>({
+    phase: 'idle',
+    targetOpen: false,
+    modalActive: false,
+    widthMode: 'compact',
+    canExpand: false,
+  });
   const stateRef = useRef(state);
   const widthRef = useRef(0);
   const widthsRef = useRef(drawerWidths(0));
@@ -46,10 +59,13 @@ export function useMobileDrawer(options: UseMobileDrawerOptions) {
   const resetLayoutRef = useRef<(hide?: boolean) => void>(() => {});
   const lastPanelRef = useRef<HTMLDivElement | null>(null);
 
-  const publish = useCallback((patch: Partial<DrawerState>) => {
-    stateRef.current = { ...stateRef.current, ...patch };
-    if (isMounted()) setState(stateRef.current);
-  }, [isMounted]);
+  const publish = useCallback(
+    (patch: Partial<DrawerState>) => {
+      stateRef.current = { ...stateRef.current, ...patch };
+      if (isMounted()) setState(stateRef.current);
+    },
+    [isMounted]
+  );
   const paint = useCallback(() => {
     const panel = drawerPanelRef.current;
     const backdrop = drawerBackdropRef.current;
@@ -69,7 +85,8 @@ export function useMobileDrawer(options: UseMobileDrawerOptions) {
     if (backdrop) {
       backdrop.style.opacity = String(opacity);
       const pointerEvents = visible || stateRef.current.modalActive ? 'auto' : 'none';
-      if (backdrop.style.pointerEvents !== pointerEvents) backdrop.style.pointerEvents = pointerEvents;
+      if (backdrop.style.pointerEvents !== pointerEvents)
+        backdrop.style.pointerEvents = pointerEvents;
     }
   }, [drawerPosition]);
   const stop = useCallback(() => {
@@ -82,54 +99,82 @@ export function useMobileDrawer(options: UseMobileDrawerOptions) {
     pendingRef.current = false;
     return versionRef.current;
   }, [drawerPosition]);
-  const finish = useCallback((open: boolean, version: number) => {
-    if (!isMounted() || version !== versionRef.current) return;
-    animationRef.current?.stop();
-    animationRef.current = null;
-    if (!open) widthRef.current = widthsRef.current.compact;
-    drawerPosition.set(open ? widthRef.current : 0);
-    const widthButton = drawerPanelRef.current?.querySelector<HTMLButtonElement>('[data-drawer-width-toggle]');
-    if (widthButton) widthButton.disabled = !open;
-    publish({ phase: 'idle', targetOpen: open, modalActive: open,
-      ...(open ? {} : { widthMode: 'compact' as const }) });
-    paint();
-  }, [drawerPosition, paint, publish, isMounted]);
-  const settle = useCallback((open: boolean, velocity = 0) => {
-    const version = stop();
-    publish({ phase: 'settling', targetOpen: open,
-      modalActive: open || stateRef.current.modalActive });
-    paint();
-    const target = open ? widthRef.current : 0;
-    if (reducedMotionRef.current || Math.abs(drawerPosition.get() - target) < 0.5) {
-      finish(open, version);
-      return;
-    }
-    animationRef.current = animate(drawerPosition, target, {
-      type: 'spring', ...DRAWER_MOTION.spring,
-      velocity: drawerSpringVelocity(drawerPosition.get(), widthRef.current, velocity),
-      onUpdate: value => {
-        // A large release velocity can reach a boundary before the spring rests.
-        if (version === versionRef.current && (value < 0 || value > widthRef.current)) finish(open, version);
-      },
-      onComplete: () => finish(open, version),
-    });
-  }, [drawerPosition, finish, paint, publish, stop]);
+  const finish = useCallback(
+    (open: boolean, version: number) => {
+      if (!isMounted() || version !== versionRef.current) return;
+      animationRef.current?.stop();
+      animationRef.current = null;
+      if (!open) widthRef.current = widthsRef.current.compact;
+      drawerPosition.set(open ? widthRef.current : 0);
+      const widthButton = drawerPanelRef.current?.querySelector<HTMLButtonElement>(
+        '[data-drawer-width-toggle]'
+      );
+      if (widthButton) widthButton.disabled = !open;
+      publish({
+        phase: 'idle',
+        targetOpen: open,
+        modalActive: open,
+        ...(open ? {} : { widthMode: 'compact' as const }),
+      });
+      paint();
+    },
+    [drawerPosition, paint, publish, isMounted]
+  );
+  const settle = useCallback(
+    (open: boolean, velocity = 0) => {
+      const version = stop();
+      publish({
+        phase: 'settling',
+        targetOpen: open,
+        modalActive: open || stateRef.current.modalActive,
+      });
+      paint();
+      const target = open ? widthRef.current : 0;
+      if (reducedMotionRef.current || Math.abs(drawerPosition.get() - target) < 0.5) {
+        finish(open, version);
+        return;
+      }
+      animationRef.current = animate(drawerPosition, target, {
+        type: 'spring',
+        ...DRAWER_MOTION.spring,
+        velocity: drawerSpringVelocity(drawerPosition.get(), widthRef.current, velocity),
+        onUpdate: value => {
+          // A large release velocity can reach a boundary before the spring rests.
+          if (version === versionRef.current && (value < 0 || value > widthRef.current))
+            finish(open, version);
+        },
+        onComplete: () => finish(open, version),
+      });
+    },
+    [drawerPosition, finish, paint, publish, stop]
+  );
   const enabled = useCallback(() => {
     const o = optionsRef.current;
-    const present = drawerPosition.get() > 0 || stateRef.current.modalActive || stateRef.current.targetOpen;
-    return o.isMobile && o.gestureActive && (!o.isAgentExpanded && !o.isFeedOpen || present) && !o.isFileViewerFullscreen;
+    const present =
+      drawerPosition.get() > 0 || stateRef.current.modalActive || stateRef.current.targetOpen;
+    return (
+      o.isMobile &&
+      o.gestureActive &&
+      ((!o.isAgentExpanded && !o.isFeedOpen) || present) &&
+      !o.isFileViewerFullscreen
+    );
   }, [drawerPosition]);
-  const setSidebarOpen = useCallback((open: boolean) => {
-    if (!optionsRef.current.isMobile) return;
-    // Menu/open commands choose the normal reading width.
-    if (open && stateRef.current.widthMode !== 'compact') {
-      const wasOpen = stateRef.current.targetOpen;
-      widthRef.current = widthsRef.current.compact;
-      drawerPosition.set(wasOpen ? widthRef.current : clampDrawerPosition(drawerPosition.get(), widthRef.current));
-      publish({ widthMode: 'compact' });
-    }
-    settle(open);
-  }, [drawerPosition, publish, settle]);
+  const setSidebarOpen = useCallback(
+    (open: boolean) => {
+      if (!optionsRef.current.isMobile) return;
+      // Menu/open commands choose the normal reading width.
+      if (open && stateRef.current.widthMode !== 'compact') {
+        const wasOpen = stateRef.current.targetOpen;
+        widthRef.current = widthsRef.current.compact;
+        drawerPosition.set(
+          wasOpen ? widthRef.current : clampDrawerPosition(drawerPosition.get(), widthRef.current)
+        );
+        publish({ widthMode: 'compact' });
+      }
+      settle(open);
+    },
+    [drawerPosition, publish, settle]
+  );
   const toggleWidth = useCallback(() => {
     const s = stateRef.current;
     if (!s.targetOpen || s.phase !== 'idle' || !widthsRef.current.canExpand) return;
@@ -156,28 +201,41 @@ export function useMobileDrawer(options: UseMobileDrawerOptions) {
     dragRef.current = { start: drawerPosition.get(), width: widthRef.current, priorTargetOpen };
     // Keep the drag phase synchronous without rendering the entire app on touchmove activation.
     stateRef.current = { ...stateRef.current, phase: 'dragging' };
-    const widthButton = drawerPanelRef.current?.querySelector<HTMLButtonElement>('[data-drawer-width-toggle]');
+    const widthButton = drawerPanelRef.current?.querySelector<HTMLButtonElement>(
+      '[data-drawer-width-toggle]'
+    );
     if (widthButton) widthButton.disabled = true;
     paint();
     return true;
   }, [drawerPosition, enabled, paint, stop]);
-  const updateDrag = useCallback((distancePx: number) => {
-    const drag = dragRef.current;
-    if (drag) drawerPosition.set(clampDrawerPosition(drag.start + distancePx, drag.width));
-  }, [drawerPosition]);
-  const endDrag = useCallback((release: DrawerRelease) => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    const open = resolveDrawerOpen({ position: drawerPosition.get(), width: drag.width,
-      priorTargetOpen: drag.priorTargetOpen, ...release });
-    settle(open, release.velocityPxPerSecond);
-  }, [drawerPosition, settle]);
+  const updateDrag = useCallback(
+    (distancePx: number) => {
+      const drag = dragRef.current;
+      if (drag) drawerPosition.set(clampDrawerPosition(drag.start + distancePx, drag.width));
+    },
+    [drawerPosition]
+  );
+  const endDrag = useCallback(
+    (release: DrawerRelease) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const open = resolveDrawerOpen({
+        position: drawerPosition.get(),
+        width: drag.width,
+        priorTargetOpen: drag.priorTargetOpen,
+        ...release,
+      });
+      settle(open, release.velocityPxPerSecond);
+    },
+    [drawerPosition, settle]
+  );
   const cancelDrag = useCallback(() => {
     const drag = dragRef.current;
     if (drag) settle(drag.priorTargetOpen);
   }, [settle]);
   const pausePending = useCallback(() => {
-    if (!enabled() || stateRef.current.phase !== 'settling' || drawerPosition.get() <= 0) return false;
+    if (!enabled() || stateRef.current.phase !== 'settling' || drawerPosition.get() <= 0)
+      return false;
     stop();
     pendingRef.current = true;
     publish({ phase: 'pending' });
@@ -186,11 +244,17 @@ export function useMobileDrawer(options: UseMobileDrawerOptions) {
   const resumePending = useCallback(() => {
     if (pendingRef.current) settle(stateRef.current.targetOpen);
   }, [settle]);
-  const getGestureState = useCallback(() => ({ enabled: enabled(),
-    present: drawerPosition.get() > 0 || stateRef.current.modalActive || stateRef.current.targetOpen,
-    targetOpen: stateRef.current.targetOpen, phase: stateRef.current.phase,
-    operationVersion: versionRef.current,
-  }), [drawerPosition, enabled]);
+  const getGestureState = useCallback(
+    () => ({
+      enabled: enabled(),
+      present:
+        drawerPosition.get() > 0 || stateRef.current.modalActive || stateRef.current.targetOpen,
+      targetOpen: stateRef.current.targetOpen,
+      phase: stateRef.current.phase,
+      operationVersion: versionRef.current,
+    }),
+    [drawerPosition, enabled]
+  );
 
   useLayoutEffect(() => {
     const panel = drawerPanelRef.current;
@@ -224,17 +288,25 @@ export function useMobileDrawer(options: UseMobileDrawerOptions) {
       const containerWidth = shell?.getBoundingClientRect().width || window.innerWidth;
       // Resolve safe-area env() through computed padding on a measurement-only element.
       const safeArea = document.createElement('div');
-      safeArea.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)';
+      safeArea.style.cssText =
+        'position:fixed;visibility:hidden;pointer-events:none;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)';
       document.body.appendChild(safeArea);
       const style = window.getComputedStyle(safeArea);
-      const safeWidth = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+      const safeWidth =
+        (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
       safeArea.remove();
       widthsRef.current = drawerWidths(containerWidth - safeWidth);
       const open = stateRef.current.targetOpen;
-      const widthMode = open && widthsRef.current.canExpand ? stateRef.current.widthMode : 'compact';
+      const widthMode =
+        open && widthsRef.current.canExpand ? stateRef.current.widthMode : 'compact';
       widthRef.current = widthsRef.current[widthMode];
       drawerPosition.set(open ? widthRef.current : 0);
-      publish({ phase: 'idle', modalActive: open, widthMode, canExpand: widthsRef.current.canExpand });
+      publish({
+        phase: 'idle',
+        modalActive: open,
+        widthMode,
+        canExpand: widthsRef.current.canExpand,
+      });
       paint();
     };
     resetLayoutRef.current = reset;
@@ -259,7 +331,8 @@ export function useMobileDrawer(options: UseMobileDrawerOptions) {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
     const change = () => {
       reducedMotionRef.current = media.matches;
-      if (media.matches && stateRef.current.phase === 'settling') settle(stateRef.current.targetOpen);
+      if (media.matches && stateRef.current.phase === 'settling')
+        settle(stateRef.current.targetOpen);
     };
     change();
     media.addEventListener('change', change);
@@ -270,12 +343,33 @@ export function useMobileDrawer(options: UseMobileDrawerOptions) {
       if (dragRef.current) cancelDrag();
       else resumePending();
     }
-  }, [options.gestureActive, options.isAgentExpanded, options.isFeedOpen,
-    options.isFileViewerFullscreen, enabled, cancelDrag, resumePending]);
+  }, [
+    options.gestureActive,
+    options.isAgentExpanded,
+    options.isFeedOpen,
+    options.isFileViewerFullscreen,
+    enabled,
+    cancelDrag,
+    resumePending,
+  ]);
 
-  return { ...state, sidebarOpen: state.modalActive,
+  return {
+    ...state,
+    sidebarOpen: state.modalActive,
     drawerVisible: state.modalActive || state.phase !== 'idle' || state.targetOpen,
     widthChangeDisabled: !state.targetOpen || state.phase !== 'idle',
-    drawerPanelRef, drawerBackdropRef, drawerPosition, setSidebarOpen, toggleWidth, stepBack,
-    beginDrag, updateDrag, endDrag, cancelDrag, pausePending, resumePending, getGestureState };
+    drawerPanelRef,
+    drawerBackdropRef,
+    drawerPosition,
+    setSidebarOpen,
+    toggleWidth,
+    stepBack,
+    beginDrag,
+    updateDrag,
+    endDrag,
+    cancelDrag,
+    pausePending,
+    resumePending,
+    getGestureState,
+  };
 }

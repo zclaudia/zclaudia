@@ -35,7 +35,9 @@ describe('ElementTree', () => {
     render(<ElementTree source={TREE_SOURCE} selectionPath={null} onSelectPath={onSelect} />);
     // 能力边界说明已移到 Layers 面板头部的 Tooltip（P4）。
     expect(screen.getByRole('region', { name: 'Structure tree' })).toBeInTheDocument();
-    expect(screen.queryByText(/The structure tree is built from the page source/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/The structure tree is built from the page source/)
+    ).not.toBeInTheDocument();
     expect(screen.getByText('<main>')).toBeInTheDocument();
     expect(screen.getByText('#root')).toBeInTheDocument();
     expect(screen.getByText('.layout')).toBeInTheDocument();
@@ -62,14 +64,20 @@ describe('ElementTree', () => {
       'aria-current',
       'true'
     );
-    expect(screen.getByRole('button', { name: 'Select main 0' })).not.toHaveAttribute('aria-current');
-    expect(screen.getByRole('button', { name: 'Select p 0.1' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('button', { name: 'Select main 0' })).not.toHaveAttribute(
+      'aria-current'
+    );
+    expect(screen.getByRole('button', { name: 'Select p 0.1' })).not.toHaveAttribute(
+      'aria-current'
+    );
   });
 
   it('renders the svg-subtree reason for svg rows', () => {
     render(<ElementTree source={TREE_SOURCE} selectionPath={null} onSelectPath={onSelect} />);
     const svgRow = screen.getByRole('button', { name: 'Select svg 1' });
-    expect(within(svgRow).getByText('SVG content supports only text, style, and structure changes')).toBeInTheDocument();
+    expect(
+      within(svgRow).getByText('SVG content supports only text, style, and structure changes')
+    ).toBeInTheDocument();
     // svg 子树内的行照常展开渲染（g 是 svg 行的兄弟行）。
     expect(screen.getByText('<g>')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Select g 1.0' })).toBeInTheDocument();
@@ -77,7 +85,11 @@ describe('ElementTree', () => {
 
   it('renders the implicit reason for parse5-implied rows', () => {
     render(
-      <ElementTree source="<body><table><tr><td>cell</td></tr></table></body>" selectionPath={null} onSelectPath={onSelect} />
+      <ElementTree
+        source="<body><table><tr><td>cell</td></tr></table></body>"
+        selectionPath={null}
+        onSelectPath={onSelect}
+      />
     );
     const tbodyRow = screen.getByRole('button', { name: 'Select tbody 0.0' });
     expect(within(tbodyRow).getByText('No explicit tag in the source')).toBeInTheDocument();
@@ -88,12 +100,16 @@ describe('ElementTree', () => {
     render(<ElementTree source={source} selectionPath={null} onSelectPath={onSelect} />);
     // 默认只展开前两层：逐层展开到第 64 层。
     for (let depth = 3; depth <= 63; depth += 1) {
-      fireEvent.click(screen.getByRole('button', { name: `Expand ${Array(depth).fill(0).join('.')}` }));
+      fireEvent.click(
+        screen.getByRole('button', { name: `Expand ${Array(depth).fill(0).join('.')}` })
+      );
     }
     const deepRow = screen.getByRole('button', {
       name: `Select div ${Array(64).fill(0).join('.')}`,
     });
-    expect(within(deepRow).getByText('Nesting exceeds the preview bridge limit')).toBeInTheDocument();
+    expect(
+      within(deepRow).getByText('Nesting exceeds the preview bridge limit')
+    ).toBeInTheDocument();
     // deep 子树不再展开：没有第 65 层的行。
     expect(
       screen.queryByRole('button', { name: `Select div ${Array(65).fill(0).join('.')}` })
@@ -136,7 +152,13 @@ describe('ElementTree', () => {
       truncated: true,
     };
     vi.mocked(buildElementTree).mockImplementationOnce(() => [truncatedNode]);
-    render(<ElementTree source="<body><section></section></body>" selectionPath={null} onSelectPath={onSelect} />);
+    render(
+      <ElementTree
+        source="<body><section></section></body>"
+        selectionPath={null}
+        onSelectPath={onSelect}
+      />
+    );
     const sectionRow = screen.getByRole('button', { name: 'Select section 0' });
     expect(within(sectionRow).getByText('… (truncated)')).toBeInTheDocument();
   });

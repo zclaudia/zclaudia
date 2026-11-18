@@ -55,7 +55,10 @@ const SELECTION_STYLE_KEYS: Partial<Record<DesignStyleProperty, 'color' | 'backg
   'background-color': 'backgroundColor',
 };
 
-function inSpan(error: { startOffset: number }, span: { startOffset: number; endOffset: number }): boolean {
+function inSpan(
+  error: { startOffset: number },
+  span: { startOffset: number; endOffset: number }
+): boolean {
   return error.startOffset >= span.startOffset && error.startOffset < span.endOffset;
 }
 
@@ -108,7 +111,11 @@ interface StyleFold {
   cleared: Set<DesignStyleProperty>;
 }
 
-function buildStyleFold(source: string, element: P5Element, operations: StyleOperation[]): StyleFold {
+function buildStyleFold(
+  source: string,
+  element: P5Element,
+  operations: StyleOperation[]
+): StyleFold {
   const applied = new Map<DesignStyleProperty, string>();
   const cleared = new Set<DesignStyleProperty>();
   const hasStyleAttr = element.attrs.some(attr => attr.name === 'style');
@@ -173,7 +180,11 @@ function buildStyleFold(source: string, element: P5Element, operations: StyleOpe
   }
   if (!changed) return { splice: null, applied, cleared };
   return {
-    splice: { start: attrSpan.start, end: attrSpan.end, replacement: `style="${escapeAttr(value)}"` },
+    splice: {
+      start: attrSpan.start,
+      end: attrSpan.end,
+      replacement: `style="${escapeAttr(value)}"`,
+    },
     applied,
     cleared,
   };
@@ -272,7 +283,13 @@ function buildStyleBlockSplice(
       `Style block #${operation.styleOrdinal} does not parse as CSS.`
     );
   }
-  return buildCssEditSplice(source, operation, block, parsed, `style block #${operation.styleOrdinal}`);
+  return buildCssEditSplice(
+    source,
+    operation,
+    block,
+    parsed,
+    `style block #${operation.styleOrdinal}`
+  );
 }
 
 /**
@@ -288,7 +305,8 @@ function applySplices(source: string, splices: Splice[]): string {
   );
   let nextSource = source;
   for (const splice of sorted) {
-    nextSource = nextSource.slice(0, splice.start) + splice.replacement + nextSource.slice(splice.end);
+    nextSource =
+      nextSource.slice(0, splice.start) + splice.replacement + nextSource.slice(splice.end);
   }
   return nextSource;
 }
@@ -393,7 +411,9 @@ function buildDuplicate(
   let renamedCopy = copy;
   for (const replacement of [...replacements].sort((a, b) => b.start - a.start)) {
     renamedCopy =
-      renamedCopy.slice(0, replacement.start) + replacement.replacement + renamedCopy.slice(replacement.end);
+      renamedCopy.slice(0, replacement.start) +
+      replacement.replacement +
+      renamedCopy.slice(replacement.end);
   }
   const copyElement = childElements(fragment)[0];
   return {
@@ -442,11 +462,17 @@ function buildMove(
   const neighborIndex = action === 'move-up' ? index - 1 : index + 1;
   const neighbor = siblings[neighborIndex];
   if (!neighbor) {
-    throw new DesignEditError('STRUCTURE_NOT_ALLOWED', 'There is no adjacent sibling element to swap with.');
+    throw new DesignEditError(
+      'STRUCTURE_NOT_ALLOWED',
+      'There is no adjacent sibling element to swap with.'
+    );
   }
   const neighborSpan = elementSpan(neighbor);
   if (!neighborSpan) {
-    throw new DesignEditError('IMPLICIT_ELEMENT', 'The adjacent sibling element has no source location.');
+    throw new DesignEditError(
+      'IMPLICIT_ELEMENT',
+      'The adjacent sibling element has no source location.'
+    );
   }
   if (action === 'move-up') {
     // Defensive: sibling spans of the same parent must not overlap.
@@ -609,10 +635,7 @@ export async function applyEditTransaction(
     );
   }
   if (parsed.errors.some(error => inSpan(error, location))) {
-    throw new DesignEditError(
-      'MALFORMED_HTML',
-      'The target element contains a parse error.'
-    );
+    throw new DesignEditError('MALFORMED_HTML', 'The target element contains a parse error.');
   }
 
   if (structureOperations.length > 0) {

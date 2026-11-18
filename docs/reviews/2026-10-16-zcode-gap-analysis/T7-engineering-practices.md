@@ -6,22 +6,22 @@
 
 ## 1. 两侧结构对照（简表）
 
-| 维度 | ZCode | zclaudia 现状 |
-| --- | --- | --- |
-| 架构治理策略文件 | `architecture-policy.yaml`（17 个模块、9 个受管模块、全局阈值、带过期时间的例外） | 无 policy 文件；规则硬编码在 `scripts/dev/check-architecture-boundaries.mjs`（ratchet 式 allowlist，server 分层 + desktop store/feature/services 规则） |
-| 架构检查器 | `scripts/architecture/`（index.mjs 399 行 + policy.mjs 193 行），带 281 行自测 | 有检查器（535 行），CI 第一步执行（`.github/workflows/ci.yml:28`）；无自测，无 fingerprint 基线 |
-| 依赖可视化 | `dependency-graph.mmd`（544 条边，`pnpm dep:graph` 生成）+ `scripts/dep-refs.mjs`（导出引用查询） | 缺失 |
-| 死代码检测 | knip 6（`knip.json`）+ `pnpm knip`，AGENTS.md 列为日常命令 | 缺失（无 knip/madge/depcheck，`grep knip package.json` 无命中） |
-| 形式化验证 | `packages/formal-proof`（状态空间枚举器）+ 会话 e2e case 转正审计（catalog/coverage/fault matrix 一致性门禁） | 缺失 |
-| E2E 规模与报告 | desktop e2e 417 个 spec 文件 + `packages/e2e-report`（chart.js 趋势/覆盖率看板）+ 容器化 e2e（`harness/remote`、`test:e2e:container`） | e2e/tests 74 个 spec；vitest+playwright 双栈、local/remote/gateway 多模式；报告依赖 playwright 内建 report |
-| 遥测 | `apps/zcode-cli/packages/telemetry`（OpenTelemetry OTLP trace+metrics，含 error-sanitizer、cost-controls，10 个测试文件）+ 桌面端 ARMS RUM | 缺失（workspace 无 @opentelemetry 依赖） |
-| 国际化 | `apps/zcode-cli/packages/i18n`（en-US/zh-CN 全量文案目录、env locale 探测、契约类型） | 缺失（desktop/src 下无 i18n/locale 模块） |
-| 三方合规 | `scripts/licenses.mjs`（green/yellow/red 分类门禁 + `check --strict`）自动生成 2MB `THIRD-PARTY-NOTICES.md`；`third-party/inventory.json`；`NOTICE.md` 29KB 风险披露 | 缺失（仅根目录 `LICENSE`，无 NOTICES/盘点） |
-| 发布工程 | release-it + conventional-changelog、`specs/zcode-unified-distribution.md`（含验收场景与已记录验证）、ADR 0004 发布平台契约、SEA 打包、smoke 脚本 | GitHub Actions 四条 workflow + `scripts/release/{macos.sh,version-bump.sh,validate-updater-signing.mjs}`（含 `__tests__`）、Android versionCode 推导 |
-| 文档体系 | docs/ 共 1866 个 md（含 `docs/adr/` 4 篇、`docs/testing/` 覆盖率矩阵），AGENTS.md 明文「先 spec 后代码」 | docs/ 233 个 md；`docs/plans`(30)、`docs/specs`(6)、`docs/reviews`、`docs/quality-audit`（00–07 分批审计 + PROGRESS）；无 ADR 目录 |
-| 工具链锁定 | `mise.toml`（node 24.14.0 + pnpm 10.33.2）+ `.nvmrc` + `ci:assert-node` | `.node-version` + engines + `scripts/hooks/ensure-node-version.mjs`（preinstall） |
-| 依赖补丁 | `patches/` 6 个 pnpm patchedDependencies（vitest/wdio-electron-service/@arms rum/@ai-sdk×2/@open-pencil） | 无 pnpm overrides/patchedDependencies |
-| CI 可见性 | 仓库内无 `.github/`/`.gitlab-ci.yml`（CI 在内部平台，ADR 0004 提及 GitLab runner） | `.github/workflows/{ci,release,_release-build,builtin-agent-runtimes}.yml` + dependabot，全部在库内可审计 |
+| 维度             | ZCode                                                                                                                                                                | zclaudia 现状                                                                                                                                           |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 架构治理策略文件 | `architecture-policy.yaml`（17 个模块、9 个受管模块、全局阈值、带过期时间的例外）                                                                                    | 无 policy 文件；规则硬编码在 `scripts/dev/check-architecture-boundaries.mjs`（ratchet 式 allowlist，server 分层 + desktop store/feature/services 规则） |
+| 架构检查器       | `scripts/architecture/`（index.mjs 399 行 + policy.mjs 193 行），带 281 行自测                                                                                       | 有检查器（535 行），CI 第一步执行（`.github/workflows/ci.yml:28`）；无自测，无 fingerprint 基线                                                         |
+| 依赖可视化       | `dependency-graph.mmd`（544 条边，`pnpm dep:graph` 生成）+ `scripts/dep-refs.mjs`（导出引用查询）                                                                    | 缺失                                                                                                                                                    |
+| 死代码检测       | knip 6（`knip.json`）+ `pnpm knip`，AGENTS.md 列为日常命令                                                                                                           | 缺失（无 knip/madge/depcheck，`grep knip package.json` 无命中）                                                                                         |
+| 形式化验证       | `packages/formal-proof`（状态空间枚举器）+ 会话 e2e case 转正审计（catalog/coverage/fault matrix 一致性门禁）                                                        | 缺失                                                                                                                                                    |
+| E2E 规模与报告   | desktop e2e 417 个 spec 文件 + `packages/e2e-report`（chart.js 趋势/覆盖率看板）+ 容器化 e2e（`harness/remote`、`test:e2e:container`）                               | e2e/tests 74 个 spec；vitest+playwright 双栈、local/remote/gateway 多模式；报告依赖 playwright 内建 report                                              |
+| 遥测             | `apps/zcode-cli/packages/telemetry`（OpenTelemetry OTLP trace+metrics，含 error-sanitizer、cost-controls，10 个测试文件）+ 桌面端 ARMS RUM                           | 缺失（workspace 无 @opentelemetry 依赖）                                                                                                                |
+| 国际化           | `apps/zcode-cli/packages/i18n`（en-US/zh-CN 全量文案目录、env locale 探测、契约类型）                                                                                | 缺失（desktop/src 下无 i18n/locale 模块）                                                                                                               |
+| 三方合规         | `scripts/licenses.mjs`（green/yellow/red 分类门禁 + `check --strict`）自动生成 2MB `THIRD-PARTY-NOTICES.md`；`third-party/inventory.json`；`NOTICE.md` 29KB 风险披露 | 缺失（仅根目录 `LICENSE`，无 NOTICES/盘点）                                                                                                             |
+| 发布工程         | release-it + conventional-changelog、`specs/zcode-unified-distribution.md`（含验收场景与已记录验证）、ADR 0004 发布平台契约、SEA 打包、smoke 脚本                    | GitHub Actions 四条 workflow + `scripts/release/{macos.sh,version-bump.sh,validate-updater-signing.mjs}`（含 `__tests__`）、Android versionCode 推导    |
+| 文档体系         | docs/ 共 1866 个 md（含 `docs/adr/` 4 篇、`docs/testing/` 覆盖率矩阵），AGENTS.md 明文「先 spec 后代码」                                                             | docs/ 233 个 md；`docs/plans`(30)、`docs/specs`(6)、`docs/reviews`、`docs/quality-audit`（00–07 分批审计 + PROGRESS）；无 ADR 目录                      |
+| 工具链锁定       | `mise.toml`（node 24.14.0 + pnpm 10.33.2）+ `.nvmrc` + `ci:assert-node`                                                                                              | `.node-version` + engines + `scripts/hooks/ensure-node-version.mjs`（preinstall）                                                                       |
+| 依赖补丁         | `patches/` 6 个 pnpm patchedDependencies（vitest/wdio-electron-service/@arms rum/@ai-sdk×2/@open-pencil）                                                            | 无 pnpm overrides/patchedDependencies                                                                                                                   |
+| CI 可见性        | 仓库内无 `.github/`/`.gitlab-ci.yml`（CI 在内部平台，ADR 0004 提及 GitLab runner）                                                                                   | `.github/workflows/{ci,release,_release-build,builtin-agent-runtimes}.yml` + dependabot，全部在库内可审计                                               |
 
 ## 2. ZCode 领先点（核心章节）
 
@@ -156,16 +156,16 @@
 
 ## 4. 不建议搬运的（及原因）
 
-| 项 | 原因 |
-| --- | --- |
-| ARMS RUM 前端监控 + `patches/@arms__rum-electron@0.0.3.patch` | 绑定阿里云 ARMS SaaS 端点；zclaudia 主打自托管/私有部署，引入云上报面不合适。若做遥测，走 2.6 的 OTLP 开源自建路线。 |
-| ADR 0004 的发布平台契约（release-candidate.v1 + 独立打包平台服务） | 需要长期运行的状态服务 + 对象存储 + 审批流，为 ZCode 的内部多平台发布规模服务；zclaudia 用 GitHub Releases + 现有签名校验已够，照搬是负资产。 |
-| `THIRD-PARTY-NOTICES.md` 2MB 成品入库 | 应移植的是生成器与门禁（2.4），不是产物；成品随依赖树漂移，入库只会制造 diff 噪音。生成后按需提交即可。 |
-| oxlint/oxfmt 替换 eslint/prettier | ZCode 选 oxlint/oxfmt 追求速度并配套 architecture disable-count 规则；zclaudia 的 eslint 配置已含 react-hooks v7 编译器规则集且团队熟。换工具是纯迁移成本，除非 lint 时长成为瓶颈。 |
-| formal-proof 的 Vite 可视化应用本体 | 强耦合 ZCode 对话产品状态机；值得带走的只是「枚举→剪枝→case 清单→一致性审计」方法论（见 2.8）。 |
-| mise 工具链管理 | zclaudia 已有 `.node-version` + engines + preinstall 校验钩子，覆盖了同一问题；再引入 mise 是双轨制。 |
-| 1866 篇 docs 的规模本身 | ZCode 文档治理（spec-first + 每特性一篇）与其团队规模匹配；zclaudia 的 plans/specs/reviews/quality-audit 四目录已覆盖同一生命周期，扩充应随需求增长而非复制体量。 |
-| `test:e2e:windows:sharded` 十分片 Windows e2e 基建 | 依赖 ZCode 内部 CI 的 Windows runner 编排；zclaudia 当前 CI 只有 ubuntu-latest，先有 Windows CI 再谈分片。 |
+| 项                                                                 | 原因                                                                                                                                                                                |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ARMS RUM 前端监控 + `patches/@arms__rum-electron@0.0.3.patch`      | 绑定阿里云 ARMS SaaS 端点；zclaudia 主打自托管/私有部署，引入云上报面不合适。若做遥测，走 2.6 的 OTLP 开源自建路线。                                                                |
+| ADR 0004 的发布平台契约（release-candidate.v1 + 独立打包平台服务） | 需要长期运行的状态服务 + 对象存储 + 审批流，为 ZCode 的内部多平台发布规模服务；zclaudia 用 GitHub Releases + 现有签名校验已够，照搬是负资产。                                       |
+| `THIRD-PARTY-NOTICES.md` 2MB 成品入库                              | 应移植的是生成器与门禁（2.4），不是产物；成品随依赖树漂移，入库只会制造 diff 噪音。生成后按需提交即可。                                                                             |
+| oxlint/oxfmt 替换 eslint/prettier                                  | ZCode 选 oxlint/oxfmt 追求速度并配套 architecture disable-count 规则；zclaudia 的 eslint 配置已含 react-hooks v7 编译器规则集且团队熟。换工具是纯迁移成本，除非 lint 时长成为瓶颈。 |
+| formal-proof 的 Vite 可视化应用本体                                | 强耦合 ZCode 对话产品状态机；值得带走的只是「枚举→剪枝→case 清单→一致性审计」方法论（见 2.8）。                                                                                     |
+| mise 工具链管理                                                    | zclaudia 已有 `.node-version` + engines + preinstall 校验钩子，覆盖了同一问题；再引入 mise 是双轨制。                                                                               |
+| 1866 篇 docs 的规模本身                                            | ZCode 文档治理（spec-first + 每特性一篇）与其团队规模匹配；zclaudia 的 plans/specs/reviews/quality-audit 四目录已覆盖同一生命周期，扩充应随需求增长而非复制体量。                   |
+| `test:e2e:windows:sharded` 十分片 Windows e2e 基建                 | 依赖 ZCode 内部 CI 的 Windows runner 编排；zclaudia 当前 CI 只有 ubuntu-latest，先有 Windows CI 再谈分片。                                                                          |
 
 ## 附：探索中未能确认的事项（unverified）
 

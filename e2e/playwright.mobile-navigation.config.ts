@@ -12,11 +12,16 @@ export default defineConfig({
   outputDir: '../artifacts/mobile-navigation',
   reporter: [['list']],
   use: {
-    browserName: 'chromium', viewport: { width: 390, height: 844 },
-    isMobile: true, hasTouch: true,
+    browserName: 'chromium',
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
     launchOptions: {
-      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || (existsSync(systemChrome) ? systemChrome : undefined),
+      executablePath:
+        process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
+        (existsSync(systemChrome) ? systemChrome : undefined),
     },
-    trace: 'retain-on-failure', screenshot: 'only-on-failure',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
   },
 });

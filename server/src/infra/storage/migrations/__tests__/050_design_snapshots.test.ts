@@ -5,7 +5,10 @@ import { migration } from '../050_design_snapshots.js';
 
 function dbBefore050() {
   const db = new Database(':memory:');
-  applyPendingMigrations(db, migrations.filter(m => m.name < migration.name));
+  applyPendingMigrations(
+    db,
+    migrations.filter(m => m.name < migration.name)
+  );
   return db;
 }
 
@@ -25,7 +28,9 @@ describe('050_design_snapshots', () => {
       'design_snapshots',
     ]);
     const index = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name = 'idx_design_snapshots_ws'")
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='index' AND name = 'idx_design_snapshots_ws'"
+      )
       .get();
     expect(index).toBeTruthy();
 
