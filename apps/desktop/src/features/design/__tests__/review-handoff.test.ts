@@ -54,7 +54,15 @@ const makeInput = (overrides: Partial<ReviewHandoffInput>): ReviewHandoffInput =
 
 describe('buildReviewHandoff（P7 §6.2 审阅进聊天交接）', () => {
   it('完整样例：快照锁定', () => {
-    expect(buildReviewHandoff(FULL_INPUT)).toMatchSnapshot();
+    // The handoff prints local zh-CN times. Substitute them so the lock does
+    // not depend on the machine timezone (the snapshot was recorded at UTC+8).
+    const handoff = buildReviewHandoff(FULL_INPUT);
+    const stable = JSON.parse(
+      JSON.stringify(handoff)
+        .replaceAll(formatTime(COMMENT_TS), '<comment-time>')
+        .replaceAll(formatTime(SNAPSHOT_TS), '<snapshot-time>')
+    );
+    expect(stable).toMatchSnapshot();
   });
 
   it('五 section 齐全且顺序固定：审阅反馈 / 分享版本 / 快照中的目标元素 / 当前版本定位 / 任务指令', () => {
