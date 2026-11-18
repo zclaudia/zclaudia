@@ -98,7 +98,21 @@ setTimeout(() => process.exit(0), ${options.turnTimeoutMs + 30_000});
   }
   const cancellationMs = Date.now() - cancelledAt;
   expect(cancellationMs).toBeLessThanOrEqual(10_000);
-  const finalTick = await readTick();
+  // isRunning can flip before the fixture's 100ms interval handles interrupt.
+  let finalTick = await readTick();
+  await expect
+    .poll(
+      async () => {
+        const first = await readTick();
+        await pause(150);
+        const second = await readTick();
+        if (!first || first !== second) return false;
+        finalTick = second;
+        return true;
+      },
+      { timeout: 3_000 }
+    )
+    .toBe(true);
   for (let sample = 0; sample < 12; sample++) {
     await pause(250);
     expect(await readTick()).toBe(finalTick);

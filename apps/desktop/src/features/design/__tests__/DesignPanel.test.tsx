@@ -358,6 +358,8 @@ async function openAgentContext(request = '') {
 
 /** 通过 `+` 菜单打开一个未打开的文件并等它的标签出现。 */
 async function openPage(path: string) {
+  // The menu stays closed while every known file is already open.
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Open page' })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'Open page' }));
   fireEvent.click(await screen.findByRole('menuitem', { name: path }));
   const name = path.slice(path.lastIndexOf('/') + 1);
@@ -1076,8 +1078,9 @@ describe('DesignPanel', () => {
 
     // 放弃修改：页面直接移除。
     fireEvent.click(within(dialog).getByRole('button', { name: 'Discard changes' }));
+    // The tab's accessible name is the file basename, not the workspace path.
     await waitFor(() =>
-      expect(screen.queryByRole('tab', { name: /design\/index\.html/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: 'index.html' })).not.toBeInTheDocument()
     );
 
     // 重新打开并编辑后关闭：保存成功再关闭。
@@ -1104,7 +1107,7 @@ describe('DesignPanel', () => {
       )
     );
     await waitFor(() =>
-      expect(screen.queryByRole('tab', { name: /design\/index\.html/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: 'index.html' })).not.toBeInTheDocument()
     );
   });
 
