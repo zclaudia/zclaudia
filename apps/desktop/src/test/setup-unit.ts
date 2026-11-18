@@ -165,12 +165,32 @@ if (typeof globalThis !== 'undefined') {
   defineProperty(globalThis, 'Element', class Element {});
 }
 
+// CSS custom properties written by stores (font tokens) must be readable back.
+// The node environment has no CSSStyleDeclaration, and vi.fn() setProperty
+// drops the value, so getPropertyValue was missing entirely.
+function createStyleDeclaration() {
+  const values = new Map<string, string>();
+  return {
+    setProperty(name: string, value: string) {
+      values.set(name, value);
+    },
+    getPropertyValue(name: string) {
+      return values.get(name) ?? '';
+    },
+    removeProperty(name: string) {
+      const previous = values.get(name) ?? '';
+      values.delete(name);
+      return previous;
+    },
+  };
+}
+
 // Mock document methods for component tests
 const mockDocument = {
   createElement: vi.fn((tag: string) => ({
     tagName: tag.toUpperCase(),
     className: '',
-    style: {},
+    style: createStyleDeclaration(),
     setAttribute: vi.fn(),
     getAttribute: vi.fn(),
     appendChild: vi.fn(),
@@ -196,11 +216,10 @@ const mockDocument = {
   body: {
     appendChild: vi.fn(),
     removeChild: vi.fn(),
+    style: createStyleDeclaration(),
   },
   documentElement: {
-    style: {
-      setProperty: vi.fn(),
-    },
+    style: createStyleDeclaration(),
   },
 };
 
