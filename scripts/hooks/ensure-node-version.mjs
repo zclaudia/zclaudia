@@ -7,8 +7,12 @@ import { fileURLToPath } from 'url';
 const repoRoot = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const nodeVersionFile = path.join(repoRoot, '.node-version');
 
-/** Matches package.json engines.node. Vercel cannot pin the .node-version patch. */
+/**
+ * Lowest 22.x this repo accepts. package.json engines is `22.x` so Vercel
+ * selects that major; it cannot pin the .node-version patch.
+ */
 export const MINIMUM_NODE_VERSION = '22.19.0';
+const VERCEL_NODE_MAJOR = 22;
 
 export function normalize(version) {
   return String(version).trim().replace(/^v/, '');
@@ -34,12 +38,22 @@ function compareVersions(left, right) {
   return 0;
 }
 
+function majorVersion(version) {
+  return Number(normalize(version).split('.')[0]) || 0;
+}
+
 /**
- * Local installs must match .node-version exactly. Vercel only offers a Node
- * major (22.x / 24.x / 26.x), so there the project minimum is enough.
+ * Local installs must match .node-version exactly. On Vercel the patch may
+ * float, but only inside 22.x at or above the project minimum. 24.x and 26.x
+ * are rejected so a mis-selected major fails at install.
  */
 export function isNodeVersionAllowed({ current, expected, vercel }) {
-  if (vercel) return compareVersions(current, MINIMUM_NODE_VERSION) >= 0;
+  if (vercel) {
+    return (
+      majorVersion(current) === VERCEL_NODE_MAJOR &&
+      compareVersions(current, MINIMUM_NODE_VERSION) >= 0
+    );
+  }
   return normalize(current) === normalize(expected);
 }
 
@@ -58,7 +72,7 @@ function main() {
   if (vercel) {
     fail(
       [
-        `Node ${current} is below the minimum ${MINIMUM_NODE_VERSION} required for Vercel installs.`,
+        `Node ${current} cannot build this repo on Vercel. Use Node >= ${MINIMUM_NODE_VERSION} and < 23 (engines is 22.x).`,
         `Local installs still require exactly ${expected} from .node-version.`,
       ].join('\n')
     );

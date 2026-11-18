@@ -25,15 +25,15 @@ test('local installs require the exact .node-version pin', () => {
   );
 });
 
-test('Vercel accepts any Node at or above 22.19.0', () => {
-  for (const current of ['22.19.0', '22.20.0', '22.23.4', '24.11.0', '26.1.0']) {
+test('Vercel accepts only Node 22 at or above 22.19.0', () => {
+  for (const current of ['22.19.0', '22.20.0', '22.23.4']) {
     assert.equal(
       isNodeVersionAllowed({ current, expected: '22.20.0', vercel: true }),
       true,
       current
     );
   }
-  for (const current of ['22.18.9', '21.9.0', '20.19.0']) {
+  for (const current of ['22.18.9', '21.9.0', '20.19.0', '24.11.0', '26.1.0']) {
     assert.equal(
       isNodeVersionAllowed({ current, expected: '22.20.0', vercel: true }),
       false,
@@ -60,5 +60,7 @@ test('the hook process keeps the exact pin unless VERCEL is set', () => {
     env: { ...env, VERCEL: '1' },
     encoding: 'utf8',
   });
-  assert.equal(vercel.status, 0, vercel.stderr);
+  const allowed = isNodeVersionAllowed({ current, expected: '22.20.0', vercel: true });
+  assert.equal(vercel.status, allowed ? 0 : 1, vercel.stderr);
+  if (!allowed) assert.match(vercel.stderr, /cannot build this repo on Vercel/);
 });
